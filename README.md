@@ -1,4 +1,10 @@
-# QDash
+<div align="center">
+
+<h1> 📊 QDash </h1>
+
+</div>
+
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 QDash is a web application that provides a user-friendly interface to manage and monitor the execution of calibration workflows.
 
@@ -47,11 +53,13 @@ docker exec -it qdash-devcontainer /bin/bash -c "python init/setup.py teardown-a
 
 ## Documentation
 
-- [Documentation Home](https://oqtopus-team.github.io/qdash/)
+- [Documentation Home](https://qdash.readthedocs.io/en/stable/)
 
 ## CITATION
 
 You can use the DOI to cite QDash in your research.
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14277283.svg)](https://doi.org/10.5281/zenodo.14277283)
 
 Citation information is also available in the [CITATION](https://github.com/oqtopus-team/qdash/blob/main/CITATION.cff) file.
 
