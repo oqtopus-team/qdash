@@ -8,6 +8,8 @@
 
 QDash is a web application that provides a user-friendly interface to manage and monitor the execution of qubit calibration workflows.
 
+![qdash-demo](docs/qdash-demo.gif)
+
 ## Key Features
 
 - **⚡ Workflows**: Centrally manage and track the progress of calibration workflows, from creation to completion.
