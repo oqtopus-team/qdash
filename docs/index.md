@@ -1,0 +1,25 @@
+---
+# https://vitepress.dev/reference/default-theme-home-page
+layout: home
+
+hero:
+  name: "QDash"
+  text: "Simplifies calibration workflow management and monitoring."
+  tagline: "A platform for managing calibration workflows."
+  actions:
+    - theme: brand
+      text: What is QDash?
+      link: /what-is-qdash
+    - theme: alt
+      text: Quickstart
+      link: /quick-start
+
+features:
+  - title: ⚡ Workflows
+    details: Centrally manage and track the progress of calibration workflows, from creation to completion.
+  - title: 📊 Observations
+    details: Access and analyze the observational data utilized in calibration processes, ensuring transparency and insight.
+  - title: ⚙️ Settings
+    details: Configure calibration parameters and adjust workflow settings to meet specific requirements seamlessly.
+---
+

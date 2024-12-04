@@ -1,0 +1,5 @@
+.venv
+node_modules
+calib_data
+mongo_data
+postgres_data
