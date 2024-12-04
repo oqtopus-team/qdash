@@ -64,7 +64,7 @@ docker exec -it qdash-devcontainer /bin/bash -c "python init/setup.py teardown-a
 
 You can use the DOI to cite QDash in your research.
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14277283.svg)](https://doi.org/10.5281/zenodo.14277283)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14277282.svg)](https://doi.org/10.5281/zenodo.14277282)
 
 Citation information is also available in the [CITATION](https://github.com/oqtopus-team/qdash/blob/main/CITATION.cff) file.
 
