@@ -1,0 +1,5 @@
+/* docs/.vitepress/theme/custom.css */
+.VPHero .image-bg {
+  width: 2000px; /* 幅を100%に設定 */
+  max-width: none; /* 最大幅の制限を解除 */
+}

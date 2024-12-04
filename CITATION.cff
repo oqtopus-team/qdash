@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "QDash"
+authors:
+  - family-names: "Masumoto"
+    given-names: "Naoyuki"
+  - family-names: "Miyaji"
+    given-names: "Kosuke"
+  - family-names: "Miyanaga"
+    given-names: "Takafumi"
+    orcid: "https://orcid.org/0009-0001-5094-6035"
+  - family-names: "Mori"
+    given-names: "Toshio"
+  - family-names: "Tsukano"
+    given-names: "Satoyuki"
+    orcid: "https://orcid.org/0009-0000-3825-9083"
+version: 0.1.0
+date-released: 2024-12-05
+license: Apache-2.0
+repository-code: "https://github.com/oqtopus-team/qdash"
+url: "https://github.com/oqtopus-team.github.io/qdash"

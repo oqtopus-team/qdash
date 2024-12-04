@@ -1,0 +1,26 @@
+{
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "files.associations": {
+    "*.env.qiqb": "plaintext",
+    ".gitmessage": "plaintext"
+  },
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    },
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+  "ruff.path": ["${workspaceFolder}/.venv/bin/ruff"],
+  "ruff.lint.args": ["--config=${workspaceFolder}/pyproject.toml"],
+  "markdownlint.config": {
+    "MD024": false,
+    "MD033": false,
+    "MD041": false
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}

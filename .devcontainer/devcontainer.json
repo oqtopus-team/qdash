@@ -1,0 +1,25 @@
+{
+  "name": "qdash",
+  "dockerComposeFile": ["../compose.dev.yaml"],
+  "service": "devcontainer",
+  "workspaceFolder": "/workspace/qdash",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "MS-CEINTL.vscode-language-pack-ja",
+        "esbenp.prettier-vscode",
+        "charliermarsh.ruff",
+        "ms-python.python",
+        "markdownlint.markdownlint",
+        "ms-azuretools.vscode-docker",
+        "EditorConfig.EditorConfig",
+        "dbaeumer.vscode-eslint",
+        "ms-python.mypy-type-checker"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": ".venv/bin/python"
+      }
+    }
+  },
+  "remoteUser": "root"
+}
