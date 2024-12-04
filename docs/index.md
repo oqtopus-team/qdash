@@ -4,7 +4,7 @@ layout: home
 
 hero:
   name: "QDash"
-  text: "Simplifies calibration workflow management and monitoring."
+  text: "Simplifies qubit calibration workflow management and monitoring."
   tagline: "A platform for managing calibration workflows."
   actions:
     - theme: brand
@@ -22,4 +22,3 @@ features:
   - title: ⚙️ Settings
     details: Configure calibration parameters and adjust workflow settings to meet specific requirements seamlessly.
 ---
-
