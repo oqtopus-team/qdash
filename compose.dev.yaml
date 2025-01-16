@@ -12,6 +12,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /workspace/qdash/.venv
       - /workspace/qdash/client/node_modules
+      - /home/shared/config:/home/shared/config
     environment:
       - PYTHONPATH=/workspace:/workspace/qdash:/workspace/qdash/backend:/workspace/qdash/backend/qcflow:/workspace/dbmodel
     network_mode: host

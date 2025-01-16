@@ -50,7 +50,7 @@ services:
         ipv4_address: 172.22.0.4
 
   prefect-server:
-    image: prefecthq/prefect:2-python3.10
+    image: prefecthq/prefect:2.20-python3.11
     restart: always
     env_file:
       - .env
@@ -83,6 +83,7 @@ services:
       - ./backend/qcflow:/app/qcflow
       - ./backend/dbmodel:/app/dbmodel
       - ${CALIB_DATA_PATH}:/app/calib_data
+      - /home/shared/config:/home/shared/config
     working_dir: /app/qcflow
     command: python deployment/${ENV}/main.py
     environment:

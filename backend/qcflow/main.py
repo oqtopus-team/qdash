@@ -1,6 +1,8 @@
 import datetime
 from os.path import dirname, join
 
+import qubex
+import qubex.version
 from db.execution_lock import (
     get_execution_lock,
     lock_execution,
@@ -12,7 +14,7 @@ from qcflow.db.bluefors import get_latest_temperature
 from qcflow.db.execution_run import get_next_execution_index
 from qcflow.db.execution_run_history import insert_execution_run, update_execution_run
 from qcflow.schema.menu import Menu
-from qcflow.subflow.one_qubit_calibration.flow import one_qubit_calibration_flow
+from qcflow.subflow.qubex.flow import qubex_flow
 from qcflow.utils.slack import SlackContents, Status
 from qcflow.utiltask.create_directory import (
     create_directory_task,
@@ -22,7 +24,7 @@ from qcflow.utiltask.save_wiring_info import (
 )
 
 calibration_flow_map = {
-    "one-qubit-calibration-flow": one_qubit_calibration_flow,
+    "qubex-flow": qubex_flow,
 }
 
 load_dotenv(verbose=True)
@@ -49,6 +51,7 @@ def main_flow(
         ui_url = ui_url.replace("172.22.0.5", "localhost")
     logger.info(f"UI URL: {ui_url}")
     logger.info(f"Execution ID: {execution_id}")
+    logger.info(f"qubex version: {qubex.version.get_version()}")
     if get_execution_lock():
         logger.error("Calibration is already running.")
         raise Exception("Calibration is already running.")
