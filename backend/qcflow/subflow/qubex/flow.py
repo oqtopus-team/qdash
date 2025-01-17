@@ -2,14 +2,12 @@ from prefect import flow, get_run_logger
 from prefect.task_runners import SequentialTaskRunner
 from qcflow.schema.menu import Menu
 from qcflow.subflow.qubex.task import (
-    TaskManager,
-    TaskResult,
-    TaskStatus,
     execute_dynamic_task,
-    task_functions,
+    task_classes,
 )
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
+from subflow.qubex.manager import TaskManager, TaskResult, TaskStatus
 
 
 @flow(
@@ -44,7 +42,7 @@ def qubex_flow(
         name="dummy", upstream_task="", status=TaskStatus.SCHEDULED, message=""
     )
     for task_name in task_manager.tasks.keys():
-        if task_name in task_functions:
+        if task_name in task_classes:
             prev_result = execute_dynamic_task(
                 exp=exp,
                 task_manager=task_manager,
