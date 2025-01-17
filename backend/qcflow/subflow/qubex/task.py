@@ -1,16 +1,25 @@
 import json
 from datetime import datetime
+from enum import Enum
 
 import numpy as np
 from prefect import get_run_logger, task
 from pydantic import BaseModel
 from qubex.experiment import Experiment
+from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
+
+
+class TaskStatus(str, Enum):
+    SCHEDULED = "scheduled"
+    RUNNING = "running"
+    SUCCESS = "success"
+    FAILED = "failed"
 
 
 class TaskResult(BaseModel):
     name: str
     upstream_task: str
-    status: str
+    status: TaskStatus = TaskStatus.SCHEDULED
     message: str
     input_parameters: dict = {}
     output_parameters: dict = {}
@@ -21,8 +30,14 @@ class TaskResult(BaseModel):
         """
         diagnose the task result and raise an error if the task failed.
         """
-        if self.status == "failed":
+        if self.status == TaskStatus.FAILED:
             raise RuntimeError(f"Task {self.name} failed with message: {self.message}")
+
+    def put_input_parameter(self, key: str, value: dict):
+        """
+        put a parameter to the task result.
+        """
+        self.input_parameters[key] = value
 
     def put_output_parameter(self, key: str, value: dict):
         """
@@ -33,11 +48,13 @@ class TaskResult(BaseModel):
 
 class TaskManager(BaseModel):
     calib_data_path: str = ""
+    qubex_version: str = ""
     execution_id: str = ""
     tasks: dict[str, TaskResult] = {}
     created_at: str = ""
     updated_at: str = ""
     tags: list[str] = []
+    box_infos: list[dict] = []
 
     def __init__(
         self,
@@ -56,7 +73,7 @@ class TaskManager(BaseModel):
             name: TaskResult(
                 name=name,
                 upstream_task=task_names[i - 1] if i > 0 else "",
-                status="scheduled",
+                status=TaskStatus.SCHEDULED,
                 message="",
                 input_parameters={},
                 output_parameters={},
@@ -74,7 +91,7 @@ class TaskManager(BaseModel):
         Update the task status to running.
         """
         if task_name in self.tasks:
-            self.tasks[task_name].status = "running"
+            self.tasks[task_name].status = TaskStatus.RUNNING
             self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self.save()
         else:
@@ -85,7 +102,7 @@ class TaskManager(BaseModel):
         Update the task status to success.
         """
         if task_name in self.tasks:
-            self.tasks[task_name].status = "success"
+            self.tasks[task_name].status = TaskStatus.SUCCESS
             self.tasks[task_name].message = message
             self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self.tasks[task_name].calibrated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -98,12 +115,34 @@ class TaskManager(BaseModel):
         Update the task status to failed.
         """
         if task_name in self.tasks:
-            self.tasks[task_name].status = "failed"
+            self.tasks[task_name].status = TaskStatus.FAILED
             self.tasks[task_name].message = message
             self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self.save()
         else:
             raise ValueError(f"Task '{task_name}' not found.")
+
+    def put_input_parameter(self, task_name: str, key: str, value: dict) -> None:
+        """
+        Put a parameter to the task result.
+        """
+        if task_name in self.tasks:
+            self.tasks[task_name].input_parameters[key] = value
+            self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.save()
+        else:
+            raise ValueError(f"Task '{task_name}' not found")
+
+    def put_input_parameters(self, task_name: str, input_parameters: dict) -> None:
+        """
+        Put a parameter to the task result.
+        """
+        if task_name in self.tasks:
+            self.tasks[task_name].input_parameters = input_parameters
+            self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.save()
+        else:
+            raise ValueError(f"Task '{task_name}' not found")
 
     def put_output_parameter(self, task_name: str, key: str, value: dict) -> None:
         """
@@ -125,6 +164,13 @@ class TaskManager(BaseModel):
         else:
             raise ValueError(f"Task '{task_name}' not found.")
 
+    def put_box_info(self, box_info: dict) -> None:
+        """
+        Put the box information to the task manager.
+        """
+        self.box_infos.append(box_info)
+        self.save()
+
     def save(self):
         """
         Save the task manager to a file.
@@ -132,6 +178,13 @@ class TaskManager(BaseModel):
         save_path = f"{self.calib_data_path}/calib_data.json"
         with open(save_path, "w") as f:
             f.write(json.dumps(self.model_dump(), indent=4))
+
+
+def linespace_to_string(func, *args, **kwargs):
+    args_str = ", ".join(map(str, args))
+    kwargs_str = ", ".join(f"{k}={v}" for k, v in kwargs.items())
+    combined = ", ".join(filter(None, [args_str, kwargs_str]))
+    return f"{func.__name__}({combined})"
 
 
 def check_status_task(exp: Experiment, task_manager: TaskManager, task_name: str):
@@ -145,8 +198,18 @@ def linkup_task(exp: Experiment, task_manager: TaskManager, task_name: str):
 
 
 def configure_task(exp: Experiment, task_manager: TaskManager, task_name: str):
-    exp.configure(confirm=False)
+    exp.state_manager.load(
+        chip_id=exp.chip_id, config_dir=exp.config_path, params_dir=exp.params_path
+    )
+    exp.state_manager.push(box_ids=exp.box_ids, confirm=False)
     exp.save_defaults()
+
+
+def dump_box_task(exp: Experiment, task_manager: TaskManager, task_name: str):
+    for id in exp.box_ids:
+        box_info = {}
+        box_info[id] = exp.tool.dump_box(id)
+        task_manager.put_box_info(box_info)
 
 
 def check_noise_task(exp: Experiment, task_manager: TaskManager, task_name: str):
@@ -176,12 +239,26 @@ def chevron_pattern_task(exp: Experiment, task_manager: TaskManager, task_name: 
 
 
 def calibrate_control_frequency_task(exp: Experiment, task_manager: TaskManager, task_name: str):
+    detuning_range = np.linspace(-0.01, 0.01, 21)
+    time_range = range(0, 101, 4)
     qubit_frequency = exp.calibrate_control_frequency(
         exp.qubit_labels,
-        detuning_range=np.linspace(-0.01, 0.01, 21),
-        time_range=range(0, 101, 4),
+        detuning_range=detuning_range,
+        time_range=time_range,
     )
+    input_params = {
+        "detuning_range": linespace_to_string(np.linspace, -0.01, 0.01, 21),
+        "time_range": linespace_to_string(range, 0, 101, 4),
+        "qubit_frequency": {target: exp.targets[target].frequency for target in exp.qubit_labels},
+        "control_amplitude": {
+            target: exp.params.control_amplitude[target] for target in exp.qubit_labels
+        },
+        "shots": DEFAULT_SHOTS,
+        "interval": DEFAULT_INTERVAL,
+    }
+
     exp.save_defaults()
+    task_manager.put_input_parameters(task_name, input_params)
     task_manager.put_output_parameter(task_name, "qubit_frequency", qubit_frequency)
 
 
@@ -292,6 +369,7 @@ task_functions = {
     "CheckStatus": check_status_task,
     "LinkUp": linkup_task,
     "Configure": configure_task,
+    "DumpBox": dump_box_task,
     "CheckNoise": check_noise_task,
     "RabiOscillation": rabi_task,
     "ChevronPattern": chevron_pattern_task,

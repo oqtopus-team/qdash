@@ -41,6 +41,7 @@ const presets = {
     "CheckStatus",
     "LinkUp",
     "Configure",
+    "DumpBox",
     "CheckNoise",
     "CheckQubitFrequency",
     "CheckReadoutFrequency",

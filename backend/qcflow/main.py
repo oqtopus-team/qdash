@@ -51,7 +51,6 @@ def main_flow(
         ui_url = ui_url.replace("172.22.0.5", "localhost")
     logger.info(f"UI URL: {ui_url}")
     logger.info(f"Execution ID: {execution_id}")
-    logger.info(f"qubex version: {qubex.version.get_version()}")
     if get_execution_lock():
         logger.error("Calibration is already running.")
         raise Exception("Calibration is already running.")

@@ -4,10 +4,12 @@ from qcflow.schema.menu import Menu
 from qcflow.subflow.qubex.task import (
     TaskManager,
     TaskResult,
+    TaskStatus,
     execute_dynamic_task,
     task_functions,
 )
 from qubex.experiment import Experiment
+from qubex.version import get_package_version
 
 
 @flow(
@@ -24,7 +26,7 @@ def qubex_flow(
 ) -> dict[str, bool]:
     logger = get_run_logger()
     logger.info(f"Menu name: {menu.name}")
-    logger.info("Starting qubex_flow")
+    logger.info(f"Qubex version: {get_package_version('qubex')}")
     exp = Experiment(
         chip_id="64Q",
         qubits=[21],
@@ -36,8 +38,11 @@ def qubex_flow(
         calib_data_path=calib_dir,
         task_names=menu.exp_list,
         tags=menu.tags,
+        qubex_version=get_package_version("qubex"),
     )
-    prev_result = TaskResult(name="dummy", upstream_task="", status="success", message="")
+    prev_result = TaskResult(
+        name="dummy", upstream_task="", status=TaskStatus.SCHEDULED, message=""
+    )
     for task_name in task_manager.tasks.keys():
         if task_name in task_functions:
             prev_result = execute_dynamic_task(
