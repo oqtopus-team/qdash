@@ -4,11 +4,11 @@ from subflow.qubex.manager import TaskManager
 
 
 class CheckNoise(BaseTask):
-    task_name = "CheckNoise"
+    task_name: str = "CheckNoise"
 
     def __init__(self):
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, task_name: str):
+    def execute(self, exp: Experiment, task_manager: TaskManager):
         exp.check_noise()
         exp.save_defaults()

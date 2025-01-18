@@ -4,12 +4,12 @@ from subflow.qubex.manager import TaskManager
 
 
 class RabiOscillation(BaseTask):
-    task_name = "RabiOscillation"
+    task_name: str = "RabiOscillation"
 
     def __init__(self):
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, task_name: str):
+    def execute(self, exp: Experiment, task_manager: TaskManager):
         default_rabi_amplitudes = {label: 0.01 for label in exp.qubit_labels}
         exp.rabi_experiment(
             amplitudes=default_rabi_amplitudes,

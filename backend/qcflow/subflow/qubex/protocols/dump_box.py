@@ -4,12 +4,12 @@ from subflow.qubex.manager import TaskManager
 
 
 class DumpBox(BaseTask):
-    task_name = "DumpBox"
+    task_name: str = "DumpBox"
 
     def __init__(self):
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, task_name: str):
+    def execute(self, exp: Experiment, task_manager: TaskManager):
         for id in exp.box_ids:
             box_info = {}
             box_info[id] = exp.tool.dump_box(id)

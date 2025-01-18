@@ -4,12 +4,12 @@ from subflow.qubex.manager import TaskManager
 
 
 class Configure(BaseTask):
-    task_name = "Configure"
+    task_name: str = "Configure"
 
     def __init__(self):
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, task_name: str):
+    def execute(self, exp: Experiment, task_manager: TaskManager):
         exp.state_manager.load(
             chip_id=exp.chip_id, config_dir=exp.config_path, params_dir=exp.params_path
         )

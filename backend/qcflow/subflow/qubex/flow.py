@@ -37,19 +37,24 @@ def qubex_flow(
         task_names=menu.exp_list,
         tags=menu.tags,
         qubex_version=get_package_version("qubex"),
+        fridge_temperature=0.0,
+        chip_id="SAMPLE",
     )
     prev_result = TaskResult(
         name="dummy", upstream_task="", status=TaskStatus.SCHEDULED, message=""
     )
-    for task_name in task_manager.tasks.keys():
-        if task_name in task_classes:
-            prev_result = execute_dynamic_task(
-                exp=exp,
-                task_manager=task_manager,
-                task_name=task_name,
-                prev_result=prev_result,
-            )
-
-    logger.info(f"Final Task States: {task_manager.tasks}")
-    logger.info(f"Final State: {task_manager.model_dump()}")
+    try:
+        task_manager.start_all_processes()
+        for task_name in task_manager.tasks.keys():
+            if task_name in task_classes:
+                prev_result = execute_dynamic_task(
+                    exp=exp,
+                    task_manager=task_manager,
+                    task_name=task_name,
+                    prev_result=prev_result,
+                )
+    except Exception as e:
+        logger.error(f"Failed to execute task: {e}")
+    finally:
+        task_manager.end_all_processes()
     return successMap

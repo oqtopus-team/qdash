@@ -20,6 +20,7 @@ from qcflow.subflow.qubex.protocols.dump_box import DumpBox
 from qcflow.subflow.qubex.protocols.link_up import LinkUp
 from qcflow.subflow.qubex.protocols.rabi_oscillation import RabiOscillation
 from qubex.experiment import Experiment
+from qubex.experiment.experiment import RABI_TIME_RANGE
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 from subflow.qubex.manager import TaskManager, TaskResult
 
@@ -37,8 +38,17 @@ task_classes = {
         shots=DEFAULT_SHOTS,
         interval=DEFAULT_INTERVAL,
     ),
-    "CheckReadoutFrequency": CheckReadoutFrequency(),
-    "CheckRabi": CheckRabi(),
+    "CheckReadoutFrequency": CheckReadoutFrequency(
+        detuning_range=np.linspace(-0.01, 0.01, 21),
+        time_range=range(0, 101, 4),
+        shots=DEFAULT_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckRabi": CheckRabi(
+        time_range=RABI_TIME_RANGE,
+        shots=DEFAULT_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
     "CreateHPIPulse": CreateHPIPulse(),
     "CheckHPIPulse": CheckHPIPulse(),
     "CreatePIPulse": CreatePIPulse(),
@@ -60,6 +70,7 @@ def execute_dynamic_task(
     prev_result.diagnose()
     try:
         logger.info(f"Starting task: {task_name}")
+        task_manager.start_each_task(task_name)
         task_manager.update_task_status_to_running(task_name)
         task_class = task_classes[task_name]
         task_class.execute(exp, task_manager, task_name)
@@ -67,4 +78,6 @@ def execute_dynamic_task(
     except Exception as e:
         task_manager.update_task_status_to_failed(task_name, f"Failed to execute {task_name}: {e}")
         raise RuntimeError(f"Task {task_name} failed: {e}")
+    finally:
+        task_manager.end_each_task(task_name)
     return task_manager.get_task(task_name)

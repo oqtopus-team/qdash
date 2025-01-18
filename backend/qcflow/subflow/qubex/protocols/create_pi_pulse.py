@@ -4,12 +4,12 @@ from subflow.qubex.manager import TaskManager
 
 
 class CreatePIPulse(BaseTask):
-    task_name = "CreatePIPulse"
+    task_name: str = "CreatePIPulse"
 
     def __init__(self):
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, task_name: str):
+    def execute(self, exp: Experiment, task_manager: TaskManager):
         pi_result = exp.calibrate_pi_pulse(
             exp.qubit_labels,
             n_rotations=1,
@@ -20,4 +20,4 @@ class CreatePIPulse(BaseTask):
             pi_amplitudes[qubit] = (
                 pi_result.data[qubit].calib_value if qubit in pi_result.data else None
             )
-        task_manager.put_output_parameter(task_name, "pi_amplitude", pi_amplitudes)
+        task_manager.put_output_parameter(self.task_name, "pi_amplitude", pi_amplitudes)

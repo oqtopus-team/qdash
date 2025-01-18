@@ -21,8 +21,10 @@ class TaskResult(BaseModel):
     message: str
     input_parameters: dict = {}
     output_parameters: dict = {}
-    calibrated_at: str = ""
     figure_path: str = ""
+    start_at: str = ""
+    end_at: str = ""
+    elapsed_time: str = ""
 
     def diagnose(self):
         """
@@ -43,6 +45,15 @@ class TaskResult(BaseModel):
         """
         self.output_parameters[key] = value
 
+    def calculate_elapsed_time(self, start_at: str, end_at: str):
+        """
+        Calculate the elapsed time.
+        """
+        start_time = datetime.strptime(start_at, "%Y-%m-%d %H:%M:%S")
+        end_time = datetime.strptime(end_at, "%Y-%m-%d %H:%M:%S")
+        elapsed_time = end_time - start_time
+        return str(elapsed_time)
+
 
 class TaskManager(BaseModel):
     calib_data_path: str = ""
@@ -53,6 +64,11 @@ class TaskManager(BaseModel):
     updated_at: str = ""
     tags: list[str] = []
     box_infos: list[dict] = []
+    fridge_temperature: float = 0.0
+    chip_id: str = ""
+    start_at: str = ""
+    end_at: str = ""
+    elapsed_time: str = ""
 
     def __init__(
         self,
@@ -75,7 +91,9 @@ class TaskManager(BaseModel):
                 message="",
                 input_parameters={},
                 output_parameters={},
-                calibrated_at="",
+                start_at="",
+                end_at="",
+                elapsed_time="",
             )
             for i, name in enumerate(task_names)
         }
@@ -103,7 +121,6 @@ class TaskManager(BaseModel):
             self.tasks[task_name].status = TaskStatus.SUCCESS
             self.tasks[task_name].message = message
             self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.tasks[task_name].calibrated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self.save()
         else:
             raise ValueError(f"Task '{task_name}' not found.")
@@ -207,3 +224,49 @@ class TaskManager(BaseModel):
         save_path = f"{self.calib_data_path}/calib_data.json"
         with open(save_path, "w") as f:
             f.write(json.dumps(self.model_dump(), indent=4))
+
+    def start_each_task(self, task_name: str) -> None:
+        """
+        Start the task.
+        """
+        if task_name in self.tasks:
+            self.tasks[task_name].start_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.save()
+        else:
+            raise ValueError(f"Task '{task_name}' not found.")
+
+    def end_each_task(self, task_name: str) -> None:
+        """
+        End the task.
+        """
+        if task_name in self.tasks:
+            self.tasks[task_name].end_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.tasks[task_name].elapsed_time = self.tasks[task_name].calculate_elapsed_time(
+                self.tasks[task_name].start_at, self.tasks[task_name].end_at
+            )
+        else:
+            raise ValueError(f"Task '{task_name}' not found.")
+
+    def calculate_elapsed_time(self, start_at: str, end_at: str):
+        """
+        Calculate the elapsed time.
+        """
+        start_time = datetime.strptime(start_at, "%Y-%m-%d %H:%M:%S")
+        end_time = datetime.strptime(end_at, "%Y-%m-%d %H:%M:%S")
+        elapsed_time = end_time - start_time
+        return str(elapsed_time)
+
+    def start_all_process(self) -> None:
+        """
+        Start all the process.
+        """
+        self.start_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.save()
+
+    def end_all_process(self) -> None:
+        """
+        End all the process.
+        """
+        self.end_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.elapsed_time = self.calculate_elapsed_time(self.start_at, self.end_at)
+        self.save()

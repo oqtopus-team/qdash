@@ -5,7 +5,7 @@ from subflow.qubex.manager import TaskManager
 
 
 class BaseTask(ABC):
-    task_name = ""
+    task_name: str = ""
 
     def __init__(
         self,
@@ -13,7 +13,7 @@ class BaseTask(ABC):
         pass
 
     @abstractmethod
-    def execute(self, exp: Experiment, task_manager: TaskManager, task_name: str):
+    def execute(self, exp: Experiment, task_manager: TaskManager):
         """
         Execute the task. This method must be implemented by all subclasses.
         """

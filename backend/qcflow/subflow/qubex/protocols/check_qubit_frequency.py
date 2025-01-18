@@ -6,7 +6,7 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 
 class CheckQubitFrequency(BaseTask):
-    task_name = ("CheckQubitFrequency",)
+    task_name: str = "CheckQubitFrequency"
     output_parameters: dict = {"qubit_frequency": {}}
 
     def __init__(
@@ -25,14 +25,14 @@ class CheckQubitFrequency(BaseTask):
             "control_amplitude": {},
         }
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, task_name: str):
+    def execute(self, exp: Experiment, task_manager: TaskManager):
         self.input_parameters["qubit_frequency"] = {
-            target: exp.params.control_amplitude[target] for target in exp.qubit_labels
+            target: exp.targets[target].frequency for target in exp.qubit_labels
         }
         self.input_parameters["control_amplitude"] = {
             target: exp.params.control_amplitude[target] for target in exp.qubit_labels
         }
-        task_manager.put_input_parameters(task_name, self.input_parameters)
+        task_manager.put_input_parameters(self.task_name, self.input_parameters)
         qubit_frequency = exp.calibrate_control_frequency(
             exp.qubit_labels,
             detuning_range=self.input_parameters["detuning_range"],
@@ -40,4 +40,4 @@ class CheckQubitFrequency(BaseTask):
         )
         exp.save_defaults()
         self.output_parameters["qubit_frequency"] = qubit_frequency
-        task_manager.put_output_parameters(task_name, self.output_parameters)
+        task_manager.put_output_parameters(self.task_name, self.output_parameters)
