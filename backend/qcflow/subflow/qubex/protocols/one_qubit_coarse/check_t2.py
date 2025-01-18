@@ -1,5 +1,5 @@
 import numpy as np
-from qcflow.subflow.qubex.manager import TaskManager
+from qcflow.subflow.qubex.manager import ExecutionManager
 from qcflow.subflow.qubex.protocols.base import BaseTask
 from qubex.experiment import Experiment
 
@@ -10,7 +10,7 @@ class CheckT2(BaseTask):
     def __init__(self):
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
         t2_result = exp.t2_experiment(
             exp.qubit_labels,
             time_range=np.logspace(
@@ -23,4 +23,4 @@ class CheckT2(BaseTask):
         t2_values = {}
         for qubit in exp.qubit_labels:
             t2_values[qubit] = t2_result.data[qubit].t2 if qubit in t2_result.data else None
-        task_manager.put_output_parameter(self.task_name, "t2", t2_values)
+        execution_manager.put_output_parameter(self.task_name, "t2", t2_values)

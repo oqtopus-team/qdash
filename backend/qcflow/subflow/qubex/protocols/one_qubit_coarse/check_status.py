@@ -1,4 +1,4 @@
-from qcflow.subflow.qubex.manager import TaskManager
+from qcflow.subflow.qubex.manager import ExecutionManager
 from qcflow.subflow.qubex.protocols.base import BaseTask
 from qubex.experiment import Experiment
 
@@ -9,6 +9,6 @@ class CheckStatus(BaseTask):
     def __init__(self):
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
         exp.check_status()
         exp.save_defaults()

@@ -1,4 +1,4 @@
-from qcflow.subflow.qubex.manager import TaskManager
+from qcflow.subflow.qubex.manager import ExecutionManager
 from qcflow.subflow.qubex.protocols.base import BaseTask
 from qubex.experiment import Experiment
 from qubex.experiment.experiment import RABI_TIME_RANGE
@@ -25,7 +25,7 @@ class CheckRabi(BaseTask):
             "readout_amplitude": {},
         }
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
         self.input_parameters["qubit_frequency"] = {
             target: exp.targets[target].frequency for target in exp.qubit_labels
         }
@@ -36,7 +36,7 @@ class CheckRabi(BaseTask):
         self.input_parameters["readout_amplitude"] = {
             target: exp.params.readout_amplitude[target] for target in exp.qubit_labels
         }
-        task_manager.put_input_parameters(self.task_name, self.input_parameters)
+        execution_manager.put_input_parameters(self.task_name, self.input_parameters)
         rabi_result = exp.check_rabi(
             time_range=self.input_parameters["time_range"],
             shots=self.input_parameters["shots"],
@@ -45,4 +45,4 @@ class CheckRabi(BaseTask):
         exp.save_defaults()
         rabi_params = {key: value.rabi_param.__dict__ for key, value in rabi_result.data.items()}
         self.output_parameters["rabi_params"] = rabi_params
-        task_manager.put_output_parameters(self.task_name, self.output_parameters)
+        execution_manager.put_output_parameters(self.task_name, self.output_parameters)

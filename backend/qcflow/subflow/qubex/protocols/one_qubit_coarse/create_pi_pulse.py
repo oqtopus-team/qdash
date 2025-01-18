@@ -1,4 +1,4 @@
-from qcflow.subflow.qubex.manager import TaskManager
+from qcflow.subflow.qubex.manager import ExecutionManager
 from qcflow.subflow.qubex.protocols.base import BaseTask
 from qubex.experiment import Experiment
 
@@ -9,7 +9,7 @@ class CreatePIPulse(BaseTask):
     def __init__(self):
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
         pi_result = exp.calibrate_pi_pulse(
             exp.qubit_labels,
             n_rotations=1,
@@ -20,4 +20,4 @@ class CreatePIPulse(BaseTask):
             pi_amplitudes[qubit] = (
                 pi_result.data[qubit].calib_value if qubit in pi_result.data else None
             )
-        task_manager.put_output_parameter(self.task_name, "pi_amplitude", pi_amplitudes)
+        execution_manager.put_output_parameter(self.task_name, "pi_amplitude", pi_amplitudes)

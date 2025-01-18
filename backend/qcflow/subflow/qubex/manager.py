@@ -2,16 +2,55 @@ import json
 from copy import deepcopy
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+SCHDULED = "scheduled"
+RUNNING = "running"
+SUCCESS = "success"
+FAILED = "failed"
 
 
 class TaskStatus(str, Enum):
-    SCHEDULED = "scheduled"
-    RUNNING = "running"
-    SUCCESS = "success"
-    FAILED = "failed"
+    SCHEDULED = SCHDULED
+    RUNNING = RUNNING
+    SUCCESS = SUCCESS
+    FAILED = FAILED
+
+
+class ExecutionStatus(str, Enum):
+    SCHEDULED = SCHDULED
+    RUNNING = RUNNING
+    SUCCESS = SUCCESS
+    FAILED = FAILED
+
+
+class TaskHistoryModel(BaseModel):
+    execution_id: str = Field(..., description="Execution ID for the process")
+    task_name: str = Field(..., description="Name of the task")
+    status: str = Field(..., description="Status of the task (e.g., SUCCESS, FAILED)")
+    start_at: datetime = Field(..., description="Start time of the task")
+    end_at: Optional[datetime] = Field(None, description="End time of the task")
+    elapsed_time: Optional[str] = Field(None, description="Elapsed time of the task")
+    input_parameters: dict = Field(
+        default_factory=dict, description="Input parameters for the task"
+    )
+    output_parameters: dict = Field(
+        default_factory=dict, description="Output parameters for the task"
+    )
+
+
+class ExecutionHistoryModel(BaseModel):
+    execution_id: str = Field(..., description="Execution ID for the process")
+    chip_id: str = Field(..., description="Chip ID used in the process")
+    start_at: datetime = Field(..., description="Start time of the process")
+    end_at: Optional[datetime] = Field(None, description="End time of the process")
+    elapsed_time: Optional[str] = Field(None, description="Elapsed time of the process")
+    tags: list[str] = Field(default_factory=list, description="Tags associated with the process")
+    tasks: list[str] = Field(..., description="List of task names executed in this process")
+    status: str = Field(..., description="Overall status of the process")
 
 
 class TaskResult(BaseModel):
@@ -55,10 +94,11 @@ class TaskResult(BaseModel):
         return str(elapsed_time)
 
 
-class TaskManager(BaseModel):
+class ExecutionManager(BaseModel):
     calib_data_path: str = ""
     qubex_version: str = ""
     execution_id: str = ""
+    status: ExecutionStatus = ExecutionStatus.SCHEDULED
     tasks: dict[str, TaskResult] = {}
     created_at: str = ""
     updated_at: str = ""
@@ -99,6 +139,30 @@ class TaskManager(BaseModel):
         }
         self.tags = tags
         self.created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.save()
+
+    def update_execution_status_to_running(self) -> None:
+        """
+        Update the execution status to running.
+        """
+        self.status = ExecutionStatus.RUNNING
+        self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.save()
+
+    def update_execution_status_to_success(self) -> None:
+        """
+        Update the execution status to success.
+        """
+        self.status = ExecutionStatus.SUCCESS
+        self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.save()
+
+    def update_execution_status_to_failed(self) -> None:
+        """
+        Update the execution status to failed.
+        """
+        self.status = ExecutionStatus.FAILED
         self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.save()
 
@@ -225,7 +289,7 @@ class TaskManager(BaseModel):
         with open(save_path, "w") as f:
             f.write(json.dumps(self.model_dump(), indent=4))
 
-    def start_each_task(self, task_name: str) -> None:
+    def start_task(self, task_name: str) -> None:
         """
         Start the task.
         """
@@ -235,7 +299,7 @@ class TaskManager(BaseModel):
         else:
             raise ValueError(f"Task '{task_name}' not found.")
 
-    def end_each_task(self, task_name: str) -> None:
+    def end_task(self, task_name: str) -> None:
         """
         End the task.
         """
@@ -256,17 +320,94 @@ class TaskManager(BaseModel):
         elapsed_time = end_time - start_time
         return str(elapsed_time)
 
-    def start_all_process(self) -> None:
+    def start_execution(self) -> None:
         """
         Start all the process.
         """
         self.start_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.save()
 
-    def end_all_process(self) -> None:
+    def end_execution(self) -> None:
         """
         End all the process.
         """
         self.end_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.elapsed_time = self.calculate_elapsed_time(self.start_at, self.end_at)
         self.save()
+
+    def export_execution_history(self) -> ExecutionHistoryModel:
+        """
+        Export the execution history.
+        """
+        return ExecutionHistoryModel(
+            execution_id=self.execution_id,
+            chip_id=self.chip_id,
+            start_at=datetime.strptime(self.start_at, "%Y-%m-%d %H:%M:%S"),
+            end_at=datetime.strptime(self.end_at, "%Y-%m-%d %H:%M:%S"),
+            elapsed_time=self.elapsed_time,
+            tags=self.tags,
+            tasks=list(self.tasks.keys()),
+            status=self.status,
+        )
+
+    def save_execution_history(self):
+        """
+        Save the execution history.
+        """
+        save_path = f"{self.calib_data_path}/execution_history.json"
+        with open(save_path, "w") as f:
+            f.write(json.dumps(self.export_execution_history().model_dump(), indent=4))
+
+    def export_task_histories(self) -> list[TaskHistoryModel]:
+        """
+        Export the task histories.
+        """
+        return [
+            TaskHistoryModel(
+                execution_id=self.execution_id,
+                task_name=task_name,
+                status=task.status,
+                start_at=datetime.strptime(task.start_at, "%Y-%m-%d %H:%M:%S"),
+                end_at=datetime.strptime(task.end_at, "%Y-%m-%d %H:%M:%S"),
+                elapsed_time=task.elapsed_time,
+                input_parameters=task.input_parameters,
+                output_parameters=task.output_parameters,
+            )
+            for task_name, task in self.tasks.items()
+        ]
+
+    def save_task_histories(self):
+        """
+        Save the task histories.
+        """
+        save_path = f"{self.calib_data_path}/task_histories.json"
+        with open(save_path, "w") as f:
+            f.write(
+                json.dumps(
+                    [task.model_dump() for task in self.export_task_histories()],
+                    indent=4,
+                )
+            )
+
+    def export_task_history(self, task_name: str) -> TaskHistoryModel:
+        """
+        Export the task history.
+        """
+        return TaskHistoryModel(
+            execution_id=self.execution_id,
+            task_name=task_name,
+            status=self.tasks[task_name].status,
+            start_at=datetime.strptime(self.tasks[task_name].start_at, "%Y-%m-%d %H:%M:%S"),
+            end_at=datetime.strptime(self.tasks[task_name].end_at, "%Y-%m-%d %H:%M:%S"),
+            elapsed_time=self.tasks[task_name].elapsed_time,
+            input_parameters=self.tasks[task_name].input_parameters,
+            output_parameters=self.tasks[task_name].output_parameters,
+        )
+
+    def save_task_history(self, task_name: str):
+        """
+        Save the task history.
+        """
+        save_path = f"{self.calib_data_path}/{task_name}_history.json"
+        with open(save_path, "w") as f:
+            f.write(json.dumps(self.export_task_history(task_name).model_dump(), indent=4))

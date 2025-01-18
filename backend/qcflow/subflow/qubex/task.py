@@ -26,7 +26,7 @@ from qcflow.subflow.qubex.protocols.one_qubit_coarse.rabi_oscillation import Rab
 from qubex.experiment import Experiment
 from qubex.experiment.experiment import RABI_TIME_RANGE
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
-from subflow.qubex.manager import TaskManager, TaskResult
+from subflow.qubex.manager import ExecutionManager, TaskResult
 
 task_classes = {
     "CheckStatus": CheckStatus(),
@@ -71,7 +71,7 @@ def validate_task_name(task_name: str):
 @task(name="execute-dynamic-task", task_run_name="{task_name}")
 def execute_dynamic_task(
     exp: Experiment,
-    task_manager: TaskManager,
+    execution_manager: ExecutionManager,
     task_name: str,
     prev_result: TaskResult,
 ) -> TaskResult:
@@ -79,17 +79,19 @@ def execute_dynamic_task(
     prev_result.diagnose()
     try:
         logger.info(f"Starting task: {task_name}")
-        task_manager.start_each_task(task_name)
-        task_manager.update_task_status_to_running(task_name)
+        execution_manager.start_task(task_name)
+        execution_manager.update_task_status_to_running(task_name)
         task_class = task_classes[task_name]
-        task_class.execute(exp, task_manager, task_name)
+        task_class.execute(exp, execution_manager, task_name)
         logger.info(f"Task {task_name} is successful.")
-        task_manager.update_task_status_to_success(task_name, f"{task_name} is successful.")
+        execution_manager.update_task_status_to_success(task_name, f"{task_name} is successful.")
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}")
-        task_manager.update_task_status_to_failed(task_name, f"Failed to execute {task_name}: {e}")
+        execution_manager.update_task_status_to_failed(
+            task_name, f"Failed to execute {task_name}: {e}"
+        )
         raise RuntimeError(f"Task {task_name} failed: {e}")
     finally:
         logger.info(f"Ending task: {task_name}")
-        task_manager.end_each_task(task_name)
-    return task_manager.get_task(task_name)
+        execution_manager.end_task(task_name)
+    return execution_manager.get_task(task_name)

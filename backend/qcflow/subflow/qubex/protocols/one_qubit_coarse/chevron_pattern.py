@@ -1,5 +1,5 @@
 import numpy as np
-from qcflow.subflow.qubex.manager import TaskManager
+from qcflow.subflow.qubex.manager import ExecutionManager
 from qcflow.subflow.qubex.protocols.base import BaseTask
 from qubex.experiment import Experiment
 
@@ -10,7 +10,7 @@ class ChevronPattern(BaseTask):
     def __init__(self):
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
         exp.chevron_pattern(
             exp.qubit_labels,
             detuning_range=np.linspace(-0.05, 0.05, 51),

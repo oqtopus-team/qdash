@@ -1,4 +1,4 @@
-from qcflow.subflow.qubex.manager import TaskManager
+from qcflow.subflow.qubex.manager import ExecutionManager
 from qcflow.subflow.qubex.protocols.base import BaseTask
 from qubex.experiment import Experiment
 
@@ -9,8 +9,8 @@ class DumpBox(BaseTask):
     def __init__(self):
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
         for id in exp.box_ids:
             box_info = {}
             box_info[id] = exp.tool.dump_box(id)
-            task_manager.put_box_info(box_info)
+            execution_manager.put_box_info(box_info)

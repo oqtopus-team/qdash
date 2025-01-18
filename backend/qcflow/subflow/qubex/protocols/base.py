@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from qcflow.subflow.qubex.manager import TaskManager
+from qcflow.subflow.qubex.manager import ExecutionManager
 from qubex.experiment import Experiment
 
 
@@ -13,7 +13,7 @@ class BaseTask(ABC):
         pass
 
     @abstractmethod
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
         """
         Execute the task. This method must be implemented by all subclasses.
         """

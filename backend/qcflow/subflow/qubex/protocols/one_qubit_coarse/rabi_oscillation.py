@@ -1,4 +1,4 @@
-from qcflow.subflow.qubex.manager import TaskManager
+from qcflow.subflow.qubex.manager import ExecutionManager
 from qcflow.subflow.qubex.protocols.base import BaseTask
 from qubex.experiment import Experiment
 
@@ -9,7 +9,7 @@ class RabiOscillation(BaseTask):
     def __init__(self):
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
         default_rabi_amplitudes = {label: 0.01 for label in exp.qubit_labels}
         exp.rabi_experiment(
             amplitudes=default_rabi_amplitudes,

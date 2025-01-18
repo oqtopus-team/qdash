@@ -8,7 +8,7 @@ from qcflow.subflow.qubex.task import (
 )
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
-from subflow.qubex.manager import TaskManager, TaskResult, TaskStatus
+from subflow.qubex.manager import ExecutionManager, TaskResult, TaskStatus
 
 
 @flow(
@@ -33,7 +33,7 @@ def qubex_flow(
     )
     exp.note.clear()
     task_names = validate_task_name(menu.exp_list)
-    task_manager = TaskManager(
+    execution_manager = ExecutionManager(
         execution_id=execution_id,
         calib_data_path=calib_dir,
         task_names=task_names,
@@ -47,18 +47,25 @@ def qubex_flow(
     )
     try:
         logger.info("Starting all processes")
-        task_manager.start_all_processes()
-        for task_name in task_manager.tasks.keys():
+        execution_manager.start_execution()
+        execution_manager.update_execution_status_to_running()
+        for task_name in execution_manager.tasks.keys():
             if task_name in task_classes:
                 prev_result = execute_dynamic_task(
                     exp=exp,
-                    task_manager=task_manager,
+                    execution_manager=execution_manager,
                     task_name=task_name,
                     prev_result=prev_result,
                 )
+                execution_manager.save_task_history(task_name)
+        execution_manager.update_execution_status_to_success()
+        execution_manager.save_execution_history()
+        execution_manager.save_task_histories()
+
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")
+        execution_manager.update_execution_status_to_failed(f"Failed to execute task: {e}")
     finally:
         logger.info("Ending all processes")
-        task_manager.end_all_processes()
+        execution_manager.end_execution()
     return successMap

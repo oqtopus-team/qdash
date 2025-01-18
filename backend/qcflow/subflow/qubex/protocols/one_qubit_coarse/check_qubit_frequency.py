@@ -1,5 +1,5 @@
 import numpy as np
-from qcflow.subflow.qubex.manager import TaskManager
+from qcflow.subflow.qubex.manager import ExecutionManager
 from qcflow.subflow.qubex.protocols.base import BaseTask
 from qubex.experiment import Experiment
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
@@ -25,14 +25,14 @@ class CheckQubitFrequency(BaseTask):
             "control_amplitude": {},
         }
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
         self.input_parameters["qubit_frequency"] = {
             target: exp.targets[target].frequency for target in exp.qubit_labels
         }
         self.input_parameters["control_amplitude"] = {
             target: exp.params.control_amplitude[target] for target in exp.qubit_labels
         }
-        task_manager.put_input_parameters(self.task_name, self.input_parameters)
+        execution_manager.put_input_parameters(self.task_name, self.input_parameters)
         qubit_frequency = exp.calibrate_control_frequency(
             exp.qubit_labels,
             detuning_range=self.input_parameters["detuning_range"],
@@ -40,4 +40,4 @@ class CheckQubitFrequency(BaseTask):
         )
         exp.save_defaults()
         self.output_parameters["qubit_frequency"] = qubit_frequency
-        task_manager.put_output_parameters(self.task_name, self.output_parameters)
+        execution_manager.put_output_parameters(self.task_name, self.output_parameters)
