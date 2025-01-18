@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
+from qcflow.subflow.qubex.manager import TaskManager
 from qubex.experiment import Experiment
-from subflow.qubex.manager import TaskManager
 
 
 class BaseTask(ABC):

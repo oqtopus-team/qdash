@@ -1,8 +1,8 @@
+from qcflow.subflow.qubex.manager import TaskManager
 from qcflow.subflow.qubex.protocols.base import BaseTask
 from qubex.experiment import Experiment
 from qubex.experiment.experiment import RABI_TIME_RANGE
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
-from subflow.qubex.manager import TaskManager
 
 
 class CheckRabi(BaseTask):

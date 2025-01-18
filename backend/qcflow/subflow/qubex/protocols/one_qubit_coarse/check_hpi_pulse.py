@@ -1,14 +1,17 @@
+from qcflow.subflow.qubex.manager import TaskManager
 from qcflow.subflow.qubex.protocols.base import BaseTask
 from qubex.experiment import Experiment
-from subflow.qubex.manager import TaskManager
 
 
-class CheckNoise(BaseTask):
-    task_name: str = "CheckNoise"
+class CheckHPIPulse(BaseTask):
+    task_name: str = "CheckHPIPulse"
 
     def __init__(self):
         pass
 
     def execute(self, exp: Experiment, task_manager: TaskManager):
-        exp.check_noise()
+        exp.repeat_sequence(
+            exp.hpi_pulse,
+            repetitions=20,
+        )
         exp.save_defaults()

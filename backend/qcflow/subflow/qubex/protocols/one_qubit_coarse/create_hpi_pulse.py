@@ -1,30 +1,29 @@
-import numpy as np
+from qcflow.subflow.qubex.manager import TaskManager
 from qcflow.subflow.qubex.protocols.base import BaseTask
 from qubex.experiment import Experiment
-from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
-from subflow.qubex.manager import TaskManager
+from qubex.experiment.experiment import CALIBRATION_SHOTS, HPI_DURATION
+from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
-class CheckReadoutFrequency(BaseTask):
-    task_name: str = "CheckReadoutFrequency"
-    output_parameters: dict = {"readout_frequency": {}}
+class CreateHPIPulse(BaseTask):
+    task_name: str = "CreateHPIPulse"
+    output_parameters: dict = {"hpi_amplitude": {}}
 
     def __init__(
         self,
-        detuning_range=np.linspace(-0.01, 0.01, 21),
-        time_range=range(0, 101, 4),
-        shots=DEFAULT_SHOTS,
+        hpi_length=HPI_DURATION,
+        shots=CALIBRATION_SHOTS,
         interval=DEFAULT_INTERVAL,
     ):
         self.input_parameters = {
-            "detuning_range": detuning_range,
-            "time_range": time_range,
+            "hpi_length": hpi_length,
             "shots": shots,
             "interval": interval,
             "qubit_frequency": {},
             "control_amplitude": {},
             "readout_frequency": {},
             "readout_amplitude": {},
+            "rabi_params": {},
         }
 
     def execute(self, exp: Experiment, task_manager: TaskManager):
@@ -38,12 +37,19 @@ class CheckReadoutFrequency(BaseTask):
         self.input_parameters["readout_amplitude"] = {
             target: exp.params.readout_amplitude[target] for target in exp.qubit_labels
         }
+        self.input_parameters["rabi_params"] = exp.rabi_params
         task_manager.put_input_parameters(self.task_name, self.input_parameters)
-        readout_frequency = exp.calibrate_readout_frequency(
+        hpi_result = exp.calibrate_hpi_pulse(
             exp.qubit_labels,
-            detuning_range=self.detuning_range,
-            time_range=self.time_range,
+            n_rotations=1,
+            shots=self.input_parameters["shots"],
+            interval=self.input_parameters["interval"],
         )
         exp.save_defaults()
-        self.output_parameters["readout_frequency"] = readout_frequency
+        hpi_amplitudes = {}
+        for qubit in exp.qubit_labels:
+            hpi_amplitudes[qubit] = (
+                hpi_result.data[qubit].calib_value if qubit in hpi_result.data else None
+            )
+        self.output_parameters["hpi_amplitude"] = hpi_amplitudes
         task_manager.put_output_parameters(self.task_name, self.output_parameters)

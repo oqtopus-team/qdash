@@ -4,6 +4,7 @@ from qcflow.schema.menu import Menu
 from qcflow.subflow.qubex.task import (
     execute_dynamic_task,
     task_classes,
+    validate_task_name,
 )
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
@@ -31,10 +32,11 @@ def qubex_flow(
         config_dir="/home/shared/config",
     )
     exp.note.clear()
+    task_names = validate_task_name(menu.exp_list)
     task_manager = TaskManager(
         execution_id=execution_id,
         calib_data_path=calib_dir,
-        task_names=menu.exp_list,
+        task_names=task_names,
         tags=menu.tags,
         qubex_version=get_package_version("qubex"),
         fridge_temperature=0.0,
@@ -44,6 +46,7 @@ def qubex_flow(
         name="dummy", upstream_task="", status=TaskStatus.SCHEDULED, message=""
     )
     try:
+        logger.info("Starting all processes")
         task_manager.start_all_processes()
         for task_name in task_manager.tasks.keys():
             if task_name in task_classes:
@@ -56,5 +59,6 @@ def qubex_flow(
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")
     finally:
+        logger.info("Ending all processes")
         task_manager.end_all_processes()
     return successMap
