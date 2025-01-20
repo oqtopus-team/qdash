@@ -4,6 +4,7 @@ from qcflow.subflow.qubex.protocols.box_setup.check_noise import CheckNoise
 from qcflow.subflow.qubex.protocols.box_setup.configure import Configure
 from qcflow.subflow.qubex.protocols.box_setup.dump_box import DumpBox
 from qcflow.subflow.qubex.protocols.box_setup.link_up import LinkUp
+from qcflow.subflow.qubex.protocols.measurement.readout_classification import ReadoutClassification
 from qcflow.subflow.qubex.protocols.one_qubit_coarse.check_effective_qubit_frequency import (
     CheckEffectiveQubitFrequency,
 )
@@ -23,6 +24,10 @@ from qcflow.subflow.qubex.protocols.one_qubit_coarse.chevron_pattern import Chev
 from qcflow.subflow.qubex.protocols.one_qubit_coarse.create_hpi_pulse import CreateHPIPulse
 from qcflow.subflow.qubex.protocols.one_qubit_coarse.create_pi_pulse import CreatePIPulse
 from qcflow.subflow.qubex.protocols.one_qubit_coarse.rabi_oscillation import RabiOscillation
+from qcflow.subflow.qubex.protocols.one_qubit_fine.check_drag_hpi_pulse import CheckDRAGHPIPulse
+from qcflow.subflow.qubex.protocols.one_qubit_fine.check_drag_pi_pulse import CheckDRAGPIPulse
+from qcflow.subflow.qubex.protocols.one_qubit_fine.create_drag_hpi_pulse import CreateDRAGHPIPulse
+from qcflow.subflow.qubex.protocols.one_qubit_fine.create_drag_pi_pulse import CreateDRAGPIPulse
 from qubex.experiment import Experiment
 from qubex.experiment.experiment import (
     CALIBRATION_SHOTS,
@@ -94,6 +99,19 @@ task_classes = {
         shots=DEFAULT_SHOTS,
         interval=DEFAULT_INTERVAL,
     ),
+    "CreateDRAGHPIPulse": CreateDRAGHPIPulse(
+        hpi_length=HPI_DURATION,
+        shots=CALIBRATION_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckDRAGHPIPulse": CheckDRAGHPIPulse(),
+    "CreateDRAGPIPulse": CreateDRAGPIPulse(
+        pi_length=PI_DURATION,
+        shots=CALIBRATION_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckDRAGPIPulse": CheckDRAGPIPulse(),
+    "ReadoutClassification": ReadoutClassification(),
 }
 
 
