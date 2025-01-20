@@ -37,6 +37,8 @@ class CheckQubitFrequency(BaseTask):
             exp.qubit_labels,
             detuning_range=self.input_parameters["detuning_range"],
             time_range=self.input_parameters["time_range"],
+            shots=self.input_parameters["shots"],
+            interval=self.input_parameters["interval"],
         )
         exp.save_defaults()
         self.output_parameters["qubit_frequency"] = qubit_frequency

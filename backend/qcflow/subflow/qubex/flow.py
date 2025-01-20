@@ -28,7 +28,7 @@ def qubex_flow(
     logger.info(f"Qubex version: {get_package_version('qubex')}")
     exp = Experiment(
         chip_id="64Q",
-        qubits=[21],
+        qubits=[5, 7],
         config_dir="/home/shared/config",
     )
     exp.note.clear()
@@ -57,14 +57,14 @@ def qubex_flow(
                     task_name=task_name,
                     prev_result=prev_result,
                 )
-                execution_manager.save_task_history(task_name)
+                # execution_manager.save_task_history(task_name)
         execution_manager.update_execution_status_to_success()
-        execution_manager.save_execution_history()
-        execution_manager.save_task_histories()
+        # execution_manager.save_execution_history()
+        # execution_manager.save_task_histories()
 
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")
-        execution_manager.update_execution_status_to_failed(f"Failed to execute task: {e}")
+        execution_manager.update_execution_status_to_failed()
     finally:
         logger.info("Ending all processes")
         execution_manager.end_execution()

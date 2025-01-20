@@ -24,7 +24,12 @@ from qcflow.subflow.qubex.protocols.one_qubit_coarse.create_hpi_pulse import Cre
 from qcflow.subflow.qubex.protocols.one_qubit_coarse.create_pi_pulse import CreatePIPulse
 from qcflow.subflow.qubex.protocols.one_qubit_coarse.rabi_oscillation import RabiOscillation
 from qubex.experiment import Experiment
-from qubex.experiment.experiment import RABI_TIME_RANGE
+from qubex.experiment.experiment import (
+    CALIBRATION_SHOTS,
+    HPI_DURATION,
+    PI_DURATION,
+    RABI_TIME_RANGE,
+)
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 from subflow.qubex.manager import ExecutionManager, TaskResult
 
@@ -53,19 +58,50 @@ task_classes = {
         shots=DEFAULT_SHOTS,
         interval=DEFAULT_INTERVAL,
     ),
-    "CreateHPIPulse": CreateHPIPulse(),
+    "CreateHPIPulse": CreateHPIPulse(
+        hpi_length=HPI_DURATION,
+        shots=CALIBRATION_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
     "CheckHPIPulse": CheckHPIPulse(),
-    "CreatePIPulse": CreatePIPulse(),
+    "CreatePIPulse": CreatePIPulse(
+        pi_length=PI_DURATION,
+        shots=CALIBRATION_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
     "CheckPIPulse": CheckPIPulse(),
-    "CheckT1": CheckT1(),
-    "CheckT2": CheckT2(),
-    "CheckEffectiveQubitFrequency": CheckEffectiveQubitFrequency(),
+    "CheckT1": CheckT1(
+        time_range=np.logspace(
+            np.log10(100),
+            np.log10(500 * 1000),
+            51,
+        ),
+        shots=DEFAULT_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckT2": CheckT2(
+        time_range=np.logspace(
+            np.log10(300),
+            np.log10(100 * 1000),
+            51,
+        ),
+        shots=DEFAULT_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckEffectiveQubitFrequency": CheckEffectiveQubitFrequency(
+        detuning=0.001,
+        time_range=np.arange(0, 20001, 100),
+        shots=DEFAULT_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
 }
 
 
-def validate_task_name(task_name: str):
-    if task_name not in task_classes:
-        raise ValueError(f"Invalid task name: {task_name}")
+def validate_task_name(task_names: list[str]):
+    for task_name in task_names:
+        if task_name not in task_classes:
+            raise ValueError(f"Invalid task name: {task_name}")
+    return task_names
 
 
 @task(name="execute-dynamic-task", task_run_name="{task_name}")
@@ -82,7 +118,7 @@ def execute_dynamic_task(
         execution_manager.start_task(task_name)
         execution_manager.update_task_status_to_running(task_name)
         task_class = task_classes[task_name]
-        task_class.execute(exp, execution_manager, task_name)
+        task_class.execute(exp, execution_manager)
         logger.info(f"Task {task_name} is successful.")
         execution_manager.update_task_status_to_success(task_name, f"{task_name} is successful.")
     except Exception as e:

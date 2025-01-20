@@ -32,7 +32,9 @@ class CheckRabi(BaseTask):
         self.input_parameters["control_amplitude"] = {
             target: exp.params.control_amplitude[target] for target in exp.qubit_labels
         }
-        self.input_parameters["readout_frequency"] = exp.resonators.values()
+        self.input_parameters["readout_frequency"] = {
+            target: resonator.frequency for target, resonator in exp.resonators.items()
+        }
         self.input_parameters["readout_amplitude"] = {
             target: exp.params.readout_amplitude[target] for target in exp.qubit_labels
         }

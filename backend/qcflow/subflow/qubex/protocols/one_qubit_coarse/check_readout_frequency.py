@@ -16,7 +16,7 @@ class CheckReadoutFrequency(BaseTask):
         shots=DEFAULT_SHOTS,
         interval=DEFAULT_INTERVAL,
     ):
-        self.input_parameters = {
+        self.input_parameters: dict = {
             "detuning_range": detuning_range,
             "time_range": time_range,
             "shots": shots,
@@ -34,15 +34,19 @@ class CheckReadoutFrequency(BaseTask):
         self.input_parameters["control_amplitude"] = {
             target: exp.params.control_amplitude[target] for target in exp.qubit_labels
         }
-        self.input_parameters["readout_frequency"] = exp.resonators.values()
+        self.input_parameters["readout_frequency"] = {
+            target: resonator.frequency for target, resonator in exp.resonators.items()
+        }
         self.input_parameters["readout_amplitude"] = {
             target: exp.params.readout_amplitude[target] for target in exp.qubit_labels
         }
         execution_manager.put_input_parameters(self.task_name, self.input_parameters)
         readout_frequency = exp.calibrate_readout_frequency(
             exp.qubit_labels,
-            detuning_range=self.detuning_range,
-            time_range=self.time_range,
+            detuning_range=self.input_parameters["detuning_range"],
+            time_range=self.input_parameters["time_range"],
+            shots=self.input_parameters["shots"],
+            interval=self.input_parameters["interval"],
         )
         exp.save_defaults()
         self.output_parameters["readout_frequency"] = readout_frequency
