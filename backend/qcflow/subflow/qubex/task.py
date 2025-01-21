@@ -1,5 +1,9 @@
 import numpy as np
 from prefect import get_run_logger, task
+from qcflow.subflow.qubex.protocols.benchmark.interleaved_randomized_benchmarking import (
+    InterleavedRandomizedBenchmarking,
+)
+from qcflow.subflow.qubex.protocols.benchmark.randomized_benchmarking import RandomizedBenchmarking
 from qcflow.subflow.qubex.protocols.box_setup.check_noise import CheckNoise
 from qcflow.subflow.qubex.protocols.box_setup.configure import Configure
 from qcflow.subflow.qubex.protocols.box_setup.dump_box import DumpBox
@@ -112,6 +116,8 @@ task_classes = {
     ),
     "CheckDRAGPIPulse": CheckDRAGPIPulse(),
     "ReadoutClassification": ReadoutClassification(),
+    "RandomizedBenchmarking": RandomizedBenchmarking(),
+    "InterleavedRandomizedBenchmarking": InterleavedRandomizedBenchmarking(),
 }
 
 
