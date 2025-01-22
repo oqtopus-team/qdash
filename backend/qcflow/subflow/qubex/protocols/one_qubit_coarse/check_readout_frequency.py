@@ -51,3 +51,7 @@ class CheckReadoutFrequency(BaseTask):
         exp.save_defaults()
         self.output_parameters["readout_frequency"] = readout_frequency
         execution_manager.put_output_parameters(self.task_name, self.output_parameters)
+        for qubit in readout_frequency:
+            execution_manager.put_calibration_value(
+                qubit, "readout_frequency", readout_frequency[qubit]
+            )

@@ -55,3 +55,5 @@ class CreateHPIPulse(BaseTask):
             )
         self.output_parameters["hpi_amplitude"] = hpi_amplitudes
         execution_manager.put_output_parameters(self.task_name, self.output_parameters)
+        for qubit in hpi_amplitudes:
+            execution_manager.put_calibration_value(qubit, "hpi_amplitude", hpi_amplitudes[qubit])

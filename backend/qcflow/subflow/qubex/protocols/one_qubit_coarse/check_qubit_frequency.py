@@ -43,3 +43,7 @@ class CheckQubitFrequency(BaseTask):
         exp.save_defaults()
         self.output_parameters["qubit_frequency"] = qubit_frequency
         execution_manager.put_output_parameters(self.task_name, self.output_parameters)
+        for qubit in qubit_frequency:
+            execution_manager.put_calibration_value(
+                qubit, "qubit_frequency", qubit_frequency[qubit]
+            )

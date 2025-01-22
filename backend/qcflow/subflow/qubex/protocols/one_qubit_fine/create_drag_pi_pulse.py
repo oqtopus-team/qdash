@@ -53,3 +53,10 @@ class CreateDRAGPIPulse(BaseTask):
         self.output_parameters["drag_pi_amplitude"] = drag_pi_result["amplitude"]
         self.output_parameters["drag_pi_coeff"] = drag_pi_result["beta"]
         execution_manager.put_output_parameters(self.task_name, self.output_parameters)
+        for qubit in drag_pi_result["amplitude"]:
+            execution_manager.put_calibration_value(
+                qubit, "drag_pi_amplitude", drag_pi_result["amplitude"][qubit]
+            )
+            execution_manager.put_calibration_value(
+                qubit, "drag_pi_coeff", drag_pi_result["beta"][qubit]
+            )

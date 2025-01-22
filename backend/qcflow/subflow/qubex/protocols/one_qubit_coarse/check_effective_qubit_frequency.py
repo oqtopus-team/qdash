@@ -35,3 +35,9 @@ class CheckEffectiveQubitFrequency(BaseTask):
             "effective_freq"
         ]
         execution_manager.put_output_parameters(self.task_name, self.output_parameters)
+        for qubit in effective_control_frequency_result["effective_freq"]:  # type: ignore
+            execution_manager.put_calibration_value(
+                qubit,
+                "effective_qubit_frequency",
+                effective_control_frequency_result["effective_freq"][qubit],  # type: ignore
+            )

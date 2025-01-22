@@ -37,3 +37,5 @@ class CheckT1(BaseTask):
             t1_values[qubit] = t1_result.data[qubit].t1 if qubit in t1_result.data else None
         self.output_parameters["t1"] = t1_values
         execution_manager.put_output_parameters(self.task_name, self.output_parameters)
+        for qubit in t1_values:
+            execution_manager.put_calibration_value(qubit, "t1", t1_values[qubit])

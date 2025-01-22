@@ -53,3 +53,5 @@ class CreatePIPulse(BaseTask):
             )
         self.output_parameters["pi_amplitude"] = pi_amplitudes
         execution_manager.put_output_parameters(self.task_name, self.output_parameters)
+        for qubit in pi_amplitudes:
+            execution_manager.put_calibration_value(qubit, "pi_amplitude", pi_amplitudes[qubit])

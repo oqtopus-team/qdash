@@ -53,6 +53,24 @@ class ExecutionStatus(str, Enum):
 #     status: str = Field(..., description="Overall status of the process")
 
 
+class CalibResult(BaseModel):
+    qubit_data: dict[str, dict[str, float | int]]
+
+    def put_result(self, qubit_id: str, key: str, value: float | int):
+        """
+        add a result to the qubit data.
+        """
+        if qubit_id not in self.qubit_data:
+            self.qubit_data[qubit_id] = {}
+        self.qubit_data[qubit_id][key] = value
+
+    def get_result(self, qubit_id: str, key: str) -> float | int | None:
+        """
+        get a result from the qubit data.
+        """
+        return self.qubit_data.get(qubit_id, {}).get(key)
+
+
 class TaskResult(BaseModel):
     name: str
     upstream_task: str
@@ -109,6 +127,8 @@ class ExecutionManager(BaseModel):
     start_at: str = ""
     end_at: str = ""
     elapsed_time: str = ""
+    qubit_results: CalibResult = CalibResult(qubit_data={})
+    sub_index: int = 0
 
     def __init__(
         self,
@@ -285,7 +305,7 @@ class ExecutionManager(BaseModel):
         """
         Save the task manager to a file.
         """
-        save_path = f"{self.calib_data_path}/calib_data.json"
+        save_path = f"{self.calib_data_path}/calib_data_{self.sub_index}.json"
         with open(save_path, "w") as f:
             f.write(json.dumps(self.model_dump(), indent=4))
 
@@ -411,3 +431,25 @@ class ExecutionManager(BaseModel):
     #     save_path = f"{self.calib_data_path}/{task_name}_history.json"
     #     with open(save_path, "w") as f:
     #         f.write(json.dumps(self.export_task_history(task_name).model_dump(), indent=4))
+
+    def put_calibration_value(self, qubit_id: str, key: str, value: float):
+        """
+        add a calibration value to the qubit data.
+        """
+        self.qubit_results.put_result(qubit_id, key, value)
+        self.save_qubit_data(qubit_id)
+
+    def get_calibration_value(self, qubit_id: str, key: str):
+        """
+        get a calibration value from the qubit data.
+        """
+        return self.qubit_results.get_result(qubit_id, key)
+
+    def save_qubit_data(self, qubit_id: str):
+        """
+        save the qubit data to a file.
+        """
+        save_path = f"{self.calib_data_path}/{qubit_id}.json"
+        with open(save_path, "w") as f:
+            json.dump({qubit_id: self.qubit_results.qubit_data[qubit_id]}, f, indent=4)
+        print(f"Real-time data saved for qubit {qubit_id}")
