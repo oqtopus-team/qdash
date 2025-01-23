@@ -4,7 +4,7 @@ from qcflow.main import main_flow
 
 # from qcflow.subflow.concurrent.flow import concurrent_flow
 from qcflow.subflow.one_qubit_daily_summary.flow import one_qubit_daily_summary_flow
-from qcflow.subflow.qubex.flow import cal_flow
+from qcflow.subflow.qubex_one_qubit_cal.flow import cal_flow
 from qcflow.subflow.scheduler.flow import scheduler_flow
 from qcflow.subflow.service_close.service_close import (
     qpu_close_flow,

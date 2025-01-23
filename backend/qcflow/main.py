@@ -2,7 +2,6 @@ import datetime
 from os.path import dirname, join
 
 import qubex
-import qubex.version
 from db.execution_lock import (
     get_execution_lock,
     lock_execution,
@@ -14,7 +13,8 @@ from qcflow.db.bluefors import get_latest_temperature
 from qcflow.db.execution_run import get_next_execution_index
 from qcflow.db.execution_run_history import insert_execution_run, update_execution_run
 from qcflow.schema.menu import Menu
-from qcflow.subflow.qubex.flow import qubex_flow
+from qcflow.subflow.qubex_one_qubit_cal.flow import qubex_one_qubit_cal_flow
+from qcflow.subflow.qubex_two_qubit_cal.flow import qubex_two_qubit_cal_flow
 from qcflow.utils.slack import SlackContents, Status
 from qcflow.utiltask.create_directory import (
     create_directory_task,
@@ -24,7 +24,8 @@ from qcflow.utiltask.save_wiring_info import (
 )
 
 calibration_flow_map = {
-    "qubex-flow": qubex_flow,
+    "qubex-one-qubit-cal-flow": qubex_one_qubit_cal_flow,
+    "qubex-two-qubit-cal-flow": qubex_two_qubit_cal_flow,
 }
 
 load_dotenv(verbose=True)
