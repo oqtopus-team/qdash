@@ -7,7 +7,7 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 class CreateDRAGHPIPulse(BaseTask):
     task_name: str = "CreateDRAGHPIPulse"
-    output_parameters: dict = {"drag_hpi_coeff": {}, "drag_hpi_amplitude": {}}
+    output_parameters: dict = {"drag_hpi_beta": {}, "drag_hpi_amplitude": {}}
 
     def __init__(
         self,
@@ -51,12 +51,12 @@ class CreateDRAGHPIPulse(BaseTask):
         )
         exp.save_defaults()
         self.output_parameters["drag_hpi_amplitude"] = drag_hpi_result["amplitude"]
-        self.output_parameters["drag_hpi_coeff"] = drag_hpi_result["beta"]
+        self.output_parameters["drag_hpi_beta"] = drag_hpi_result["beta"]
         execution_manager.put_output_parameters(self.task_name, self.output_parameters)
         for qubit in drag_hpi_result["amplitude"]:
             execution_manager.put_calibration_value(
                 qubit, "drag_hpi_amplitude", drag_hpi_result["amplitude"][qubit]
             )
             execution_manager.put_calibration_value(
-                qubit, "drag_hpi_coeff", drag_hpi_result["beta"][qubit]
+                qubit, "drag_hpi_beta", drag_hpi_result["beta"][qubit]
             )

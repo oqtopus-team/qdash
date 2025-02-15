@@ -55,6 +55,14 @@ class ExecutionStatus(str, Enum):
 #     status: str = Field(..., description="Overall status of the process")
 
 
+class Qubits(BaseModel):
+    calibrated_at: str
+
+
+class Coupling(BaseModel):
+    calibrated_at: str
+
+
 class CalibResult(BaseModel):
     qubit_data: dict[str, dict[str, float | int]]
 
@@ -80,6 +88,7 @@ class TaskResult(BaseModel):
     message: str
     input_parameters: dict = {}
     output_parameters: dict = {}
+    note: str = ""
     figure_path: str = ""
     start_at: str = ""
     end_at: str = ""
@@ -97,6 +106,12 @@ class TaskResult(BaseModel):
         put a parameter to the task result.
         """
         self.input_parameters[key] = value
+
+    def put_note(self, note: str):
+        """
+        put a note to the task result.
+        """
+        self.note = note
 
     def put_output_parameter(self, key: str, value: dict):
         """
@@ -298,6 +313,17 @@ class ExecutionManager(BaseModel):
         else:
             raise ValueError(f"Task '{task_name}' not found")
 
+    def put_note_to_task(self, task_name: str, note: str) -> None:
+        """
+        Put a note to the task result.
+        """
+        if task_name in self.tasks:
+            self.tasks[task_name].note = note
+            self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.save()
+        else:
+            raise ValueError(f"Task '{task_name}' not found.")
+
     def get_task(self, task_name: str) -> TaskResult:
         """
         Get the task result by task name.
@@ -318,7 +344,7 @@ class ExecutionManager(BaseModel):
         """
         Save the task manager to a file.
         """
-        save_path = f"{self.calib_data_path}/calib_data_{self.sub_index}.json"
+        save_path = f"{self.calib_data_path}/calib_note_{self.sub_index}.json"
         with open(save_path, "w") as f:
             f.write(json.dumps(self.model_dump(), indent=4))
 
@@ -475,5 +501,5 @@ class ExecutionManager(BaseModel):
         """
         save_path = f"{self.calib_data_path}/{qubit_id}.json"
         with open(save_path, "w") as f:
-            json.dump({qubit_id: self.qubit_results.qubit_data[qubit_id]}, f, indent=4)
+            json.dump(self.qubit_results.qubit_data[qubit_id], f, indent=2)
         print(f"Real-time data saved for qubit {qubit_id}")

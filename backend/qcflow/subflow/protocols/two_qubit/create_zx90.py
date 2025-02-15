@@ -13,13 +13,21 @@ class CreateZX90(BaseTask):
     def __init__(self):
         pass
 
-    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
-        cr_control = exp.qubit_labels[0]
-        cr_target = exp.qubit_labels[1]
+    @staticmethod
+    def determine_cr_pair(exp: Experiment):
+        qubit_frequencies = {target: exp.targets[target].frequency for target in exp.qubit_labels}
+        sorted_qubits = sorted(qubit_frequencies.items(), key=lambda item: item[1])
+        cr_control, cr_target = sorted_qubits[0][0], sorted_qubits[1][0]
+
         cr_pair = (cr_control, cr_target)
+        cr_label = f"{cr_control}-{cr_target}"
+
+        return cr_pair, cr_label
+
+    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
+        cr_pair, cr_label = self.determine_cr_pair(exp)
         cr_duration = 100
         cr_ramptime = 40
-        cr_label = f"{cr_control}-{cr_target}"
         cr_result = exp.calibrate_zx90(
             *cr_pair,
             duration=cr_duration,
@@ -33,3 +41,5 @@ class CreateZX90(BaseTask):
         execution_manager.put_calibration_value(
             cr_label, "cr_amplitude", cr_result["calibrated_value"]
         )
+        note = f"CR pair: {cr_label}"
+        execution_manager.put_note_to_task(self.task_name, note)

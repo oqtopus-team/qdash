@@ -38,3 +38,9 @@ class RandomizedBenchmarking(BaseTask):
             self.output_parameters["average_gate_fidelity"][target] = rb_result["avg_gate_fidelity"]
             exp.save_defaults()
         execution_manager.put_output_parameters(self.task_name, self.output_parameters)
+        for qubit in self.output_parameters["average_gate_fidelity"]:
+            execution_manager.put_calibration_value(
+                qubit,
+                "average_gate_fidelity",
+                self.output_parameters["average_gate_fidelity"][qubit],
+            )

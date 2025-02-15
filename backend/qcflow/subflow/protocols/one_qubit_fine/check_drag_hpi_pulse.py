@@ -11,7 +11,7 @@ class CheckDRAGHPIPulse(BaseTask):
 
     def execute(self, exp: Experiment, execution_manager: ExecutionManager):
         exp.repeat_sequence(
-            exp.drag_hpi_pulse,
+            {qubit: exp.drag_hpi_pulse[qubit] for qubit in exp.qubit_labels},
             repetitions=20,
         )
         exp.save_defaults()
