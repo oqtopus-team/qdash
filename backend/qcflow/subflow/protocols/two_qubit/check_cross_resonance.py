@@ -1,11 +1,12 @@
 import numpy as np
-from qcflow.subflow.manager import ExecutionManager
 from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.task_manager import TaskManager
 from qubex.experiment import Experiment
 
 
 class CheckCrossResonance(BaseTask):
     task_name: str = "CheckCrossResonance"
+    task_type: str = "coupling"
     output_parameters: dict = {
         "cr_amplitude": {},
         "cr_phase": {},
@@ -27,7 +28,7 @@ class CheckCrossResonance(BaseTask):
 
         return cr_pair, cr_label
 
-    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
+    def execute(self, exp: Experiment, task_manager: TaskManager):
         cr_labels = exp.get_cr_labels()
         for cr_label in cr_labels:
             cr_pair, cr_label = self.determine_cr_pair(exp)
@@ -42,19 +43,17 @@ class CheckCrossResonance(BaseTask):
             self.output_parameters["cr_phase"] = cr_result["cr_pulse"]["phase"]
             self.output_parameters["cancel_amplitude"] = cr_result["cancel_pulse"]["amplitude"]
             self.output_parameters["cancel_phase"] = cr_result["cancel_pulse"]["phase"]
-            execution_manager.put_output_parameters(self.task_name, self.output_parameters)
+            task_manager.put_output_parameters(self.task_name, self.output_parameters)
             exp.save_defaults()
-            execution_manager.put_calibration_value(
+            task_manager.put_calibration_value(
                 cr_label, "cr_amplitude", cr_result["cr_pulse"]["amplitude"]
             )
-            execution_manager.put_calibration_value(
-                cr_label, "cr_phase", cr_result["cr_pulse"]["phase"]
-            )
-            execution_manager.put_calibration_value(
+            task_manager.put_calibration_value(cr_label, "cr_phase", cr_result["cr_pulse"]["phase"])
+            task_manager.put_calibration_value(
                 cr_label, "cancel_amplitude", cr_result["cancel_pulse"]["amplitude"]
             )
-            execution_manager.put_calibration_value(
+            task_manager.put_calibration_value(
                 cr_label, "cancel_phase", cr_result["cancel_pulse"]["phase"]
             )
             note = f"CR pair: {cr_label}"
-            execution_manager.put_note_to_task(self.task_name, note)
+            task_manager.put_note_to_task(self.task_name, note)

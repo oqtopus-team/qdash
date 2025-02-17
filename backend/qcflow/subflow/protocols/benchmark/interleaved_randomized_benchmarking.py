@@ -1,13 +1,15 @@
 import numpy as np
-from qcflow.subflow.manager import ExecutionManager
 from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.task_manager import TaskManager
 from qubex.experiment import Experiment
-from qubex.experiment.experiment import CALIBRATION_SHOTS
+from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class InterleavedRandomizedBenchmarking(BaseTask):
     task_name: str = "InterleavedRandomizedBenchmarking"
+    task_type: str = "qubit"
+
     output_parameters: dict = {"average_fidelity": {}}
 
     def __init__(
@@ -24,7 +26,7 @@ class InterleavedRandomizedBenchmarking(BaseTask):
             "interval": interval,
         }
 
-    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
+    def execute(self, exp: Experiment, task_manager: TaskManager):
         for target in exp.qubit_labels:
             rb_result = exp.randomized_benchmarking(
                 target=target,
@@ -37,4 +39,4 @@ class InterleavedRandomizedBenchmarking(BaseTask):
             )
             self.output_parameters["average_fidelity"][target] = rb_result["mean"]
             exp.save_defaults()
-        execution_manager.put_output_parameters(self.task_name, self.output_parameters)
+        task_manager.put_output_parameters(self.task_name, self.output_parameters)

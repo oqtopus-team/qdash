@@ -1,12 +1,16 @@
+from typing import Any
+
 import numpy as np
-from qcflow.subflow.manager import ExecutionManager
 from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.task_manager import TaskManager
+from qcflow.subflow.util import convert_qid
 from qubex.experiment import Experiment
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 
 class CheckReadoutFrequency(BaseTask):
     task_name: str = "CheckReadoutFrequency"
+    task_type: str = "qubit"
     output_parameters: dict = {"readout_frequency": {}}
 
     def __init__(
@@ -27,21 +31,48 @@ class CheckReadoutFrequency(BaseTask):
             "readout_amplitude": {},
         }
 
-    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
-        self.input_parameters["qubit_frequency"] = {
-            target: exp.targets[target].frequency for target in exp.qubit_labels
-        }
-        self.input_parameters["control_amplitude"] = {
-            target: exp.params.control_amplitude[target] for target in exp.qubit_labels
-        }
-        self.input_parameters["readout_frequency"] = {
-            target: resonator.frequency for target, resonator in exp.resonators.items()
-        }
-        self.input_parameters["readout_amplitude"] = {
-            target: exp.params.readout_amplitude[target] for target in exp.qubit_labels
-        }
-        execution_manager.put_input_parameters(self.task_name, self.input_parameters)
-        readout_frequency = exp.calibrate_readout_frequency(
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager):
+        for label in exp.qubit_labels:
+            input_param = {
+                "detuning_range": self.input_parameters["detuning_range"],
+                "time_range": self.input_parameters["time_range"],
+                "shots": self.input_parameters["shots"],
+                "interval": self.input_parameters["interval"],
+                "qubit_frequency": exp.targets[label].frequency,
+                "control_amplitude": exp.params.control_amplitude[label],
+                "readout_frequency": exp.resonators[label].frequency,
+                "readout_amplitude": exp.params.readout_amplitude[label],
+            }
+            task_manager.put_input_parameters(
+                self.task_name,
+                input_param,
+                self.task_type,
+                qid=convert_qid(label),
+            )
+        task_manager.save()
+
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
+        for label in exp.qubit_labels:
+            output_param = {
+                "readout_frequency": result[label],
+            }
+            task_manager.put_output_parameters(
+                self.task_name,
+                output_param,
+                self.task_type,
+                qid=convert_qid(label),
+            )
+            task_manager.put_calib_data(
+                qid=convert_qid(label),
+                task_type=self.task_type,
+                parameter_name="readout_frequency",
+                value=result[label],
+            )
+        task_manager.save()
+
+    def execute(self, exp: Experiment, task_manager: TaskManager):
+        self._preprocess(exp, task_manager)
+        result = exp.calibrate_readout_frequency(
             exp.qubit_labels,
             detuning_range=self.input_parameters["detuning_range"],
             time_range=self.input_parameters["time_range"],
@@ -49,9 +80,4 @@ class CheckReadoutFrequency(BaseTask):
             interval=self.input_parameters["interval"],
         )
         exp.save_defaults()
-        self.output_parameters["readout_frequency"] = readout_frequency
-        execution_manager.put_output_parameters(self.task_name, self.output_parameters)
-        for qubit in readout_frequency:
-            execution_manager.put_calibration_value(
-                qubit, "readout_frequency", readout_frequency[qubit]
-            )
+        self._postprocess(exp, task_manager, result)

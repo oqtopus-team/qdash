@@ -1,12 +1,14 @@
-from qcflow.subflow.manager import ExecutionManager
 from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.task_manager import TaskManager
+from qcflow.subflow.util import convert_qid
 from qubex.experiment import Experiment
-from qubex.experiment.experiment import CALIBRATION_SHOTS, PI_DURATION
+from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, PI_DURATION
 from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class CreateDRAGPIPulse(BaseTask):
     task_name: str = "CreateDRAGPIPulse"
+    task_type: str = "qubit"
     output_parameters: dict = {"drag_pi_beta": {}, "drag_pi_amplitude": {}}
 
     def __init__(
@@ -26,7 +28,7 @@ class CreateDRAGPIPulse(BaseTask):
             "rabi_params": {},
         }
 
-    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
+    def execute(self, exp: Experiment, task_manager: TaskManager):
         self.input_parameters["qubit_frequency"] = {
             target: exp.targets[target].frequency for target in exp.qubit_labels
         }
@@ -40,7 +42,15 @@ class CreateDRAGPIPulse(BaseTask):
             target: exp.params.readout_amplitude[target] for target in exp.qubit_labels
         }
         self.input_parameters["rabi_params"] = exp.rabi_params
-        execution_manager.put_input_parameters(self.task_name, self.input_parameters)
+        for qubit in exp.qubit_labels:
+            task_manager.put_input_parameters(
+                self.task_name,
+                self.input_parameters,
+                self.task_type,
+                qid=convert_qid(qubit),
+            )
+
+        task_manager.put_input_parameters(self.task_name, self.input_parameters)
         drag_pi_result = exp.calibrate_drag_pi_pulse(
             exp.qubit_labels,
             n_rotations=4,
@@ -52,11 +62,22 @@ class CreateDRAGPIPulse(BaseTask):
         exp.save_defaults()
         self.output_parameters["drag_pi_amplitude"] = drag_pi_result["amplitude"]
         self.output_parameters["drag_pi_beta"] = drag_pi_result["beta"]
-        execution_manager.put_output_parameters(self.task_name, self.output_parameters)
-        for qubit in drag_pi_result["amplitude"]:
-            execution_manager.put_calibration_value(
-                qubit, "drag_pi_amplitude", drag_pi_result["amplitude"][qubit]
+        for qubit in exp.qubit_labels:
+            task_manager.put_output_parameters(
+                self.task_name,
+                self.output_parameters,
+                self.task_type,
+                qid=convert_qid(qubit),
             )
-            execution_manager.put_calibration_value(
-                qubit, "drag_pi_beta", drag_pi_result["beta"][qubit]
+            task_manager.put_calib_data(
+                qid=convert_qid(qubit),
+                task_type=self.task_type,
+                parameter_name="drag_pi_amplitude",
+                value=drag_pi_result["amplitude"][qubit],
+            )
+            task_manager.put_calib_data(
+                qid=convert_qid(qubit),
+                task_type=self.task_type,
+                parameter_name="drag_pi_beta",
+                value=drag_pi_result["beta"][qubit],
             )

@@ -1,12 +1,16 @@
-from qcflow.subflow.manager import ExecutionManager
+from typing import Any
+
 from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.task_manager import TaskManager
+from qcflow.subflow.util import convert_qid
 from qubex.experiment import Experiment
-from qubex.experiment.experiment import CALIBRATION_SHOTS, HPI_DURATION
+from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, HPI_DURATION
 from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class CreateHPIPulse(BaseTask):
     task_name: str = "CreateHPIPulse"
+    task_type: str = "qubit"
     output_parameters: dict = {"hpi_amplitude": {}}
 
     def __init__(
@@ -26,34 +30,52 @@ class CreateHPIPulse(BaseTask):
             "rabi_params": {},
         }
 
-    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
-        self.input_parameters["qubit_frequency"] = {
-            target: exp.targets[target].frequency for target in exp.qubit_labels
-        }
-        self.input_parameters["control_amplitude"] = {
-            target: exp.params.control_amplitude[target] for target in exp.qubit_labels
-        }
-        self.input_parameters["readout_frequency"] = {
-            target: resonator.frequency for target, resonator in exp.resonators.items()
-        }
-        self.input_parameters["readout_amplitude"] = {
-            target: exp.params.readout_amplitude[target] for target in exp.qubit_labels
-        }
-        self.input_parameters["rabi_params"] = exp.rabi_params
-        execution_manager.put_input_parameters(self.task_name, self.input_parameters)
-        hpi_result = exp.calibrate_hpi_pulse(
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager):
+        for label in exp.qubit_labels:
+            input_param = {
+                "hpi_length": self.input_parameters["hpi_length"],
+                "shots": self.input_parameters["shots"],
+                "interval": self.input_parameters["interval"],
+                "qubit_frequency": exp.targets[label].frequency,
+                "control_amplitude": exp.params.control_amplitude[label],
+                "readout_frequency": exp.resonators[label].frequency,
+                "readout_amplitude": exp.params.readout_amplitude[label],
+                "rabi_params": exp.rabi_params[label],
+            }
+            task_manager.put_input_parameters(
+                self.task_name,
+                input_param,
+                self.task_type,
+                qid=convert_qid(label),
+            )
+        task_manager.save()
+
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
+        for label in exp.qubit_labels:
+            output_param = {
+                "hpi_amplitude": result[label].calib_value,
+            }
+            task_manager.put_output_parameters(
+                self.task_name,
+                output_param,
+                self.task_type,
+                qid=convert_qid(label),
+            )
+            task_manager.put_calib_data(
+                qid=convert_qid(label),
+                task_type=self.task_type,
+                parameter_name="hpi_amplitude",
+                value=result[label].calib_value,
+            )
+        task_manager.save()
+
+    def execute(self, exp: Experiment, task_manager: TaskManager):
+        self._preprocess(exp, task_manager)
+        result = exp.calibrate_hpi_pulse(
             exp.qubit_labels,
             n_rotations=1,
             shots=self.input_parameters["shots"],
             interval=self.input_parameters["interval"],
         )
         exp.save_defaults()
-        hpi_amplitudes = {}
-        for qubit in exp.qubit_labels:
-            hpi_amplitudes[qubit] = (
-                hpi_result.data[qubit].calib_value if qubit in hpi_result.data else None
-            )
-        self.output_parameters["hpi_amplitude"] = hpi_amplitudes
-        execution_manager.put_output_parameters(self.task_name, self.output_parameters)
-        for qubit in hpi_amplitudes:
-            execution_manager.put_calibration_value(qubit, "hpi_amplitude", hpi_amplitudes[qubit])
+        self._postprocess(exp, task_manager, result)

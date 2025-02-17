@@ -1,11 +1,13 @@
 import numpy as np
-from qcflow.subflow.manager import ExecutionManager
 from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.task_manager import TaskManager
 from qubex.experiment import Experiment
 
 
 class CreateZX90(BaseTask):
     task_name: str = "CreateZX90"
+    task_type: str = "coupling"
+
     output_parameters: dict = {
         "cr_amplitude": {},
     }
@@ -24,7 +26,7 @@ class CreateZX90(BaseTask):
 
         return cr_pair, cr_label
 
-    def execute(self, exp: Experiment, execution_manager: ExecutionManager):
+    def execute(self, exp: Experiment, task_manager: TaskManager):
         cr_pair, cr_label = self.determine_cr_pair(exp)
         cr_duration = 100
         cr_ramptime = 40
@@ -36,10 +38,8 @@ class CreateZX90(BaseTask):
             # x180=ex.drag_pi_pulse,
         )
         self.output_parameters["cr_amplitude"] = cr_result["calibrated_value"]
-        execution_manager.put_output_parameters(self.task_name, self.output_parameters)
+        task_manager.put_output_parameters(self.task_name, self.output_parameters)
         exp.save_defaults()
-        execution_manager.put_calibration_value(
-            cr_label, "cr_amplitude", cr_result["calibrated_value"]
-        )
+        task_manager.put_calibration_value(cr_label, "cr_amplitude", cr_result["calibrated_value"])
         note = f"CR pair: {cr_label}"
-        execution_manager.put_note_to_task(self.task_name, note)
+        task_manager.put_note_to_task(self.task_name, note)

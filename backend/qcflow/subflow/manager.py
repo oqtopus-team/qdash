@@ -1,31 +1,22 @@
 import json
-from copy import deepcopy
 from datetime import datetime
 from enum import Enum
 
 # from typing import Optional
-import numpy as np
-from pydantic import BaseModel  # , Field
+from pydantic import BaseModel
+from qcflow.subflow.task_manager import CalibData, TaskResult
 
 SCHDULED = "scheduled"
 RUNNING = "running"
-SUCCESS = "success"
+COMPLETED = "completed"
 FAILED = "failed"
 PENDING = "pending"
-
-
-class TaskStatus(str, Enum):
-    SCHEDULED = SCHDULED
-    RUNNING = RUNNING
-    SUCCESS = SUCCESS
-    FAILED = FAILED
-    PENDING = PENDING
 
 
 class ExecutionStatus(str, Enum):
     SCHEDULED = SCHDULED
     RUNNING = RUNNING
-    SUCCESS = SUCCESS
+    COMPLETED = COMPLETED
     FAILED = FAILED
 
 
@@ -55,86 +46,12 @@ class ExecutionStatus(str, Enum):
 #     status: str = Field(..., description="Overall status of the process")
 
 
-class Qubits(BaseModel):
-    calibrated_at: str
-
-
-class Coupling(BaseModel):
-    calibrated_at: str
-
-
-class CalibResult(BaseModel):
-    qubit_data: dict[str, dict[str, float | int]]
-
-    def put_result(self, qubit_id: str, key: str, value: float | int):
-        """
-        add a result to the qubit data.
-        """
-        if qubit_id not in self.qubit_data:
-            self.qubit_data[qubit_id] = {}
-        self.qubit_data[qubit_id][key] = value
-
-    def get_result(self, qubit_id: str, key: str) -> float | int | None:
-        """
-        get a result from the qubit data.
-        """
-        return self.qubit_data.get(qubit_id, {}).get(key)
-
-
-class TaskResult(BaseModel):
-    name: str
-    upstream_task: str
-    status: TaskStatus = TaskStatus.SCHEDULED
-    message: str
-    input_parameters: dict = {}
-    output_parameters: dict = {}
-    note: str = ""
-    figure_path: str = ""
-    start_at: str = ""
-    end_at: str = ""
-    elapsed_time: str = ""
-
-    def diagnose(self):
-        """
-        diagnose the task result and raise an error if the task failed.
-        """
-        if self.status == TaskStatus.FAILED:
-            raise RuntimeError(f"Task {self.name} failed with message: {self.message}")
-
-    def put_input_parameter(self, key: str, value: dict):
-        """
-        put a parameter to the task result.
-        """
-        self.input_parameters[key] = value
-
-    def put_note(self, note: str):
-        """
-        put a note to the task result.
-        """
-        self.note = note
-
-    def put_output_parameter(self, key: str, value: dict):
-        """
-        put a parameter to the task result.
-        """
-        self.output_parameters[key] = value
-
-    def calculate_elapsed_time(self, start_at: str, end_at: str):
-        """
-        Calculate the elapsed time.
-        """
-        start_time = datetime.strptime(start_at, "%Y-%m-%d %H:%M:%S")
-        end_time = datetime.strptime(end_at, "%Y-%m-%d %H:%M:%S")
-        elapsed_time = end_time - start_time
-        return str(elapsed_time)
-
-
 class ExecutionManager(BaseModel):
     calib_data_path: str = ""
     qubex_version: str = ""
     execution_id: str = ""
     status: ExecutionStatus = ExecutionStatus.SCHEDULED
-    tasks: dict[str, TaskResult] = {}
+    task_result: TaskResult = TaskResult()
     created_at: str = ""
     updated_at: str = ""
     tags: list[str] = []
@@ -144,36 +61,19 @@ class ExecutionManager(BaseModel):
     start_at: str = ""
     end_at: str = ""
     elapsed_time: str = ""
-    qubit_results: CalibResult = CalibResult(qubit_data={})
+    calib_data: CalibData = CalibData(qubit={}, coupling={})
     sub_index: int = 0
 
     def __init__(
         self,
         execution_id: str,
         calib_data_path: str,
-        task_names: list[str],
         tags: list[str],
         **kargs,
     ):
         super().__init__(**kargs)
-        if not task_names or not isinstance(task_names, list):
-            raise ValueError("task_names must be a non-empty list of strings.")
         self.calib_data_path = calib_data_path
         self.execution_id = execution_id
-        self.tasks = {
-            name: TaskResult(
-                name=name,
-                upstream_task=task_names[i - 1] if i > 0 else "",
-                status=TaskStatus.SCHEDULED,
-                message="",
-                input_parameters={},
-                output_parameters={},
-                start_at="",
-                end_at="",
-                elapsed_time="",
-            )
-            for i, name in enumerate(task_names)
-        }
         self.tags = tags
         self.created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -187,11 +87,11 @@ class ExecutionManager(BaseModel):
         self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.save()
 
-    def update_execution_status_to_success(self) -> None:
+    def update_execution_status_to_completed(self) -> None:
         """
         Update the execution status to success.
         """
-        self.status = ExecutionStatus.SUCCESS
+        self.status = ExecutionStatus.COMPLETED
         self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.save()
 
@@ -203,135 +103,92 @@ class ExecutionManager(BaseModel):
         self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.save()
 
-    def update_task_status_to_running(self, task_name: str) -> None:
-        """
-        Update the task status to running.
-        """
-        if task_name in self.tasks:
-            self.tasks[task_name].status = TaskStatus.RUNNING
-            self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.save()
-        else:
-            raise ValueError(f"Task '{task_name}' not found.")
+    # # 同様に、put_input_parameters, put_output_parameter, put_output_parameters, put_note_to_task, get_task も
+    # # 引数 task_category を task_type に置き換えて実装します。
 
-    def update_task_status_to_success(self, task_name: str, message: str = "") -> None:
-        """
-        Update the task status to success.
-        """
-        if task_name in self.tasks:
-            self.tasks[task_name].status = TaskStatus.SUCCESS
-            self.tasks[task_name].message = message
-            self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.save()
-        else:
-            raise ValueError(f"Task '{task_name}' not found.")
+    # def put_input_parameter(self, task_name: str, key: str, value: dict) -> None:
+    #     """
+    #     Put a parameter to the task result.
+    #     """
+    #     if task_name in self.tasks:
+    #         self.tasks[task_name].input_parameters[key] = value
+    #         self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    #         self.save()
+    #     else:
+    #         raise ValueError(f"Task '{task_name}' not found")
 
-    def update_task_status_to_failed(self, task_name: str, message: str = "") -> None:
-        """
-        Update the task status to failed.
-        """
-        if task_name in self.tasks:
-            self.tasks[task_name].status = TaskStatus.FAILED
-            self.tasks[task_name].message = message
-            self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.save()
-        else:
-            raise ValueError(f"Task '{task_name}' not found.")
+    # def put_input_parameters(self, task_name: str, input_parameters: dict) -> None:
+    #     """
+    #     Put a parameter to the task result.
+    #     """
 
-    def update_task_status_to_pending(self, task_name: str) -> None:
-        """
-        Update the task status to pending.
-        """
-        if task_name in self.tasks:
-            self.tasks[task_name].status = TaskStatus.PENDING
-            self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.save()
-        else:
-            raise ValueError(f"Task '{task_name}' not found.")
+    #     copied_parameters = deepcopy(input_parameters)
+    #     # Process the copied_parameters
+    #     for key, item in copied_parameters.items():
+    #         if isinstance(item, np.ndarray):
+    #             copied_parameters[key] = str(item.tolist())
+    #         elif isinstance(item, range):
+    #             copied_parameters[key] = str(list(item))
 
-    def put_input_parameter(self, task_name: str, key: str, value: dict) -> None:
-        """
-        Put a parameter to the task result.
-        """
-        if task_name in self.tasks:
-            self.tasks[task_name].input_parameters[key] = value
-            self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.save()
-        else:
-            raise ValueError(f"Task '{task_name}' not found")
+    #     # Update the task with the modified parameters
+    #     if task_name in self.tasks:
+    #         self.tasks[task_name].input_parameters = copied_parameters
+    #         self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    #         self.save()
+    #     else:
+    #         raise ValueError(f"Task '{task_name}' not found")
 
-    def put_input_parameters(self, task_name: str, input_parameters: dict) -> None:
-        """
-        Put a parameter to the task result.
-        """
+    # def put_output_parameter(self, task_name: str, key: str, value: dict) -> None:
+    #     """
+    #     Put a parameter to the task result.
+    #     """
+    #     if task_name in self.tasks:
+    #         self.tasks[task_name].output_parameters[key] = value
+    #         self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    #         self.save()
+    #     else:
+    #         raise ValueError(f"Task '{task_name}' not found.")
 
-        copied_parameters = deepcopy(input_parameters)
-        # Process the copied_parameters
-        for key, item in copied_parameters.items():
-            if isinstance(item, np.ndarray):
-                copied_parameters[key] = str(item.tolist())
-            elif isinstance(item, range):
-                copied_parameters[key] = str(list(item))
+    # def put_output_parameters(self, task_name: str, output_parameters: dict) -> None:
+    #     """
+    #     Put a parameter to the task result.
+    #     """
 
-        # Update the task with the modified parameters
-        if task_name in self.tasks:
-            self.tasks[task_name].input_parameters = copied_parameters
-            self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.save()
-        else:
-            raise ValueError(f"Task '{task_name}' not found")
+    #     copied_parameters = deepcopy(output_parameters)
+    #     # Process the copied_parameters
+    #     for key, item in copied_parameters.items():
+    #         if isinstance(item, np.ndarray):
+    #             copied_parameters[key] = str(item.tolist())
+    #         elif isinstance(item, range):
+    #             copied_parameters[key] = str(list(item))
 
-    def put_output_parameter(self, task_name: str, key: str, value: dict) -> None:
-        """
-        Put a parameter to the task result.
-        """
-        if task_name in self.tasks:
-            self.tasks[task_name].output_parameters[key] = value
-            self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.save()
-        else:
-            raise ValueError(f"Task '{task_name}' not found.")
+    #     # Update the task with the modified parameters
+    #     if task_name in self.tasks:
+    #         self.tasks[task_name].output_parameters = copied_parameters
+    #         self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    #         self.save()
+    #     else:
+    #         raise ValueError(f"Task '{task_name}' not found")
 
-    def put_output_parameters(self, task_name: str, output_parameters: dict) -> None:
-        """
-        Put a parameter to the task result.
-        """
+    # def put_note_to_task(self, task_name: str, note: str) -> None:
+    #     """
+    #     Put a note to the task result.
+    #     """
+    #     if task_name in self.tasks:
+    #         self.tasks[task_name].note = note
+    #         self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    #         self.save()
+    #     else:
+    #         raise ValueError(f"Task '{task_name}' not found.")
 
-        copied_parameters = deepcopy(output_parameters)
-        # Process the copied_parameters
-        for key, item in copied_parameters.items():
-            if isinstance(item, np.ndarray):
-                copied_parameters[key] = str(item.tolist())
-            elif isinstance(item, range):
-                copied_parameters[key] = str(list(item))
-
-        # Update the task with the modified parameters
-        if task_name in self.tasks:
-            self.tasks[task_name].output_parameters = copied_parameters
-            self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.save()
-        else:
-            raise ValueError(f"Task '{task_name}' not found")
-
-    def put_note_to_task(self, task_name: str, note: str) -> None:
-        """
-        Put a note to the task result.
-        """
-        if task_name in self.tasks:
-            self.tasks[task_name].note = note
-            self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.save()
-        else:
-            raise ValueError(f"Task '{task_name}' not found.")
-
-    def get_task(self, task_name: str) -> TaskResult:
-        """
-        Get the task result by task name.
-        """
-        if task_name in self.tasks:
-            return self.tasks[task_name]
-        else:
-            raise ValueError(f"Task '{task_name}' not found.")
+    # def get_task(self, task_name: str) -> BaseTask:
+    #     """
+    #     Get the task result by task name.
+    #     """
+    #     if task_name in self.tasks:
+    #         return self.tasks[task_name]
+    #     else:
+    #         raise ValueError(f"Task '{task_name}' not found.")
 
     def put_box_info(self, box_info: dict) -> None:
         """
@@ -348,27 +205,27 @@ class ExecutionManager(BaseModel):
         with open(save_path, "w") as f:
             f.write(json.dumps(self.model_dump(), indent=4))
 
-    def start_task(self, task_name: str) -> None:
-        """
-        Start the task.
-        """
-        if task_name in self.tasks:
-            self.tasks[task_name].start_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.save()
-        else:
-            raise ValueError(f"Task '{task_name}' not found.")
+    # def start_task(self, task_name: str) -> None:
+    #     """
+    #     Start the task.
+    #     """
+    #     if task_name in self.tasks:
+    #         self.tasks[task_name].start_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    #         self.save()
+    #     else:
+    #         raise ValueError(f"Task '{task_name}' not found.")
 
-    def end_task(self, task_name: str) -> None:
-        """
-        End the task.
-        """
-        if task_name in self.tasks:
-            self.tasks[task_name].end_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.tasks[task_name].elapsed_time = self.tasks[task_name].calculate_elapsed_time(
-                self.tasks[task_name].start_at, self.tasks[task_name].end_at
-            )
-        else:
-            raise ValueError(f"Task '{task_name}' not found.")
+    # def end_task(self, task_name: str) -> None:
+    #     """
+    #     End the task.
+    #     """
+    #     if task_name in self.tasks:
+    #         self.tasks[task_name].end_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    #         self.tasks[task_name].elapsed_time = self.tasks[task_name].calculate_elapsed_time(
+    #             self.tasks[task_name].start_at, self.tasks[task_name].end_at
+    #         )
+    #     else:
+    #         raise ValueError(f"Task '{task_name}' not found.")
 
     def calculate_elapsed_time(self, start_at: str, end_at: str):
         """
@@ -386,15 +243,15 @@ class ExecutionManager(BaseModel):
         self.start_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.save()
 
-    def pending_task_all(self) -> None:
-        """
-        Update all the task status to pending.
-        """
-        for task_name in self.tasks.keys():
-            if self.tasks[task_name].status == TaskStatus.SCHEDULED:
-                self.update_task_status_to_pending(task_name)
-                self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                self.save()
+    # def pending_task_all(self) -> None:
+    #     """
+    #     Update all the task status to pending.
+    #     """
+    #     for task_name in self.tasks.keys():
+    #         if self.tasks[task_name].status == TaskStatus.SCHEDULED:
+    #             self.update_task_status_to_pending(task_name)
+    #             self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    #             self.save()
 
     def end_execution(self) -> None:
         """
@@ -402,7 +259,7 @@ class ExecutionManager(BaseModel):
         """
         self.end_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.elapsed_time = self.calculate_elapsed_time(self.start_at, self.end_at)
-        self.pending_task_all()
+        # self.pending_task_all()
         self.save()
 
     # def export_execution_history(self) -> ExecutionHistoryModel:
@@ -482,24 +339,24 @@ class ExecutionManager(BaseModel):
     #     with open(save_path, "w") as f:
     #         f.write(json.dumps(self.export_task_history(task_name).model_dump(), indent=4))
 
-    def put_calibration_value(self, qubit_id: str, key: str, value: float):
-        """
-        add a calibration value to the qubit data.
-        """
-        self.qubit_results.put_result(qubit_id, key, value)
-        self.save_qubit_data(qubit_id)
+    # def put_calibration_value(self, qubit_id: str, key: str, value: float):
+    #     """
+    #     add a calibration value to the qubit data.
+    #     """
+    #     self.qubit_results.put_result(qubit_id, key, value)
+    #     self.save_qubit_data(qubit_id)
 
-    def get_calibration_value(self, qubit_id: str, key: str):
-        """
-        get a calibration value from the qubit data.
-        """
-        return self.qubit_results.get_result(qubit_id, key)
+    # def get_calibration_value(self, qubit_id: str, key: str):
+    #     """
+    #     get a calibration value from the qubit data.
+    #     """
+    #     return self.qubit_results.get_result(qubit_id, key)
 
-    def save_qubit_data(self, qubit_id: str):
-        """
-        save the qubit data to a file.
-        """
-        save_path = f"{self.calib_data_path}/{qubit_id}.json"
-        with open(save_path, "w") as f:
-            json.dump(self.qubit_results.qubit_data[qubit_id], f, indent=2)
-        print(f"Real-time data saved for qubit {qubit_id}")
+    # def save_qubit_data(self, qubit_id: str):
+    #     """
+    #     save the qubit data to a file.
+    #     """
+    #     save_path = f"{self.calib_data_path}/{qubit_id}.json"
+    #     with open(save_path, "w") as f:
+    #         json.dump(self.qubit_results.qubit_data[qubit_id], f, indent=2)
+    #     print(f"Real-time data saved for qubit {qubit_id}")

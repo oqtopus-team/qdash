@@ -5,14 +5,19 @@ from prefect import flow, get_run_logger, task
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
 from qcflow.schema.menu import Menu
+from qcflow.subflow.manager import ExecutionManager
 from qcflow.subflow.task import (
+    build_workflow,
     execute_dynamic_task,
     task_classes,
     validate_task_name,
 )
+from qcflow.subflow.task_manager import TaskManager
+from qcflow.subflow.util import convert_label
+
+# from qcflow.subflow.task_manager import TaskManager, TaskResult, TaskStatus
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
-from subflow.manager import ExecutionManager, TaskResult, TaskStatus
 
 
 @flow(
@@ -23,7 +28,7 @@ def cal_flow(
     calib_dir: str,
     successMap: dict[str, bool],
     execution_id: str,
-    qubits: list[int],
+    qubits: list[str],
     sub_index: int = 0,
 ) -> dict[str, bool]:
     """deployment to run calibration flow for a single qubit"""
@@ -31,6 +36,7 @@ def cal_flow(
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
     logger.info(f"Qubits: {qubits}")
+    qubits = [convert_label(q) for q in qubits]
     exp = Experiment(
         chip_id="64Q",
         qubits=qubits,
@@ -38,42 +44,29 @@ def cal_flow(
     )
     exp.note.clear()
     task_names = validate_task_name(menu.exp_list)
-    execution_manager = ExecutionManager(
-        execution_id=execution_id,
-        calib_data_path=calib_dir,
-        task_names=task_names,
-        tags=menu.tags,
-        qubex_version=get_package_version("qubex"),
-        fridge_temperature=0.0,
-        chip_id="SAMPLE",
-        sub_index=sub_index,
-    )
-    prev_result = TaskResult(
-        name="dummy", upstream_task="", status=TaskStatus.SCHEDULED, message=""
-    )
+    task_manager = TaskManager(qids=["28", "29"], calib_dir=calib_dir)
+    workflow = build_workflow(task_names, ["28", "29"])
+    task_manager.task_result = workflow
+    task_manager.save()
+    # task_manager.update_task_status_to_running("CheckStatus",)
+    # task_manager.put_input_parameters(
+    #     "CreateDRAGHPIPulse", {"test": 1.0}, task_type="qubit", qid="28"
+    # )
+    # task_manager.put_calib_data(qid="28", task_type="qubit", parameter_name="test", value=1.0)
+    # task_manager.export_json(calib_dir=calib_dir)
     try:
         logger.info("Starting all processes")
-        execution_manager.start_execution()
-        execution_manager.update_execution_status_to_running()
-        for task_name in execution_manager.tasks.keys():
+        for task_name in task_names:
             if task_name in task_classes:
-                prev_result = execute_dynamic_task(
+                task_manager = execute_dynamic_task(
                     exp=exp,
-                    execution_manager=execution_manager,
+                    task_manager=task_manager,
                     task_name=task_name,
-                    prev_result=prev_result,
                 )
-                # execution_manager.save_task_history(task_name)
-        execution_manager.update_execution_status_to_success()
-        # execution_manager.save_execution_history()
-        # execution_manager.save_task_histories()
-
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")
-        execution_manager.update_execution_status_to_failed()
     finally:
         logger.info("Ending all processes")
-        execution_manager.end_execution()
     return successMap
 
 
@@ -120,11 +113,12 @@ def merge_results_qubits(calib_dir):
 
 
 async def trigger_cal_flow(
+    execution_manager: ExecutionManager,
     menu: Menu,
     calib_dir: str,
     successMap: dict[str, bool],
     execution_id: str,
-    qubits: list[list[int]],
+    qubits: list[list[str]],
 ):
     """Trigger calibration flow for all qubits"""
     deployments = []
@@ -140,6 +134,8 @@ async def trigger_cal_flow(
         deployments.append(run_deployment("cal-flow/oqtopus-cal-flow", parameters=parameters))
 
     results = await asyncio.gather(*deployments)
+
+    ## implement gather_results
 
     for result in results:
         print(result)
@@ -161,6 +157,7 @@ def organize_qubits(qubits: list[list[int]], parallel: bool) -> list[list[int]]:
     flow_run_name="{execution_id}",
 )
 async def qubex_one_qubit_cal_flow(
+    execution_manager: ExecutionManager,
     menu: Menu,
     calib_dir: str,
     successMap: dict[str, bool],
@@ -170,17 +167,22 @@ async def qubex_one_qubit_cal_flow(
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
     parallel = True
+    plan = [["28", "29"]]
     if len(menu.one_qubit_calib_plan) == 1:
         parallel = False
     if parallel:
         logger.info("parallel is True")
-        qubits = organize_qubits(menu.one_qubit_calib_plan, parallel)
-        await trigger_cal_flow(menu, calib_dir, successMap, execution_id, qubits)
+        # qubits = organize_qubits(menu.one_qubit_calib_plan, parallel)
+        await trigger_cal_flow(execution_manager, menu, calib_dir, successMap, execution_id, plan)
         merge_results_qubits(calib_dir)
         return successMap
     else:
-        qubits = organize_qubits(menu.one_qubit_calib_plan, parallel)
+        # qubits = organize_qubits(menu.one_qubit_calib_plan, parallel)
         logger.info("parallel is False")
-        await trigger_cal_flow(menu, calib_dir, successMap, execution_id, qubits)
+        await trigger_cal_flow(execution_manager, menu, calib_dir, successMap, execution_id, plan)
         merge_results_qubits(calib_dir)
         return successMap
+
+
+# qubit_calib_plan = [["28", "29"]]
+# coupling_calib_plan = [["28-29"]]
