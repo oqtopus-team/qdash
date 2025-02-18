@@ -51,8 +51,8 @@ class CheckRabi(BaseTask):
     def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
         for label in exp.qubit_labels:
             output_param = {
-                "rabi_amplitude": result.data[label].rabi_param.amplitude,
-                "rabi_frequency": result.data[label].rabi_param.frequency,
+                "rabi_amplitude": result.rabi_params[label].amplitude,
+                "rabi_frequency": result.rabi_params[label].frequency,
             }
             task_manager.put_output_parameters(
                 self.task_name,
@@ -64,22 +64,24 @@ class CheckRabi(BaseTask):
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="rabi_amplitude",
-                value=result.data[label].rabi_param.amplitude,
+                value=result.rabi_params[label].amplitude,
             )
             task_manager.put_calib_data(
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="rabi_frequency",
-                value=result.data[label].rabi_param.frequency,
+                value=result.rabi_params[label].frequency,
             )
             task_manager.save_figure(
-                name=f"{convert_qid(label)}_{self.task_name}",
-                fig=result.data[label].fit()["fig"],
+                task_name=f"{self.task_name}",
+                task_type=self.task_type,
+                figure=result.data[label].fit()["fig"],
+                qid=convert_qid(label),
             )
         task_manager.save()
 
     def execute(self, exp: Experiment, task_manager: TaskManager):
-        result = exp.check_rabi(
+        result = exp.obtain_rabi_params(
             time_range=self.input_parameters["time_range"],
             shots=self.input_parameters["shots"],
             interval=self.input_parameters["interval"],

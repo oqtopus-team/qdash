@@ -81,7 +81,7 @@ class BaseTaskResult(BaseModel):
     input_parameters: dict = {}
     output_parameters: dict = {}
     note: str = ""
-    figure_path: list[str] = [""]
+    figure_path: list[str] = []
     start_at: str = ""
     end_at: str = ""
     elapsed_time: str = ""
@@ -371,7 +371,25 @@ class TaskManager(BaseModel):
         if task is None:
             raise ValueError(f"Task '{task_name}' not found.")
         task.note = note
-        self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    def save_figure(
+        self,
+        figure: go.Figure,
+        task_name: str,
+        task_type: str = "global",
+        savedir: str = "",
+        qid: str = "",
+    ) -> None:
+        container = self._get_task_container(task_name, task_type, qid)
+
+        task = self._find_task_in_container(container, task_name)
+        if task is None:
+            raise ValueError(f"Task '{task_name}' not found.")
+        if savedir == "":
+            savedir = os.path.join(self.calib_dir, "fig")
+        savepath = os.path.join(savedir, f"{qid}_{task_name}.png")
+        task.figure_path.append(savepath)
+        self._save_figure(savepath=savepath, fig=figure)
 
     def save(self, calib_dir: str = "") -> None:
         if calib_dir == "":
@@ -382,15 +400,15 @@ class TaskManager(BaseModel):
     def diagnose(self):
         pass
 
-    def save_figure(
+    def _save_figure(
         self,
-        savedir: str,
-        name: str,
         fig: go.Figure,
         format: Literal["png", "svg", "jpeg", "webp"] = "png",
         width: int = 600,
         height: int = 300,
         scale: int = 3,
+        name: str = "",
+        savepath: str = "",
     ):
         """
         Save the figure.
@@ -404,13 +422,10 @@ class TaskManager(BaseModel):
             height (int): The height of the figure.
             scale (int): The scale of the figure.
         """
-        if not os.path.exists(savedir):
-            os.makedirs(savedir)
-
-        if savedir == "":
-            savedir = os.path.join(self.calib_dir, "fig")
+        if savepath == "":
+            savepath = os.path.join(self.calib_dir, "fig", f"{name}.{format}")
         fig.write_image(
-            os.path.join(savedir, f"{name}.{format}"),
+            savepath,
             format=format,
             width=width,
             height=height,

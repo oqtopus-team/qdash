@@ -55,6 +55,17 @@ class CheckT1(BaseTask):
                 self.task_type,
                 qid=convert_qid(label),
             )
+            task_manager.put_calib_data(
+                self.task_name,
+                result.data[label].t1_data,
+                qid=convert_qid(label),
+            )
+            task_manager.save_figure(
+                self.task_name,
+                task_type=self.task_type,
+                figure=result.data[label].fit()["fig"],
+                qid=convert_qid(label),
+            )
 
     def execute(self, exp: Experiment, task_manager: TaskManager):
         self._preprocess(exp, task_manager)

@@ -30,7 +30,7 @@ from qcflow.subflow.protocols.one_qubit_coarse.check_readout_frequency import (
 )
 from qcflow.subflow.protocols.one_qubit_coarse.check_status import CheckStatus
 from qcflow.subflow.protocols.one_qubit_coarse.check_t1 import CheckT1
-from qcflow.subflow.protocols.one_qubit_coarse.check_t2 import CheckT2
+from qcflow.subflow.protocols.one_qubit_coarse.check_t2_echo import CheckT2Echo
 from qcflow.subflow.protocols.one_qubit_coarse.chevron_pattern import ChevronPattern
 from qcflow.subflow.protocols.one_qubit_coarse.create_hpi_pulse import CreateHPIPulse
 from qcflow.subflow.protocols.one_qubit_coarse.create_pi_pulse import CreatePIPulse

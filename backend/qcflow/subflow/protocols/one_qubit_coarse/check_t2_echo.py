@@ -8,10 +8,10 @@ from qubex.experiment import Experiment
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 
-class CheckT2(BaseTask):
-    task_name: str = "CheckT2"
+class CheckT2Echo(BaseTask):
+    task_name: str = "CheckT2Echo"
     task_type: str = "qubit"
-    output_parameters: dict = {"t2": {}}
+    output_parameters: dict = {"t2_echo": {}}
 
     def __init__(
         self,
@@ -47,7 +47,7 @@ class CheckT2(BaseTask):
     def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
         for label in exp.qubit_labels:
             output_param = {
-                "t2": result.data[label].t2,
+                "t2_echo": result.data[label].t2,
             }
             task_manager.put_output_parameters(
                 self.task_name,
@@ -58,8 +58,14 @@ class CheckT2(BaseTask):
             task_manager.put_calib_data(
                 qid=convert_qid(label),
                 task_type=self.task_type,
-                parameter_name="t2",
+                parameter_name="t2_echo",
                 value=result.data[label].t2,
+            )
+            task_manager.save_figure(
+                self.task_name,
+                task_type=self.task_type,
+                figure=result.data[label].fit()["fig"],
+                qid=convert_qid(label),
             )
         task_manager.save()
 
