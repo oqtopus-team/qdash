@@ -86,5 +86,5 @@ class CheckRabi(BaseTask):
             shots=self.input_parameters["shots"],
             interval=self.input_parameters["interval"],
         )
-        exp.save_defaults()
+        exp.calib_note.save()
         self._postprocess(exp, task_manager, result)

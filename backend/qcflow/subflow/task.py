@@ -145,8 +145,8 @@ task_classes = {
         ),
         "task_type": CheckT1.task_type,
     },
-    "CheckT2": {
-        "instance": CheckT2(
+    "CheckT2Echo": {
+        "instance": CheckT2Echo(
             time_range=np.logspace(
                 np.log10(300),
                 np.log10(100 * 1000),
@@ -155,7 +155,7 @@ task_classes = {
             shots=DEFAULT_SHOTS,
             interval=DEFAULT_INTERVAL,
         ),
-        "task_type": CheckT2.task_type,
+        "task_type": CheckT2Echo.task_type,
     },
     "CheckEffectiveQubitFrequency": {
         "instance": CheckEffectiveQubitFrequency(

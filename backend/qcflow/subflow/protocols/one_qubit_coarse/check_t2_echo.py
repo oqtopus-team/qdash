@@ -62,7 +62,7 @@ class CheckT2Echo(BaseTask):
                 value=result.data[label].t2,
             )
             task_manager.save_figure(
-                self.task_name,
+                task_name=self.task_name,
                 task_type=self.task_type,
                 figure=result.data[label].fit()["fig"],
                 qid=convert_qid(label),

@@ -23,4 +23,4 @@ class CheckHPIPulse(BaseTask):
             exp.hpi_pulse,
             repetitions=20,
         )
-        exp.save_defaults()
+        exp.calib_note.save()

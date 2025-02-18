@@ -32,6 +32,27 @@ class TaskStatus(str, Enum):
     PENDING = PENDING
 
 
+def current_iso_time() -> str:
+    return datetime.now().isoformat()
+
+
+class Data(BaseModel):
+    """
+    Data model.
+
+    Attributes:
+        qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.
+        coupling (dict[str, dict[str, float | int]]): The calibration data for couplings.
+    """
+
+    value: float | int = 0
+    unit: str = ""
+    calibrated_at: str = Field(
+        default_factory=current_iso_time,
+        description="The time when the system information was created",
+    )
+
+
 class CalibData(BaseModel):
     """
     Calibration data model.
@@ -387,7 +408,15 @@ class TaskManager(BaseModel):
             raise ValueError(f"Task '{task_name}' not found.")
         if savedir == "":
             savedir = os.path.join(self.calib_dir, "fig")
-        savepath = os.path.join(savedir, f"{qid}_{task_name}.png")
+        os.makedirs(savedir, exist_ok=True)
+
+        base_savepath = os.path.join(savedir, f"{qid}_{task_name}")
+        savepath = f"{base_savepath}.png"
+        counter = 0
+        while os.path.exists(savepath):
+            savepath = f"{base_savepath}_{counter}.png"
+            counter += 1
+
         task.figure_path.append(savepath)
         self._save_figure(savepath=savepath, fig=figure)
 

@@ -54,8 +54,8 @@ class CreateDRAGPIPulse(BaseTask):
     def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
         for label in exp.qubit_labels:
             output_param = {
-                "drag_pi_beta": result["beta"][label].calib_value,
-                "drag_pi_amplitude": result["amplitude"][label].calib_value,
+                "drag_pi_beta": result["beta"][label],
+                "drag_pi_amplitude": result["amplitude"][label],
             }
             task_manager.put_output_parameters(
                 self.task_name,
@@ -67,14 +67,15 @@ class CreateDRAGPIPulse(BaseTask):
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="drag_pi_beta",
-                value=result["beta"][label].calib_value,
+                value=result["beta"][label],
             )
             task_manager.put_calib_data(
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="drag_pi_amplitude",
-                value=result["amplitude"][label].calib_value,
+                value=result["amplitude"][label],
             )
+        task_manager.save()
 
     def execute(self, exp: Experiment, task_manager: TaskManager):
         self._preprocess(exp, task_manager)
@@ -86,5 +87,5 @@ class CreateDRAGPIPulse(BaseTask):
             shots=self.input_parameters["shots"],
             interval=self.input_parameters["interval"],
         )
-        exp.save_defaults()
+        exp.calib_note.save()
         self._postprocess(exp, task_manager, result)

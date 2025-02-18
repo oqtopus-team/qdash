@@ -23,4 +23,4 @@ class CheckPIPulse(BaseTask):
             exp.pi_pulse,
             repetitions=20,
         )
-        exp.save_defaults()
+        exp.calib_note.save()

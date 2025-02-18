@@ -82,5 +82,5 @@ class CreatePIPulse(BaseTask):
             exp.qubit_labels,
             n_rotations=1,
         )
-        exp.save_defaults()
+        exp.calib_note.save()
         self._postprocess(exp, task_manager, result)

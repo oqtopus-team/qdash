@@ -45,35 +45,40 @@ class RandomizedBenchmarking(BaseTask):
 
         task_manager.save()
 
-    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
-        for label in exp.qubit_labels:
-            output_param = {
-                "average_gate_fidelity": result["average_gate_fidelity"][label],
-            }
-            task_manager.put_output_parameters(
-                self.task_name,
-                output_param,
-                self.task_type,
-                qid=convert_qid(label),
-            )
-            task_manager.put_calib_data(
-                qid=convert_qid(label),
-                task_type=self.task_type,
-                parameter_name="average_gate_fidelity",
-                value=result["average_gate_fidelity"][label],
-            )
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any, label: str):
+        output_param = {
+            "average_gate_fidelity": result["avg_gate_fidelity"],
+        }
+        task_manager.put_output_parameters(
+            self.task_name,
+            output_param,
+            self.task_type,
+            qid=convert_qid(label),
+        )
+        task_manager.put_calib_data(
+            qid=convert_qid(label),
+            task_type=self.task_type,
+            parameter_name="average_gate_fidelity",
+            value=result["avg_gate_fidelity"],
+        )
+        task_manager.save_figure(
+            task_name=self.task_name,
+            task_type=self.task_type,
+            figure=result["fig"],
+            qid=convert_qid(label),
+        )
 
     def execute(self, exp: Experiment, task_manager: TaskManager):
         self._preprocess(exp, task_manager)
-        for target in exp.qubit_labels:
+        for label in exp.qubit_labels:
             result = exp.randomized_benchmarking(
-                target=target,
+                target=label,
                 n_cliffords_range=self.input_parameters["n_cliffords_range"],
                 n_trials=self.input_parameters["n_trials"],
-                x90=exp.drag_hpi_pulse[target],
+                x90=exp.drag_hpi_pulse[label],
                 save_image=True,
                 shots=self.input_parameters["shots"],
                 interval=self.input_parameters["interval"],
             )
-        self._postprocess(exp, task_manager, result)
-        exp.save_defaults()
+            self._postprocess(exp, task_manager, result, label)
+        exp.calib_note.save()

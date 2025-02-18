@@ -27,4 +27,4 @@ class RabiOscillation(BaseTask):
             shots=300,
             interval=50_000,
         )
-        exp.save_defaults()
+        exp.calib_note.save()

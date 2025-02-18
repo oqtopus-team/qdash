@@ -44,22 +44,47 @@ class CheckEffectiveQubitFrequency(BaseTask):
         task_manager.save()
 
     def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
-        for qid in exp.qubit_labels:
+        for label in exp.qubit_labels:
             output_param = {
-                "effective_qubit_frequency": result["effective_freq"][qid],
+                "effective_qubit_frequency": result["effective_freq"][label],
             }
             task_manager.put_output_parameters(
                 self.task_name,
                 output_param,
                 self.task_type,
-                qid=convert_qid(qid),
+                qid=convert_qid(label),
             )
             task_manager.put_calib_data(
-                qid=convert_qid(qid),
+                qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="effective_qubit_frequency",
-                value=result["effective_freq"][qid],
+                value=result["effective_freq"][label],
             )
+            task_manager.put_calib_data(
+                qid=convert_qid(label),
+                task_type=self.task_type,
+                parameter_name="effective_qubit_frequency_0",
+                value=result["result_0"].data[label].bare_freq,
+            )
+            task_manager.put_calib_data(
+                qid=convert_qid(label),
+                task_type=self.task_type,
+                parameter_name="effective_qubit_frequency_1",
+                value=result["result_1"].data[label].bare_freq,
+            )
+            task_manager.save_figure(
+                task_name=self.task_name,
+                task_type=self.task_type,
+                figure=result["result_0"].data[label].fit()["fig"],
+                qid=convert_qid(label),
+            )
+            task_manager.save_figure(
+                task_name=self.task_name,
+                task_type=self.task_type,
+                figure=result["result_1"].data[label].fit()["fig"],
+                qid=convert_qid(label),
+            )
+
         task_manager.save()
 
     def execute(self, exp: Experiment, task_manager: TaskManager):
@@ -71,5 +96,5 @@ class CheckEffectiveQubitFrequency(BaseTask):
             shots=self.input_parameters["shots"],
             interval=self.input_parameters["interval"],
         )
-        exp.save_defaults()
+        exp.calib_note.save()
         self._postprocess(exp, task_manager, result)

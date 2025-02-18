@@ -35,8 +35,20 @@ class ReadoutClassification(BaseTask):
                 parameter_name="average_readout_fidelity",
                 value=result["average_readout_fidelity"][label],
             )
+            task_manager.put_calib_data(
+                qid=convert_qid(label),
+                task_type=self.task_type,
+                parameter_name="readout_fidelity_0",
+                value=result["readout_fidelties"][label][0],
+            )
+            task_manager.put_calib_data(
+                qid=convert_qid(label),
+                task_type=self.task_type,
+                parameter_name="readout_fidelity_1",
+                value=result["readout_fidelties"][label][1],
+            )
 
     def execute(self, exp: Experiment, task_manager: TaskManager):
         result = exp.build_classifier()
-        exp.save_defaults()
+        exp.calib_note.save()
         self._postprocess(exp, task_manager, result)

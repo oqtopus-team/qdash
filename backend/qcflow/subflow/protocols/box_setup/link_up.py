@@ -18,4 +18,4 @@ class LinkUp(BaseTask):
 
     def execute(self, exp: Experiment, task_manager: TaskManager):
         exp.linkup()
-        exp.save_defaults()
+        exp.calib_note.save()

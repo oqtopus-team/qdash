@@ -20,4 +20,4 @@ class CheckStatus(BaseTask):
 
     def execute(self, exp: Experiment, task_manager: TaskManager):
         exp.check_status()
-        exp.save_defaults()
+        exp.calib_note.save()

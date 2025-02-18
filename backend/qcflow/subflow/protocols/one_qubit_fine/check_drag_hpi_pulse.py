@@ -23,4 +23,4 @@ class CheckDRAGHPIPulse(BaseTask):
             {qubit: exp.drag_hpi_pulse[qubit] for qubit in exp.qubit_labels},
             repetitions=20,
         )
-        exp.save_defaults()
+        exp.calib_note.save()

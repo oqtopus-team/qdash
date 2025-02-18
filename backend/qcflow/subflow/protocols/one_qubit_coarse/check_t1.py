@@ -56,12 +56,13 @@ class CheckT1(BaseTask):
                 qid=convert_qid(label),
             )
             task_manager.put_calib_data(
-                self.task_name,
-                result.data[label].t1_data,
                 qid=convert_qid(label),
+                task_type=self.task_type,
+                parameter_name="t1",
+                value=result.data[label].t1,
             )
             task_manager.save_figure(
-                self.task_name,
+                task_name=self.task_name,
                 task_type=self.task_type,
                 figure=result.data[label].fit()["fig"],
                 qid=convert_qid(label),
