@@ -10,6 +10,12 @@ class Configure(BaseTask):
     def __init__(self):
         pass
 
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager):
+        pass
+
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager):
+        pass
+
     def execute(self, exp: Experiment, task_manager: TaskManager):
         exp.state_manager.load(
             chip_id=exp.chip_id, config_dir=exp.config_path, params_dir=exp.params_path

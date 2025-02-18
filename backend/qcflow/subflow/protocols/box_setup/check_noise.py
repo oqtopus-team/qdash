@@ -10,6 +10,12 @@ class CheckNoise(BaseTask):
     def __init__(self):
         pass
 
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager):
+        pass
+
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager):
+        pass
+
     def execute(self, exp: Experiment, task_manager: TaskManager):
         exp.check_noise()
         exp.save_defaults()

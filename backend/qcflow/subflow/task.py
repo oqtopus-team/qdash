@@ -1,9 +1,15 @@
 import numpy as np
 from prefect import get_run_logger, task
-from qcflow.subflow.protocols.benchmark.interleaved_randomized_benchmarking import (
-    InterleavedRandomizedBenchmarking,
-)
 from qcflow.subflow.protocols.benchmark.randomized_benchmarking import RandomizedBenchmarking
+from qcflow.subflow.protocols.benchmark.x90_interleaved_randomized_benchmarking import (
+    X90InterleavedRandomizedBenchmarking,
+)
+from qcflow.subflow.protocols.benchmark.x180_interleaved_randoized_benchmarking import (
+    X180InterleavedRandomizedBenchmarking,
+)
+from qcflow.subflow.protocols.benchmark.zx90_interleaved_randoized_benchmarking import (
+    ZX90InterleavedRandomizedBenchmarking,
+)
 from qcflow.subflow.protocols.box_setup.check_noise import CheckNoise
 
 # from qcflow.subflow.protocols.box_setup.configure import Configure
@@ -192,9 +198,17 @@ task_classes = {
         "instance": RandomizedBenchmarking(),
         "task_type": RandomizedBenchmarking.task_type,
     },
-    "InterleavedRandomizedBenchmarking": {
-        "instance": InterleavedRandomizedBenchmarking(),
-        "task_type": InterleavedRandomizedBenchmarking.task_type,
+    "X90InterleavedRandomizedBenchmarking": {
+        "instance": X90InterleavedRandomizedBenchmarking(),
+        "task_type": X90InterleavedRandomizedBenchmarking.task_type,
+    },
+    "X180InterleavedRandomizedBenchmarking": {
+        "instance": X180InterleavedRandomizedBenchmarking(),
+        "task_type": X180InterleavedRandomizedBenchmarking.task_type,
+    },
+    "ZX90InterleavedRandomizedBenchmarking": {
+        "instance": ZX90InterleavedRandomizedBenchmarking(),
+        "task_type": ZX90InterleavedRandomizedBenchmarking.task_type,
     },
     "CheckCrossResonance": {
         "instance": CheckCrossResonance(),

@@ -14,8 +14,6 @@ from qcflow.subflow.task import (
 )
 from qcflow.subflow.task_manager import TaskManager
 from qcflow.subflow.util import convert_label
-
-# from qcflow.subflow.task_manager import TaskManager, TaskResult, TaskStatus
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
 
@@ -48,12 +46,6 @@ def cal_flow(
     workflow = build_workflow(task_names, ["28", "29"])
     task_manager.task_result = workflow
     task_manager.save()
-    # task_manager.update_task_status_to_running("CheckStatus",)
-    # task_manager.put_input_parameters(
-    #     "CreateDRAGHPIPulse", {"test": 1.0}, task_type="qubit", qid="28"
-    # )
-    # task_manager.put_calib_data(qid="28", task_type="qubit", parameter_name="test", value=1.0)
-    # task_manager.export_json(calib_dir=calib_dir)
     try:
         logger.info("Starting all processes")
         for task_name in task_names:
@@ -88,7 +80,6 @@ def merge_results_qubits(calib_dir):
         logger.info(f"File: {file_path}")
 
     calib_json_path = os.path.join(calib_dir, "calib.json")
-    # calib.json が存在する場合は読み込み、存在しなければ初期化
     if os.path.exists(calib_json_path):
         with open(calib_json_path, "r", encoding="utf-8") as f:
             merged_data = json.load(f)
@@ -96,15 +87,12 @@ def merge_results_qubits(calib_dir):
             merged_data["qubits"] = {}
     else:
         merged_data = {"qubits": {}}
-
-    # 各ファイルの内容を、ファイル名（拡張子除く）をキーとして追加
     for file_path in q_files:
         qubit_key = os.path.splitext(os.path.basename(file_path))[0]
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         merged_data["qubits"][qubit_key] = data
 
-    # 結果を calib.json に上書き保存
     merged_data["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     merged_data["couplings"] = {}
     with open(calib_json_path, "w", encoding="utf-8") as f:

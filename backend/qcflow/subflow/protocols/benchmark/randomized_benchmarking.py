@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 from qcflow.subflow.protocols.base import BaseTask
 from qcflow.subflow.task_manager import TaskManager
@@ -26,9 +28,45 @@ class RandomizedBenchmarking(BaseTask):
             "interval": interval,
         }
 
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager):
+        for label in exp.qubit_labels:
+            input_param = {
+                "n_cliffords_range": self.input_parameters["n_cliffords_range"],
+                "n_trials": self.input_parameters["n_trials"],
+                "shots": self.input_parameters["shots"],
+                "interval": self.input_parameters["interval"],
+            }
+            task_manager.put_input_parameters(
+                self.task_name,
+                input_param,
+                self.task_type,
+                qid=convert_qid(label),
+            )
+
+        task_manager.save()
+
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
+        for label in exp.qubit_labels:
+            output_param = {
+                "average_gate_fidelity": result["average_gate_fidelity"][label],
+            }
+            task_manager.put_output_parameters(
+                self.task_name,
+                output_param,
+                self.task_type,
+                qid=convert_qid(label),
+            )
+            task_manager.put_calib_data(
+                qid=convert_qid(label),
+                task_type=self.task_type,
+                parameter_name="average_gate_fidelity",
+                value=result["average_gate_fidelity"][label],
+            )
+
     def execute(self, exp: Experiment, task_manager: TaskManager):
+        self._preprocess(exp, task_manager)
         for target in exp.qubit_labels:
-            rb_result = exp.randomized_benchmarking(
+            result = exp.randomized_benchmarking(
                 target=target,
                 n_cliffords_range=self.input_parameters["n_cliffords_range"],
                 n_trials=self.input_parameters["n_trials"],
@@ -37,17 +75,5 @@ class RandomizedBenchmarking(BaseTask):
                 shots=self.input_parameters["shots"],
                 interval=self.input_parameters["interval"],
             )
-            self.output_parameters["average_gate_fidelity"][target] = rb_result["avg_gate_fidelity"]
-            task_manager.put_output_parameters(
-                self.task_name,
-                self.output_parameters,
-                self.task_type,
-                qid=convert_qid(target),
-            )
-            task_manager.put_calib_data(
-                qid=convert_qid(target),
-                task_type=self.task_type,
-                parameter_name="average_gate_fidelity",
-                value=rb_result["avg_gate_fidelity"],
-            )
-            exp.save_defaults()
+        self._postprocess(exp, task_manager, result)
+        exp.save_defaults()

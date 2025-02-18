@@ -78,7 +78,7 @@ class CreateDRAGHPIPulse(BaseTask):
 
     def execute(self, exp: Experiment, task_manager: TaskManager):
         self._preprocess(exp, task_manager)
-        drag_hpi_result = exp.calibrate_drag_hpi_pulse(
+        result = exp.calibrate_drag_hpi_pulse(
             exp.qubit_labels,
             n_rotations=4,
             n_turns=1,
@@ -87,24 +87,4 @@ class CreateDRAGHPIPulse(BaseTask):
             interval=self.input_parameters["interval"],
         )
         exp.save_defaults()
-        self.output_parameters["drag_hpi_amplitude"] = drag_hpi_result["amplitude"]
-        self.output_parameters["drag_hpi_beta"] = drag_hpi_result["beta"]
-        for qubit in exp.qubit_labels:
-            task_manager.put_output_parameters(
-                self.task_name,
-                self.output_parameters,
-                self.task_type,
-                qid=convert_qid(qubit),
-            )
-            task_manager.put_calb_data(
-                qid=convert_qid(qubit),
-                task_type=self.task_type,
-                parameter_name="drag_hpi_amplitude",
-                value=drag_hpi_result["amplitude"][qubit],
-            )
-            task_manager.put_calb_data(
-                qid=convert_qid(qubit),
-                task_type=self.task_type,
-                parameter_name="drag_hpi_beta",
-                value=drag_hpi_result["beta"][qubit],
-            )
+        self._postprocess(exp, task_manager, result)

@@ -1,7 +1,11 @@
+import json
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from enum import Enum
 from typing import Literal
+
+import numpy as np
 
 # from typing import Optional
 from pydantic import BaseModel, Field
@@ -39,6 +43,17 @@ class SystemInfoModel(BaseModel):
 
 
 class TaskStatus(str, Enum):
+    """
+    Task status enum.
+
+    Attributes:
+        SCHEDULED (str): The task is scheduled.
+        RUNNING (str): The task is running.
+        COMPLETED (str): The task is completed.
+        FAILED (str): The task is failed.
+        PENDING (str): The task is pending
+    """
+
     SCHEDULED = SCHDULED
     RUNNING = RUNNING
     COMPLETED = COMPLETED
@@ -110,10 +125,6 @@ class BaseTaskResult(BaseModel):
             raise RuntimeError(f"Task {self.name} failed with message: {self.message}")
 
     def put_input_parameter(self, input_parameters: dict):
-        from copy import deepcopy
-
-        import numpy as np
-
         """
         put a parameter to the task result.
         """
@@ -164,20 +175,52 @@ class BaseTaskResult(BaseModel):
 
 
 class GlobalTask(BaseTaskResult):
+    """
+    Global task result class.
+
+    Attributes:
+        task_type (str): The type of the task. e.g. "global".
+    """
+
     task_type: Literal["global"] = "global"
 
 
 class QubitTask(BaseTaskResult):
+    """
+    Qubit task result class.
+
+    Attributes:
+        task_type (str): The type of the task. e.g. "qubit".
+        qid (str): The qubit id.
+    """
+
     task_type: Literal["qubit"] = "qubit"
     qid: str
 
 
 class CouplingTask(BaseTaskResult):
+    """
+    Coupling task result class.
+
+    Attributes:
+        task_type (str): The type of the task. e.g. "coupling".
+        qid (str): The qubit id.
+    """
+
     task_type: Literal["coupling"] = "coupling"
     qid: str
 
 
 class TaskResult(BaseModel):
+    """
+    Task result class.
+
+    Attributes:
+        global_tasks (list[GlobalTask]): The global tasks.
+        qubit_tasks (dict[str, list[QubitTask]]): The qubit tasks.
+        coupling_tasks (dict[str, list[CouplingTask]]): The coupling tasks.
+    """
+
     global_tasks: list[GlobalTask] = []
     qubit_tasks: dict[str, list[QubitTask]] = {}
     coupling_tasks: dict[str, list[CouplingTask]] = {}
@@ -191,6 +234,7 @@ class TaskManager(BaseModel):
         id (str): The unique identifier of the task manager.
         task_result (TaskResult): The task result.
         calib_data (CalibData): The calibration data.
+        calib_dir (str): The calibration directory.
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -232,7 +276,9 @@ class TaskManager(BaseModel):
     def _update_task_status_in_container(
         self, container: list, task_name: str, new_status: TaskStatus, message: str
     ) -> None:
-        """リスト内のタスクを task_name で検索し、status と message を更新する。"""
+        """
+        Update the status of a task with the given name to the new status.
+        """
         for t in container:
             if t.name == task_name:
                 t.status = new_status
@@ -257,9 +303,6 @@ class TaskManager(BaseModel):
     ) -> None:
         for qid in qids:
             self.end_task(task_name, task_type, qid)
-
-    # def get_task(self, task_name: str, task_type: str = "global", qid: str = "") -> BaseTaskResult:
-    #     pass
 
     def update_task_status(
         self,
@@ -360,10 +403,8 @@ class TaskManager(BaseModel):
         self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def save(self, calib_dir: str = "") -> None:
-        import json
-
         if calib_dir == "":
-            calib_dir = self.calib_dir
+            calib_dir = f"{self.calib_dir}/task"
         with open(f"{calib_dir}/{self.id}.json", "w") as f:
             json.dump(self.model_dump(), f, indent=2)
 
