@@ -51,7 +51,8 @@ class CheckRabi(BaseTask):
     def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
         for label in exp.qubit_labels:
             output_param = {
-                "rabi_params": result[label].rabi_param.__dict__,
+                "rabi_amplitude": result.data[label].amplitude,
+                "rabi_frequency": result.data[label].frequency,
             }
             task_manager.put_output_parameters(
                 self.task_name,

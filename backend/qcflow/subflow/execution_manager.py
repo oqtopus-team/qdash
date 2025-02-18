@@ -54,7 +54,7 @@ class ExecutionManager(BaseModel):
     task_result: TaskResult = TaskResult()
     tags: list[str] = []
     controller_info: list[dict] = []
-    fridge_info: float = 0.0
+    fridge_info: dict = {}
     chip_id: str = ""
     start_at: str = ""
     end_at: str = ""
@@ -72,6 +72,7 @@ class ExecutionManager(BaseModel):
         super().__init__(**kargs)
         self.calib_data_path = calib_data_path
         self.execution_id = execution_id
+        self.fridge_info = {"temperature": 0.0}
         self.tags = tags
         self.save()
 

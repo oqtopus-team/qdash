@@ -12,7 +12,7 @@ from qcflow.db.bluefors import get_latest_temperature
 from qcflow.db.execution_run import get_next_execution_index
 from qcflow.db.execution_run_history import insert_execution_run
 from qcflow.schema.menu import Menu
-from qcflow.subflow.manager import ExecutionManager
+from qcflow.subflow.execution_manager import ExecutionManager
 from qcflow.subflow.qubex_one_qubit_cal.flow import qubex_one_qubit_cal_flow
 from qcflow.utiltask.create_directory import (
     create_directory_task,
@@ -73,7 +73,7 @@ def main_flow(
         calib_data_path=calib_dir,
         tags=menu.tags,
         qubex_version=get_package_version("qubex"),
-        fridge_temperature=0.0,
+        fridge_info={"temperature": 0.0},
         chip_id="SAMPLE",
     )
     execution_manager.start_execution()
