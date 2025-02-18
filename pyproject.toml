@@ -60,7 +60,7 @@ tqdm = "^4.66.2"
 sqe-fitting = {git = "https://github.com/orangekame3/sqe_fitting"}
 ipython = "^8.27.0"
 cirq = "^1.4.1"
-qubex = {git = "https://github.com/amachino/qubex.git", extras = ["backend"]}
+qubex = {git = "https://github.com/amachino/qubex.git@1.2.9", extras = ["backend"]}
 
 
 
@@ -86,5 +86,4 @@ no_implicit_optional = true
 warn_return_any = true
 check_untyped_defs = true
 
-[tool.poetry.requires-plugins]
-poetry-plugin-export = ">=1.8"
+
