@@ -1,4 +1,5 @@
 import json
+import os
 import uuid
 from copy import deepcopy
 from datetime import datetime
@@ -6,6 +7,7 @@ from enum import Enum
 from typing import Literal
 
 import numpy as np
+import plotly.graph_objs as go
 from pydantic import BaseModel, Field
 from qcflow.subflow.constant import COMPLETED, FAILED, PENDING, RUNNING, SCHDULED
 from qcflow.subflow.system_info import SystemInfo
@@ -379,3 +381,38 @@ class TaskManager(BaseModel):
 
     def diagnose(self):
         pass
+
+    def save_figure(
+        self,
+        savedir: str,
+        name: str,
+        fig: go.Figure,
+        format: Literal["png", "svg", "jpeg", "webp"] = "png",
+        width: int = 600,
+        height: int = 300,
+        scale: int = 3,
+    ):
+        """
+        Save the figure.
+
+        Args:
+            savedir (str): The directory to save the figure.
+            name (str): The name of the figure.
+            fig (go.Figure): The figure to save.
+            format (Literal["png", "svg", "jpeg", "webp"]): The format of the figure.
+            width (int): The width of the figure.
+            height (int): The height of the figure.
+            scale (int): The scale of the figure.
+        """
+        if not os.path.exists(savedir):
+            os.makedirs(savedir)
+
+        if savedir == "":
+            savedir = os.path.join(self.calib_dir, "fig")
+        fig.write_image(
+            os.path.join(savedir, f"{name}.{format}"),
+            format=format,
+            width=width,
+            height=height,
+            scale=scale,
+        )
