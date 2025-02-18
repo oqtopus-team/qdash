@@ -5,7 +5,7 @@ from prefect import flow, get_run_logger, task
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
 from qcflow.schema.menu import Menu
-from qcflow.subflow.manager import ExecutionManager
+from qcflow.subflow.execution_manager import ExecutionManager
 from qcflow.subflow.task import (
     build_workflow,
     execute_dynamic_task,

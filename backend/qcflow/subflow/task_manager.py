@@ -6,40 +6,9 @@ from enum import Enum
 from typing import Literal
 
 import numpy as np
-
-# from typing import Optional
 from pydantic import BaseModel, Field
-
-SCHDULED = "scheduled"
-RUNNING = "running"
-COMPLETED = "completed"
-FAILED = "failed"
-PENDING = "pending"
-
-
-def current_iso_time() -> str:
-    return datetime.now().isoformat()
-
-
-class SystemInfoModel(BaseModel):
-    """Data model for system information.
-
-    Attributes:
-        created_at (str): The time when the system information was created. e.g. "2021-01-01T00:00:00Z".
-        updated_at (str): The time when the system information was updated. e.g. "2021-01-01T00:00:00Z".
-    """
-
-    created_at: str = Field(
-        default_factory=current_iso_time,
-        description="The time when the system information was created",
-    )
-    updated_at: str = Field(
-        default_factory=current_iso_time,
-        description="The time when the system information was updated",
-    )
-
-    def update_time(self):
-        self.updated_at = current_iso_time()
+from qcflow.subflow.constant import COMPLETED, FAILED, PENDING, RUNNING, SCHDULED
+from qcflow.subflow.system_info import SystemInfo
 
 
 class TaskStatus(str, Enum):
@@ -115,7 +84,7 @@ class BaseTaskResult(BaseModel):
     end_at: str = ""
     elapsed_time: str = ""
     task_type: str = "global"
-    system_info: SystemInfoModel = SystemInfoModel()
+    system_info: SystemInfo = SystemInfo()
 
     def diagnose(self):
         """
