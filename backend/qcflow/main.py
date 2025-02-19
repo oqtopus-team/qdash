@@ -68,19 +68,19 @@ def main_flow(
     create_directory_task.submit(latest_calib_dir).result()
     successMap = {flow_name: False for flow_name in menu.flow}
     execution_manager = ExecutionManager(
+        name=menu.name,
         execution_id=execution_id,
         calib_data_path=calib_dir,
         tags=menu.tags,
         fridge_info={"temperature": 0.0},
         chip_id="SAMPLE",
     )
+    execution_manager.save()
     execution_manager.start_execution()
     execution_manager.update_execution_status_to_running()
     try:
         for flow_name in menu.flow:
-            successMap = calibration_flow_map[flow_name](
-                execution_manager, menu, calib_dir, successMap, execution_id
-            )  # type: ignore
+            successMap = calibration_flow_map[flow_name](menu, calib_dir, successMap, execution_id)  # type: ignore
         execution_manager.update_execution_status_to_success()
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")

@@ -21,4 +21,4 @@ class Configure(BaseTask):
             chip_id=exp.chip_id, config_dir=exp.config_path, params_dir=exp.params_path
         )
         exp.state_manager.push(box_ids=exp.box_ids, confirm=False)
-        exp.calib_note.save()
+        exp.calib_note.save(file_path=task_manager.calib_dir)

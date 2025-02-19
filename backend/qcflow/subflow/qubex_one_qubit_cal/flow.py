@@ -24,7 +24,6 @@ from qubex.version import get_package_version
     flow_run_name="{qubits}",
 )
 def cal_flow(
-    execution_manager: ExecutionManager,
     menu: Menu,
     calib_dir: str,
     successMap: dict[str, bool],
@@ -48,11 +47,9 @@ def cal_flow(
     workflow = build_workflow(task_names, qubits=qubits)
     task_manager.task_result = workflow
     task_manager.save()
-    execution_manager.load_from_file(
-        calib_data_path=calib_dir
-    )  #  TODO(orangekame3): This is memory inefficient and should be fixed
-    execution_manager.task_results[execution_id] = task_manager.task_result
-    execution_manager.save()
+    ExecutionManager(execution_id=execution_id, calib_data_path=calib_dir).update_with_task_manager(
+        task_manager=task_manager
+    )
     try:
         logger.info("Starting all processes")
         for task_name in task_names:
@@ -106,7 +103,6 @@ def merge_results_qubits(calib_dir: str) -> None:
 
 
 async def trigger_cal_flow(
-    execution_manager: ExecutionManager,
     menu: Menu,
     calib_dir: str,
     successMap: dict[str, bool],
@@ -117,7 +113,6 @@ async def trigger_cal_flow(
     deployments = []
     for qubit in qubits:
         parameters = {
-            "execution_manager": execution_manager.model_dump(),
             "menu": menu.model_dump(),
             "calib_dir": calib_dir,
             "successMap": successMap,
@@ -151,7 +146,6 @@ def organize_qubits(qubits: list[list[int]], parallel: bool) -> list[list[int]]:
     flow_run_name="{execution_id}",
 )
 async def qubex_one_qubit_cal_flow(
-    execution_manager: ExecutionManager,
     menu: Menu,
     calib_dir: str,
     successMap: dict[str, bool],
@@ -168,13 +162,13 @@ async def qubex_one_qubit_cal_flow(
     if parallel:
         logger.info("parallel is True")
         # qubits = organize_qubits(menu.one_qubit_calib_plan, parallel)
-        await trigger_cal_flow(execution_manager, menu, calib_dir, successMap, execution_id, plan)
+        await trigger_cal_flow(menu, calib_dir, successMap, execution_id, plan)
         merge_results_qubits(calib_dir)
         return successMap
     else:
         # qubits = organize_qubits(menu.one_qubit_calib_plan, parallel)
         logger.info("parallel is False")
-        await trigger_cal_flow(execution_manager, menu, calib_dir, successMap, execution_id, plan)
+        await trigger_cal_flow(menu, calib_dir, successMap, execution_id, plan)
         merge_results_qubits(calib_dir)
         return successMap
 

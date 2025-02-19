@@ -12,13 +12,13 @@ class ReadoutClassification(BaseTask):
 
     output_parameters: dict = {"average_readout_fidelity": {}}
 
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager):
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager) -> None:
         pass
 
-    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any) -> None:
         for label in exp.qubit_labels:
             output_param = {
                 "average_readout_fidelity": result["average_readout_fidelity"][label],
@@ -48,7 +48,7 @@ class ReadoutClassification(BaseTask):
                 data=Data(value=result["readout_fidelties"][label][1]),
             )
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, task_manager: TaskManager) -> None:
         result = exp.build_classifier()
-        exp.calib_note.save()
+        exp.calib_note.save(file_path=task_manager.calib_dir)
         self._postprocess(exp, task_manager, result)

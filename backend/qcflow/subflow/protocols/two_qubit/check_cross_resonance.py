@@ -44,7 +44,7 @@ class CheckCrossResonance(BaseTask):
             self.output_parameters["cancel_amplitude"] = cr_result["cancel_pulse"]["amplitude"]
             self.output_parameters["cancel_phase"] = cr_result["cancel_pulse"]["phase"]
             task_manager.put_output_parameters(self.task_name, self.output_parameters)
-            exp.calib_note.save()
+            exp.calib_note.save(file_path=task_manager.calib_dir)
             task_manager.put_calibration_value(
                 cr_label, "cr_amplitude", cr_result["cr_pulse"]["amplitude"]
             )

@@ -87,5 +87,5 @@ class CreateDRAGPIPulse(BaseTask):
             shots=self.input_parameters["shots"],
             interval=self.input_parameters["interval"],
         )
-        exp.calib_note.save()
+        exp.calib_note.save(file_path=task_manager.calib_dir)
         self._postprocess(exp, task_manager, result)

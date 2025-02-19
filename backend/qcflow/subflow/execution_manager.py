@@ -1,25 +1,18 @@
 import json
 from enum import Enum
 from pathlib import Path
+from typing import Callable
 
 import pendulum
+from filelock import FileLock
 from pydantic import BaseModel
 from qcflow.subflow.constant import COMPLETED, FAILED, RUNNING, SCHDULED
 from qcflow.subflow.system_info import SystemInfo
-from qcflow.subflow.task_manager import CalibData, TaskResult
+from qcflow.subflow.task_manager import CalibData, TaskManager, TaskResult
 
 
 class ExecutionStatus(str, Enum):
-    """Enum class for execution status.
-
-    Attributes
-    ----------
-        SCHEDULED (str): The execution is scheduled.
-        RUNNING (str): The execution is running.
-        COMPLETED (str): The execution is completed.
-        FAILED (str): The execution is failed.
-
-    """
+    """enum class for the status of the execution."""
 
     SCHEDULED = SCHDULED
     RUNNING = RUNNING
@@ -28,35 +21,16 @@ class ExecutionStatus(str, Enum):
 
 
 class ExecutionManager(BaseModel):
-    """Execution manager class.
+    """ExecutionManager class to manage the execution of the calibration flow."""
 
-    Attributes
-    ----------
-        execution_id (str): The execution id.
-        calib_data_path (str): The calibration data path.
-        qubex_version (str): The qubex version.
-        status (ExecutionStatus): The execution status.
-        task_result (TaskResult): The task result.
-        created_at (str): The created time.
-        updated_at (str): The updated time.
-        tags (list[str]): The tags.
-        controller_info (list[dict]): The controller information.
-        fridge_info (float): The fridge information.
-        chip_id (str): The chip id.
-        start_at (str): The start time.
-        end_at (str): The end time.
-        elapsed_time (str): The elapsed time.
-        calib_data (CalibData): The calibration data.
-
-    """
-
+    name: str = ""
     execution_id: str = ""
     calib_data_path: str = ""
     qubex_version: str = ""
     status: ExecutionStatus = ExecutionStatus.SCHEDULED
     task_results: dict[str, TaskResult] = {}
     tags: list[str] = []
-    controller_info: list[dict] = []
+    controller_info: dict[str, dict] = {}
     fridge_info: dict = {}
     chip_id: str = ""
     start_at: str = ""
@@ -72,78 +46,93 @@ class ExecutionManager(BaseModel):
         tags: list[str] = [],
         fridge_info: dict = {},
         chip_id: str = "",
+        name: str = "default",
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.calib_data_path = calib_data_path
+        self.name = name
         self.execution_id = execution_id
-        self.fridge_info = fridge_info
+        self.calib_data_path = calib_data_path
         self.tags = tags
+        self.fridge_info = fridge_info
         self.chip_id = chip_id
-        self.save()
+        self._lock_file = Path(f"{self.calib_data_path}/execution_note.lock")
+
+    def _with_file_lock(self, func: Callable[["ExecutionManager"], None]) -> None:
+        """Filelock in the update method."""
+        lock = FileLock(str(self._lock_file))
+        with lock:
+            instance = ExecutionManager.load_from_file(self.calib_data_path)
+            func(instance)
+            instance.system_info.update_time()
+            instance._atomic_save()
+
+    def update_status(self, new_status: ExecutionStatus) -> None:
+        """Update the status of the execution."""
+
+        def updater(instance: ExecutionManager) -> None:
+            instance.status = new_status
+
+        self._with_file_lock(updater)
 
     def update_execution_status_to_running(self) -> None:
-        """Update the execution status to running."""
-        self.status = ExecutionStatus.RUNNING
-        self.system_info.update_time()
-        self.save()
+        self.update_status(ExecutionStatus.RUNNING)
 
     def update_execution_status_to_completed(self) -> None:
-        """Update the execution status to success."""
-        self.status = ExecutionStatus.COMPLETED
-        self.system_info.update_time()
-        self.save()
+        self.update_status(ExecutionStatus.COMPLETED)
 
     def update_execution_status_to_failed(self) -> None:
-        """Update the execution status to failed."""
-        self.status = ExecutionStatus.FAILED
-        self.system_info.update_time()
-        self.save()
+        self.update_status(ExecutionStatus.FAILED)
 
-    def put_controller_info(self, box_info: dict) -> None:
-        """Put the box information to the task manager."""
-        self.controller_info.append(box_info)
-        self.save()
+    def update_with_task_manager(self, task_manager: TaskManager) -> None:
+        def updater(instance: ExecutionManager) -> None:
+            instance.task_results[task_manager.id] = task_manager.task_result
+            for qid in task_manager.calib_data.qubit:
+                instance.calib_data.qubit[qid] = task_manager.calib_data.qubit[qid]
+            for qid in task_manager.calib_data.coupling:
+                instance.calib_data.coupling[qid] = task_manager.calib_data.coupling[qid]
+            for _id in task_manager.controller_info:
+                instance.controller_info[_id] = task_manager.controller_info[_id]
 
-    def save(self) -> None:
-        """Save the task manager to a file."""
-        from pathlib import Path
-
-        save_path = Path(f"{self.calib_data_path}/execution_note.json")
-        with save_path.open("w") as f:
-            f.write(json.dumps(self.model_dump(), indent=2))
-
-    @classmethod
-    def load_from_file(cls, calib_data_path: str) -> "ExecutionManager":
-        """Load the task manager from a file."""
-        save_path = Path(f"{calib_data_path}/execution_note.json")
-        return cls.model_validate_json(save_path.read_text())
+        self._with_file_lock(updater)
 
     def calculate_elapsed_time(self, start_at: str, end_at: str) -> str:
-        """Calculate the elapsed time.
-
-        Args:
-        ----
-            start_at (str): The start time.
-            end_at (str): The end time.
-
-        """
         try:
             start_time = pendulum.parse(start_at)
             end_time = pendulum.parse(end_at)
         except Exception as e:
-            error_message = f"Failed to parse the time. {e}"
-            raise ValueError(error_message)
+            raise ValueError(f"Failed to parse the time. {e}")
         return end_time.diff_for_humans(start_time, absolute=True)
 
     def start_execution(self) -> None:
-        """Start all the process."""
-        self.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-        self.save()
+        def updater(instance: ExecutionManager) -> None:
+            instance.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+
+        self._with_file_lock(updater)
 
     def end_execution(self) -> None:
-        """End all the process."""
-        self.end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-        self.elapsed_time = self.calculate_elapsed_time(self.start_at, self.end_at)
-        # self.pending_task_all()
-        self.save()
+        def updater(instance: ExecutionManager) -> None:
+            instance.end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+            instance.elapsed_time = instance.calculate_elapsed_time(
+                instance.start_at, instance.end_at
+            )
+
+        self._with_file_lock(updater)
+
+    def save(self) -> None:
+        self._atomic_save()
+
+    def _atomic_save(self) -> None:
+        """Filelock in the save method."""
+        save_path = Path(f"{self.calib_data_path}/execution_note.json")
+        temp_path = save_path.with_suffix(".tmp")
+        with temp_path.open("w") as f:
+            f.write(json.dumps(self.model_dump(), indent=2))
+        temp_path.replace(save_path)
+
+    @classmethod
+    def load_from_file(cls, calib_data_path: str) -> "ExecutionManager":
+        save_path = Path(f"{calib_data_path}/execution_note.json")
+        if not save_path.exists():
+            raise FileNotFoundError(f"{save_path} does not exist.")
+        return cls.model_validate_json(save_path.read_text())

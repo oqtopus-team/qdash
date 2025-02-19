@@ -1,5 +1,6 @@
 import numpy as np
 from prefect import get_run_logger, task
+from qcflow.subflow.execution_manager import ExecutionManager
 from qcflow.subflow.protocols.benchmark.randomized_benchmarking import RandomizedBenchmarking
 from qcflow.subflow.protocols.benchmark.x90_interleaved_randomized_benchmarking import (
     X90InterleavedRandomizedBenchmarking,
@@ -296,19 +297,31 @@ def execute_dynamic_task(
         task_manager.update_all_qid_task_status_to_running(
             task_name=task_name, message=f"running {task_name} ...", task_type=task_type, qids=qids
         )
+        ExecutionManager(
+            execution_id=task_manager.execution_id, calib_data_path=task_manager.calib_dir
+        ).update_with_task_manager(task_manager=task_manager)
         task_instance.execute(exp, task_manager)
         logger.info(f"Task {task_name} is successful, id: {task_manager.id}")
         task_manager.update_all_qid_task_status_to_completed(
             task_name=task_name, message=f"{task_name} is completed", task_type=task_type, qids=qids
         )
+        ExecutionManager(
+            execution_id=task_manager.execution_id, calib_data_path=task_manager.calib_dir
+        ).update_with_task_manager(task_manager=task_manager)
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
         task_manager.update_all_qid_task_status_to_failed(
             task_name=task_name, message=f"{task_name} failed", task_type=task_type, qids=qids
         )
+        ExecutionManager(
+            execution_id=task_manager.execution_id, calib_data_path=task_manager.calib_dir
+        ).update_with_task_manager(task_manager=task_manager)
         raise RuntimeError(f"Task {task_name} failed: {e}")
     finally:
         logger.info(f"Ending task: {task_name}, id: {task_manager.id}")
         task_manager.end_all_qid_tasks(task_name, task_type, qids)
         task_manager.save()
+        ExecutionManager(
+            execution_id=task_manager.execution_id, calib_data_path=task_manager.calib_dir
+        ).update_with_task_manager(task_manager=task_manager)
     return task_manager

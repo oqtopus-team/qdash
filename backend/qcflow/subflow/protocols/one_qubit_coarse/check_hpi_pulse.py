@@ -23,4 +23,4 @@ class CheckHPIPulse(BaseTask):
             exp.hpi_pulse,
             repetitions=20,
         )
-        exp.calib_note.save()
+        exp.calib_note.save(file_path=task_manager.calib_dir)

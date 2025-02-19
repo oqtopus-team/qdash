@@ -18,4 +18,4 @@ class CheckNoise(BaseTask):
 
     def execute(self, exp: Experiment, task_manager: TaskManager):
         exp.check_noise()
-        exp.calib_note.save()
+        exp.calib_note.save(file_path=task_manager.calib_dir)

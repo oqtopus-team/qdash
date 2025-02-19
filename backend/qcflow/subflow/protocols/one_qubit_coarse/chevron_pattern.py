@@ -25,4 +25,4 @@ class ChevronPattern(BaseTask):
             detuning_range=np.linspace(-0.05, 0.05, 51),
             time_range=np.arange(0, 201, 4),
         )
-        exp.calib_note.save()
+        exp.calib_note.save(file_path=task_manager.calib_dir)

@@ -81,4 +81,4 @@ class RandomizedBenchmarking(BaseTask):
                 interval=self.input_parameters["interval"],
             )
             self._postprocess(exp, task_manager, result, label)
-        exp.calib_note.save()
+        exp.calib_note.save(file_path=task_manager.calib_dir)

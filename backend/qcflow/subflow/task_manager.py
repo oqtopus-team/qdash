@@ -244,6 +244,7 @@ class TaskManager(BaseModel):
     task_result: TaskResult = TaskResult()  # デフォルト値を指定
     calib_data: CalibData = CalibData(qubit={}, coupling={})
     calib_dir: str = ""
+    controller_info: dict[str, dict] = {}
 
     def __init__(self, execution_id: str, qids: list[str] = [], calib_dir: str = ".") -> None:
         super().__init__()
@@ -511,3 +512,6 @@ class TaskManager(BaseModel):
             height=height,
             scale=scale,
         )
+
+    def put_controller_info(self, box_info: dict) -> None:
+        self.controller_info = box_info
