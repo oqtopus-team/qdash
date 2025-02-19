@@ -76,6 +76,45 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 line-length = 100
 lint.unfixable = ["F401"]
+lint.select = ["ALL"]
+lint.ignore = [
+  "COM812",
+  "CPY001",
+  "D100",
+  "D104",
+  "D107",
+  "D203",
+  "D213",
+  "ISC001",
+  "ERA001",
+  "G004",
+  "TRY400",
+  "TRY003",
+  "BLE001",
+  "EM102",
+  "B904",
+  "FA102",
+  "D102",
+  "PLR0913",
+  "B006",
+  "E501",
+  "N803",
+  "TD003",
+  "FIX002",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+  "ANN201",
+  "ANN205",
+  "ANN401",
+  "CPY001",
+  "D",
+  "PLC1901",
+  "PLR2004",
+  "PLR6301",
+  "S101",
+]
 
 [tool.mypy]
 disallow-untyped-defs = true

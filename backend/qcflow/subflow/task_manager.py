@@ -1,12 +1,12 @@
 import json
-import os
 import uuid
 from copy import deepcopy
-from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
+import pendulum
 import plotly.graph_objs as go
 from pydantic import BaseModel, Field
 from qcflow.subflow.constant import COMPLETED, FAILED, PENDING, RUNNING, SCHDULED
@@ -14,15 +14,16 @@ from qcflow.subflow.system_info import SystemInfo
 
 
 class TaskStatus(str, Enum):
-    """
-    Task status enum.
+    """Task status enum.
 
-    Attributes:
+    Attributes
+    ----------
         SCHEDULED (str): The task is scheduled.
         RUNNING (str): The task is running.
         COMPLETED (str): The task is completed.
         FAILED (str): The task is failed.
         PENDING (str): The task is pending
+
     """
 
     SCHEDULED = SCHDULED
@@ -32,52 +33,49 @@ class TaskStatus(str, Enum):
     PENDING = PENDING
 
 
-def current_iso_time() -> str:
-    return datetime.now().isoformat()
-
-
 class Data(BaseModel):
-    """
-    Data model.
+    """Data model.
 
-    Attributes:
+    Attributes
+    ----------
         qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.
         coupling (dict[str, dict[str, float | int]]): The calibration data for couplings.
+
     """
 
     value: float | int = 0
     unit: str = ""
     calibrated_at: str = Field(
-        default_factory=current_iso_time,
+        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
         description="The time when the system information was created",
     )
 
 
 class CalibData(BaseModel):
+    """Calibration data model.
+
+    Attributes
+    ----------
+        qubit (dict[str, dict[str, Data]]): The calibration data for qubits.
+        coupling (dict[str, dict[str, Data]]): The calibration data for couplings.
+
     """
-    Calibration data model.
 
-    Attributes:
-        qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.
-        coupling (dict[str, dict[str, float | int]]): The calibration data for couplings.
-    """
+    qubit: dict[str, dict[str, Data]] = Field(default_factory=dict)
+    coupling: dict[str, dict[str, Data]] = Field(default_factory=dict)
 
-    qubit: dict[str, dict[str, float | int]] = Field(default_factory=dict)
-    coupling: dict[str, dict[str, float | int]] = Field(default_factory=dict)
+    def put_qubit_data(self, qid: str, parameter_name: str, data: Data) -> None:
+        self.qubit[qid][parameter_name] = data
 
-    def put_qubit_data(self, qid: str, parameter_name: str, value: float | int):
-        self.qubit[qid][parameter_name] = value
-
-    def put_coupling_data(self, qid: str, parameter_name: str, value: float | int):
-        self.coupling[qid][parameter_name] = value
+    def put_coupling_data(self, qid: str, parameter_name: str, data: Data) -> None:
+        self.coupling[qid][parameter_name] = data
 
 
 class BaseTaskResult(BaseModel):
-    """
-    Base class for task results.
+    """Base class for task results.
 
-    Attributes:
-
+    Attributes
+    ----------
         id (str): The unique identifier of the task result.
         name (str): The name of the task.
         upstream_id (str): The unique identifier of the upstream task.
@@ -92,6 +90,7 @@ class BaseTaskResult(BaseModel):
         elapsed_time (str): The elapsed time of the task.
         task_type (str): The type of the task.
         system_info (SystemInfoModel): The system information.
+
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -109,17 +108,13 @@ class BaseTaskResult(BaseModel):
     task_type: str = "global"
     system_info: SystemInfo = SystemInfo()
 
-    def diagnose(self):
-        """
-        diagnose the task result and raise an error if the task failed.
-        """
+    def diagnose(self) -> None:
+        """Diagnose the task result and raise an error if the task failed."""
         if self.status == TaskStatus.FAILED:
             raise RuntimeError(f"Task {self.name} failed with message: {self.message}")
 
-    def put_input_parameter(self, input_parameters: dict):
-        """
-        put a parameter to the task result.
-        """
+    def put_input_parameter(self, input_parameters: dict) -> None:
+        """Put a parameter to the task result."""
         copied_parameters = deepcopy(input_parameters)
         # Process the copied_parameters
         for key, item in copied_parameters.items():
@@ -131,9 +126,7 @@ class BaseTaskResult(BaseModel):
                 copied_parameters[key] = item
         self.input_parameters = copied_parameters
 
-    def put_output_parameter(self, output_parameters: dict):
-        from copy import deepcopy
-
+    def put_output_parameter(self, output_parameters: dict) -> None:
         import numpy as np
 
         """
@@ -150,40 +143,54 @@ class BaseTaskResult(BaseModel):
                 copied_parameters[key] = item
         self.output_parameters = copied_parameters
 
-    def put_note(self, note: str):
-        """
-        put a note to the task result.
+    def put_note(self, note: str) -> None:
+        """Put a note to the task result.
+
+        Args:
+        ----
+            note (str): The note to put.
+
         """
         self.note = note
 
-    def calculate_elapsed_time(self, start_at: str, end_at: str):
+    def calculate_elapsed_time(self, start_at: str, end_at: str) -> str:
+        """Calculate the elapsed time.
+
+        Args:
+        ----
+            start_at (str): The start time.
+            end_at (str): The end time.
+
         """
-        Calculate the elapsed time.
-        """
-        start_time = datetime.strptime(start_at, "%Y-%m-%d %H:%M:%S")
-        end_time = datetime.strptime(end_at, "%Y-%m-%d %H:%M:%S")
-        elapsed_time = end_time - start_time
-        return str(elapsed_time)
+        try:
+            start_time = pendulum.parse(start_at)
+            end_time = pendulum.parse(end_at)
+        except Exception as e:
+            error_message = f"Failed to parse the time. {e}"
+            raise ValueError(error_message)
+        return end_time.diff_for_humans(start_time, absolute=True)
 
 
 class GlobalTask(BaseTaskResult):
-    """
-    Global task result class.
+    """Global task result class.
 
-    Attributes:
+    Attributes
+    ----------
         task_type (str): The type of the task. e.g. "global".
+
     """
 
     task_type: Literal["global"] = "global"
 
 
 class QubitTask(BaseTaskResult):
-    """
-    Qubit task result class.
+    """Qubit task result class.
 
-    Attributes:
+    Attributes
+    ----------
         task_type (str): The type of the task. e.g. "qubit".
         qid (str): The qubit id.
+
     """
 
     task_type: Literal["qubit"] = "qubit"
@@ -191,12 +198,13 @@ class QubitTask(BaseTaskResult):
 
 
 class CouplingTask(BaseTaskResult):
-    """
-    Coupling task result class.
+    """Coupling task result class.
 
-    Attributes:
+    Attributes
+    ----------
         task_type (str): The type of the task. e.g. "coupling".
         qid (str): The qubit id.
+
     """
 
     task_type: Literal["coupling"] = "coupling"
@@ -204,13 +212,14 @@ class CouplingTask(BaseTaskResult):
 
 
 class TaskResult(BaseModel):
-    """
-    Task result class.
+    """Task result class.
 
-    Attributes:
+    Attributes
+    ----------
         global_tasks (list[GlobalTask]): The global tasks.
         qubit_tasks (dict[str, list[QubitTask]]): The qubit tasks.
         coupling_tasks (dict[str, list[CouplingTask]]): The coupling tasks.
+
     """
 
     global_tasks: list[GlobalTask] = []
@@ -219,23 +228,26 @@ class TaskResult(BaseModel):
 
 
 class TaskManager(BaseModel):
-    """
-    Task manager class.
+    """Task manager class.
 
-    Attributes:
+    Attributes
+    ----------
         id (str): The unique identifier of the task manager.
         task_result (TaskResult): The task result.
         calib_data (CalibData): The calibration data.
         calib_dir (str): The calibration directory.
+
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    execution_id: str = ""
     task_result: TaskResult = TaskResult()  # デフォルト値を指定
     calib_data: CalibData = CalibData(qubit={}, coupling={})
     calib_dir: str = ""
 
-    def __init__(self, qids: list[str] = [], calib_dir: str = ".", **data):
-        super().__init__(**data)
+    def __init__(self, execution_id: str, qids: list[str] = [], calib_dir: str = ".") -> None:
+        super().__init__()
+        self.execution_id = execution_id
         for qid in qids:
             self.task_result.qubit_tasks[qid] = []
             self.task_result.coupling_tasks[qid] = []
@@ -243,43 +255,53 @@ class TaskManager(BaseModel):
             self.calib_dir = calib_dir
 
     def _get_task_container(
-        self, task_name: str, task_type: str, qid: str = ""
+        self, task_type: str, qid: str = ""
     ) -> list[GlobalTask] | list[QubitTask] | list[CouplingTask]:
         container: list[GlobalTask] | list[QubitTask] | list[CouplingTask]
         if task_type == "global":
             return self.task_result.global_tasks
-        elif task_type == "qubit":
+        if task_type == "qubit":
             if qid is None:
-                raise ValueError("For qubit tasks, a qid must be provided.")
+                error_message = "For qubit tasks, a qid must be provided."
+                raise ValueError(error_message)
             container = self.task_result.qubit_tasks[qid]
             if container is None:
-                raise ValueError(f"No tasks found for qubit '{qid}'.")
+                error_message = f"No tasks found for qubit '{qid}'."
+                raise ValueError(error_message)
             return container
-        elif task_type == "coupling":
+        if task_type == "coupling":
             if qid is None:
-                raise ValueError("For coupling tasks, a qid must be provided.")
+                error_message = "For coupling tasks, a qid must be provided."
+                raise ValueError(error_message)
             container = self.task_result.coupling_tasks[qid]
             if container is None:
-                raise ValueError(f"No tasks found for coupling with qid '{qid}'.")
+                error_message = f"No tasks found for coupling with qid '{qid}'."
+                raise ValueError(error_message)
             return container
-        else:
-            raise ValueError(f"Unknown task type: {task_type}")
+        error_message = f"Unknown task type: {task_type}"
+        raise ValueError(error_message)
 
     def _update_task_status_in_container(
         self, container: list, task_name: str, new_status: TaskStatus, message: str
     ) -> None:
-        """
-        Update the status of a task with the given name to the new status.
-        """
+        """Update the status of a task with the given name to the new status."""
         for t in container:
             if t.name == task_name:
                 t.status = new_status
                 t.message = message
+                t.system_info.update_time()
                 return
         raise ValueError(f"Task '{task_name}' not found in container.")
 
     def start_task(self, task_name: str, task_type: str = "global", qid: str = "") -> None:
-        pass
+        container = self._get_task_container(task_type, qid)
+        for t in container:
+            if t.name == task_name:
+                t.status = TaskStatus.RUNNING
+                t.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+                t.system_info.update_time()
+                return
+        raise ValueError(f"Task '{task_name}' not found in container.")
 
     def start_all_qid_tasks(
         self, task_name: str, task_type: str = "qubit", qids: list[str] = []
@@ -288,7 +310,15 @@ class TaskManager(BaseModel):
             self.start_task(task_name, task_type, qid)
 
     def end_task(self, task_name: str, task_type: str = "global", qid: str = "") -> None:
-        pass
+        container = self._get_task_container(task_type, qid)
+        for t in container:
+            if t.name == task_name:
+                t.status = TaskStatus.COMPLETED
+                t.end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+                t.elapsed_time = t.calculate_elapsed_time(t.start_at, t.end_at)
+                t.system_info.update_time()
+                return
+        raise ValueError(f"Task '{task_name}' not found in container.")
 
     def end_all_qid_tasks(
         self, task_name: str, task_type: str = "qubit", qids: list[str] = []
@@ -304,44 +334,66 @@ class TaskManager(BaseModel):
         task_type: str = "global",
         qid: str = "",
     ) -> None:
-        """
-        Update the status of a task with the given name to the new status.
-        """
-        container = self._get_task_container(task_name, task_type, qid)
+        """Update the status of a task with the given name to the new status."""
+        container = self._get_task_container(task_type, qid)
         self._update_task_status_in_container(container, task_name, new_status, message)
 
     def update_task_status_to_running(
-        self, task_name: str, task_type: str = "global", qid: str = ""
+        self, task_name: str, message: str = "", task_type: str = "global", qid: str = ""
     ) -> None:
-        self.update_task_status(task_name, TaskStatus.RUNNING, task_type=task_type, qid=qid)
-
-    def update_all_qid_task_status_to_running(
-        self, task_name: str, task_type: str = "qubit", qids: list[str] = []
-    ) -> None:
-        for qid in qids:
-            self.update_task_status_to_running(task_name, task_type, qid)
+        self.update_task_status(
+            task_name=task_name,
+            new_status=TaskStatus.RUNNING,
+            message=message,
+            task_type=task_type,
+            qid=qid,
+        )
 
     def update_task_status_to_completed(
         self, task_name: str, message: str = "", task_type: str = "global", qid: str = ""
     ) -> None:
-        self.update_task_status(task_name, TaskStatus.COMPLETED, message, task_type, qid)
+        self.update_task_status(
+            task_name=task_name,
+            new_status=TaskStatus.COMPLETED,
+            message=message,
+            task_type=task_type,
+            qid=qid,
+        )
+
+    def update_task_status_to_failed(
+        self, task_name: str, message: str = "", task_type: str = "global", qid: str = ""
+    ) -> None:
+        self.update_task_status(
+            task_name=task_name,
+            new_status=TaskStatus.FAILED,
+            message=message,
+            task_type=task_type,
+            qid=qid,
+        )
+
+    def update_all_qid_task_status_to_running(
+        self, task_name: str, message: str = "", task_type: str = "qubit", qids: list[str] = []
+    ) -> None:
+        for qid in qids:
+            self.update_task_status_to_running(
+                task_name=task_name, message=message, task_type=task_type, qid=qid
+            )
 
     def update_all_qid_task_status_to_completed(
         self, task_name: str, message: str = "", task_type: str = "qubit", qids: list[str] = []
     ) -> None:
         for qid in qids:
-            self.update_task_status_to_completed(task_name, message, task_type, qid)
-
-    def update_task_status_to_failed(
-        self, task_name: str, message: str = "", task_type: str = "global", qid: str = ""
-    ) -> None:
-        self.update_task_status(task_name, TaskStatus.FAILED, message, task_type, qid)
+            self.update_task_status_to_completed(
+                task_name=task_name, message=message, task_type=task_type, qid=qid
+            )
 
     def update_all_qid_task_status_to_failed(
         self, task_name: str, message: str = "", task_type: str = "qubit", qids: list[str] = []
     ) -> None:
         for qid in qids:
-            self.update_task_status_to_failed(task_name, message, task_type, qid)
+            self.update_task_status_to_failed(
+                task_name=task_name, message=message, task_type=task_type, qid=qid
+            )
 
     def _find_task_in_container(
         self, container: list[GlobalTask] | list[QubitTask] | list[CouplingTask], task_name: str
@@ -354,7 +406,7 @@ class TaskManager(BaseModel):
     def put_input_parameters(
         self, task_name: str, input_parameters: dict, task_type: str = "global", qid: str = ""
     ) -> None:
-        container = self._get_task_container(task_name, task_type, qid)
+        container = self._get_task_container(task_type, qid)
 
         task = self._find_task_in_container(container, task_name)
         if task is None:
@@ -365,7 +417,7 @@ class TaskManager(BaseModel):
     def put_output_parameters(
         self, task_name: str, output_parameters: dict, task_type: str = "global", qid: str = ""
     ) -> None:
-        container = self._get_task_container(task_name, task_type, qid)
+        container = self._get_task_container(task_type, qid)
 
         task = self._find_task_in_container(container, task_name)
         if task is None:
@@ -373,20 +425,18 @@ class TaskManager(BaseModel):
         task.put_output_parameter(output_parameters)
         task.system_info.update_time()
 
-    def put_calib_data(
-        self, qid: str, task_type: str, parameter_name: str, value: float | int
-    ) -> None:
+    def put_calib_data(self, qid: str, task_type: str, parameter_name: str, data: Data) -> None:
         if task_type == "qubit":
-            self.calib_data.put_qubit_data(qid, parameter_name, value)
+            self.calib_data.put_qubit_data(qid, parameter_name, data)
         elif task_type == "coupling":
-            self.calib_data.put_coupling_data(qid, parameter_name, value)
+            self.calib_data.put_coupling_data(qid, parameter_name, data)
         else:
             raise ValueError(f"Unknown task type: {task_type}")
 
     def put_note_to_task(
         self, task_name: str, note: str, task_type: str = "global", qid: str = ""
     ) -> None:
-        container = self._get_task_container(task_name, task_type, qid)
+        container = self._get_task_container(task_type, qid)
 
         task = self._find_task_in_container(container, task_name)
         if task is None:
@@ -401,61 +451,62 @@ class TaskManager(BaseModel):
         savedir: str = "",
         qid: str = "",
     ) -> None:
-        container = self._get_task_container(task_name, task_type, qid)
+        container = self._get_task_container(task_type, qid)
 
         task = self._find_task_in_container(container, task_name)
         if task is None:
             raise ValueError(f"Task '{task_name}' not found.")
-        if savedir == "":
-            savedir = os.path.join(self.calib_dir, "fig")
-        os.makedirs(savedir, exist_ok=True)
+        savedir_path = Path(self.calib_dir) / "fig" if savedir == "" else Path(savedir)
+        savedir_path.mkdir(parents=True, exist_ok=True)
 
-        base_savepath = os.path.join(savedir, f"{qid}_{task_name}")
-        savepath = f"{base_savepath}.png"
-        counter = 0
-        while os.path.exists(savepath):
-            savepath = f"{base_savepath}_{counter}.png"
+        base_savepath = savedir_path / f"{qid}_{task_name}"
+        savepath = base_savepath.with_suffix(".png")
+        counter = 1
+        while savepath.exists():
+            savepath = base_savepath.with_name(f"{base_savepath.stem}_{counter}.png")
             counter += 1
 
-        task.figure_path.append(savepath)
-        self._save_figure(savepath=savepath, fig=figure)
+        task.figure_path.append(str(savepath))
+        self._write_figure(savepath=str(savepath), fig=figure)
 
     def save(self, calib_dir: str = "") -> None:
         if calib_dir == "":
             calib_dir = f"{self.calib_dir}/task"
-        with open(f"{calib_dir}/{self.id}.json", "w") as f:
+
+        with Path(f"{calib_dir}/{self.id}.json").open("w") as f:
             json.dump(self.model_dump(), f, indent=2)
 
-    def diagnose(self):
-        pass
+    def diagnose(self) -> None:
+        """Diagnose the task manager and raise an error if the task failed."""
 
-    def _save_figure(
+    def _write_figure(
         self,
         fig: go.Figure,
-        format: Literal["png", "svg", "jpeg", "webp"] = "png",
+        file_format: Literal["png", "svg", "jpeg", "webp"] = "png",
         width: int = 600,
         height: int = 300,
         scale: int = 3,
         name: str = "",
         savepath: str = "",
-    ):
-        """
-        Save the figure.
+    ) -> None:
+        """Save the figure.
 
         Args:
-            savedir (str): The directory to save the figure.
-            name (str): The name of the figure.
+        ----
+            savepath (str): The path to save the figure.
             fig (go.Figure): The figure to save.
-            format (Literal["png", "svg", "jpeg", "webp"]): The format of the figure.
-            width (int): The width of the figure.
-            height (int): The height of the figure.
-            scale (int): The scale of the figure.
+            file_format (str, optional): The format of the file. Defaults to "png".
+            width (int, optional): The width of the figure. Defaults to 600.
+            height (int, optional): The height of the figure. Defaults to 300.
+            scale (int, optional): The scale of the figure. Defaults to 3.
+            name (str, optional): The name of the figure. Defaults to "".
+
         """
         if savepath == "":
-            savepath = os.path.join(self.calib_dir, "fig", f"{name}.{format}")
+            savepath = str(Path(self.calib_dir) / "fig" / f"{name}.{file_format}")
         fig.write_image(
             savepath,
-            format=format,
+            format=file_format,
             width=width,
             height=height,
             scale=scale,

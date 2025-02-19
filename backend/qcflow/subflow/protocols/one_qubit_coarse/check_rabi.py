@@ -1,7 +1,7 @@
 from typing import Any
 
 from qcflow.subflow.protocols.base import BaseTask
-from qcflow.subflow.task_manager import TaskManager
+from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_qid
 from qubex.experiment import Experiment
 from qubex.experiment.experiment import RABI_TIME_RANGE
@@ -64,13 +64,13 @@ class CheckRabi(BaseTask):
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="rabi_amplitude",
-                value=result.rabi_params[label].amplitude,
+                data=Data(value=result.rabi_params[label].amplitude),
             )
             task_manager.put_calib_data(
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="rabi_frequency",
-                value=result.rabi_params[label].frequency,
+                data=Data(value=result.rabi_params[label].frequency, unit="GHz"),
             )
             task_manager.save_figure(
                 task_name=f"{self.task_name}",

@@ -1,7 +1,8 @@
 import json
-from datetime import datetime
 from enum import Enum
+from pathlib import Path
 
+import pendulum
 from pydantic import BaseModel
 from qcflow.subflow.constant import COMPLETED, FAILED, RUNNING, SCHDULED
 from qcflow.subflow.system_info import SystemInfo
@@ -9,14 +10,15 @@ from qcflow.subflow.task_manager import CalibData, TaskResult
 
 
 class ExecutionStatus(str, Enum):
-    """
-    Execution status enum.
+    """Enum class for execution status.
 
-    Attributes:
-        SCHEDULED (str): The execution
-        RUNNING (str): The execution
-        COMPLETED (str): The execution
-        FAILED (str): The execution
+    Attributes
+    ----------
+        SCHEDULED (str): The execution is scheduled.
+        RUNNING (str): The execution is running.
+        COMPLETED (str): The execution is completed.
+        FAILED (str): The execution is failed.
+
     """
 
     SCHEDULED = SCHDULED
@@ -26,10 +28,10 @@ class ExecutionStatus(str, Enum):
 
 
 class ExecutionManager(BaseModel):
-    """
-    Execution manager class.
+    """Execution manager class.
 
-    Attributes:
+    Attributes
+    ----------
         execution_id (str): The execution id.
         calib_data_path (str): The calibration data path.
         qubex_version (str): The qubex version.
@@ -45,13 +47,14 @@ class ExecutionManager(BaseModel):
         end_at (str): The end time.
         elapsed_time (str): The elapsed time.
         calib_data (CalibData): The calibration data.
+
     """
 
     execution_id: str = ""
     calib_data_path: str = ""
     qubex_version: str = ""
     status: ExecutionStatus = ExecutionStatus.SCHEDULED
-    task_result: TaskResult = TaskResult()
+    task_results: dict[str, TaskResult] = {}
     tags: list[str] = []
     controller_info: list[dict] = []
     fridge_info: dict = {}
@@ -66,108 +69,81 @@ class ExecutionManager(BaseModel):
         self,
         execution_id: str,
         calib_data_path: str,
-        tags: list[str],
-        **kargs,
-    ):
-        super().__init__(**kargs)
+        tags: list[str] = [],
+        fridge_info: dict = {},
+        chip_id: str = "",
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
         self.calib_data_path = calib_data_path
         self.execution_id = execution_id
-        self.fridge_info = {"temperature": 0.0}
+        self.fridge_info = fridge_info
         self.tags = tags
+        self.chip_id = chip_id
         self.save()
 
     def update_execution_status_to_running(self) -> None:
-        """
-        Update the execution status to running.
-        """
+        """Update the execution status to running."""
         self.status = ExecutionStatus.RUNNING
         self.system_info.update_time()
         self.save()
 
     def update_execution_status_to_completed(self) -> None:
-        """
-        Update the execution status to success.
-        """
+        """Update the execution status to success."""
         self.status = ExecutionStatus.COMPLETED
         self.system_info.update_time()
         self.save()
 
     def update_execution_status_to_failed(self) -> None:
-        """
-        Update the execution status to failed.
-        """
+        """Update the execution status to failed."""
         self.status = ExecutionStatus.FAILED
         self.system_info.update_time()
         self.save()
 
     def put_controller_info(self, box_info: dict) -> None:
-        """
-        Put the box information to the task manager.
-        """
+        """Put the box information to the task manager."""
         self.controller_info.append(box_info)
         self.save()
 
-    def save(self):
-        """
-        Save the task manager to a file.
-        """
-        save_path = f"{self.calib_data_path}/calib_note.json"
-        with open(save_path, "w") as f:
-            f.write(json.dumps(self.model_dump(), indent=4))
+    def save(self) -> None:
+        """Save the task manager to a file."""
+        from pathlib import Path
 
-    # def start_task(self, task_name: str) -> None:
-    #     """
-    #     Start the task.
-    #     """
-    #     if task_name in self.tasks:
-    #         self.tasks[task_name].start_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    #         self.save()
-    #     else:
-    #         raise ValueError(f"Task '{task_name}' not found.")
+        save_path = Path(f"{self.calib_data_path}/execution_note.json")
+        with save_path.open("w") as f:
+            f.write(json.dumps(self.model_dump(), indent=2))
 
-    # def end_task(self, task_name: str) -> None:
-    #     """
-    #     End the task.
-    #     """
-    #     if task_name in self.tasks:
-    #         self.tasks[task_name].end_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    #         self.tasks[task_name].elapsed_time = self.tasks[task_name].calculate_elapsed_time(
-    #             self.tasks[task_name].start_at, self.tasks[task_name].end_at
-    #         )
-    #     else:
-    #         raise ValueError(f"Task '{task_name}' not found.")
+    @classmethod
+    def load_from_file(cls, calib_data_path: str) -> "ExecutionManager":
+        """Load the task manager from a file."""
+        save_path = Path(f"{calib_data_path}/execution_note.json")
+        return cls.model_validate_json(save_path.read_text())
 
-    def calculate_elapsed_time(self, start_at: str, end_at: str):
+    def calculate_elapsed_time(self, start_at: str, end_at: str) -> str:
+        """Calculate the elapsed time.
+
+        Args:
+        ----
+            start_at (str): The start time.
+            end_at (str): The end time.
+
         """
-        Calculate the elapsed time.
-        """
-        start_time = datetime.strptime(start_at, "%Y-%m-%d %H:%M:%S")
-        end_time = datetime.strptime(end_at, "%Y-%m-%d %H:%M:%S")
-        elapsed_time = end_time - start_time
-        return str(elapsed_time)
+        try:
+            start_time = pendulum.parse(start_at)
+            end_time = pendulum.parse(end_at)
+        except Exception as e:
+            error_message = f"Failed to parse the time. {e}"
+            raise ValueError(error_message)
+        return end_time.diff_for_humans(start_time, absolute=True)
 
     def start_execution(self) -> None:
-        """
-        Start all the process.
-        """
-        self.start_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        """Start all the process."""
+        self.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
         self.save()
 
-    # def pending_task_all(self) -> None:
-    #     """
-    #     Update all the task status to pending.
-    #     """
-    #     for task_name in self.tasks.keys():
-    #         if self.tasks[task_name].status == TaskStatus.SCHEDULED:
-    #             self.update_task_status_to_pending(task_name)
-    #             self.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    #             self.save()
-
     def end_execution(self) -> None:
-        """
-        End all the process.
-        """
-        self.end_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        """End all the process."""
+        self.end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
         self.elapsed_time = self.calculate_elapsed_time(self.start_at, self.end_at)
         # self.pending_task_all()
         self.save()

@@ -1,7 +1,7 @@
 from typing import Any
 
 from qcflow.subflow.protocols.base import BaseTask
-from qcflow.subflow.task_manager import TaskManager
+from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_qid
 from qubex.experiment import Experiment
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, PI_DURATION
@@ -67,13 +67,13 @@ class CreateDRAGPIPulse(BaseTask):
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="drag_pi_beta",
-                value=result["beta"][label],
+                data=Data(value=result["beta"][label]),
             )
             task_manager.put_calib_data(
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="drag_pi_amplitude",
-                value=result["amplitude"][label],
+                data=Data(value=result["amplitude"][label]),
             )
         task_manager.save()
 

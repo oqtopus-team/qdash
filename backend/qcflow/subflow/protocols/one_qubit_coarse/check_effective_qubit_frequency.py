@@ -2,7 +2,7 @@ from typing import Any
 
 import numpy as np
 from qcflow.subflow.protocols.base import BaseTask
-from qcflow.subflow.task_manager import TaskManager
+from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_qid
 from qubex.experiment import Experiment
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
@@ -58,19 +58,19 @@ class CheckEffectiveQubitFrequency(BaseTask):
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="effective_qubit_frequency",
-                value=result["effective_freq"][label],
+                data=Data(value=result["effective_freq"][label]),
             )
             task_manager.put_calib_data(
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="effective_qubit_frequency_0",
-                value=result["result_0"].data[label].bare_freq,
+                data=Data(value=result["result_0"].data[label].bare_freq),
             )
             task_manager.put_calib_data(
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="effective_qubit_frequency_1",
-                value=result["result_1"].data[label].bare_freq,
+                data=Data(value=result["result_1"].data[label].bare_freq),
             )
             task_manager.save_figure(
                 task_name=self.task_name,

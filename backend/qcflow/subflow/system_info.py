@@ -1,28 +1,19 @@
-from datetime import datetime
-
+import pendulum
 from pydantic import BaseModel, Field
 
 
-def current_iso_time() -> str:
-    return datetime.now().isoformat()
-
-
 class SystemInfo(BaseModel):
-    """Data model for system information.
-
-    Attributes:
-        created_at (str): The time when the system information was created. e.g. "2021-01-01T00:00:00Z".
-        updated_at (str): The time when the system information was updated. e.g. "2021-01-01T00:00:00Z".
-    """
+    """Data model for system information."""
 
     created_at: str = Field(
-        default_factory=current_iso_time,
+        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
         description="The time when the system information was created",
     )
     updated_at: str = Field(
-        default_factory=current_iso_time,
+        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
         description="The time when the system information was updated",
     )
 
-    def update_time(self):
-        self.updated_at = current_iso_time()
+    def update_time(self) -> None:
+        """Update the time when the system information was updated."""
+        self.updated_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()

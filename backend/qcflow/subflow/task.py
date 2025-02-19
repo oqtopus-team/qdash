@@ -229,7 +229,8 @@ task_classes = {
 }
 
 
-def validate_task_name(task_names: list[str]):
+def validate_task_name(task_names: list[str]) -> list[str]:
+    """Validate task names."""
     for task_name in task_names:
         if task_name not in task_classes:
             raise ValueError(f"Invalid task name: {task_name}")
@@ -237,6 +238,7 @@ def validate_task_name(task_names: list[str]):
 
 
 def build_workflow(task_names: list[str], qubits: list[str]) -> TaskResult:
+    """Build workflow."""
     task_result = TaskResult()
     global_previous_task_id = ""
     qubit_previous_task_id = {qubit: "" for qubit in qubits}
@@ -280,6 +282,7 @@ def execute_dynamic_task(
     task_manager: TaskManager,
     task_name: str,
 ) -> TaskManager:
+    """Execute dynamic task."""
     logger = get_run_logger()
     task_manager.diagnose()
     try:
@@ -289,16 +292,23 @@ def execute_dynamic_task(
         task_type = task_map["task_type"]
         task_instance = task_map["instance"]
         task_manager.start_all_qid_tasks(task_name, task_type, qids)
-        task_manager.update_all_qid_task_status_to_running(task_name, task_type, qids)
+        logger.info(f"Running task: {task_name}, id: {task_manager.id}")
+        task_manager.update_all_qid_task_status_to_running(
+            task_name=task_name, message=f"running {task_name} ...", task_type=task_type, qids=qids
+        )
         task_instance.execute(exp, task_manager)
-        logger.info(f"Task {task_name} is successful.")
-        task_manager.update_all_qid_task_status_to_completed(task_name, task_type, qids)
+        logger.info(f"Task {task_name} is successful, id: {task_manager.id}")
+        task_manager.update_all_qid_task_status_to_completed(
+            task_name=task_name, message=f"{task_name} is completed", task_type=task_type, qids=qids
+        )
     except Exception as e:
-        logger.error(f"Failed to execute {task_name}: {e}")
-        task_manager.update_all_qid_task_status_to_failed(task_name, task_type, qids)
+        logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
+        task_manager.update_all_qid_task_status_to_failed(
+            task_name=task_name, message=f"{task_name} failed", task_type=task_type, qids=qids
+        )
         raise RuntimeError(f"Task {task_name} failed: {e}")
     finally:
-        logger.info(f"Ending task: {task_name}")
+        logger.info(f"Ending task: {task_name}, id: {task_manager.id}")
         task_manager.end_all_qid_tasks(task_name, task_type, qids)
         task_manager.save()
     return task_manager

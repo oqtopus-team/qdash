@@ -1,7 +1,7 @@
 from typing import Any
 
 from qcflow.subflow.protocols.base import BaseTask
-from qcflow.subflow.task_manager import TaskManager
+from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_qid
 from qubex.experiment import Experiment
 
@@ -33,19 +33,19 @@ class ReadoutClassification(BaseTask):
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="average_readout_fidelity",
-                value=result["average_readout_fidelity"][label],
+                data=Data(value=result["average_readout_fidelity"][label]),
             )
             task_manager.put_calib_data(
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="readout_fidelity_0",
-                value=result["readout_fidelties"][label][0],
+                data=Data(value=result["readout_fidelties"][label][0]),
             )
             task_manager.put_calib_data(
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="readout_fidelity_1",
-                value=result["readout_fidelties"][label][1],
+                data=Data(value=result["readout_fidelties"][label][1]),
             )
 
     def execute(self, exp: Experiment, task_manager: TaskManager):

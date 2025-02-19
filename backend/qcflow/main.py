@@ -17,7 +17,6 @@ from qcflow.subflow.qubex_one_qubit_cal.flow import qubex_one_qubit_cal_flow
 from qcflow.utiltask.create_directory import (
     create_directory_task,
 )
-from qubex.version import get_package_version
 
 calibration_flow_map = {
     "qubex-one-qubit-cal-flow": qubex_one_qubit_cal_flow,
@@ -72,7 +71,6 @@ def main_flow(
         execution_id=execution_id,
         calib_data_path=calib_dir,
         tags=menu.tags,
-        qubex_version=get_package_version("qubex"),
         fridge_info={"temperature": 0.0},
         chip_id="SAMPLE",
     )

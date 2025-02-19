@@ -1,7 +1,7 @@
 from typing import Any
 
 from qcflow.subflow.protocols.base import BaseTask
-from qcflow.subflow.task_manager import TaskManager
+from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_qid
 from qubex.experiment import Experiment
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, HPI_DURATION
@@ -67,7 +67,7 @@ class CreateHPIPulse(BaseTask):
                 qid=convert_qid(label),
                 task_type=self.task_type,
                 parameter_name="hpi_amplitude",
-                value=result.data[label].calib_value,
+                data=Data(value=result.data[label].calib_value),
             )
             task_manager.save_figure(
                 task_name=self.task_name,

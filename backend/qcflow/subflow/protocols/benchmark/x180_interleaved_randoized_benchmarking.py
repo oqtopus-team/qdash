@@ -2,7 +2,7 @@ from typing import Any
 
 import numpy as np
 from qcflow.subflow.protocols.base import BaseTask
-from qcflow.subflow.task_manager import TaskManager
+from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_qid
 from qubex.clifford import Clifford
 from qubex.experiment import Experiment
@@ -59,7 +59,7 @@ class X180InterleavedRandomizedBenchmarking(BaseTask):
             qid=convert_qid(label),
             task_type=self.task_type,
             parameter_name="x180_gate_fidelity",
-            value=result["gate_fidelity"],
+            data=Data(value=result["gate_fidelity"]),
         )
         task_manager.save_figure(
             task_name=self.task_name,
