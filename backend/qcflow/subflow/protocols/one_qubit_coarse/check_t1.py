@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 from qcflow.subflow.protocols.base import BaseTask
@@ -9,9 +9,11 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 
 class CheckT1(BaseTask):
+    """Task to check the T1 time."""
+
     task_name: str = "CheckT1"
     task_type: str = "qubit"
-    output_parameters: dict = {"t1": {}}
+    output_parameters: ClassVar[list[str]] = ["t1"]
 
     def __init__(
         self,
@@ -22,14 +24,14 @@ class CheckT1(BaseTask):
         ),
         shots=DEFAULT_SHOTS,
         interval=DEFAULT_INTERVAL,
-    ):
+    ) -> None:
         self.input_parameters = {
             "time_range": time_range,
             "shots": shots,
             "interval": interval,
         }
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager):
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager) -> None:
         for label in exp.qubit_labels:
             input_param = {
                 "time_range": self.input_parameters["time_range"],
@@ -44,10 +46,10 @@ class CheckT1(BaseTask):
             )
         task_manager.save()
 
-    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any) -> None:
         for label in exp.qubit_labels:
             output_param = {
-                "t1": result.data[label].t1,
+                "t1": Data(value=result.data[label].t1, unit="ns"),
             }
             task_manager.put_output_parameters(
                 self.task_name,
@@ -68,7 +70,7 @@ class CheckT1(BaseTask):
                 qid=convert_qid(label),
             )
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, task_manager: TaskManager) -> None:
         self._preprocess(exp, task_manager)
         result = exp.t1_experiment(
             time_range=self.input_parameters["time_range"],

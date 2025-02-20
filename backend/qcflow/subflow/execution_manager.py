@@ -1,9 +1,11 @@
+# application code for the execution manager.
 import json
 from enum import Enum
 from pathlib import Path
 from typing import Callable
 
 import pendulum
+from datamodel.execution import ExecutionModel
 from filelock import FileLock
 from pydantic import BaseModel
 from qcflow.subflow.constant import COMPLETED, FAILED, RUNNING, SCHDULED
@@ -26,7 +28,7 @@ class ExecutionManager(BaseModel):
     name: str = ""
     execution_id: str = ""
     calib_data_path: str = ""
-    qubex_version: str = ""
+    note: dict = {}
     status: ExecutionStatus = ExecutionStatus.SCHEDULED
     task_results: dict[str, TaskResult] = {}
     tags: list[str] = []
@@ -38,6 +40,7 @@ class ExecutionManager(BaseModel):
     elapsed_time: str = ""
     calib_data: CalibData = CalibData(qubit={}, coupling={})
     system_info: SystemInfo = SystemInfo()
+    message: str = ""
 
     def __init__(
         self,
@@ -47,6 +50,7 @@ class ExecutionManager(BaseModel):
         fridge_info: dict = {},
         chip_id: str = "",
         name: str = "default",
+        note: dict = {},
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -56,6 +60,7 @@ class ExecutionManager(BaseModel):
         self.tags = tags
         self.fridge_info = fridge_info
         self.chip_id = chip_id
+        self.note = note
         self._lock_file = Path(f"{self.calib_data_path}/execution_note.lock")
 
     def _with_file_lock(self, func: Callable[["ExecutionManager"], None]) -> None:
@@ -84,7 +89,11 @@ class ExecutionManager(BaseModel):
     def update_execution_status_to_failed(self) -> None:
         self.update_status(ExecutionStatus.FAILED)
 
-    def update_with_task_manager(self, task_manager: TaskManager) -> None:
+    def reload(self) -> "ExecutionManager":
+        """Reload the execution manager from the file and return self for chaining."""
+        return ExecutionManager.load_from_file(self.calib_data_path)
+
+    def update_with_task_manager(self, task_manager: TaskManager) -> "ExecutionManager":
         def updater(instance: ExecutionManager) -> None:
             instance.task_results[task_manager.id] = task_manager.task_result
             for qid in task_manager.calib_data.qubit:
@@ -95,6 +104,7 @@ class ExecutionManager(BaseModel):
                 instance.controller_info[_id] = task_manager.controller_info[_id]
 
         self._with_file_lock(updater)
+        return self
 
     def calculate_elapsed_time(self, start_at: str, end_at: str) -> str:
         try:
@@ -136,3 +146,28 @@ class ExecutionManager(BaseModel):
         if not save_path.exists():
             raise FileNotFoundError(f"{save_path} does not exist.")
         return cls.model_validate_json(save_path.read_text())
+
+    # def reload(self) -> None:
+    #     """Reload the execution manager from the file."""
+    #     instance = ExecutionManager.load_from_file(self.calib_data_path)
+    #     self.__dict__.update(instance.__dict__)
+
+    def to_domain(self) -> ExecutionModel:
+        return ExecutionModel(
+            name=self.name,
+            execution_id=self.execution_id,
+            calib_data_path=self.calib_data_path,
+            note=self.note,
+            status=self.status,
+            task_results=self.task_results,
+            tags=self.tags,
+            controller_info=self.controller_info,
+            fridge_info=self.fridge_info,
+            chip_id=self.chip_id,
+            start_at=self.start_at,
+            end_at=self.end_at,
+            elapsed_time=self.elapsed_time,
+            calib_data=self.calib_data.model_dump(),
+            system_info=self.system_info.model_dump(),
+            message=self.message,
+        )

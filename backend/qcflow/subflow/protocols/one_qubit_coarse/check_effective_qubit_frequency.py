@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 from qcflow.subflow.protocols.base import BaseTask
@@ -9,9 +9,15 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 
 class CheckEffectiveQubitFrequency(BaseTask):
+    """Task to check the effective qubit frequency."""
+
     task_name: str = "CheckEffectiveQubitFrequency"
     task_type: str = "qubit"
-    output_parameters: dict = {"effective_qubit_frequency": {}}
+    output_parameters: ClassVar[list[str]] = [
+        "effective_qubit_frequency",
+        "effective_qubit_frequency_0",
+        "effective_qubit_frequency_1",
+    ]
 
     def __init__(
         self,
@@ -19,7 +25,7 @@ class CheckEffectiveQubitFrequency(BaseTask):
         time_range=np.arange(0, 20001, 100),
         shots=DEFAULT_SHOTS,
         interval=DEFAULT_INTERVAL,
-    ):
+    ) -> None:
         self.input_parameters = {
             "detuning": detuning,
             "time_range": time_range,
@@ -27,7 +33,7 @@ class CheckEffectiveQubitFrequency(BaseTask):
             "interval": interval,
         }
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager):
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager) -> None:
         for qid in exp.qubit_labels:
             input_param = {
                 "detuning": self.input_parameters["detuning"],
@@ -43,10 +49,18 @@ class CheckEffectiveQubitFrequency(BaseTask):
             )
         task_manager.save()
 
-    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any) -> None:
         for label in exp.qubit_labels:
             output_param = {
-                "effective_qubit_frequency": result["effective_freq"][label],
+                "effective_qubit_frequency": Data(
+                    value=result["effective_freq"][label], unit="GHz"
+                ),
+                "effective_qubit_frequency_0": Data(
+                    value=result["result_0"].data[label].bare_freq, unit="GHz"
+                ),
+                "effective_qubit_frequency_1": Data(
+                    value=result["result_1"].data[label].bare_freq, unit="GHz"
+                ),
             }
             task_manager.put_output_parameters(
                 self.task_name,
@@ -87,7 +101,7 @@ class CheckEffectiveQubitFrequency(BaseTask):
 
         task_manager.save()
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, task_manager: TaskManager) -> None:
         self._preprocess(exp, task_manager)
         result = exp.obtain_effective_control_frequency(
             exp.qubit_labels,

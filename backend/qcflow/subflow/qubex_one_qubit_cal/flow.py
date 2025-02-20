@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from neodbmodel.execution_history import ExecutionHistoryDocument
 from prefect import flow, get_run_logger, task
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
@@ -18,6 +19,7 @@ from qcflow.subflow.task_manager import TaskManager
 from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
+from repository.initialize import initialize
 
 
 @flow(
@@ -47,9 +49,9 @@ def cal_flow(
     workflow = build_workflow(task_names, qubits=qubits)
     task_manager.task_result = workflow
     task_manager.save()
-    ExecutionManager(execution_id=execution_id, calib_data_path=calib_dir).update_with_task_manager(
-        task_manager=task_manager
-    )
+    em = ExecutionManager.load_from_file(calib_dir).update_with_task_manager(task_manager)
+    initialize()
+    ExecutionHistoryDocument.update_document(em)
     try:
         logger.info("Starting all processes")
         for task_name in task_names:
@@ -156,7 +158,7 @@ async def qubex_one_qubit_cal_flow(
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
     parallel = True
-    plan = [["28"]]
+    plan = [["45"]]
     if len(menu.one_qubit_calib_plan) == 1:
         parallel = False
     if parallel:

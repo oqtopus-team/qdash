@@ -70,6 +70,12 @@ class CalibData(BaseModel):
     def put_coupling_data(self, qid: str, parameter_name: str, data: Data) -> None:
         self.coupling[qid][parameter_name] = data
 
+    def __getitem__(self, key: str) -> dict:
+        """Get the item by key."""
+        if key in ("qubit", "coupling"):
+            return getattr(self, key)
+        raise KeyError(f"Invalid key: {key}")
+
 
 class BaseTaskResult(BaseModel):
     """Base class for task results.
@@ -93,14 +99,15 @@ class BaseTaskResult(BaseModel):
 
     """
 
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    task_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
     upstream_id: str = ""
     status: TaskStatus = TaskStatus.SCHEDULED
     message: str = ""
     input_parameters: dict = {}
     output_parameters: dict = {}
-    note: str = ""
+    output_parameter_names: list[str] = []
+    note: dict = {}
     figure_path: list[str] = []
     start_at: str = ""
     end_at: str = ""
@@ -141,9 +148,10 @@ class BaseTaskResult(BaseModel):
                 copied_parameters[key] = str(list(item))
             else:
                 copied_parameters[key] = item
+            self.output_parameter_names.append(key)
         self.output_parameters = copied_parameters
 
-    def put_note(self, note: str) -> None:
+    def put_note(self, note: dict) -> None:
         """Put a note to the task result.
 
         Args:
@@ -281,6 +289,10 @@ class TaskManager(BaseModel):
             return container
         error_message = f"Unknown task type: {task_type}"
         raise ValueError(error_message)
+
+    def get_task(self, task_name: str, task_type: str = "global", qid: str = "") -> BaseTaskResult:
+        container = self._get_task_container(task_type, qid)
+        return self._find_task_in_container(container, task_name)
 
     def _update_task_status_in_container(
         self, container: list, task_name: str, new_status: TaskStatus, message: str
@@ -435,7 +447,7 @@ class TaskManager(BaseModel):
             raise ValueError(f"Unknown task type: {task_type}")
 
     def put_note_to_task(
-        self, task_name: str, note: str, task_type: str = "global", qid: str = ""
+        self, task_name: str, note: dict, task_type: str = "global", qid: str = ""
     ) -> None:
         container = self._get_task_container(task_type, qid)
 

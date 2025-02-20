@@ -1,19 +1,20 @@
+from datamodel.coupling import CouplingModel
+from datamodel.qubit import QubitModel
+from datamodel.system_info import SystemInfoModel
 from pydantic import BaseModel, Field
-
-from .coupling import CouplingModel
-from .qubit import QubitModel
-from .system_info import SystemInfoModel
 
 
 class ChipModel(BaseModel):
     """Data model for a chip.
 
-    Attributes:
+    Attributes
+    ----------
         chip_id (str): The chip ID. e.g. "chip1".
         size (int): The size of the chip.
         qubits (dict): The qubits of the chip.
         couplings (dict): The couplings of the chip.
         system_info (SystemInfo): The system information. e.g. {"created_at": "2021-01-01T00:00:00Z", "updated_at": "2021-01-01T00:00:00Z"}.
+
     """
 
     chip_id: str = Field(..., description="The chip ID")

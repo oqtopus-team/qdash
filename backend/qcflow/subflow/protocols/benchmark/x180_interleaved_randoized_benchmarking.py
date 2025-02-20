@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 from qcflow.subflow.protocols.base import BaseTask
@@ -11,10 +11,12 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class X180InterleavedRandomizedBenchmarking(BaseTask):
+    """Task to perform X180 interleaved randomized benchmarking."""
+
     task_name: str = "X180InterleavedRandomizedBenchmarking"
     task_type: str = "qubit"
 
-    output_parameters: dict = {"x180_gate_fidelity": {}}
+    output_parameters: ClassVar[list[str]] = ["x180_gate_fidelity"]
 
     def __init__(
         self,
@@ -22,7 +24,7 @@ class X180InterleavedRandomizedBenchmarking(BaseTask):
         interval=DEFAULT_INTERVAL,
         n_cliffords_range=np.arange(0, 1001, 100),
         n_trials=30,
-    ):
+    ) -> None:
         self.input_parameters = {
             "n_cliffords_range": n_cliffords_range,
             "n_trials": n_trials,
@@ -30,7 +32,7 @@ class X180InterleavedRandomizedBenchmarking(BaseTask):
             "interval": interval,
         }
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager, label: str):
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager, label: str) -> None:
         input_param = {
             "n_cliffords_range": self.input_parameters["n_cliffords_range"],
             "n_trials": self.input_parameters["n_trials"],
@@ -45,9 +47,11 @@ class X180InterleavedRandomizedBenchmarking(BaseTask):
         )
         task_manager.save()
 
-    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any, label: str):
+    def _postprocess(
+        self, exp: Experiment, task_manager: TaskManager, result: Any, label: str
+    ) -> None:
         output_param = {
-            "x180_gate_fidelity": result["gate_fidelity"],
+            "x180_gate_fidelity": Data(value=result["gate_fidelity"]),
         }
         task_manager.put_output_parameters(
             self.task_name,
@@ -69,7 +73,7 @@ class X180InterleavedRandomizedBenchmarking(BaseTask):
         )
         task_manager.save()
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, task_manager: TaskManager) -> None:
         for label in exp.qubit_labels:
             self._preprocess(exp, task_manager, label)
             result = exp.interleaved_randomized_benchmarking(

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, ClassVar
 
 from qcflow.subflow.protocols.base import BaseTask
 from qcflow.subflow.task_manager import Data, TaskManager
@@ -7,10 +7,16 @@ from qubex.experiment import Experiment
 
 
 class ReadoutClassification(BaseTask):
+    """Task to classify the readout."""
+
     task_name: str = "ReadoutClassification"
     task_type: str = "qubit"
 
-    output_parameters: dict = {"average_readout_fidelity": {}}
+    output_parameters: ClassVar[list[str]] = [
+        "average_readout_fidelity",
+        "readout_fidelity_0",
+        "readout_fidelity_1",
+    ]
 
     def __init__(self) -> None:
         pass
@@ -21,7 +27,9 @@ class ReadoutClassification(BaseTask):
     def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any) -> None:
         for label in exp.qubit_labels:
             output_param = {
-                "average_readout_fidelity": result["average_readout_fidelity"][label],
+                "average_readout_fidelity": Data(value=result["average_readout_fidelity"][label]),
+                "readout_fidelity_0": Data(value=result["readout_fidelties"][label][0]),
+                "readout_fidelity_1": Data(value=result["readout_fidelties"][label][1]),
             }
             task_manager.put_output_parameters(
                 self.task_name,

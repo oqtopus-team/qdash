@@ -1,18 +1,19 @@
 from datetime import datetime
 
+from datamodel.system_info import SystemInfoModel
 from pydantic import BaseModel, Field
-
-from .system_info import SystemInfoModel
 
 
 class FridgeModel(BaseModel):
     """Data model for a fridge.
 
-    Attributes:
+    Attributes
+    ----------
         device_id (str): The device ID.
         timestamp (datetime): The timestamp.
         data (dict): The data.
         system_info (SystemInfo): The system information.
+
     """
 
     device_id: str = Field(..., description="The device ID")

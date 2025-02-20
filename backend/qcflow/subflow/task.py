@@ -1,4 +1,6 @@
 import numpy as np
+from neodbmodel.execution_history import ExecutionHistoryDocument
+from neodbmodel.task_history import TaskHistoryDocument
 from prefect import get_run_logger, task
 from qcflow.subflow.execution_manager import ExecutionManager
 from qcflow.subflow.protocols.benchmark.randomized_benchmarking import RandomizedBenchmarking
@@ -12,8 +14,7 @@ from qcflow.subflow.protocols.benchmark.zx90_interleaved_randoized_benchmarking 
     ZX90InterleavedRandomizedBenchmarking,
 )
 from qcflow.subflow.protocols.box_setup.check_noise import CheckNoise
-
-# from qcflow.subflow.protocols.box_setup.configure import Configure
+from qcflow.subflow.protocols.box_setup.configure import Configure
 from qcflow.subflow.protocols.box_setup.dump_box import DumpBox
 from qcflow.subflow.protocols.box_setup.link_up import LinkUp
 from qcflow.subflow.protocols.measurement.readout_classification import ReadoutClassification
@@ -54,6 +55,7 @@ from qubex.experiment.experiment_constants import (
     RABI_TIME_RANGE,
 )
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
+from repository.initialize import initialize
 
 task_classes = {
     "CheckStatus": {
@@ -64,10 +66,10 @@ task_classes = {
         "instance": LinkUp(),
         "task_type": LinkUp.task_type,
     },
-    # "Configure": {
-    #     "instance": Configure(),
-    #     "task_type": Configure.task_type,
-    # },
+    "Configure": {
+        "instance": Configure(),
+        "task_type": Configure.task_type,
+    },
     "DumpBox": {
         "instance": DumpBox(),
         "task_type": DumpBox.task_type,
@@ -252,7 +254,7 @@ def build_workflow(task_names: list[str], qubits: list[str]) -> TaskResult:
             if task_type == "global":
                 task = GlobalTask(name=name, upstream_id=global_previous_task_id)
                 task_result.global_tasks.append(task)
-                global_previous_task_id = task.id
+                global_previous_task_id = task.task_id
 
             elif task_type == "qubit":
                 for qubit in qubits:
@@ -260,7 +262,7 @@ def build_workflow(task_names: list[str], qubits: list[str]) -> TaskResult:
                         name=name, upstream_id=qubit_previous_task_id[qubit], qid=qubit
                     )
                     task_result.qubit_tasks.setdefault(qubit, []).append(task)
-                    qubit_previous_task_id[qubit] = task.id
+                    qubit_previous_task_id[qubit] = task.task_id
 
             elif task_type == "coupling":
                 for qubit in qubits:
@@ -268,13 +270,16 @@ def build_workflow(task_names: list[str], qubits: list[str]) -> TaskResult:
                         name=name, upstream_id=coupling_previous_task_id[qubit], qid=qubit
                     )
                     task_result.coupling_tasks.setdefault(qubit, []).append(task)
-                    coupling_previous_task_id[qubit] = task.id
+                    coupling_previous_task_id[qubit] = task.task_id
             else:
                 raise ValueError(f"Task type {task_type} not found.")
         else:
             raise ValueError(f"Task {name} not found.")
 
     return task_result
+
+
+initialize()
 
 
 @task(name="execute-dynamic-task", task_run_name="{task_name}")
@@ -289,39 +294,45 @@ def execute_dynamic_task(
     try:
         logger.info(f"Starting task: {task_name}")
         qids = [convert_qid(qid) for qid in exp.qubit_labels]
-        task_map = task_classes[task_name]
-        task_type = task_map["task_type"]
-        task_instance = task_map["instance"]
+        task_instance = task_classes[task_name]["instance"]
+        task_type = task_instance.get_task_type()
+        execution_manager = ExecutionManager.load_from_file(task_manager.calib_dir)
         task_manager.start_all_qid_tasks(task_name, task_type, qids)
         logger.info(f"Running task: {task_name}, id: {task_manager.id}")
         task_manager.update_all_qid_task_status_to_running(
             task_name=task_name, message=f"running {task_name} ...", task_type=task_type, qids=qids
         )
-        ExecutionManager(
-            execution_id=task_manager.execution_id, calib_data_path=task_manager.calib_dir
-        ).update_with_task_manager(task_manager=task_manager)
+        execution_manager = execution_manager.reload().update_with_task_manager(
+            task_manager=task_manager
+        )
         task_instance.execute(exp, task_manager)
-        logger.info(f"Task {task_name} is successful, id: {task_manager.id}")
+        execution_manager = execution_manager.reload().update_with_task_manager(
+            task_manager=task_manager
+        )
+        ExecutionHistoryDocument.update_document(execution_manager)
         task_manager.update_all_qid_task_status_to_completed(
             task_name=task_name, message=f"{task_name} is completed", task_type=task_type, qids=qids
         )
-        ExecutionManager(
-            execution_id=task_manager.execution_id, calib_data_path=task_manager.calib_dir
-        ).update_with_task_manager(task_manager=task_manager)
+        for qid in qids:
+            executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
+            TaskHistoryDocument.upsert_document(
+                task=executed_task, execution_manager=execution_manager
+            )
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
         task_manager.update_all_qid_task_status_to_failed(
             task_name=task_name, message=f"{task_name} failed", task_type=task_type, qids=qids
         )
-        ExecutionManager(
-            execution_id=task_manager.execution_id, calib_data_path=task_manager.calib_dir
-        ).update_with_task_manager(task_manager=task_manager)
+        execution_manager = execution_manager.reload().update_with_task_manager(
+            task_manager=task_manager
+        )
         raise RuntimeError(f"Task {task_name} failed: {e}")
     finally:
         logger.info(f"Ending task: {task_name}, id: {task_manager.id}")
         task_manager.end_all_qid_tasks(task_name, task_type, qids)
         task_manager.save()
-        ExecutionManager(
-            execution_id=task_manager.execution_id, calib_data_path=task_manager.calib_dir
-        ).update_with_task_manager(task_manager=task_manager)
+        execution_manager = execution_manager.reload().update_with_task_manager(
+            task_manager=task_manager
+        )
+        ExecutionHistoryDocument.update_document(execution_manager)
     return task_manager

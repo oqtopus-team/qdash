@@ -14,7 +14,7 @@ services:
       - /workspace/qdash/client/node_modules
       - /home/shared/config:/home/shared/config
     environment:
-      - PYTHONPATH=/workspace:/workspace/qdash:/workspace/qdash/backend:/workspace/qdash/backend/qcflow:/workspace/dbmodel
+      - PYTHONPATH=/workspace:/workspace/qdash:/workspace/qdash/backend:/workspace/qdash/backend/qcflow:/workspace/qdash/backend/dbmodel:/workspace/qdash/backend/datamodel:/workspace/qdash/backend/neodbmodel:/workspace/qdash/backend/repository
     network_mode: host
 
     develop:

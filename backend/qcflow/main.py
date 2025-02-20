@@ -17,11 +17,15 @@ from qcflow.subflow.qubex_one_qubit_cal.flow import qubex_one_qubit_cal_flow
 from qcflow.utiltask.create_directory import (
     create_directory_task,
 )
+from qubex.version import get_package_version
+from repository.initialize import initialize
 
 calibration_flow_map = {
     "qubex-one-qubit-cal-flow": qubex_one_qubit_cal_flow,
 }
+from neodbmodel.execution_history import ExecutionHistoryDocument
 
+initialize()
 load_dotenv(verbose=True)
 dotenv_path = join(dirname(__file__), ".env")
 load_dotenv(dotenv_path)
@@ -67,6 +71,7 @@ def main_flow(
     latest_calib_dir = f"/app/calib_data/{date_str}/latest"
     create_directory_task.submit(latest_calib_dir).result()
     successMap = {flow_name: False for flow_name in menu.flow}
+
     execution_manager = ExecutionManager(
         name=menu.name,
         execution_id=execution_id,
@@ -74,8 +79,10 @@ def main_flow(
         tags=menu.tags,
         fridge_info={"temperature": 0.0},
         chip_id="SAMPLE",
+        note={"qubex_version": get_package_version("qubex")},
     )
     execution_manager.save()
+    ExecutionHistoryDocument.insert_document(execution_manager)
     execution_manager.start_execution()
     execution_manager.update_execution_status_to_running()
     try:

@@ -1,21 +1,22 @@
 from bunnet import Document
+from datamodel.chip import ChipModel
+from datamodel.coupling import CouplingModel
+from datamodel.qubit import QubitModel
+from datamodel.system_info import SystemInfoModel
 from pydantic import ConfigDict, Field
-
-from ..datamodel.chip import ChipModel
-from ..datamodel.coupling import CouplingModel
-from ..datamodel.qubit import QubitModel
-from ..datamodel.system_info import SystemInfoModel
 
 
 class ChipDocument(Document):
     """Data model for a chip.
 
-    Attributes:
+    Attributes
+    ----------
         chip_id (str): The chip ID. e.g. "chip1".
         size (int): The size of the chip.
         qubits (dict): The qubits of the chip.
         couplings (dict): The couplings of the chip.
         system_info (SystemInfo): The system information. e.g. {"created_at": "2021-01-01T00:00:00Z", "updated_at": "2021-01-01T00:00:00Z"}.
+
     """
 
     chip_id: str = Field(..., description="The chip ID")
@@ -30,6 +31,8 @@ class ChipDocument(Document):
     )
 
     class Settings:
+        """Settings for the document."""
+
         name = "chip"
         indexes = [("chip_id")]
 

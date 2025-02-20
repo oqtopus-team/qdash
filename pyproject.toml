@@ -9,6 +9,8 @@ packages = [
     { include = "server", from = "backend" },
     { include = "qcflow", from = "backend" },
     { include = "dbmodel", from = "backend" },
+    { include = "datamodel", from = "backend" },
+    { include = "neodbmodel", from = "backend"}
 ]
 
 [tool.poetry.dependencies]

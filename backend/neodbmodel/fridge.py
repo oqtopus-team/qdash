@@ -1,20 +1,21 @@
 from datetime import datetime
 
 from bunnet import Document, Granularity, TimeSeriesConfig
+from datamodel.fridge import FridgeModel
+from datamodel.system_info import SystemInfoModel
 from pydantic import ConfigDict, Field
-
-from ..datamodel.fridge import FridgeModel
-from ..datamodel.system_info import SystemInfoModel
 
 
 class FridgeDocument(Document):
     """Document for a fridge.
 
-    Attributes:
+    Attributes
+    ----------
         device_id (str): The device ID.
         timestamp (datetime): The timestamp.
         data (dict): The data.
         system_info (SystemInfo): The system information.
+
     """
 
     device_id: str = Field(..., description="The device ID")
@@ -27,6 +28,8 @@ class FridgeDocument(Document):
     )
 
     class Settings:
+        """Settings for the document."""
+
         name = "fridge"
 
         timeseries = TimeSeriesConfig(

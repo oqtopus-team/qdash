@@ -82,6 +82,9 @@ services:
     volumes:
       - ./backend/qcflow:/app/qcflow
       - ./backend/dbmodel:/app/dbmodel
+      - ./backend/datamodel:/app/datamodel
+      - ./backend/neodbmodel:/app/neodbmodel
+      - ./backend/repository:/app/repository
       - ${CALIB_DATA_PATH}:/app/calib_data
       - /home/shared/config:/home/shared/config
     working_dir: /app/qcflow

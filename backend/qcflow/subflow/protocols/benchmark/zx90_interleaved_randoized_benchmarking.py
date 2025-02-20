@@ -1,8 +1,8 @@
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 from qcflow.subflow.protocols.base import BaseTask
-from qcflow.subflow.task_manager import TaskManager
+from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_qid
 from qubex.experiment import Experiment
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
@@ -10,10 +10,11 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class ZX90InterleavedRandomizedBenchmarking(BaseTask):
+    """Task to perform ZX90 interleaved randomized benchmarking."""
+
     task_name: str = "ZX90InterleavedRandomizedBenchmarking"
     task_type: str = "coupling"
-
-    output_parameters: dict = {"zx90_gate_fidelity": {}}
+    output_parameters: ClassVar[list[str]] = ["zx90_gate_fidelity"]
 
     def __init__(
         self,
@@ -21,7 +22,7 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
         interval=DEFAULT_INTERVAL,
         n_cliffords_range=np.arange(0, 1001, 100),
         n_trials=30,
-    ):
+    ) -> None:
         self.input_parameters = {
             "n_cliffords_range": n_cliffords_range,
             "n_trials": n_trials,
@@ -29,7 +30,7 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
             "interval": interval,
         }
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager, label: str):
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager, label: str) -> None:
         input_param = {
             "n_cliffords_range": self.input_parameters["n_cliffords_range"],
             "n_trials": self.input_parameters["n_trials"],
@@ -44,9 +45,11 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
         )
         task_manager.save()
 
-    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any, label: str):
+    def _postprocess(
+        self, exp: Experiment, task_manager: TaskManager, result: Any, label: str
+    ) -> None:
         output_param = {
-            "zx90_gate_fidelity": result["mean"][label],
+            "zx90_gate_fidelity": Data(value=result["mean"][label]),
         }
         task_manager.put_output_parameters(
             self.task_name,
@@ -62,7 +65,7 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
         )
         task_manager.save()
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, task_manager: TaskManager) -> None:
         for label in exp.qubit_labels:
             self._preprocess(exp, task_manager, label)
             result = exp.randomized_benchmarking(

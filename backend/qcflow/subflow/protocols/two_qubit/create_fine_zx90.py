@@ -1,3 +1,5 @@
+from typing import Any, ClassVar
+
 import numpy as np
 from qcflow.subflow.protocols.base import BaseTask
 from qcflow.subflow.task_manager import TaskManager
@@ -5,18 +7,18 @@ from qubex.experiment import Experiment
 
 
 class CreateFineZX90(BaseTask):
+    """Task to create a fine ZX90 pulse."""
+
     task_name: str = "CreateFineZX90"
     task_type: str = "coupling"
 
-    output_parameters: dict = {
-        "cr_amplitude": {},
-    }
+    output_parameters: ClassVar[list[str]] = ["cr_amplitude"]
 
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     @staticmethod
-    def determine_cr_pair(exp: Experiment):
+    def determine_cr_pair(exp: Experiment) -> tuple[tuple[str, str], str]:
         qubit_frequencies = {target: exp.targets[target].frequency for target in exp.qubit_labels}
         sorted_qubits = sorted(qubit_frequencies.items(), key=lambda item: item[1])
         cr_control, cr_target = sorted_qubits[0][0], sorted_qubits[1][0]
@@ -26,7 +28,7 @@ class CreateFineZX90(BaseTask):
 
         return cr_pair, cr_label
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, task_manager: TaskManager) -> None:
         cr_pair, cr_label = self.determine_cr_pair(exp)
         center = task_manager.get_calibration_value(cr_label, "cr_amplitude")
         cr_duration = 100

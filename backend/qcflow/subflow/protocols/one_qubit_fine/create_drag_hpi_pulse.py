@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, ClassVar
 
 from qcflow.subflow.protocols.base import BaseTask
 from qcflow.subflow.task_manager import Data, TaskManager
@@ -9,16 +9,18 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class CreateDRAGHPIPulse(BaseTask):
+    """Task to create the DRAG HPI pulse."""
+
     task_name: str = "CreateDRAGHPIPulse"
     task_type: str = "qubit"
-    output_parameters: dict = {"drag_hpi_beta": {}, "drag_hpi_amplitude": {}}
+    output_parameters: ClassVar[list[str]] = ["drag_hpi_beta", "drag_hpi_amplitude"]
 
     def __init__(
         self,
         hpi_length=HPI_DURATION,
         shots=CALIBRATION_SHOTS,
         interval=DEFAULT_INTERVAL,
-    ):
+    ) -> None:
         self.input_parameters = {
             "hpi_length": hpi_length,
             "shots": shots,
@@ -31,7 +33,7 @@ class CreateDRAGHPIPulse(BaseTask):
             "rabi_amplitude": {},
         }
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager):
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager) -> None:
         for label in exp.qubit_labels:
             input_param = {
                 "hpi_length": self.input_parameters["hpi_length"],
@@ -52,11 +54,11 @@ class CreateDRAGHPIPulse(BaseTask):
             )
         task_manager.save()
 
-    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any):
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any) -> None:
         for label in exp.qubit_labels:
             output_param = {
-                "drag_hpi_beta": result["beta"][label],
-                "drag_hpi_amplitude": result["amplitude"][label],
+                "drag_hpi_beta": Data(value=result["beta"][label]),
+                "drag_hpi_amplitude": Data(value=result["amplitude"][label]),
             }
             task_manager.put_output_parameters(
                 self.task_name,
@@ -80,7 +82,7 @@ class CreateDRAGHPIPulse(BaseTask):
             )
         task_manager.save()
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, task_manager: TaskManager) -> None:
         self._preprocess(exp, task_manager)
         result = exp.calibrate_drag_hpi_pulse(
             exp.qubit_labels,

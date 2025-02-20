@@ -1,12 +1,19 @@
+from datamodel.system_info import SystemInfoModel
+from datamodel.task import CalibDataModel, TaskResultModel
 from pydantic import BaseModel, Field
 
-from .system_info import SystemInfoModel
+SCHDULED = "scheduled"
+RUNNING = "running"
+COMPLETED = "completed"
+FAILED = "failed"
+PENDING = "pending"
 
 
 class ExecutionModel(BaseModel):
     """Data model for an execution.
 
-    Attributes:
+    Attributes
+    ----------
         execution_id (str): The execution ID. e.g. "0".
         status (str): The status of the execution. e.g. "completed".
         tasks (dict): The tasks of the execution. e.g. {"task1": "completed"}.
@@ -20,19 +27,22 @@ class ExecutionModel(BaseModel):
         end_at (str): The time when the execution ended.
         elapsed_time (str): The elapsed time.
         system_info (SystemInfo): The system information. e.g. {"created_at": "2021-01-01T00:00:00Z", "updated_at": "2021-01-01T00:00:00Z"}.
+
     """
 
+    name: str = Field(..., description="The name of the execution")
     execution_id: str = Field(..., description="The execution ID")
+    calib_data_path: str = Field(..., description="The path to the calibration data")
+    note: dict = Field(..., description="The note")
     status: str = Field(..., description="The status of the execution")
-    tasks: dict = Field(..., description="The tasks of the execution")
-    calib_data: dict = Field(..., description="The calibration data")
-    fridge_info: dict = Field(..., description="The fridge information")
-    controller_info: dict = Field(..., description="The controller information")
-    note: str = Field(..., description="The note")
+    task_results: dict[str, TaskResultModel] = Field(..., description="The results of the tasks")
     tags: list[str] = Field(..., description="The tags")
-    message: str = Field(..., description="The message")
+    controller_info: dict = Field(..., description="The controller information")
+    fridge_info: dict = Field(..., description="The fridge information")
+    chip_id: str = Field(..., description="The chip ID")
     start_at: str = Field(..., description="The time when the execution started")
     end_at: str = Field(..., description="The time when the execution ended")
     elapsed_time: str = Field(..., description="The elapsed time")
-
+    calib_data: CalibDataModel = Field(..., description="The calibration data")
+    message: str = Field(..., description="The message")
     system_info: SystemInfoModel = Field(..., description="The system information")

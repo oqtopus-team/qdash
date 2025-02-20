@@ -1,19 +1,20 @@
 from bunnet import Document
+from datamodel.qubit import NodeInfoModel, QubitModel
+from datamodel.system_info import SystemInfoModel
 from pydantic import ConfigDict, Field
-
-from ..datamodel.qubit import NodeInfoModel, QubitModel
-from ..datamodel.system_info import SystemInfoModel
 
 
 class QubitDocument(Document):
     """Data model for a qubit.
 
-    Attributes:
+    Attributes
+    ----------
         qid (str): The qubit ID. e.g. "0".
         chip_id (str): The chip ID. e.g. "chip1".
         data (dict): The data of the qubit. e.g. {"qubit_frequency": 5.0}.
         calibrated_at (str): The time when the qubit was calibrated. e.g. "2021-01-01T00:00:00Z".
         system_info (SystemInfo): The system information. e.g. {"created_at": "2021-01-01T00:00:00Z", "updated_at": "2021-01-01T00:00:00Z"}.
+
     """
 
     qid: str = Field(..., description="The qubit ID")

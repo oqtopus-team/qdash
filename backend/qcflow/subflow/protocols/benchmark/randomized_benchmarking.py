@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 from qcflow.subflow.protocols.base import BaseTask
@@ -10,9 +10,11 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class RandomizedBenchmarking(BaseTask):
+    """Task to perform randomized benchmarking."""
+
     task_name: str = "RandomizedBenchmarking"
     task_type: str = "qubit"
-    output_parameters: dict = {"average_gate_fidelity": {}}
+    output_parameters: ClassVar[list[str]] = ["average_gate_fidelity"]
 
     def __init__(
         self,
@@ -20,7 +22,7 @@ class RandomizedBenchmarking(BaseTask):
         interval=DEFAULT_INTERVAL,
         n_cliffords_range=np.arange(0, 1001, 100),
         n_trials=30,
-    ):
+    ) -> None:
         self.input_parameters = {
             "n_cliffords_range": n_cliffords_range,
             "n_trials": n_trials,
@@ -28,7 +30,7 @@ class RandomizedBenchmarking(BaseTask):
             "interval": interval,
         }
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager):
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager) -> None:
         for label in exp.qubit_labels:
             input_param = {
                 "n_cliffords_range": self.input_parameters["n_cliffords_range"],
@@ -45,9 +47,11 @@ class RandomizedBenchmarking(BaseTask):
 
         task_manager.save()
 
-    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any, label: str):
+    def _postprocess(
+        self, exp: Experiment, task_manager: TaskManager, result: Any, label: str
+    ) -> None:
         output_param = {
-            "average_gate_fidelity": result["avg_gate_fidelity"],
+            "average_gate_fidelity": Data(value=result["avg_gate_fidelity"]),
         }
         task_manager.put_output_parameters(
             self.task_name,
@@ -68,7 +72,7 @@ class RandomizedBenchmarking(BaseTask):
             qid=convert_qid(label),
         )
 
-    def execute(self, exp: Experiment, task_manager: TaskManager):
+    def execute(self, exp: Experiment, task_manager: TaskManager) -> None:
         self._preprocess(exp, task_manager)
         for label in exp.qubit_labels:
             result = exp.randomized_benchmarking(
