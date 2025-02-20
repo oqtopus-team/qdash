@@ -60,3 +60,15 @@ class BaseTask(ABC):
     def get_task_type(self) -> Literal["global", "qubit", "coupling"]:
         """Return the type of the task."""
         return self.task_type
+
+    def is_global_task(self) -> bool:
+        """Return True if the task is a global task."""
+        return self.task_type == "global"
+
+    def is_qubit_task(self) -> bool:
+        """Return True if the task is a qubit task."""
+        return self.task_type == "qubit"
+
+    def is_coupling_task(self) -> bool:
+        """Return True if the task is a coupling task."""
+        return self.task_type == "coupling"

@@ -1,10 +1,7 @@
 import asyncio
-import json
-from datetime import datetime, timezone
-from pathlib import Path
 
 from neodbmodel.execution_history import ExecutionHistoryDocument
-from prefect import flow, get_run_logger, task
+from prefect import flow, get_run_logger
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
 from qcflow.schema.menu import Menu
@@ -82,7 +79,6 @@ def cal_flow(
     logger = get_run_logger()
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
-    logger.info(f"Qubits: {qubits}")
     labels = [convert_label(q) for q in qubits]
     exp = Experiment(
         chip_id="64Q",
@@ -95,48 +91,14 @@ def cal_flow(
     workflow = build_workflow(task_names, qubits=qubits)
     task_manager.task_result = workflow
     task_manager.save()
-    em = ExecutionManager.load_from_file(calib_dir).update_with_task_manager(task_manager)
+    execution_manager = ExecutionManager.load_from_file(calib_dir).update_with_task_manager(
+        task_manager
+    )
     initialize()
-    ExecutionHistoryDocument.update_document(em)
+    ExecutionHistoryDocument.update_document(execution_manager=execution_manager)
     for qid in qubits:
         task_manager = cal_sequence(exp, task_manager, task_names, qid)
     return successMap
-
-
-@task(name="merge-results-qubits")
-def merge_results_qubits(calib_dir: str) -> None:
-    """Merge results from multiple qubits into calib.json with structure {"qubits": { ... } }.
-
-    If calib.json exists, append new data to the existing qubits.
-    """
-    logger = get_run_logger()
-    logger.info(f"Calibration directory: {calib_dir}")
-
-    # Q??.json ファイルを再帰的に検索
-    # pattern = Path(calib_dir) / "**" / "Q??.json"
-    q_files = Path(calib_dir).rglob("Q??.json")
-    for file_path in q_files:
-        logger.info(f"File: {file_path}")
-
-    calib_json_path = Path(calib_dir) / "calib.json"
-    if calib_json_path.exists():
-        with calib_json_path.open(encoding="utf-8") as f:
-            merged_data = json.load(f)
-        if "qubits" not in merged_data:
-            merged_data["qubits"] = {}
-    else:
-        merged_data = {"qubits": {}}
-    for file_path in q_files:
-        qubit_key = Path(file_path).stem
-        with Path(file_path).open(encoding="utf-8") as f:
-            data = json.load(f)
-        merged_data["qubits"][qubit_key] = data
-
-    merged_data["timestamp"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    merged_data["couplings"] = {}
-    with calib_json_path.open("w", encoding="utf-8") as f:
-        json.dump(merged_data, f, ensure_ascii=False, indent=2)
-    logger.info(f"Merged JSON saved to: {calib_json_path}")
 
 
 async def trigger_cal_flow(
@@ -159,11 +121,6 @@ async def trigger_cal_flow(
         deployments.append(run_deployment("cal-flow/oqtopus-cal-flow", parameters=parameters))
 
     results = await asyncio.gather(*deployments)
-
-    ## implement gather_results
-
-    for result in results:
-        print(result)
 
 
 def organize_qubits(qubits: list[list[int]], parallel: bool) -> list[list[int]]:
@@ -200,13 +157,11 @@ async def qubex_one_qubit_cal_flow(
         logger.info("parallel is True")
         # qubits = organize_qubits(menu.one_qubit_calib_plan, parallel)
         await trigger_cal_flow(menu, calib_dir, successMap, execution_id, plan)
-        merge_results_qubits(calib_dir)
         return successMap
     else:
         # qubits = organize_qubits(menu.one_qubit_calib_plan, parallel)
         logger.info("parallel is False")
         await trigger_cal_flow(menu, calib_dir, successMap, execution_id, plan)
-        merge_results_qubits(calib_dir)
         return successMap
 
 

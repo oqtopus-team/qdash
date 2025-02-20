@@ -59,177 +59,87 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 from repository.initialize import initialize
 
 task_classes = {
-    "CheckStatus": {
-        "instance": CheckStatus(),
-        "task_type": CheckStatus.task_type,
-    },
-    "LinkUp": {
-        "instance": LinkUp(),
-        "task_type": LinkUp.task_type,
-    },
-    "Configure": {
-        "instance": Configure(),
-        "task_type": Configure.task_type,
-    },
-    "DumpBox": {
-        "instance": DumpBox(),
-        "task_type": DumpBox.task_type,
-    },
-    "CheckNoise": {
-        "instance": CheckNoise(),
-        "task_type": CheckNoise.task_type,
-    },
-    "RabiOscillation": {
-        "instance": RabiOscillation(),
-        "task_type": RabiOscillation.task_type,
-    },
-    "ChevronPattern": {
-        "instance": ChevronPattern(),
-        "task_type": ChevronPattern.task_type,
-    },
-    "CheckQubitFrequency": {
-        "instance": CheckQubitFrequency(
-            detuning_range=np.linspace(-0.01, 0.01, 21),
-            time_range=range(0, 101, 4),
-            shots=DEFAULT_SHOTS,
-            interval=DEFAULT_INTERVAL,
+    "CheckStatus": CheckStatus(),
+    "LinkUp": LinkUp(),
+    "Configure": Configure(),
+    "DumpBox": DumpBox(),
+    "CheckNoise": CheckNoise(),
+    "RabiOscillation": RabiOscillation(),
+    "ChevronPattern": ChevronPattern(),
+    "CheckQubitFrequency": CheckQubitFrequency(
+        detuning_range=np.linspace(-0.01, 0.01, 21),
+        time_range=range(0, 101, 4),
+        shots=DEFAULT_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckReadoutFrequency": CheckReadoutFrequency(
+        detuning_range=np.linspace(-0.01, 0.01, 21),
+        time_range=range(0, 101, 4),
+        shots=DEFAULT_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckRabi": CheckRabi(
+        time_range=RABI_TIME_RANGE,
+        shots=DEFAULT_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CreateHPIPulse": CreateHPIPulse(
+        hpi_length=HPI_DURATION,
+        shots=CALIBRATION_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckHPIPulse": CheckHPIPulse(),
+    "CreatePIPulse": CreatePIPulse(
+        pi_length=PI_DURATION,
+        shots=CALIBRATION_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckPIPulse": CheckPIPulse(),
+    "CheckT1": CheckT1(
+        time_range=np.logspace(
+            np.log10(100),
+            np.log10(500 * 1000),
+            51,
         ),
-        "task_type": CheckQubitFrequency.task_type,
-    },
-    "CheckReadoutFrequency": {
-        "instance": CheckReadoutFrequency(
-            detuning_range=np.linspace(-0.01, 0.01, 21),
-            time_range=range(0, 101, 4),
-            shots=DEFAULT_SHOTS,
-            interval=DEFAULT_INTERVAL,
+        shots=DEFAULT_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckT2Echo": CheckT2Echo(
+        time_range=np.logspace(
+            np.log10(300),
+            np.log10(100 * 1000),
+            51,
         ),
-        "task_type": CheckReadoutFrequency.task_type,
-    },
-    "CheckRabi": {
-        "instance": CheckRabi(
-            time_range=RABI_TIME_RANGE,
-            shots=DEFAULT_SHOTS,
-            interval=DEFAULT_INTERVAL,
-        ),
-        "task_type": CheckRabi.task_type,
-    },
-    "CreateHPIPulse": {
-        "instance": CreateHPIPulse(
-            hpi_length=HPI_DURATION,
-            shots=CALIBRATION_SHOTS,
-            interval=DEFAULT_INTERVAL,
-        ),
-        "task_type": CreateHPIPulse.task_type,
-    },
-    "CheckHPIPulse": {
-        "instance": CheckHPIPulse(),
-        "task_type": CheckHPIPulse.task_type,
-    },
-    "CreatePIPulse": {
-        "instance": CreatePIPulse(
-            pi_length=PI_DURATION,
-            shots=CALIBRATION_SHOTS,
-            interval=DEFAULT_INTERVAL,
-        ),
-        "task_type": CreatePIPulse.task_type,
-    },
-    "CheckPIPulse": {
-        "instance": CheckPIPulse(),
-        "task_type": CheckPIPulse.task_type,
-    },
-    "CheckT1": {
-        "instance": CheckT1(
-            time_range=np.logspace(
-                np.log10(100),
-                np.log10(500 * 1000),
-                51,
-            ),
-            shots=DEFAULT_SHOTS,
-            interval=DEFAULT_INTERVAL,
-        ),
-        "task_type": CheckT1.task_type,
-    },
-    "CheckT2Echo": {
-        "instance": CheckT2Echo(
-            time_range=np.logspace(
-                np.log10(300),
-                np.log10(100 * 1000),
-                51,
-            ),
-            shots=DEFAULT_SHOTS,
-            interval=DEFAULT_INTERVAL,
-        ),
-        "task_type": CheckT2Echo.task_type,
-    },
-    "CheckEffectiveQubitFrequency": {
-        "instance": CheckEffectiveQubitFrequency(
-            detuning=0.001,
-            time_range=np.arange(0, 20001, 100),
-            shots=DEFAULT_SHOTS,
-            interval=DEFAULT_INTERVAL,
-        ),
-        "task_type": CheckEffectiveQubitFrequency.task_type,
-    },
-    "CreateDRAGHPIPulse": {
-        "instance": CreateDRAGHPIPulse(
-            hpi_length=HPI_DURATION,
-            shots=CALIBRATION_SHOTS,
-            interval=DEFAULT_INTERVAL,
-        ),
-        "task_type": CreateDRAGHPIPulse.task_type,
-    },
-    "CheckDRAGHPIPulse": {
-        "instance": CheckDRAGHPIPulse(),
-        "task_type": CheckDRAGHPIPulse.task_type,
-    },
-    "CreateDRAGPIPulse": {
-        "instance": CreateDRAGPIPulse(
-            pi_length=PI_DURATION,
-            shots=CALIBRATION_SHOTS,
-            interval=DEFAULT_INTERVAL,
-        ),
-        "task_type": CreateDRAGPIPulse.task_type,
-    },
-    "CheckDRAGPIPulse": {
-        "instance": CheckDRAGPIPulse(),
-        "task_type": CheckDRAGPIPulse.task_type,
-    },
-    "ReadoutClassification": {
-        "instance": ReadoutClassification(),
-        "task_type": ReadoutClassification.task_type,
-    },
-    "RandomizedBenchmarking": {
-        "instance": RandomizedBenchmarking(),
-        "task_type": RandomizedBenchmarking.task_type,
-    },
-    "X90InterleavedRandomizedBenchmarking": {
-        "instance": X90InterleavedRandomizedBenchmarking(),
-        "task_type": X90InterleavedRandomizedBenchmarking.task_type,
-    },
-    "X180InterleavedRandomizedBenchmarking": {
-        "instance": X180InterleavedRandomizedBenchmarking(),
-        "task_type": X180InterleavedRandomizedBenchmarking.task_type,
-    },
-    "ZX90InterleavedRandomizedBenchmarking": {
-        "instance": ZX90InterleavedRandomizedBenchmarking(),
-        "task_type": ZX90InterleavedRandomizedBenchmarking.task_type,
-    },
-    "CheckCrossResonance": {
-        "instance": CheckCrossResonance(),
-        "task_type": CheckCrossResonance.task_type,
-    },
-    "CreateFineZX90": {
-        "instance": CreateFineZX90(),
-        "task_type": CreateFineZX90.task_type,
-    },
-    "CreateZX90": {
-        "instance": CreateZX90(),
-        "task_type": CreateZX90.task_type,
-    },
-    "OptimizeZX90": {
-        "instance": OptimizeZX90(),
-        "task_type": OptimizeZX90.task_type,
-    },
+        shots=DEFAULT_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckEffectiveQubitFrequency": CheckEffectiveQubitFrequency(
+        detuning=0.001,
+        time_range=np.arange(0, 20001, 100),
+        shots=DEFAULT_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CreateDRAGHPIPulse": CreateDRAGHPIPulse(
+        hpi_length=HPI_DURATION,
+        shots=CALIBRATION_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckDRAGHPIPulse": CheckDRAGHPIPulse(),
+    "CreateDRAGPIPulse": CreateDRAGPIPulse(
+        pi_length=PI_DURATION,
+        shots=CALIBRATION_SHOTS,
+        interval=DEFAULT_INTERVAL,
+    ),
+    "CheckDRAGPIPulse": CheckDRAGPIPulse(),
+    "ReadoutClassification": ReadoutClassification(),
+    "RandomizedBenchmarking": RandomizedBenchmarking(),
+    "X90InterleavedRandomizedBenchmarking": X90InterleavedRandomizedBenchmarking(),
+    "X180InterleavedRandomizedBenchmarking": X180InterleavedRandomizedBenchmarking(),
+    "ZX90InterleavedRandomizedBenchmarking": ZX90InterleavedRandomizedBenchmarking(),
+    "CheckCrossResonance": CheckCrossResonance(),
+    "CreateFineZX90": CreateFineZX90(),
+    "CreateZX90": CreateZX90(),
+    "OptimizeZX90": OptimizeZX90(),
 }
 
 
@@ -249,23 +159,21 @@ def build_workflow(task_names: list[str], qubits: list[str]) -> TaskResult:
     coupling_previous_task_id = {qubit: "" for qubit in qubits}
     for name in task_names:
         if name in task_classes:
-            task_class = task_classes[name]
-            task_type = task_class["task_type"]
+            this_task = task_classes[name]
 
-            if task_type == "global":
+            if this_task.is_global_task():
                 task = GlobalTask(name=name, upstream_id=global_previous_task_id)
                 task_result.global_tasks.append(task)
                 global_previous_task_id = task.task_id
 
-            elif task_type == "qubit":
+            elif this_task.is_qubit_task():
                 for qubit in qubits:
                     task = QubitTask(
                         name=name, upstream_id=qubit_previous_task_id[qubit], qid=qubit
                     )
                     task_result.qubit_tasks.setdefault(qubit, []).append(task)
                     qubit_previous_task_id[qubit] = task.task_id
-
-            elif task_type == "coupling":
+            elif this_task.is_coupling_task():
                 for qubit in qubits:
                     task = CouplingTask(
                         name=name, upstream_id=coupling_previous_task_id[qubit], qid=qubit
@@ -273,7 +181,7 @@ def build_workflow(task_names: list[str], qubits: list[str]) -> TaskResult:
                     task_result.coupling_tasks.setdefault(qubit, []).append(task)
                     coupling_previous_task_id[qubit] = task.task_id
             else:
-                raise ValueError(f"Task type {task_type} not found.")
+                raise ValueError(f"Task type {this_task.get_task_type()} not found.")
         else:
             raise ValueError(f"Task {name} not found.")
 
@@ -295,7 +203,7 @@ def cal_sequence(
     try:
         for task_name in task_names:
             if task_name in task_classes:
-                task_type = task_classes[task_name]["instance"].get_task_type()
+                task_type = task_classes[task_name].get_task_type()
                 if task_manager.this_task_is_completed(
                     task_name=task_name, task_type=task_type, qid=qid
                 ):
@@ -323,8 +231,8 @@ def execute_dynamic_task_by_qid(
     logger = get_run_logger()
     task_manager.diagnose()
     try:
-        task_instance = task_classes[task_name]["instance"]
-        task_type = task_instance.get_task_type()
+        this_task = task_classes[task_name]
+        task_type = this_task.get_task_type()
         execution_manager = ExecutionManager.load_from_file(task_manager.calib_dir)
         logger.info(f"Starting task: {task_name}")
         task_manager.start_task(task_name, task_type, qid)
@@ -335,7 +243,7 @@ def execute_dynamic_task_by_qid(
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
-        task_instance.execute(exp, task_manager, target=qid)
+        this_task.execute(exp, task_manager, target=qid)
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
