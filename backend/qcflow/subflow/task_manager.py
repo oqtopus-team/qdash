@@ -540,3 +540,11 @@ class TaskManager(BaseModel):
         container = self._get_task_container(task_type, qid)
         task = self._find_task_in_container(container, task_name)
         return task.output_parameters
+
+    def this_task_is_completed(
+        self, task_name: str, task_type: str = "global", qid: str = ""
+    ) -> bool:
+        """Check if the task is completed."""
+        container = self._get_task_container(task_type, qid)
+        task = self._find_task_in_container(container, task_name)
+        return task.status == TaskStatus.COMPLETED

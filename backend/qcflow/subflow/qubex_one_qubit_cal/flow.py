@@ -11,8 +11,9 @@ from qcflow.schema.menu import Menu
 from qcflow.subflow.execution_manager import ExecutionManager
 from qcflow.subflow.task import (
     build_workflow,
-    execute_dynamic_task,
-    task_classes,
+    cal_sequence,
+    # execute_dynamic_task,
+    # task_classes,
     validate_task_name,
 )
 from qcflow.subflow.task_manager import TaskManager
@@ -20,6 +21,51 @@ from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
 from repository.initialize import initialize
+
+# @flow(
+#     flow_run_name="{qubits}",
+# )
+# def cal_flow(
+#     menu: Menu,
+#     calib_dir: str,
+#     successMap: dict[str, bool],
+#     execution_id: str,
+#     qubits: list[str],
+# ) -> dict[str, bool]:
+#     """Deployment to run calibration flow for a single qubit or a pair of qubits."""
+#     logger = get_run_logger()
+#     logger.info(f"Menu name: {menu.name}")
+#     logger.info(f"Qubex version: {get_package_version('qubex')}")
+#     logger.info(f"Qubits: {qubits}")
+#     labels = [convert_label(q) for q in qubits]
+#     exp = Experiment(
+#         chip_id="64Q",
+#         qubits=labels,
+#         config_dir="/home/shared/config",
+#     )
+#     exp.note.clear()
+#     task_names = validate_task_name(menu.exp_list)
+#     task_manager = TaskManager(execution_id=execution_id, qids=qubits, calib_dir=calib_dir)
+#     workflow = build_workflow(task_names, qubits=qubits)
+#     task_manager.task_result = workflow
+#     task_manager.save()
+#     em = ExecutionManager.load_from_file(calib_dir).update_with_task_manager(task_manager)
+#     initialize()
+#     ExecutionHistoryDocument.update_document(em)
+#     try:
+#         logger.info("Starting all processes")
+#         for task_name in task_names:
+#             if task_name in task_classes:
+#                 task_manager = execute_dynamic_task(
+#                     exp=exp,
+#                     task_manager=task_manager,
+#                     task_name=task_name,
+#                 )
+#     except Exception as e:
+#         logger.error(f"Failed to execute task: {e}")
+#     finally:
+#         logger.info("Ending all processes")
+#     return successMap
 
 
 @flow(
@@ -52,19 +98,8 @@ def cal_flow(
     em = ExecutionManager.load_from_file(calib_dir).update_with_task_manager(task_manager)
     initialize()
     ExecutionHistoryDocument.update_document(em)
-    try:
-        logger.info("Starting all processes")
-        for task_name in task_names:
-            if task_name in task_classes:
-                task_manager = execute_dynamic_task(
-                    exp=exp,
-                    task_manager=task_manager,
-                    task_name=task_name,
-                )
-    except Exception as e:
-        logger.error(f"Failed to execute task: {e}")
-    finally:
-        logger.info("Ending all processes")
+    for qid in qubits:
+        task_manager = cal_sequence(exp, task_manager, task_names, qid)
     return successMap
 
 
@@ -158,7 +193,7 @@ async def qubex_one_qubit_cal_flow(
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
     parallel = True
-    plan = [["45"]]
+    plan = [["44", "45"]]
     if len(menu.one_qubit_calib_plan) == 1:
         parallel = False
     if parallel:

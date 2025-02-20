@@ -2,7 +2,7 @@ import numpy as np
 from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.qubit import QubitDocument
 from neodbmodel.task_history import TaskHistoryDocument
-from prefect import get_run_logger, task
+from prefect import flow, get_run_logger, task
 from qcflow.subflow.execution_manager import ExecutionManager
 from qcflow.subflow.protocols.benchmark.randomized_benchmarking import RandomizedBenchmarking
 from qcflow.subflow.protocols.benchmark.x90_interleaved_randomized_benchmarking import (
@@ -283,53 +283,79 @@ def build_workflow(task_names: list[str], qubits: list[str]) -> TaskResult:
 initialize()
 
 
+@flow(flow_run_name="{qid}")
+def cal_sequence(
+    exp: Experiment,
+    task_manager: TaskManager,
+    task_names: list[str],
+    qid: str,
+) -> TaskManager:
+    """Calibrate in sequence."""
+    logger = get_run_logger()
+    try:
+        for task_name in task_names:
+            if task_name in task_classes:
+                task_type = task_classes[task_name]["instance"].get_task_type()
+                if task_manager.this_task_is_completed(
+                    task_name=task_name, task_type=task_type, qid=qid
+                ):
+                    logger.info(f"Task {task_name} is already completed")
+                    continue
+                logger.info(f"Starting task: {task_name}")
+                task_manager = execute_dynamic_task_by_qid(
+                    exp=exp, task_manager=task_manager, task_name=task_name, qid=qid
+                )
+    except Exception as e:
+        logger.error(f"Failed to execute task: {e}")
+    finally:
+        logger.info("Ending all processes")
+    return task_manager
+
+
 @task(name="execute-dynamic-task", task_run_name="{task_name}")
-def execute_dynamic_task(
+def execute_dynamic_task_by_qid(
     exp: Experiment,
     task_manager: TaskManager,
     task_name: str,
+    qid: str,
 ) -> TaskManager:
     """Execute dynamic task."""
     logger = get_run_logger()
     task_manager.diagnose()
     try:
-        logger.info(f"Starting task: {task_name}")
-        qids = [convert_qid(qid) for qid in exp.qubit_labels]
         task_instance = task_classes[task_name]["instance"]
         task_type = task_instance.get_task_type()
         execution_manager = ExecutionManager.load_from_file(task_manager.calib_dir)
-        task_manager.start_all_qid_tasks(task_name, task_type, qids)
+        logger.info(f"Starting task: {task_name}")
+        task_manager.start_task(task_name, task_type, qid)
         logger.info(f"Running task: {task_name}, id: {task_manager.id}")
-        task_manager.update_all_qid_task_status_to_running(
-            task_name=task_name, message=f"running {task_name} ...", task_type=task_type, qids=qids
+        task_manager.update_task_status_to_running(
+            task_name=task_name, message=f"running {task_name} ...", task_type=task_type, qid=qid
         )
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
-        task_instance.execute(exp, task_manager)
+        task_instance.execute(exp, task_manager, target=qid)
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
         ExecutionHistoryDocument.update_document(execution_manager)
-        task_manager.update_all_qid_task_status_to_completed(
-            task_name=task_name, message=f"{task_name} is completed", task_type=task_type, qids=qids
+        task_manager.update_task_status_to_completed(
+            task_name=task_name, message=f"{task_name} is completed", task_type=task_type, qid=qid
         )
-        for qid in qids:
-            executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
-            TaskHistoryDocument.upsert_document(
-                task=executed_task, execution_manager=execution_manager
+        executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
+        TaskHistoryDocument.upsert_document(task=executed_task, execution_manager=execution_manager)
+        output_parameters = task_manager.get_output_parameter_by_task_name(
+            task_name=task_name, task_type=task_type, qid=qid
+        )
+        if output_parameters:
+            QubitDocument.update_calib_data(
+                qid=qid, chip_id=execution_manager.chip_id, output_parameters=output_parameters
             )
-            output_parameters = task_manager.get_output_parameter_by_task_name(
-                task_name=task_name, task_type=task_type, qid=qid
-            )
-            if output_parameters:
-                QubitDocument.update_calib_data(
-                    qid=qid, chip_id=execution_manager.chip_id, output_parameters=output_parameters
-                )
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
-        task_manager.update_all_qid_task_status_to_failed(
-            task_name=task_name, message=f"{task_name} failed", task_type=task_type, qids=qids
+        task_manager.update_task_status_to_failed(
+            task_name=task_name, message=f"{task_name} failed", task_type=task_type, qid=qid
         )
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
@@ -337,10 +363,73 @@ def execute_dynamic_task(
         raise RuntimeError(f"Task {task_name} failed: {e}")
     finally:
         logger.info(f"Ending task: {task_name}, id: {task_manager.id}")
-        task_manager.end_all_qid_tasks(task_name, task_type, qids)
+        task_manager.end_task(task_name, task_type, qid)
         task_manager.save()
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
         ExecutionHistoryDocument.update_document(execution_manager)
     return task_manager
+
+
+# @task(name="execute-dynamic-task", task_run_name="{task_name}")
+# def execute_dynamic_task(
+#     exp: Experiment,
+#     task_manager: TaskManager,
+#     task_name: str,
+# ) -> TaskManager:
+#     """Execute dynamic task."""
+#     logger = get_run_logger()
+#     task_manager.diagnose()
+#     try:
+#         logger.info(f"Starting task: {task_name}")
+#         qids = [convert_qid(qid) for qid in exp.qubit_labels]
+#         task_instance = task_classes[task_name]["instance"]
+#         task_type = task_instance.get_task_type()
+#         execution_manager = ExecutionManager.load_from_file(task_manager.calib_dir)
+#         task_manager.start_all_qid_tasks(task_name, task_type, qids)
+#         logger.info(f"Running task: {task_name}, id: {task_manager.id}")
+#         task_manager.update_all_qid_task_status_to_running(
+#             task_name=task_name, message=f"running {task_name} ...", task_type=task_type, qids=qids
+#         )
+#         execution_manager = execution_manager.reload().update_with_task_manager(
+#             task_manager=task_manager
+#         )
+#         task_instance.execute(exp, task_manager)
+#         execution_manager = execution_manager.reload().update_with_task_manager(
+#             task_manager=task_manager
+#         )
+#         ExecutionHistoryDocument.update_document(execution_manager)
+#         task_manager.update_all_qid_task_status_to_completed(
+#             task_name=task_name, message=f"{task_name} is completed", task_type=task_type, qids=qids
+#         )
+#         for qid in qids:
+#             executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
+#             TaskHistoryDocument.upsert_document(
+#                 task=executed_task, execution_manager=execution_manager
+#             )
+#             output_parameters = task_manager.get_output_parameter_by_task_name(
+#                 task_name=task_name, task_type=task_type, qid=qid
+#             )
+#             if output_parameters:
+#                 QubitDocument.update_calib_data(
+#                     qid=qid, chip_id=execution_manager.chip_id, output_parameters=output_parameters
+#                 )
+#     except Exception as e:
+#         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
+#         task_manager.update_all_qid_task_status_to_failed(
+#             task_name=task_name, message=f"{task_name} failed", task_type=task_type, qids=qids
+#         )
+#         execution_manager = execution_manager.reload().update_with_task_manager(
+#             task_manager=task_manager
+#         )
+#         raise RuntimeError(f"Task {task_name} failed: {e}")
+#     finally:
+#         logger.info(f"Ending task: {task_name}, id: {task_manager.id}")
+#         task_manager.end_all_qid_tasks(task_name, task_type, qids)
+#         task_manager.save()
+#         execution_manager = execution_manager.reload().update_with_task_manager(
+#             task_manager=task_manager
+#         )
+#         ExecutionHistoryDocument.update_document(execution_manager)
+#     return task_manager
