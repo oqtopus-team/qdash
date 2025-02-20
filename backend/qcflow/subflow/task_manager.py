@@ -527,3 +527,16 @@ class TaskManager(BaseModel):
 
     def put_controller_info(self, box_info: dict) -> None:
         self.controller_info = box_info
+
+    def get_qubit_calib_data(self, qid: str) -> dict:
+        return self.calib_data.qubit[qid]
+
+    def get_coupling_calib_data(self, qid: str) -> dict:
+        return self.calib_data.coupling[qid]
+
+    def get_output_parameter_by_task_name(
+        self, task_name: str, task_type: str = "global", qid: str = ""
+    ) -> dict:
+        container = self._get_task_container(task_type, qid)
+        task = self._find_task_in_container(container, task_name)
+        return task.output_parameters

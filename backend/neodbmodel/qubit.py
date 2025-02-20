@@ -1,7 +1,8 @@
 from bunnet import Document
-from datamodel.qubit import NodeInfoModel, QubitModel
+from datamodel.qubit import NodeInfoModel
 from datamodel.system_info import SystemInfoModel
 from pydantic import ConfigDict, Field
+from qcflow.subflow.task_manager import TaskManager
 
 
 class QubitDocument(Document):
@@ -18,9 +19,9 @@ class QubitDocument(Document):
     """
 
     qid: str = Field(..., description="The qubit ID")
+    status: str = Field("pending", description="The status of the qubit")
     chip_id: str = Field(..., description="The chip ID")
     data: dict = Field(..., description="The data of the qubit")
-    calibrated_at: str = Field(..., description="The time when the qubit was calibrated")
     node_info: NodeInfoModel = Field(..., description="The node information")
 
     system_info: SystemInfoModel = Field(..., description="The system information")
@@ -34,18 +35,33 @@ class QubitDocument(Document):
         indexes = [("qid", "chip_id")]
 
     @classmethod
-    def from_domain(cls, domain: QubitModel, existing_doc: "QubitDocument") -> "QubitDocument":
-        if existing_doc:
-            existing_data = existing_doc.model_dump()
-            domain_data = domain.model_dump()
-            # not to overwrite node_info
-            if "node_info" in existing_data:
-                domain_data["node_info"] = existing_data["node_info"]
-            merged_data = {**existing_data, **domain_data}
-            return cls(**merged_data)
-        else:
-            # create new document
-            return cls(**domain.model_dump())
+    def find_by_qid(cls, qid: str, chip_id: str) -> "QubitDocument":
+        """Find a QubitDocument by qid."""
+        return cls.find_one({"qid": qid, "chip_id": chip_id}).run()
 
-    def to_domain(self) -> QubitModel:
-        return QubitModel(**self.model_dump())
+    @staticmethod
+    def merge_calib_data(existing: dict, new: dict) -> dict:
+        """Merge calibration data recursively."""
+        for key, value in new.items():
+            if key in existing and isinstance(existing[key], dict) and isinstance(value, dict):
+                existing[key] = QubitDocument.merge_calib_data(existing[key], value)
+            else:
+                existing[key] = value
+        return existing
+
+    @classmethod
+    def update_calib_data(cls, qid: str, chip_id: str, output_parameters: dict) -> "QubitDocument":
+        """Update the QubitDocument's calibration data with new values."""
+        doc = cls.find_by_qid(qid, chip_id)
+        # Merge new calibration data into the existing data
+        doc.data = QubitDocument.merge_calib_data(doc.data, output_parameters)
+        doc.system_info.update_time()
+        return doc.save()
+
+    @classmethod
+    def update_status(cls, status: str, qid: str, chip_id: str) -> "QubitDocument":
+        """Update the QubitDocument's status."""
+        doc = cls.find_by_qid(qid, chip_id)
+        doc.status = status
+        doc.system_info.update_time()
+        return doc.save()

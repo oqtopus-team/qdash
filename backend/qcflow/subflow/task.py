@@ -1,5 +1,6 @@
 import numpy as np
 from neodbmodel.execution_history import ExecutionHistoryDocument
+from neodbmodel.qubit import QubitDocument
 from neodbmodel.task_history import TaskHistoryDocument
 from prefect import get_run_logger, task
 from qcflow.subflow.execution_manager import ExecutionManager
@@ -318,6 +319,13 @@ def execute_dynamic_task(
             TaskHistoryDocument.upsert_document(
                 task=executed_task, execution_manager=execution_manager
             )
+            output_parameters = task_manager.get_output_parameter_by_task_name(
+                task_name=task_name, task_type=task_type, qid=qid
+            )
+            if output_parameters:
+                QubitDocument.update_calib_data(
+                    qid=qid, chip_id=execution_manager.chip_id, output_parameters=output_parameters
+                )
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
         task_manager.update_all_qid_task_status_to_failed(
