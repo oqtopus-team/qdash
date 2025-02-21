@@ -1,6 +1,7 @@
 from bunnet import Document
 from datamodel.qubit import NodeInfoModel
 from datamodel.system_info import SystemInfoModel
+from neodbmodel.chip import ChipDocument
 from pydantic import ConfigDict, Field
 from qcflow.subflow.task_manager import TaskManager
 
@@ -56,7 +57,12 @@ class QubitDocument(Document):
         # Merge new calibration data into the existing data
         doc.data = QubitDocument.merge_calib_data(doc.data, output_parameters)
         doc.system_info.update_time()
-        return doc.save()
+        updated_qubit = doc.save()
+        chip_doc = ChipDocument.find_one({"chip_id": chip_id}).run()
+        if chip_doc:
+            chip_doc.update_qubit(qid, updated_qubit.model_dump())
+
+        return updated_qubit
 
     @classmethod
     def update_status(cls, status: str, qid: str, chip_id: str) -> "QubitDocument":

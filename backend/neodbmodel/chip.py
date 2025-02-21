@@ -1,9 +1,26 @@
 from bunnet import Document
-from datamodel.chip import ChipModel
 from datamodel.coupling import CouplingModel
-from datamodel.qubit import QubitModel
+from datamodel.qubit import NodeInfoModel
 from datamodel.system_info import SystemInfoModel
-from pydantic import ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class QubitModel(BaseModel):
+    """Model for a qubit.
+
+    Attributes
+    ----------
+        qubit_id (str): The qubit ID. e.g. "0".
+        status (str): The status of the qubit.
+        data (dict): The data of the qubit.
+        node_info (NodeInfo): The node information.
+
+    """
+
+    qid: str = Field(..., description="The qubit ID")
+    status: str = Field("pending", description="The status of the qubit")
+    data: dict = Field(..., description="The data of the qubit")
+    node_info: NodeInfoModel = Field(..., description="The node information")
 
 
 class ChipDocument(Document):
@@ -19,10 +36,10 @@ class ChipDocument(Document):
 
     """
 
-    chip_id: str = Field(..., description="The chip ID")
-    size: int = Field(..., description="The size of the chip")
-    qubits: dict[str, QubitModel] = Field(..., description="The qubits of the chip")
-    couplings: dict[str, CouplingModel] = Field(..., description="The couplings of the chip")
+    chip_id: str = Field("SAMPLE", description="The chip ID")
+    size: int = Field(64, description="The size of the chip")
+    qubits: dict[str, QubitModel] = Field({}, description="The qubits of the chip")
+    couplings: dict[str, CouplingModel] = Field({}, description="The couplings of the chip")
 
     system_info: SystemInfoModel = Field(..., description="The system information")
 
@@ -36,21 +53,10 @@ class ChipDocument(Document):
         name = "chip"
         indexes = [("chip_id")]
 
-    @classmethod
-    def from_domain(cls, domain: ChipModel, existing_doc: "ChipDocument") -> "ChipDocument":
-        if existing_doc:
-            existing_data = existing_doc.model_dump()
-            domain_data = domain.model_dump()
-            # not to overwrite qubits and couplings
-            if "qubits" in existing_data:
-                domain_data["qubits"] = existing_data["qubits"]
-            if "couplings" in existing_data:
-                domain_data["couplings"] = existing_data["couplings"]
-            merged_data = {**existing_data, **domain_data}
-            return cls(**merged_data)
-        else:
-            # create new document
-            return cls(**domain.model_dump())
-
-    def to_domain(self) -> ChipModel:
-        return ChipModel(**self.model_dump())
+    def update_qubit(self, qid: str, qubit_data: dict) -> "ChipDocument":
+        if not isinstance(qubit_data, QubitModel):
+            qubit_data.pop("id", None)
+            qubit_data = QubitModel(**qubit_data)
+        self.qubits[qid] = qubit_data
+        self.system_info.update_time()
+        return self.save()

@@ -1,6 +1,7 @@
 import os
 
 from bunnet import init_bunnet
+from neodbmodel.chip import ChipDocument
 from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.qubit import QubitDocument
 from neodbmodel.task_history import TaskHistoryDocument
@@ -14,5 +15,10 @@ def initialize() -> None:
     """Initialize the repository."""
     init_bunnet(
         database=client.qubex,
-        document_models=[ExecutionHistoryDocument, TaskHistoryDocument, QubitDocument],
+        document_models=[
+            ExecutionHistoryDocument,
+            TaskHistoryDocument,
+            QubitDocument,
+            ChipDocument,
+        ],
     )
