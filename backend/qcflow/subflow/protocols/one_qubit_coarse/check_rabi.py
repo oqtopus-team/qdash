@@ -2,7 +2,7 @@ from typing import Any, ClassVar
 
 from qcflow.subflow.protocols.base import BaseTask
 from qcflow.subflow.task_manager import Data, TaskManager
-from qcflow.subflow.util import convert_label, convert_qid
+from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
 from qubex.experiment.experiment import RABI_TIME_RANGE
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
@@ -31,7 +31,8 @@ class CheckRabi(BaseTask):
             "readout_amplitude": {},
         }
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager, label: str) -> None:
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
+        label = convert_label(qid)
         input_param = {
             "time_range": self.input_parameters["time_range"],
             "shots": self.input_parameters["shots"],
@@ -45,13 +46,14 @@ class CheckRabi(BaseTask):
             self.task_name,
             input_param,
             self.task_type,
-            qid=convert_qid(label),
+            qid=qid,
         )
         task_manager.save()
 
     def _postprocess(
-        self, exp: Experiment, task_manager: TaskManager, result: Any, label: str
+        self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
     ) -> None:
+        label = convert_label(qid)
         output_param = {
             "rabi_amplitude": Data(value=result.rabi_params[label].amplitude),
             "rabi_frequency": Data(value=result.rabi_params[label].frequency, unit="GHz"),
@@ -60,16 +62,16 @@ class CheckRabi(BaseTask):
             self.task_name,
             output_param,
             self.task_type,
-            qid=convert_qid(label),
+            qid=qid,
         )
         task_manager.put_calib_data(
-            qid=convert_qid(label),
+            qid=qid,
             task_type=self.task_type,
             parameter_name="rabi_amplitude",
             data=Data(value=result.rabi_params[label].amplitude),
         )
         task_manager.put_calib_data(
-            qid=convert_qid(label),
+            qid=qid,
             task_type=self.task_type,
             parameter_name="rabi_frequency",
             data=Data(value=result.rabi_params[label].frequency, unit="GHz"),
@@ -78,29 +80,18 @@ class CheckRabi(BaseTask):
             task_name=f"{self.task_name}",
             task_type=self.task_type,
             figure=result.data[label].fit()["fig"],
-            qid=convert_qid(label),
+            qid=qid,
         )
         task_manager.save()
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, target: str = "") -> None:
-        if target != "":
-            label = convert_label(target)
-            result = exp.obtain_rabi_params(
-                time_range=self.input_parameters["time_range"],
-                shots=self.input_parameters["shots"],
-                interval=self.input_parameters["interval"],
-                targets=label,
-            )
-            exp.calib_note.save(file_path=task_manager.calib_dir)
-            self._postprocess(exp, task_manager, result, label)
-        else:
-            for label in exp.qubit_labels:
-                self._preprocess(exp, task_manager, label)
-            result = exp.obtain_rabi_params(
-                time_range=self.input_parameters["time_range"],
-                shots=self.input_parameters["shots"],
-                interval=self.input_parameters["interval"],
-            )
-            exp.calib_note.save(file_path=task_manager.calib_dir)
-            for label in exp.qubit_labels:
-                self._postprocess(exp, task_manager, result, label)
+    def execute(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
+        self._preprocess(exp, task_manager, qid=qid)
+        label = convert_label(qid)
+        result = exp.obtain_rabi_params(
+            time_range=self.input_parameters["time_range"],
+            shots=self.input_parameters["shots"],
+            interval=self.input_parameters["interval"],
+            targets=label,
+        )
+        exp.calib_note.save()
+        self._postprocess(exp, task_manager, result, qid=qid)

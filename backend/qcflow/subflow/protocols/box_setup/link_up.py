@@ -15,12 +15,12 @@ class LinkUp(BaseTask):
     def __init__(self) -> None:
         pass
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager) -> None:
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
         pass
 
-    def _postprocess(self, exp: Experiment, task_manager: TaskManager) -> None:
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager) -> None:
+    def execute(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
         exp.linkup()
-        exp.calib_note.save(file_path=task_manager.calib_dir)
+        exp.calib_note.save()

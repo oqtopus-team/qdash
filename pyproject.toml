@@ -63,6 +63,7 @@ sqe-fitting = {git = "https://github.com/orangekame3/sqe_fitting"}
 ipython = "^8.27.0"
 cirq = "^1.4.1"
 qubex = {git = "https://github.com/amachino/qubex.git@1.2.9", extras = ["backend"]}
+mermaid-py = "^0.7.0"
 
 
 

@@ -15,13 +15,15 @@ class RabiOscillation(BaseTask):
     def __init__(self) -> None:
         pass
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager) -> None:
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
         pass
 
-    def _postprocess(self, exp: Experiment, task_manager: TaskManager, result: Any) -> None:
+    def _postprocess(
+        self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
+    ) -> None:
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager) -> None:
+    def execute(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
         default_rabi_amplitudes = {label: 0.01 for label in exp.qubit_labels}
         exp.rabi_experiment(
             amplitudes=default_rabi_amplitudes,
@@ -30,4 +32,4 @@ class RabiOscillation(BaseTask):
             shots=300,
             interval=50_000,
         )
-        exp.calib_note.save(file_path=task_manager.calib_dir)
+        exp.calib_note.save()

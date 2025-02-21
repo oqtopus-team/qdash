@@ -42,7 +42,7 @@ class OptimizeZX90(BaseTask):
         self.output_parameters["cancel_amplitude"] = cr_result["cancel_amplitude"]
         self.output_parameters["cancel_phase"] = cr_result["cancel_phase"]
         task_manager.put_output_parameters(self.task_name, self.output_parameters)
-        exp.calib_note.save(file_path=task_manager.calib_dir)
+        exp.calib_note.save()
         task_manager.put_calibration_value(cr_label, "cr_amplitude", cr_result["cr_amplitude"])
         task_manager.put_calibration_value(cr_label, "cr_phase", cr_result["cr_phase"])
         task_manager.put_calibration_value(

@@ -15,13 +15,13 @@ class DumpBox(BaseTask):
     def __init__(self) -> None:
         pass
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager) -> None:
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
         pass
 
-    def _postprocess(self, exp: Experiment, task_manager: TaskManager) -> None:
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager) -> None:
+    def execute(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
         for _id in exp.box_ids:
             box_info = {}
             box_info[_id] = exp.tool.dump_box(_id)

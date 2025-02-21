@@ -15,15 +15,15 @@ class Configure(BaseTask):
     def __init__(self) -> None:
         pass
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager) -> None:
+    def _preprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
         pass
 
-    def _postprocess(self, exp: Experiment, task_manager: TaskManager) -> None:
+    def _postprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager) -> None:
+    def execute(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
         exp.state_manager.load(
             chip_id=exp.chip_id, config_dir=exp.config_path, params_dir=exp.params_path
         )
         exp.state_manager.push(box_ids=exp.box_ids, confirm=False)
-        exp.calib_note.save(file_path=task_manager.calib_dir)
+        exp.calib_note.save()

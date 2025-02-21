@@ -2797,6 +2797,21 @@ files = [
 ]
 
 [[package]]
+name = "mermaid-py"
+version = "0.7.0"
+description = "Python Interface for the Popular mermaid-js Library, Simplified for Diagram Creation."
+optional = false
+python-versions = "<4.0,>=3.9"
+groups = ["qcflow"]
+files = [
+    {file = "mermaid_py-0.7.0-py3-none-any.whl", hash = "sha256:2752d3fb42983014ea284a4c2f5ee9df7c42cff55702222de2c8c38744e0c57b"},
+    {file = "mermaid_py-0.7.0.tar.gz", hash = "sha256:f06a68573faf815861afe29e1621aca433cf718f066d6a2adcd554eeebe2e3b6"},
+]
+
+[package.dependencies]
+requests = ">=2.31.0,<3.0.0"
+
+[[package]]
 name = "mistune"
 version = "3.1.1"
 description = "A sane and fast Markdown parser with useful plugins and renderers"
@@ -4638,7 +4653,6 @@ files = [
     {file = "qcs_sdk_python-0.21.12-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:dd30ba533384f06512fc2dfba1acb851e5840b65c3c52d36fceceb696cc5e9d7"},
     {file = "qcs_sdk_python-0.21.12-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:b10219d0c6887e0be436b946613c2a98e40fcb6a75803682f9c6dfbb755dc978"},
     {file = "qcs_sdk_python-0.21.12-cp39-cp39-manylinux_2_28_ppc64le.whl", hash = "sha256:2df766b9ec7059b4f8274e5521fc4b1a26d6ac4ef66f7ca914de3ce9a4d85c36"},
-    {file = "qcs_sdk_python-0.21.12-cp39-cp39-manylinux_2_28_x86_64.whl", hash = "sha256:e63d12c465614339f0a0ab4de21440b5ac5a58114fc966c0c2acb8bdae369ea7"},
     {file = "qcs_sdk_python-0.21.12-cp39-cp39-win_amd64.whl", hash = "sha256:e5aa1097210c63203d72aabe291a890d9de9df7c935f196960e4495da712c9f4"},
     {file = "qcs_sdk_python-0.21.12.tar.gz", hash = "sha256:d2fcaa5b90798bee974f8aa5a2d366de369bd866e34a5a55cce5918c70eddd64"},
 ]
@@ -4670,7 +4684,7 @@ scipy = ">=1.12.0,<2.0.0"
 
 [[package]]
 name = "qubecalib"
-version = "3.1.4"
+version = "3.1.6"
 description = "QuBE calibration tools"
 optional = false
 python-versions = ">=3.9"
@@ -4683,6 +4697,7 @@ e7awgsw = {git = "https://github.com/e-trees/e7awg_sw.git", rev = "7dccc53c"}
 jupyter = ">=1.0,<2.0"
 matplotlib = ">=3.0,<4.0"
 numpy = ">=1.0,<2.0"
+plotly = ">=5.0,<6.0"
 quel_clock_master = {git = "https://github.com/quel-inc/quelware.git", rev = "0.8.10", subdirectory = "quel_clock_master"}
 quel_ic_config = {git = "https://github.com/quel-inc/quelware.git", rev = "0.8.10", subdirectory = "quel_ic_config"}
 tqdm = ">=4.0,<5.0"
@@ -4690,12 +4705,12 @@ tqdm = ">=4.0,<5.0"
 [package.source]
 type = "git"
 url = "https://github.com/qiqb-osaka/qube-calib.git"
-reference = "3.1.5"
-resolved_reference = "57ecee94f5ff2448144d2e0dfc361dbe2e96ee78"
+reference = "3.1.6"
+resolved_reference = "9f83c1eb4488198a019261d52c847b386f24ea5d"
 
 [[package]]
 name = "qubex"
-version = "1.2.9+c1d43d7"
+version = "1.2.11+a554767"
 description = "Qubex: Quantum Experimentation and Simulation Framework"
 optional = false
 python-versions = ">=3.9"
@@ -4719,7 +4734,7 @@ plotly = ">=5.0,<6.0"
 pydantic = ">=2.0,<3.0"
 pyyaml = ">=6.0,<7.0"
 qctrl-visualizer = ">=8.0,<9.0"
-qubecalib = {git = "https://github.com/qiqb-osaka/qube-calib.git", rev = "3.1.5", optional = true, markers = "extra == \"backend\""}
+qubecalib = {git = "https://github.com/qiqb-osaka/qube-calib.git", rev = "3.1.6", optional = true, markers = "extra == \"backend\""}
 qutip = ">=5.0,<6.0"
 rich = ">=13.0,<14.0"
 scikit-learn = ">=1.0,<2.0"
@@ -4727,13 +4742,13 @@ scipy = ">=1.0,<2.0"
 tqdm = ">=4.0,<5.0"
 
 [package.extras]
-backend = ["qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@3.1.5"]
+backend = ["qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@3.1.6"]
 
 [package.source]
 type = "git"
 url = "https://github.com/amachino/qubex.git"
 reference = "HEAD"
-resolved_reference = "c1d43d7cf9efd6e9baca88d494b32772fe61aee6"
+resolved_reference = "a5547673470db4af47bf97248b54f5851ca1dce1"
 
 [[package]]
 name = "quel_clock_master"
@@ -6459,4 +6474,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "6ccc990671309cc38a1e82cf59d5dae3cd9900752fc2d2d4f478de054b665f8d"
+content-hash = "ed3deac0a191e12a65d4e99e7327f256ece82045aab68a53c338d7931595f774"

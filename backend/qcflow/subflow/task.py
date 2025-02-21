@@ -31,7 +31,6 @@ from qcflow.subflow.protocols.one_qubit_coarse.check_rabi import CheckRabi
 from qcflow.subflow.protocols.one_qubit_coarse.check_readout_frequency import (
     CheckReadoutFrequency,
 )
-from qcflow.subflow.protocols.one_qubit_coarse.check_status import CheckStatus
 from qcflow.subflow.protocols.one_qubit_coarse.check_t1 import CheckT1
 from qcflow.subflow.protocols.one_qubit_coarse.check_t2_echo import CheckT2Echo
 from qcflow.subflow.protocols.one_qubit_coarse.chevron_pattern import ChevronPattern
@@ -57,6 +56,7 @@ from qubex.experiment.experiment_constants import (
 )
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 from repository.initialize import initialize
+from subflow.protocols.box_setup.check_status import CheckStatus
 
 task_classes = {
     "CheckStatus": CheckStatus(),
@@ -243,7 +243,7 @@ def execute_dynamic_task_by_qid(
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
-        this_task.execute(exp, task_manager, target=qid)
+        this_task.execute(exp, task_manager, qid=qid)
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
