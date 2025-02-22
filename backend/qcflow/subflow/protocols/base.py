@@ -1,8 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import Literal
+from typing import ClassVar, Literal
 
+from pydantic import BaseModel
 from qcflow.subflow.task_manager import TaskManager
 from qubex.experiment import Experiment
+
+
+class OutputParameter(BaseModel):
+    """Output parameter class."""
+
+    unit: str = ""
+    description: str = ""
 
 
 class BaseTask(ABC):
@@ -10,7 +18,12 @@ class BaseTask(ABC):
 
     task_name: str = ""
     task_type: Literal["global", "qubit", "coupling"]
-    output_parameters: list[str] = []
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {}
+    registry: dict = {}
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        BaseTask.registry[cls.__name__] = cls
 
     def __init__(
         self,
@@ -51,7 +64,7 @@ class BaseTask(ABC):
 
     def get_output_parameters(self) -> list[str]:
         """Return the output parameters of the task."""
-        return self.output_parameters
+        return list(self.output_parameters.keys())
 
     def get_task_name(self) -> str:
         """Return the name of the task."""

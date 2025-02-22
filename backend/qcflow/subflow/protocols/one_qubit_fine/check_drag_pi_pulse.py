@@ -1,6 +1,6 @@
 from typing import Any, ClassVar
 
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import TaskManager
 from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
@@ -11,7 +11,7 @@ class CheckDRAGPIPulse(BaseTask):
 
     task_name: str = "CheckDRAGPIPulse"
     task_type: str = "qubit"
-    output_parameters: ClassVar[list[str]] = []
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {}
 
     def __init__(self) -> None:
         pass

@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 import numpy as np
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_qid
 from qubex.experiment import Experiment
@@ -14,7 +14,12 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
 
     task_name: str = "ZX90InterleavedRandomizedBenchmarking"
     task_type: str = "coupling"
-    output_parameters: ClassVar[list[str]] = ["zx90_gate_fidelity"]
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "zx90_gate_fidelity": OutputParameter(
+            unit="",
+            description="ZX90 gate fidelity",
+        ),
+    }
 
     def __init__(
         self,
@@ -48,9 +53,13 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
     def _postprocess(
         self, exp: Experiment, task_manager: TaskManager, result: Any, label: str
     ) -> None:
+        op = self.output_parameters
         output_param = {
             "zx90_gate_fidelity": Data(
-                value=result["mean"][label], execution_id=task_manager.execution_id
+                value=result["mean"][label],
+                unit=op["zx90_gate_fidelity"].unit,
+                description=op["zx90_gate_fidelity"].description,
+                execution_id=task_manager.execution_id,
             ),
         }
         task_manager.put_output_parameters(

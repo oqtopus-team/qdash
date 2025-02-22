@@ -14,7 +14,7 @@ from qcflow.subflow.task import (
     validate_task_name,
 )
 from qcflow.subflow.task_manager import TaskManager
-from qcflow.subflow.util import convert_label, generate_dag
+from qcflow.subflow.util import convert_label, generate_dag, update_active_output_parameters
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
 from repository.initialize import initialize
@@ -92,6 +92,7 @@ def cal_flow(
     task_manager.task_result = workflow
     task_manager.save()
     generate_dag(f"{calib_dir}/task/{task_manager.id}.json")
+    # update_active_output_parameters()
     execution_manager = ExecutionManager.load_from_file(calib_dir).update_with_task_manager(
         task_manager
     )

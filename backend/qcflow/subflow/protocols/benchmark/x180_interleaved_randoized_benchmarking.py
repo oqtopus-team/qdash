@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 import numpy as np
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_label, convert_qid
 from qubex.clifford import Clifford
@@ -16,7 +16,12 @@ class X180InterleavedRandomizedBenchmarking(BaseTask):
     task_name: str = "X180InterleavedRandomizedBenchmarking"
     task_type: str = "qubit"
 
-    output_parameters: ClassVar[list[str]] = ["x180_gate_fidelity"]
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "x180_gate_fidelity": OutputParameter(
+            unit="",
+            description="X180 gate fidelity",
+        ),
+    }
 
     def __init__(
         self,
@@ -50,9 +55,13 @@ class X180InterleavedRandomizedBenchmarking(BaseTask):
     def _postprocess(
         self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
     ) -> None:
+        op = self.output_parameters
         output_param = {
             "x180_gate_fidelity": Data(
-                value=result["gate_fidelity"], execution_id=task_manager.execution_id
+                value=result["gate_fidelity"],
+                unit=op["x180_gate_fidelity"].unit,
+                description=op["x180_gate_fidelity"].description,
+                execution_id=task_manager.execution_id,
             ),
         }
         task_manager.put_output_parameters(

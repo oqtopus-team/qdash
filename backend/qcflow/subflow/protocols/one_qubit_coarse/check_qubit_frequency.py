@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 import numpy as np
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_label, convert_qid
 from qubex.experiment import Experiment
@@ -13,7 +13,9 @@ class CheckQubitFrequency(BaseTask):
 
     task_name: str = "CheckQubitFrequency"
     task_type: str = "qubit"
-    output_parameters: ClassVar[list[str]] = ["qubit_frequency"]
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "qubit_frequency": OutputParameter(unit="GHz", description="Qubit frequency"),
+    }
 
     def __init__(
         self,
@@ -53,9 +55,13 @@ class CheckQubitFrequency(BaseTask):
         self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
     ) -> None:
         label = convert_label(qid)
+        op = self.output_parameters
         output_param = {
             "qubit_frequency": Data(
-                value=result[label], unit="GHz", execution_id=task_manager.execution_id
+                value=result[label],
+                unit=op["qubit_frequency"].unit,
+                description=op["qubit_frequency"].description,
+                execution_id=task_manager.execution_id,
             ),
         }
         task_manager.put_output_parameters(

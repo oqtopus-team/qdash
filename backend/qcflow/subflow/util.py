@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from mermaid import Config, Graph, Mermaid
+from prefect import get_run_logger
 from prefect import task as prefect_task
 
 
@@ -103,3 +104,29 @@ def generate_dag(file_path: str) -> None:
     output_path = output_dir / f"{base_name}.png"
 
     m.to_png(output_path)
+
+
+@prefect_task
+def update_active_output_parameters() -> None:
+    """Update the active output parameters in the input file.
+
+    Args:
+    ----
+        file_path: The path to the input file.
+
+    """
+    from qcflow.subflow.protocols.base import BaseTask
+
+    logger = get_run_logger()
+    all_outputs = {name: cls.output_parameters for name, cls in BaseTask.registry.items()}
+    unique_elements = list({param for params in all_outputs.values() for param in params})
+    logger.info(f"Active output parameters: {unique_elements}")
+    with Path("active_output_parameters.json").open("w") as f:
+        json.dump(all_outputs, f)
+    with Path("unique_output_parameters.json").open("w") as f:
+        json.dump(unique_elements, f)
+
+    all_descriptions = {name: cls.__doc__ for name, cls in BaseTask.registry.items()}
+    with Path("task_descriptions.json").open("w") as f:
+        json.dump(all_descriptions, f)
+    logger.info(f"Task descriptions: {all_descriptions}")

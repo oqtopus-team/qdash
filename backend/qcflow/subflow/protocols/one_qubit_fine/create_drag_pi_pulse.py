@@ -1,6 +1,6 @@
 from typing import Any, ClassVar
 
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_label, convert_qid
 from qubex.experiment import Experiment
@@ -13,7 +13,11 @@ class CreateDRAGPIPulse(BaseTask):
 
     task_name: str = "CreateDRAGPIPulse"
     task_type: str = "qubit"
-    output_parameters: ClassVar[list[str]] = ["drag_pi_beta", "drag_pi_amplitude"]
+    # output_parameters: ClassVar[list[str]] = ["drag_pi_beta", "drag_pi_amplitude"]
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "drag_pi_beta": OutputParameter(unit="", description="DRAG PI pulse beta"),
+        "drag_pi_amplitude": OutputParameter(unit="", description="DRAG PI pulse amplitude"),
+    }
 
     def __init__(
         self,
@@ -57,12 +61,19 @@ class CreateDRAGPIPulse(BaseTask):
         self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
     ) -> None:
         label = convert_label(qid)
+        op = self.output_parameters
         output_param = {
             "drag_pi_beta": Data(
-                value=result["beta"][label], execution_id=task_manager.execution_id
+                value=result["beta"][label],
+                unit=op["drag_pi_beta"].unit,
+                description=op["drag_pi_beta"].description,
+                execution_id=task_manager.execution_id,
             ),
             "drag_pi_amplitude": Data(
-                value=result["amplitude"][label], execution_id=task_manager.execution_id
+                value=result["amplitude"][label],
+                unit=op["drag_pi_amplitude"].unit,
+                description=op["drag_pi_amplitude"].description,
+                execution_id=task_manager.execution_id,
             ),
         }
         task_manager.put_output_parameters(

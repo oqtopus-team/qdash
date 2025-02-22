@@ -1,6 +1,6 @@
 from typing import Any, ClassVar
 
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
@@ -11,12 +11,20 @@ class ReadoutClassification(BaseTask):
 
     task_name: str = "ReadoutClassification"
     task_type: str = "qubit"
-
-    output_parameters: ClassVar[list[str]] = [
-        "average_readout_fidelity",
-        "readout_fidelity_0",
-        "readout_fidelity_1",
-    ]
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "average_readout_fidelity": OutputParameter(
+            unit="GHz",
+            description="Average readout fidelity",
+        ),
+        "readout_fidelity_0": OutputParameter(
+            unit="GHz",
+            description="Readout fidelity with preparation state 0",
+        ),
+        "readout_fidelity_1": OutputParameter(
+            unit="GHz",
+            description="Readout fidelity with preparation state 1",
+        ),
+    }
 
     def __init__(self) -> None:
         pass
@@ -28,16 +36,25 @@ class ReadoutClassification(BaseTask):
         self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
     ) -> None:
         label = convert_label(qid)
+        op = self.output_parameters
         output_param = {
             "average_readout_fidelity": Data(
                 value=result["average_readout_fidelity"][label],
+                unit=op["average_readout_fidelity"].unit,
+                description=op["average_readout_fidelity"].description,
                 execution_id=task_manager.execution_id,
             ),
             "readout_fidelity_0": Data(
-                value=result["readout_fidelties"][label][0], execution_id=task_manager.execution_id
+                value=result["readout_fidelties"][label][0],
+                unit=op["readout_fidelity_0"].unit,
+                description=op["readout_fidelity_0"].description,
+                execution_id=task_manager.execution_id,
             ),
             "readout_fidelity_1": Data(
-                value=result["readout_fidelties"][label][1], execution_id=task_manager.execution_id
+                value=result["readout_fidelties"][label][1],
+                unit=op["readout_fidelity_1"].unit,
+                description=op["readout_fidelity_1"].description,
+                execution_id=task_manager.execution_id,
             ),
         }
         task_manager.put_output_parameters(

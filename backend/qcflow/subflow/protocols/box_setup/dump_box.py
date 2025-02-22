@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import TaskManager
 from qubex.experiment import Experiment
 
@@ -10,7 +10,7 @@ class DumpBox(BaseTask):
 
     task_name: str = "DumpBox"
     task_type: str = "global"
-    output_parameters: ClassVar[list[str]] = []
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {}
 
     def __init__(self) -> None:
         pass

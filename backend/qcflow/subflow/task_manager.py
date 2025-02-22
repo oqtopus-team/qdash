@@ -45,6 +45,7 @@ class Data(BaseModel):
 
     value: float | int = 0
     unit: str = ""
+    description: str = ""
     calibrated_at: str = Field(
         default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
         description="The time when the system information was created",

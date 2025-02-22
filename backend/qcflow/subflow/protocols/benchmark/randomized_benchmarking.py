@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 import numpy as np
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_label, convert_qid
 from qubex.experiment import Experiment
@@ -14,7 +14,12 @@ class RandomizedBenchmarking(BaseTask):
 
     task_name: str = "RandomizedBenchmarking"
     task_type: str = "qubit"
-    output_parameters: ClassVar[list[str]] = ["average_gate_fidelity"]
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "average_gate_fidelity": OutputParameter(
+            unit="",
+            description="Average gate fidelity",
+        ),
+    }
 
     def __init__(
         self,
@@ -49,9 +54,13 @@ class RandomizedBenchmarking(BaseTask):
     def _postprocess(
         self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
     ) -> None:
+        op = self.output_parameters
         output_param = {
             "average_gate_fidelity": Data(
-                value=result["avg_gate_fidelity"], execution_id=task_manager.execution_id
+                value=result["avg_gate_fidelity"],
+                unit=op["average_gate_fidelity"].unit,
+                description=op["average_gate_fidelity"].description,
+                execution_id=task_manager.execution_id,
             ),
         }
         task_manager.put_output_parameters(

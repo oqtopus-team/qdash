@@ -1,6 +1,6 @@
 from typing import Any, ClassVar
 
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_label, convert_qid
 from qubex.experiment import Experiment
@@ -13,7 +13,9 @@ class CreatePIPulse(BaseTask):
 
     task_name: str = "CreatePIPulse"
     task_type: str = "qubit"
-    output_parameters: ClassVar[list[str]] = ["pi_amplitude"]
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "pi_amplitude": OutputParameter(unit="", description="PI pulse amplitude")
+    }
 
     def __init__(
         self,
@@ -57,9 +59,13 @@ class CreatePIPulse(BaseTask):
         self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
     ) -> None:
         label = convert_label(qid)
+        op = self.output_parameters
         output_param = {
             "pi_amplitude": Data(
-                value=result.data[label].calib_value, execution_id=task_manager.execution_id
+                value=result.data[label].calib_value,
+                unit=op["pi_amplitude"].unit,
+                description=op["pi_amplitude"].description,
+                execution_id=task_manager.execution_id,
             ),
         }
         task_manager.put_output_parameters(

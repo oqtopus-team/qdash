@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 import numpy as np
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import TaskManager
 from qubex.experiment import Experiment
 
@@ -11,12 +11,18 @@ class CheckCrossResonance(BaseTask):
 
     task_name: str = "CheckCrossResonance"
     task_type: str = "coupling"
-    output_parameters: ClassVar[list[str]] = [
-        "cr_amplitude",
-        "cr_phase",
-        "cancel_amplitude",
-        "cancel_phase",
-    ]
+    # output_parameters: ClassVar[list[str]] = [
+    #     "cr_amplitude",
+    #     "cr_phase",
+    #     "cancel_amplitude",
+    #     "cancel_phase",
+    # ]
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "cr_amplitude": OutputParameter(unit="", description="Amplitude of the CR pulse."),
+        "cr_phase": OutputParameter(unit="", description="Phase of the CR pulse."),
+        "cancel_amplitude": OutputParameter(unit="", description="Amplitude of the cancel pulse."),
+        "cancel_phase": OutputParameter(unit="", description="Phase of the cancel pulse."),
+    }
 
     def __init__(self) -> None:
         pass

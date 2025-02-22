@@ -1,6 +1,6 @@
 from typing import Any, ClassVar
 
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
@@ -13,7 +13,10 @@ class CheckRabi(BaseTask):
 
     task_name: str = "CheckRabi"
     task_type: str = "qubit"
-    output_parameters: ClassVar[list[str]] = ["rabi_amplitude", "rabi_frequency"]
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "rabi_amplitude": OutputParameter(unit="", description="Rabi oscillation amplitude"),
+        "rabi_frequency": OutputParameter(unit="GHz", description="Rabi oscillation frequency"),
+    }
 
     def __init__(
         self,
@@ -54,13 +57,18 @@ class CheckRabi(BaseTask):
         self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
     ) -> None:
         label = convert_label(qid)
+        op = self.output_parameters
         output_param = {
             "rabi_amplitude": Data(
-                value=result.rabi_params[label].amplitude, execution_id=task_manager.execution_id
+                value=result.rabi_params[label].amplitude,
+                unit=op["rabi_amplitude"].unit,
+                description=op["rabi_amplitude"].description,
+                execution_id=task_manager.execution_id,
             ),
             "rabi_frequency": Data(
                 value=result.rabi_params[label].frequency,
-                unit="GHz",
+                unit=op["rabi_frequency"].unit,
+                description=op["rabi_frequency"].description,
                 execution_id=task_manager.execution_id,
             ),
         }

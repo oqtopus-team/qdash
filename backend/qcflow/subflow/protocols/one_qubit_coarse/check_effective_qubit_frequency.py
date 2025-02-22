@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 import numpy as np
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import Data, TaskManager
 from qcflow.subflow.util import convert_label, convert_qid
 from qubex.experiment import Experiment
@@ -13,11 +13,17 @@ class CheckEffectiveQubitFrequency(BaseTask):
 
     task_name: str = "CheckEffectiveQubitFrequency"
     task_type: str = "qubit"
-    output_parameters: ClassVar[list[str]] = [
-        "effective_qubit_frequency",
-        "effective_qubit_frequency_0",
-        "effective_qubit_frequency_1",
-    ]
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "effective_qubit_frequency": OutputParameter(
+            unit="GHz", description="Effective qubit frequency"
+        ),
+        "effective_qubit_frequency_0": OutputParameter(
+            unit="GHz", description="Effective qubit frequency for qubit 0"
+        ),
+        "effective_qubit_frequency_1": OutputParameter(
+            unit="GHz", description="Effective qubit frequency for qubit 1"
+        ),
+    }
 
     def __init__(
         self,
@@ -52,20 +58,24 @@ class CheckEffectiveQubitFrequency(BaseTask):
         self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
     ) -> None:
         label = convert_label(qid)
+        op = self.output_parameters
         output_param = {
             "effective_qubit_frequency": Data(
                 value=result["effective_freq"][label],
-                unit="GHz",
+                unit=op["effective_qubit_frequency"].unit,
+                description=op["effective_qubit_frequency"].description,
                 execution_id=task_manager.execution_id,
             ),
             "effective_qubit_frequency_0": Data(
                 value=result["result_0"].data[label].bare_freq,
-                unit="GHz",
+                unit=op["effective_qubit_frequency_0"].unit,
+                description=op["effective_qubit_frequency_0"].description,
                 execution_id=task_manager.execution_id,
             ),
             "effective_qubit_frequency_1": Data(
                 value=result["result_1"].data[label].bare_freq,
-                unit="GHz",
+                unit=op["effective_qubit_frequency_1"].unit,
+                description=op["effective_qubit_frequency_1"].description,
                 execution_id=task_manager.execution_id,
             ),
         }

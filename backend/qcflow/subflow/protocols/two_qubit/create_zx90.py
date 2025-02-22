@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 import numpy as np
-from qcflow.subflow.protocols.base import BaseTask
+from qcflow.subflow.protocols.base import BaseTask, OutputParameter
 from qcflow.subflow.task_manager import TaskManager
 from qubex.experiment import Experiment
 
@@ -12,7 +12,10 @@ class CreateZX90(BaseTask):
     task_name: str = "CreateZX90"
     task_type: str = "coupling"
 
-    output_parameters: ClassVar[list[str]] = ["cr_amplitude"]
+    # output_parameters: ClassVar[list[str]] = ["cr_amplitude"]
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "cr_amplitude": OutputParameter(unit="", description="Amplitude of the ZX90 gate."),
+    }
 
     def __init__(self) -> None:
         pass
