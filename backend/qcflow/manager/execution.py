@@ -8,7 +8,7 @@ import pendulum
 from datamodel.execution import ExecutionModel
 from filelock import FileLock
 from pydantic import BaseModel
-from qcflow.manager.task_manager import CalibData, TaskManager, TaskResult
+from qcflow.manager.task import CalibData, TaskManager, TaskResult
 from qcflow.subflow.constant import COMPLETED, FAILED, RUNNING, SCHDULED
 from qcflow.subflow.system_info import SystemInfo
 
@@ -51,7 +51,7 @@ class ExecutionManager(BaseModel):
         chip_id: str = "",
         name: str = "default",
         note: dict = {},
-        **kwargs,
+        **kwargs,  # noqa: ANN003
     ) -> None:
         super().__init__(**kwargs)
         self.name = name
@@ -70,7 +70,7 @@ class ExecutionManager(BaseModel):
             instance = ExecutionManager.load_from_file(self.calib_data_path)
             func(instance)
             instance.system_info.update_time()
-            instance._atomic_save()
+            instance._atomic_save()  # noqa: SLF001
 
     def update_status(self, new_status: ExecutionStatus) -> None:
         """Update the status of the execution."""
@@ -112,7 +112,7 @@ class ExecutionManager(BaseModel):
             end_time = pendulum.parse(end_at)
         except Exception as e:
             raise ValueError(f"Failed to parse the time. {e}")
-        return end_time.diff_for_humans(start_time, absolute=True)
+        return end_time.diff_for_humans(start_time, absolute=True)  # type: ignore #noqa: PGH003
 
     def start_execution(self) -> None:
         def updater(instance: ExecutionManager) -> None:
@@ -146,11 +146,6 @@ class ExecutionManager(BaseModel):
         if not save_path.exists():
             raise FileNotFoundError(f"{save_path} does not exist.")
         return cls.model_validate_json(save_path.read_text())
-
-    # def reload(self) -> None:
-    #     """Reload the execution manager from the file."""
-    #     instance = ExecutionManager.load_from_file(self.calib_data_path)
-    #     self.__dict__.update(instance.__dict__)
 
     def to_domain(self) -> ExecutionModel:
         return ExecutionModel(

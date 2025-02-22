@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
-from qcflow.manager.task_manager import Data
+from qcflow.manager.task import Data
 from qcflow.qubex_protocols.base import (
     BaseTask,
     OutputParameter,

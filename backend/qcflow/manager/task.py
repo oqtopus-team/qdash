@@ -75,7 +75,7 @@ class CalibData(BaseModel):
     def __getitem__(self, key: str) -> dict:
         """Get the item by key."""
         if key in ("qubit", "coupling"):
-            return getattr(self, key)
+            return getattr(self, key)  # type: ignore #noqa: PGH003
         raise KeyError(f"Invalid key: {key}")
 
 
@@ -178,7 +178,7 @@ class BaseTaskResult(BaseModel):
         except Exception as e:
             error_message = f"Failed to parse the time. {e}"
             raise ValueError(error_message)
-        return end_time.diff_for_humans(start_time, absolute=True)
+        return end_time.diff_for_humans(start_time, absolute=True)  # type: ignore #noqa: PGH003
 
 
 class GlobalTask(BaseTaskResult):

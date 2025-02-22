@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qcflow.manager.task_manager import Data
+from qcflow.manager.task import Data
 from qcflow.qubex_protocols.base import (
     BaseTask,
     OutputParameter,

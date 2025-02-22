@@ -2,8 +2,8 @@ from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.qubit import QubitDocument
 from neodbmodel.task_history import TaskHistoryDocument
 from prefect import flow, get_run_logger, task
-from qcflow.manager.execution_manager import ExecutionManager
-from qcflow.manager.task_manager import CouplingTask, GlobalTask, QubitTask, TaskManager, TaskResult
+from qcflow.manager.execution import ExecutionManager
+from qcflow.manager.task import CouplingTask, GlobalTask, QubitTask, TaskManager, TaskResult
 from qcflow.qubex_protocols.active_protocols import task_classes
 from qubex.experiment import Experiment
 from repository.initialize import initialize

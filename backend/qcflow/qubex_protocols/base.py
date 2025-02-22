@@ -3,7 +3,7 @@ from typing import Any, ClassVar, Literal
 
 import plotly.graph_objs as go
 from pydantic import BaseModel
-from qcflow.manager.task_manager import Data
+from qcflow.manager.task import Data
 from qubex.experiment import Experiment
 
 
