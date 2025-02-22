@@ -1,5 +1,6 @@
 from typing import ClassVar
 
+from qcflow.manager.task_manager import Data
 from qcflow.qubex_protocols.base import (
     BaseTask,
     OutputParameter,
@@ -7,7 +8,6 @@ from qcflow.qubex_protocols.base import (
     PreProcessResult,
     RunResult,
 )
-from qcflow.subflow.task_manager import Data
 from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, PI_DURATION

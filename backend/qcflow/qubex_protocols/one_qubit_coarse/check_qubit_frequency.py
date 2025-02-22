@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, ClassVar
 if TYPE_CHECKING:
     import plotly.graph_objs as go
 import numpy as np
+from qcflow.manager.task_manager import Data
 from qcflow.qubex_protocols.base import (
     BaseTask,
     OutputParameter,
@@ -10,7 +11,6 @@ from qcflow.qubex_protocols.base import (
     PreProcessResult,
     RunResult,
 )
-from qcflow.subflow.task_manager import Data
 from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS

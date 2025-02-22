@@ -2,8 +2,8 @@ from bunnet import Document
 from datamodel.system_info import SystemInfoModel
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
-from qcflow.subflow.execution_manager import ExecutionManager
-from qcflow.subflow.task_manager import BaseTaskResult
+from qcflow.manager.execution_manager import ExecutionManager
+from qcflow.manager.task_manager import BaseTaskResult
 
 
 class SystemInfo(SystemInfoModel):

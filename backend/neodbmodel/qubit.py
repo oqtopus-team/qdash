@@ -3,7 +3,6 @@ from datamodel.qubit import NodeInfoModel
 from datamodel.system_info import SystemInfoModel
 from neodbmodel.chip import ChipDocument
 from pydantic import ConfigDict, Field
-from qcflow.subflow.task_manager import TaskManager
 
 
 class QubitDocument(Document):

@@ -444,13 +444,6 @@ class TaskManager(BaseModel):
         task.put_output_parameter(output_parameters)
         task.system_info.update_time()
         self._put_calib_data(qid, task_type, output_parameters)
-        # for key, value in output_parameters.items():
-        #     if task_type == "qubit":
-        #         self.calib_data.put_qubit_data(qid, key, value)
-        #     elif task_type == "coupling":
-        #         self.calib_data.put_coupling_data(qid, key, value)
-        #     else:
-        #         raise ValueError(f"Unknown task type: {task_type}")
 
     def _put_calib_data(self, qid: str, task_type: str, output_parameters: dict) -> None:
         for key, value in output_parameters.items():
@@ -460,15 +453,6 @@ class TaskManager(BaseModel):
                 self.calib_data.put_coupling_data(qid, key, value)
             else:
                 raise ValueError(f"Unknown task type: {task_type}")
-
-    # def put_calib_data(self, qid: str, task_type: str, parameter_name: str, data: Data) -> None:
-    #     data.execution_id = self.execution_id
-    #     if task_type == "qubit":
-    #         self.calib_data.put_qubit_data(qid, parameter_name, data)
-    #     elif task_type == "coupling":
-    #         self.calib_data.put_coupling_data(qid, parameter_name, data)
-    #     else:
-    #         raise ValueError(f"Unknown task type: {task_type}")
 
     def put_note_to_task(
         self, task_name: str, note: dict, task_type: str = "global", qid: str = ""
