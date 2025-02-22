@@ -1,5 +1,4 @@
 import json
-import os
 import re
 from pathlib import Path
 
@@ -115,7 +114,7 @@ def update_active_output_parameters() -> None:
         file_path: The path to the input file.
 
     """
-    from qcflow.subflow.protocols.base import BaseTask
+    from qcflow.qubex_protocols.base import BaseTask
 
     logger = get_run_logger()
     all_outputs = {name: cls.output_parameters for name, cls in BaseTask.registry.items()}
