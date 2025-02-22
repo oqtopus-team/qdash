@@ -50,19 +50,15 @@ class CheckT1(BaseTask):
     ) -> None:
         label = convert_label(qid)
         output_param = {
-            "t1": Data(value=result.data[label].t1, unit="ns"),
+            "t1": Data(
+                value=result.data[label].t1, unit="ns", execution_id=task_manager.execution_id
+            ),
         }
         task_manager.put_output_parameters(
             self.task_name,
             output_param,
             self.task_type,
             qid=qid,
-        )
-        task_manager.put_calib_data(
-            qid=convert_qid(label),
-            task_type=self.task_type,
-            parameter_name="t1",
-            data=Data(value=result.data[label].t1, unit="ns"),
         )
         task_manager.save_figure(
             task_name=self.task_name,

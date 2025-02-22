@@ -49,6 +49,7 @@ class Data(BaseModel):
         default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
         description="The time when the system information was created",
     )
+    execution_id: str = ""
 
 
 class CalibData(BaseModel):
@@ -248,15 +249,20 @@ class TaskManager(BaseModel):
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    execution_id: str = ""
+    execution_id: str
     task_result: TaskResult = TaskResult()  # デフォルト値を指定
     calib_data: CalibData = CalibData(qubit={}, coupling={})
     calib_dir: str = ""
     controller_info: dict[str, dict] = {}
 
     def __init__(self, execution_id: str, qids: list[str] = [], calib_dir: str = ".") -> None:
-        super().__init__()
-        self.execution_id = execution_id
+        super().__init__(
+            execution_id=execution_id,
+            task_result=TaskResult(),
+            calib_data=CalibData(qubit={}, coupling={}),
+            calib_dir=calib_dir,
+            controller_info={},
+        )
         for qid in qids:
             self.task_result.qubit_tasks[qid] = []
             self.task_result.coupling_tasks[qid] = []
@@ -431,20 +437,37 @@ class TaskManager(BaseModel):
         self, task_name: str, output_parameters: dict, task_type: str = "global", qid: str = ""
     ) -> None:
         container = self._get_task_container(task_type, qid)
-
         task = self._find_task_in_container(container, task_name)
         if task is None:
             raise ValueError(f"Task '{task_name}' not found.")
         task.put_output_parameter(output_parameters)
         task.system_info.update_time()
+        self._put_calib_data(qid, task_type, output_parameters)
+        # for key, value in output_parameters.items():
+        #     if task_type == "qubit":
+        #         self.calib_data.put_qubit_data(qid, key, value)
+        #     elif task_type == "coupling":
+        #         self.calib_data.put_coupling_data(qid, key, value)
+        #     else:
+        #         raise ValueError(f"Unknown task type: {task_type}")
 
-    def put_calib_data(self, qid: str, task_type: str, parameter_name: str, data: Data) -> None:
-        if task_type == "qubit":
-            self.calib_data.put_qubit_data(qid, parameter_name, data)
-        elif task_type == "coupling":
-            self.calib_data.put_coupling_data(qid, parameter_name, data)
-        else:
-            raise ValueError(f"Unknown task type: {task_type}")
+    def _put_calib_data(self, qid: str, task_type: str, output_parameters: dict) -> None:
+        for key, value in output_parameters.items():
+            if task_type == "qubit":
+                self.calib_data.put_qubit_data(qid, key, value)
+            elif task_type == "coupling":
+                self.calib_data.put_coupling_data(qid, key, value)
+            else:
+                raise ValueError(f"Unknown task type: {task_type}")
+
+    # def put_calib_data(self, qid: str, task_type: str, parameter_name: str, data: Data) -> None:
+    #     data.execution_id = self.execution_id
+    #     if task_type == "qubit":
+    #         self.calib_data.put_qubit_data(qid, parameter_name, data)
+    #     elif task_type == "coupling":
+    #         self.calib_data.put_coupling_data(qid, parameter_name, data)
+    #     else:
+    #         raise ValueError(f"Unknown task type: {task_type}")
 
     def put_note_to_task(
         self, task_name: str, note: dict, task_type: str = "global", qid: str = ""

@@ -50,19 +50,15 @@ class CheckT2Echo(BaseTask):
     ) -> None:
         label = convert_label(qid)
         output_param = {
-            "t2_echo": Data(value=result.data[label].t2, unit="ns"),
+            "t2_echo": Data(
+                value=result.data[label].t2, unit="ns", execution_id=task_manager.execution_id
+            ),
         }
         task_manager.put_output_parameters(
             self.task_name,
             output_param,
             self.task_type,
             qid=qid,
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="t2_echo",
-            data=Data(value=result.data[label].t2, unit="ns"),
         )
         task_manager.save_figure(
             task_name=self.task_name,

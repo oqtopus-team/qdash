@@ -59,28 +59,18 @@ class CreateDRAGHPIPulse(BaseTask):
     ) -> None:
         label = convert_label(qid)
         output_param = {
-            "drag_hpi_beta": Data(value=result["beta"][label]),
-            "drag_hpi_amplitude": Data(value=result["amplitude"][label]),
+            "drag_hpi_beta": Data(
+                value=result["beta"][label], execution_id=task_manager.execution_id
+            ),
+            "drag_hpi_amplitude": Data(
+                value=result["amplitude"][label], execution_id=task_manager.execution_id
+            ),
         }
         task_manager.put_output_parameters(
             self.task_name,
             output_param,
             self.task_type,
             qid=qid,
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="drag_hpi_beta",
-            data=Data(value=result["beta"][label]),
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="drag_hpi_amplitude",
-            data=Data(
-                value=result["amplitude"][label],
-            ),
         )
         task_manager.save()
 

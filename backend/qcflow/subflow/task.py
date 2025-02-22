@@ -234,7 +234,7 @@ def execute_dynamic_task_by_qid(
         this_task = task_classes[task_name]
         task_type = this_task.get_task_type()
         execution_manager = ExecutionManager.load_from_file(task_manager.calib_dir)
-        logger.info(f"Starting task: {task_name}")
+        logger.info(f"Starting task: {task_name}, execution_id: {task_manager.execution_id}")
         task_manager.start_task(task_name, task_type, qid)
         logger.info(f"Running task: {task_name}, id: {task_manager.id}")
         task_manager.update_task_status_to_running(

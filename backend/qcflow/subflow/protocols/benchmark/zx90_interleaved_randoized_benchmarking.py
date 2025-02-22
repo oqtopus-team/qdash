@@ -49,19 +49,15 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
         self, exp: Experiment, task_manager: TaskManager, result: Any, label: str
     ) -> None:
         output_param = {
-            "zx90_gate_fidelity": Data(value=result["mean"][label]),
+            "zx90_gate_fidelity": Data(
+                value=result["mean"][label], execution_id=task_manager.execution_id
+            ),
         }
         task_manager.put_output_parameters(
             self.task_name,
             output_param,
             self.task_type,
             qid=convert_qid(label),
-        )
-        task_manager.put_calib_data(
-            qid=convert_qid(label),
-            task_type=self.task_type,
-            parameter_name="zx90_gate_fidelity",
-            value=result["mean"][label],
         )
         task_manager.save()
 

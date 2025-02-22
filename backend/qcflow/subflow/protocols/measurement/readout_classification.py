@@ -29,33 +29,22 @@ class ReadoutClassification(BaseTask):
     ) -> None:
         label = convert_label(qid)
         output_param = {
-            "average_readout_fidelity": Data(value=result["average_readout_fidelity"][label]),
-            "readout_fidelity_0": Data(value=result["readout_fidelties"][label][0]),
-            "readout_fidelity_1": Data(value=result["readout_fidelties"][label][1]),
+            "average_readout_fidelity": Data(
+                value=result["average_readout_fidelity"][label],
+                execution_id=task_manager.execution_id,
+            ),
+            "readout_fidelity_0": Data(
+                value=result["readout_fidelties"][label][0], execution_id=task_manager.execution_id
+            ),
+            "readout_fidelity_1": Data(
+                value=result["readout_fidelties"][label][1], execution_id=task_manager.execution_id
+            ),
         }
         task_manager.put_output_parameters(
             self.task_name,
             output_param,
             self.task_type,
             qid=qid,
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="average_readout_fidelity",
-            data=Data(value=result["average_readout_fidelity"][label]),
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="readout_fidelity_0",
-            data=Data(value=result["readout_fidelties"][label][0]),
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="readout_fidelity_1",
-            data=Data(value=result["readout_fidelties"][label][1]),
         )
 
     def execute(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:

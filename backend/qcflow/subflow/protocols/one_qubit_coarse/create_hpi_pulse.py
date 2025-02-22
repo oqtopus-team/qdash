@@ -59,19 +59,15 @@ class CreateHPIPulse(BaseTask):
     ) -> None:
         label = convert_label(qid)
         output_param = {
-            "hpi_amplitude": Data(value=result.data[label].calib_value),
+            "hpi_amplitude": Data(
+                value=result.data[label].calib_value, execution_id=task_manager.execution_id
+            ),
         }
         task_manager.put_output_parameters(
             self.task_name,
             output_param,
             self.task_type,
             qid=qid,
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="hpi_amplitude",
-            data=Data(value=result.data[label].calib_value),
         )
         task_manager.save_figure(
             task_name=self.task_name,

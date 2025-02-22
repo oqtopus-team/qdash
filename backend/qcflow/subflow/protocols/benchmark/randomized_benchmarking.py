@@ -50,19 +50,15 @@ class RandomizedBenchmarking(BaseTask):
         self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
     ) -> None:
         output_param = {
-            "average_gate_fidelity": Data(value=result["avg_gate_fidelity"]),
+            "average_gate_fidelity": Data(
+                value=result["avg_gate_fidelity"], execution_id=task_manager.execution_id
+            ),
         }
         task_manager.put_output_parameters(
             self.task_name,
             output_param,
             self.task_type,
             qid=qid,
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="average_gate_fidelity",
-            data=Data(value=result["avg_gate_fidelity"]),
         )
         task_manager.save_figure(
             task_name=self.task_name,

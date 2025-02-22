@@ -54,19 +54,15 @@ class CheckQubitFrequency(BaseTask):
     ) -> None:
         label = convert_label(qid)
         output_param = {
-            "qubit_frequency": Data(value=result[label], unit="GHz"),
+            "qubit_frequency": Data(
+                value=result[label], unit="GHz", execution_id=task_manager.execution_id
+            ),
         }
         task_manager.put_output_parameters(
             self.task_name,
             output_param,
             self.task_type,
             qid=qid,
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="qubit_frequency",
-            data=Data(value=result[label], unit="GHz"),
         )
         task_manager.save()
 

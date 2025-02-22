@@ -44,6 +44,5 @@ class CreateFineZX90(BaseTask):
         self.output_parameters["cr_amplitude"] = cr_result["calibrated_value"]
         task_manager.put_output_parameters(self.task_name, self.output_parameters)
         exp.calib_note.save()
-        task_manager.put_calibration_value(cr_label, "cr_amplitude", cr_result["calibrated_value"])
         note = f"CR pair: {cr_label}"
         task_manager.put_note_to_task(self.task_name, note)

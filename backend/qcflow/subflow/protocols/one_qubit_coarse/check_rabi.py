@@ -55,26 +55,20 @@ class CheckRabi(BaseTask):
     ) -> None:
         label = convert_label(qid)
         output_param = {
-            "rabi_amplitude": Data(value=result.rabi_params[label].amplitude),
-            "rabi_frequency": Data(value=result.rabi_params[label].frequency, unit="GHz"),
+            "rabi_amplitude": Data(
+                value=result.rabi_params[label].amplitude, execution_id=task_manager.execution_id
+            ),
+            "rabi_frequency": Data(
+                value=result.rabi_params[label].frequency,
+                unit="GHz",
+                execution_id=task_manager.execution_id,
+            ),
         }
         task_manager.put_output_parameters(
             self.task_name,
             output_param,
             self.task_type,
             qid=qid,
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="rabi_amplitude",
-            data=Data(value=result.rabi_params[label].amplitude),
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="rabi_frequency",
-            data=Data(value=result.rabi_params[label].frequency, unit="GHz"),
         )
         task_manager.save_figure(
             task_name=f"{self.task_name}",

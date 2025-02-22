@@ -51,7 +51,9 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
         self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
     ) -> None:
         output_param = {
-            "x90_gate_fidelity": Data(value=result["gate_fidelity"]),
+            "x90_gate_fidelity": Data(
+                value=result["gate_fidelity"], execution_id=task_manager.execution_id
+            ),
         }
 
         task_manager.put_output_parameters(
@@ -59,12 +61,6 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
             output_param,
             self.task_type,
             qid=qid,
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="x90_gate_fidelity",
-            data=Data(value=result["gate_fidelity"]),
         )
         task_manager.save_figure(
             task_name=self.task_name,

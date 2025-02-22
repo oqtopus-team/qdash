@@ -53,12 +53,20 @@ class CheckEffectiveQubitFrequency(BaseTask):
     ) -> None:
         label = convert_label(qid)
         output_param = {
-            "effective_qubit_frequency": Data(value=result["effective_freq"][label], unit="GHz"),
+            "effective_qubit_frequency": Data(
+                value=result["effective_freq"][label],
+                unit="GHz",
+                execution_id=task_manager.execution_id,
+            ),
             "effective_qubit_frequency_0": Data(
-                value=result["result_0"].data[label].bare_freq, unit="GHz"
+                value=result["result_0"].data[label].bare_freq,
+                unit="GHz",
+                execution_id=task_manager.execution_id,
             ),
             "effective_qubit_frequency_1": Data(
-                value=result["result_1"].data[label].bare_freq, unit="GHz"
+                value=result["result_1"].data[label].bare_freq,
+                unit="GHz",
+                execution_id=task_manager.execution_id,
             ),
         }
         task_manager.put_output_parameters(
@@ -66,24 +74,6 @@ class CheckEffectiveQubitFrequency(BaseTask):
             output_param,
             self.task_type,
             qid=qid,
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="effective_qubit_frequency",
-            data=Data(value=result["effective_freq"][label]),
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="effective_qubit_frequency_0",
-            data=Data(value=result["result_0"].data[label].bare_freq),
-        )
-        task_manager.put_calib_data(
-            qid=qid,
-            task_type=self.task_type,
-            parameter_name="effective_qubit_frequency_1",
-            data=Data(value=result["result_1"].data[label].bare_freq),
         )
         task_manager.save_figure(
             task_name=self.task_name,
