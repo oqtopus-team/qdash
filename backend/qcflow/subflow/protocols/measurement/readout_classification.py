@@ -1,7 +1,15 @@
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
-from qcflow.subflow.protocols.base import BaseTask, OutputParameter
-from qcflow.subflow.task_manager import Data, TaskManager
+if TYPE_CHECKING:
+    import plotly.graph_objs as go
+from qcflow.subflow.protocols.base import (
+    BaseTask,
+    OutputParameter,
+    PostProcessResult,
+    PreProcessResult,
+    RunResult,
+)
+from qcflow.subflow.task_manager import Data
 from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
 
@@ -29,43 +37,38 @@ class ReadoutClassification(BaseTask):
     def __init__(self) -> None:
         pass
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
+    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
         pass
 
-    def _postprocess(
-        self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
-    ) -> None:
+    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = convert_label(qid)
+        result = run_result.raw_result
         op = self.output_parameters
         output_param = {
             "average_readout_fidelity": Data(
                 value=result["average_readout_fidelity"][label],
                 unit=op["average_readout_fidelity"].unit,
                 description=op["average_readout_fidelity"].description,
-                execution_id=task_manager.execution_id,
+                execution_id=execution_id,
             ),
             "readout_fidelity_0": Data(
                 value=result["readout_fidelties"][label][0],
                 unit=op["readout_fidelity_0"].unit,
                 description=op["readout_fidelity_0"].description,
-                execution_id=task_manager.execution_id,
+                execution_id=execution_id,
             ),
             "readout_fidelity_1": Data(
                 value=result["readout_fidelties"][label][1],
                 unit=op["readout_fidelity_1"].unit,
                 description=op["readout_fidelity_1"].description,
-                execution_id=task_manager.execution_id,
+                execution_id=execution_id,
             ),
         }
-        task_manager.put_output_parameters(
-            self.task_name,
-            output_param,
-            self.task_type,
-            qid=qid,
-        )
+        figures: list[go.Figure] = []
+        return PostProcessResult(output_parameters=output_param, figures=figures)
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
+    def run(self, exp: Experiment, qid: str) -> RunResult:
         label = convert_label(qid)
         result = exp.build_classifier(targets=label)
         exp.calib_note.save()
-        self._postprocess(exp, task_manager, result, qid=qid)
+        return RunResult(raw_result=result)

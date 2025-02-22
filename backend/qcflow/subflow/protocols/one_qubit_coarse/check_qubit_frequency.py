@@ -1,9 +1,17 @@
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
+if TYPE_CHECKING:
+    import plotly.graph_objs as go
 import numpy as np
-from qcflow.subflow.protocols.base import BaseTask, OutputParameter
-from qcflow.subflow.task_manager import Data, TaskManager
-from qcflow.subflow.util import convert_label, convert_qid
+from qcflow.subflow.protocols.base import (
+    BaseTask,
+    OutputParameter,
+    PostProcessResult,
+    PreProcessResult,
+    RunResult,
+)
+from qcflow.subflow.task_manager import Data
+from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
@@ -19,11 +27,15 @@ class CheckQubitFrequency(BaseTask):
 
     def __init__(
         self,
-        detuning_range=np.linspace(-0.01, 0.01, 21),
-        time_range=range(0, 101, 4),
-        shots=DEFAULT_SHOTS,
-        interval=DEFAULT_INTERVAL,
+        detuning_range=None,  # noqa: ANN001
+        time_range=None,  # noqa: ANN001
+        shots=DEFAULT_SHOTS,  # noqa: ANN001
+        interval=DEFAULT_INTERVAL,  # noqa: ANN001
     ) -> None:
+        if detuning_range is None:
+            detuning_range = np.linspace(-0.01, 0.01, 21)
+        if time_range is None:
+            time_range = range(0, 101, 4)
         self.input_parameters: dict = {
             "detuning_range": detuning_range,
             "time_range": time_range,
@@ -33,7 +45,7 @@ class CheckQubitFrequency(BaseTask):
             "control_amplitude": 0.0,
         }
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
+    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
         label = convert_label(qid)
         input_param = {
             "detuning_range": self.input_parameters["detuning_range"],
@@ -43,37 +55,24 @@ class CheckQubitFrequency(BaseTask):
             "qubit_frequency": exp.targets[label].frequency,
             "control_amplitude": exp.params.control_amplitude[label],
         }
-        task_manager.put_input_parameters(
-            self.task_name,
-            input_param,
-            self.task_type,
-            qid=qid,
-        )
-        task_manager.save()
+        return PreProcessResult(input_parameters=input_param)
 
-    def _postprocess(
-        self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
-    ) -> None:
+    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = convert_label(qid)
+        result = run_result.raw_result
         op = self.output_parameters
         output_param = {
             "qubit_frequency": Data(
                 value=result[label],
                 unit=op["qubit_frequency"].unit,
                 description=op["qubit_frequency"].description,
-                execution_id=task_manager.execution_id,
+                execution_id=execution_id,
             ),
         }
-        task_manager.put_output_parameters(
-            self.task_name,
-            output_param,
-            self.task_type,
-            qid=qid,
-        )
-        task_manager.save()
+        figures: list[go.Figure] = []
+        return PostProcessResult(output_parameters=output_param, figures=figures)
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
-        self._preprocess(exp, task_manager, qid)
+    def run(self, exp: Experiment, qid: str) -> RunResult:
         labels = [convert_label(qid)]
         result = exp.calibrate_control_frequency(
             labels,
@@ -83,4 +82,4 @@ class CheckQubitFrequency(BaseTask):
             interval=self.input_parameters["interval"],
         )
         exp.calib_note.save()
-        self._postprocess(exp, task_manager, result, qid=qid)
+        return RunResult(raw_result=result)

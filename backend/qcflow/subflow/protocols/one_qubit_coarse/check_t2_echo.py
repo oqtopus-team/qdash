@@ -1,9 +1,15 @@
-from typing import Any, ClassVar
+from typing import ClassVar
 
 import numpy as np
-from qcflow.subflow.protocols.base import BaseTask, OutputParameter
-from qcflow.subflow.task_manager import Data, TaskManager
-from qcflow.subflow.util import convert_label, convert_qid
+from qcflow.subflow.protocols.base import (
+    BaseTask,
+    OutputParameter,
+    PostProcessResult,
+    PreProcessResult,
+    RunResult,
+)
+from qcflow.subflow.task_manager import Data
+from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
@@ -19,69 +25,50 @@ class CheckT2Echo(BaseTask):
 
     def __init__(
         self,
-        time_range=np.logspace(
-            np.log10(300),
-            np.log10(100 * 1000),
-            51,
-        ),
-        shots=DEFAULT_SHOTS,
-        interval=DEFAULT_INTERVAL,
+        time_range=None,  # noqa: ANN001
+        shots=DEFAULT_SHOTS,  # noqa: ANN001
+        interval=DEFAULT_INTERVAL,  # noqa: ANN001
     ) -> None:
+        if time_range is None:
+            time_range = np.logspace(np.log10(300), np.log10(100 * 1000), 51)
         self.input_parameters = {
             "time_range": time_range,
             "shots": shots,
             "interval": interval,
         }
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
+    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
         input_param = {
             "time_range": self.input_parameters["time_range"],
             "shots": self.input_parameters["shots"],
             "interval": self.input_parameters["interval"],
         }
-        task_manager.put_input_parameters(
-            self.task_name,
-            input_param,
-            self.task_type,
-            qid=qid,
-        )
-        task_manager.save()
+        return PreProcessResult(input_parameters=input_param)
 
-    def _postprocess(
-        self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
-    ) -> None:
+    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = convert_label(qid)
+        result = run_result.raw_result
         op = self.output_parameters
         output_param = {
             "t2_echo": Data(
                 value=result.data[label].t2,
                 unit=op["t2_echo"].unit,
                 description=op["t2_echo"].description,
-                execution_id=task_manager.execution_id,
+                execution_id=execution_id,
             ),
         }
-        task_manager.put_output_parameters(
-            self.task_name,
-            output_param,
-            self.task_type,
-            qid=qid,
-        )
-        task_manager.save_figure(
-            task_name=self.task_name,
-            task_type=self.task_type,
-            figure=result.data[label].fit()["fig"],
-            qid=qid,
-        )
-        task_manager.save()
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
-        self._preprocess(exp, task_manager, qid=qid)
+        figures = [result.data[label].fit()["fig"]]
+        return PostProcessResult(output_parameters=output_param, figures=figures)
+
+    def run(self, exp: Experiment, qid: str) -> RunResult:
         labels = [convert_label(qid)]
         result = exp.t2_experiment(
             labels,
             time_range=self.input_parameters["time_range"],
             shots=self.input_parameters["shots"],
             interval=self.input_parameters["interval"],
-            save_image=True,
+            save_image=False,
         )
-        self._postprocess(exp, task_manager, result, qid=qid)
+        exp.calib_note.save()
+        return RunResult(raw_result=result)

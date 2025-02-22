@@ -1,7 +1,13 @@
-from typing import Any, ClassVar
+from typing import ClassVar
 
-from qcflow.subflow.protocols.base import BaseTask, OutputParameter
-from qcflow.subflow.task_manager import Data, TaskManager
+from qcflow.subflow.protocols.base import (
+    BaseTask,
+    OutputParameter,
+    PostProcessResult,
+    PreProcessResult,
+    RunResult,
+)
+from qcflow.subflow.task_manager import Data
 from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
 from qubex.experiment.experiment import RABI_TIME_RANGE
@@ -20,9 +26,9 @@ class CheckRabi(BaseTask):
 
     def __init__(
         self,
-        time_range=RABI_TIME_RANGE,
-        shots=DEFAULT_SHOTS,
-        interval=DEFAULT_INTERVAL,
+        time_range=RABI_TIME_RANGE,  # noqa: ANN001
+        shots=DEFAULT_SHOTS,  # noqa: ANN001
+        interval=DEFAULT_INTERVAL,  # noqa: ANN001
     ) -> None:
         self.input_parameters: dict = {
             "time_range": time_range,
@@ -34,7 +40,7 @@ class CheckRabi(BaseTask):
             "readout_amplitude": {},
         }
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
+    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
         label = convert_label(qid)
         input_param = {
             "time_range": self.input_parameters["time_range"],
@@ -45,49 +51,30 @@ class CheckRabi(BaseTask):
             "readout_frequency": exp.resonators[label].frequency,
             "readout_amplitude": exp.params.readout_amplitude[label],
         }
-        task_manager.put_input_parameters(
-            self.task_name,
-            input_param,
-            self.task_type,
-            qid=qid,
-        )
-        task_manager.save()
+        return PreProcessResult(input_parameters=input_param)
 
-    def _postprocess(
-        self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
-    ) -> None:
+    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = convert_label(qid)
+        result = run_result.raw_result
         op = self.output_parameters
         output_param = {
             "rabi_amplitude": Data(
                 value=result.rabi_params[label].amplitude,
                 unit=op["rabi_amplitude"].unit,
                 description=op["rabi_amplitude"].description,
-                execution_id=task_manager.execution_id,
+                execution_id=execution_id,
             ),
             "rabi_frequency": Data(
                 value=result.rabi_params[label].frequency,
                 unit=op["rabi_frequency"].unit,
                 description=op["rabi_frequency"].description,
-                execution_id=task_manager.execution_id,
+                execution_id=execution_id,
             ),
         }
-        task_manager.put_output_parameters(
-            self.task_name,
-            output_param,
-            self.task_type,
-            qid=qid,
-        )
-        task_manager.save_figure(
-            task_name=f"{self.task_name}",
-            task_type=self.task_type,
-            figure=result.data[label].fit()["fig"],
-            qid=qid,
-        )
-        task_manager.save()
+        figures = [result.data[label].fit()["fig"]]
+        return PostProcessResult(output_parameters=output_param, figures=figures)
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
-        self._preprocess(exp, task_manager, qid=qid)
+    def run(self, exp: Experiment, qid: str) -> RunResult:
         label = convert_label(qid)
         result = exp.obtain_rabi_params(
             time_range=self.input_parameters["time_range"],
@@ -96,4 +83,4 @@ class CheckRabi(BaseTask):
             targets=label,
         )
         exp.calib_note.save()
-        self._postprocess(exp, task_manager, result, qid=qid)
+        return RunResult(raw_result=result)

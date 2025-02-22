@@ -1,8 +1,16 @@
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
-from qcflow.subflow.protocols.base import BaseTask, OutputParameter
-from qcflow.subflow.task_manager import Data, TaskManager
-from qcflow.subflow.util import convert_label, convert_qid
+if TYPE_CHECKING:
+    import plotly.graph_objs as go
+from qcflow.subflow.protocols.base import (
+    BaseTask,
+    OutputParameter,
+    PostProcessResult,
+    PreProcessResult,
+    RunResult,
+)
+from qcflow.subflow.task_manager import Data
+from qcflow.subflow.util import convert_label
 from qubex.experiment import Experiment
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, HPI_DURATION
 from qubex.measurement.measurement import DEFAULT_INTERVAL
@@ -13,7 +21,6 @@ class CreateDRAGHPIPulse(BaseTask):
 
     task_name: str = "CreateDRAGHPIPulse"
     task_type: str = "qubit"
-    # output_parameters: ClassVar[list[str]] = ["drag_hpi_beta", "drag_hpi_amplitude"]
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "drag_hpi_beta": OutputParameter(unit="", description="DRAG HPI pulse beta"),
         "drag_hpi_amplitude": OutputParameter(unit="", description="DRAG HPI pulse amplitude"),
@@ -21,9 +28,9 @@ class CreateDRAGHPIPulse(BaseTask):
 
     def __init__(
         self,
-        hpi_length=HPI_DURATION,
-        shots=CALIBRATION_SHOTS,
-        interval=DEFAULT_INTERVAL,
+        hpi_length=HPI_DURATION,  # noqa: ANN001
+        shots=CALIBRATION_SHOTS,  # noqa: ANN001
+        interval=DEFAULT_INTERVAL,  # noqa: ANN001
     ) -> None:
         self.input_parameters = {
             "hpi_length": hpi_length,
@@ -37,7 +44,7 @@ class CreateDRAGHPIPulse(BaseTask):
             "rabi_amplitude": {},
         }
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
+    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
         label = convert_label(qid)
         input_param = {
             "hpi_length": self.input_parameters["hpi_length"],
@@ -50,43 +57,30 @@ class CreateDRAGHPIPulse(BaseTask):
             "rabi_frequency": exp.rabi_params[label].frequency,
             "rabi_amplitude": exp.rabi_params[label].amplitude,
         }
-        task_manager.put_input_parameters(
-            self.task_name,
-            input_param,
-            self.task_type,
-            qid=qid,
-        )
-        task_manager.save()
+        return PreProcessResult(input_parameters=input_param)
 
-    def _postprocess(
-        self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
-    ) -> None:
+    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = convert_label(qid)
+        result = run_result.raw_result
         op = self.output_parameters
         output_param = {
             "drag_hpi_beta": Data(
                 value=result["beta"][label],
                 unit=op["drag_hpi_beta"].unit,
                 description=op["drag_hpi_beta"].description,
-                execution_id=task_manager.execution_id,
+                execution_id=execution_id,
             ),
             "drag_hpi_amplitude": Data(
                 value=result["amplitude"][label],
                 unit=op["drag_hpi_amplitude"].unit,
                 description=op["drag_hpi_amplitude"].description,
-                execution_id=task_manager.execution_id,
+                execution_id=execution_id,
             ),
         }
-        task_manager.put_output_parameters(
-            self.task_name,
-            output_param,
-            self.task_type,
-            qid=qid,
-        )
-        task_manager.save()
+        figures: list[go.Figure] = []
+        return PostProcessResult(output_parameters=output_param, figures=figures)
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
-        self._preprocess(exp, task_manager, qid=qid)
+    def run(self, exp: Experiment, qid: str) -> RunResult:
         labels = [convert_label(qid)]
         result = exp.calibrate_drag_hpi_pulse(
             targets=labels,
@@ -97,4 +91,4 @@ class CreateDRAGHPIPulse(BaseTask):
             interval=self.input_parameters["interval"],
         )
         exp.calib_note.save()
-        self._postprocess(exp, task_manager, result, qid=qid)
+        return RunResult(raw_result=result)

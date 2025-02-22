@@ -480,6 +480,32 @@ class TaskManager(BaseModel):
             raise ValueError(f"Task '{task_name}' not found.")
         task.note = note
 
+    def save_figures(
+        self,
+        figures: list[go.Figure],
+        task_name: str,
+        task_type: str = "global",
+        savedir: str = "",
+        qid: str = "",
+    ) -> None:
+        container = self._get_task_container(task_type, qid)
+
+        task = self._find_task_in_container(container, task_name)
+        if task is None:
+            raise ValueError(f"Task '{task_name}' not found.")
+        savedir_path = Path(self.calib_dir) / "fig" if savedir == "" else Path(savedir)
+        savedir_path.mkdir(parents=True, exist_ok=True)
+
+        for i, fig in enumerate(figures):
+            base_savepath = savedir_path / f"{qid}_{task_name}_{i}"
+            savepath = base_savepath.with_suffix(".png")
+            counter = 1
+            while savepath.exists():
+                savepath = base_savepath.with_name(f"{base_savepath.stem}_{counter}.png")
+                counter += 1
+            task.figure_path.append(str(savepath))
+            self._write_figure(savepath=str(savepath), fig=fig)
+
     def save_figure(
         self,
         figure: go.Figure,

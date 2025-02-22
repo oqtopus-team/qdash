@@ -1,7 +1,12 @@
-from typing import Any, ClassVar
+from typing import ClassVar
 
-from qcflow.subflow.protocols.base import BaseTask, OutputParameter
-from qcflow.subflow.task_manager import TaskManager
+from qcflow.subflow.protocols.base import (
+    BaseTask,
+    OutputParameter,
+    PostProcessResult,
+    PreProcessResult,
+    RunResult,
+)
 from qubex.experiment import Experiment
 
 
@@ -15,15 +20,13 @@ class RabiOscillation(BaseTask):
     def __init__(self) -> None:
         pass
 
-    def _preprocess(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
+    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
         pass
 
-    def _postprocess(
-        self, exp: Experiment, task_manager: TaskManager, result: Any, qid: str
-    ) -> None:
+    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         pass
 
-    def execute(self, exp: Experiment, task_manager: TaskManager, qid: str) -> None:
+    def run(self, exp: Experiment, qid: str) -> RunResult:  # noqa: ARG002
         default_rabi_amplitudes = {label: 0.01 for label in exp.qubit_labels}
         exp.rabi_experiment(
             amplitudes=default_rabi_amplitudes,
@@ -33,3 +36,4 @@ class RabiOscillation(BaseTask):
             interval=50_000,
         )
         exp.calib_note.save()
+        return RunResult(raw_result=None)

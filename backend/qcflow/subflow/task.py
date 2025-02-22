@@ -46,7 +46,6 @@ from qcflow.subflow.protocols.two_qubit.create_fine_zx90 import CreateFineZX90
 from qcflow.subflow.protocols.two_qubit.create_zx90 import CreateZX90
 from qcflow.subflow.protocols.two_qubit.optimize_zx90 import OptimizeZX90
 from qcflow.subflow.task_manager import CouplingTask, GlobalTask, QubitTask, TaskManager, TaskResult
-from qcflow.subflow.util import convert_qid
 from qubex.experiment import Experiment
 from qubex.experiment.experiment_constants import (
     CALIBRATION_SHOTS,
@@ -233,6 +232,7 @@ def execute_dynamic_task_by_qid(
     try:
         this_task = task_classes[task_name]
         task_type = this_task.get_task_type()
+        execution_id = task_manager.execution_id
         execution_manager = ExecutionManager.load_from_file(task_manager.calib_dir)
         logger.info(f"Starting task: {task_name}, execution_id: {task_manager.execution_id}")
         task_manager.start_task(task_name, task_type, qid)
@@ -243,7 +243,34 @@ def execute_dynamic_task_by_qid(
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
-        this_task.execute(exp, task_manager, qid=qid)
+        preprocess_result = this_task.preprocess(exp=exp, qid=qid)
+        if preprocess_result is not None:
+            task_manager.put_input_parameters(
+                task_name=task_name,
+                input_parameters=preprocess_result.input_parameters,
+                task_type=task_type,
+                qid=qid,
+            )
+            task_manager.save()
+        run_result = this_task.run(exp=exp, qid=qid)
+        if run_result is not None:
+            postprocess_result = this_task.postprocess(
+                execution_id=execution_id, run_result=run_result, qid=qid
+            )
+            if postprocess_result is not None:
+                task_manager.put_output_parameters(
+                    task_name=task_name,
+                    output_parameters=postprocess_result.output_parameters,
+                    task_type=task_type,
+                    qid=qid,
+                )
+                task_manager.save_figures(
+                    task_name=task_name,
+                    task_type=task_type,
+                    figures=postprocess_result.figures,
+                    qid=qid,
+                )
+                task_manager.save()
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
