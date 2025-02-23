@@ -9,8 +9,8 @@ import numpy as np
 import pendulum
 import plotly.graph_objs as go
 from pydantic import BaseModel, Field
-from qcflow.subflow.constant import COMPLETED, FAILED, PENDING, RUNNING, SCHDULED
-from qcflow.subflow.system_info import SystemInfo
+from qcflow.manager.constant import COMPLETED, FAILED, PENDING, RUNNING, SCHDULED
+from qcflow.manager.system_info import SystemInfo
 
 
 class TaskStatus(str, Enum):
