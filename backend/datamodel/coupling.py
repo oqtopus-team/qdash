@@ -1,26 +1,4 @@
-from datamodel.system_info import SystemInfoModel
 from pydantic import BaseModel, Field
-
-
-class CouplingModel(BaseModel):
-    """Data model for a coupling.
-
-    Attributes
-    ----------
-        qid (str): The coupling ID. e.g. "0-1".
-        chip_id (str): The chip ID. e.g. "chip1".
-        data (dict): The data of the coupling. e.g. {"coupling_strength": 0.1}.
-        calibrated_at (str): The time when the coupling was calibrated. e.g. "2021-01-01T00:00:00Z".
-        system_info (SystemInfo): The system information. e.g. {"created_at": "2021-01-01T00:00:00Z", "updated_at": "2021-01-01T00:00:00Z"}.
-
-    """
-
-    qid: str = Field(..., description="The coupling ID")
-    chip_id: str = Field(..., description="The chip ID")
-    data: dict = Field(..., description="The data of the coupling")
-    calibrated_at: str = Field(..., description="The time when the coupling was calibrated")
-
-    system_info: SystemInfoModel = Field(..., description="The system information")
 
 
 class EdgeInfoModel(BaseModel):
@@ -33,4 +11,26 @@ class EdgeInfoModel(BaseModel):
 
     """
 
+    source: str = Field(..., description="The source node")
+    target: str = Field(..., description="The target node")
+    size: int = Field(..., description="The size of the edge")
     fill: str = Field(..., description="The fill color")
+
+
+class CouplingModel(BaseModel):
+    """Data model for a coupling.
+
+    Attributes
+    ----------
+        qid (str): The coupling ID. e.g. "0-1".
+        chip_id (str): The chip ID. e.g. "chip1".
+        data (dict): The data of the coupling. e.g. {"coupling_strength": 0.1}.
+        edge_info (EdgeInfoModel): The edge information. e.g. {"fill": "red", "position": {"x": 0.0, "y": 0.0}}.
+
+    """
+
+    qid: str = Field(..., description="The coupling ID")
+    status: str = Field("pending", description="The status of the coupling")
+    chip_id: str = Field(..., description="The chip ID")
+    data: dict = Field(..., description="The data of the coupling")
+    edge_info: EdgeInfoModel = Field(..., description="The edge information")

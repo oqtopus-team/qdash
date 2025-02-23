@@ -1,7 +1,10 @@
+from typing import ClassVar
+
 from bunnet import Document
-from datamodel.coupling import CouplingModel, EdgeInfoModel
+from datamodel.coupling import EdgeInfoModel
 from datamodel.system_info import SystemInfoModel
 from pydantic import ConfigDict, Field
+from pymongo import ASCENDING, IndexModel
 
 
 class CouplingDocument(Document):
@@ -19,9 +22,9 @@ class CouplingDocument(Document):
     """
 
     qid: str = Field(..., description="The coupling ID")
+    status: str = Field("pending", description="The status of the coupling")
     chip_id: str = Field(..., description="The chip ID")
     data: dict = Field(..., description="The data of the coupling")
-    calibrated_at: str = Field(..., description="The time when the coupling was calibrated")
     edge_info: EdgeInfoModel = Field(..., description="The edge information")
 
     system_info: SystemInfoModel = Field(..., description="The system information")
@@ -34,23 +37,4 @@ class CouplingDocument(Document):
         """Settings for the document."""
 
         name = "coupling"
-        indexes = [("qid", "chip_id")]
-
-    @classmethod
-    def from_domain(
-        cls, domain: CouplingModel, existing_doc: "CouplingDocument"
-    ) -> "CouplingDocument":
-        if existing_doc:
-            existing_data = existing_doc.model_dump()
-            domain_data = domain.model_dump()
-            # not to overwrite edge_info
-            if "edge_info" in existing_data:
-                domain_data["node_info"] = existing_data["edge_info"]
-            merged_data = {**existing_data, **domain_data}
-            return cls(**merged_data)
-        else:
-            # create new document
-            return cls(**domain.model_dump())
-
-    def to_domain(self) -> CouplingModel:
-        return CouplingModel(**self.model_dump())
+        indexes: ClassVar = [IndexModel([("chip_id", ASCENDING), ("qid", ASCENDING)], unique=True)]
