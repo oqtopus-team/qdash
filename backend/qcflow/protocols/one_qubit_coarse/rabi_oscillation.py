@@ -13,7 +13,7 @@ from qubex.experiment import Experiment
 class RabiOscillation(BaseTask):
     """Task to check the Rabi oscillation."""
 
-    task_name: str = "RabiOscillation"
+    name: str = "RabiOscillation"
     task_type: str = "qubit"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {}
 

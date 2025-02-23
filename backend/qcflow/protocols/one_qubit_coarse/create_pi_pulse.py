@@ -17,7 +17,7 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL
 class CreatePIPulse(BaseTask):
     """Task to create the pi pulse."""
 
-    task_name: str = "CreatePIPulse"
+    name: str = "CreatePIPulse"
     task_type: str = "qubit"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "pi_amplitude": OutputParameter(unit="", description="PI pulse amplitude")

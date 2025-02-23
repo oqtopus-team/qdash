@@ -7,9 +7,11 @@ from cal_task import (
     # task_classes,
     validate_task_name,
 )
-from cal_util import qid_to_label, update_active_output_parameters
+from cal_util import qid_to_label, update_active_output_parameters, update_active_tasks
 from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.initialize import initialize
+from neodbmodel.parameter import ParameterDocument
+from neodbmodel.task import TaskDocument
 from prefect import flow, get_run_logger
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
@@ -75,7 +77,11 @@ def cal_flow(
     task_manager = TaskManager(execution_id=execution_id, qids=qubits, calib_dir=calib_dir)
     task_manager = build_workflow(task_manager=task_manager, task_names=task_names, qubits=qubits)
     task_manager.save()
-    # update_active_output_parameters()
+    parameters = update_active_output_parameters()
+    ParameterDocument.insert_parameters(parameters)
+    tasks = update_active_tasks()
+    logger.info(f"updating tasks: {tasks}")
+    TaskDocument.insert_tasks(tasks)
     execution_manager = ExecutionManager.load_from_file(calib_dir).update_with_task_manager(
         task_manager
     )

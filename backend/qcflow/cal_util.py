@@ -1,8 +1,9 @@
-import json
 import re
-from pathlib import Path
 
-from prefect import get_run_logger, task
+from datamodel.parameter import ParameterModel
+from datamodel.task import TaskModel
+from prefect import task
+from pydantic import BaseModel
 
 
 def label_to_qid(qid: str) -> str:
@@ -21,8 +22,38 @@ def qid_to_label(qid: str) -> str:
     raise ValueError(error_message)
 
 
+def pydantic_serializer(obj: BaseModel) -> dict:
+    """Serialize a Pydantic BaseModel instance to a dictionary.
+
+    Args:
+    ----
+        obj (BaseModel): The Pydantic model instance to serialize.
+
+    Returns:
+    -------
+        dict: The serialized dictionary representation of the model.
+
+    Raises:
+    ------
+        TypeError: If the object is not a Pydantic BaseModel instance.
+
+    """
+    if isinstance(obj, BaseModel):
+        return obj.model_dump()
+    raise TypeError(f"Type {type(obj)} not serializable")
+
+
+def convert_output_parameters(outputs: dict[str, any]) -> dict[str, dict]:  # type: ignore # noqa: PGH003
+    """Convert the output parameters to the Parameter class."""
+    converted = {}
+    for param_name, output in outputs.items():
+        param = ParameterModel(name=param_name, unit=output.unit, description=output.description)  # type: ignore # noqa: PGH003
+        converted[param_name] = param.model_dump()
+    return converted
+
+
 @task
-def update_active_output_parameters() -> None:
+def update_active_output_parameters() -> list[ParameterModel]:
     """Update the active output parameters in the input file.
 
     Args:
@@ -32,16 +63,38 @@ def update_active_output_parameters() -> None:
     """
     from qcflow.protocols.base import BaseTask
 
-    logger = get_run_logger()
     all_outputs = {name: cls.output_parameters for name, cls in BaseTask.registry.items()}
-    unique_elements = list({param for params in all_outputs.values() for param in params})
-    logger.info(f"Active output parameters: {unique_elements}")
-    with Path("active_output_parameters.json").open("w") as f:
-        json.dump(all_outputs, f)
-    with Path("unique_output_parameters.json").open("w") as f:
-        json.dump(unique_elements, f)
+    converted_outputs = {
+        task_name: convert_output_parameters(outputs) for task_name, outputs in all_outputs.items()
+    }
 
-    all_descriptions = {name: cls.__doc__ for name, cls in BaseTask.registry.items()}
-    with Path("task_descriptions.json").open("w") as f:
-        json.dump(all_descriptions, f)
-    logger.info(f"Task descriptions: {all_descriptions}")
+    unique_parameter_names = {
+        param_name for outputs in converted_outputs.values() for param_name in outputs
+    }
+    return [
+        ParameterModel(
+            name=name,
+            unit=converted_outputs[
+                next(task for task in converted_outputs if name in converted_outputs[task])
+            ][name]["unit"],
+            description=converted_outputs[
+                next(task for task in converted_outputs if name in converted_outputs[task])
+            ][name]["description"],
+        )
+        for name in unique_parameter_names
+    ]
+
+
+@task
+def update_active_tasks() -> list[TaskModel]:
+    """Update the active tasks in the registry and return a list of TaskModel instances."""
+    from qcflow.protocols.base import BaseTask
+
+    return [
+        TaskModel(
+            name=cls.name,
+            description=cls.__doc__,
+            task_type=cls.task_type,
+        )
+        for cls in BaseTask.registry.values()
+    ]

@@ -17,7 +17,7 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 class CheckEffectiveQubitFrequency(BaseTask):
     """Task to check the effective qubit frequency."""
 
-    task_name: str = "CheckEffectiveQubitFrequency"
+    name: str = "CheckEffectiveQubitFrequency"
     task_type: str = "qubit"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "effective_qubit_frequency": OutputParameter(

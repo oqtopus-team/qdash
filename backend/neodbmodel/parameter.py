@@ -1,6 +1,9 @@
+from typing import ClassVar
+
 from bunnet import Document
 from datamodel.parameter import ParameterModel
 from pydantic import ConfigDict, Field
+from pymongo import ASCENDING, IndexModel
 
 
 class ParameterDocument(Document):
@@ -13,7 +16,8 @@ class ParameterDocument(Document):
 
     """
 
-    parameter_name: str = Field(..., description="The name of the parameter")
+    name: str = Field(..., description="The name of the parameter")
+    unit: str = Field(..., description="The unit of the parameter")
     description: str = Field(..., description="Detailed description of the parameter")
 
     # Configuration to parse attributes automatically.
@@ -25,36 +29,40 @@ class ParameterDocument(Document):
         """Database settings for ParameterDocument."""
 
         name = "parameter"
-        indexes = [("parameter_name",)]
+        indexes: ClassVar = [IndexModel([("name", ASCENDING)], unique=True)]
 
     @classmethod
-    def from_domain(
-        cls, domain: ParameterModel, existing_doc: "ParameterDocument"
-    ) -> "ParameterDocument":
-        """Creates or updates a ParameterDocument from a domain model.
+    def from_parameter_model(cls, model: ParameterModel) -> "ParameterDocument":
+        """Create a ParameterDocument from a ParameterModel.
 
         Parameters
         ----------
-            domain : ParameterModel
-                The domain model instance.
-            existing_doc : ParameterDocument
-                The existing document instance.
-
-        """
-        if existing_doc:
-            existing_data = existing_doc.model_dump()
-            domain_data = domain.model_dump()
-            merged_data = {**existing_data, **domain_data}
-            return cls(**merged_data)
-        else:
-            return cls(**domain.model_dump())
-
-    def to_domain(self) -> ParameterModel:
-        """Converts this document instance back to the domain model.
+        model : ParameterModel
+            The parameter model to convert.
 
         Returns
         -------
-            Parameter: The domain model instance.
+        ParameterDocument
+            The converted parameter document.
 
         """
-        return ParameterModel(**self.model_dump())
+        return cls(
+            name=model.name,
+            unit=model.unit,
+            description=model.description,
+        )
+
+    @classmethod
+    def insert_parameters(cls, parameters: list[ParameterModel]) -> list["ParameterDocument"]:
+        inserted_documents = []
+        for param in parameters:
+            doc = cls.find_one(cls.name == param.name).run()
+            if doc is None:
+                doc = cls.from_task_model(param)
+                doc.save()
+            else:
+                doc.unit = param.unit
+                doc.description = param.description
+                doc.save()
+            inserted_documents.append(doc)
+        return inserted_documents

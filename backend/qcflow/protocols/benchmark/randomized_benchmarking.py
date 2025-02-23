@@ -18,7 +18,7 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL
 class RandomizedBenchmarking(BaseTask):
     """Task to perform randomized benchmarking."""
 
-    task_name: str = "RandomizedBenchmarking"
+    name: str = "RandomizedBenchmarking"
     task_type: str = "qubit"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "average_gate_fidelity": OutputParameter(

@@ -17,7 +17,7 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 class CheckRabi(BaseTask):
     """Task to check the Rabi oscillation."""
 
-    task_name: str = "CheckRabi"
+    name: str = "CheckRabi"
     task_type: str = "qubit"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "rabi_amplitude": OutputParameter(unit="", description="Rabi oscillation amplitude"),

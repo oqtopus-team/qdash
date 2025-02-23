@@ -17,7 +17,7 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 class CheckT2Echo(BaseTask):
     """Task to check the T2 echo time."""
 
-    task_name: str = "CheckT2Echo"
+    name: str = "CheckT2Echo"
     task_type: str = "qubit"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "t2_echo": OutputParameter(unit="ns", description="T2 echo time"),

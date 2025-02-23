@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from bunnet import Document
 from datamodel.system_info import SystemInfoModel
 from pydantic import ConfigDict, Field
@@ -60,7 +62,7 @@ class TaskHistoryDocument(Document):
         """Settings for the document."""
 
         name = "task_history"
-        indexes = [IndexModel([("task_id", ASCENDING)], unique=True)]
+        indexes: ClassVar = [IndexModel([("task_id", ASCENDING)], unique=True)]
 
     @classmethod
     def from_manager(
@@ -89,13 +91,13 @@ class TaskHistoryDocument(Document):
         )
 
     @classmethod
-    def find_by_task_id(cls, task_id: str) -> "TaskHistoryDocument":
+    def find_by_task_id(cls, task_id: str) -> "TaskHistoryDocument" | None:  # noqa: TCH010
         return cls.find_one({"task_id": task_id}).run()
 
     @classmethod
     def upsert_document(
         cls, task: BaseTaskResult, execution_manager: ExecutionManager
-    ) -> "TaskHistoryDocument":
+    ) -> "TaskHistoryDocument" | None:  # noqa: TCH010
         doc = cls.find_by_task_id(task.task_id)
         if doc:
             doc.delete()

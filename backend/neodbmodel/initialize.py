@@ -3,7 +3,9 @@ import os
 from bunnet import init_bunnet
 from neodbmodel.chip import ChipDocument
 from neodbmodel.execution_history import ExecutionHistoryDocument
+from neodbmodel.parameter import ParameterDocument
 from neodbmodel.qubit import QubitDocument
+from neodbmodel.task import TaskDocument
 from neodbmodel.task_history import TaskHistoryDocument
 from pymongo import MongoClient
 
@@ -20,5 +22,7 @@ def initialize() -> None:
             TaskHistoryDocument,
             QubitDocument,
             ChipDocument,
+            ParameterDocument,
+            TaskDocument,
         ],
     )

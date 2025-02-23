@@ -41,7 +41,7 @@ class RunResult(BaseModel):
 class BaseTask(ABC):
     """Base class for the task."""
 
-    task_name: str = ""
+    name: str = ""
     task_type: Literal["global", "qubit", "coupling"]
     output_parameters: ClassVar[dict[str, OutputParameter]] = {}
     registry: ClassVar[dict] = {}
@@ -95,9 +95,9 @@ class BaseTask(ABC):
         """Return the output parameters of the task."""
         return list(self.output_parameters.keys())
 
-    def get_task_name(self) -> str:
+    def get_name(self) -> str:
         """Return the name of the task."""
-        return self.task_name
+        return self.name
 
     def get_task_type(self) -> Literal["global", "qubit", "coupling"]:
         """Return the type of the task."""

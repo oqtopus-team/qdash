@@ -13,7 +13,7 @@ from qubex.experiment import Experiment
 class LinkUp(BaseTask):
     """Task to link up the box."""
 
-    task_name: str = "LinkUp"
+    name: str = "LinkUp"
     task_type: str = "global"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {}
 

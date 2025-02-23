@@ -13,7 +13,7 @@ from qubex.experiment import Experiment
 class Configure(BaseTask):
     """Task to configure the box."""
 
-    task_name: str = "Configure"
+    name: str = "Configure"
     task_type: str = "global"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {}
 

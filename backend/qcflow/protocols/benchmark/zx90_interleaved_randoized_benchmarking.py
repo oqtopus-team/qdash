@@ -18,7 +18,7 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL
 class ZX90InterleavedRandomizedBenchmarking(BaseTask):
     """Task to perform ZX90 interleaved randomized benchmarking."""
 
-    task_name: str = "ZX90InterleavedRandomizedBenchmarking"
+    name: str = "ZX90InterleavedRandomizedBenchmarking"
     task_type: str = "coupling"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "zx90_gate_fidelity": OutputParameter(

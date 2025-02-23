@@ -17,7 +17,7 @@ from qubex.experiment import Experiment
 class ReadoutClassification(BaseTask):
     """Task to classify the readout."""
 
-    task_name: str = "ReadoutClassification"
+    name: str = "ReadoutClassification"
     task_type: str = "qubit"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "average_readout_fidelity": OutputParameter(

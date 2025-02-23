@@ -13,7 +13,7 @@ from qubex.experiment import Experiment
 class CheckNoise(BaseTask):
     """Task to check the noise."""
 
-    task_name: str = "CheckNoise"
+    name: str = "CheckNoise"
     task_type: str = "global"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {}
 

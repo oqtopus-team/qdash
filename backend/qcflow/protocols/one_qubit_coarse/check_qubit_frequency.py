@@ -19,7 +19,7 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 class CheckQubitFrequency(BaseTask):
     """Task to check the qubit frequency."""
 
-    task_name: str = "CheckQubitFrequency"
+    name: str = "CheckQubitFrequency"
     task_type: str = "qubit"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "qubit_frequency": OutputParameter(unit="GHz", description="Qubit frequency"),

@@ -14,7 +14,7 @@ from qubex.experiment import Experiment
 class CheckDRAGPIPulse(BaseTask):
     """Task to check the DRAG PI pulse."""
 
-    task_name: str = "CheckDRAGPIPulse"
+    name: str = "CheckDRAGPIPulse"
     task_type: str = "qubit"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {}
 

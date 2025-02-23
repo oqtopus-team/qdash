@@ -19,7 +19,7 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL
 class X180InterleavedRandomizedBenchmarking(BaseTask):
     """Task to perform X180 interleaved randomized benchmarking."""
 
-    task_name: str = "X180InterleavedRandomizedBenchmarking"
+    name: str = "X180InterleavedRandomizedBenchmarking"
     task_type: str = "qubit"
 
     output_parameters: ClassVar[dict[str, OutputParameter]] = {

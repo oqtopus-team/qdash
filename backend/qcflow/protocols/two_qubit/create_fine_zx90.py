@@ -13,7 +13,7 @@ from qubex.experiment import Experiment
 class CreateFineZX90(BaseTask):
     """Task to create a fine ZX90 pulse."""
 
-    task_name: str = "CreateFineZX90"
+    name: str = "CreateFineZX90"
     task_type: str = "coupling"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {"cr_amplitude": OutputParameter()}
 
@@ -45,10 +45,10 @@ class CreateFineZX90(BaseTask):
     #         n_repetitions=3,
     #     )
     #     self.output_parameters["cr_amplitude"] = cr_result["calibrated_value"]
-    #     task_manager.put_output_parameters(self.task_name, self.output_parameters)
+    #     task_manager.put_output_parameters(self.name, self.output_parameters)
     #     exp.calib_note.save()
     #     note = f"CR pair: {cr_label}"
-    #     task_manager.put_note_to_task(self.task_name, note)
+    #     task_manager.put_note_to_task(self.name, note)
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
         pass
 

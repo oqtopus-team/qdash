@@ -158,3 +158,19 @@ class TaskResultModel(BaseModel):
     global_tasks: list[GlobalTaskModel] = []
     qubit_tasks: dict[str, list[QubitTaskModel]] = {}
     coupling_tasks: dict[str, list[CouplingTaskModel]] = {}
+
+
+class TaskModel(BaseModel):
+    """Task model.
+
+    Attributes
+    ----------
+        name (str): The name of the task. e.g. "CheckT1" ,"CheckT2Echo" ".
+        description (str): Detailed description of the task.
+        task_type (str): The type of the task. e.g. "global", "qubit", "coupling".
+
+    """
+
+    name: str = Field(..., description="The name of the task")
+    description: str = Field(..., description="Detailed description of the task")
+    task_type: str = Field(..., description="The type of the task")

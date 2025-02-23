@@ -19,7 +19,7 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL
 class CreateDRAGHPIPulse(BaseTask):
     """Task to create the DRAG HPI pulse."""
 
-    task_name: str = "CreateDRAGHPIPulse"
+    name: str = "CreateDRAGHPIPulse"
     task_type: str = "qubit"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "drag_hpi_beta": OutputParameter(unit="", description="DRAG HPI pulse beta"),

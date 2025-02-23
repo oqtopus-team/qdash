@@ -15,7 +15,7 @@ from qubex.experiment import Experiment
 class ChevronPattern(BaseTask):
     """Task to check the chevron pattern."""
 
-    task_name: str = "ChevronPattern"
+    name: str = "ChevronPattern"
     task_type: str = "qubit"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {}
 

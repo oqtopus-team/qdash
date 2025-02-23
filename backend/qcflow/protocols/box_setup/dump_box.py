@@ -13,7 +13,7 @@ from qubex.experiment import Experiment
 class DumpBox(BaseTask):
     """DumpBox class to dump the box information."""
 
-    task_name: str = "DumpBox"
+    name: str = "DumpBox"
     task_type: str = "global"
     output_parameters: ClassVar[dict[str, OutputParameter]] = {}
 
