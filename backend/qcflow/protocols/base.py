@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Literal
 
 import plotly.graph_objs as go
+from datamodel.task import DataModel
 from pydantic import BaseModel
-from qcflow.manager.task import Data
 from qubex.experiment import Experiment
 
 
@@ -23,7 +23,7 @@ class PreProcessResult(BaseModel):
 class PostProcessResult(BaseModel):
     """Result class."""
 
-    output_parameters: dict[str, Data]
+    output_parameters: dict[str, DataModel]
     figures: list[go.Figure] = []
 
     class Config:

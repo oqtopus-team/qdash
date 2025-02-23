@@ -112,7 +112,7 @@ def main_flow(
         note={"qubex_version": get_package_version("qubex")},
     )
     execution_manager.save()
-    ExecutionHistoryDocument.upsert_document(execution_manager)
+    ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
     execution_manager.start_execution()
     execution_manager.update_execution_status_to_running()
     try:

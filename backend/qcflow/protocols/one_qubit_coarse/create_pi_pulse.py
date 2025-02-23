@@ -1,7 +1,7 @@
 from typing import ClassVar
 
+from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
-from qcflow.manager.task import Data
 from qcflow.protocols.base import (
     BaseTask,
     OutputParameter,
@@ -60,7 +60,7 @@ class CreatePIPulse(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "pi_amplitude": Data(
+            "pi_amplitude": DataModel(
                 value=result.data[label].calib_value,
                 unit=op["pi_amplitude"].unit,
                 description=op["pi_amplitude"].description,

@@ -1,15 +1,11 @@
 from typing import ClassVar
 
 from bunnet import Document
+from datamodel.execution import ExecutionModel
 from datamodel.system_info import SystemInfoModel
+from datamodel.task import BaseTaskResultModel
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
-from qcflow.manager.execution import ExecutionManager
-from qcflow.manager.task import BaseTaskResult
-
-
-class SystemInfo(SystemInfoModel):
-    """System information model."""
 
 
 class TaskResultHistoryDocument(Document):
@@ -47,7 +43,7 @@ class TaskResultHistoryDocument(Document):
     end_at: str = Field(..., description="The time when the execution ended")
     elapsed_time: str = Field(..., description="The elapsed time")
     task_type: str = Field(..., description="The task type")
-    system_info: SystemInfo = Field(..., description="The system information")
+    system_info: SystemInfoModel = Field(..., description="The system information")
     qid: str = Field("", description="The qubit ID")
 
     execution_id: str = Field(..., description="The execution ID")
@@ -66,7 +62,7 @@ class TaskResultHistoryDocument(Document):
 
     @classmethod
     def from_manager(
-        cls, task: BaseTaskResult, execution_manager: ExecutionManager
+        cls, task: BaseTaskResultModel, execution_model: ExecutionModel
     ) -> "TaskResultHistoryDocument":
         return cls(
             task_id=task.task_id,
@@ -85,18 +81,18 @@ class TaskResultHistoryDocument(Document):
             task_type=task.task_type,
             system_info=task.system_info.model_dump(),
             qid=getattr(task, "qid", ""),
-            execution_id=execution_manager.execution_id,
-            tags=execution_manager.tags,
-            chip_id=execution_manager.chip_id,
+            execution_id=execution_model.execution_id,
+            tags=execution_model.tags,
+            chip_id=execution_model.chip_id,
         )
 
     @classmethod
     def upsert_document(
-        cls, task: BaseTaskResult, execution_manager: ExecutionManager
+        cls, task: BaseTaskResultModel, execution_model: ExecutionModel
     ) -> "TaskResultHistoryDocument":
         doc = cls.find_one({"task_id": task.task_id}).run()
         if doc is None:
-            doc = cls.from_manager(task=task, execution_manager=execution_manager)
+            doc = cls.from_manager(task=task, execution_model=execution_model)
             doc.save()
             return doc
         doc.name = task.name
@@ -114,8 +110,8 @@ class TaskResultHistoryDocument(Document):
         doc.task_type = task.task_type
         doc.system_info = task.system_info.model_dump()
         doc.qid = getattr(task, "qid", "")
-        doc.execution_id = execution_manager.execution_id
-        doc.tags = execution_manager.tags
-        doc.chip_id = execution_manager.chip_id
+        doc.execution_id = execution_model.execution_id
+        doc.tags = execution_model.tags
+        doc.chip_id = execution_model.chip_id
         doc.save()
         return doc

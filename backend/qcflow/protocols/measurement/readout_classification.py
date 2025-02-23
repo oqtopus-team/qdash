@@ -2,8 +2,8 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
+from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
-from qcflow.manager.task import Data
 from qcflow.protocols.base import (
     BaseTask,
     OutputParameter,
@@ -45,19 +45,19 @@ class ReadoutClassification(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "average_readout_fidelity": Data(
+            "average_readout_fidelity": DataModel(
                 value=result["average_readout_fidelity"][label],
                 unit=op["average_readout_fidelity"].unit,
                 description=op["average_readout_fidelity"].description,
                 execution_id=execution_id,
             ),
-            "readout_fidelity_0": Data(
+            "readout_fidelity_0": DataModel(
                 value=result["readout_fidelties"][label][0],
                 unit=op["readout_fidelity_0"].unit,
                 description=op["readout_fidelity_0"].description,
                 execution_id=execution_id,
             ),
-            "readout_fidelity_1": Data(
+            "readout_fidelity_1": DataModel(
                 value=result["readout_fidelties"][label][1],
                 unit=op["readout_fidelity_1"].unit,
                 description=op["readout_fidelity_1"].description,

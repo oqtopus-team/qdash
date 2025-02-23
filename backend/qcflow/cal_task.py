@@ -1,10 +1,11 @@
+from datamodel.task import CouplingTaskModel, GlobalTaskModel, QubitTaskModel, TaskResultModel
 from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.initialize import initialize
 from neodbmodel.qubit import QubitDocument
 from neodbmodel.task_result_history import TaskResultHistoryDocument
 from prefect import get_run_logger, task
 from qcflow.manager.execution import ExecutionManager
-from qcflow.manager.task import CouplingTask, GlobalTask, QubitTask, TaskManager, TaskResult
+from qcflow.manager.task import TaskManager
 from qcflow.protocols.active_protocols import task_classes
 from qubex.experiment import Experiment
 
@@ -22,7 +23,7 @@ def build_workflow(
     task_manager: TaskManager, task_names: list[str], qubits: list[str]
 ) -> TaskManager:
     """Build workflow."""
-    task_result = TaskResult()
+    task_result = TaskResultModel()
     global_previous_task_id = ""
     qubit_previous_task_id = {qubit: "" for qubit in qubits}
     coupling_previous_task_id = {qubit: "" for qubit in qubits}
@@ -31,20 +32,20 @@ def build_workflow(
             this_task = task_classes[name]
 
             if this_task.is_global_task():
-                task = GlobalTask(name=name, upstream_id=global_previous_task_id)
+                task = GlobalTaskModel(name=name, upstream_id=global_previous_task_id)
                 task_result.global_tasks.append(task)
                 global_previous_task_id = task.task_id
 
             elif this_task.is_qubit_task():
                 for qubit in qubits:
-                    task = QubitTask(
+                    task = QubitTaskModel(
                         name=name, upstream_id=qubit_previous_task_id[qubit], qid=qubit
                     )
                     task_result.qubit_tasks.setdefault(qubit, []).append(task)
                     qubit_previous_task_id[qubit] = task.task_id
             elif this_task.is_coupling_task():
                 for qubit in qubits:
-                    task = CouplingTask(
+                    task = CouplingTaskModel(
                         name=name, upstream_id=coupling_previous_task_id[qubit], qid=qubit
                     )
                     task_result.coupling_tasks.setdefault(qubit, []).append(task)
@@ -115,13 +116,13 @@ def execute_dynamic_task_by_qid(
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
-        ExecutionHistoryDocument.upsert_document(execution_manager)
+        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
         task_manager.update_task_status_to_completed(
             task_name=task_name, message=f"{task_name} is completed", task_type=task_type, qid=qid
         )
         executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
         TaskResultHistoryDocument.upsert_document(
-            task=executed_task, execution_manager=execution_manager
+            task=executed_task, execution_model=execution_manager.to_datamodel()
         )
         output_parameters = task_manager.get_output_parameter_by_task_name(
             task_name=task_name, task_type=task_type, qid=qid
@@ -146,5 +147,5 @@ def execute_dynamic_task_by_qid(
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
-        ExecutionHistoryDocument.upsert_document(execution_manager)
+        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
     return task_manager

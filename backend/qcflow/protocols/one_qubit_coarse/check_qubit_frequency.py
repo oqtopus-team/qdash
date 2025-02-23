@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING, ClassVar
 if TYPE_CHECKING:
     import plotly.graph_objs as go
 import numpy as np
+from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
-from qcflow.manager.task import Data
 from qcflow.protocols.base import (
     BaseTask,
     OutputParameter,
@@ -62,7 +62,7 @@ class CheckQubitFrequency(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "qubit_frequency": Data(
+            "qubit_frequency": DataModel(
                 value=result[label],
                 unit=op["qubit_frequency"].unit,
                 description=op["qubit_frequency"].description,

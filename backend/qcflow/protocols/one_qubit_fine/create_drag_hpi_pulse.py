@@ -2,8 +2,8 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
+from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
-from qcflow.manager.task import Data
 from qcflow.protocols.base import (
     BaseTask,
     OutputParameter,
@@ -64,13 +64,13 @@ class CreateDRAGHPIPulse(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "drag_hpi_beta": Data(
+            "drag_hpi_beta": DataModel(
                 value=result["beta"][label],
                 unit=op["drag_hpi_beta"].unit,
                 description=op["drag_hpi_beta"].description,
                 execution_id=execution_id,
             ),
-            "drag_hpi_amplitude": Data(
+            "drag_hpi_amplitude": DataModel(
                 value=result["amplitude"][label],
                 unit=op["drag_hpi_amplitude"].unit,
                 description=op["drag_hpi_amplitude"].description,

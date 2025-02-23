@@ -130,9 +130,7 @@ def fetch_all_executions_experiments(
     if label:
         query["$and"].append({"$or": [{"label": la} for la in label]})
     if experiment_name:
-        query["$and"].append(
-            {"$or": [{"experiment_name": en} for en in experiment_name]}
-        )
+        query["$and"].append({"$or": [{"experiment_name": en} for en in experiment_name]})
     if execution_id:
         query["$and"].append({"$or": [{"execution_id": eid} for eid in execution_id]})
     logger.info(f"Query: {query}")

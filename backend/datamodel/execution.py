@@ -1,3 +1,5 @@
+from enum import Enum
+
 from datamodel.system_info import SystemInfoModel
 from datamodel.task import CalibDataModel, TaskResultModel
 from pydantic import BaseModel, Field
@@ -7,6 +9,15 @@ RUNNING = "running"
 COMPLETED = "completed"
 FAILED = "failed"
 PENDING = "pending"
+
+
+class ExecutionStatusModel(str, Enum):
+    """enum class for the status of the execution."""
+
+    SCHEDULED = SCHDULED
+    RUNNING = RUNNING
+    COMPLETED = COMPLETED
+    FAILED = FAILED
 
 
 class ExecutionModel(BaseModel):
