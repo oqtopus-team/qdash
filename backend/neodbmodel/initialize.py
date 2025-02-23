@@ -7,7 +7,7 @@ from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.parameter import ParameterDocument
 from neodbmodel.qubit import QubitDocument
 from neodbmodel.task import TaskDocument
-from neodbmodel.task_history import TaskHistoryDocument
+from neodbmodel.task_result_history import TaskResultHistoryDocument
 from pymongo import MongoClient
 
 mongo_ip = os.getenv("MONGO_HOST")
@@ -20,7 +20,7 @@ def initialize() -> None:
         database=client.qubex,
         document_models=[
             ExecutionHistoryDocument,
-            TaskHistoryDocument,
+            TaskResultHistoryDocument,
             QubitDocument,
             ChipDocument,
             ParameterDocument,

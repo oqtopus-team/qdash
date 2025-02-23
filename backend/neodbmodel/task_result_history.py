@@ -12,7 +12,7 @@ class SystemInfo(SystemInfoModel):
     """System information model."""
 
 
-class TaskHistoryDocument(Document):
+class TaskResultHistoryDocument(Document):
     """Document for storing execution history.
 
     Attributes
@@ -61,13 +61,13 @@ class TaskHistoryDocument(Document):
     class Settings:
         """Settings for the document."""
 
-        name = "task_history"
+        name = "task_result_history"
         indexes: ClassVar = [IndexModel([("task_id", ASCENDING)], unique=True)]
 
     @classmethod
     def from_manager(
         cls, task: BaseTaskResult, execution_manager: ExecutionManager
-    ) -> "TaskHistoryDocument":
+    ) -> "TaskResultHistoryDocument":
         return cls(
             task_id=task.task_id,
             name=task.name,
@@ -93,7 +93,7 @@ class TaskHistoryDocument(Document):
     @classmethod
     def upsert_document(
         cls, task: BaseTaskResult, execution_manager: ExecutionManager
-    ) -> "TaskHistoryDocument":
+    ) -> "TaskResultHistoryDocument":
         doc = cls.find_one({"task_id": task.task_id}).run()
         if doc is None:
             doc = cls.from_manager(task=task, execution_manager=execution_manager)

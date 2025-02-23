@@ -1,7 +1,7 @@
 from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.initialize import initialize
 from neodbmodel.qubit import QubitDocument
-from neodbmodel.task_history import TaskHistoryDocument
+from neodbmodel.task_result_history import TaskResultHistoryDocument
 from prefect import get_run_logger, task
 from qcflow.manager.execution import ExecutionManager
 from qcflow.manager.task import CouplingTask, GlobalTask, QubitTask, TaskManager, TaskResult
@@ -120,7 +120,9 @@ def execute_dynamic_task_by_qid(
             task_name=task_name, message=f"{task_name} is completed", task_type=task_type, qid=qid
         )
         executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
-        TaskHistoryDocument.upsert_document(task=executed_task, execution_manager=execution_manager)
+        TaskResultHistoryDocument.upsert_document(
+            task=executed_task, execution_manager=execution_manager
+        )
         output_parameters = task_manager.get_output_parameter_by_task_name(
             task_name=task_name, task_type=task_type, qid=qid
         )
