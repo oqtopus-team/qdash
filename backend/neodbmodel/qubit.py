@@ -1,8 +1,11 @@
+from typing import ClassVar
+
 from bunnet import Document
-from datamodel.qubit import NodeInfoModel
+from datamodel.qubit import NodeInfoModel, QubitModel
 from datamodel.system_info import SystemInfoModel
 from neodbmodel.chip import ChipDocument
 from pydantic import ConfigDict, Field
+from pymongo import ASCENDING, IndexModel
 
 
 class QubitDocument(Document):
@@ -34,12 +37,7 @@ class QubitDocument(Document):
         """Settings for the document."""
 
         name = "qubit"
-        indexes = [("qid", "chip_id")]
-
-    @classmethod
-    def find_by_qid(cls, qid: str, chip_id: str) -> "QubitDocument":
-        """Find a QubitDocument by qid."""
-        return cls.find_one({"qid": qid, "chip_id": chip_id}).run()
+        indexes: ClassVar = [IndexModel([("chip_id", ASCENDING), ("qid", ASCENDING)], unique=True)]
 
     @staticmethod
     def merge_calib_data(existing: dict, new: dict) -> dict:
@@ -54,21 +52,28 @@ class QubitDocument(Document):
     @classmethod
     def update_calib_data(cls, qid: str, chip_id: str, output_parameters: dict) -> "QubitDocument":
         """Update the QubitDocument's calibration data with new values."""
-        doc = cls.find_by_qid(qid, chip_id)
+        qubit_doc = cls.find_one({"qid": qid, "chip_id": chip_id}).run()
+        if qubit_doc is None:
+            raise ValueError(f"Qubit {qid} not found in chip {chip_id}")
         # Merge new calibration data into the existing data
-        doc.data = QubitDocument.merge_calib_data(doc.data, output_parameters)
-        doc.system_info.update_time()
-        updated_qubit = doc.save()
+        qubit_doc.data = QubitDocument.merge_calib_data(qubit_doc.data, output_parameters)
+        qubit_doc.system_info.update_time()
+        qubit_doc.save()
+        # Update the qubit in the chip document
         chip_doc = ChipDocument.find_one({"chip_id": chip_id}).run()
-        if chip_doc:
-            chip_doc.update_qubit(qid, updated_qubit.model_dump())
-
-        return updated_qubit
+        if chip_doc is None:
+            raise ValueError(f"Chip {chip_id} not found")
+        qubit_model = QubitModel(qid=qid, data=qubit_doc.data, node_info=qubit_doc.node_info)
+        chip_doc.update_qubit(qid, qubit_model)
+        return qubit_doc
 
     @classmethod
-    def update_status(cls, status: str, qid: str, chip_id: str) -> "QubitDocument":
+    def update_status(cls, qid: str, chip_id: str, status: str) -> "QubitDocument":
         """Update the QubitDocument's status."""
-        doc = cls.find_by_qid(qid, chip_id)
+        doc = cls.find_one({"qid": qid, "chip_id": chip_id}).run()
+        if doc is None:
+            raise ValueError(f"Qubit {qid} not found in chip {chip_id}")
         doc.status = status
         doc.system_info.update_time()
-        return doc.save()
+        doc.save()
+        return doc

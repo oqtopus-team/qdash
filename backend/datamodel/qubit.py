@@ -26,3 +26,21 @@ class NodeInfoModel(BaseModel):
     """
 
     position: PositionModel = Field(..., description="The position")
+
+
+class QubitModel(BaseModel):
+    """Model for a qubit.
+
+    Attributes
+    ----------
+        qubit_id (str): The qubit ID. e.g. "0".
+        status (str): The status of the qubit.
+        data (dict): The data of the qubit.
+        node_info (NodeInfo): The node information.
+
+    """
+
+    qid: str = Field(..., description="The qubit ID")
+    status: str = Field("pending", description="The status of the qubit")
+    data: dict = Field(..., description="The data of the qubit")
+    node_info: NodeInfoModel = Field(..., description="The node information")

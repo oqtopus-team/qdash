@@ -1,6 +1,5 @@
 from datamodel.qubit import NodeInfoModel, PositionModel
 from neodbmodel.qubit import QubitDocument
-from repository.initialize import initialize
 
 
 def qubit_lattice(n, d):
