@@ -31,6 +31,8 @@ class QubitDocument(Document):
     )
 
     class Settings:
+        """Settings for the document."""
+
         name = "qubit"
         indexes = [("qid", "chip_id")]
 

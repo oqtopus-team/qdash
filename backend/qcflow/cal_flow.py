@@ -86,7 +86,7 @@ def cal_flow(
         task_manager
     )
     initialize()
-    ExecutionHistoryDocument.update_document(execution_manager=execution_manager)
+    ExecutionHistoryDocument.upsert_document(execution_manager=execution_manager)
     for qid in qubits:
         task_manager = cal_sequence(exp, task_manager, task_names, qid)
     return successMap

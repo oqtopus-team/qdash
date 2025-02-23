@@ -1,4 +1,6 @@
 # dbmodel/execution_history.py
+from typing import ClassVar
+
 from bunnet import Document
 from datamodel.execution import TaskResultModel
 from datamodel.system_info import SystemInfoModel
@@ -57,7 +59,7 @@ class ExecutionHistoryDocument(Document):
         """Settings for the document."""
 
         name = "execution_history"
-        indexes = [IndexModel([("execution_id", ASCENDING)], unique=True)]
+        indexes: ClassVar = [IndexModel([("execution_id", ASCENDING)], unique=True)]
 
     @classmethod
     def from_execution_manager(
@@ -83,12 +85,12 @@ class ExecutionHistoryDocument(Document):
         )
 
     @classmethod
-    def find_by_execution_id(cls, execution_id: str) -> "ExecutionHistoryDocument":
-        return cls.find_one({"execution_id": execution_id}).run()
-
-    @classmethod
-    def update_document(cls, execution_manager: ExecutionManager) -> "ExecutionHistoryDocument":
-        doc = cls.find_by_execution_id(execution_manager.execution_id)
+    def upsert_document(cls, execution_manager: ExecutionManager) -> "ExecutionHistoryDocument":
+        doc = cls.find_one({"execution_id": execution_manager.execution_id}).run()
+        if doc is None:
+            doc = cls.from_execution_manager(execution_manager)
+            doc.save()
+            return doc
         doc.name = execution_manager.name
         doc.calib_data_path = execution_manager.calib_data_path
         doc.note = execution_manager.note
@@ -104,11 +106,8 @@ class ExecutionHistoryDocument(Document):
         doc.calib_data = execution_manager.calib_data.model_dump()
         doc.message = execution_manager.message
         doc.system_info = execution_manager.system_info.model_dump()
-        return doc.save()
-
-    @classmethod
-    def insert_document(cls, execution_manager: ExecutionManager) -> "ExecutionHistoryDocument":
-        return cls.from_execution_manager(execution_manager).save()
+        doc.save()
+        return doc
 
     model_config = ConfigDict(
         from_attributes=True,

@@ -91,14 +91,31 @@ class TaskHistoryDocument(Document):
         )
 
     @classmethod
-    def find_by_task_id(cls, task_id: str) -> "TaskHistoryDocument" | None:  # noqa: TCH010
-        return cls.find_one({"task_id": task_id}).run()
-
-    @classmethod
     def upsert_document(
         cls, task: BaseTaskResult, execution_manager: ExecutionManager
-    ) -> "TaskHistoryDocument" | None:  # noqa: TCH010
-        doc = cls.find_by_task_id(task.task_id)
-        if doc:
-            doc.delete()
-        return cls.from_manager(task=task, execution_manager=execution_manager).save()
+    ) -> "TaskHistoryDocument":
+        doc = cls.find_one({"task_id": task.task_id}).run()
+        if doc is None:
+            doc = cls.from_manager(task=task, execution_manager=execution_manager)
+            doc.save()
+            return doc
+        doc.name = task.name
+        doc.upstream_id = task.upstream_id
+        doc.status = task.status
+        doc.message = task.message
+        doc.input_parameters = task.input_parameters
+        doc.output_parameters = task.output_parameters
+        doc.output_parameter_names = task.output_parameter_names
+        doc.note = task.note
+        doc.figure_path = task.figure_path
+        doc.start_at = task.start_at
+        doc.end_at = task.end_at
+        doc.elapsed_time = task.elapsed_time
+        doc.task_type = task.task_type
+        doc.system_info = task.system_info.model_dump()
+        doc.qid = getattr(task, "qid", "")
+        doc.execution_id = execution_manager.execution_id
+        doc.tags = execution_manager.tags
+        doc.chip_id = execution_manager.chip_id
+        doc.save()
+        return doc

@@ -115,7 +115,7 @@ def execute_dynamic_task_by_qid(
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
-        ExecutionHistoryDocument.update_document(execution_manager)
+        ExecutionHistoryDocument.upsert_document(execution_manager)
         task_manager.update_task_status_to_completed(
             task_name=task_name, message=f"{task_name} is completed", task_type=task_type, qid=qid
         )
@@ -144,5 +144,5 @@ def execute_dynamic_task_by_qid(
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
-        ExecutionHistoryDocument.update_document(execution_manager)
+        ExecutionHistoryDocument.upsert_document(execution_manager)
     return task_manager
