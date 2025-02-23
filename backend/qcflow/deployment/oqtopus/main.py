@@ -1,6 +1,9 @@
 from prefect import serve
 from prefect.client.schemas.schedules import CronSchedule
+from qcflow.cal_flow import cal_flow
 from qcflow.main import main_flow
+
+# from qcflow.subflow.concurrent.flow import concurrent_flow
 from qcflow.subflow.one_qubit_daily_summary.flow import one_qubit_daily_summary_flow
 from qcflow.subflow.scheduler.flow import scheduler_flow
 from qcflow.subflow.service_close.service_close import (
@@ -122,6 +125,11 @@ if __name__ == "__main__":
         ),
         is_schedule_active=True,
     )
+    cal_flow_deploy = cal_flow.to_deployment(
+        name=f"{deployment_name}-cal-flow",
+        description="""This is a cal flow.
+        """,
+    )
 
     _ = serve(
         main_deploy,  # type: ignore
@@ -131,6 +139,7 @@ if __name__ == "__main__":
         simulator_open_deploy,  # type: ignore
         simulator_close_deploy,  # type: ignore
         one_qubit_daily_summary_deploy,  # type: ignore
+        cal_flow_deploy,  # type: ignore
         webserver=True,
         limit=50,
     )

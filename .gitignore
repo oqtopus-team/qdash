@@ -215,3 +215,8 @@ quel.json
 qpu_data/
 docs/.vitepress/cache/
 client/.vite/
+
+backend/qcflow/images/*
+backend/qcflow/.system_note.json
+backend/qcflow/*.json
+backend/qcflow/.calibration/*.json

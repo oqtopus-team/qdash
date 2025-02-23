@@ -37,7 +37,35 @@ exp_list:
 const calib_list = ["Example1", "Example2", "Example3", "Example4"];
 
 const presets = {
-  default: ["Example1", "Example2"],
+  default: [
+    "CheckStatus",
+    "LinkUp",
+    "Configure",
+    "DumpBox",
+    "CheckNoise",
+    "CheckQubitFrequency",
+    "CheckReadoutFrequency",
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CheckT1",
+    "CheckT2Echo",
+    "CheckEffectiveQubitFrequency",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
+    "CreateDRAGPIPulse",
+    "CheckDRAGPIPulse",
+    "ReadoutClassification",
+    "RandomizedBenchmarking",
+    "X90InterleavedRandomizedBenchmarking",
+    "X180InterleavedRandomizedBenchmarking",
+    "CheckCrossResonance",
+    "OptimizeZX90",
+    "CreateZX90",
+    "CreateFineZX90",
+  ],
   preset1: ["Example1", "Example2", "Example3"],
   preset2: ["Example1", "Example2", "Example3", "Example4"],
   custom: [],
@@ -54,7 +82,7 @@ export function TableEditModal({
   refetchMenu: () => Promise<UseQueryResult<any, any>>;
 }) {
   const [yamlText, setYamlText] = useState(
-    generateYamlWithCustomArrayFormat(selectedItem),
+    generateYamlWithCustomArrayFormat(selectedItem)
   );
   const [validationError, setValidationError] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null); // 現在のプリセット
@@ -120,12 +148,12 @@ export function TableEditModal({
       if (updatedItem.mode !== "custom") {
         const allPresetItems = Object.values(presets).flat(); // 全プリセットの項目を統合
         const invalidItems = updatedItem.exp_list?.filter(
-          (item) => !allPresetItems.includes(item),
+          (item) => !allPresetItems.includes(item)
         );
 
         if (invalidItems?.length > 0) {
           setValidationError(
-            `exp_list に無効な項目が含まれています: ${invalidItems.join(", ")}`,
+            `exp_list に無効な項目が含まれています: ${invalidItems.join(", ")}`
           );
           return;
         }
@@ -145,7 +173,7 @@ export function TableEditModal({
             [],
           exp_list:
             updatedItem.exp_list?.filter(
-              (item: string | null) => item !== null,
+              (item: string | null) => item !== null
             ) ?? [],
         };
 
@@ -158,7 +186,7 @@ export function TableEditModal({
               const updatedData = await refetchMenu();
               if (updatedData.data) {
                 setTableData(
-                  mapListMenuResponseToListMenu(updatedData.data.data),
+                  mapListMenuResponseToListMenu(updatedData.data.data)
                 );
                 scheduleSettingChangedNotify();
               }
@@ -166,7 +194,7 @@ export function TableEditModal({
             onError: (error) => {
               console.error("Error updating menu:", error);
             },
-          },
+          }
         );
       }
     } catch (error) {

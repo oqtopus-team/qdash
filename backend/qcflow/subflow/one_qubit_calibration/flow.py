@@ -215,9 +215,7 @@ def single_calibration(
                     output_params=output_params,
                     timestamp=timestamp,
                 )
-                update_slack_success_notification(
-                    contents, ts, exp_name, qubit_index, fig_path
-                )
+                update_slack_success_notification(contents, ts, exp_name, qubit_index, fig_path)
                 update_node_status(qubit_index, NodeStatus.SUCCESS)
                 if status != "success":
                     result["success"] = False
@@ -229,7 +227,5 @@ def single_calibration(
                 update_slack_failure_notification(contents, exp_name, qubit_index)
                 update_node_status(qubit_index, NodeStatus.FAILED)
                 raise Exception(f"Error: {e}")
-        handle_calibration_result(
-            notes, qubit_index, status, calib_dir, menu, execution_id
-        )
+        handle_calibration_result(notes, qubit_index, status, calib_dir, menu, execution_id)
     return "success"

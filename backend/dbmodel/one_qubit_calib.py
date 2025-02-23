@@ -67,9 +67,7 @@ class OneQubitCalibModel(Document):
 
     class Settings:
         name = "one_qubit_calib"
-        indexes = [
-            IndexModel([("label", ASCENDING), ("qpu_name", ASCENDING)], unique=True)
-        ]
+        indexes = [IndexModel([("label", ASCENDING), ("qpu_name", ASCENDING)], unique=True)]
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -79,10 +77,7 @@ class OneQubitCalibModel(Document):
     def get_qubit_info(cls) -> dict[str, Any]:
         qpu_name = QPUModel.get_active_qpu_name()
         one_qubit_calib_list = cls.find(cls.qpu_name == qpu_name).run()
-        return {
-            item.label: item.one_qubit_calib_data.dict()
-            for item in one_qubit_calib_list
-        }
+        return {item.label: item.one_qubit_calib_data.dict() for item in one_qubit_calib_list}
 
     @classmethod
     def convert_from_json_dict(cls, json_dict: dict) -> dict[str, Any]:
