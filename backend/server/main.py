@@ -28,6 +28,7 @@ from pymongo import MongoClient
 from server.routers import (
     calibration,
     execution,
+    # execution_v2,
     experiment,
     fridges,
     menu,
@@ -45,9 +46,7 @@ mongo_host = os.getenv("MONGO_HOST")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    client: MongoClient = MongoClient(
-        mongo_host, 27017, username="root", password="example"
-    )
+    client: MongoClient = MongoClient(mongo_host, 27017, username="root", password="example")
     init_bunnet(
         database=client.cloud,
         document_models=[
@@ -84,7 +83,7 @@ app = FastAPI(
     version="0.0.1",
     contact={
         "name": "QDash",
-        "email": "oqtopus-team[at]googlegroups.com",
+        "email": "oqtopus-team@googlegroups.com",
     },
     license_info={
         "name": "Apache 2.0",
@@ -113,3 +112,4 @@ app.include_router(settings.router, tags=["settings"])
 app.include_router(fridges.router, tags=["fridges"])
 app.include_router(execution.router, tags=["execution"])
 app.include_router(experiment.router, tags=["experiment"])
+# app.include_router(execution_v2.router, tags=["execution_v2"])

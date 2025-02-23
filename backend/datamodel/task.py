@@ -1,7 +1,9 @@
 import uuid
+from copy import deepcopy
 from enum import Enum
 from typing import Literal
 
+import numpy as np
 import pendulum
 from datamodel.system_info import SystemInfoModel
 from pydantic import BaseModel, Field
@@ -45,10 +47,12 @@ class DataModel(BaseModel):
 
     value: float | int = 0
     unit: str = ""
+    description: str = ""
     calibrated_at: str = Field(
         default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
         description="The time when the system information was created",
     )
+    execution_id: str = ""
 
 
 class CalibDataModel(BaseModel):
@@ -63,6 +67,18 @@ class CalibDataModel(BaseModel):
 
     qubit: dict[str, dict[str, DataModel]] = Field(default_factory=dict)
     coupling: dict[str, dict[str, DataModel]] = Field(default_factory=dict)
+
+    def put_qubit_data(self, qid: str, parameter_name: str, data: DataModel) -> None:
+        self.qubit[qid][parameter_name] = data
+
+    def put_coupling_data(self, qid: str, parameter_name: str, data: DataModel) -> None:
+        self.coupling[qid][parameter_name] = data
+
+    def __getitem__(self, key: str) -> dict:
+        """Get the item by key."""
+        if key in ("qubit", "coupling"):
+            return getattr(self, key)  # type: ignore #noqa: PGH003
+        raise KeyError(f"Invalid key: {key}")
 
 
 class BaseTaskResultModel(BaseModel):
@@ -102,6 +118,69 @@ class BaseTaskResultModel(BaseModel):
     elapsed_time: str = ""
     task_type: str = "global"
     system_info: SystemInfoModel = SystemInfoModel()
+
+    def diagnose(self) -> None:
+        """Diagnose the task result and raise an error if the task failed."""
+        if self.status == TaskStatusModel.FAILED:
+            raise RuntimeError(f"Task {self.name} failed with message: {self.message}")
+
+    def put_input_parameter(self, input_parameters: dict) -> None:
+        """Put a parameter to the task result."""
+        copied_parameters = deepcopy(input_parameters)
+        # Process the copied_parameters
+        for key, item in copied_parameters.items():
+            if isinstance(item, np.ndarray):
+                copied_parameters[key] = str(item.tolist())
+            elif isinstance(item, range):
+                copied_parameters[key] = str(list(item))
+            else:
+                copied_parameters[key] = item
+        self.input_parameters = copied_parameters
+
+    def put_output_parameter(self, output_parameters: dict) -> None:
+        import numpy as np
+
+        """
+        put a parameter to the task result.
+        """
+        copied_parameters = deepcopy(output_parameters)
+        # Process the copied_parameters
+        for key, item in copied_parameters.items():
+            if isinstance(item, np.ndarray):
+                copied_parameters[key] = str(item.tolist())
+            elif isinstance(item, range):
+                copied_parameters[key] = str(list(item))
+            else:
+                copied_parameters[key] = item
+            self.output_parameter_names.append(key)
+        self.output_parameters = copied_parameters
+
+    def put_note(self, note: dict) -> None:
+        """Put a note to the task result.
+
+        Args:
+        ----
+            note (str): The note to put.
+
+        """
+        self.note = note
+
+    def calculate_elapsed_time(self, start_at: str, end_at: str) -> str:
+        """Calculate the elapsed time.
+
+        Args:
+        ----
+            start_at (str): The start time.
+            end_at (str): The end time.
+
+        """
+        try:
+            start_time = pendulum.parse(start_at)
+            end_time = pendulum.parse(end_at)
+        except Exception as e:
+            error_message = f"Failed to parse the time. {e}"
+            raise ValueError(error_message)
+        return end_time.diff_for_humans(start_time, absolute=True)  # type: ignore #noqa: PGH003
 
 
 class GlobalTaskModel(BaseTaskResultModel):

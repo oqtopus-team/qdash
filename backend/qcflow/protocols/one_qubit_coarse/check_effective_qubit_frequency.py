@@ -1,8 +1,8 @@
 from typing import ClassVar
 
 import numpy as np
+from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
-from qcflow.manager.task import Data
 from qcflow.protocols.base import (
     BaseTask,
     OutputParameter,
@@ -62,19 +62,19 @@ class CheckEffectiveQubitFrequency(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "effective_qubit_frequency": Data(
+            "effective_qubit_frequency": DataModel(
                 value=result["effective_freq"][label],
                 unit=op["effective_qubit_frequency"].unit,
                 description=op["effective_qubit_frequency"].description,
                 execution_id=execution_id,
             ),
-            "effective_qubit_frequency_0": Data(
+            "effective_qubit_frequency_0": DataModel(
                 value=result["result_0"].data[label].bare_freq,
                 unit=op["effective_qubit_frequency_0"].unit,
                 description=op["effective_qubit_frequency_0"].description,
                 execution_id=execution_id,
             ),
-            "effective_qubit_frequency_1": Data(
+            "effective_qubit_frequency_1": DataModel(
                 value=result["result_1"].data[label].bare_freq,
                 unit=op["effective_qubit_frequency_1"].unit,
                 description=op["effective_qubit_frequency_1"].description,

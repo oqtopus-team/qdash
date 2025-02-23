@@ -1,25 +1,19 @@
 # application code for the execution manager.
 import json
-from enum import Enum
 from pathlib import Path
 from typing import Callable
 
 import pendulum
-from datamodel.execution import ExecutionModel
+from datamodel.execution import (
+    CalibDataModel,
+    ExecutionModel,
+    ExecutionStatusModel,
+    TaskResultModel,
+)
+from datamodel.system_info import SystemInfoModel
 from filelock import FileLock
 from pydantic import BaseModel
-from qcflow.manager.constant import COMPLETED, FAILED, RUNNING, SCHDULED
-from qcflow.manager.system_info import SystemInfo
-from qcflow.manager.task import CalibData, TaskManager, TaskResult
-
-
-class ExecutionStatus(str, Enum):
-    """enum class for the status of the execution."""
-
-    SCHEDULED = SCHDULED
-    RUNNING = RUNNING
-    COMPLETED = COMPLETED
-    FAILED = FAILED
+from qcflow.manager.task import TaskManager
 
 
 class ExecutionManager(BaseModel):
@@ -29,8 +23,8 @@ class ExecutionManager(BaseModel):
     execution_id: str = ""
     calib_data_path: str = ""
     note: dict = {}
-    status: ExecutionStatus = ExecutionStatus.SCHEDULED
-    task_results: dict[str, TaskResult] = {}
+    status: ExecutionStatusModel = ExecutionStatusModel.SCHEDULED
+    task_results: dict[str, TaskResultModel] = {}
     tags: list[str] = []
     controller_info: dict[str, dict] = {}
     fridge_info: dict = {}
@@ -38,9 +32,9 @@ class ExecutionManager(BaseModel):
     start_at: str = ""
     end_at: str = ""
     elapsed_time: str = ""
-    calib_data: CalibData = CalibData(qubit={}, coupling={})
-    system_info: SystemInfo = SystemInfo()
+    calib_data: CalibDataModel = CalibDataModel(qubit={}, coupling={})
     message: str = ""
+    system_info: SystemInfoModel = SystemInfoModel()
 
     def __init__(
         self,
@@ -72,7 +66,7 @@ class ExecutionManager(BaseModel):
             instance.system_info.update_time()
             instance._atomic_save()  # noqa: SLF001
 
-    def update_status(self, new_status: ExecutionStatus) -> None:
+    def update_status(self, new_status: ExecutionStatusModel) -> None:
         """Update the status of the execution."""
 
         def updater(instance: ExecutionManager) -> None:
@@ -81,13 +75,13 @@ class ExecutionManager(BaseModel):
         self._with_file_lock(updater)
 
     def update_execution_status_to_running(self) -> None:
-        self.update_status(ExecutionStatus.RUNNING)
+        self.update_status(ExecutionStatusModel.RUNNING)
 
     def update_execution_status_to_completed(self) -> None:
-        self.update_status(ExecutionStatus.COMPLETED)
+        self.update_status(ExecutionStatusModel.COMPLETED)
 
     def update_execution_status_to_failed(self) -> None:
-        self.update_status(ExecutionStatus.FAILED)
+        self.update_status(ExecutionStatusModel.FAILED)
 
     def reload(self) -> "ExecutionManager":
         """Reload the execution manager from the file and return self for chaining."""
@@ -147,7 +141,7 @@ class ExecutionManager(BaseModel):
             raise FileNotFoundError(f"{save_path} does not exist.")
         return cls.model_validate_json(save_path.read_text())
 
-    def to_domain(self) -> ExecutionModel:
+    def to_datamodel(self) -> ExecutionModel:
         return ExecutionModel(
             name=self.name,
             execution_id=self.execution_id,
@@ -163,6 +157,6 @@ class ExecutionManager(BaseModel):
             end_at=self.end_at,
             elapsed_time=self.elapsed_time,
             calib_data=self.calib_data.model_dump(),
-            system_info=self.system_info.model_dump(),
             message=self.message,
+            system_info=self.system_info.model_dump(),
         )

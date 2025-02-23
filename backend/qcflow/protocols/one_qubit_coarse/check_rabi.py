@@ -1,7 +1,7 @@
 from typing import ClassVar
 
+from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
-from qcflow.manager.task import Data
 from qcflow.protocols.base import (
     BaseTask,
     OutputParameter,
@@ -58,13 +58,13 @@ class CheckRabi(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "rabi_amplitude": Data(
+            "rabi_amplitude": DataModel(
                 value=result.rabi_params[label].amplitude,
                 unit=op["rabi_amplitude"].unit,
                 description=op["rabi_amplitude"].description,
                 execution_id=execution_id,
             ),
-            "rabi_frequency": Data(
+            "rabi_frequency": DataModel(
                 value=result.rabi_params[label].frequency,
                 unit=op["rabi_frequency"].unit,
                 description=op["rabi_frequency"].description,

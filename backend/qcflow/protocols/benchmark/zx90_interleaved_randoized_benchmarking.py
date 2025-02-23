@@ -1,8 +1,8 @@
 from typing import ClassVar
 
 import numpy as np
+from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
-from qcflow.manager.task import Data
 from qcflow.protocols.base import (
     BaseTask,
     OutputParameter,
@@ -57,7 +57,7 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "zx90_gate_fidelity": Data(
+            "zx90_gate_fidelity": DataModel(
                 value=result["mean"][label],
                 unit=op["zx90_gate_fidelity"].unit,
                 description=op["zx90_gate_fidelity"].description,

@@ -1,8 +1,8 @@
 from typing import ClassVar
 
 import numpy as np
+from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
-from qcflow.manager.task import Data
 from qcflow.protocols.base import (
     BaseTask,
     OutputParameter,
@@ -54,7 +54,7 @@ class CheckT1(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "t1": Data(
+            "t1": DataModel(
                 value=result.data[label].t1,
                 unit=op["t1"].unit,
                 description=op["t1"].description,
