@@ -8,7 +8,7 @@ from neodbmodel.task_history import TaskHistoryDocument
 from pymongo import MongoClient
 
 mongo_ip = os.getenv("MONGO_HOST")
-client: MongoClient = MongoClient(mongo_ip, 27017, username="root", password="example")
+client: MongoClient = MongoClient(mongo_ip, 27017, username="root", password="example")  # noqa: S106
 
 
 def initialize() -> None:

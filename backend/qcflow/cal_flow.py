@@ -2,22 +2,52 @@ import asyncio
 
 from cal_task import (
     build_workflow,
-    cal_sequence,
+    execute_dynamic_task_by_qid,
     # execute_dynamic_task,
     # task_classes,
     validate_task_name,
 )
 from cal_util import qid_to_label, update_active_output_parameters
 from neodbmodel.execution_history import ExecutionHistoryDocument
+from neodbmodel.initialize import initialize
 from prefect import flow, get_run_logger
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
+from protocols.active_protocols import task_classes
 from qcflow.manager.execution import ExecutionManager
 from qcflow.manager.task import TaskManager
 from qcflow.schema.menu import Menu
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
-from repository.initialize import initialize
+
+
+@flow(flow_run_name="{qid}")
+def cal_sequence(
+    exp: Experiment,
+    task_manager: TaskManager,
+    task_names: list[str],
+    qid: str,
+) -> TaskManager:
+    """Calibrate in sequence."""
+    logger = get_run_logger()
+    try:
+        for task_name in task_names:
+            if task_name in task_classes:
+                task_type = task_classes[task_name].get_task_type()
+                if task_manager.this_task_is_completed(
+                    task_name=task_name, task_type=task_type, qid=qid
+                ):
+                    logger.info(f"Task {task_name} is already completed")
+                    continue
+                logger.info(f"Starting task: {task_name}")
+                task_manager = execute_dynamic_task_by_qid(
+                    exp=exp, task_manager=task_manager, task_name=task_name, qid=qid
+                )
+    except Exception as e:
+        logger.error(f"Failed to execute task: {e}")
+    finally:
+        logger.info("Ending all processes")
+    return task_manager
 
 
 @flow(
@@ -43,8 +73,7 @@ def cal_flow(
     exp.note.clear()
     task_names = validate_task_name(menu.exp_list)
     task_manager = TaskManager(execution_id=execution_id, qids=qubits, calib_dir=calib_dir)
-    workflow = build_workflow(task_names, qubits=qubits)
-    task_manager.task_result = workflow
+    task_manager = build_workflow(task_manager=task_manager, task_names=task_names, qubits=qubits)
     task_manager.save()
     # update_active_output_parameters()
     execution_manager = ExecutionManager.load_from_file(calib_dir).update_with_task_manager(

@@ -1,12 +1,12 @@
 from neodbmodel.execution_history import ExecutionHistoryDocument
+from neodbmodel.initialize import initialize
 from neodbmodel.qubit import QubitDocument
 from neodbmodel.task_history import TaskHistoryDocument
-from prefect import flow, get_run_logger, task
+from prefect import get_run_logger, task
 from qcflow.manager.execution import ExecutionManager
 from qcflow.manager.task import CouplingTask, GlobalTask, QubitTask, TaskManager, TaskResult
 from qcflow.protocols.active_protocols import task_classes
 from qubex.experiment import Experiment
-from repository.initialize import initialize
 
 
 def validate_task_name(task_names: list[str]) -> list[str]:
@@ -17,7 +17,10 @@ def validate_task_name(task_names: list[str]) -> list[str]:
     return task_names
 
 
-def build_workflow(task_names: list[str], qubits: list[str]) -> TaskResult:
+@task(name="build-workflow")
+def build_workflow(
+    task_manager: TaskManager, task_names: list[str], qubits: list[str]
+) -> TaskManager:
     """Build workflow."""
     task_result = TaskResult()
     global_previous_task_id = ""
@@ -50,36 +53,7 @@ def build_workflow(task_names: list[str], qubits: list[str]) -> TaskResult:
                 raise ValueError(f"Task type {this_task.get_task_type()} not found.")
         else:
             raise ValueError(f"Task {name} not found.")
-
-    return task_result
-
-
-@flow(flow_run_name="{qid}")
-def cal_sequence(
-    exp: Experiment,
-    task_manager: TaskManager,
-    task_names: list[str],
-    qid: str,
-) -> TaskManager:
-    """Calibrate in sequence."""
-    logger = get_run_logger()
-    try:
-        for task_name in task_names:
-            if task_name in task_classes:
-                task_type = task_classes[task_name].get_task_type()
-                if task_manager.this_task_is_completed(
-                    task_name=task_name, task_type=task_type, qid=qid
-                ):
-                    logger.info(f"Task {task_name} is already completed")
-                    continue
-                logger.info(f"Starting task: {task_name}")
-                task_manager = execute_dynamic_task_by_qid(
-                    exp=exp, task_manager=task_manager, task_name=task_name, qid=qid
-                )
-    except Exception as e:
-        logger.error(f"Failed to execute task: {e}")
-    finally:
-        logger.info("Ending all processes")
+    task_manager.task_result = task_result
     return task_manager
 
 
