@@ -109,7 +109,7 @@ def main_flow(
         tags=menu.tags,
         fridge_info={"temperature": 0.0},
         chip_id="SAMPLE",
-        note={"qubex_version": get_package_version("qubex")},
+        note={"qubex_version": get_package_version("qubex"), "ui_url": ui_url},
     )
     execution_manager.save()
     ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())

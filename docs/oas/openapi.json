@@ -6,7 +6,7 @@
     "description": "API for QDash",
     "contact": {
       "name": "QDash",
-      "email": "oqtopus-team[at]googlegroups.com"
+      "email": "oqtopus-team@googlegroups.com"
     },
     "license": {
       "name": "Apache 2.0",
@@ -2152,10 +2152,261 @@
           }
         }
       }
+    },
+    "/v2/execution": {
+      "get": {
+        "tags": [
+          "executionV2"
+        ],
+        "summary": "Fetch executions",
+        "description": "Fetch all executions.",
+        "operationId": "fetchExecutionsV2",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExecutionResponseSummaryV2"
+                  },
+                  "type": "array",
+                  "title": "Response Fetchexecutionsv2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/execution/{execution_id}": {
+      "get": {
+        "tags": [
+          "executionV2"
+        ],
+        "summary": "Fetch an execution by its ID",
+        "description": "Return the execution detail by its ID.",
+        "operationId": "fetchExecutionByIdV2",
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Execution Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionResponseDetailV2"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chip": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Fetch all chips",
+        "description": "Fetch all chips.",
+        "operationId": "listChips",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChipResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Listchips"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chip/{chip_id}": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Fetch a chip",
+        "description": "Fetch a chip by its ID.",
+        "operationId": "fetchChip",
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chip/{chip_id}/execution": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Fetch executions",
+        "description": "Fetch all executions for a given chip.",
+        "operationId": "listExecutionsByChipId",
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExecutionResponseSummary"
+                  },
+                  "title": "Response Listexecutionsbychipid"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chip/{chip_id}/execution/{execution_id}": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Fetch an execution by its ID",
+        "description": "Return the execution detail by its ID.",
+        "operationId": "fetchExecutionByChipId",
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Execution Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionResponseDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ChipResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id"
+        ],
+        "title": "ChipResponse",
+        "description": "Chip is a Pydantic model that represents a chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    name (str): The name of the chip."
+      },
       "CreateMenuRequest": {
         "properties": {
           "name": {
@@ -2665,6 +2916,186 @@
           "timestamp"
         ],
         "title": "ExecutionResponse"
+      },
+      "ExecutionResponseDetail": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "start_at": {
+            "type": "string",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "type": "string",
+            "title": "Elapsed Time"
+          },
+          "task": {
+            "items": {
+              "$ref": "#/components/schemas/Task"
+            },
+            "type": "array",
+            "title": "Task"
+          },
+          "note": {
+            "type": "object",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status",
+          "start_at",
+          "end_at",
+          "elapsed_time",
+          "task",
+          "note"
+        ],
+        "title": "ExecutionResponseDetail",
+        "description": "ExecutionResponseDetailV2 is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time"
+      },
+      "ExecutionResponseDetailV2": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "start_at": {
+            "type": "string",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "type": "string",
+            "title": "Elapsed Time"
+          },
+          "task": {
+            "items": {
+              "$ref": "#/components/schemas/Task"
+            },
+            "type": "array",
+            "title": "Task"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status",
+          "start_at",
+          "end_at",
+          "elapsed_time",
+          "task"
+        ],
+        "title": "ExecutionResponseDetailV2",
+        "description": "ExecutionResponseDetailV2 is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time"
+      },
+      "ExecutionResponseSummary": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "start_at": {
+            "type": "string",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "type": "string",
+            "title": "Elapsed Time"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "note": {
+            "type": "object",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "execution_id",
+          "status",
+          "start_at",
+          "end_at",
+          "elapsed_time",
+          "tags",
+          "note"
+        ],
+        "title": "ExecutionResponseSummary",
+        "description": "ExecutionResponseSummaryV2 is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution."
+      },
+      "ExecutionResponseSummaryV2": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "start_at": {
+            "type": "string",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "type": "string",
+            "title": "Elapsed Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "execution_id",
+          "status",
+          "start_at",
+          "end_at",
+          "elapsed_time"
+        ],
+        "title": "ExecutionResponseSummaryV2",
+        "description": "ExecutionResponseSummaryV2 is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution."
       },
       "ExecutionRunResponse": {
         "properties": {
@@ -3816,6 +4247,116 @@
           }
         ]
       },
+      "Task": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "default": ""
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "upstream_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Id",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "input_parameters": {
+            "type": "object",
+            "title": "Input Parameters"
+          },
+          "output_parameters": {
+            "type": "object",
+            "title": "Output Parameters"
+          },
+          "output_parameter_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Parameter Names"
+          },
+          "note": {
+            "type": "object",
+            "title": "Note"
+          },
+          "figure_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Figure Path"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Time"
+          },
+          "task_type": {
+            "type": "string",
+            "title": "Task Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "name",
+          "status",
+          "message",
+          "task_type"
+        ],
+        "title": "Task",
+        "description": "Task is a Pydantic model that represents a task in the execution response.\n\nAttributes\n----------\n    task_id (str): The ID of the task.\n    name (str): The name of the task.\n    upstream_id (Optional[str]): The ID of the upstream task.\n    status (str): The current status of the task.\n    message (str): The message associated with the task.\n    input_parameters (dict[str, Any]): The input parameters of the task.\n    output_parameters (dict[str, Any]): The output parameters of the task.\n    output_parameter_names (List[str]): The names of the output parameters.\n    note (dict[str, Any]): The note associated with the task.\n    figure_path (List[str]): The paths to the figures associated with the task.\n    start_at (Optional[str]): The start time of the task.\n    end_at (Optional[str]): The end time of the task.\n    elapsed_time (Optional[str]): The total elapsed time of the task.\n    task_type (str): The type of the task.\ndef modify_name(cls, v: str, values: dict[str, Any]) -> str:"
+      },
       "TwoQubitCalibDailySummaryModel": {
         "properties": {
           "_id": {
@@ -3828,7 +4369,7 @@
                 "type": "null"
               }
             ],
-            "title": " Id",
+            "title": "Id",
             "description": "MongoDB document ObjectID"
           },
           "date": {
