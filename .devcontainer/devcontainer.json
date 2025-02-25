@@ -14,7 +14,8 @@
         "ms-azuretools.vscode-docker",
         "EditorConfig.EditorConfig",
         "dbaeumer.vscode-eslint",
-        "ms-python.mypy-type-checker"
+        "ms-python.mypy-type-checker",
+        "saoudrizwan.claude-dev"
       ],
       "settings": {
         "python.defaultInterpreterPath": ".venv/bin/python"
