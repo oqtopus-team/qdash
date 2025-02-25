@@ -76,15 +76,22 @@ def execute_dynamic_task_by_qid(
         task_type = this_task.get_task_type()
         execution_id = task_manager.execution_id
         execution_manager = ExecutionManager.load_from_file(task_manager.calib_dir)
+        logger.info(f"execution manager: {execution_manager.model_dump()}")
         logger.info(f"Starting task: {task_name}, execution_id: {task_manager.execution_id}")
         task_manager.start_task(task_name, task_type, qid)
+        logger.info(f"task manager: {task_manager.model_dump()}")
         logger.info(f"Running task: {task_name}, id: {task_manager.id}")
-        task_manager.update_task_status_to_running(
-            task_name=task_name, message=f"running {task_name} ...", task_type=task_type, qid=qid
+        # task_manager.save()
+        executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
+        TaskResultHistoryDocument.upsert_document(
+            task=executed_task, execution_model=execution_manager.to_datamodel()
         )
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )
+        execution_manager.save()
+        logger.info(f"execution manager: {execution_manager.model_dump()}")
+        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
         preprocess_result = this_task.preprocess(exp=exp, qid=qid)
         if preprocess_result is not None:
             task_manager.put_input_parameters(
@@ -94,6 +101,14 @@ def execute_dynamic_task_by_qid(
                 qid=qid,
             )
             task_manager.save()
+            execution_manager = execution_manager.reload().update_with_task_manager(
+                task_manager=task_manager
+            )
+            execution_manager.save()
+            logger.info(f"execution manager: {execution_manager.model_dump()}")
+            ExecutionHistoryDocument.upsert_document(
+                execution_model=execution_manager.to_datamodel()
+            )
         run_result = this_task.run(exp=exp, qid=qid)
         if run_result is not None:
             postprocess_result = this_task.postprocess(
@@ -113,17 +128,20 @@ def execute_dynamic_task_by_qid(
                     qid=qid,
                 )
                 task_manager.save()
-        execution_manager = execution_manager.reload().update_with_task_manager(
-            task_manager=task_manager
-        )
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
+
         task_manager.update_task_status_to_completed(
             task_name=task_name, message=f"{task_name} is completed", task_type=task_type, qid=qid
         )
+        task_manager.save()
         executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
         TaskResultHistoryDocument.upsert_document(
             task=executed_task, execution_model=execution_manager.to_datamodel()
         )
+        execution_manager = execution_manager.reload().update_with_task_manager(
+            task_manager=task_manager
+        )
+        execution_manager.save()
+        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
         output_parameters = task_manager.get_output_parameter_by_task_name(
             task_name=task_name, task_type=task_type, qid=qid
         )
@@ -148,4 +166,8 @@ def execute_dynamic_task_by_qid(
             task_manager=task_manager
         )
         ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
+        executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
+        TaskResultHistoryDocument.upsert_document(
+            task=executed_task, execution_model=execution_manager.to_datamodel()
+        )
     return task_manager

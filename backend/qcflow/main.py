@@ -114,16 +114,26 @@ def main_flow(
     execution_manager.save()
     ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
     execution_manager.start_execution()
+    execution_manager.save()
+    ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
     execution_manager.update_execution_status_to_running()
+    execution_manager.save()
+    ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
     try:
         for flow_name in menu.flow:
             success_map = calibration_flow_map[flow_name](
                 menu, calib_dir, success_map, execution_id
             )
-        execution_manager.update_execution_status_to_success()
+        execution_manager.update_execution_status_to_completed()
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")
+        execution_manager = execution_manager.reload()
         execution_manager.update_execution_status_to_failed()
+        execution_manager.save()
+        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
     finally:
+        execution_manager = execution_manager.reload()
         execution_manager.end_execution()
+        execution_manager.save()
+        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
         unlock_execution()
