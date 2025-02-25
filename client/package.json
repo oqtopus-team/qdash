@@ -5,8 +5,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "next",
+    "build": "tsc && next build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "fmt": "eslint . --fix",
@@ -25,6 +25,7 @@
     "date-fns": "4.1.0",
     "js-yaml": "^4.1.0",
     "lit": "^3.2.1",
+    "next": "^15.1.7",
     "node-fetch": "^3.3.2",
     "nuqs": "^2.4.0",
     "openapi-fetch": "^0.13.0",
@@ -53,6 +54,7 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.15",
+    "@types/node": "22.13.5",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/react-json-editor-ajrm": "^2.5.6",
