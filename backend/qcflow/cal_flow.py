@@ -85,6 +85,7 @@ def cal_flow(
     execution_manager = ExecutionManager.load_from_file(calib_dir).update_with_task_manager(
         task_manager
     )
+    execution_manager.update_execution_status_to_running()
     initialize()
     ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
     for qid in qubits:

@@ -113,6 +113,8 @@ services:
     volumes:
       - ./backend/server:/app/server
       - ./backend/dbmodel:/app/dbmodel
+      - ./backend/datamodel:/app/datamodel
+      - ./backend/neodbmodel:/app/neodbmodel
       - ${CALIB_DATA_PATH}:/app/calib_data
       - ${QPU_DATA_PATH}:/app/qpu_data
     working_dir: /app/server

@@ -1,114 +1,127 @@
 import { useState, useEffect } from "react";
 import {
-  useFetchExperimentsById,
   useAddExecutionTags,
   useRemoveExecutionTags,
 } from "@/client/execution/execution";
 import {
-  ExecutionRunResponse,
-  ExecutionResponse,
-} from "@/schemas/execution/execution";
+  useListChips,
+  useListExecutionsByChipId,
+  useFetchExecutionByChipId,
+} from "@/client/chip/chip";
+import { ChipResponse } from "@/schemas";
+import { ExecutionResponseSummary } from "@/schemas";
 import JsonView from "react18-json-view";
 import { FaExternalLinkAlt } from "react-icons/fa";
-import QubitCalibChart from "./components/QubitCalibChart"; // 新しく作成したコンポーネントをインポート
 import Select from "react-select";
-import { useFetchAllExecutionsByQpuName, useListQpu } from "@/client/qpu/qpu";
 
 const ExecutionPage = () => {
+  const [selectedChipId, setSelectedChipId] = useState<string>("SAMPLE");
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
-    null,
+    null
   );
-  const [selectedQpuName, setSelectedQpuName] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [expandedExperimentIndex, setExpandedExperimentIndex] = useState<
-    number | null
-  >(null);
+  const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(
+    null
+  );
   const [newTag, setNewTag] = useState<string>("");
+  const [cardData, setCardData] = useState<ExecutionResponseSummary[]>([]);
 
-  const { data: qpuListData } = useListQpu();
+  // チップ一覧取得
+  const { data: chipData } = useListChips();
+
+  // chip_id による実行概要一覧の取得
   const {
     data: executionData,
     isError,
     isLoading,
     refetch,
-  } = useFetchAllExecutionsByQpuName(
-    selectedQpuName ? encodeURIComponent(selectedQpuName) : "",
-  );
-  const { data: experimentsByIdData } = useFetchExperimentsById(
-    selectedExecutionId ? encodeURIComponent(selectedExecutionId) : "",
+  } = useListExecutionsByChipId(selectedChipId);
+
+  // 選択された execution_id に対して、チップと実行IDでタスク一覧取得
+  const {
+    data: executionDetailData,
+    isLoading: isDetailLoading,
+    isError: isDetailError,
+    refetch: refetchDetail,
+  } = useFetchExecutionByChipId(
+    selectedChipId,
+    selectedExecutionId ? selectedExecutionId : ""
   );
 
   const addTagMutation = useAddExecutionTags({
-    onSuccess: () => {
-      refetch();
-    },
-    onError: (error) => {
-      console.error("Error adding tag:", error);
+    mutation: {
+      onSuccess: () => {
+        refetch();
+        refetchDetail();
+      },
+      onError: (error: any) => {
+        console.error("Error adding tag:", error);
+      },
     },
   });
 
   const removeTagMutation = useRemoveExecutionTags({
-    onSuccess: () => {
-      refetch();
-    },
-    onError: (error) => {
-      console.error("Error removing tag:", error);
+    mutation: {
+      onSuccess: () => {
+        refetch();
+        refetchDetail();
+      },
+      onError: (error: any) => {
+        console.error("Error removing tag:", error);
+      },
     },
   });
 
-  const [cardData, setCardData] = useState<ExecutionRunResponse[]>([]);
-
-  // Set up initial data fetch
+  // 実行データ取得時にカードデータをセット
   useEffect(() => {
     if (executionData) {
       setCardData(executionData.data);
     }
   }, [executionData]);
 
-  // Set default QPU name
-  useEffect(() => {
-    if (qpuListData && qpuListData.data.length > 0) {
-      setSelectedQpuName(qpuListData.data[0].name);
+  // チップ選択の変更ハンドラ
+  const handleChipChange = (
+    selectedOption: { value: string; label: string } | null
+  ) => {
+    if (selectedOption) {
+      setSelectedChipId(selectedOption.value);
+      setSelectedExecutionId(null);
+      setIsSidebarOpen(false);
+      setCardData([]);
     }
-  }, [qpuListData]);
+  };
 
-  // Log query and results
+  // ログ出力
   useEffect(() => {
-    console.log("Query Params:", { executionId: selectedExecutionId });
+    console.log("Chip:", selectedChipId);
+    console.log("Execution ID:", selectedExecutionId);
     console.log("Execution Data:", executionData);
-    console.log("Experiments By ID Data:", experimentsByIdData);
-  }, [selectedExecutionId, executionData, experimentsByIdData]);
+    console.log("Execution Detail Data:", executionDetailData);
+  }, [selectedChipId, selectedExecutionId, executionData, executionDetailData]);
 
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-  if (isError) {
-    return <div>Error</div>;
-  }
+  if (isLoading) return <div>Loading...</div>;
+  if (isError) return <div>Error</div>;
 
-  // Generate a unique key for each execution
-  const getExecutionKey = (execution) => `${execution.execution_id}`;
+  // 一意キー生成
+  const getExecutionKey = (execution: ExecutionResponseSummary) =>
+    `${execution.execution_id}`;
 
-  const handleCardClick = (execution) => {
+  const handleCardClick = (execution: ExecutionResponseSummary) => {
     setSelectedExecutionId(execution.execution_id);
     setIsSidebarOpen(true);
+    setExpandedTaskIndex(null);
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
     if (selectedExecutionId) {
-      console.log("Removing tag:", tagToRemove);
-      console.log("Selected Execution ID:", selectedExecutionId);
-
       removeTagMutation.mutate(
         {
           executionId: selectedExecutionId,
           data: [tagToRemove],
         },
         {
-          onSuccess: () => {
-            refetch();
-          },
-        },
+          onSuccess: () => refetch(),
+        }
       );
     } else {
       console.error("selectedExecutionId is undefined");
@@ -127,7 +140,7 @@ const ExecutionPage = () => {
             setNewTag("");
             refetch();
           },
-        },
+        }
       );
     }
   };
@@ -135,34 +148,35 @@ const ExecutionPage = () => {
   const handleCloseSidebar = () => {
     setIsSidebarOpen(false);
     setSelectedExecutionId(null);
-    setExpandedExperimentIndex(null);
+    setExpandedTaskIndex(null);
   };
 
-  const handleExperimentClick = (index: number) => {
-    setExpandedExperimentIndex(
-      expandedExperimentIndex === index ? null : index,
-    );
+  // タスククリック時の展開トグル
+  const handleTaskClick = (index: number) => {
+    setExpandedTaskIndex(expandedTaskIndex === index ? null : index);
   };
 
-  // Function to determine the left border color based on status
-  const getStatusBorderStyle = (status) => {
+  // ステータス別ボーダーカラー
+  const getStatusBorderStyle = (status: string) => {
     switch (status) {
       case "running":
-        return "border-l-4 border-blue-400"; // running: blue
-      case "success":
-        return "border-l-4 border-teal-400"; // success: teal
+        return "border-l-4 border-blue-400";
+      case "completed":
+        return "border-l-4 border-teal-400";
+      case "scheduled":
+        return "border-l-4 border-yellow-400";
       case "failed":
-        return "border-l-4 border-red-400"; // failed: red
+        return "border-l-4 border-red-400";
       default:
-        return "border-l-4 border-gray-400"; // fallback: gray
+        return "border-l-4 border-gray-400";
     }
   };
 
-  // QPU options for the dropdown
-  const qpuOptions = qpuListData?.data?.map((qpu) => ({
-    value: qpu.name,
-    label: qpu.name,
-  }));
+  const chipOptions =
+    chipData?.data?.map((chip: ChipResponse) => ({
+      value: chip.chip_id,
+      label: chip.chip_id,
+    })) || [];
 
   return (
     <div
@@ -171,85 +185,66 @@ const ExecutionPage = () => {
     >
       <div className="px-10 pb-3">
         <h1 className="text-left text-3xl font-bold">Execution History</h1>
-        <div className="flex justify-start w-full mt-4 mx-10">
-          <Select
-            value={qpuOptions?.find(
-              (option) => option.value === selectedQpuName,
-            )}
-            options={qpuOptions}
-            onChange={(selectedOption) =>
-              setSelectedQpuName(selectedOption?.value)
-            }
-            placeholder="Select QPU"
-            className="w-64"
-          />
-        </div>
       </div>
-      <div className="rounded-lg bg-white flex justify-center mx-20 my-5">
-        <div className="w-full mx-20 h-[600px]">
-          <QubitCalibChart name={selectedQpuName} />
-        </div>
+      <div className="px-10 pb-6">
+        <Select
+          options={chipOptions}
+          value={chipOptions.find((option) => option.value === selectedChipId)}
+          onChange={handleChipChange}
+          placeholder="Select Chip"
+        />
       </div>
       <div className="grid grid-cols-1 gap-2 mx-5">
-        {cardData.map((execution, index) => {
+        {cardData.map((execution) => {
           const executionKey = getExecutionKey(execution);
           const isSelected = selectedExecutionId === execution.execution_id;
           const statusBorderStyle = getStatusBorderStyle(execution.status);
 
           return (
             <div
-              key={index}
+              key={executionKey}
               className={`p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden transition-transform duration-200 bg-white ${
                 isSelected ? "transform scale-100" : "transform scale-95"
               } ${statusBorderStyle}`}
               onClick={() => handleCardClick(execution)}
             >
-              {/* Overlay for selected card to add blue highlight */}
               {isSelected && (
                 <div className="absolute inset-0 bg-blue-200 opacity-20 pointer-events-none transition-opacity duration-500" />
               )}
               <div className="relative z-10">
-                <h2 className="text-xl font-semibold mb-1">
-                  {execution.menu.name} - {execution.execution_id}
-                </h2>
+                <h2 className="text-xl font-semibold mb-1">{execution.name}</h2>
                 <div className="flex items-center mb-1">
                   <p className="text-sm text-gray-500 mr-4">
-                    {new Date(execution.timestamp).toLocaleString()}
+                    {new Date(execution.start_at).toLocaleString()}
                   </p>
                   <span
                     className={`text-sm font-semibold ${
                       execution.status === "running"
                         ? "text-blue-600"
-                        : execution.status === "success"
-                          ? "text-teal-600"
-                          : "text-red-600"
+                        : execution.status === "completed"
+                        ? "text-teal-600"
+                        : execution.status === "scheduled"
+                        ? "text-yellow-600"
+                        : "text-red-600"
                     }`}
                   >
                     {execution.status === "running"
                       ? "Running"
-                      : execution.status === "success"
-                        ? "Success"
-                        : "Failed"}
+                      : execution.status === "completed"
+                      ? "Completed"
+                      : execution.status === "scheduled"
+                      ? "Scheduled"
+                      : "Failed"}
                   </span>
-                  <div className="flex flex-wrap ml-4">
-                    {execution.tags?.map((tag, tagIndex) => (
-                      <span
-                        key={tagIndex}
-                        className="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-1"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
                 </div>
               </div>
             </div>
           );
         })}
       </div>
-      {/* Sidebar */}
+      {/* サイドバー：カード風のスタイルに変更 */}
       <div
-        className={`fixed right-0 top-0 w-1/2 h-full bg-white shadow-lg border-l overflow-y-auto p-6 transition-transform duration-300 ${
+        className={`fixed right-0 top-0 w-1/2 h-full bg-white shadow-xl border-l overflow-y-auto p-6 transition-transform duration-300 ${
           isSidebarOpen
             ? "transform translate-x-0"
             : "transform translate-x-full"
@@ -264,19 +259,18 @@ const ExecutionPage = () => {
         </button>
         {selectedExecutionId && (
           <>
-            <div className="flex justify-between items-center mb-6">
+            <div className="p-4 bg-white mb-6">
               <h2 className="text-2xl font-bold">
                 {
                   cardData.find(
-                    (exec) => getExecutionKey(exec) === selectedExecutionId,
-                  )?.menu.name
-                }{" "}
-                - {selectedExecutionId}{" "}
+                    (exec) => getExecutionKey(exec) === selectedExecutionId
+                  )?.name
+                }
               </h2>
-              <div className="flex space-x-4 mx-8">
+              <div className="flex space-x-4 mt-4">
                 <a
                   href={`http://localhost:5714/execution/${selectedExecutionId}/experiment`}
-                  className="bg-neutral text-white  px-4 py-2 rounded flex items-center"
+                  className="bg-neutral text-white px-4 py-2 rounded flex items-center hover:bg-neutral-dark transition-colors"
                 >
                   <FaExternalLinkAlt className="mr-2" />
                   Go to Experiment
@@ -284,17 +278,17 @@ const ExecutionPage = () => {
                 <a
                   href={
                     cardData.find(
-                      (exec) => getExecutionKey(exec) === selectedExecutionId,
-                    )?.flow_url
+                      (exec) => getExecutionKey(exec) === selectedExecutionId
+                    )?.note.ui_url
                   }
-                  className="bg-teal-500 text-white px-4 py-2 rounded flex items-center"
+                  className="bg-teal-500 text-white px-4 py-2 rounded flex items-center hover:bg-teal-600 transition-colors"
                 >
                   <FaExternalLinkAlt className="mr-2" />
                   Go to Flow
                 </a>
               </div>
             </div>
-            <div className="text-left mb-6">
+            <div className="bg-white">
               <div className="flex flex-wrap mb-4">
                 {cardData
                   .find((exec) => getExecutionKey(exec) === selectedExecutionId)
@@ -330,120 +324,129 @@ const ExecutionPage = () => {
                   Add
                 </button>
               </div>
-              <div className="my-2">
-                <h3 className="text-xl font-semibold mb-2">QPU</h3>
-                <div className="bg-gray-50 p-4 rounded-lg font-semibold">
-                  {
-                    cardData.find(
-                      (exec) => getExecutionKey(exec) === selectedExecutionId,
-                    ).qpu_name
-                  }
-                </div>
-              </div>
-              <div className="my-2">
-                <h3 className="text-xl font-semibold mb-2">
-                  Fridge Temperature
-                </h3>
-                <div className="bg-gray-50 p-4 rounded-lg font-semibold">
-                  {
-                    cardData.find(
-                      (exec) => getExecutionKey(exec) === selectedExecutionId,
-                    ).fridge_temperature
-                  }
-                </div>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Menu</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <JsonView
-                  src={
-                    cardData.find(
-                      (exec) => getExecutionKey(exec) === selectedExecutionId,
-                    ).menu
-                  }
-                  collapsed={1}
-                  theme="vscode"
-                />
-              </div>
             </div>
-            {experimentsByIdData?.data?.map(
-              (experiment: ExecutionResponse, index: number) => (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg shadow-md bg-white mb-4 ${getStatusBorderStyle(
-                    experiment.status,
-                  )}`}
-                  onClick={() => handleExperimentClick(index)}
-                >
-                  <h3 className="text-xl font-semibold mb-1 text-left">
-                    {experiment.label} - {experiment.experiment_name}
-                  </h3>
-                  <div className="flex items-center mb-1">
-                    <p className="text-sm text-gray-500 mr-4">
-                      {new Date(experiment.timestamp).toLocaleString()}
-                    </p>
-                    <span
-                      className={`text-sm font-semibold ${
-                        experiment.status === "running"
-                          ? "text-blue-600"
-                          : experiment.status === "success"
-                            ? "text-teal-600"
-                            : "text-red-600"
-                      }`}
+            <div>
+              <h3 className="text-xl font-bold mb-4">Execution Details</h3>
+              {isDetailLoading && <div>Loading details...</div>}
+              {isDetailError && <div>Error loading details.</div>}
+              {executionDetailData &&
+                executionDetailData.data.task &&
+                executionDetailData.data.task.map((detailTask, idx) => {
+                  const taskBorderStyle = (() => {
+                    switch (detailTask.status) {
+                      case "running":
+                        return "border-l-4 border-blue-400";
+                      case "completed":
+                        return "border-l-4 border-teal-400";
+                      case "failed":
+                        return "border-l-4 border-red-400";
+                      case "scheduled":
+                        return "border-l-4 border-yellow-400";
+                      default:
+                        return "border-l-4 border-gray-400";
+                    }
+                  })();
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`mb-4 p-4 rounded-lg shadow-md bg-white cursor-pointer hover:shadow-lg transition-shadow ${taskBorderStyle}`}
+                      onClick={() => handleTaskClick(idx)}
                     >
-                      {experiment.status === "running"
-                        ? "Running"
-                        : experiment.status === "success"
-                          ? "Success"
+                      <h4 className="text-lg font-semibold text-left">
+                        {detailTask.name}
+                      </h4>
+                      <p className="text-left">
+                        Start at:{" "}
+                        {new Date(detailTask.start_at).toLocaleString()}
+                      </p>
+                      <p className="text-left">
+                        Elapsed time: {detailTask.elapsed_time}
+                      </p>
+                      <p
+                        className={`text-left text-sm font-semibold ${
+                          detailTask.status === "running"
+                            ? "text-blue-600"
+                            : detailTask.status === "completed"
+                            ? "text-teal-600"
+                            : detailTask.status === "scheduled"
+                            ? "text-yellow-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {detailTask.status === "running"
+                          ? "Running"
+                          : detailTask.status === "completed"
+                          ? "Completed"
+                          : detailTask.status === "scheduled"
+                          ? "Scheduled"
                           : "Failed"}
-                    </span>
-                  </div>
-                  {expandedExperimentIndex === index && (
-                    <div className="mt-2">
-                      {experiment.fig_path && (
+                      </p>
+                      {expandedTaskIndex === idx && (
                         <div className="mt-2">
-                          <h4 className="text-lg font-semibold mb-1 text-left">
-                            Figure
-                          </h4>
-                          <img
-                            src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                              experiment.fig_path,
-                            )}`}
-                            alt="Experiment Figure"
-                            className="w-full h-auto max-h-[60vh] object-contain rounded border"
-                          />
+                          {Array.isArray(detailTask.figure_path) ? (
+                            detailTask.figure_path.map((path, i) => (
+                              <div key={i} className="mt-2">
+                                <h5 className="text-md font-semibold mb-1 text-left">
+                                  Figure {i + 1}
+                                </h5>
+                                <img
+                                  src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
+                                    path
+                                  )}`}
+                                  alt={`Task Figure ${i + 1}`}
+                                  className="w-full h-auto max-h-[60vh] object-contain rounded border"
+                                />
+                              </div>
+                            ))
+                          ) : detailTask.figure_path ? (
+                            <div className="mt-2">
+                              <h5 className="text-md font-semibold mb-1 text-left">
+                                Figure
+                              </h5>
+                              <img
+                                src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
+                                  detailTask.figure_path
+                                )}`}
+                                alt="Task Figure"
+                                className="w-full h-auto max-h-[60vh] object-contain rounded border"
+                              />
+                            </div>
+                          ) : null}
                         </div>
                       )}
-                      {experiment.input_parameter && (
+                      {expandedTaskIndex === idx && (
                         <div className="mt-2">
-                          <h4 className="text-lg font-semibold mb-1 text-left">
+                          <h5 className="text-md font-semibold mb-1 text-left">
                             Input Parameters
-                          </h4>
+                          </h5>
                           <div className="bg-gray-100 p-2 rounded">
                             <JsonView
-                              src={experiment.input_parameter}
+                              src={detailTask.input_parameters}
                               theme="vscode"
+                              collapsed={1}
                             />
                           </div>
                         </div>
                       )}
-                      {experiment.output_parameter && (
+                      {expandedTaskIndex === idx && (
                         <div className="mt-2">
-                          <h4 className="text-lg font-semibold mb-1 text-left">
+                          <h5 className="text-md font-semibold mb-1 text-left">
                             Output Parameters
-                          </h4>
+                          </h5>
                           <div className="bg-gray-100 p-2 rounded">
                             <JsonView
-                              src={experiment.output_parameter}
+                              src={detailTask.output_parameters}
                               theme="vscode"
+                              collapsed={2}
                             />
                           </div>
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              ),
-            )}
+                  );
+                })}
+            </div>
           </>
         )}
       </div>

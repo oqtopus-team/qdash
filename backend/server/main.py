@@ -27,8 +27,9 @@ from fastapi.routing import APIRoute
 from pymongo import MongoClient
 from server.routers import (
     calibration,
+    chip,
     execution,
-    # execution_v2,
+    execution_v2,
     experiment,
     fridges,
     menu,
@@ -112,4 +113,5 @@ app.include_router(settings.router, tags=["settings"])
 app.include_router(fridges.router, tags=["fridges"])
 app.include_router(execution.router, tags=["execution"])
 app.include_router(experiment.router, tags=["experiment"])
-# app.include_router(execution_v2.router, tags=["execution_v2"])
+app.include_router(execution_v2.router, tags=["executionV2"])
+app.include_router(chip.router, tags=["chip"])

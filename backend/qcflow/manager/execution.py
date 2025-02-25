@@ -12,7 +12,7 @@ from datamodel.execution import (
 )
 from datamodel.system_info import SystemInfoModel
 from filelock import FileLock
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from qcflow.manager.task import TaskManager
 
 
@@ -29,7 +29,10 @@ class ExecutionManager(BaseModel):
     controller_info: dict[str, dict] = {}
     fridge_info: dict = {}
     chip_id: str = ""
-    start_at: str = ""
+    start_at: str = Field(
+        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+        description="The time when the system information was created",
+    )
     end_at: str = ""
     elapsed_time: str = ""
     calib_data: CalibDataModel = CalibDataModel(qubit={}, coupling={})
@@ -88,17 +91,17 @@ class ExecutionManager(BaseModel):
         return ExecutionManager.load_from_file(self.calib_data_path)
 
     def update_with_task_manager(self, task_manager: TaskManager) -> "ExecutionManager":
-        def updater(instance: ExecutionManager) -> None:
-            instance.task_results[task_manager.id] = task_manager.task_result
+        def updater(updated: ExecutionManager) -> None:
+            updated.task_results[task_manager.id] = task_manager.task_result
             for qid in task_manager.calib_data.qubit:
-                instance.calib_data.qubit[qid] = task_manager.calib_data.qubit[qid]
+                updated.calib_data.qubit[qid] = task_manager.calib_data.qubit[qid]
             for qid in task_manager.calib_data.coupling:
-                instance.calib_data.coupling[qid] = task_manager.calib_data.coupling[qid]
+                updated.calib_data.coupling[qid] = task_manager.calib_data.coupling[qid]
             for _id in task_manager.controller_info:
-                instance.controller_info[_id] = task_manager.controller_info[_id]
+                updated.controller_info[_id] = task_manager.controller_info[_id]
 
         self._with_file_lock(updater)
-        return self
+        return ExecutionManager.load_from_file(self.calib_data_path)
 
     def calculate_elapsed_time(self, start_at: str, end_at: str) -> str:
         try:

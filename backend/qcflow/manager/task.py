@@ -323,6 +323,7 @@ class TaskManager(BaseModel):
         for t in container:
             if t.name == task_name:
                 t.status = TaskStatusModel.RUNNING
+                t.message = f"{task_name} is running."
                 t.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
                 t.system_info.update_time()
                 return
