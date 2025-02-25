@@ -69,6 +69,7 @@
     "@typescript-eslint/parser": "^8.13.0",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
+    "next": "^15.1.7",
     "daisyui": "^4.12.14",
     "eslint": "^9.21.0",
     "eslint-plugin-import": "^2.31.0",

@@ -140,7 +140,7 @@ services:
       dockerfile: ./client/Dockerfile
     volumes:
       - ./client:/app
-      - /app/node_modules
+      # - /app/node_modules
     restart: always
     env_file:
       - .env
