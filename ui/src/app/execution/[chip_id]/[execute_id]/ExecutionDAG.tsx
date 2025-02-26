@@ -13,6 +13,7 @@ import {
   NodeTypes,
   ReactFlowProvider,
   Panel,
+  MarkerType,
 } from "@xyflow/react";
 import React from "react";
 import JsonView from "react18-json-view";
@@ -149,21 +150,35 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
     });
 
     // Create nodes with positions based on levels
-    const HORIZONTAL_SPACING = 250;
-    const VERTICAL_SPACING = 100;
-    const nodesAtLevel = new Map<number, number>();
+    const HORIZONTAL_SPACING = 300;
+    const VERTICAL_SPACING = 120;
+    const nodesAtLevel = new Map<number, string[]>();
 
+    // First pass: Group nodes by level
     tasks.forEach((task) => {
       const level = levelMap.get(task.task_id) || 0;
-      const count = nodesAtLevel.get(level) || 0;
-      nodesAtLevel.set(level, count + 1);
+      const nodesInLevel = nodesAtLevel.get(level) || [];
+      nodesInLevel.push(task.task_id);
+      nodesAtLevel.set(level, nodesInLevel);
+    });
+
+    // Second pass: Position nodes with vertical centering for each level
+    tasks.forEach((task) => {
+      const level = levelMap.get(task.task_id) || 0;
+      const nodesInLevel = nodesAtLevel.get(level) || [];
+      const index = nodesInLevel.indexOf(task.task_id);
+      const totalNodesInLevel = nodesInLevel.length;
+
+      // Center nodes vertically within their level
+      const verticalCenter = ((totalNodesInLevel - 1) * VERTICAL_SPACING) / 2;
+      const yPosition = index * VERTICAL_SPACING - verticalCenter;
 
       nodes.push({
         id: task.task_id,
         type: "custom",
         position: {
           x: level * HORIZONTAL_SPACING,
-          y: count * VERTICAL_SPACING,
+          y: yPosition,
         },
         data: {
           name: task.name,
@@ -181,7 +196,7 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
           id: `${task.upstream_id}-${task.task_id}`,
           source: task.upstream_id,
           target: task.task_id,
-          type: "smoothstep",
+          type: "step",
         });
       }
     });
@@ -202,8 +217,15 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
             fitView
             className="bg-base-200"
             defaultEdgeOptions={{
-              type: "smoothstep",
+              type: "step",
               animated: true,
+              style: { strokeWidth: 2 },
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+              },
+            }}
+            fitViewOptions={{
+              padding: 0.2,
             }}
             onNodeClick={(_, node) => {
               const data = node.data as NodeData;
