@@ -18,7 +18,7 @@ interface YamlData {
   name: string;
   description: string;
   one_qubit_calib_plan: number[][];
-  two_qubit_calib_plan: number[][];
+  two_qubit_calib_plan: [number, number][][];
   mode: string;
   notify_bool: boolean;
   flow: string[];
@@ -37,7 +37,7 @@ ${data.one_qubit_calib_plan
   .join("\n")}
 two_qubit_calib_plan:
 ${data.two_qubit_calib_plan
-  .map((seq) => `  - ${JSON.stringify(seq)}`)
+  .map((pair) => `  - [${pair[0]}, ${pair[1]}]`)
   .join("\n")}
 mode: ${data.mode}
 notify_bool: ${data.notify_bool}
@@ -155,7 +155,26 @@ export function TableEditModal({
 
   const handleSaveClick = async () => {
     try {
-      const updatedItem = yaml.load(yamlText) as YamlData;
+      const rawData = yaml.load(yamlText) as any;
+
+      // Ensure two_qubit_calib_plan is properly formatted
+      const updatedItem: YamlData = {
+        ...rawData,
+        two_qubit_calib_plan: (rawData.two_qubit_calib_plan as number[][]).map(
+          (pair) => {
+            if (
+              !Array.isArray(pair) ||
+              pair.length !== 2 ||
+              !pair.every((n) => typeof n === "number")
+            ) {
+              throw new Error(
+                "Invalid two_qubit_calib_plan format. Each pair must be [number, number]"
+              );
+            }
+            return pair as [number, number];
+          }
+        ),
+      };
 
       if (updatedItem.mode !== "custom") {
         const allPresetItems = Object.values(presets).flat();
@@ -172,26 +191,38 @@ export function TableEditModal({
         }
       }
 
-      // Convert two_qubit_calib_plan from number[][] to [number, number][][]
-      const formattedTwoQubitPlan: [number, number][][] =
-        updatedItem.two_qubit_calib_plan.map((pair) => [[pair[0], pair[1]]]);
-
       const formattedItem: UpdateMenuRequest = {
         name: updatedItem.name,
         description: updatedItem.description,
         one_qubit_calib_plan: updatedItem.one_qubit_calib_plan,
-        two_qubit_calib_plan: formattedTwoQubitPlan,
+        two_qubit_calib_plan: updatedItem.two_qubit_calib_plan,
         mode: updatedItem.mode,
         notify_bool: updatedItem.notify_bool,
         flow: updatedItem.flow,
-        tags: updatedItem.tags?.filter((item) => item !== null) ?? [],
-        exp_list: updatedItem.exp_list?.filter((item) => item !== null) ?? [],
+        tags:
+          updatedItem.tags?.filter((item) => item !== null && item !== "") ??
+          [],
+        exp_list:
+          updatedItem.exp_list?.filter(
+            (item) => item !== null && item !== ""
+          ) ?? [],
       };
 
       const menuItem: Menu = {
-        ...updatedItem,
-        tags: updatedItem.tags?.filter((item) => item !== null) ?? [],
-        exp_list: updatedItem.exp_list?.filter((item) => item !== null) ?? [],
+        name: updatedItem.name,
+        description: updatedItem.description,
+        one_qubit_calib_plan: updatedItem.one_qubit_calib_plan,
+        two_qubit_calib_plan: updatedItem.two_qubit_calib_plan,
+        mode: updatedItem.mode,
+        notify_bool: updatedItem.notify_bool,
+        flow: updatedItem.flow,
+        tags:
+          updatedItem.tags?.filter((item) => item !== null && item !== "") ??
+          [],
+        exp_list:
+          updatedItem.exp_list?.filter(
+            (item) => item !== null && item !== ""
+          ) ?? [],
       };
 
       setSelectedItem(menuItem);
