@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { BiAtom } from "react-icons/bi";
 import { FaScrewdriverWrench } from "react-icons/fa6";
 import { GoWorkflow } from "react-icons/go";
 import { FaBolt } from "react-icons/fa6";
@@ -32,13 +31,13 @@ function Sidebar() {
           <div className="p-6"></div>
           <li>
             <Link
-              href="/qpu"
+              href="/chip"
               className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
-                isActive("/qpu") ? "bg-neutral text-white" : ""
+                isActive("/chip") ? "bg-neutral text-white" : ""
               }`}
             >
               <BsCpu />
-              <span className="ml-2">QPU</span>
+              <span className="ml-2">Chip</span>
             </Link>
           </li>
           <li>
