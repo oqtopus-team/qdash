@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import {
   useAddExecutionTags,
   useRemoveExecutionTags,
@@ -264,20 +263,18 @@ export default function ExecutionPage() {
               </h2>
               <div className="flex space-x-4 mt-4">
                 <a
-                  href={`/execution/${selectedExecutionId}/experiment`}
+                  href={`/execution/${selectedChipId}/${selectedExecutionId}`}
                   className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
                 >
                   <FaExternalLinkAlt className="mr-2" />
-                  Go to Experiment
+                  Go to Detail
                 </a>
                 <a
-                  href={
-                    (
-                      cardData.find(
-                        (exec) => getExecutionKey(exec) === selectedExecutionId
-                      )?.note as { [key: string]: any }
-                    )?.ui_url || "#"
-                  }
+                  href={String(
+                    cardData.find(
+                      (exec) => getExecutionKey(exec) === selectedExecutionId
+                    )?.note?.ui_url || "#"
+                  )}
                   className="bg-accent text-accent-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
                 >
                   <FaExternalLinkAlt className="mr-2" />
