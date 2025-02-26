@@ -1,8 +1,8 @@
-import tsEslint from "@typescript-eslint/eslint-plugin";
-import importPlugin from "eslint-plugin-import";
-import reactHooks from "eslint-plugin-react-hooks";
+const tsEslint = require("@typescript-eslint/eslint-plugin");
+const importPlugin = require("eslint-plugin-import");
+const reactHooks = require("eslint-plugin-react-hooks");
 
-export default [
+module.exports = [
   {
     languageOptions: {
       ecmaVersion: 2020,
@@ -15,7 +15,7 @@ export default [
         __dirname: "readonly",
         __filename: "readonly",
       },
-      parser: (await import("@typescript-eslint/parser")).default,
+      parser: require("@typescript-eslint/parser"),
     },
     ignores: ["dist", ".eslintrc.cjs"],
     plugins: {

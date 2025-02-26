@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
   images: {
     remotePatterns: [
       {
@@ -13,10 +10,8 @@ const nextConfig = {
       },
     ],
   },
-  // Disable pages directory
   pageExtensions: ["tsx", "ts"],
-  // Ensure app directory is used
   useFileSystemPublicRoutes: true,
 };
 
-export default nextConfig;
+module.exports = nextConfig;

@@ -2,8 +2,10 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-COPY ./ui/package*.json  ./
-RUN npm install
+COPY ./ui .
+
+# Install dependencies with legacy peer deps to handle version conflicts
+RUN npm install --legacy-peer-deps
 
 ENV HOST 0.0.0.0
 ENV PORT 5714
