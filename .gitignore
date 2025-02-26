@@ -214,7 +214,7 @@ quel.json
 .pnpm-store/
 qpu_data/
 docs/.vitepress/cache/
-client/.vite/
+ui/.vite/
 
 backend/qcflow/images/*
 backend/qcflow/.system_note.json
