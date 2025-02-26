@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 
 export function useTheme() {
-  const [theme, setTheme] = useState(localStorage.getItem("theme") ?? "nord");
+  const [theme, setTheme] = useState(localStorage.getItem("theme") ?? "light");
 
   const handleToggle = (e: any) => {
     if (e.target.checked) {
-      setTheme("dracula");
+      setTheme("dark");
     } else {
-      setTheme("nord");
+      setTheme("light");
     }
   };
 
@@ -17,8 +17,8 @@ export function useTheme() {
     document.querySelector("html")?.setAttribute("data-theme", localTheme!);
   }, [theme]);
 
-  const isDarkMode = theme === "dracula";
-  const textClass = isDarkMode ? "text-neutral" : "text-neutral-content";
+  const isDarkMode = theme === "dark";
+  const textClass = "text-base-content"; // Use base-content for consistent text color in both modes
 
   return { isDarkMode, textClass, handleToggle };
 }

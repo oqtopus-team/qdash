@@ -33,7 +33,9 @@ function Sidebar() {
             <Link
               href="/chip"
               className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
-                isActive("/chip") ? "bg-neutral text-white" : ""
+                isActive("/chip")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
               }`}
             >
               <BsCpu />
@@ -44,7 +46,9 @@ function Sidebar() {
             <Link
               href="/calibration"
               className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
-                isActive("/calibration") ? "bg-neutral text-white" : ""
+                isActive("/calibration")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
               }`}
             >
               <FaScrewdriverWrench />
@@ -55,7 +59,9 @@ function Sidebar() {
             <Link
               href="/execution"
               className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
-                isActive("/execution") ? "bg-neutral text-white" : ""
+                isActive("/execution")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
               }`}
             >
               <FaBolt />
@@ -66,7 +72,9 @@ function Sidebar() {
             <Link
               href="/experiment"
               className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
-                isActive("/experiment") ? "bg-neutral text-white" : ""
+                isActive("/experiment")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
               }`}
             >
               <TbTestPipe />
@@ -77,7 +85,9 @@ function Sidebar() {
             <Link
               href="/fridge"
               className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
-                isActive("/fridge") ? "bg-neutral text-white" : ""
+                isActive("/fridge")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
               }`}
             >
               <LuThermometerSnowflake />
@@ -88,7 +98,9 @@ function Sidebar() {
             <Link
               href="/setting"
               className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
-                isActive("/setting") ? "bg-neutral text-white" : ""
+                isActive("/setting")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
               }`}
             >
               <IoMdSettings />

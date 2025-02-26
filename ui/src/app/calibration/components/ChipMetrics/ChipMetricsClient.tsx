@@ -186,8 +186,8 @@ export function ChipMetricsClient() {
             <div className="card-body h-full w-full overflow-y-auto text-left">
               <h3 className="font-bold text-xl mb-4">Qubit Property</h3>
               {hoveredNode ? (
-                <div className="mb-4 p-4 bg-white rounded-lg shadow-md h-80">
-                  <h4 className="font-bold text-lg text-blue-600">
+                <div className="mb-4 p-4 bg-base-100 rounded-lg shadow-md h-80">
+                  <h4 className="font-bold text-lg text-primary">
                     {hoveredNode.label}
                   </h4>
                   <p className="py-2 text-gray-700">
@@ -208,8 +208,8 @@ export function ChipMetricsClient() {
                   </p>
                 </div>
               ) : hoveredEdge ? (
-                <div className="mb-4 p-4 bg-white rounded-lg shadow-md h-80">
-                  <h4 className="font-bold text-lg text-blue-600">
+                <div className="mb-4 p-4 bg-base-100 rounded-lg shadow-md h-80">
+                  <h4 className="font-bold text-lg text-primary">
                     {hoveredEdge.label}
                   </h4>
                   <p className="py-2 text-gray-700">
@@ -222,8 +222,8 @@ export function ChipMetricsClient() {
                   </p>
                 </div>
               ) : (
-                <div className="mb-4 p-4 bg-white rounded-lg shadow-md h-80">
-                  <h4 className="font-bold text-lg text-blue-600">Qubit N/A</h4>
+                <div className="mb-4 p-4 bg-base-100 rounded-lg shadow-md h-80">
+                  <h4 className="font-bold text-lg text-primary">Qubit N/A</h4>
                   <p className="py-2 text-gray-700">Status: N/A</p>
                   <p className="py-2 text-gray-700">Qubit Frequency: N/A</p>
                   <p className="py-2 text-gray-700">T1: N/A</p>

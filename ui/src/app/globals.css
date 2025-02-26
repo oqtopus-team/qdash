@@ -2,25 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 255, 255, 255;
-}
-
-body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
-}
-
 /* DaisyUI classes */
 .btn {
-  @apply px-4 py-2 rounded bg-neutral text-white hover:opacity-80 transition-colors;
+  @apply px-4 py-2 rounded bg-neutral text-neutral-content hover:opacity-80 transition-colors;
 }
 
 .input {
-  @apply px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-neutral;
+  @apply px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-neutral bg-base-100 text-base-content;
 }
 
 .input-bordered {
-  @apply border-gray-300;
+  @apply border-base-300;
 }

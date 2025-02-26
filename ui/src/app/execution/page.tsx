@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -23,9 +23,13 @@ interface ChipOption {
 
 export default function ExecutionPage() {
   const [selectedChipId, setSelectedChipId] = useState<string>("SAMPLE");
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
+    null
+  );
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(null);
+  const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(
+    null
+  );
   const [newTag, setNewTag] = useState<string>("");
   const [cardData, setCardData] = useState<ExecutionResponseSummary[]>([]);
 
@@ -151,15 +155,15 @@ export default function ExecutionPage() {
   const getStatusBorderStyle = (status: string) => {
     switch (status) {
       case "running":
-        return "border-l-4 border-blue-400";
+        return "border-l-4 border-info";
       case "completed":
-        return "border-l-4 border-teal-400";
+        return "border-l-4 border-success";
       case "scheduled":
-        return "border-l-4 border-yellow-400";
+        return "border-l-4 border-warning";
       case "failed":
-        return "border-l-4 border-red-400";
+        return "border-l-4 border-error";
       default:
-        return "border-l-4 border-gray-400";
+        return "border-l-4 border-base-300";
     }
   };
 
@@ -170,7 +174,10 @@ export default function ExecutionPage() {
     })) || [];
 
   return (
-    <div className="w-full px-4 relative" style={{ width: "calc(100vw - 20rem)" }}>
+    <div
+      className="w-full px-4 relative"
+      style={{ width: "calc(100vw - 20rem)" }}
+    >
       <div className="px-10 pb-3">
         <h1 className="text-left text-3xl font-bold">Execution History</h1>
       </div>
@@ -191,29 +198,29 @@ export default function ExecutionPage() {
           return (
             <div
               key={executionKey}
-              className={`p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden transition-transform duration-200 bg-white ${
+              className={`p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden transition-transform duration-200 bg-base-100 ${
                 isSelected ? "transform scale-100" : "transform scale-95"
               } ${statusBorderStyle}`}
               onClick={() => handleCardClick(execution)}
             >
               {isSelected && (
-                <div className="absolute inset-0 bg-blue-200 opacity-20 pointer-events-none transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-primary opacity-10 pointer-events-none transition-opacity duration-500" />
               )}
               <div className="relative z-10">
                 <h2 className="text-xl font-semibold mb-1">{execution.name}</h2>
                 <div className="flex items-center mb-1">
-                  <p className="text-sm text-gray-500 mr-4">
+                  <p className="text-sm text-base-content/60 mr-4">
                     {new Date(execution.start_at).toLocaleString()}
                   </p>
                   <span
                     className={`text-sm font-semibold ${
                       execution.status === "running"
-                        ? "text-blue-600"
+                        ? "text-info"
                         : execution.status === "completed"
-                        ? "text-teal-600"
+                        ? "text-success"
                         : execution.status === "scheduled"
-                        ? "text-yellow-600"
-                        : "text-red-600"
+                        ? "text-warning"
+                        : "text-error"
                     }`}
                   >
                     {execution.status === "running"
@@ -232,20 +239,22 @@ export default function ExecutionPage() {
       </div>
       {/* サイドバー */}
       <div
-        className={`fixed right-0 top-0 w-1/2 h-full bg-white shadow-xl border-l overflow-y-auto p-6 transition-transform duration-300 ${
-          isSidebarOpen ? "transform translate-x-0" : "transform translate-x-full"
+        className={`fixed right-0 top-0 w-1/2 h-full bg-base-100 shadow-xl border-l overflow-y-auto p-6 transition-transform duration-300 ${
+          isSidebarOpen
+            ? "transform translate-x-0"
+            : "transform translate-x-full"
         }`}
         style={{ maxWidth: "40%" }}
       >
         <button
           onClick={handleCloseSidebar}
-          className="text-gray-600 text-2xl font-bold absolute top-4 right-4"
+          className="text-base-content/60 text-2xl font-bold absolute top-4 right-4 hover:text-base-content"
         >
           ×
         </button>
         {selectedExecutionId && (
           <>
-            <div className="p-4 bg-white mb-6">
+            <div className="p-4 bg-base-100 mb-6">
               <h2 className="text-2xl font-bold">
                 {
                   cardData.find(
@@ -256,37 +265,39 @@ export default function ExecutionPage() {
               <div className="flex space-x-4 mt-4">
                 <a
                   href={`/execution/${selectedExecutionId}/experiment`}
-                  className="bg-neutral text-white px-4 py-2 rounded flex items-center hover:bg-neutral-dark transition-colors"
+                  className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
                 >
                   <FaExternalLinkAlt className="mr-2" />
                   Go to Experiment
                 </a>
                 <a
                   href={
-                    (cardData.find(
-                      (exec) => getExecutionKey(exec) === selectedExecutionId
-                    )?.note as { [key: string]: any })?.ui_url || '#'
+                    (
+                      cardData.find(
+                        (exec) => getExecutionKey(exec) === selectedExecutionId
+                      )?.note as { [key: string]: any }
+                    )?.ui_url || "#"
                   }
-                  className="bg-teal-500 text-white px-4 py-2 rounded flex items-center hover:bg-teal-600 transition-colors"
+                  className="bg-accent text-accent-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
                 >
                   <FaExternalLinkAlt className="mr-2" />
                   Go to Flow
                 </a>
               </div>
             </div>
-            <div className="bg-white">
+            <div className="bg-base-100">
               <div className="flex flex-wrap mb-4">
                 {cardData
                   .find((exec) => getExecutionKey(exec) === selectedExecutionId)
                   ?.tags?.map((tag, tagIndex) => (
                     <span
                       key={tagIndex}
-                      className="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-1"
+                      className="inline-block bg-base-200 rounded-full px-3 py-1 text-sm font-semibold text-base-content mr-2 mb-1"
                     >
                       {tag}
                       <button
                         type="button"
-                        className="ml-2 text-red-500"
+                        className="ml-2 text-error hover:text-error/80"
                         onClick={() => handleRemoveTag(tag)}
                       >
                         ×
@@ -318,32 +329,24 @@ export default function ExecutionPage() {
               {executionDetailData &&
                 executionDetailData.data.task &&
                 executionDetailData.data.task.map((detailTask, idx) => {
-                  const taskBorderStyle = (() => {
-                    switch (detailTask.status) {
-                      case "running":
-                        return "border-l-4 border-blue-400";
-                      case "completed":
-                        return "border-l-4 border-teal-400";
-                      case "failed":
-                        return "border-l-4 border-red-400";
-                      case "scheduled":
-                        return "border-l-4 border-yellow-400";
-                      default:
-                        return "border-l-4 border-gray-400";
-                    }
-                  })();
+                  const taskBorderStyle = getStatusBorderStyle(
+                    detailTask.status
+                  );
 
                   return (
                     <div
                       key={idx}
-                      className={`mb-4 p-4 rounded-lg shadow-md bg-white cursor-pointer hover:shadow-lg transition-shadow ${taskBorderStyle}`}
+                      className={`mb-4 p-4 rounded-lg shadow-md bg-base-100 cursor-pointer hover:shadow-lg transition-shadow ${taskBorderStyle}`}
                       onClick={() => handleTaskClick(idx)}
                     >
                       <h4 className="text-lg font-semibold text-left">
                         {detailTask.name}
                       </h4>
                       <p className="text-left">
-                        Start at: {detailTask.start_at ? new Date(detailTask.start_at).toLocaleString() : 'N/A'}
+                        Start at:{" "}
+                        {detailTask.start_at
+                          ? new Date(detailTask.start_at).toLocaleString()
+                          : "N/A"}
                       </p>
                       <p className="text-left">
                         Elapsed time: {detailTask.elapsed_time}
@@ -351,12 +354,12 @@ export default function ExecutionPage() {
                       <p
                         className={`text-left text-sm font-semibold ${
                           detailTask.status === "running"
-                            ? "text-blue-600"
+                            ? "text-info"
                             : detailTask.status === "completed"
-                            ? "text-teal-600"
+                            ? "text-success"
                             : detailTask.status === "scheduled"
-                            ? "text-yellow-600"
-                            : "text-red-600"
+                            ? "text-warning"
+                            : "text-error"
                         }`}
                       >
                         {detailTask.status === "running"
@@ -405,7 +408,7 @@ export default function ExecutionPage() {
                           <h5 className="text-md font-semibold mb-1 text-left">
                             Input Parameters
                           </h5>
-                          <div className="bg-gray-100 p-2 rounded">
+                          <div className="bg-base-200 p-2 rounded">
                             <JsonView
                               src={detailTask.input_parameters}
                               theme="vscode"
@@ -419,7 +422,7 @@ export default function ExecutionPage() {
                           <h5 className="text-md font-semibold mb-1 text-left">
                             Output Parameters
                           </h5>
-                          <div className="bg-gray-100 p-2 rounded">
+                          <div className="bg-base-200 p-2 rounded">
                             <JsonView
                               src={detailTask.output_parameters}
                               theme="vscode"
