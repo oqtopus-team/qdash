@@ -1,7 +1,7 @@
 #!/bin/bash
 
 env_content='ENV="oqtopus"
-CLIENT_URL=http://client:5714
+CLIENT_URL=http://ui:5714
 SLACK_BOT_TOKEN=""
 POSTGRES_DATA_PATH="./postgres_data"
 MONGO_DATA_PATH="./mongo_data/data/db"

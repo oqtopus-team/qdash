@@ -2,7 +2,7 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-COPY ./client/package*.json  ./
+COPY ./ui/package*.json  ./
 RUN npm install
 
 ENV HOST 0.0.0.0

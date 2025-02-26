@@ -86,7 +86,7 @@ services:
       - ./backend/neodbmodel:/app/neodbmodel
       - ./backend/repository:/app/repository
       - ${CALIB_DATA_PATH}:/app/calib_data
-      - /home/shared/config:/home/shared/config
+      # - /home/shared/config:/home/shared/config
     working_dir: /app/qcflow
     command: python deployment/${ENV}/main.py
     environment:
@@ -134,13 +134,13 @@ services:
       - PREFECT_API_URL=http://${PREFECT_HOST}:4200/api
     network_mode: host
 
-  client:
+  ui:
     build:
       context: .
-      dockerfile: ./client/Dockerfile
+      dockerfile: ./ui/Dockerfile
     volumes:
-      - ./client:/app
-      # - /app/node_modules
+      - ./ui:/app
+      - /app/node_modules
     restart: always
     env_file:
       - .env
