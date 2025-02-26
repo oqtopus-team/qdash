@@ -77,6 +77,9 @@ export default function ExecutionDetailClient({
               upstream_id: task.upstream_id || undefined,
               start_at: task.start_at || undefined,
               elapsed_time: task.elapsed_time || undefined,
+              figure_path: task.figure_path || undefined,
+              input_parameters: task.input_parameters || undefined,
+              output_parameters: task.output_parameters || undefined,
             }))}
           />
         </div>

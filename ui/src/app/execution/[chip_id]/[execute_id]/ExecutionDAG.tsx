@@ -230,7 +230,7 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
       {selectedTask && (
         <div
           className="w-[30%] bg-base-100 p-4 rounded-lg shadow overflow-y-auto"
-          style={{ height: "400px" }}
+          style={{ height: "600px" }}
         >
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">{selectedTask.name}</h3>
@@ -287,7 +287,7 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
                         path
                       )}`}
                       alt={`Task Figure ${i + 1}`}
-                      className="w-full h-auto rounded border"
+                      className="w-full h-auto rounded border max-h-[200px] object-contain"
                     />
                   ))}
                 </div>
