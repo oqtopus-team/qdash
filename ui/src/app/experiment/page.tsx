@@ -3,11 +3,13 @@ import {
   useFetchAllExecutionsExperiments,
   useFetchAllExecutions,
 } from "@/client/execution/execution";
-import { ExecutionResponse } from "@/schemas/execution/execution";
+import type { ExecutionResponse, ExecutionResponseStatus } from "@/schemas";
 import { useFetchAllExperiment } from "@/client/experiment/experiment";
-import { ExperimentResponse } from "@/schemas";
+import type {
+  ExperimentResponse,
+  FetchAllExecutionsExperimentsParams,
+} from "@/schemas";
 import { useEffect, useState } from "react";
-// import { useNavigate } from "react-router-dom";
 import JsonView from "react18-json-view";
 import Select from "react-select";
 
@@ -26,13 +28,12 @@ function ExperimentPage() {
   const [selectedExecutionIds, setSelectedExecutionIds] = useState<
     { value: string; label: string }[]
   >([]);
-  // const navigate = useNavigate();
 
   // ロギング用のクエリパラメータ
-  const queryParams = {
-    label: selectedLabels.map((option) => option.value),
-    experiment_name: selectedExperiments.map((option) => option.value),
-    execution_id: selectedExecutionIds.map((option) => option.value),
+  const queryParams: FetchAllExecutionsExperimentsParams = {
+    "label[]": selectedLabels.map((option) => option.value),
+    "experiment_name[]": selectedExperiments.map((option) => option.value),
+    "execution_id[]": selectedExecutionIds.map((option) => option.value),
   };
 
   // クエリパラメータをコンソールに出力
@@ -77,12 +78,12 @@ function ExperimentPage() {
   }
 
   // Generate a unique key for each execution
-  const getExecutionKey = (execution) =>
+  const getExecutionKey = (execution: ExecutionResponse): string =>
     `${execution.experiment_name}-${new Date(
       execution.timestamp
     ).toISOString()}`;
 
-  const handleCardClick = (execution) => {
+  const handleCardClick = (execution: ExecutionResponse) => {
     setSelectedExecutionKey(getExecutionKey(execution));
     setIsSidebarOpen(true);
   };
@@ -92,24 +93,17 @@ function ExperimentPage() {
     setSelectedExecutionKey(null);
   };
 
-  // const handleOpenDetailPage = () => {
-  //   if (selectedExecutionKey) {
-  //     console.log("selectedExecutionKey", selectedExecutionKey);
-  //     navigate(`/experiment/${selectedExecutionKey}`);
-  //   }
-  // };
-
   // Function to determine the left border color based on status
-  const getStatusBorderStyle = (status) => {
+  const getStatusBorderStyle = (status: ExecutionResponseStatus): string => {
     switch (status) {
       case "running":
-        return "border-l-4 border-blue-400"; // running: teal
+        return "border-l-4 border-info";
       case "success":
-        return "border-l-4 border-teal-400"; // success: blue
+        return "border-l-4 border-success";
       case "failed":
-        return "border-l-4 border-red-400"; // failed: red
+        return "border-l-4 border-error";
       default:
-        return "border-l-4 border-gray-400"; // fallback: gray
+        return "border-l-4 border-base-300";
     }
   };
 
@@ -142,7 +136,7 @@ function ExperimentPage() {
             setSelectedLabels(newValue as { value: string; label: string }[])
           }
           placeholder="Filter by label"
-          className="w-1/5" // Adjust the width as needed
+          className="w-1/5"
         />
         <Select
           isMulti
@@ -154,7 +148,7 @@ function ExperimentPage() {
             )
           }
           placeholder="Filter by experiment"
-          className="w-1/4" // Adjust the width as needed
+          className="w-1/4"
         />
         <Select
           isMulti
@@ -166,42 +160,43 @@ function ExperimentPage() {
             )
           }
           placeholder="Filter by execution ID"
-          className="w-1/4" // Adjust the width as needed
+          className="w-1/4"
         />
       </div>
       <div className="grid grid-cols-1 gap-2 mx-5">
         {cardData.map((execution, index) => {
           const executionKey = getExecutionKey(execution);
           const isSelected = selectedExecutionKey === executionKey;
-          const statusBorderStyle = getStatusBorderStyle(execution.status);
+          const statusBorderStyle = getStatusBorderStyle(
+            execution.status ?? "failed"
+          );
 
           return (
             <div
               key={index}
-              className={`p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden transition-transform duration-200 bg-white ${
+              className={`p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden transition-transform duration-200 bg-base-100 ${
                 isSelected ? "transform scale-100" : "transform scale-95"
               } ${statusBorderStyle}`}
               onClick={() => handleCardClick(execution)}
             >
-              {/* Overlay for selected card to add blue highlight */}
               {isSelected && (
-                <div className="absolute inset-0 bg-blue-200 opacity-20 pointer-events-none transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-primary opacity-10 pointer-events-none transition-opacity duration-500" />
               )}
               <div className="relative z-10">
                 <h2 className="text-xl font-semibold mb-1">
                   {execution.label} - {execution.experiment_name}
                 </h2>
                 <div className="flex items-center mb-1">
-                  <p className="text-sm text-gray-500 mr-4">
+                  <p className="text-sm text-base-content/60 mr-4">
                     {new Date(execution.timestamp).toLocaleString()}
                   </p>
                   <span
                     className={`text-sm font-semibold ${
                       execution.status === "running"
-                        ? "text-blue-600"
+                        ? "text-info"
                         : execution.status === "success"
-                        ? "text-teal-600"
-                        : "text-red-600"
+                        ? "text-success"
+                        : "text-error"
                     }`}
                   >
                     {execution.status === "running"
@@ -219,7 +214,7 @@ function ExperimentPage() {
 
       {/* Sidebar */}
       <div
-        className={`fixed right-0 top-0 w-1/2 h-full bg-white shadow-lg border-l overflow-y-auto p-6 transition-transform duration-300 ${
+        className={`fixed right-0 top-0 w-1/2 h-full bg-base-100 shadow-lg border-l overflow-y-auto p-6 transition-transform duration-300 ${
           isSidebarOpen
             ? "transform translate-x-0"
             : "transform translate-x-full"
@@ -228,18 +223,13 @@ function ExperimentPage() {
       >
         <button
           onClick={handleCloseSidebar}
-          className="text-gray-600 text-2xl font-bold absolute top-4 right-4"
+          className="text-base-content/60 text-2xl font-bold absolute top-4 right-4 hover:text-base-content"
         >
           ×
         </button>
         {selectedExecutionKey && (
           <>
-            <button
-              onClick={handleOpenDetailPage}
-              className="bg-blue-500 text-white px-4 py-2 rounded mb-4"
-            >
-              Open in New Page
-            </button>
+            <button className="btn btn-primary mb-4">Open in New Page</button>
             <h2 className="text-2xl font-bold mb-6">
               {selectedExecutionKey.replace("-", " - ")}
             </h2>
@@ -252,7 +242,7 @@ function ExperimentPage() {
                   src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
                     cardData.find(
                       (exec) => getExecutionKey(exec) === selectedExecutionKey
-                    )?.fig_path
+                    )?.fig_path ?? ""
                   )}`}
                   alt="Execution Figure"
                   className="w-full h-auto max-h-[60vh] object-contain rounded border"
@@ -261,7 +251,7 @@ function ExperimentPage() {
             )}
             <div className="mb-6">
               <h3 className="text-xl font-semibold mb-2">Output Parameters</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="bg-base-200 p-4 rounded-lg">
                 <JsonView
                   src={
                     cardData.find(
@@ -274,7 +264,7 @@ function ExperimentPage() {
             </div>
             <div className="mb-6">
               <h3 className="text-xl font-semibold mb-2">Input Parameters</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="bg-base-200 p-4 rounded-lg">
                 <JsonView
                   src={
                     cardData.find(

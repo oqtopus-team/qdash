@@ -4,6 +4,7 @@ import "react18-json-view/src/style.css";
 import { toast } from "react-toastify";
 import yaml from "js-yaml";
 import { useEffect, useState } from "react";
+import { useTheme } from "@/app/hooks/useTheme";
 import Editor from "@monaco-editor/react";
 
 import { mapListMenuResponseToListMenu } from "../../model";
@@ -11,9 +12,22 @@ import { useUpdateMenu } from "@/client/menu/menu";
 
 import type { Menu } from "../../model";
 import type { UseQueryResult } from "@tanstack/react-query";
+import type { UpdateMenuRequest } from "@/schemas";
+
+interface YamlData {
+  name: string;
+  description: string;
+  one_qubit_calib_plan: number[][];
+  two_qubit_calib_plan: number[][];
+  mode: string;
+  notify_bool: boolean;
+  flow: string[];
+  tags?: string[];
+  exp_list?: string[];
+}
 
 // YAML 形式でデータを生成する関数
-function generateYamlWithCustomArrayFormat(data) {
+function generateYamlWithCustomArrayFormat(data: Menu): string {
   return `
 name: ${data.name}
 description: ${data.description}
@@ -72,6 +86,7 @@ const presets = {
   preset2: ["Example1", "Example2", "Example3", "Example4"],
   custom: [],
 };
+
 export function TableEditModal({
   selectedItem,
   setSelectedItem,
@@ -84,39 +99,38 @@ export function TableEditModal({
   refetchMenu: () => Promise<UseQueryResult<any, any>>;
 }) {
   const [yamlText, setYamlText] = useState(
-    generateYamlWithCustomArrayFormat(selectedItem),
+    generateYamlWithCustomArrayFormat(selectedItem)
   );
   const [validationError, setValidationError] = useState("");
-  const [selectedPreset, setSelectedPreset] = useState<string | null>(null); // 現在のプリセット
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const scheduleSettingChangedNotify = () => toast("schedule setting changed!");
   const mutation = useUpdateMenu();
+  const { theme } = useTheme();
 
   useEffect(() => {
     setYamlText(generateYamlWithCustomArrayFormat(selectedItem));
   }, [selectedItem]);
 
-  const handleYamlChange = (value) => {
+  const handleYamlChange = (value: string | undefined) => {
     if (value !== undefined) {
       setYamlText(value);
       try {
         yaml.load(value);
         setValidationError("");
       } catch (error) {
-        setValidationError("Validation Error: " + error);
+        setValidationError(`Validation Error: ${error}`);
       }
     }
   };
 
   const handlePresetClick = (presetKey: keyof typeof presets) => {
     try {
-      const updatedYaml = yaml.load(yamlText);
-      if (updatedYaml && typeof updatedYaml === "object") {
-        updatedYaml.exp_list = presets[presetKey]; // プリセットに置き換え
-        updatedYaml.mode = presetKey; // mode をプリセット名に設定
-        setYamlText(generateYamlWithCustomArrayFormat(updatedYaml)); // エディタの内容を更新
-        setValidationError(""); // バリデーションエラーをクリア
-        setSelectedPreset(presetKey); // 選択中のプリセットを設定
-      }
+      const updatedYaml = yaml.load(yamlText) as YamlData;
+      updatedYaml.exp_list = presets[presetKey];
+      updatedYaml.mode = presetKey;
+      setYamlText(generateYamlWithCustomArrayFormat(updatedYaml as Menu));
+      setValidationError("");
+      setSelectedPreset(presetKey);
     } catch (error) {
       console.error("YAMLパースエラー:", error);
       toast.error("プリセットの適用に失敗しました");
@@ -125,80 +139,80 @@ export function TableEditModal({
 
   const handleListItemClick = (item: string) => {
     try {
-      const updatedYaml = yaml.load(yamlText);
-      if (updatedYaml && typeof updatedYaml === "object") {
-        // exp_list が存在しない場合は初期化
-        if (!updatedYaml.exp_list) {
-          updatedYaml.exp_list = [];
-        }
-
-        updatedYaml.exp_list.push(item); // YAML文字列を更新
-        setYamlText(generateYamlWithCustomArrayFormat(updatedYaml)); // エディタの内容を更新
-        setValidationError(""); // バリデーションエラーをクリア
-        setSelectedPreset(null); // プリセット選択を解除
+      const updatedYaml = yaml.load(yamlText) as YamlData;
+      if (!updatedYaml.exp_list) {
+        updatedYaml.exp_list = [];
       }
+      updatedYaml.exp_list.push(item);
+      setYamlText(generateYamlWithCustomArrayFormat(updatedYaml as Menu));
+      setValidationError("");
+      setSelectedPreset(null);
     } catch (error) {
       console.error("YAMLパースエラー:", error);
       toast.error("エディタ内容の更新に失敗しました");
     }
   };
+
   const handleSaveClick = async () => {
     try {
-      const updatedItem = yaml.load(yamlText);
+      const updatedItem = yaml.load(yamlText) as YamlData;
 
-      // mode が custom ではない場合のバリデーション
       if (updatedItem.mode !== "custom") {
-        const allPresetItems = Object.values(presets).flat(); // 全プリセットの項目を統合
-        const invalidItems = updatedItem.exp_list?.filter(
-          (item) => !allPresetItems.includes(item),
-        );
+        const allPresetItems = Object.values(presets).flat();
+        const invalidItems =
+          updatedItem.exp_list?.filter(
+            (item) => !allPresetItems.includes(item)
+          ) ?? [];
 
-        if (invalidItems?.length > 0) {
+        if (invalidItems.length > 0) {
           setValidationError(
-            `exp_list に無効な項目が含まれています: ${invalidItems.join(", ")}`,
+            `exp_list に無効な項目が含まれています: ${invalidItems.join(", ")}`
           );
           return;
         }
       }
 
-      if (updatedItem && typeof updatedItem === "object") {
-        const formattedItem: Menu = {
-          name: updatedItem.name,
-          description: updatedItem.description,
-          one_qubit_calib_plan: updatedItem.one_qubit_calib_plan,
-          two_qubit_calib_plan: updatedItem.two_qubit_calib_plan,
-          mode: updatedItem.mode,
-          notify_bool: updatedItem.notify_bool,
-          flow: updatedItem.flow,
-          tags:
-            updatedItem.tags?.filter((item: string | null) => item !== null) ??
-            [],
-          exp_list:
-            updatedItem.exp_list?.filter(
-              (item: string | null) => item !== null,
-            ) ?? [],
-        };
+      // Convert two_qubit_calib_plan from number[][] to [number, number][][]
+      const formattedTwoQubitPlan: [number, number][][] =
+        updatedItem.two_qubit_calib_plan.map((pair) => [[pair[0], pair[1]]]);
 
-        setSelectedItem(formattedItem);
+      const formattedItem: UpdateMenuRequest = {
+        name: updatedItem.name,
+        description: updatedItem.description,
+        one_qubit_calib_plan: updatedItem.one_qubit_calib_plan,
+        two_qubit_calib_plan: formattedTwoQubitPlan,
+        mode: updatedItem.mode,
+        notify_bool: updatedItem.notify_bool,
+        flow: updatedItem.flow,
+        tags: updatedItem.tags?.filter((item) => item !== null) ?? [],
+        exp_list: updatedItem.exp_list?.filter((item) => item !== null) ?? [],
+      };
 
-        mutation.mutate(
-          { name: selectedItem.name, data: formattedItem },
-          {
-            onSuccess: async () => {
-              const updatedData = await refetchMenu();
-              if (updatedData.data) {
-                setTableData(
-                  mapListMenuResponseToListMenu(updatedData.data.data),
-                );
-                scheduleSettingChangedNotify();
-              }
-            },
-            onError: (error) => {
-              console.error("Error updating menu:", error);
-            },
+      const menuItem: Menu = {
+        ...updatedItem,
+        tags: updatedItem.tags?.filter((item) => item !== null) ?? [],
+        exp_list: updatedItem.exp_list?.filter((item) => item !== null) ?? [],
+      };
+
+      setSelectedItem(menuItem);
+
+      mutation.mutate(
+        { name: selectedItem.name, data: formattedItem },
+        {
+          onSuccess: async () => {
+            const updatedData = await refetchMenu();
+            if (updatedData.data) {
+              setTableData(
+                mapListMenuResponseToListMenu(updatedData.data.data)
+              );
+              scheduleSettingChangedNotify();
+            }
           },
-        );
-      }
+          onError: (error) => {
+            console.error("Error updating menu:", error);
+          },
+        }
+      );
     } catch (error) {
       console.error("YAMLパースエラー:", error);
       toast.error("YAMLの形式が正しくありません");
@@ -211,8 +225,8 @@ export function TableEditModal({
         <h3 className="font-bold text-lg mb-4">{selectedItem.name}</h3>
         <div className="flex">
           <div
-            className="w-1/3 p-4 bg-gray-100 rounded-lg mr-4"
-            style={{ maxHeight: "800px", overflowY: "auto" }} // 独立スクロール
+            className="w-1/3 p-4 bg-base-200 rounded-lg mr-4"
+            style={{ maxHeight: "800px", overflowY: "auto" }}
           >
             <h4 className="font-bold mb-2">Presets</h4>
             <ul className="space-y-2 mb-4">
@@ -221,12 +235,12 @@ export function TableEditModal({
                   key={presetKey}
                   className={`flex items-center p-2 rounded shadow hover:shadow-lg cursor-pointer ${
                     selectedPreset === presetKey
-                      ? "bg-blue-300 text-white"
-                      : "bg-blue-100 text-blue-700"
+                      ? "bg-primary/30 text-primary-content"
+                      : "bg-primary/10 text-primary"
                   }`}
                   onClick={() =>
                     handlePresetClick(presetKey as keyof typeof presets)
-                  } // プリセット選択
+                  }
                 >
                   <span className="text-sm font-bold">{presetKey}</span>
                 </li>
@@ -237,11 +251,11 @@ export function TableEditModal({
               {calib_list.map((item) => (
                 <li
                   key={item}
-                  className="flex items-center p-2 bg-white rounded shadow hover:shadow-lg cursor-pointer"
-                  onClick={() => handleListItemClick(item)} // 個別クリックで追加
+                  className="flex items-center p-2 bg-base-100 rounded shadow hover:shadow-lg cursor-pointer"
+                  onClick={() => handleListItemClick(item)}
                 >
-                  <span className="material-icons text-blue-500 mr-2">-</span>
-                  <span className="text-sm text-gray-700">{item}</span>
+                  <span className="material-icons text-primary mr-2">-</span>
+                  <span className="text-sm text-base-content/70">{item}</span>
                 </li>
               ))}
             </ul>
@@ -252,7 +266,7 @@ export function TableEditModal({
               defaultLanguage="yaml"
               value={yamlText}
               onChange={handleYamlChange}
-              theme="light"
+              theme={theme === "dark" ? "vs-dark" : "light"}
               language="yaml"
               options={{
                 folding: true,
@@ -264,9 +278,7 @@ export function TableEditModal({
               }}
             />
             {validationError && (
-              <div style={{ color: "red", marginTop: "8px" }}>
-                {validationError}
-              </div>
+              <div className="text-error mt-2">{validationError}</div>
             )}
           </div>
         </div>

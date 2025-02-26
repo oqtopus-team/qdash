@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 
 import { getColumns } from "./TableColumns";
 import { TableDetailModal } from "./TableDetailModal";
@@ -7,10 +7,17 @@ import { TableDetailModal } from "./TableDetailModal";
 import type { OneQubitCalibSummary } from "@/schemas";
 
 import { useFetchOneQubitCalibSummaryByDate } from "@/client/calibration/calibration";
-import { Table } from "@/components/Table";
+import { Table } from "@/app/components/Table";
 const INITIAL_SELECTED_ITEM: OneQubitCalibSummary = {
   label: "label",
-  one_qubit_calib_data: [],
+  one_qubit_calib_data: {
+    resonator_frequency: { value: 0, unit: "Hz", type: "number" },
+    qubit_frequency: { value: 0, unit: "Hz", type: "number" },
+    t1: { value: 0, unit: "s", type: "number" },
+    t2_star: { value: 0, unit: "s", type: "number" },
+    t2_echo: { value: 0, unit: "s", type: "number" },
+    average_gate_fidelity: { value: 0, unit: "", type: "number" },
+  },
 };
 
 type OneQubitHistoryTableProps = {
@@ -38,14 +45,14 @@ export function OneQubitHistoryTable({ date }: OneQubitHistoryTableProps) {
       detailModal.showModal();
     }
   };
-  const navigate = useNavigate();
+  const router = useRouter();
   const handleFigureClick = (item: OneQubitCalibSummary) => {
     setSelectedItem(item);
-    navigate(`/result/history/one_qubit/${date}/${item.label}`);
+    router.push(`/result/history/one_qubit/${date}/${item.label}`);
   };
   const handleHistoryClick = (item: OneQubitCalibSummary) => {
     setSelectedItem(item);
-    navigate(`/result/latest/one_qubit/${item.label}`);
+    router.push(`/result/latest/one_qubit/${item.label}`);
   };
   if (isLoading) {
     return <div>Loading...</div>;

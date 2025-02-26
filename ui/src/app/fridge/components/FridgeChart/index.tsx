@@ -15,7 +15,7 @@ import {
 import type { ListFridgeResponse } from "@/schemas";
 
 import { useFridgesGetFridgeTemperature } from "@/client/fridges/fridges";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 
 type FridgeChartProps = {
   channel: number;

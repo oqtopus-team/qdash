@@ -1,10 +1,10 @@
 "use client";
 
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/app/hooks/useTheme";
 import { SettingsCard } from "./components/SettingsCard";
 
 export default function SettingsPage() {
-  const { isDarkMode, handleToggle } = useTheme();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="w-full px-4" style={{ width: "calc(100vw - 20rem)" }}>
@@ -25,8 +25,8 @@ export default function SettingsPage() {
               <input
                 name="theme"
                 type="checkbox"
-                checked={isDarkMode}
-                onChange={handleToggle}
+                checked={theme === "dark"}
+                onChange={toggleTheme}
                 className="toggle toggle-lg toggle-accent mr-2"
               />
               {/* moon icon */}

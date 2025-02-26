@@ -11,7 +11,7 @@ import {
   useFetchAllLatestOneQubitCalib,
   useFetchAllLatestTwoQubitCalib,
 } from "@/client/calibration/calibration";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 import { ChipMetricsGraph } from "./ChipMetricsGraph";
 import "color-legend-element";
 
@@ -190,18 +190,18 @@ export function ChipMetricsClient() {
                   <h4 className="font-bold text-lg text-primary">
                     {hoveredNode.label}
                   </h4>
-                  <p className="py-2 text-gray-700">
+                  <p className="py-2 text-base-content/70">
                     Status: {hoveredNode.status}
                   </p>
-                  <p className="py-2 text-gray-700">
+                  <p className="py-2 text-base-content/70">
                     Qubit Frequency:{" "}
                     {hoveredNode.one_qubit_calib_data?.qubit_frequency?.value ??
                       null}
                   </p>
-                  <p className="py-2 text-gray-700">
+                  <p className="py-2 text-base-content/70">
                     T1: {hoveredNode.one_qubit_calib_data?.t1?.value ?? null}
                   </p>
-                  <p className="py-2 text-gray-700">
+                  <p className="py-2 text-base-content/70">
                     Average Gate Fidelity:{" "}
                     {hoveredNode.one_qubit_calib_data?.average_gate_fidelity
                       ?.value ?? null}
@@ -212,10 +212,10 @@ export function ChipMetricsClient() {
                   <h4 className="font-bold text-lg text-primary">
                     {hoveredEdge.label}
                   </h4>
-                  <p className="py-2 text-gray-700">
+                  <p className="py-2 text-base-content/70">
                     Status: {hoveredEdge.status}
                   </p>
-                  <p className="py-2 text-gray-700">
+                  <p className="py-2 text-base-content/70">
                     Average Gate Fidelity:{" "}
                     {hoveredEdge.two_qubit_calib_data?.average_gate_fidelity
                       ?.value ?? null}
@@ -224,14 +224,18 @@ export function ChipMetricsClient() {
               ) : (
                 <div className="mb-4 p-4 bg-base-100 rounded-lg shadow-md h-80">
                   <h4 className="font-bold text-lg text-primary">Qubit N/A</h4>
-                  <p className="py-2 text-gray-700">Status: N/A</p>
-                  <p className="py-2 text-gray-700">Qubit Frequency: N/A</p>
-                  <p className="py-2 text-gray-700">T1: N/A</p>
-                  <p className="py-2 text-gray-700">Readout Accuracy: N/A</p>
-                  <p className="py-2 text-gray-700">
+                  <p className="py-2 text-base-content/70">Status: N/A</p>
+                  <p className="py-2 text-base-content/70">
+                    Qubit Frequency: N/A
+                  </p>
+                  <p className="py-2 text-base-content/70">T1: N/A</p>
+                  <p className="py-2 text-base-content/70">
+                    Readout Accuracy: N/A
+                  </p>
+                  <p className="py-2 text-base-content/70">
                     Average Gate Fidelity: N/A
                   </p>
-                  <p className="py-2 text-gray-700">
+                  <p className="py-2 text-base-content/70">
                     Average Gate Fidelity DRAG: N/A
                   </p>
                 </div>

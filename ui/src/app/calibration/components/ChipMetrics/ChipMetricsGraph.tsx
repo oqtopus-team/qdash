@@ -8,8 +8,8 @@ import type { OneQubitCalib, TwoQubitCalib } from "../../model";
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
   ssr: false,
   loading: () => (
-    <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
-      <div className="text-gray-500">Loading graph...</div>
+    <div className="absolute inset-0 flex items-center justify-center bg-base-100 z-10">
+      <div className="text-base-content/50">Loading graph...</div>
     </div>
   ),
 });

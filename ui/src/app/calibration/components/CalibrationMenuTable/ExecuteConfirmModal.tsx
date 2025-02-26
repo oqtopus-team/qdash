@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTheme } from "@/app/hooks/useTheme";
 import Editor from "@monaco-editor/react";
 import { toast } from "react-toastify";
 import yaml from "js-yaml";
@@ -17,18 +18,23 @@ export function ExecuteConfirmModal({
   onCancel: () => void;
 }) {
   const [yamlText, setYamlText] = useState(
-    generateYamlWithCustomArrayFormat(selectedItem),
+    generateYamlWithCustomArrayFormat(selectedItem)
   );
   const [validationError, setValidationError] = useState("");
 
-  const handleYamlChange = (value) => {
+  const { theme } = useTheme();
+
+  const handleYamlChange = (value: string | undefined) => {
     if (value !== undefined) {
       setYamlText(value);
       try {
         yaml.load(value); // Validate YAML format
         setValidationError("");
       } catch (error) {
-        setValidationError("YAMLの形式が正しくありません: " + error.message);
+        setValidationError(
+          "YAMLの形式が正しくありません: " +
+            (error instanceof Error ? error.message : String(error))
+        );
       }
     }
   };
@@ -39,7 +45,10 @@ export function ExecuteConfirmModal({
         const updatedItem = yaml.load(yamlText) as Menu;
         onConfirm(updatedItem);
       } catch (error) {
-        toast.error("YAMLのパースに失敗しました: " + error.message);
+        toast.error(
+          "YAMLのパースに失敗しました: " +
+            (error instanceof Error ? error.message : String(error))
+        );
       }
     } else {
       toast.error("YAMLの形式が正しくありません");
@@ -59,7 +68,7 @@ export function ExecuteConfirmModal({
           defaultLanguage="yaml"
           value={yamlText}
           onChange={handleYamlChange}
-          theme="light"
+          theme={theme === "dark" ? "vs-dark" : "light"}
           options={{
             fontSize: 16,
             minimap: { enabled: false },

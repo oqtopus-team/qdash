@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import ja from "date-fns/locale/ja";
+import { ja } from "date-fns/locale/ja";
 import { registerLocale } from "react-datepicker";
 import { FaRegSquarePlus } from "react-icons/fa6";
 import "react-datepicker/dist/react-datepicker.css";
@@ -22,8 +22,8 @@ import {
   useDeleteCalibSchedule,
 } from "@/client/calibration/calibration";
 import { useListMenu } from "@/client/menu/menu";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { Table } from "@/components/Table";
+import { LoadingSpinner } from "@/app/components/LoadingSpinner";
+import { Table } from "@/app/components/Table";
 
 registerLocale("ja", ja);
 
