@@ -36,7 +36,7 @@ RUN apt-get install -y nodejs
 # COPY ./client/package*.json ./client/pnpm-lock.yaml ./
 # RUN npm install -g pnpm
 # RUN pnpm install
-COPY ./client/package*.json ./
+COPY ./ui/package*.json ./
 # pnpm をインストール
 #RUN npm install -g pnpm
 RUN npm install
