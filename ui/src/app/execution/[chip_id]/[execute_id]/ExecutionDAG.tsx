@@ -30,18 +30,38 @@ interface TaskNode {
   output_parameters?: Record<string, unknown>;
 }
 
-const getStatusColor = (status: string) => {
+const getStatusStyles = (status: string) => {
   switch (status) {
     case "running":
-      return "hsl(var(--in))";
+      return {
+        background: "hsl(198 93% 60% / 0.1)",
+        borderColor: "hsl(198 93% 60%)",
+        color: "hsl(198 93% 60%)",
+      };
     case "completed":
-      return "hsl(var(--su))";
+      return {
+        background: "hsl(142 71% 45% / 0.1)",
+        borderColor: "hsl(142 71% 45%)",
+        color: "hsl(142 71% 45%)",
+      };
     case "scheduled":
-      return "hsl(var(--wa))";
+      return {
+        background: "hsl(48 96% 53% / 0.1)",
+        borderColor: "hsl(48 96% 53%)",
+        color: "hsl(48 96% 53%)",
+      };
     case "failed":
-      return "hsl(var(--er))";
+      return {
+        background: "hsl(0 91% 71% / 0.1)",
+        borderColor: "hsl(0 91% 71%)",
+        color: "hsl(0 91% 71%)",
+      };
     default:
-      return "hsl(var(--b3))";
+      return {
+        background: "hsl(220 13% 91%)",
+        borderColor: "hsl(220 13% 91%)",
+        color: "hsl(220 9% 46%)",
+      };
   }
 };
 
@@ -59,17 +79,16 @@ const CustomNode = ({ data, selected }: NodeProps) => {
   const nodeData = data as NodeData;
   return (
     <div
-      className="group px-4 py-2 shadow-lg rounded-lg border relative"
+      className="group px-4 py-2 shadow-lg rounded-lg border relative transition-colors"
       style={{
-        background: "hsl(var(--b1))",
-        borderColor: getStatusColor(nodeData.status),
+        ...getStatusStyles(nodeData.status),
         borderWidth: "2px",
         minWidth: "150px",
       }}
     >
       <Handle type="target" position={Position.Left} />
       <div className="font-semibold">{nodeData.name}</div>
-      <div className="text-sm opacity-70">{nodeData.status}</div>
+      <div className="text-sm font-medium">{nodeData.status}</div>
       {nodeData.startAt && (
         <div className="tooltip tooltip-bottom absolute -bottom-12 opacity-0 group-hover:opacity-100 transition-opacity bg-base-300 p-2 rounded text-xs whitespace-nowrap z-10">
           <div>Start: {new Date(nodeData.startAt).toLocaleString()}</div>

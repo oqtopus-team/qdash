@@ -47,20 +47,7 @@ export default function ExecutionDetailClient({
   return (
     <div className="w-full px-4 py-6">
       <div className="max-w-6xl mx-auto space-y-6">
-        <div className="bg-base-100 rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4">Execution Flow</h2>
-          <ExecutionDAG
-            tasks={execution.task.map((task) => ({
-              task_id: task.task_id,
-              name: task.name,
-              status: task.status,
-              upstream_id: task.upstream_id || undefined,
-              start_at: task.start_at || undefined,
-              elapsed_time: task.elapsed_time || undefined,
-            }))}
-          />
-        </div>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">{execution.name}</h1>
           <div className="flex space-x-4">
             <a
@@ -80,7 +67,21 @@ export default function ExecutionDetailClient({
           </div>
         </div>
 
-        <div className="bg-base-100 rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-base-100 rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-bold mb-4">Execution Flow</h2>
+          <ExecutionDAG
+            tasks={execution.task.map((task) => ({
+              task_id: task.task_id,
+              name: task.name,
+              status: task.status,
+              upstream_id: task.upstream_id || undefined,
+              start_at: task.start_at || undefined,
+              elapsed_time: task.elapsed_time || undefined,
+            }))}
+          />
+        </div>
+
+        <div className="bg-base-100 rounded-lg shadow-md p-6">
           <div className="space-y-4">
             <h2 className="text-xl font-bold">Tasks</h2>
             {execution.task?.map((task: any, index: number) => {
