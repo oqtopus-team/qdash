@@ -1,7 +1,6 @@
 import tsEslint from "@typescript-eslint/eslint-plugin";
 import importPlugin from "eslint-plugin-import";
 import reactHooks from "eslint-plugin-react-hooks";
-import reactRefresh from "eslint-plugin-react-refresh";
 
 export default [
   {
@@ -20,7 +19,6 @@ export default [
     },
     ignores: ["dist", ".eslintrc.cjs"],
     plugins: {
-      "react-refresh": reactRefresh,
       import: importPlugin,
       "react-hooks": reactHooks,
       "@typescript-eslint": tsEslint,
@@ -28,10 +26,6 @@ export default [
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
-      "react-refresh/only-export-components": [
-        "warn",
-        { allowConstantExport: true },
-      ],
       "import/order": [
         "error",
         {
@@ -46,7 +40,7 @@ export default [
           ],
           pathGroups: [
             {
-              pattern: "{react,react-dom/**,react-router-dom}",
+              pattern: "{react,react-dom/**,next/**}",
               group: "builtin",
               position: "before",
             },
