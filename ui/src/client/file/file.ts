@@ -18,28 +18,34 @@ import type {
 } from "@tanstack/react-query";
 import axios from "axios";
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-import type { HTTPValidationError } from "../../schemas";
+import type { DownloadFileParams, HTTPValidationError } from "../../schemas";
 
 /**
  * Download a file.
  * @summary download file
  */
 export const downloadFile = (
-  filePath: string,
+  params: DownloadFileParams,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<void>> => {
-  return axios.get(`http://localhost:5715/${filePath}`, options);
+  return axios.get(`http://localhost:5715/file/raw_data`, {
+    ...options,
+    params: { ...params, ...options?.params },
+  });
 };
 
-export const getDownloadFileQueryKey = (filePath: string) => {
-  return [`http://localhost:5715/${filePath}`] as const;
+export const getDownloadFileQueryKey = (params: DownloadFileParams) => {
+  return [
+    `http://localhost:5715/file/raw_data`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getDownloadFileQueryOptions = <
   TData = Awaited<ReturnType<typeof downloadFile>>,
   TError = AxiosError<HTTPValidationError>,
 >(
-  filePath: string,
+  params: DownloadFileParams,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>
@@ -49,18 +55,13 @@ export const getDownloadFileQueryOptions = <
 ) => {
   const { query: queryOptions, axios: axiosOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getDownloadFileQueryKey(filePath);
+  const queryKey = queryOptions?.queryKey ?? getDownloadFileQueryKey(params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadFile>>> = ({
     signal,
-  }) => downloadFile(filePath, { signal, ...axiosOptions });
+  }) => downloadFile(params, { signal, ...axiosOptions });
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!filePath,
-    ...queryOptions,
-  } as UseQueryOptions<
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof downloadFile>>,
     TError,
     TData
@@ -76,7 +77,7 @@ export function useDownloadFile<
   TData = Awaited<ReturnType<typeof downloadFile>>,
   TError = AxiosError<HTTPValidationError>,
 >(
-  filePath: string,
+  params: DownloadFileParams,
   options: {
     query: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>
@@ -98,7 +99,7 @@ export function useDownloadFile<
   TData = Awaited<ReturnType<typeof downloadFile>>,
   TError = AxiosError<HTTPValidationError>,
 >(
-  filePath: string,
+  params: DownloadFileParams,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>
@@ -118,7 +119,7 @@ export function useDownloadFile<
   TData = Awaited<ReturnType<typeof downloadFile>>,
   TError = AxiosError<HTTPValidationError>,
 >(
-  filePath: string,
+  params: DownloadFileParams,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>
@@ -134,7 +135,7 @@ export function useDownloadFile<
   TData = Awaited<ReturnType<typeof downloadFile>>,
   TError = AxiosError<HTTPValidationError>,
 >(
-  filePath: string,
+  params: DownloadFileParams,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>
@@ -142,7 +143,7 @@ export function useDownloadFile<
     axios?: AxiosRequestConfig;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getDownloadFileQueryOptions(filePath, options);
+  const queryOptions = getDownloadFileQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData>;
