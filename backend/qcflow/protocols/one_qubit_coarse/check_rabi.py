@@ -72,7 +72,8 @@ class CheckRabi(BaseTask):
             ),
         }
         figures = [result.data[label].fit()["fig"]]
-        return PostProcessResult(output_parameters=output_param, figures=figures)
+        raw_data = [result.data[label].data]
+        return PostProcessResult(output_parameters=output_param, figures=figures, raw_data=raw_data)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         label = qid_to_label(qid)

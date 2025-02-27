@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { Task } from "./task";
+import type { ServerRoutersExecutionV2Task } from "./serverRoutersExecutionV2Task";
 
 /**
  * ExecutionResponseDetailV2 is a Pydantic model that represents the detail of an execution response.
@@ -22,5 +22,5 @@ export interface ExecutionResponseDetailV2 {
   start_at: string;
   end_at: string;
   elapsed_time: string;
-  task: Task[];
+  task: ServerRoutersExecutionV2Task[];
 }

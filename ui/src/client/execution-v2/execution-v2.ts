@@ -16,7 +16,7 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
-import * as axios from "axios";
+import axios from "axios";
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import type {
   ExecutionResponseDetailV2,
@@ -31,7 +31,7 @@ import type {
 export const fetchExecutionsV2 = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionResponseSummaryV2[]>> => {
-  return axios.default.get(`http://localhost:5715/v2/execution`, options);
+  return axios.get(`http://localhost:5715/v2/execution`, options);
 };
 
 export const getFetchExecutionsV2QueryKey = () => {
@@ -164,7 +164,7 @@ export const fetchExecutionByIdV2 = (
   executionId: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionResponseDetailV2>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/v2/execution/${executionId}`,
     options,
   );

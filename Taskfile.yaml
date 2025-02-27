@@ -6,7 +6,7 @@ tasks:
     cmds:
       - task -l
   generate:
-    dir: client
+    dir: ui
     cmds:
       - curl http://localhost:5715/openapi.json | jq > ../docs/oas/openapi.json
       - npx orval --config ./orval.config.cjs

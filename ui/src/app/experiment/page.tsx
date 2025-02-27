@@ -80,7 +80,7 @@ function ExperimentPage() {
   // Generate a unique key for each execution
   const getExecutionKey = (execution: ExecutionResponse): string =>
     `${execution.experiment_name}-${new Date(
-      execution.timestamp
+      execution.timestamp,
     ).toISOString()}`;
 
   const handleCardClick = (execution: ExecutionResponse) => {
@@ -144,7 +144,7 @@ function ExperimentPage() {
           value={selectedExperiments}
           onChange={(newValue) =>
             setSelectedExperiments(
-              newValue as { value: string; label: string }[]
+              newValue as { value: string; label: string }[],
             )
           }
           placeholder="Filter by experiment"
@@ -156,7 +156,7 @@ function ExperimentPage() {
           value={selectedExecutionIds}
           onChange={(newValue) =>
             setSelectedExecutionIds(
-              newValue as { value: string; label: string }[]
+              newValue as { value: string; label: string }[],
             )
           }
           placeholder="Filter by execution ID"
@@ -168,7 +168,7 @@ function ExperimentPage() {
           const executionKey = getExecutionKey(execution);
           const isSelected = selectedExecutionKey === executionKey;
           const statusBorderStyle = getStatusBorderStyle(
-            execution.status ?? "failed"
+            execution.status ?? "failed",
           );
 
           return (
@@ -195,15 +195,15 @@ function ExperimentPage() {
                       execution.status === "running"
                         ? "text-info"
                         : execution.status === "success"
-                        ? "text-success"
-                        : "text-error"
+                          ? "text-success"
+                          : "text-error"
                     }`}
                   >
                     {execution.status === "running"
                       ? "Running"
                       : execution.status === "success"
-                      ? "Success"
-                      : "Failed"}
+                        ? "Success"
+                        : "Failed"}
                   </span>
                 </div>
               </div>
@@ -234,15 +234,15 @@ function ExperimentPage() {
               {selectedExecutionKey.replace("-", " - ")}
             </h2>
             {cardData.find(
-              (exec) => getExecutionKey(exec) === selectedExecutionKey
+              (exec) => getExecutionKey(exec) === selectedExecutionKey,
             )?.fig_path && (
               <div className="mb-6">
                 <h3 className="text-xl font-semibold mb-2">Figure</h3>
                 <img
                   src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
                     cardData.find(
-                      (exec) => getExecutionKey(exec) === selectedExecutionKey
-                    )?.fig_path ?? ""
+                      (exec) => getExecutionKey(exec) === selectedExecutionKey,
+                    )?.fig_path ?? "",
                   )}`}
                   alt="Execution Figure"
                   className="w-full h-auto max-h-[60vh] object-contain rounded border"
@@ -255,7 +255,7 @@ function ExperimentPage() {
                 <JsonView
                   src={
                     cardData.find(
-                      (exec) => getExecutionKey(exec) === selectedExecutionKey
+                      (exec) => getExecutionKey(exec) === selectedExecutionKey,
                     )?.output_parameter
                   }
                   theme="vscode"
@@ -268,7 +268,7 @@ function ExperimentPage() {
                 <JsonView
                   src={
                     cardData.find(
-                      (exec) => getExecutionKey(exec) === selectedExecutionKey
+                      (exec) => getExecutionKey(exec) === selectedExecutionKey,
                     )?.input_parameter
                   }
                   theme="vscode"

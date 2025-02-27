@@ -113,6 +113,7 @@ class BaseTaskResultModel(BaseModel):
     output_parameter_names: list[str] = []
     note: dict = {}
     figure_path: list[str] = []
+    raw_data_path: list[str] = []
     start_at: str = ""
     end_at: str = ""
     elapsed_time: str = ""

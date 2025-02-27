@@ -127,6 +127,12 @@ def execute_dynamic_task_by_qid(
                     figures=postprocess_result.figures,
                     qid=qid,
                 )
+                task_manager.save_raw_data(
+                    task_name=task_name,
+                    task_type=task_type,
+                    raw_data=postprocess_result.raw_data,
+                    qid=qid,
+                )
                 task_manager.save()
 
         task_manager.update_task_status_to_completed(

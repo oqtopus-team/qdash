@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type TaskNote = { [key: string]: unknown };
+export type ServerRoutersChipTaskEndAt = string | null;

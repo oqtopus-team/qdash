@@ -30,7 +30,7 @@ export type Menu = {
 };
 
 export const mapListMenuResponseToListMenu = (
-  data: ListMenuResponse[]
+  data: ListMenuResponse[],
 ): Menu[] => {
   return data.map((item) => ({
     name: item.name,
@@ -41,10 +41,10 @@ export const mapListMenuResponseToListMenu = (
     notify_bool: item.notify_bool ?? false,
     flow: item.flow,
     tags: (item.tags ?? []).filter(
-      (tag): tag is string => tag !== null && tag !== ""
+      (tag): tag is string => tag !== null && tag !== "",
     ),
     exp_list: (item.exp_list ?? []).filter(
-      (exp): exp is string => exp !== null && exp !== ""
+      (exp): exp is string => exp !== null && exp !== "",
     ),
   }));
 };
@@ -97,7 +97,7 @@ export type TwoQubitCalib = {
 };
 
 export const mapTwoQubitCalibResponseToTwoQubitCalibration = (
-  data: TwoQubitCalibResponse[]
+  data: TwoQubitCalibResponse[],
 ): TwoQubitCalib[] => {
   return data.map((item) => ({
     id: item.label,
@@ -151,7 +151,7 @@ export type OneQubitCalib = {
 };
 
 export const mapOneQubitCalibResponseToOneQubitCalibration = (
-  data: OneQubitCalibResponse[]
+  data: OneQubitCalibResponse[],
 ): OneQubitCalib[] => {
   return data.map((item) => ({
     id: item.label,
@@ -199,7 +199,7 @@ export type CalibrationSchedule = {
 };
 
 export const mapScheduleCalibResponsetoCalibSchedule = (
-  data: ScheduleCalibResponse[]
+  data: ScheduleCalibResponse[],
 ): CalibSchedule[] => {
   return data.map((item) => ({
     description: item.description,

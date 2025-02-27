@@ -27,7 +27,7 @@ type OneQubitHistoryTableProps = {
 export function OneQubitHistoryTable({ date }: OneQubitHistoryTableProps) {
   const [tableData, setTableData] = useState([] as OneQubitCalibSummary[]);
   const [selectedItem, setSelectedItem] = useState<OneQubitCalibSummary>(
-    INITIAL_SELECTED_ITEM
+    INITIAL_SELECTED_ITEM,
   );
   const { data, isError, isLoading } = useFetchOneQubitCalibSummaryByDate(date);
   useEffect(() => {
@@ -39,7 +39,7 @@ export function OneQubitHistoryTable({ date }: OneQubitHistoryTableProps) {
   const handleDetailClick = (item: OneQubitCalibSummary) => {
     setSelectedItem(item);
     const detailModal = document.getElementById(
-      "tableDetail"
+      "tableDetail",
     ) as HTMLDialogElement | null;
     if (detailModal) {
       detailModal.showModal();
@@ -63,7 +63,7 @@ export function OneQubitHistoryTable({ date }: OneQubitHistoryTableProps) {
   const columns = getColumns(
     handleDetailClick,
     handleFigureClick,
-    handleHistoryClick
+    handleHistoryClick,
   );
   return (
     <div>

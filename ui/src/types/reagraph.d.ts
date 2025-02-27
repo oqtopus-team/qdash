@@ -29,7 +29,10 @@ declare module "reagraph" {
     edgeArrowPosition?: "none" | "start" | "end" | "both";
     layoutType?: "custom" | "force" | "tree";
     layoutOverrides?: {
-      getNodePosition: (id: string, args: NodePositionArgs) => InternalGraphPosition;
+      getNodePosition: (
+        id: string,
+        args: NodePositionArgs,
+      ) => InternalGraphPosition;
     };
     nodes: any[];
     edges: any[];

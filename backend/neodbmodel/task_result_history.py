@@ -39,6 +39,7 @@ class TaskResultHistoryDocument(Document):
     output_parameter_names: list[str] = Field(..., description="The output parameter names")
     note: dict = Field(..., description="The note")
     figure_path: list[str] = Field(..., description="The path to the figure")
+    raw_data_path: list[str] = Field([], description="The path to the raw data")
     start_at: str = Field(..., description="The time when the execution started")
     end_at: str = Field(..., description="The time when the execution ended")
     elapsed_time: str = Field(..., description="The elapsed time")
@@ -61,7 +62,7 @@ class TaskResultHistoryDocument(Document):
         indexes: ClassVar = [IndexModel([("task_id", ASCENDING)], unique=True)]
 
     @classmethod
-    def from_manager(
+    def from_datamodel(
         cls, task: BaseTaskResultModel, execution_model: ExecutionModel
     ) -> "TaskResultHistoryDocument":
         return cls(
@@ -75,6 +76,7 @@ class TaskResultHistoryDocument(Document):
             output_parameter_names=task.output_parameter_names,
             note=task.note,
             figure_path=task.figure_path,
+            raw_data_path=task.raw_data_path,
             start_at=task.start_at,
             end_at=task.end_at,
             elapsed_time=task.elapsed_time,
@@ -92,7 +94,7 @@ class TaskResultHistoryDocument(Document):
     ) -> "TaskResultHistoryDocument":
         doc = cls.find_one({"task_id": task.task_id}).run()
         if doc is None:
-            doc = cls.from_manager(task=task, execution_model=execution_model)
+            doc = cls.from_datamodel(task=task, execution_model=execution_model)
             doc.save()
             return doc
         doc.name = task.name
@@ -104,6 +106,7 @@ class TaskResultHistoryDocument(Document):
         doc.output_parameter_names = task.output_parameter_names
         doc.note = task.note
         doc.figure_path = task.figure_path
+        doc.raw_data_path = task.raw_data_path
         doc.start_at = task.start_at
         doc.end_at = task.end_at
         doc.elapsed_time = task.elapsed_time

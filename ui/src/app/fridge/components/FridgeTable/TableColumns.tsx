@@ -10,7 +10,7 @@ const columnHelper = createColumnHelper<OneQubitCalibSummary>();
 export const getColumns = (
   handleDetailClick: (item: OneQubitCalibSummary) => void,
   handleFigureClick: (item: OneQubitCalibSummary) => void,
-  handleHistoryClick: (item: OneQubitCalibSummary) => void
+  handleHistoryClick: (item: OneQubitCalibSummary) => void,
 ) => [
   columnHelper.accessor("label", {
     header: "Qubit",

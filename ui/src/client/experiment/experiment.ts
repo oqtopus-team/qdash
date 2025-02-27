@@ -16,7 +16,7 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
-import * as axios from "axios";
+import axios from "axios";
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import type { ExperimentResponse } from "../../schemas";
 
@@ -26,7 +26,7 @@ import type { ExperimentResponse } from "../../schemas";
 export const fetchAllExperiment = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExperimentResponse[]>> => {
-  return axios.default.get(`http://localhost:5715/experiments`, options);
+  return axios.get(`http://localhost:5715/experiments`, options);
 };
 
 export const getFetchAllExperimentQueryKey = () => {

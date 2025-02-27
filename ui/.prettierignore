@@ -1,0 +1,4 @@
+# Ignore Next.js build output
+.next/
+# Ignore problematic layout file
+src/app/layout.tsx

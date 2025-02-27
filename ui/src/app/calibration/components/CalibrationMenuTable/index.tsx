@@ -70,7 +70,7 @@ export function CalibrationMenuTable() {
   const calibrationExecutedNotify = (flow_run_url: string) => {
     const localUrl = flow_run_url.replace(
       "http://172.22.0.5:4200",
-      "http://localhost:4200"
+      "http://localhost:4200",
     );
     toast(
       <div>
@@ -82,7 +82,7 @@ export function CalibrationMenuTable() {
         >
           Check detail from here! 🚀
         </a>
-      </div>
+      </div>,
     );
   };
 
@@ -103,7 +103,7 @@ export function CalibrationMenuTable() {
           console.error("Error executing calibration:", error);
           toast.error("Error executing calibration");
         },
-      }
+      },
     );
   };
 
@@ -120,13 +120,13 @@ export function CalibrationMenuTable() {
         onError: (error) => {
           console.error("Error deleting menu:", error);
         },
-      }
+      },
     );
   };
 
   const handleNewItem = () => {
     const newItemModal = document.getElementById(
-      "newItem"
+      "newItem",
     ) as HTMLDialogElement | null;
     if (newItemModal) {
       newItemModal.showModal();
@@ -135,7 +135,7 @@ export function CalibrationMenuTable() {
 
   const handleCreateTemplate = () => {
     const createTemplateModal = document.getElementById(
-      "createTemplate"
+      "createTemplate",
     ) as HTMLDialogElement | null;
     if (createTemplateModal) {
       createTemplateModal.showModal();
@@ -145,7 +145,7 @@ export function CalibrationMenuTable() {
   const handleEditClick = (item: Menu) => {
     setSelectedItem(item);
     const editModal = document.getElementById(
-      "tableEdit"
+      "tableEdit",
     ) as HTMLDialogElement | null;
     if (editModal) {
       editModal.showModal();
@@ -163,7 +163,7 @@ export function CalibrationMenuTable() {
     handleEditClick,
     handleDeleteClick,
     handleExecuteCalib,
-    lock ?? false // ロック状態を渡す
+    lock ?? false, // ロック状態を渡す
   );
 
   return (

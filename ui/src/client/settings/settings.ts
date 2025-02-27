@@ -16,7 +16,7 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
-import * as axios from "axios";
+import axios from "axios";
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import type { Settings } from "../../schemas";
 
@@ -27,7 +27,7 @@ import type { Settings } from "../../schemas";
 export const fetchConfig = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<Settings>> => {
-  return axios.default.get(`http://localhost:5715/settings`, options);
+  return axios.get(`http://localhost:5715/settings`, options);
 };
 
 export const getFetchConfigQueryKey = () => {

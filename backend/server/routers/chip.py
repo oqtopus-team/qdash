@@ -80,6 +80,7 @@ class Task(BaseModel):
     output_parameter_names: list[str] = Field(default_factory=list)
     note: dict[str, Any] = Field(default_factory=dict)
     figure_path: list[str] = Field(default_factory=list)
+    raw_data_path: list[str] = Field(default_factory=list)
     start_at: str | None = None
     end_at: str | None = None
     elapsed_time: str | None = None

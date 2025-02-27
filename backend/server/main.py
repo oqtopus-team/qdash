@@ -31,6 +31,7 @@ from server.routers import (
     execution,
     execution_v2,
     experiment,
+    file,
     fridges,
     menu,
     qpu,
@@ -115,3 +116,4 @@ app.include_router(execution.router, tags=["execution"])
 app.include_router(experiment.router, tags=["experiment"])
 app.include_router(execution_v2.router, tags=["executionV2"])
 app.include_router(chip.router, tags=["chip"])
+app.include_router(file.router, tags=["file"])
