@@ -2,24 +2,46 @@
 
 import { useListChips, useFetchChip } from "@/client/chip/chip";
 import { ChipResponse, NodeInfo, EdgeInfo } from "@/schemas";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import Select from "react-select";
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  Node,
-  Edge,
-  NodeProps,
-  useNodesState,
-  useEdgesState,
-  OnNodesChange,
-  OnEdgesChange,
-  NodeMouseHandler,
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
+import { GraphCanvas } from "reagraph";
 
-// SVG Topology component
+// Define types for reagraph nodes and edges
+interface NodePositionArgs {
+  nodes: any[];
+}
+
+interface QubitNode {
+  id: string;
+  label: string;
+  fill?: string;
+  size?: number;
+  data: {
+    position: { x: number; y: number };
+    status: string;
+    isCalibrated: boolean;
+    qubitData?: Record<
+      string,
+      {
+        value: number;
+        unit?: string;
+        description?: string;
+        calibrated_at: string;
+        execution_id?: string;
+      }
+    >;
+  };
+}
+
+interface QubitEdge {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+  fill?: string;
+}
+
+// Types for API data
 interface QubitData {
   qid: string;
   status: string;
@@ -44,30 +66,6 @@ interface CouplingData {
   edge_info: EdgeInfo;
 }
 
-// Custom node component for qubits
-type QubitNodeData = {
-  label: string;
-  isCalibrated: boolean;
-};
-
-const QubitNode = ({
-  data,
-}: {
-  data: QubitNodeData & Record<string, unknown>;
-}) => {
-  return (
-    <div
-      className="flex items-center justify-center w-8 h-8 rounded-full border-2"
-      style={{
-        backgroundColor: data.isCalibrated ? "#4CAF50" : "#ccc",
-        borderColor: "#333",
-      }}
-    >
-      <span className="text-xs text-black">{data.label}</span>
-    </div>
-  );
-};
-
 const TopologyVisualization = ({
   chipData,
   onNodeClick,
@@ -77,54 +75,135 @@ const TopologyVisualization = ({
 }) => {
   if (!chipData.qubits || !chipData.couplings) return null;
 
-  // Convert qubits to nodes
-  const initialNodes: Node<QubitNodeData>[] = Object.entries(
-    chipData.qubits as Record<string, QubitData>
-  ).map(([id, qubit]) => ({
-    id,
-    type: "qubit",
-    position: qubit.node_info.position,
-    data: {
-      label: id,
-      isCalibrated: qubit.data && Object.keys(qubit.data).length > 0,
-    },
-  }));
+  const [nodes, setNodes] = useState<QubitNode[]>([]);
+  const [edges, setEdges] = useState<QubitEdge[]>([]);
+  const [hoveredNode, setHoveredNode] = useState<QubitNode | null>(null);
+  const [hoveredEdge, setHoveredEdge] = useState<QubitEdge | null>(null);
+
+  // Initialize nodes from qubit data
+  useEffect(() => {
+    if (!chipData.qubits) return;
+
+    const newNodes = Object.entries(
+      chipData.qubits as Record<string, QubitData>
+    ).map(([id, qubit]) => {
+      const isCalibrated = qubit.data && Object.keys(qubit.data).length > 0;
+
+      // Use position from API
+      const x = qubit.node_info.position.x;
+      const y = qubit.node_info.position.y;
+
+      return {
+        id,
+        label: id,
+        size: 20,
+        fill: isCalibrated ? "#4CAF50" : "#ccc",
+        data: {
+          position: { x, y },
+          status: qubit.status,
+          isCalibrated,
+          qubitData: qubit.data,
+        },
+      };
+    });
+
+    setNodes(newNodes);
+  }, [chipData.qubits]);
 
   // Convert couplings to edges
-  const initialEdges: Edge[] = Object.entries(
-    chipData.couplings as Record<string, CouplingData>
-  ).map(([id, coupling]) => ({
-    id,
-    source: coupling.edge_info.source,
-    target: coupling.edge_info.target,
-    style: { stroke: "#666", strokeWidth: coupling.edge_info.size || 2 },
-  }));
+  useEffect(() => {
+    if (!chipData.couplings) return;
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+    const newEdges = Object.entries(
+      chipData.couplings as Record<string, CouplingData>
+    ).map(([id, coupling]) => ({
+      id,
+      source: coupling.edge_info.source,
+      target: coupling.edge_info.target,
+      fill: "#666",
+    }));
 
-  const nodeTypes = useMemo(() => {
-    return {
-      qubit: QubitNode as unknown as React.ComponentType<NodeProps>,
-    };
-  }, []);
+    setEdges(newEdges);
+  }, [chipData.couplings]);
+
+  // Custom node position function for reagraph - uses the node's position data
+  const getNodePosition = (id: string, { nodes }: NodePositionArgs) => {
+    const idx = nodes.findIndex((n) => n.id === id);
+    if (idx !== -1 && nodes[idx].data.position) {
+      return {
+        x: nodes[idx].data.position.x,
+        y: nodes[idx].data.position.y,
+        z: 1,
+      };
+    }
+    return { x: 0, y: 0, z: 1 };
+  };
+
+  const handleNodePointerOver = (node: any) => {
+    setHoveredNode(node);
+    setHoveredEdge(null);
+  };
+
+  const handleEdgePointerOver = (edge: any) => {
+    setHoveredEdge(edge);
+    setHoveredNode(null);
+  };
+
+  const handleNodeClick = (node: any) => {
+    if (node) {
+      onNodeClick(node.id);
+    }
+  };
 
   return (
-    <div style={{ width: "100%", height: "400px" }}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        nodeTypes={nodeTypes}
-        onNodeClick={(_: React.MouseEvent, node: Node<QubitNodeData>) =>
-          onNodeClick(node.id)
-        }
-        fitView
-      >
-        <Background />
-        <Controls />
-      </ReactFlow>
+    <div className="flex h-full">
+      <div className="w-2/3" style={{ height: "400px" }}>
+        <GraphCanvas
+          // @ts-ignore - Ignore TypeScript errors for edge arrow position
+          edgeArrowPosition="none"
+          // @ts-ignore - Ignore TypeScript errors for custom layout
+          layoutType="custom"
+          // @ts-ignore - Ignore TypeScript errors for layout overrides
+          layoutOverrides={{ getNodePosition }}
+          nodes={nodes}
+          edges={edges}
+          // @ts-ignore - Ignore TypeScript errors for node pointer over
+          onNodePointerOver={handleNodePointerOver}
+          // @ts-ignore - Ignore TypeScript errors for edge pointer over
+          onEdgePointerOver={handleEdgePointerOver}
+          // @ts-ignore - Ignore TypeScript errors for node click handler
+          onNodeClick={handleNodeClick}
+        />
+      </div>
+      <div className="w-1/3 p-4 bg-base-200 h-[400px] overflow-y-auto">
+        <h3 className="text-lg font-bold mb-4 sticky top-0 bg-base-200">
+          {hoveredNode
+            ? `Qubit ${hoveredNode.id}`
+            : hoveredEdge
+            ? `Coupling ${hoveredEdge.id}`
+            : "Select a qubit or coupling"}
+        </h3>
+
+        {hoveredNode && (
+          <div className="space-y-2 overflow-y-auto">
+            <p>Status: {hoveredNode.data.status}</p>
+            <p>Calibrated: {hoveredNode.data.isCalibrated ? "Yes" : "No"}</p>
+            {hoveredNode.data.qubitData &&
+              Object.entries(hoveredNode.data.qubitData).map(([key, value]) => (
+                <p key={key}>
+                  {key}: {value.value} {value.unit || ""}
+                </p>
+              ))}
+          </div>
+        )}
+
+        {hoveredEdge && (
+          <div className="space-y-2 overflow-y-auto">
+            <p>Source: {hoveredEdge.source}</p>
+            <p>Target: {hoveredEdge.target}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
