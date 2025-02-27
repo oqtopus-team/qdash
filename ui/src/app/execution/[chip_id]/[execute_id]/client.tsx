@@ -19,7 +19,14 @@ export default function ExecutionDetailClient({
     data: executionDetailData,
     isLoading: isDetailLoading,
     isError: isDetailError,
-  } = useFetchExecutionByChipId(chip_id, execute_id);
+  } = useFetchExecutionByChipId(chip_id, execute_id, {
+    query: {
+      // Refresh every 5 seconds
+      refetchInterval: 5000,
+      // Keep polling even when the window is in the background
+      refetchIntervalInBackground: true,
+    },
+  });
 
   const getStatusBorderStyle = (status: string) => {
     switch (status) {
