@@ -2228,19 +2228,49 @@
           "chip"
         ],
         "summary": "Fetch all chips",
-        "description": "Fetch all chips.",
+        "description": "Fetch all chips.\n\nParameters\n----------\ncurrent_user_id : str\n    Current user ID from authentication\n\nReturns\n-------\nlist[ChipResponse]\n    List of available chips",
         "operationId": "listChips",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User ID",
+              "title": "X-User-Id"
+            },
+            "description": "User ID"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/ChipResponse"
                   },
-                  "type": "array",
                   "title": "Response Listchips"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2254,7 +2284,7 @@
           "chip"
         ],
         "summary": "Fetch a chip",
-        "description": "Fetch a chip by its ID.",
+        "description": "Fetch a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user_id : str\n    Current user ID from authentication\n\nReturns\n-------\nChipResponse\n    Chip information",
         "operationId": "fetchChip",
         "parameters": [
           {
@@ -2265,6 +2295,24 @@
               "type": "string",
               "title": "Chip Id"
             }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User ID",
+              "title": "X-User-Id"
+            },
+            "description": "User ID"
           }
         ],
         "responses": {
@@ -2297,7 +2345,7 @@
           "chip"
         ],
         "summary": "Fetch executions",
-        "description": "Fetch all executions for a given chip.",
+        "description": "Fetch all executions for a given chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch executions for\ncurrent_user_id : str\n    Current user ID from authentication\n\nReturns\n-------\nlist[ExecutionResponseSummary]\n    List of executions for the chip",
         "operationId": "listExecutionsByChipId",
         "parameters": [
           {
@@ -2308,6 +2356,24 @@
               "type": "string",
               "title": "Chip Id"
             }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User ID",
+              "title": "X-User-Id"
+            },
+            "description": "User ID"
           }
         ],
         "responses": {
@@ -2344,7 +2410,7 @@
           "chip"
         ],
         "summary": "Fetch an execution by its ID",
-        "description": "Return the execution detail by its ID.",
+        "description": "Return the execution detail by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nexecution_id : str\n    ID of the execution to fetch\ncurrent_user_id : str\n    Current user ID from authentication\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
         "operationId": "fetchExecutionByChipId",
         "parameters": [
           {
@@ -2364,6 +2430,24 @@
               "type": "string",
               "title": "Execution Id"
             }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "User ID",
+              "title": "X-User-Id"
+            },
+            "description": "User ID"
           }
         ],
         "responses": {
@@ -2425,10 +2509,215 @@
           }
         }
       }
+    },
+    "/auth/token": {
+      "post": {
+        "tags": [
+          "auth",
+          "authentication",
+          "authentication"
+        ],
+        "summary": "Login For Access Token",
+        "operationId": "auth-login_for_access_token",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_auth-login_for_access_token"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "auth",
+          "authentication",
+          "authentication"
+        ],
+        "summary": "Register User",
+        "operationId": "auth-register_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "auth",
+          "authentication",
+          "authentication"
+        ],
+        "summary": "Read Users Me",
+        "operationId": "auth-read_users_me",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "auth",
+          "authentication",
+          "authentication"
+        ],
+        "summary": "Logout",
+        "description": "Logout endpoint.\n\nThis endpoint doesn't need to do anything on the backend since the token is managed client-side.\nThe client will remove the token from cookies.",
+        "operationId": "auth-logout",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "Body_auth-login_for_access_token": {
+        "properties": {
+          "grant_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "password"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grant Type"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "default": ""
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "Body_auth-login_for_access_token"
+      },
       "ChipResponse": {
         "properties": {
           "chip_id": {
@@ -4298,6 +4587,24 @@
           }
         ]
       },
+      "Token": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type"
+        ],
+        "title": "Token"
+      },
       "TwoQubitCalibDailySummaryModel": {
         "properties": {
           "_id": {
@@ -4794,6 +5101,88 @@
         ],
         "title": "UpdateMenuResponse"
       },
+      "User": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "disabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username"
+        ],
+        "title": "User"
+      },
+      "UserCreate": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "email",
+          "password"
+        ],
+        "title": "UserCreate"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -4942,7 +5331,7 @@
           "task_type"
         ],
         "title": "Task",
-        "description": "Task is a Pydantic model that represents a task in the execution response.\n\nAttributes\n----------\n    task_id (str): The ID of the task.\n    name (str): The name of the task.\n    upstream_id (Optional[str]): The ID of the upstream task.\n    status (str): The current status of the task.\n    message (str): The message associated with the task.\n    input_parameters (dict[str, Any]): The input parameters of the task.\n    output_parameters (dict[str, Any]): The output parameters of the task.\n    output_parameter_names (List[str]): The names of the output parameters.\n    note (dict[str, Any]): The note associated with the task.\n    figure_path (List[str]): The paths to the figures associated with the task.\n    start_at (Optional[str]): The start time of the task.\n    end_at (Optional[str]): The end time of the task.\n    elapsed_time (Optional[str]): The total elapsed time of the task.\n    task_type (str): The type of the task.\ndef modify_name(cls, v: str, values: dict[str, Any]) -> str:"
+        "description": "Task is a Pydantic model that represents a task in the execution response.\n\nAttributes\n----------\n    task_id (str): The ID of the task.\n    name (str): The name of the task.\n    upstream_id (Optional[str]): The ID of the upstream task.\n    status (str): The current status of the task.\n    message (str): The message associated with the task.\n    input_parameters (dict[str, Any]): The input parameters of the task.\n    output_parameters (dict[str, Any]): The output parameters of the task.\n    output_parameter_names (List[str]): The names of the output parameters.\n    note (dict[str, Any]): The note associated with the task.\n    figure_path (List[str]): The paths to the figures associated with the task.\n    start_at (Optional[str]): The start time of the task.\n    end_at (Optional[str]): The end time of the task.\n    elapsed_time (Optional[str]): The total elapsed time of the task.\n    task_type (str): The type of the task."
       },
       "server__routers__execution_v2__Task": {
         "properties": {
@@ -5053,6 +5442,17 @@
         ],
         "title": "Task",
         "description": "Task is a Pydantic model that represents a task in the execution response.\n\nAttributes\n----------\n    task_id (str): The ID of the task.\n    name (str): The name of the task.\n    upstream_id (Optional[str]): The ID of the upstream task.\n    status (str): The current status of the task.\n    message (str): The message associated with the task.\n    input_parameters (dict[str, Any]): The input parameters of the task.\n    output_parameters (dict[str, Any]): The output parameters of the task.\n    output_parameter_names (List[str]): The names of the output parameters.\n    note (dict[str, Any]): The note associated with the task.\n    figure_path (List[str]): The paths to the figures associated with the task.\n    start_at (Optional[str]): The start time of the task.\n    end_at (Optional[str]): The end time of the task.\n    elapsed_time (Optional[str]): The total elapsed time of the task.\n    task_type (str): The type of the task.\ndef modify_name(cls, v: str, values: dict[str, Any]) -> str:"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2PasswordBearer": {
+        "type": "oauth2",
+        "flows": {
+          "password": {
+            "scopes": {},
+            "tokenUrl": "token"
+          }
+        }
       }
     }
   }

@@ -2,6 +2,10 @@
 
 import { useCallback, useRef } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/app/contexts/AuthContext";
+import { useAuthLogout } from "@/client/auth/auth";
+import type { User } from "@/schemas";
 
 function MenuIcon() {
   return (
@@ -40,25 +44,26 @@ function HiddenIcon() {
 
 function ProfileModal({
   modalRef,
+  user,
 }: {
   modalRef: React.RefObject<HTMLDialogElement>;
+  user: User | null;
 }) {
   return (
     <dialog ref={modalRef} className="modal">
       <div className="modal-box w-96">
         <div className="card">
           <figure className="relative w-full h-64">
-            <Image
-              src="https://github.com/orangekame3.png"
-              alt="Avatar"
-              fill
-              className="object-cover"
-            />
+            <div className="bg-gray-200 w-full h-full flex items-center justify-center">
+              <span className="text-4xl">
+                {user?.username?.[0]?.toUpperCase()}
+              </span>
+            </div>
           </figure>
           <div className="card-body py-2">
-            <h2 className="card-title text-2xl">orangekame3</h2>
+            <h2 className="card-title text-2xl">{user?.username}</h2>
             <ul className="text-left">
-              <li>Role: admin</li>
+              <li>Email: {user?.email}</li>
             </ul>
             <div className="modal-action">
               <form method="dialog">
@@ -74,10 +79,23 @@ function ProfileModal({
 
 function Navbar() {
   const modalRef = useRef<HTMLDialogElement>(null);
+  const router = useRouter();
+  const { user, logout: authLogout } = useAuth();
 
   const openModal = useCallback(() => {
     modalRef.current?.showModal();
   }, []);
+
+  const logoutMutation = useAuthLogout();
+  const handleLogout = useCallback(async () => {
+    try {
+      await logoutMutation.mutateAsync();
+      authLogout();
+      router.push("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  }, [logoutMutation, authLogout, router]);
 
   return (
     <nav className="navbar w-full">
@@ -100,12 +118,11 @@ function Navbar() {
           className="btn btn-ghost btn-circle avatar"
         >
           <div className="relative w-10 h-10 rounded-full shadow overflow-hidden">
-            <Image
-              alt="Avatar"
-              src="https://github.com/orangekame3.png"
-              fill
-              className="object-cover"
-            />
+            <div className="bg-gray-200 w-full h-full flex items-center justify-center">
+              <span className="text-2xl">
+                {user?.username?.[0]?.toUpperCase()}
+              </span>
+            </div>
           </div>
         </div>
         <ul
@@ -118,11 +135,11 @@ function Navbar() {
             </button>
           </li>
           <li>
-            <button>Logout</button>
+            <button onClick={handleLogout}>Logout</button>
           </li>
         </ul>
       </div>
-      <ProfileModal modalRef={modalRef} />
+      <ProfileModal modalRef={modalRef} user={user} />
     </nav>
   );
 }

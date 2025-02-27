@@ -1,26 +1,24 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
-from fastapi import APIRouter
-from fastapi.logger import logger
+from fastapi import APIRouter, Header
 from neodbmodel.chip import ChipDocument
 from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.initialize import initialize
 from pydantic import BaseModel, Field, field_validator
+from server.lib.current_user import get_current_user_id
 
 if TYPE_CHECKING:
     from pydantic.validators import FieldValidationInfo
 from pymongo import DESCENDING
 
 router = APIRouter()
-gunicorn_logger = logging.getLogger("gunicorn.error")
-logger.handlers = gunicorn_logger.handlers
-if __name__ != "main":
-    logger.setLevel(gunicorn_logger.level)
-else:
-    logger.setLevel(logging.DEBUG)
+
+# ロガーの設定
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class ExecutionResponseSummary(BaseModel):
@@ -65,7 +63,6 @@ class Task(BaseModel):
         end_at (Optional[str]): The end time of the task.
         elapsed_time (Optional[str]): The total elapsed time of the task.
         task_type (str): The type of the task.
-    def modify_name(cls, v: str, values: dict[str, Any]) -> str:
 
     """
 
@@ -134,8 +131,22 @@ class ChipResponse(BaseModel):
 @router.get(
     "/chip", response_model=list[ChipResponse], summary="Fetch all chips", operation_id="listChips"
 )
-def list_chips() -> list[ChipResponse]:
-    """Fetch all chips."""
+def list_chips(x_user_id: str | None = Header(None, description="User ID")) -> list[ChipResponse]:
+    """Fetch all chips.
+
+    Parameters
+    ----------
+    current_user_id : str
+        Current user ID from authentication
+
+    Returns
+    -------
+    list[ChipResponse]
+        List of available chips
+
+    """
+    username = x_user_id or "default_user"
+    logger.debug(f"Listing chips for user: {username}")
     initialize()
     chips = ChipDocument.find().run()
     return [ChipResponse(chip_id=chip.chip_id) for chip in chips]
@@ -144,8 +155,26 @@ def list_chips() -> list[ChipResponse]:
 @router.get(
     "/chip/{chip_id}", response_model=ChipResponse, summary="Fetch a chip", operation_id="fetchChip"
 )
-def fetch_chip(chip_id: str) -> ChipResponse:
-    """Fetch a chip by its ID."""
+def fetch_chip(
+    chip_id: str, x_user_id: str | None = Header(None, description="User ID")
+) -> ChipResponse:
+    """Fetch a chip by its ID.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip to fetch
+    current_user_id : str
+        Current user ID from authentication
+
+    Returns
+    -------
+    ChipResponse
+        Chip information
+
+    """
+    username = x_user_id or "default_user"
+    logger.debug(f"Fetching chip {chip_id} for user: {username}")
     initialize()
     chip = ChipDocument.find_one({"chip_id": chip_id}).run()
     return ChipResponse(
@@ -162,8 +191,26 @@ def fetch_chip(chip_id: str) -> ChipResponse:
     summary="Fetch executions",
     operation_id="listExecutionsByChipId",
 )
-def list_executions_by_chip_id(chip_id: str) -> list[ExecutionResponseSummary]:
-    """Fetch all executions for a given chip."""
+def list_executions_by_chip_id(
+    chip_id: str, x_user_id: str | None = Header(None, description="User ID")
+) -> list[ExecutionResponseSummary]:
+    """Fetch all executions for a given chip.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip to fetch executions for
+    current_user_id : str
+        Current user ID from authentication
+
+    Returns
+    -------
+    list[ExecutionResponseSummary]
+        List of executions for the chip
+
+    """
+    username = x_user_id or "default_user"
+    logger.debug(f"Listing executions for chip {chip_id}, user: {username}")
     initialize()
     executions = (
         ExecutionHistoryDocument.find({"chip_id": chip_id}, sort=[("start_at", DESCENDING)])
@@ -185,12 +232,20 @@ def list_executions_by_chip_id(chip_id: str) -> list[ExecutionResponseSummary]:
     ]
 
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-
 def flatten_tasks(task_results: dict) -> list[dict]:
-    """Flatten the task results into a list of tasks."""
+    """Flatten the task results into a list of tasks.
+
+    Parameters
+    ----------
+    task_results : dict
+        Task results to flatten
+
+    Returns
+    -------
+    list[dict]
+        Flattened list of tasks
+
+    """
     flat_tasks = []
     logger.debug("Flattening task_results: %s", task_results)
 
@@ -226,8 +281,28 @@ def flatten_tasks(task_results: dict) -> list[dict]:
     summary="Fetch an execution by its ID",
     operation_id="fetchExecutionByChipId",
 )
-def fetch_execution_by_chip_id(chip_id: str, execution_id: str) -> ExecutionResponseDetail:
-    """Return the execution detail by its ID."""
+def fetch_execution_by_chip_id(
+    chip_id: str, execution_id: str, x_user_id: str | None = Header(None, description="User ID")
+) -> ExecutionResponseDetail:
+    """Return the execution detail by its ID.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    execution_id : str
+        ID of the execution to fetch
+    current_user_id : str
+        Current user ID from authentication
+
+    Returns
+    -------
+    ExecutionResponseDetail
+        Detailed execution information
+
+    """
+    username = x_user_id or "default_user"
+    logger.debug(f"Fetching execution {execution_id} for chip {chip_id}, user: {username}")
     initialize()
     execution = ExecutionHistoryDocument.find_one(
         {
