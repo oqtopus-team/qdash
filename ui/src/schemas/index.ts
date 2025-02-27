@@ -8,6 +8,8 @@
 
 export * from "./_twoQubitCalibDailySummaryModelId";
 export * from "./chipResponse";
+export * from "./chipResponseCouplings";
+export * from "./chipResponseQubits";
 export * from "./createMenuRequest";
 export * from "./createMenuRequestExpList";
 export * from "./createMenuRequestTags";
@@ -16,6 +18,7 @@ export * from "./data";
 export * from "./dataValue";
 export * from "./deleteMenuResponse";
 export * from "./detail";
+export * from "./downloadFileParams";
 export * from "./edgeInfo";
 export * from "./executeCalibRequest";
 export * from "./executeCalibRequestExpList";

@@ -2390,7 +2390,7 @@
         }
       }
     },
-    "/{file_path}": {
+    "/file/raw_data": {
       "get": {
         "tags": [
           "file"
@@ -2400,12 +2400,12 @@
         "operationId": "downloadFile",
         "parameters": [
           {
-            "name": "file_path",
-            "in": "path",
+            "name": "path",
+            "in": "query",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "File Path"
+              "title": "Path"
             }
           }
         ],
@@ -2434,6 +2434,21 @@
           "chip_id": {
             "type": "string",
             "title": "Chip Id"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "default": 64
+          },
+          "qubits": {
+            "type": "object",
+            "title": "Qubits",
+            "default": {}
+          },
+          "couplings": {
+            "type": "object",
+            "title": "Couplings",
+            "default": {}
           }
         },
         "type": "object",

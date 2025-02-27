@@ -126,6 +126,9 @@ class ChipResponse(BaseModel):
     """
 
     chip_id: str
+    size: int = 64
+    qubits: dict[str, Any] = {}
+    couplings: dict[str, Any] = {}
 
 
 @router.get(
@@ -145,7 +148,12 @@ def fetch_chip(chip_id: str) -> ChipResponse:
     """Fetch a chip by its ID."""
     initialize()
     chip = ChipDocument.find_one({"chip_id": chip_id}).run()
-    return ChipResponse(chip_id=chip.chip_id)
+    return ChipResponse(
+        chip_id=chip.chip_id,
+        size=chip.size,
+        qubits=chip.qubits,
+        couplings=chip.couplings,
+    )
 
 
 @router.get(
