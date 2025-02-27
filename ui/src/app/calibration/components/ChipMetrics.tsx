@@ -5,6 +5,115 @@ import { ChipResponse, NodeInfo, EdgeInfo } from "@/schemas";
 import { useEffect, useState } from "react";
 import Select from "react-select";
 import { GraphCanvas } from "reagraph";
+import { ColorRepresentation } from "three";
+
+type ThemeColor = number | string;
+
+interface Theme {
+  canvas: {
+    background: ThemeColor;
+    fog: ThemeColor;
+  };
+  node: {
+    fill: ThemeColor;
+    activeFill: ThemeColor;
+    opacity: number;
+    selectedOpacity: number;
+    inactiveOpacity: number;
+    label: {
+      color: ThemeColor;
+      stroke: ThemeColor;
+      activeColor: ThemeColor;
+    };
+    subLabel?: {
+      color: ColorRepresentation;
+      stroke?: ColorRepresentation;
+      activeColor: ColorRepresentation;
+    };
+  };
+  ring: {
+    fill: ThemeColor;
+    activeFill: ThemeColor;
+  };
+  edge: {
+    fill: ThemeColor;
+    activeFill: ThemeColor;
+    opacity: number;
+    selectedOpacity: number;
+    inactiveOpacity: number;
+    label: {
+      color: ThemeColor;
+      stroke: ThemeColor;
+      activeColor: ThemeColor;
+      fontSize: number;
+    };
+  };
+  arrow: {
+    fill: ThemeColor;
+    activeFill: ThemeColor;
+  };
+  lasso: {
+    background: string;
+    border: string;
+  };
+  cluster?: {
+    stroke?: ColorRepresentation;
+    fill?: ColorRepresentation;
+    opacity?: number;
+    selectedOpacity?: number;
+    inactiveOpacity?: number;
+    label?: {
+      stroke?: ColorRepresentation;
+      color: ColorRepresentation;
+      fontSize?: number;
+      offset?: [number, number, number];
+    };
+  };
+}
+
+const darkTheme: Theme = {
+  canvas: {
+    background: "#1a1b1e",
+    fog: "#1a1b1e",
+  },
+  node: {
+    fill: "#2b2b2b",
+    activeFill: "#3b3b3b",
+    opacity: 1,
+    selectedOpacity: 1,
+    inactiveOpacity: 0.4,
+    label: {
+      color: "#fff",
+      stroke: "#1a1b1e",
+      activeColor: "#fff",
+    },
+  },
+  ring: {
+    fill: "#666",
+    activeFill: "#888",
+  },
+  edge: {
+    fill: "#666",
+    activeFill: "#888",
+    opacity: 0.8,
+    selectedOpacity: 1,
+    inactiveOpacity: 0.4,
+    label: {
+      color: "#fff",
+      stroke: "#1a1b1e",
+      activeColor: "#fff",
+      fontSize: 12,
+    },
+  },
+  arrow: {
+    fill: "#666",
+    activeFill: "#888",
+  },
+  lasso: {
+    background: "rgba(255, 255, 255, 0.1)",
+    border: "#fff",
+  },
+};
 
 // Define types for reagraph nodes and edges
 interface NodePositionArgs {
@@ -166,6 +275,7 @@ const TopologyVisualization = ({
         layoutType="custom"
         // @ts-ignore - Ignore TypeScript errors for layout overrides
         layoutOverrides={{ getNodePosition }}
+        theme={darkTheme}
         nodes={nodes}
         edges={edges}
         // @ts-ignore - Ignore TypeScript errors for node pointer over
