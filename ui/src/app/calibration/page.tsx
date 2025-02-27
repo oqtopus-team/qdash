@@ -9,15 +9,15 @@ import { CalibrationScheduleTable } from "./components/CalibrationScheduleTable"
 import { ChipMetrics } from "./components/ChipMetrics";
 
 export default function CalibrationPage() {
-  const [activeTab, setActiveTab] = useState("Calibration Menu");
+  const [activeTab, setActiveTab] = useState("Menu");
   const MemoizedCalibrationMenuTable = React.memo(CalibrationMenuTable);
   const MemoizedCalibrationScheduleTable = React.memo(CalibrationScheduleTable);
 
   const getComponent = (tabName: string) => {
     switch (tabName) {
-      case "Calibration Menu":
+      case "Menu":
         return <MemoizedCalibrationMenuTable />;
-      case "Calibration Schedule":
+      case "Schedule":
         return <MemoizedCalibrationScheduleTable />;
       default:
         return null;
@@ -43,20 +43,18 @@ export default function CalibrationPage() {
                   className={
                     activeTab === "Calibration Menu" ? "tab tab-active" : "tab"
                   }
-                  onClick={() => setActiveTab("Calibration Menu")}
+                  onClick={() => setActiveTab("Menu")}
                 >
-                  Calibration Menu
+                  Menu
                 </a>
                 <a
                   role="tab"
                   className={
-                    activeTab === "Calibration Schedule"
-                      ? "tab tab-active"
-                      : "tab"
+                    activeTab === "Schedule" ? "tab tab-active" : "tab"
                   }
-                  onClick={() => setActiveTab("Calibration Schedule")}
+                  onClick={() => setActiveTab("Schedule")}
                 >
-                  Calibration Schedule
+                  Schedule
                 </a>
               </div>
               {getComponent(activeTab)}
