@@ -154,8 +154,10 @@ export default function ExecutionDetailClient({
                                           link.href = `http://localhost:5715/file/raw_data?path=${encodeURIComponent(
                                             normalizedPath
                                           )}`;
-                                          link.download =
+                                          // Get just the filename for download
+                                          const filename =
                                             path.split("/").pop() || "file";
+                                          link.download = filename;
                                           document.body.appendChild(link);
                                           link.click();
                                           document.body.removeChild(link);
