@@ -69,16 +69,18 @@ interface CouplingData {
 const TopologyVisualization = ({
   chipData,
   onNodeClick,
+  onNodeHover,
+  onEdgeHover,
 }: {
   chipData: ChipResponse;
   onNodeClick: (qubitId: string) => void;
+  onNodeHover: (node: QubitNode | null) => void;
+  onEdgeHover: (edge: QubitEdge | null) => void;
 }) => {
   if (!chipData.qubits || !chipData.couplings) return null;
 
   const [nodes, setNodes] = useState<QubitNode[]>([]);
   const [edges, setEdges] = useState<QubitEdge[]>([]);
-  const [hoveredNode, setHoveredNode] = useState<QubitNode | null>(null);
-  const [hoveredEdge, setHoveredEdge] = useState<QubitEdge | null>(null);
 
   // Initialize nodes from qubit data
   useEffect(() => {
@@ -140,13 +142,13 @@ const TopologyVisualization = ({
   };
 
   const handleNodePointerOver = (node: any) => {
-    setHoveredNode(node);
-    setHoveredEdge(null);
+    onNodeHover(node);
+    onEdgeHover(null);
   };
 
   const handleEdgePointerOver = (edge: any) => {
-    setHoveredEdge(edge);
-    setHoveredNode(null);
+    onEdgeHover(edge);
+    onNodeHover(null);
   };
 
   const handleNodeClick = (node: any) => {
@@ -156,54 +158,23 @@ const TopologyVisualization = ({
   };
 
   return (
-    <div className="flex h-full">
-      <div className="w-2/3" style={{ height: "400px" }}>
-        <GraphCanvas
-          // @ts-ignore - Ignore TypeScript errors for edge arrow position
-          edgeArrowPosition="none"
-          // @ts-ignore - Ignore TypeScript errors for custom layout
-          layoutType="custom"
-          // @ts-ignore - Ignore TypeScript errors for layout overrides
-          layoutOverrides={{ getNodePosition }}
-          nodes={nodes}
-          edges={edges}
-          // @ts-ignore - Ignore TypeScript errors for node pointer over
-          onNodePointerOver={handleNodePointerOver}
-          // @ts-ignore - Ignore TypeScript errors for edge pointer over
-          onEdgePointerOver={handleEdgePointerOver}
-          // @ts-ignore - Ignore TypeScript errors for node click handler
-          onNodeClick={handleNodeClick}
-        />
-      </div>
-      <div className="w-1/3 p-4 bg-base-200 h-[400px] overflow-y-auto">
-        <h3 className="text-lg font-bold mb-4 sticky top-0 bg-base-200">
-          {hoveredNode
-            ? `Qubit ${hoveredNode.id}`
-            : hoveredEdge
-            ? `Coupling ${hoveredEdge.id}`
-            : "Select a qubit or coupling"}
-        </h3>
-
-        {hoveredNode && (
-          <div className="space-y-2 overflow-y-auto">
-            <p>Status: {hoveredNode.data.status}</p>
-            <p>Calibrated: {hoveredNode.data.isCalibrated ? "Yes" : "No"}</p>
-            {hoveredNode.data.qubitData &&
-              Object.entries(hoveredNode.data.qubitData).map(([key, value]) => (
-                <p key={key}>
-                  {key}: {value.value} {value.unit || ""}
-                </p>
-              ))}
-          </div>
-        )}
-
-        {hoveredEdge && (
-          <div className="space-y-2 overflow-y-auto">
-            <p>Source: {hoveredEdge.source}</p>
-            <p>Target: {hoveredEdge.target}</p>
-          </div>
-        )}
-      </div>
+    <div style={{ height: "400px" }}>
+      <GraphCanvas
+        // @ts-ignore - Ignore TypeScript errors for edge arrow position
+        edgeArrowPosition="none"
+        // @ts-ignore - Ignore TypeScript errors for custom layout
+        layoutType="custom"
+        // @ts-ignore - Ignore TypeScript errors for layout overrides
+        layoutOverrides={{ getNodePosition }}
+        nodes={nodes}
+        edges={edges}
+        // @ts-ignore - Ignore TypeScript errors for node pointer over
+        onNodePointerOver={handleNodePointerOver}
+        // @ts-ignore - Ignore TypeScript errors for edge pointer over
+        onEdgePointerOver={handleEdgePointerOver}
+        // @ts-ignore - Ignore TypeScript errors for node click handler
+        onNodeClick={handleNodeClick}
+      />
     </div>
   );
 };
@@ -303,6 +274,8 @@ const CalibrationSummary = ({
 export const ChipMetrics = () => {
   const [selectedChipId, setSelectedChipId] = useState<string>("");
   const [selectedQubitId, setSelectedQubitId] = useState<string | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<QubitNode | null>(null);
+  const [hoveredEdge, setHoveredEdge] = useState<QubitEdge | null>(null);
 
   const {
     data: chips,
@@ -370,26 +343,92 @@ export const ChipMetrics = () => {
 
         {metrics && <CalibrationSummary metrics={metrics} />}
 
-        <div className="grid grid-cols-3 gap-6 mt-6">
-          <div className="col-span-2">
-            {chipData?.data && (
-              <div className="relative">
+        <div className="flex gap-6 mt-6">
+          <div className="w-1/2 card bg-base-100 shadow-xl">
+            <div className="card-body p-0">
+              {chipData?.data && (
                 <TopologyVisualization
                   chipData={chipData.data}
                   onNodeClick={(qubitId) => setSelectedQubitId(qubitId)}
+                  onNodeHover={setHoveredNode}
+                  onEdgeHover={setHoveredEdge}
                 />
-              </div>
-            )}
+              )}
+            </div>
           </div>
-          <div className="col-span-1">
-            <div className="card bg-base-100 shadow">
-              <div className="card-body">
-                <h2 className="card-title">
-                  {selectedQubitId
-                    ? `Qubit ${selectedQubitId} Calibration`
-                    : "Select a qubit"}
-                </h2>
-                {selectedQubit && <CalibrationDetails qubit={selectedQubit} />}
+          <div className="w-1/2 h-[400px]">
+            <div className="card bg-base-100 shadow-xl h-full">
+              <div className="card-body h-full overflow-y-auto relative">
+                <div className="sticky top-0 left-0 right-0 z-20 bg-base-100 -mx-8 px-8 -mt-6 pt-6">
+                  <div className="pb-4">
+                    <h3 className="text-lg font-bold mb-4">
+                      {hoveredNode
+                        ? `Qubit ${hoveredNode.id}`
+                        : hoveredEdge
+                        ? `Coupling ${hoveredEdge.id}`
+                        : "Information"}
+                    </h3>
+                    <div className="divider my-2"></div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-4">
+                  {hoveredNode && (
+                    <div className="overflow-x-auto">
+                      <table className="table table-sm">
+                        <tbody>
+                          <tr>
+                            <td className="font-medium">Status</td>
+                            <td>{hoveredNode.data.status}</td>
+                          </tr>
+                          <tr>
+                            <td className="font-medium">Calibrated</td>
+                            <td>
+                              {hoveredNode.data.isCalibrated ? "Yes" : "No"}
+                            </td>
+                          </tr>
+                          {hoveredNode.data.qubitData && (
+                            <>
+                              {Object.entries(hoveredNode.data.qubitData).map(
+                                ([key, value]) => (
+                                  <tr key={key}>
+                                    <td className="font-medium whitespace-normal">
+                                      {key}
+                                    </td>
+                                    <td>
+                                      {value.value} {value.unit || ""}
+                                    </td>
+                                  </tr>
+                                )
+                              )}
+                            </>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {hoveredEdge && (
+                    <div className="overflow-x-auto">
+                      <table className="table table-sm">
+                        <tbody>
+                          <tr>
+                            <td className="font-medium">Source</td>
+                            <td>{hoveredEdge.source}</td>
+                          </tr>
+                          <tr>
+                            <td className="font-medium">Target</td>
+                            <td>{hoveredEdge.target}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {selectedQubit && !hoveredNode && !hoveredEdge && (
+                    <CalibrationDetails qubit={selectedQubit} />
+                  )}
+                </div>
               </div>
             </div>
           </div>
