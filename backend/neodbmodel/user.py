@@ -1,0 +1,41 @@
+from typing import ClassVar, Optional
+
+from bunnet import Document
+from datamodel.system_info import SystemInfoModel
+from pydantic import ConfigDict, EmailStr, Field
+from pymongo import ASCENDING, IndexModel
+
+
+class UserDocument(Document):
+    """Data model for a user.
+
+    Attributes
+    ----------
+        username (str): The username.
+        email (EmailStr): The email address.
+        hashed_password (str): The hashed password.
+        full_name (Optional[str]): The full name of the user.
+        disabled (bool): Whether the user is disabled.
+        system_info (SystemInfo): The system information.
+
+    """
+
+    username: str = Field(description="The username")
+    email: EmailStr = Field(description="The email address")
+    hashed_password: str = Field(description="The hashed password")
+    full_name: str | None = Field(default=None, description="The full name of the user")
+    disabled: bool = Field(default=False, description="Whether the user is disabled")
+    system_info: SystemInfoModel = Field(description="The system information")
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+    class Settings:
+        """Settings for the document."""
+
+        name = "user"
+        indexes: ClassVar = [
+            IndexModel([("username", ASCENDING)], unique=True),
+            IndexModel([("email", ASCENDING)], unique=True),
+        ]

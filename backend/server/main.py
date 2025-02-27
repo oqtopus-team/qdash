@@ -21,11 +21,13 @@ from dbmodel.two_qubit_calib import TwoQubitCalibModel
 from dbmodel.two_qubit_calib_daily_summary import TwoQubitCalibDailySummaryModel
 from dbmodel.two_qubit_calib_history import TwoQubitCalibHistoryModel
 from dbmodel.wiring_info import WiringInfoModel
-from fastapi import FastAPI
+from fastapi import FastAPI, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
+from fastapi.security import OAuth2PasswordBearer
 from pymongo import MongoClient
 from server.routers import (
+    auth,
     calibration,
     chip,
     execution,
@@ -91,7 +93,6 @@ app = FastAPI(
         "name": "Apache 2.0",
         "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
     },
-    # openapi_url="/openapi.json",
     generate_unique_id_function=custom_generate_unique_id,
     separate_input_output_schemas=False,
     lifespan=lifespan,
@@ -117,3 +118,4 @@ app.include_router(experiment.router, tags=["experiment"])
 app.include_router(execution_v2.router, tags=["executionV2"])
 app.include_router(chip.router, tags=["chip"])
 app.include_router(file.router, tags=["file"])
+app.include_router(auth.router, tags=["auth", "authentication"])
