@@ -16,7 +16,7 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
-import * as axios from "axios";
+import axios from "axios";
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import type {
   ChipResponse,
@@ -32,7 +32,7 @@ import type {
 export const listChips = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ChipResponse[]>> => {
-  return axios.default.get(`http://localhost:5715/chip`, options);
+  return axios.get(`http://localhost:5715/chip`, options);
 };
 
 export const getListChipsQueryKey = () => {
@@ -145,7 +145,7 @@ export const fetchChip = (
   chipId: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ChipResponse>> => {
-  return axios.default.get(`http://localhost:5715/chip/${chipId}`, options);
+  return axios.get(`http://localhost:5715/chip/${chipId}`, options);
 };
 
 export const getFetchChipQueryKey = (chipId: string) => {
@@ -276,10 +276,7 @@ export const listExecutionsByChipId = (
   chipId: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionResponseSummary[]>> => {
-  return axios.default.get(
-    `http://localhost:5715/chip/${chipId}/execution`,
-    options,
-  );
+  return axios.get(`http://localhost:5715/chip/${chipId}/execution`, options);
 };
 
 export const getListExecutionsByChipIdQueryKey = (chipId: string) => {
@@ -435,7 +432,7 @@ export const fetchExecutionByChipId = (
   executionId: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionResponseDetail>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/chip/${chipId}/execution/${executionId}`,
     options,
   );

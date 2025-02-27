@@ -6,4 +6,6 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type TaskEndAt = string | null;
+export type ServerRoutersExecutionV2TaskOutputParameters = {
+  [key: string]: unknown;
+};

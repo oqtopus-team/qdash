@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type TaskElapsedTime = string | null;
+export type ServerRoutersChipTaskNote = { [key: string]: unknown };

@@ -62,8 +62,8 @@ export function FridgeChart({ channel, hours, name }: FridgeChartProps) {
     name === "MXC-FLANGE"
       ? [0, 0.03]
       : name === "4K-FLANGE"
-      ? [0, 10]
-      : ["auto", "auto"];
+        ? [0, 10]
+        : ["auto", "auto"];
   return (
     <div className="h-full">
       <div className="flex justify-between">

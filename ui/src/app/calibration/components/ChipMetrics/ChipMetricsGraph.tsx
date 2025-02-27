@@ -173,7 +173,7 @@ export function ChipMetricsGraph({
           nodeCanvasObject={(
             node: any,
             ctx: CanvasRenderingContext2D,
-            globalScale: number
+            globalScale: number,
           ) => {
             const radius = 18 / globalScale;
             ctx.beginPath();

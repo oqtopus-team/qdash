@@ -42,7 +42,7 @@ export default function ExecutionDetailPage() {
         {executionDetail.fig_path && (
           <img
             src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-              String(executionDetail.fig_path)
+              String(executionDetail.fig_path),
             )}`}
             alt="Execution Figure"
             className="w-full h-auto max-h-[60vh] object-contain rounded border border-base-300"

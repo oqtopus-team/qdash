@@ -16,7 +16,7 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
-import * as axios from "axios";
+import axios from "axios";
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import type {
   Detail,
@@ -41,7 +41,7 @@ export const fetchQpuFigureByPath = (
   params: FetchQpuFigureByPathParams,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<void>> => {
-  return axios.default.get(`http://localhost:5715/qpu/figure`, {
+  return axios.get(`http://localhost:5715/qpu/figure`, {
     ...options,
     params: { ...params, ...options?.params },
   });
@@ -199,7 +199,7 @@ export const fetchQpuInfo = (
   name: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<QPUInfoResponse>> => {
-  return axios.default.get(`http://localhost:5715/qpu/info/${name}`, options);
+  return axios.get(`http://localhost:5715/qpu/info/${name}`, options);
 };
 
 export const getFetchQpuInfoQueryKey = (name: string) => {
@@ -330,7 +330,7 @@ export function useFetchQpuInfo<
 export const listQpu = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<QPUInfoResponse[]>> => {
-  return axios.default.get(`http://localhost:5715/qpu`, options);
+  return axios.get(`http://localhost:5715/qpu`, options);
 };
 
 export const getListQpuQueryKey = () => {
@@ -441,7 +441,7 @@ export function useListQpu<
 export const fetchActiveQpu = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<QPUInfoResponse>> => {
-  return axios.default.get(`http://localhost:5715/qpu/active`, options);
+  return axios.get(`http://localhost:5715/qpu/active`, options);
 };
 
 export const getFetchActiveQpuQueryKey = () => {
@@ -553,7 +553,7 @@ export const fetchQpu = (
   name: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<QPUInfoResponse>> => {
-  return axios.default.get(`http://localhost:5715/qpu/${name}`, options);
+  return axios.get(`http://localhost:5715/qpu/${name}`, options);
 };
 
 export const getFetchQpuQueryKey = (name: string) => {
@@ -683,10 +683,7 @@ export const fetchAllExecutionsByQpuName = (
   name: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionRunResponse[]>> => {
-  return axios.default.get(
-    `http://localhost:5715/qpu/${name}/executions`,
-    options,
-  );
+  return axios.get(`http://localhost:5715/qpu/${name}/executions`, options);
 };
 
 export const getFetchAllExecutionsByQpuNameQueryKey = (name: string) => {
@@ -845,13 +842,10 @@ export const fetchOneQubitCalibByQpuName = (
   params?: FetchOneQubitCalibByQpuNameParams,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<OneQubitCalibResponse[]>> => {
-  return axios.default.get(
-    `http://localhost:5715/qpu/${name}/one_qubit_calib/nodes`,
-    {
-      ...options,
-      params: { ...params, ...options?.params },
-    },
-  );
+  return axios.get(`http://localhost:5715/qpu/${name}/one_qubit_calib/nodes`, {
+    ...options,
+    params: { ...params, ...options?.params },
+  });
 };
 
 export const getFetchOneQubitCalibByQpuNameQueryKey = (
@@ -1024,7 +1018,7 @@ export const fetchOneQubitCalibByLabel = (
   params?: FetchOneQubitCalibByLabelParams,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<OneQubitCalibResponse>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/qpu/${name}/one_qubit_calib/nodes/${label}`,
     {
       ...options,
@@ -1209,7 +1203,7 @@ export const fetchOneQubitCalibByParamName = (
   paramName: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ParamResponse>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/qpu/${name}/one_qubit_calib/params/${paramName}`,
     options,
   );
@@ -1384,7 +1378,7 @@ export const fetchOneQubitCalibHistoryByParamName = (
   params?: FetchOneQubitCalibHistoryByParamNameParams,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<MetricsResponse>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/qpu/${name}/history/one_qubit_calib/${paramName}`,
     {
       ...options,
@@ -1571,7 +1565,7 @@ export const fetchTwoQubitCalibByQpuName = (
   name: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<TwoQubitCalibResponse[]>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/qpu/${name}/two_qubit_calib/edges`,
     options,
   );
@@ -1733,7 +1727,7 @@ export const fetchTwoQubitCalibByLabel = (
   label: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<TwoQubitCalibResponse>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/qpu/${name}/two_qubit_calib/edges/${label}`,
     options,
   );
@@ -1906,7 +1900,7 @@ export const fetchTwoQubitCalibByParamName = (
   paramName: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ParamResponse>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/qpu/${name}/two_qubit_calib/params/${paramName}`,
     options,
   );
@@ -2079,7 +2073,7 @@ export const fetchQpuStatsByName = (
   name: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<QPUStatsResponse>> => {
-  return axios.default.get(`http://localhost:5715/qpu/${name}/stats`, options);
+  return axios.get(`http://localhost:5715/qpu/${name}/stats`, options);
 };
 
 export const getFetchQpuStatsByNameQueryKey = (name: string) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useFetchExecutionByChipId } from "@/client/chip/chip";
-import { FaExternalLinkAlt } from "react-icons/fa";
+import { FaExternalLinkAlt, FaDownload } from "react-icons/fa";
 import JsonView from "react18-json-view";
 import { ExecutionResponseDetail } from "@/schemas";
 import ExecutionDAG from "./ExecutionDAG";
@@ -174,6 +174,46 @@ export default function ExecutionDetailClient({
                         />
                       </div>
                     </div>
+
+                    {task.raw_data_path && task.raw_data_path.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-md font-semibold mb-2">Raw Data</h4>
+                        <div className="space-y-2">
+                          {task.raw_data_path.map((path: string, i: number) => (
+                            <div
+                              key={i}
+                              className="flex items-center justify-between bg-base-200 p-2 rounded"
+                            >
+                              <span className="text-sm truncate flex-1 mr-4">
+                                {path.split("/").pop()}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  // Create a link to download the file
+                                  const link = document.createElement("a");
+                                  // Ensure path starts with a slash
+                                  const normalizedPath = path.startsWith("/")
+                                    ? path
+                                    : `/${path}`;
+                                  link.href = `http://localhost:5715/file/raw_data?path=${encodeURIComponent(
+                                    normalizedPath
+                                  )}`;
+                                  link.download =
+                                    path.split("/").pop() || "file";
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                }}
+                                className="btn btn-sm btn-primary"
+                              >
+                                <FaDownload className="mr-2" />
+                                Download
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </details>
               );

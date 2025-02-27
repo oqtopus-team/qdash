@@ -2389,6 +2389,42 @@
           }
         }
       }
+    },
+    "/{file_path}": {
+      "get": {
+        "tags": [
+          "file"
+        ],
+        "summary": "download file",
+        "description": "Download a file.",
+        "operationId": "downloadFile",
+        "parameters": [
+          {
+            "name": "file_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2941,7 +2977,7 @@
           },
           "task": {
             "items": {
-              "$ref": "#/components/schemas/Task"
+              "$ref": "#/components/schemas/server__routers__chip__Task"
             },
             "type": "array",
             "title": "Task"
@@ -2988,7 +3024,7 @@
           },
           "task": {
             "items": {
-              "$ref": "#/components/schemas/Task"
+              "$ref": "#/components/schemas/server__routers__execution_v2__Task"
             },
             "type": "array",
             "title": "Task"
@@ -4247,116 +4283,6 @@
           }
         ]
       },
-      "Task": {
-        "properties": {
-          "task_id": {
-            "type": "string",
-            "title": "Task Id"
-          },
-          "qid": {
-            "type": "string",
-            "title": "Qid",
-            "default": ""
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "upstream_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Upstream Id",
-            "default": ""
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "input_parameters": {
-            "type": "object",
-            "title": "Input Parameters"
-          },
-          "output_parameters": {
-            "type": "object",
-            "title": "Output Parameters"
-          },
-          "output_parameter_names": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Output Parameter Names"
-          },
-          "note": {
-            "type": "object",
-            "title": "Note"
-          },
-          "figure_path": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Figure Path"
-          },
-          "start_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Start At"
-          },
-          "end_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "End At"
-          },
-          "elapsed_time": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Elapsed Time"
-          },
-          "task_type": {
-            "type": "string",
-            "title": "Task Type"
-          }
-        },
-        "type": "object",
-        "required": [
-          "task_id",
-          "name",
-          "status",
-          "message",
-          "task_type"
-        ],
-        "title": "Task",
-        "description": "Task is a Pydantic model that represents a task in the execution response.\n\nAttributes\n----------\n    task_id (str): The ID of the task.\n    name (str): The name of the task.\n    upstream_id (Optional[str]): The ID of the upstream task.\n    status (str): The current status of the task.\n    message (str): The message associated with the task.\n    input_parameters (dict[str, Any]): The input parameters of the task.\n    output_parameters (dict[str, Any]): The output parameters of the task.\n    output_parameter_names (List[str]): The names of the output parameters.\n    note (dict[str, Any]): The note associated with the task.\n    figure_path (List[str]): The paths to the figures associated with the task.\n    start_at (Optional[str]): The start time of the task.\n    end_at (Optional[str]): The end time of the task.\n    elapsed_time (Optional[str]): The total elapsed time of the task.\n    task_type (str): The type of the task.\ndef modify_name(cls, v: str, values: dict[str, Any]) -> str:"
-      },
       "TwoQubitCalibDailySummaryModel": {
         "properties": {
           "_id": {
@@ -4885,6 +4811,233 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "server__routers__chip__Task": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "default": ""
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "upstream_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Id",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "input_parameters": {
+            "type": "object",
+            "title": "Input Parameters"
+          },
+          "output_parameters": {
+            "type": "object",
+            "title": "Output Parameters"
+          },
+          "output_parameter_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Parameter Names"
+          },
+          "note": {
+            "type": "object",
+            "title": "Note"
+          },
+          "figure_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Figure Path"
+          },
+          "raw_data_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Raw Data Path"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Time"
+          },
+          "task_type": {
+            "type": "string",
+            "title": "Task Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "name",
+          "status",
+          "message",
+          "task_type"
+        ],
+        "title": "Task",
+        "description": "Task is a Pydantic model that represents a task in the execution response.\n\nAttributes\n----------\n    task_id (str): The ID of the task.\n    name (str): The name of the task.\n    upstream_id (Optional[str]): The ID of the upstream task.\n    status (str): The current status of the task.\n    message (str): The message associated with the task.\n    input_parameters (dict[str, Any]): The input parameters of the task.\n    output_parameters (dict[str, Any]): The output parameters of the task.\n    output_parameter_names (List[str]): The names of the output parameters.\n    note (dict[str, Any]): The note associated with the task.\n    figure_path (List[str]): The paths to the figures associated with the task.\n    start_at (Optional[str]): The start time of the task.\n    end_at (Optional[str]): The end time of the task.\n    elapsed_time (Optional[str]): The total elapsed time of the task.\n    task_type (str): The type of the task.\ndef modify_name(cls, v: str, values: dict[str, Any]) -> str:"
+      },
+      "server__routers__execution_v2__Task": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "default": ""
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "upstream_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Id",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "input_parameters": {
+            "type": "object",
+            "title": "Input Parameters"
+          },
+          "output_parameters": {
+            "type": "object",
+            "title": "Output Parameters"
+          },
+          "output_parameter_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Parameter Names"
+          },
+          "note": {
+            "type": "object",
+            "title": "Note"
+          },
+          "figure_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Figure Path"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Time"
+          },
+          "task_type": {
+            "type": "string",
+            "title": "Task Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "name",
+          "status",
+          "message",
+          "task_type"
+        ],
+        "title": "Task",
+        "description": "Task is a Pydantic model that represents a task in the execution response.\n\nAttributes\n----------\n    task_id (str): The ID of the task.\n    name (str): The name of the task.\n    upstream_id (Optional[str]): The ID of the upstream task.\n    status (str): The current status of the task.\n    message (str): The message associated with the task.\n    input_parameters (dict[str, Any]): The input parameters of the task.\n    output_parameters (dict[str, Any]): The output parameters of the task.\n    output_parameter_names (List[str]): The names of the output parameters.\n    note (dict[str, Any]): The note associated with the task.\n    figure_path (List[str]): The paths to the figures associated with the task.\n    start_at (Optional[str]): The start time of the task.\n    end_at (Optional[str]): The end time of the task.\n    elapsed_time (Optional[str]): The total elapsed time of the task.\n    task_type (str): The type of the task.\ndef modify_name(cls, v: str, values: dict[str, Any]) -> str:"
       }
     }
   }

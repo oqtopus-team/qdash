@@ -59,7 +59,7 @@ export function NewItemModalFromTemplate({
       } catch (error) {
         setValidationError(
           "YAMLの形式が正しくありません: " +
-            (error instanceof Error ? error.message : String(error))
+            (error instanceof Error ? error.message : String(error)),
         );
       }
     }
@@ -74,7 +74,7 @@ export function NewItemModalFromTemplate({
         const formattedData: CreateMenuRequest = {
           ...parsedData,
           two_qubit_calib_plan: parsedData.two_qubit_calib_plan.map((pairs) =>
-            pairs.map((pair) => [pair[0], pair[1]] as [number, number])
+            pairs.map((pair) => [pair[0], pair[1]] as [number, number]),
           ),
         };
 
@@ -85,7 +85,7 @@ export function NewItemModalFromTemplate({
               const updatedData = await refetchMenu();
               if (updatedData.data) {
                 setTableData(
-                  mapListMenuResponseToListMenu(updatedData.data.data)
+                  mapListMenuResponseToListMenu(updatedData.data.data),
                 );
                 toast.success("Template item created successfully!");
               }
@@ -94,7 +94,7 @@ export function NewItemModalFromTemplate({
               console.error("Error creating template item:", error);
               toast.error("Error creating template item");
             },
-          }
+          },
         );
       }
     } catch (error) {

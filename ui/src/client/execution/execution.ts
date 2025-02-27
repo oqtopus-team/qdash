@@ -19,7 +19,7 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
-import * as axios from "axios";
+import axios from "axios";
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import type {
   Detail,
@@ -37,7 +37,7 @@ import type {
 export const fetchAllExecutions = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionRunResponse[]>> => {
-  return axios.default.get(`http://localhost:5715/executions`, options);
+  return axios.get(`http://localhost:5715/executions`, options);
 };
 
 export const getFetchAllExecutionsQueryKey = () => {
@@ -169,7 +169,7 @@ export const fetchExperimentsById = (
   executionId: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionResponse[]>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/executions/${executionId}/experiments`,
     options,
   );
@@ -332,7 +332,7 @@ export const addExecutionTags = (
   addExecutionTagsBody: string[],
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<unknown>> => {
-  return axios.default.post(
+  return axios.post(
     `http://localhost:5715/executions/${executionId}/tags`,
     addExecutionTagsBody,
     options,
@@ -415,10 +415,10 @@ export const removeExecutionTags = (
   removeExecutionTagsBody: string[],
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<unknown>> => {
-  return axios.default.delete(
-    `http://localhost:5715/executions/${executionId}/tags`,
-    { data: removeExecutionTagsBody, ...options },
-  );
+  return axios.delete(`http://localhost:5715/executions/${executionId}/tags`, {
+    data: removeExecutionTagsBody,
+    ...options,
+  });
 };
 
 export const getRemoveExecutionTagsMutationOptions = <
@@ -496,7 +496,7 @@ export const fetchAllExecutionsExperiments = (
   params?: FetchAllExecutionsExperimentsParams,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionResponse[]>> => {
-  return axios.default.get(`http://localhost:5715/executions/experiments`, {
+  return axios.get(`http://localhost:5715/executions/experiments`, {
     ...options,
     params: { ...params, ...options?.params },
   });
@@ -657,7 +657,7 @@ export const fetchFigureByPath = (
   params: FetchFigureByPathParams,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<void>> => {
-  return axios.default.get(`http://localhost:5715/executions/figure`, {
+  return axios.get(`http://localhost:5715/executions/figure`, {
     ...options,
     params: { ...params, ...options?.params },
   });
@@ -814,10 +814,7 @@ export function useFetchFigureByPath<
 export const fetchExecutionLockStatus = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionLockStatusResponse>> => {
-  return axios.default.get(
-    `http://localhost:5715/executions/lock_status`,
-    options,
-  );
+  return axios.get(`http://localhost:5715/executions/lock_status`, options);
 };
 
 export const getFetchExecutionLockStatusQueryKey = () => {

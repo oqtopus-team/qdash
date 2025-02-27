@@ -25,6 +25,7 @@ class PostProcessResult(BaseModel):
 
     output_parameters: dict[str, DataModel]
     figures: list[go.Figure] = []
+    raw_data: list[Any] = []
 
     class Config:
         """Pydantic config."""

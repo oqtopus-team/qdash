@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { Task } from "./task";
+import type { ServerRoutersChipTask } from "./serverRoutersChipTask";
 import type { ExecutionResponseDetailNote } from "./executionResponseDetailNote";
 
 /**
@@ -23,6 +23,6 @@ export interface ExecutionResponseDetail {
   start_at: string;
   end_at: string;
   elapsed_time: string;
-  task: Task[];
+  task: ServerRoutersChipTask[];
   note: ExecutionResponseDetailNote;
 }

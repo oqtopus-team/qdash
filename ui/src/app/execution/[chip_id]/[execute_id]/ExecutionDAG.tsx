@@ -272,10 +272,10 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
                   selectedTask.status === "running"
                     ? "text-info"
                     : selectedTask.status === "completed"
-                    ? "text-success"
-                    : selectedTask.status === "scheduled"
-                    ? "text-warning"
-                    : "text-error"
+                      ? "text-success"
+                      : selectedTask.status === "scheduled"
+                        ? "text-warning"
+                        : "text-error"
                 }`}
               >
                 {selectedTask.status}
@@ -306,7 +306,7 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
                     <img
                       key={i}
                       src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                        path
+                        path,
                       )}`}
                       alt={`Task Figure ${i + 1}`}
                       className="w-full h-auto rounded border max-h-[200px] object-contain"

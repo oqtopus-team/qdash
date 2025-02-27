@@ -57,7 +57,7 @@ const getNodeColor = (metricValue: number | string, selectedMetric: string) => {
 
 const updateNodesWithMetricColor = (
   nodes: OneQubitCalib[],
-  selectedMetric: string
+  selectedMetric: string,
 ) => {
   return nodes.map((node) => {
     let metricValue;
@@ -79,7 +79,7 @@ const updateNodesWithMetricColor = (
 
 const updateEdgesWithMetricColor = (
   edges: TwoQubitCalib[],
-  selectedMetric: string
+  selectedMetric: string,
 ) => {
   return edges.map((edge) => {
     let metricValue;
@@ -98,10 +98,10 @@ const updateEdgesWithMetricColor = (
 export function ChipMetricsClient() {
   const [selectedMetric, setSelectedMetric] = useState<string>("status");
   const [oneQubitCalibInfo, setOneQubitCalibInfo] = useState<OneQubitCalib[]>(
-    []
+    [],
   );
   const [twoQubitCalibInfo, setTwoQubitCalibInfo] = useState<TwoQubitCalib[]>(
-    []
+    [],
   );
   const [hoveredNode, setHoveredNode] = useState<any>(null);
   const [hoveredEdge, setHoveredEdge] = useState<any>(null);
@@ -123,7 +123,7 @@ export function ChipMetricsClient() {
     if (oneQubitCalib) {
       const updatedNodes = updateNodesWithMetricColor(
         mapOneQubitCalibResponseToOneQubitCalibration(oneQubitCalib.data),
-        selectedMetric
+        selectedMetric,
       );
       setOneQubitCalibInfo(updatedNodes);
     }
@@ -131,7 +131,7 @@ export function ChipMetricsClient() {
     if (twoQubitCalib) {
       const updatedEdges = updateEdgesWithMetricColor(
         mapTwoQubitCalibResponseToTwoQubitCalibration(twoQubitCalib.data),
-        selectedMetric
+        selectedMetric,
       );
       setTwoQubitCalibInfo(updatedEdges);
     }

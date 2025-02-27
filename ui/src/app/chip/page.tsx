@@ -62,7 +62,7 @@ const QubitCalibChartContainer = () => {
   const nameOptions = qpuOptions;
 
   const handleQpuChange = (
-    selectedOption: { value: string; label: string } | null
+    selectedOption: { value: string; label: string } | null,
   ) => {
     const newValue = selectedOption ? selectedOption.value : "SAMPLE";
     setSelectedName(newValue);
@@ -94,7 +94,9 @@ const QubitCalibChartContainer = () => {
         <Stats
           average_gate_fidelity={
             Math.round(
-              (qpuStats?.data.average_gate_fidelity.max_value ?? 0) * 100 * 1000
+              (qpuStats?.data.average_gate_fidelity.max_value ?? 0) *
+                100 *
+                1000,
             ) / 1000
           }
           t1={Math.round((qpuStats?.data.t1.max_value ?? 0) * 1000) / 1000}
@@ -116,7 +118,7 @@ const QubitCalibChartContainer = () => {
                 <div className="mt-2">
                   <img
                     src={`http://localhost:5715/qpu/figure?path=${encodeURIComponent(
-                      stats.fig_path
+                      stats.fig_path,
                     )}`}
                     alt="Experiment Figure"
                     className="w-full h-auto max-h-[60vh] object-contain rounded border"

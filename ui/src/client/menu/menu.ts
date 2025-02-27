@@ -19,7 +19,7 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
-import * as axios from "axios";
+import axios from "axios";
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import type {
   CreateMenuRequest,
@@ -43,7 +43,7 @@ Returns:
 export const listMenu = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ListMenuResponse[]>> => {
-  return axios.default.get(`http://localhost:5715/menu`, options);
+  return axios.get(`http://localhost:5715/menu`, options);
 };
 
 export const getListMenuQueryKey = () => {
@@ -162,11 +162,7 @@ export const createMenu = (
   createMenuRequest: CreateMenuRequest,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<CreateMenuResponse>> => {
-  return axios.default.post(
-    `http://localhost:5715/menu`,
-    createMenuRequest,
-    options,
-  );
+  return axios.post(`http://localhost:5715/menu`, createMenuRequest, options);
 };
 
 export const getCreateMenuMutationOptions = <
@@ -254,7 +250,7 @@ export const deleteMenu = (
   name: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<DeleteMenuResponse>> => {
-  return axios.default.delete(`http://localhost:5715/menu/${name}`, options);
+  return axios.delete(`http://localhost:5715/menu/${name}`, options);
 };
 
 export const getDeleteMenuMutationOptions = <
@@ -341,7 +337,7 @@ export const updateMenu = (
   updateMenuRequest: UpdateMenuRequest,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<UpdateMenuResponse>> => {
-  return axios.default.put(
+  return axios.put(
     `http://localhost:5715/menu/${name}`,
     updateMenuRequest,
     options,
@@ -434,7 +430,7 @@ export const getMenuByName = (
   name: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<GetMenuResponse>> => {
-  return axios.default.get(`http://localhost:5715/menu/${name}`, options);
+  return axios.get(`http://localhost:5715/menu/${name}`, options);
 };
 
 export const getGetMenuByNameQueryKey = (name: string) => {

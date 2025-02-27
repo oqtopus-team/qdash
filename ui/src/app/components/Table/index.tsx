@@ -55,7 +55,7 @@ export function Table<T>({ data, columns, filter }: TableProps<T>) {
                       ? null
                       : flexRender(
                           header.column.columnDef.header,
-                          header.getContext()
+                          header.getContext(),
                         )}
                   </th>
                 ))}

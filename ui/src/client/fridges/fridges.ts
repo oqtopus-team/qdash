@@ -16,7 +16,7 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
-import * as axios from "axios";
+import axios from "axios";
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import type {
   FridgesGetFridgeTemperatureParams,
@@ -31,7 +31,7 @@ import type {
 export const fridgesListAllFridges = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ListAllFridgeResponse>> => {
-  return axios.default.get(`http://localhost:5715/fridges/`, options);
+  return axios.get(`http://localhost:5715/fridges/`, options);
 };
 
 export const getFridgesListAllFridgesQueryKey = () => {
@@ -164,13 +164,10 @@ export const fridgesGetFridgeTemperature = (
   params?: FridgesGetFridgeTemperatureParams,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ListFridgeResponse[]>> => {
-  return axios.default.get(
-    `http://localhost:5715/fridges/XLD/channels/${channel}`,
-    {
-      ...options,
-      params: { ...params, ...options?.params },
-    },
-  );
+  return axios.get(`http://localhost:5715/fridges/XLD/channels/${channel}`, {
+    ...options,
+    params: { ...params, ...options?.params },
+  });
 };
 
 export const getFridgesGetFridgeTemperatureQueryKey = (

@@ -8,7 +8,7 @@ import type { CalibSchedule } from "../../model";
 const columnHelper = createColumnHelper<CalibSchedule>();
 
 export const getColumns = (
-  handleDeleteClick: (item: CalibSchedule) => void
+  handleDeleteClick: (item: CalibSchedule) => void,
 ) => [
   columnHelper.accessor("menu_name", {
     header: "Menu Name",

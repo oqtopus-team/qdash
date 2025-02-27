@@ -5,13 +5,13 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskUpstreamId } from "./taskUpstreamId";
-import type { TaskInputParameters } from "./taskInputParameters";
-import type { TaskOutputParameters } from "./taskOutputParameters";
-import type { TaskNote } from "./taskNote";
-import type { TaskStartAt } from "./taskStartAt";
-import type { TaskEndAt } from "./taskEndAt";
-import type { TaskElapsedTime } from "./taskElapsedTime";
+import type { ServerRoutersExecutionV2TaskUpstreamId } from "./serverRoutersExecutionV2TaskUpstreamId";
+import type { ServerRoutersExecutionV2TaskInputParameters } from "./serverRoutersExecutionV2TaskInputParameters";
+import type { ServerRoutersExecutionV2TaskOutputParameters } from "./serverRoutersExecutionV2TaskOutputParameters";
+import type { ServerRoutersExecutionV2TaskNote } from "./serverRoutersExecutionV2TaskNote";
+import type { ServerRoutersExecutionV2TaskStartAt } from "./serverRoutersExecutionV2TaskStartAt";
+import type { ServerRoutersExecutionV2TaskEndAt } from "./serverRoutersExecutionV2TaskEndAt";
+import type { ServerRoutersExecutionV2TaskElapsedTime } from "./serverRoutersExecutionV2TaskElapsedTime";
 
 /**
  * Task is a Pydantic model that represents a task in the execution response.
@@ -34,20 +34,20 @@ Attributes
     task_type (str): The type of the task.
 def modify_name(cls, v: str, values: dict[str, Any]) -> str:
  */
-export interface Task {
+export interface ServerRoutersExecutionV2Task {
   task_id: string;
   qid?: string;
   name: string;
-  upstream_id?: TaskUpstreamId;
+  upstream_id?: ServerRoutersExecutionV2TaskUpstreamId;
   status: string;
   message: string;
-  input_parameters?: TaskInputParameters;
-  output_parameters?: TaskOutputParameters;
+  input_parameters?: ServerRoutersExecutionV2TaskInputParameters;
+  output_parameters?: ServerRoutersExecutionV2TaskOutputParameters;
   output_parameter_names?: string[];
-  note?: TaskNote;
+  note?: ServerRoutersExecutionV2TaskNote;
   figure_path?: string[];
-  start_at?: TaskStartAt;
-  end_at?: TaskEndAt;
-  elapsed_time?: TaskElapsedTime;
+  start_at?: ServerRoutersExecutionV2TaskStartAt;
+  end_at?: ServerRoutersExecutionV2TaskEndAt;
+  elapsed_time?: ServerRoutersExecutionV2TaskElapsedTime;
   task_type: string;
 }

@@ -19,7 +19,7 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
-import * as axios from "axios";
+import axios from "axios";
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import type {
   Detail,
@@ -64,7 +64,7 @@ export const executeCalib = (
   executeCalibRequest: ExecuteCalibRequest,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecuteCalibResponse>> => {
-  return axios.default.post(
+  return axios.post(
     `http://localhost:5715/calibrations`,
     executeCalibRequest,
     options,
@@ -145,10 +145,7 @@ export const useExecuteCalib = <
 export const fetchAllCalibSchedule = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ScheduleCalibResponse[]>> => {
-  return axios.default.get(
-    `http://localhost:5715/calibrations/schedule`,
-    options,
-  );
+  return axios.get(`http://localhost:5715/calibrations/schedule`, options);
 };
 
 export const getFetchAllCalibScheduleQueryKey = () => {
@@ -280,7 +277,7 @@ export const scheduleCalib = (
   scheduleCalibRequest: ScheduleCalibRequest,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<unknown>> => {
-  return axios.default.post(
+  return axios.post(
     `http://localhost:5715/calibrations/schedule`,
     scheduleCalibRequest,
     options,
@@ -362,7 +359,7 @@ export const deleteCalibSchedule = (
   flowRunId: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<unknown>> => {
-  return axios.default.delete(
+  return axios.delete(
     `http://localhost:5715/calibrations/schedule/${flowRunId}`,
     options,
   );
@@ -446,7 +443,7 @@ Returns:
 export const fetchAllLatestOneQubitCalib = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<OneQubitCalibResponse[]>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/calibrations/latest/one_qubit`,
     options,
   );
@@ -582,7 +579,7 @@ export const updateAllLatestOneQubitCalibCwInfo = (
   oneQubitCalibCWInfo: OneQubitCalibCWInfo,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<SuccessResponse>> => {
-  return axios.default.put(
+  return axios.put(
     `http://localhost:5715/calibrations/latest/one_qubit/cw_info`,
     oneQubitCalibCWInfo,
     options,
@@ -670,7 +667,7 @@ Returns:
 export const fetchAllLatestTwoQubitCalib = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<TwoQubitCalibResponse[]>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/calibrations/latest/two_qubit`,
     options,
   );
@@ -813,7 +810,7 @@ export const fetchOneQubitCalibHistoryByLabel = (
   label: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<OneQubitCalibHistoryResponse[]>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/calibrations/history/one_qubit/${label}`,
     options,
   );
@@ -977,7 +974,7 @@ export const fetchTwoQubitCalibHistoryByLabel = (
   label: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<TwoQubitCalibHistoryResponse[]>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/calibrations/history/two_qubit/${label}`,
     options,
   );
@@ -1140,7 +1137,7 @@ export function useFetchTwoQubitCalibHistoryByLabel<
 export const fetchAllOneQubitCalibSummary = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<OneQubitCalibDailySummaryResponse[]>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/calibrations/one_qubit/summary`,
     options,
   );
@@ -1275,7 +1272,7 @@ export function useFetchAllOneQubitCalibSummary<
 export const fetchAllTwoQubitCalibSummary = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<TwoQubitCalibDailySummaryResponse[]>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/calibrations/two_qubit/summary`,
     options,
   );
@@ -1412,7 +1409,7 @@ export const fetchOneQubitCalibSummaryByDate = (
   params?: FetchOneQubitCalibSummaryByDateParams,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<OneQubitCalibDailySummaryResponse>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/calibrations/one_qubit/summary/${date}`,
     {
       ...options,
@@ -1591,7 +1588,7 @@ export const updateOneQubitCalibSummaryByDate = (
   oneQubitCalibDailySummaryRequest: OneQubitCalibDailySummaryRequest,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<OneQubitCalibDailySummaryResponse>> => {
-  return axios.default.patch(
+  return axios.patch(
     `http://localhost:5715/calibrations/one_qubit/summary/${date}`,
     oneQubitCalibDailySummaryRequest,
     options,
@@ -1676,7 +1673,7 @@ export const fetchTwoQubitCalibSummaryByDate = (
   date: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<TwoQubitCalibDailySummaryResponse>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/calibrations/two_qubit/summary/${date}`,
     options,
   );
@@ -1841,7 +1838,7 @@ export const updateTwoQubitCalibSummaryByDate = (
   twoQubitCalibDailySummaryRequest: TwoQubitCalibDailySummaryRequest,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<TwoQubitCalibDailySummaryModel>> => {
-  return axios.default.patch(
+  return axios.patch(
     `http://localhost:5715/calibrations/two_qubit/summary/${date}`,
     twoQubitCalibDailySummaryRequest,
     options,
@@ -1930,7 +1927,7 @@ export const fetchCalibFigureByDate = (
   exp: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<unknown>> => {
-  return axios.default.get(
+  return axios.get(
     `http://localhost:5715/calibrations/figure/${date}/${qubit}/${path}/${exp}`,
     options,
   );
@@ -2125,7 +2122,7 @@ export const fetchOneQubitCalibStats = (
   oneQubitCalibStatsRequest: OneQubitCalibStatsRequest,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<OneQubitCalibStatsResponse[]>> => {
-  return axios.default.post(
+  return axios.post(
     `http://localhost:5715/calibrations/stats/one_qubit`,
     oneQubitCalibStatsRequest,
     options,
@@ -2215,7 +2212,7 @@ export const fetchTwoQubitCalibStats = (
   twoQubitCalibStatsRequest: TwoQubitCalibStatsRequest,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<TwoQubitCalibStatsResponse[]>> => {
-  return axios.default.post(
+  return axios.post(
     `http://localhost:5715/calibrations/stats/two_qubit`,
     twoQubitCalibStatsRequest,
     options,

@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type TaskOutputParameters = { [key: string]: unknown };
+export type ServerRoutersExecutionV2TaskUpstreamId = string | null;
