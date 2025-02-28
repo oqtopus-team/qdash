@@ -6,6 +6,9 @@ import Navbar from "./components/Navbar";
 export const metadata = {
   title: "QDash",
   description: "Quantum Dashboard",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

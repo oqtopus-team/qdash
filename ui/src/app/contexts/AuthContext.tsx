@@ -64,15 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } as AxiosRequestConfig,
   });
 
-  // ユーザー情報の更新とヘッダーの設定
+  // ユーザー情報の更新
   useEffect(() => {
     if (userData?.data) {
-      const username = userData.data.username;
       setUser(userData.data);
-      // グローバルにヘッダーを設定
-      window.localStorage.setItem("X-User-ID", username);
-      // axiosのデフォルトヘッダーを設定
-      axios.defaults.headers.common["X-User-ID"] = username;
     }
   }, [userData]);
 
@@ -82,9 +77,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Failed to fetch user info:", userError);
       removeToken();
       setUser(null);
-      // ユーザーIDをクリア
-      window.localStorage.removeItem("X-User-ID");
-      delete axios.defaults.headers.common["X-User-ID"];
     }
   }, [userError, removeToken]);
 
@@ -95,11 +87,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .find((row) => row.startsWith("token="))
       ?.split("=")[1];
 
-    const storedUserId = window.localStorage.getItem("X-User-ID");
-    if (storedUserId) {
-      axios.defaults.headers.common["X-User-ID"] = storedUserId;
-    }
-
     if (storedToken) {
       try {
         const decodedToken = decodeURIComponent(storedToken);
@@ -107,9 +94,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error("Failed to decode token:", error);
         removeToken();
-        // ユーザーIDをクリア
-        window.localStorage.removeItem("X-User-ID");
-        delete axios.defaults.headers.common["X-User-ID"];
       }
     }
     setLoading(false);
@@ -122,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data: {
             username,
             password,
+            grant_type: "password",
           },
         });
         const newToken = response.data.access_token;
@@ -131,17 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [loginMutation, saveToken],
+    [loginMutation, saveToken]
   );
 
   const logout = useCallback(() => {
     logoutMutation.mutate();
     setUser(null);
     removeToken();
-    // ユーザーIDをクリア
-    window.localStorage.removeItem("X-User-ID");
-    // axiosのデフォルトヘッダーをクリア
-    delete axios.defaults.headers.common["X-User-ID"];
   }, [logoutMutation, removeToken]);
 
   return (
