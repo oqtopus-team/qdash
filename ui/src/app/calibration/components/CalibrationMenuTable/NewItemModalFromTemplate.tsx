@@ -15,27 +15,15 @@ import type { CreateMenuRequest } from "@/schemas";
 // テンプレートの初期データ
 const templateData = `
 name: template
-description: full calibration for mux9
-one_qubit_calib_plan:
-  - [0, 1, 2]
-  - [4, 5, 6]
-  - [7, 8, 9]
-two_qubit_calib_plan:
-  - [[0, 1], [0, 2], [3, 4]]
-  - [[5, 6], [7, 8]]
-mode: calib
+username: default_user
+description: calibration menu template
+qids:
+  - ["Q1"]
+  - ["Q2", "Q3"]
 notify_bool: false
-flow:
-  - one-qubit-calibration-flow
-  - one-qubit-jazz-flow
-  - lock-devices-flow
-  - two-qubit-calibration-flow
 tags:
-  - tag1
-  - tag2
-exp_list:
-  - exp1
-  - exp2
+  - calibration
+  - template
 `;
 
 export function NewItemModalFromTemplate({
@@ -59,7 +47,7 @@ export function NewItemModalFromTemplate({
       } catch (error) {
         setValidationError(
           "YAMLの形式が正しくありません: " +
-            (error instanceof Error ? error.message : String(error)),
+            (error instanceof Error ? error.message : String(error))
         );
       }
     }
@@ -67,17 +55,9 @@ export function NewItemModalFromTemplate({
 
   const handleSaveClick = async () => {
     try {
-      const parsedData = yaml.load(templateText) as CreateMenuRequest;
+      const formattedData = yaml.load(templateText) as CreateMenuRequest;
 
-      if (parsedData && typeof parsedData === "object") {
-        // Convert two_qubit_calib_plan to the correct format
-        const formattedData: CreateMenuRequest = {
-          ...parsedData,
-          two_qubit_calib_plan: parsedData.two_qubit_calib_plan.map((pairs) =>
-            pairs.map((pair) => [pair[0], pair[1]] as [number, number]),
-          ),
-        };
-
+      if (formattedData && typeof formattedData === "object") {
         createMutation.mutate(
           { data: formattedData },
           {
@@ -85,7 +65,7 @@ export function NewItemModalFromTemplate({
               const updatedData = await refetchMenu();
               if (updatedData.data) {
                 setTableData(
-                  mapListMenuResponseToListMenu(updatedData.data.data),
+                  mapListMenuResponseToListMenu(updatedData.data.data)
                 );
                 toast.success("Template item created successfully!");
               }
@@ -94,7 +74,7 @@ export function NewItemModalFromTemplate({
               console.error("Error creating template item:", error);
               toast.error("Error creating template item");
             },
-          },
+          }
         );
       }
     } catch (error) {

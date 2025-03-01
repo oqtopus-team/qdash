@@ -5,17 +5,18 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { GetMenuResponseExpList } from "./getMenuResponseExpList";
+import type { GetMenuResponseTasks } from "./getMenuResponseTasks";
 import type { GetMenuResponseTags } from "./getMenuResponseTags";
 
+/**
+ * GetMenuResponse is a Pydantic model for the get menu response.
+ */
 export interface GetMenuResponse {
   name: string;
+  username: string;
   description: string;
-  one_qubit_calib_plan: number[][];
-  two_qubit_calib_plan: [number, number][][];
-  mode: string;
+  qids: string[][];
   notify_bool?: boolean;
-  flow: string[];
-  exp_list?: GetMenuResponseExpList;
+  tasks?: GetMenuResponseTasks;
   tags?: GetMenuResponseTags;
 }

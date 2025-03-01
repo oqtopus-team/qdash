@@ -800,7 +800,7 @@
           "menu"
         ],
         "summary": "Retrieve a list of menu items.",
-        "description": "Retrieve a list of menu items.\n\nReturns:\n    ListMenuResponse: A response containing the list of menu items.",
+        "description": "Retrieve a list of menu items.\n\nReturns\n-------\n    ListMenuResponse: A response containing the list of menu items.",
         "operationId": "list_menu",
         "responses": {
           "200": {
@@ -808,23 +808,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ListMenuResponse"
-                  },
-                  "type": "array",
-                  "title": "Response List Menu"
+                  "$ref": "#/components/schemas/ListMenuResponse"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       },
       "post": {
         "tags": [
           "menu"
         ],
         "summary": "Create a new menu item.",
-        "description": "Create a new menu item.\n\nArgs:\n    request (CreateMenuRequest): The request object containing the menu item details.\n\nReturns:\n    CreateMenuResponse: The response object containing the ID of the created menu item.",
+        "description": "Create a new menu item.\n\nArgs:\n----\n    request (CreateMenuRequest): The request object containing the menu item details.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    CreateMenuResponse: The response object containing the name of the created menu item.",
         "operationId": "create_menu",
         "requestBody": {
           "content": {
@@ -857,7 +858,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/menu/{name}": {
@@ -866,8 +872,13 @@
           "menu"
         ],
         "summary": "Delete a menu by its name.",
-        "description": "Delete a menu by its name.\n\nArgs:\n    name (str): The name of the menu to be deleted.\n\nReturns:\n    DeleteMenuResponse | NotFoundErrorResponse: The response indicating the success or failure of the deletion.\n\nRaises:\n    None",
+        "description": "Delete a menu by its name.\n\nArgs:\n----\n    name (str): The name of the menu to be deleted.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    DeleteMenuResponse | NotFoundErrorResponse: The response indicating the success or failure of the deletion.",
         "operationId": "delete_menu",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "name",
@@ -917,8 +928,13 @@
           "menu"
         ],
         "summary": "Update a menu with the given name.",
-        "description": "Update a menu with the given name.\n\nArgs:\n    id (str): The name of the menu to update.\n    req (UpdateMenuRequest): The request object containing the updated menu data.\n\nReturns:\n    Union[UpdateMenuResponse, NotFoundErrorResponse]: The response object indicating the success of the update or an error if the menu is not found.",
+        "description": "Update a menu with the given name.\n\nArgs:\n----\n    name (str): The name of the menu to update.\n    req (UpdateMenuRequest): The request object containing the updated menu data.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    Union[UpdateMenuResponse, NotFoundErrorResponse]: The response object indicating the success of the update or an error if the menu is not found.",
         "operationId": "update_menu",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "name",
@@ -978,8 +994,13 @@
           "menu"
         ],
         "summary": "Retrieve a menu by its name.",
-        "description": "Retrieve a menu by its name.\n\nArgs:\n    name (str): The name of the menu.\n\nReturns:\n    GetMenuResponse: The response containing the menu details.\n\nRaises:\n    InternalServerError: If there is an error retrieving the menu.\n    NotFoundErrorResponse: If the menu is not found.",
+        "description": "Retrieve a menu by its name.\n\nArgs:\n----\n    name (str): The name of the menu.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    GetMenuResponse: The response containing the menu details.\n\nRaises:\n------\n    InternalServerError: If there is an error retrieving the menu.\n    NotFoundErrorResponse: If the menu is not found.",
         "operationId": "get_menu_by_name",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "name",
@@ -2689,57 +2710,30 @@
             "type": "string",
             "title": "Name"
           },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
           "description": {
             "type": "string",
             "title": "Description"
           },
-          "one_qubit_calib_plan": {
+          "qids": {
             "items": {
               "items": {
-                "type": "integer"
+                "type": "string"
               },
               "type": "array"
             },
             "type": "array",
-            "title": "One Qubit Calib Plan"
-          },
-          "two_qubit_calib_plan": {
-            "items": {
-              "items": {
-                "prefixItems": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "integer"
-                  }
-                ],
-                "type": "array",
-                "maxItems": 2,
-                "minItems": 2
-              },
-              "type": "array"
-            },
-            "type": "array",
-            "title": "Two Qubit Calib Plan"
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode"
+            "title": "Qids"
           },
           "notify_bool": {
             "type": "boolean",
             "title": "Notify Bool",
-            "default": true
+            "default": false
           },
-          "flow": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Flow"
-          },
-          "exp_list": {
+          "tasks": {
             "anyOf": [
               {
                 "items": {
@@ -2751,8 +2745,7 @@
                 "type": "null"
               }
             ],
-            "title": "Exp List",
-            "default": []
+            "title": "Tasks"
           },
           "tags": {
             "anyOf": [
@@ -2766,78 +2759,18 @@
                 "type": "null"
               }
             ],
-            "title": "Tags",
-            "default": []
+            "title": "Tags"
           }
         },
         "type": "object",
         "required": [
           "name",
+          "username",
           "description",
-          "one_qubit_calib_plan",
-          "two_qubit_calib_plan",
-          "mode",
-          "flow"
+          "qids"
         ],
         "title": "CreateMenuRequest",
-        "examples": [
-          {
-            "description": "menu description",
-            "flow": [
-              "one-qubit-calibration-flow"
-            ],
-            "mode": "calib",
-            "name": "sample-menu",
-            "notify_bool": false,
-            "one_qubit_calib_plan": [
-              [
-                0,
-                1,
-                2
-              ],
-              [
-                4,
-                5,
-                6
-              ],
-              [
-                7,
-                8,
-                9
-              ]
-            ],
-            "tags": [
-              "tag1",
-              "tag2"
-            ],
-            "two_qubit_calib_plan": [
-              [
-                [
-                  0,
-                  1
-                ],
-                [
-                  0,
-                  2
-                ],
-                [
-                  3,
-                  4
-                ]
-              ],
-              [
-                [
-                  5,
-                  6
-                ],
-                [
-                  7,
-                  8
-                ]
-              ]
-            ]
-          }
-        ]
+        "description": "CreateMenuRequest is a Pydantic model for creating a menu item."
       },
       "CreateMenuResponse": {
         "properties": {
@@ -2850,7 +2783,8 @@
         "required": [
           "name"
         ],
-        "title": "CreateMenuResponse"
+        "title": "CreateMenuResponse",
+        "description": "CreateMenuResponse is a Pydantic model for the create menu response."
       },
       "Data": {
         "properties": {
@@ -2901,7 +2835,8 @@
         "required": [
           "name"
         ],
-        "title": "DeleteMenuResponse"
+        "title": "DeleteMenuResponse",
+        "description": "DeleteMenuResponse is a Pydantic model for the delete menu response."
       },
       "Detail": {
         "properties": {
@@ -3483,57 +3418,30 @@
             "type": "string",
             "title": "Name"
           },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
           "description": {
             "type": "string",
             "title": "Description"
           },
-          "one_qubit_calib_plan": {
+          "qids": {
             "items": {
               "items": {
-                "type": "integer"
+                "type": "string"
               },
               "type": "array"
             },
             "type": "array",
-            "title": "One Qubit Calib Plan"
-          },
-          "two_qubit_calib_plan": {
-            "items": {
-              "items": {
-                "prefixItems": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "integer"
-                  }
-                ],
-                "type": "array",
-                "maxItems": 2,
-                "minItems": 2
-              },
-              "type": "array"
-            },
-            "type": "array",
-            "title": "Two Qubit Calib Plan"
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode"
+            "title": "Qids"
           },
           "notify_bool": {
             "type": "boolean",
             "title": "Notify Bool",
-            "default": true
+            "default": false
           },
-          "flow": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Flow"
-          },
-          "exp_list": {
+          "tasks": {
             "anyOf": [
               {
                 "items": {
@@ -3545,8 +3453,7 @@
                 "type": "null"
               }
             ],
-            "title": "Exp List",
-            "default": []
+            "title": "Tasks"
           },
           "tags": {
             "anyOf": [
@@ -3560,78 +3467,18 @@
                 "type": "null"
               }
             ],
-            "title": "Tags",
-            "default": []
+            "title": "Tags"
           }
         },
         "type": "object",
         "required": [
           "name",
+          "username",
           "description",
-          "one_qubit_calib_plan",
-          "two_qubit_calib_plan",
-          "mode",
-          "flow"
+          "qids"
         ],
         "title": "GetMenuResponse",
-        "examples": [
-          {
-            "description": "menu description",
-            "flow": [
-              "one-qubit-calibration-flow"
-            ],
-            "mode": "calib",
-            "name": "sample-menu",
-            "notify_bool": false,
-            "one_qubit_calib_plan": [
-              [
-                0,
-                1,
-                2
-              ],
-              [
-                4,
-                5,
-                6
-              ],
-              [
-                7,
-                8,
-                9
-              ]
-            ],
-            "tags": [
-              "tag1",
-              "tag2"
-            ],
-            "two_qubit_calib_plan": [
-              [
-                [
-                  0,
-                  1
-                ],
-                [
-                  0,
-                  2
-                ],
-                [
-                  3,
-                  4
-                ]
-              ],
-              [
-                [
-                  5,
-                  6
-                ],
-                [
-                  7,
-                  8
-                ]
-              ]
-            ]
-          }
-        ]
+        "description": "GetMenuResponse is a Pydantic model for the get menu response."
       },
       "HTTPValidationError": {
         "properties": {
@@ -3680,61 +3527,51 @@
       },
       "ListMenuResponse": {
         "properties": {
+          "menus": {
+            "items": {
+              "$ref": "#/components/schemas/MenuModel"
+            },
+            "type": "array",
+            "title": "Menus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "menus"
+        ],
+        "title": "ListMenuResponse",
+        "description": "ListMenuResponse is a Pydantic model that represents a menu item."
+      },
+      "MenuModel": {
+        "properties": {
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
           },
           "description": {
             "type": "string",
             "title": "Description"
           },
-          "one_qubit_calib_plan": {
+          "qids": {
             "items": {
               "items": {
-                "type": "integer"
+                "type": "string"
               },
               "type": "array"
             },
             "type": "array",
-            "title": "One Qubit Calib Plan"
-          },
-          "two_qubit_calib_plan": {
-            "items": {
-              "items": {
-                "prefixItems": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "integer"
-                  }
-                ],
-                "type": "array",
-                "maxItems": 2,
-                "minItems": 2
-              },
-              "type": "array"
-            },
-            "type": "array",
-            "title": "Two Qubit Calib Plan"
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode"
+            "title": "Qids"
           },
           "notify_bool": {
             "type": "boolean",
             "title": "Notify Bool",
-            "default": true
+            "default": false
           },
-          "flow": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Flow"
-          },
-          "exp_list": {
+          "tasks": {
             "anyOf": [
               {
                 "items": {
@@ -3746,8 +3583,7 @@
                 "type": "null"
               }
             ],
-            "title": "Exp List",
-            "default": []
+            "title": "Tasks"
           },
           "tags": {
             "anyOf": [
@@ -3761,78 +3597,18 @@
                 "type": "null"
               }
             ],
-            "title": "Tags",
-            "default": []
+            "title": "Tags"
           }
         },
         "type": "object",
         "required": [
           "name",
+          "username",
           "description",
-          "one_qubit_calib_plan",
-          "two_qubit_calib_plan",
-          "mode",
-          "flow"
+          "qids"
         ],
-        "title": "ListMenuResponse",
-        "examples": [
-          {
-            "description": "menu description",
-            "flow": [
-              "one-qubit-calibration-flow"
-            ],
-            "mode": "calib",
-            "name": "sample-menu",
-            "notify_bool": false,
-            "one_qubit_calib_plan": [
-              [
-                0,
-                1,
-                2
-              ],
-              [
-                4,
-                5,
-                6
-              ],
-              [
-                7,
-                8,
-                9
-              ]
-            ],
-            "tags": [
-              "tag1",
-              "tag2"
-            ],
-            "two_qubit_calib_plan": [
-              [
-                [
-                  0,
-                  1
-                ],
-                [
-                  0,
-                  2
-                ],
-                [
-                  3,
-                  4
-                ]
-              ],
-              [
-                [
-                  5,
-                  6
-                ],
-                [
-                  7,
-                  8
-                ]
-              ]
-            ]
-          }
-        ]
+        "title": "MenuModel",
+        "description": "Menu model.\n\nAttributes\n----------\n    name (str): The name of the menu.\n    username (str): The username of the user who created\n    description (str): Detailed description of the menu.\n    cal_plan (list[list[int]]): The calibration plan.\n    notify_bool (bool): The notification boolean.\n    tasks (list[str]): The tasks.\n    tags (list[str]): The tags."
       },
       "MetricsResponse": {
         "properties": {
@@ -4874,57 +4650,30 @@
             "type": "string",
             "title": "Name"
           },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
           "description": {
             "type": "string",
             "title": "Description"
           },
-          "one_qubit_calib_plan": {
+          "qids": {
             "items": {
               "items": {
-                "type": "integer"
+                "type": "string"
               },
               "type": "array"
             },
             "type": "array",
-            "title": "One Qubit Calib Plan"
-          },
-          "two_qubit_calib_plan": {
-            "items": {
-              "items": {
-                "prefixItems": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "integer"
-                  }
-                ],
-                "type": "array",
-                "maxItems": 2,
-                "minItems": 2
-              },
-              "type": "array"
-            },
-            "type": "array",
-            "title": "Two Qubit Calib Plan"
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode"
+            "title": "Qids"
           },
           "notify_bool": {
             "type": "boolean",
             "title": "Notify Bool",
-            "default": true
+            "default": false
           },
-          "flow": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Flow"
-          },
-          "exp_list": {
+          "tasks": {
             "anyOf": [
               {
                 "items": {
@@ -4936,8 +4685,7 @@
                 "type": "null"
               }
             ],
-            "title": "Exp List",
-            "default": []
+            "title": "Tasks"
           },
           "tags": {
             "anyOf": [
@@ -4951,78 +4699,18 @@
                 "type": "null"
               }
             ],
-            "title": "Tags",
-            "default": []
+            "title": "Tags"
           }
         },
         "type": "object",
         "required": [
           "name",
+          "username",
           "description",
-          "one_qubit_calib_plan",
-          "two_qubit_calib_plan",
-          "mode",
-          "flow"
+          "qids"
         ],
         "title": "UpdateMenuRequest",
-        "examples": [
-          {
-            "description": "menu description",
-            "flow": [
-              "one-qubit-calibration-flow"
-            ],
-            "mode": "calib",
-            "name": "sample-menu",
-            "notify_bool": false,
-            "one_qubit_calib_plan": [
-              [
-                0,
-                1,
-                2
-              ],
-              [
-                4,
-                5,
-                6
-              ],
-              [
-                7,
-                8,
-                9
-              ]
-            ],
-            "tags": [
-              "tag1",
-              "tag2"
-            ],
-            "two_qubit_calib_plan": [
-              [
-                [
-                  0,
-                  1
-                ],
-                [
-                  0,
-                  2
-                ],
-                [
-                  3,
-                  4
-                ]
-              ],
-              [
-                [
-                  5,
-                  6
-                ],
-                [
-                  7,
-                  8
-                ]
-              ]
-            ]
-          }
-        ]
+        "description": "UpdateMenuRequest is a Pydantic model for updating a menu item."
       },
       "UpdateMenuResponse": {
         "properties": {
@@ -5035,7 +4723,8 @@
         "required": [
           "name"
         ],
-        "title": "UpdateMenuResponse"
+        "title": "UpdateMenuResponse",
+        "description": "UpdateMenuResponse is a Pydantic model for the update menu response."
       },
       "User": {
         "properties": {

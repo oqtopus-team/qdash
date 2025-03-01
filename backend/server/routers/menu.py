@@ -1,62 +1,87 @@
 from logging import getLogger
+from typing import Annotated
 
-from dbmodel.menu import MenuModel
-from fastapi import APIRouter
+from datamodel.menu import MenuModel
+from fastapi import APIRouter, Depends
+from neodbmodel.initialize import initialize
+from neodbmodel.menu import MenuDocument
+from pydantic import BaseModel
+from server.lib.auth import get_current_active_user
+from server.schemas.auth import User
 from server.schemas.error import (
     Detail,
     NotFoundErrorResponse,
 )
 from server.schemas.exception import InternalSeverError
-from server.schemas.menu import (
-    CreateMenuRequest,
-    CreateMenuResponse,
-    DeleteMenuResponse,
-    GetMenuResponse,
-    ListMenuResponse,
-    UpdateMenuRequest,
-    UpdateMenuResponse,
-)
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
 
 
+class ListMenuResponse(BaseModel):
+    """ListMenuResponse is a Pydantic model that represents a menu item."""
+
+    menus: list[MenuModel]
+
+
+class CreateMenuRequest(MenuModel):
+    """CreateMenuRequest is a Pydantic model for creating a menu item."""
+
+
+class CreateMenuResponse(BaseModel):
+    """CreateMenuResponse is a Pydantic model for the create menu response."""
+
+    name: str
+
+
+class UpdateMenuRequest(MenuModel):
+    """UpdateMenuRequest is a Pydantic model for updating a menu item."""
+
+
+class UpdateMenuResponse(BaseModel):
+    """UpdateMenuResponse is a Pydantic model for the update menu response."""
+
+    name: str
+
+
+class DeleteMenuResponse(BaseModel):
+    """DeleteMenuResponse is a Pydantic model for the delete menu response."""
+
+    name: str
+
+
+class GetMenuResponse(MenuModel):
+    """GetMenuResponse is a Pydantic model for the get menu response."""
+
+
 @router.get(
     "/menu",
-    response_model=list[ListMenuResponse],
+    response_model=ListMenuResponse,
     summary="Retrieve a list of menu items.",
     operation_id="list_menu",
 )
-def list_menu() -> list[ListMenuResponse]:
-    """
-    Retrieve a list of menu items.
+def list_menu(current_user: Annotated[User, Depends(get_current_active_user)]) -> ListMenuResponse:
+    """Retrieve a list of menu items.
 
-    Returns:
+    Returns
+    -------
         ListMenuResponse: A response containing the list of menu items.
+
     """
-    try:
-        menu_list = MenuModel.find_all().to_list()
-    except Exception as e:
-        logger.error(f"Failed to list menu: {e}")
-        raise InternalSeverError(detail=f"Failed to list menu: {str(e)}")
-    if menu_list is None:
-        return list[ListMenuResponse]
-    menu_list_response = []
-    for menu in menu_list:
-        menu_list_response.append(
-            ListMenuResponse(
-                name=menu.name,
-                description=menu.description,
-                one_qubit_calib_plan=menu.one_qubit_calib_plan,
-                two_qubit_calib_plan=menu.two_qubit_calib_plan,
-                mode=menu.mode,
-                notify_bool=menu.notify_bool,
-                flow=menu.flow,
-                exp_list=menu.exp_list,
-                tags=menu.tags,
-            )
+    initialize()
+    menus = MenuDocument.find({"username": current_user.username}).run()
+    menu_list = []
+    for menu in menus:
+        menu_item = MenuModel(
+            name=menu.name,
+            username=menu.username,
+            description=menu.description,
+            qids=menu.qids,
+            notify_bool=menu.notify_bool,
+            tags=menu.tags,
         )
-    return menu_list_response
+        menu_list.append(menu_item)
+    return ListMenuResponse(menus=menu_list)
 
 
 @router.post(
@@ -65,23 +90,37 @@ def list_menu() -> list[ListMenuResponse]:
     summary="Create a new menu item.",
     operation_id="create_menu",
 )
-def create_menu(request: CreateMenuRequest) -> CreateMenuResponse:
-    """
-    Create a new menu item.
+def create_menu(
+    request: CreateMenuRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> CreateMenuResponse:
+    """Create a new menu item.
 
     Args:
+    ----
         request (CreateMenuRequest): The request object containing the menu item details.
+        current_user (User): The current authenticated user.
 
     Returns:
-        CreateMenuResponse: The response object containing the ID of the created menu item.
+    -------
+        CreateMenuResponse: The response object containing the name of the created menu item.
+
     """
-    menu_model = MenuModel(**request.model_dump())
+    initialize()
+    menu_doc = MenuDocument(
+        name=request.name,
+        username=current_user.username,
+        description=request.description,
+        qids=request.qids,
+        notify_bool=request.notify_bool,
+        tags=request.tags,
+    )
     try:
-        menu_model.save()
+        menu_doc.save()
     except Exception as e:
         logger.error(f"Failed to save menu: {e}")
-        raise InternalSeverError(detail=f"Failed to save menu: {str(e)}")
-    return CreateMenuResponse(name=menu_model.name)
+        raise InternalSeverError(detail=f"Failed to save menu: {e!s}")
+    return CreateMenuResponse(name=menu_doc.name)
 
 
 @router.delete(
@@ -91,27 +130,29 @@ def create_menu(request: CreateMenuRequest) -> CreateMenuResponse:
     summary="Delete a menu by its name.",
     operation_id="delete_menu",
 )
-def deleteMenu(name: str) -> DeleteMenuResponse | NotFoundErrorResponse:
-    """
-    Delete a menu by its name.
+def delete_menu(
+    name: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> DeleteMenuResponse | NotFoundErrorResponse:
+    """Delete a menu by its name.
 
     Args:
+    ----
         name (str): The name of the menu to be deleted.
+        current_user (User): The current authenticated user.
 
     Returns:
+    -------
         DeleteMenuResponse | NotFoundErrorResponse: The response indicating the success or failure of the deletion.
 
-    Raises:
-        None
-
     """
-    existing_menu = MenuModel.find_one(MenuModel.name == name).run()
+    initialize()
+    existing_menu = MenuDocument.find_one({"name": name, "username": current_user.username}).run()
     if existing_menu is not None:
         existing_menu.delete()
         return DeleteMenuResponse(name=existing_menu.name)
-    else:
-        logger.warn(f"menu not found: {name}")
-        return NotFoundErrorResponse(detail=f"menu not found: {name}")
+    logger.warning(f"menu not found: {name}")
+    return NotFoundErrorResponse(detail=f"menu not found: {name}")
 
 
 @router.put(
@@ -121,35 +162,36 @@ def deleteMenu(name: str) -> DeleteMenuResponse | NotFoundErrorResponse:
     summary="Update a menu with the given name.",
     operation_id="update_menu",
 )
-def updateMenu(
-    name: str, req: UpdateMenuRequest
+def update_menu(
+    name: str,
+    req: UpdateMenuRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> UpdateMenuResponse | NotFoundErrorResponse:
-    """
-    Update a menu with the given name.
+    """Update a menu with the given name.
 
     Args:
-        id (str): The name of the menu to update.
+    ----
+        name (str): The name of the menu to update.
         req (UpdateMenuRequest): The request object containing the updated menu data.
+        current_user (User): The current authenticated user.
 
     Returns:
+    -------
         Union[UpdateMenuResponse, NotFoundErrorResponse]: The response object indicating the success of the update or an error if the menu is not found.
+
     """
-    existing_menu = MenuModel.find_one(MenuModel.name == name).run()
+    initialize()
+    existing_menu = MenuDocument.find_one({"name": name, "username": current_user.username}).run()
     if existing_menu:
         existing_menu.name = req.name
         existing_menu.description = req.description
-        existing_menu.one_qubit_calib_plan = req.one_qubit_calib_plan
-        existing_menu.two_qubit_calib_plan = req.two_qubit_calib_plan
-        existing_menu.mode = req.mode
+        existing_menu.qids = req.qids
         existing_menu.notify_bool = req.notify_bool
-        existing_menu.flow = req.flow
         existing_menu.tags = req.tags
-        existing_menu.exp_list = req.exp_list
         existing_menu.save()
         return UpdateMenuResponse(name=existing_menu.name)
-    else:
-        logger.warn(f"menu not found: {name}")
-        return NotFoundErrorResponse(detail=f"menu not found: {name}")
+    logger.warning(f"menu not found: {name}")
+    return NotFoundErrorResponse(detail=f"menu not found: {name}")
 
 
 @router.get(
@@ -159,35 +201,40 @@ def updateMenu(
     responses={404: {"model": Detail}},
     operation_id="get_menu_by_name",
 )
-def get_menu_by_name(name: str) -> GetMenuResponse | NotFoundErrorResponse:
-    """
-    Retrieve a menu by its name.
+def get_menu_by_name(
+    name: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> GetMenuResponse | NotFoundErrorResponse:
+    """Retrieve a menu by its name.
 
     Args:
+    ----
         name (str): The name of the menu.
+        current_user (User): The current authenticated user.
 
     Returns:
+    -------
         GetMenuResponse: The response containing the menu details.
 
     Raises:
+    ------
         InternalServerError: If there is an error retrieving the menu.
         NotFoundErrorResponse: If the menu is not found.
+
     """
     try:
-        menu = MenuModel.find_one(MenuModel.name == name).run()
+        initialize()
+        menu = MenuDocument.find_one({"name": name, "username": current_user.username}).run()
     except Exception as e:
         logger.error(f"Failed to get menu: {e}")
-        raise InternalSeverError(detail=f"Failed to get menu: {str(e)}")
+        raise InternalSeverError(detail=f"Failed to get menu: {e!s}")
     if menu is None:
         return NotFoundErrorResponse(detail=f"menu not found: {name}")
     return GetMenuResponse(
         name=menu.name,
+        username=menu.username,
         description=menu.description,
-        one_qubit_calib_plan=menu.one_qubit_calib_plan,
-        two_qubit_calib_plan=menu.two_qubit_calib_plan,
-        mode=menu.mode,
+        qids=menu.qids,
         notify_bool=menu.notify_bool,
-        flow=menu.flow,
-        exp_list=menu.exp_list,
         tags=menu.tags,
     )

@@ -38,13 +38,14 @@ import type {
 /**
  * Retrieve a list of menu items.
 
-Returns:
+Returns
+-------
     ListMenuResponse: A response containing the list of menu items.
  * @summary Retrieve a list of menu items.
  */
 export const listMenu = (
   options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ListMenuResponse[]>> => {
+): Promise<AxiosResponse<ListMenuResponse>> => {
   return axios.get(`http://localhost:5715/menu`, options);
 };
 
@@ -154,10 +155,13 @@ export function useListMenu<
  * Create a new menu item.
 
 Args:
+----
     request (CreateMenuRequest): The request object containing the menu item details.
+    current_user (User): The current authenticated user.
 
 Returns:
-    CreateMenuResponse: The response object containing the ID of the created menu item.
+-------
+    CreateMenuResponse: The response object containing the name of the created menu item.
  * @summary Create a new menu item.
  */
 export const createMenu = (
@@ -239,13 +243,13 @@ export const useCreateMenu = <
  * Delete a menu by its name.
 
 Args:
+----
     name (str): The name of the menu to be deleted.
+    current_user (User): The current authenticated user.
 
 Returns:
+-------
     DeleteMenuResponse | NotFoundErrorResponse: The response indicating the success or failure of the deletion.
-
-Raises:
-    None
  * @summary Delete a menu by its name.
  */
 export const deleteMenu = (
@@ -327,10 +331,13 @@ export const useDeleteMenu = <
  * Update a menu with the given name.
 
 Args:
-    id (str): The name of the menu to update.
+----
+    name (str): The name of the menu to update.
     req (UpdateMenuRequest): The request object containing the updated menu data.
+    current_user (User): The current authenticated user.
 
 Returns:
+-------
     Union[UpdateMenuResponse, NotFoundErrorResponse]: The response object indicating the success of the update or an error if the menu is not found.
  * @summary Update a menu with the given name.
  */
@@ -418,12 +425,16 @@ export const useUpdateMenu = <
  * Retrieve a menu by its name.
 
 Args:
+----
     name (str): The name of the menu.
+    current_user (User): The current authenticated user.
 
 Returns:
+-------
     GetMenuResponse: The response containing the menu details.
 
 Raises:
+------
     InternalServerError: If there is an error retrieving the menu.
     NotFoundErrorResponse: If the menu is not found.
  * @summary Retrieve a menu by its name.

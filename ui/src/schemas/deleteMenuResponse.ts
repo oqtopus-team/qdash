@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * DeleteMenuResponse is a Pydantic model for the delete menu response.
+ */
 export interface DeleteMenuResponse {
   name: string;
 }

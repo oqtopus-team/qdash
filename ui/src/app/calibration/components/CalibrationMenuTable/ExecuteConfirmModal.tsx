@@ -18,7 +18,7 @@ export function ExecuteConfirmModal({
   onCancel: () => void;
 }) {
   const [yamlText, setYamlText] = useState(
-    generateYamlWithCustomArrayFormat(selectedItem),
+    generateYamlWithCustomArrayFormat(selectedItem)
   );
   const [validationError, setValidationError] = useState("");
 
@@ -33,7 +33,7 @@ export function ExecuteConfirmModal({
       } catch (error) {
         setValidationError(
           "YAMLの形式が正しくありません: " +
-            (error instanceof Error ? error.message : String(error)),
+            (error instanceof Error ? error.message : String(error))
         );
       }
     }
@@ -47,7 +47,7 @@ export function ExecuteConfirmModal({
       } catch (error) {
         toast.error(
           "YAMLのパースに失敗しました: " +
-            (error instanceof Error ? error.message : String(error)),
+            (error instanceof Error ? error.message : String(error))
         );
       }
     } else {
@@ -105,22 +105,15 @@ export function ExecuteConfirmModal({
 function generateYamlWithCustomArrayFormat(data: Menu) {
   return `
 name: ${data.name}
+username: ${data.username}
 description: ${data.description}
-one_qubit_calib_plan:
-${data.one_qubit_calib_plan
-  .map((seq) => `  - ${JSON.stringify(seq)}`)
-  .join("\n")}
-two_qubit_calib_plan:
-${data.two_qubit_calib_plan
-  .map((seq) => `  - ${JSON.stringify(seq)}`)
-  .join("\n")}
-mode: ${data.mode}
+qids:
+${data.qids.map((seq) => `  - ${JSON.stringify(seq)}`).join("\n")}
 notify_bool: ${data.notify_bool}
-flow:
-  - ${data.flow.join("\n  - ")}
-tags:
-  - ${(data.tags ?? []).join("\n  - ")}
-exp_list:
-  - ${(data.exp_list ?? []).join("\n  - ")}
+${
+  data.tags && data.tags.length > 0
+    ? `tags:\n  - ${data.tags.join("\n  - ")}`
+    : ""
+}
   `;
 }

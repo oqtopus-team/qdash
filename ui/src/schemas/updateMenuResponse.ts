@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * UpdateMenuResponse is a Pydantic model for the update menu response.
+ */
 export interface UpdateMenuResponse {
   name: string;
 }

@@ -5,17 +5,18 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UpdateMenuRequestExpList } from "./updateMenuRequestExpList";
+import type { UpdateMenuRequestTasks } from "./updateMenuRequestTasks";
 import type { UpdateMenuRequestTags } from "./updateMenuRequestTags";
 
+/**
+ * UpdateMenuRequest is a Pydantic model for updating a menu item.
+ */
 export interface UpdateMenuRequest {
   name: string;
+  username: string;
   description: string;
-  one_qubit_calib_plan: number[][];
-  two_qubit_calib_plan: [number, number][][];
-  mode: string;
+  qids: string[][];
   notify_bool?: boolean;
-  flow: string[];
-  exp_list?: UpdateMenuRequestExpList;
+  tasks?: UpdateMenuRequestTasks;
   tags?: UpdateMenuRequestTags;
 }
