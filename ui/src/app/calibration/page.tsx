@@ -40,9 +40,7 @@ export default function CalibrationPage() {
               <div role="tablist" className="tabs tabs-bordered tabs-lg mt-20">
                 <a
                   role="tab"
-                  className={
-                    activeTab === "Calibration Menu" ? "tab tab-active" : "tab"
-                  }
+                  className={activeTab === "Menu" ? "tab tab-active" : "tab"}
                   onClick={() => setActiveTab("Menu")}
                 >
                   Menu

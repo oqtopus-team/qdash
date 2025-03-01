@@ -6,7 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export interface TwoQubitCalibStatsResponse {
-  date: string;
-  [key: string]: unknown;
-}
+export type CreateMenuRequestTasks = string[] | null;

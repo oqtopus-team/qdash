@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ExecuteCalibRequestTasks } from "./executeCalibRequestTasks";
-import type { ExecuteCalibRequestTags } from "./executeCalibRequestTags";
+import type { MenuModelTasks } from "./menuModelTasks";
+import type { MenuModelTags } from "./menuModelTags";
 
 /**
  * Menu model.
@@ -16,17 +16,17 @@ Attributes
     name (str): The name of the menu.
     username (str): The username of the user who created
     description (str): Detailed description of the menu.
-    qids (list[list[str]]): The qubit IDs.
+    cal_plan (list[list[int]]): The calibration plan.
     notify_bool (bool): The notification boolean.
     tasks (list[str]): The tasks.
     tags (list[str]): The tags.
  */
-export interface ExecuteCalibRequest {
+export interface MenuModel {
   name: string;
   username: string;
   description: string;
   qids: string[][];
   notify_bool?: boolean;
-  tasks?: ExecuteCalibRequestTasks;
-  tags?: ExecuteCalibRequestTags;
+  tasks?: MenuModelTasks;
+  tags?: MenuModelTags;
 }

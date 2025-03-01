@@ -2,6 +2,9 @@ from pathlib import Path
 
 import pendulum
 from cal_flow import qubex_one_qubit_cal_flow
+
+# from qcflow.schema.menu import Menu
+from datamodel.menu import MenuModel as Menu
 from db.execution_lock import (
     get_execution_lock,
     lock_execution,
@@ -15,7 +18,6 @@ from qcflow.db.bluefors import get_latest_temperature
 from qcflow.db.execution_run import get_next_execution_index
 from qcflow.db.execution_run_history import insert_execution_run
 from qcflow.manager.execution import ExecutionManager
-from qcflow.schema.menu import Menu
 from qcflow.utiltask.create_directory import (
     create_directory_task,
 )
@@ -101,7 +103,7 @@ def main_flow(
     create_directory_task.submit(calib_dir).result()
     latest_calib_dir = f"/app/calib_data/{username}/{date_str}/latest"
     create_directory_task.submit(latest_calib_dir).result()
-    success_map = {flow_name: False for flow_name in menu.flow}
+    success_map = {flow_name: False for flow_name in calibration_flow_map}
 
     execution_manager = ExecutionManager(
         username=username,
@@ -122,10 +124,7 @@ def main_flow(
     execution_manager.save()
     ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
     try:
-        for flow_name in menu.flow:
-            success_map = calibration_flow_map[flow_name](
-                menu, calib_dir, success_map, execution_id
-            )
+        success_map = qubex_one_qubit_cal_flow(menu, calib_dir, success_map, execution_id)
         execution_manager.update_execution_status_to_completed()
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")

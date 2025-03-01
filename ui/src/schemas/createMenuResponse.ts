@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * CreateMenuResponse is a Pydantic model for the create menu response.
+ */
 export interface CreateMenuResponse {
   name: string;
 }

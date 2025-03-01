@@ -8,6 +8,7 @@ from cal_task import (
     validate_task_name,
 )
 from cal_util import qid_to_label, update_active_output_parameters, update_active_tasks
+from datamodel.menu import MenuModel as Menu
 from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.initialize import initialize
 from neodbmodel.parameter import ParameterDocument
@@ -18,7 +19,6 @@ from prefect.task_runners import SequentialTaskRunner
 from protocols.active_protocols import task_classes
 from qcflow.manager.execution import ExecutionManager
 from qcflow.manager.task import TaskManager
-from qcflow.schema.menu import Menu
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
 
@@ -74,7 +74,7 @@ def cal_flow(
         config_dir="/home/shared/config",
     )
     exp.note.clear()
-    task_names = validate_task_name(menu.exp_list)
+    task_names = validate_task_name(menu.tasks)
     task_manager = TaskManager(
         username=username, execution_id=execution_id, qids=qubits, calib_dir=calib_dir
     )
@@ -146,7 +146,7 @@ async def qubex_one_qubit_cal_flow(
     logger.info(f"Qubex version: {get_package_version('qubex')}")
     parallel = True
     plan = [["28", "29", "30", "31"]]
-    if len(menu.one_qubit_calib_plan) == 1:
+    if len(menu.qids) == 1:
         parallel = False
     if parallel:
         logger.info("parallel is True")

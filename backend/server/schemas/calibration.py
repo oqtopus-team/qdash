@@ -53,31 +53,39 @@ class TwoQubitCalibHistoryResponse(BaseModel):
 
 
 class ExecuteCalibRequest(BaseModel):
+    """Menu model.
+
+    Attributes
+    ----------
+        name (str): The name of the menu.
+        username (str): The username of the user who created
+        description (str): Detailed description of the menu.
+        qids (list[list[str]]): The qubit IDs.
+        notify_bool (bool): The notification boolean.
+        tasks (list[str]): The tasks.
+        tags (list[str]): The tags.
+
+    """
+
     name: str
+    username: str
     description: str
-    one_qubit_calib_plan: list[list[int]]
-    two_qubit_calib_plan: list[list[tuple[int, int]]]
-    mode: str
-    notify_bool: bool = True
-    flow: list[str]
-    exp_list: Optional[list[str]] = Field(default=[])
-    tags: Optional[list[str]] = Field(default=None)
+    qids: list[list[str]]
+    notify_bool: bool = False
+    tasks: list[str] | None = Field(default=None)
+    tags: list[str] | None = Field(default=None)
 
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
                     "name": "1Q-MOCK-DEMO",
+                    "username": "default-user",
                     "description": "one qubit calibration for mock demo",
-                    "one_qubit_calib_plan": [[0, 1, 2], [4, 5, 6], [7, 8, 9]],
-                    "two_qubit_calib_plan": [
-                        [[0, 1], [0, 2], [3, 4]],
-                        [[5, 6], [7, 8]],
-                    ],
-                    "mode": "calib",
+                    "qids": [["Q1"], ["Q2", "Q3"]],
                     "notify_bool": False,
-                    "flow": ["one-qubit-calibration-flow"],
-                    "tags": ["tag1", "tag2"],
+                    "tasks": ["task1", "task2"],
+                    "tags": ["calibration", "demo"],
                 },
             ]
         }

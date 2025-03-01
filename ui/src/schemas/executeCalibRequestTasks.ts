@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type UpdateMenuRequestExpList = string[] | null;
+export type ExecuteCalibRequestTasks = string[] | null;

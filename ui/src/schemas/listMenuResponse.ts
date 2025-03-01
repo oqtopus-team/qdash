@@ -5,17 +5,11 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ListMenuResponseExpList } from "./listMenuResponseExpList";
-import type { ListMenuResponseTags } from "./listMenuResponseTags";
+import type { MenuModel } from "./menuModel";
 
+/**
+ * ListMenuResponse is a Pydantic model that represents a menu item.
+ */
 export interface ListMenuResponse {
-  name: string;
-  description: string;
-  one_qubit_calib_plan: number[][];
-  two_qubit_calib_plan: [number, number][][];
-  mode: string;
-  notify_bool?: boolean;
-  flow: string[];
-  exp_list?: ListMenuResponseExpList;
-  tags?: ListMenuResponseTags;
+  menus: MenuModel[];
 }

@@ -10,26 +10,24 @@ import type { Menu } from "../../model";
 import { FaRegCirclePlay } from "react-icons/fa6";
 const columnHelper = createColumnHelper<Menu>();
 
-function generateYamlWithCustomArrayFormat(data) {
+function generateYamlWithCustomArrayFormat(data: Menu) {
   return `
 name: ${data.name}
+username: ${data.username}
 description: ${data.description}
-one_qubit_calib_plan:
-${data.one_qubit_calib_plan
-  .map((seq) => `  - ${JSON.stringify(seq)}`)
-  .join("\n")}
-two_qubit_calib_plan:
-${data.two_qubit_calib_plan
-  .map((seq) => `  - ${JSON.stringify(seq)}`)
-  .join("\n")}
-mode: ${data.mode}
+qids:
+${data.qids.map((seq) => `  - ${JSON.stringify(seq)}`).join("\n")}
 notify_bool: ${data.notify_bool}
-flow:
-  - ${data.flow.join("\n  - ")}
-tags:
-  - ${(data.tags ?? []).join("\n  - ")}
-exp_list:
-  - ${(data.exp_list ?? []).join("\n  - ")}
+${
+  data.tasks && data.tasks.length > 0
+    ? `tasks:\n  - ${data.tasks.join("\n  - ")}`
+    : ""
+}
+${
+  data.tags && data.tags.length > 0
+    ? `tags:\n  - ${data.tags.join("\n  - ")}`
+    : ""
+}
   `;
 }
 
@@ -63,21 +61,13 @@ export const getColumns = (
     header: "Description",
     cell: (info) => info.getValue(),
   }),
-  columnHelper.accessor("one_qubit_calib_plan", {
-    header: "One Qubit Calib Plan",
-    cell: (info) => JSON.stringify(info.getValue()), // YAML形式にしたい場合は別途変換
-  }),
-  columnHelper.accessor("two_qubit_calib_plan", {
-    header: "Two Qubit Calib Plan",
-    cell: (info) => JSON.stringify(info.getValue()), // YAML形式にしたい場合は別途変換
-  }),
-  columnHelper.accessor("mode", {
-    header: "Mode",
-    cell: (info) => info.getValue(),
+  columnHelper.accessor("qids", {
+    header: "QIDs",
+    cell: (info) => JSON.stringify(info.getValue()),
   }),
   columnHelper.accessor("tags", {
     header: "Tags",
-    cell: (info) => JSON.stringify(info.getValue()), // YAML形式にしたい場合は別途変換
+    cell: (info) => JSON.stringify(info.getValue()),
   }),
   columnHelper.display({
     id: "tableEdit",

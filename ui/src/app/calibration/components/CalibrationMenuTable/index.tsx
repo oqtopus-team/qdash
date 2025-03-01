@@ -13,99 +13,35 @@ import { NewItemModalFromTemplate } from "./NewItemModalFromTemplate";
 import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
 
 import type { Menu } from "../../model";
-import { useExecuteCalib } from "@/client/calibration/calibration";
-import { useFetchExecutionLockStatus } from "@/client/execution/execution";
 import { useListMenu, useDeleteMenu } from "@/client/menu/menu";
+import { useExecuteCalib } from "@/client/calibration/calibration";
+import { useAuth } from "@/app/contexts/AuthContext";
 import { Table } from "@/app/components/Table";
 
 // Initial selected item
 const INITIAL_SELECTED_ITEM: Menu = {
-  name: "open-service",
-  description: "open-service",
-  one_qubit_calib_plan: [[0], [0]],
-  two_qubit_calib_plan: [
-    [0, 1],
-    [0, 2],
-  ],
-  mode: "mode",
+  name: "default-menu",
+  username: "default-user",
+  description: "Default calibration menu",
+  qids: [["Q1"], ["Q2", "Q3"]],
   notify_bool: false,
-  tags: ["tags"],
-  flow: ["flow"],
+  tags: ["calibration"],
 };
 
 export function CalibrationMenuTable() {
   const { data, isError, isLoading, refetch: refetchMenu } = useListMenu();
   const deleteMutation = useDeleteMenu();
   const executeCalibMutation = useExecuteCalib();
-  const {
-    data: lockStatus,
-    isLoading: isLockStatusLoading,
-    refetch: refetchLockStatus,
-  } = useFetchExecutionLockStatus();
-  const [lock, setLock] = useState<boolean>();
+  const { user } = useAuth();
   const [tableData, setTableData] = useState<Menu[]>([]);
   const [selectedItem, setSelectedItem] = useState<Menu>(INITIAL_SELECTED_ITEM);
-  const [showConfirmModal, setShowConfirmModal] = useState(false); // モーダル表示の状態
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   useEffect(() => {
     if (data) {
       setTableData(mapListMenuResponseToListMenu(data.data));
     }
   }, [data]);
-
-  useEffect(() => {
-    if (lockStatus) {
-      setLock(lockStatus.data.lock);
-    }
-  }, [lockStatus]);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      refetchLockStatus();
-    }, 5000); // 5秒ごとにロック状態を確認
-
-    return () => clearInterval(intervalId); // クリーンアップ
-  }, [refetchLockStatus]);
-
-  const calibrationExecutedNotify = (flow_run_url: string) => {
-    const localUrl = flow_run_url.replace(
-      "http://172.22.0.5:4200",
-      "http://localhost:4200",
-    );
-    toast(
-      <div>
-        <a
-          href={localUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-500 underline"
-        >
-          Check detail from here! 🚀
-        </a>
-      </div>,
-    );
-  };
-
-  const handleExecuteCalib = (menu: Menu) => {
-    setSelectedItem(menu);
-    setShowConfirmModal(true); // 確認モーダルを表示
-  };
-
-  const confirmExecution = (updatedItem: Menu) => {
-    executeCalibMutation.mutate(
-      { data: updatedItem },
-      {
-        onSuccess: (response) => {
-          calibrationExecutedNotify(response.data.flow_run_url);
-          setShowConfirmModal(false); // モーダルを閉じる
-        },
-        onError: (error) => {
-          console.error("Error executing calibration:", error);
-          toast.error("Error executing calibration");
-        },
-      },
-    );
-  };
 
   const handleDeleteClick = (item: Menu) => {
     deleteMutation.mutate(
@@ -120,13 +56,13 @@ export function CalibrationMenuTable() {
         onError: (error) => {
           console.error("Error deleting menu:", error);
         },
-      },
+      }
     );
   };
 
   const handleNewItem = () => {
     const newItemModal = document.getElementById(
-      "newItem",
+      "newItem"
     ) as HTMLDialogElement | null;
     if (newItemModal) {
       newItemModal.showModal();
@@ -135,7 +71,7 @@ export function CalibrationMenuTable() {
 
   const handleCreateTemplate = () => {
     const createTemplateModal = document.getElementById(
-      "createTemplate",
+      "createTemplate"
     ) as HTMLDialogElement | null;
     if (createTemplateModal) {
       createTemplateModal.showModal();
@@ -145,25 +81,30 @@ export function CalibrationMenuTable() {
   const handleEditClick = (item: Menu) => {
     setSelectedItem(item);
     const editModal = document.getElementById(
-      "tableEdit",
+      "tableEdit"
     ) as HTMLDialogElement | null;
     if (editModal) {
       editModal.showModal();
     }
   };
 
-  if (isLoading || isLockStatusLoading) {
+  if (isLoading) {
     return <div>Loading...</div>;
   }
   if (isError) {
     return <div>Error</div>;
   }
 
+  const handleExecuteCalib = (item: Menu) => {
+    setSelectedItem(item);
+    setShowConfirmModal(true);
+  };
+
   const columns = getColumns(
     handleEditClick,
     handleDeleteClick,
     handleExecuteCalib,
-    lock ?? false, // ロック状態を渡す
+    false // Temporarily disable lock
   );
 
   return (
@@ -200,11 +141,29 @@ export function CalibrationMenuTable() {
         setTableData={setTableData}
         refetchMenu={refetchMenu}
       />
-      {/* 確認モーダルの表示 */}
       {showConfirmModal && (
         <ExecuteConfirmModal
           selectedItem={selectedItem}
-          onConfirm={confirmExecution}
+          onConfirm={(updatedItem) => {
+            executeCalibMutation.mutate(
+              {
+                data: {
+                  ...updatedItem,
+                  username: user?.username ?? "default-user",
+                },
+              },
+              {
+                onSuccess: (response) => {
+                  toast.success("Calibration execution started!");
+                  setShowConfirmModal(false);
+                },
+                onError: (error) => {
+                  console.error("Error executing calibration:", error);
+                  toast.error("Error executing calibration");
+                },
+              }
+            );
+          }}
           onCancel={() => setShowConfirmModal(false)}
         />
       )}

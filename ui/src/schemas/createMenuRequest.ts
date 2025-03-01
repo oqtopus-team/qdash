@@ -5,17 +5,18 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CreateMenuRequestExpList } from "./createMenuRequestExpList";
+import type { CreateMenuRequestTasks } from "./createMenuRequestTasks";
 import type { CreateMenuRequestTags } from "./createMenuRequestTags";
 
+/**
+ * CreateMenuRequest is a Pydantic model for creating a menu item.
+ */
 export interface CreateMenuRequest {
   name: string;
+  username: string;
   description: string;
-  one_qubit_calib_plan: number[][];
-  two_qubit_calib_plan: [number, number][][];
-  mode: string;
+  qids: string[][];
   notify_bool?: boolean;
-  flow: string[];
-  exp_list?: CreateMenuRequestExpList;
+  tasks?: CreateMenuRequestTasks;
   tags?: CreateMenuRequestTags;
 }

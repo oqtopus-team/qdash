@@ -4,6 +4,7 @@ from bunnet import init_bunnet
 from neodbmodel.chip import ChipDocument
 from neodbmodel.coupling import CouplingDocument
 from neodbmodel.execution_history import ExecutionHistoryDocument
+from neodbmodel.menu import MenuDocument
 from neodbmodel.parameter import ParameterDocument
 from neodbmodel.qubit import QubitDocument
 from neodbmodel.task import TaskDocument
@@ -28,5 +29,6 @@ def initialize() -> None:
             TaskDocument,
             CouplingDocument,
             UserDocument,
+            MenuDocument,
         ],
     )
