@@ -51,9 +51,24 @@ export default function ExecutionDetailClient({
     data: ExecutionResponseDetail;
   };
 
+  // Filter out tasks without task_id and ensure all required fields are present
+  const validTasks = execution.task
+    .filter((task) => task.task_id)
+    .map((task) => ({
+      task_id: task.task_id as string,
+      name: task.name,
+      status: task.status || "unknown",
+      upstream_id: task.upstream_id || undefined,
+      start_at: task.start_at || undefined,
+      elapsed_time: task.elapsed_time || undefined,
+      figure_path: task.figure_path || undefined,
+      input_parameters: task.input_parameters || undefined,
+      output_parameters: task.output_parameters || undefined,
+    }));
+
   return (
-    <div className="w-full px-4 py-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="w-full px-4 py-6" style={{ width: "calc(100vw - 20rem)" }}>
+      <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">{execution.name}</h1>
           <div className="flex space-x-4">
@@ -76,19 +91,7 @@ export default function ExecutionDetailClient({
 
         <div className="bg-base-100 rounded-lg shadow-md p-6">
           <h2 className="text-xl font-bold mb-4">Execution Flow</h2>
-          <ExecutionDAG
-            tasks={execution.task.map((task) => ({
-              task_id: task.task_id,
-              name: task.name,
-              status: task.status,
-              upstream_id: task.upstream_id || undefined,
-              start_at: task.start_at || undefined,
-              elapsed_time: task.elapsed_time || undefined,
-              figure_path: task.figure_path || undefined,
-              input_parameters: task.input_parameters || undefined,
-              output_parameters: task.output_parameters || undefined,
-            }))}
-          />
+          <ExecutionDAG tasks={validTasks} />
         </div>
 
         <div className="bg-base-100 rounded-lg shadow-md p-6">
@@ -110,10 +113,10 @@ export default function ExecutionDetailClient({
                           task.status === "running"
                             ? "text-info"
                             : task.status === "completed"
-                              ? "text-success"
-                              : task.status === "scheduled"
-                                ? "text-warning"
-                                : "text-error"
+                            ? "text-success"
+                            : task.status === "scheduled"
+                            ? "text-warning"
+                            : "text-error"
                         }`}
                       >
                         {task.status}
@@ -159,7 +162,7 @@ export default function ExecutionDetailClient({
                                               ? path
                                               : `/${path}`;
                                           link.href = `http://localhost:5715/file/raw_data?path=${encodeURIComponent(
-                                            normalizedPath,
+                                            normalizedPath
                                           )}`;
                                           // Get just the filename for download
                                           const filename =
@@ -175,7 +178,7 @@ export default function ExecutionDetailClient({
                                         Download
                                       </button>
                                     </div>
-                                  ),
+                                  )
                                 )}
                               </div>
                             </div>
@@ -191,7 +194,7 @@ export default function ExecutionDetailClient({
                                 </h4>
                                 <img
                                   src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                                    path,
+                                    path
                                   )}`}
                                   alt={`Task Figure ${i + 1}`}
                                   className="w-full h-auto max-h-[60vh] object-contain rounded border"
@@ -205,7 +208,7 @@ export default function ExecutionDetailClient({
                               </h4>
                               <img
                                 src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                                  task.figure_path,
+                                  task.figure_path
                                 )}`}
                                 alt="Task Figure"
                                 className="w-full h-auto max-h-[60vh] object-contain rounded border"
