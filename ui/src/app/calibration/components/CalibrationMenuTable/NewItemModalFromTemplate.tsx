@@ -15,12 +15,14 @@ import type { CreateMenuRequest } from "@/schemas";
 // テンプレートの初期データ
 const templateData = `
 name: template
-username: default_user
 description: calibration menu template
 qids:
   - ["Q1"]
   - ["Q2", "Q3"]
 notify_bool: false
+tasks:
+  - task1
+  - task2
 tags:
   - calibration
   - template

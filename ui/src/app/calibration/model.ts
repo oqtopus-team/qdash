@@ -23,6 +23,7 @@ export type Menu = {
   description: string;
   qids: string[][];
   notify_bool: boolean;
+  tasks?: string[];
   tags?: string[];
 };
 
@@ -35,6 +36,7 @@ export const mapListMenuResponseToListMenu = (
     description: item.description,
     qids: item.qids,
     notify_bool: item.notify_bool ?? false,
+    tasks: item.tasks ?? [],
     tags: item.tags ?? [],
   }));
 };

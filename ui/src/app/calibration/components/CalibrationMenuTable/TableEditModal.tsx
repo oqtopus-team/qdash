@@ -16,10 +16,10 @@ import type { UpdateMenuRequest } from "@/schemas";
 
 interface YamlData {
   name: string;
-  username: string;
   description: string;
   qids: string[][];
   notify_bool: boolean;
+  tasks?: string[];
   tags?: string[];
 }
 
@@ -27,11 +27,15 @@ interface YamlData {
 function generateYamlWithCustomArrayFormat(data: Menu): string {
   return `
 name: ${data.name}
-username: ${data.username}
 description: ${data.description}
 qids:
 ${data.qids.map((seq) => `  - ${JSON.stringify(seq)}`).join("\n")}
 notify_bool: ${data.notify_bool}
+${
+  data.tasks && data.tasks.length > 0
+    ? `tasks:\n  - ${data.tasks.join("\n  - ")}`
+    : ""
+}
 ${
   data.tags && data.tags.length > 0
     ? `tags:\n  - ${data.tags.join("\n  - ")}`
@@ -83,10 +87,13 @@ export function TableEditModal({
 
       const formattedItem: UpdateMenuRequest = {
         name: updatedItem.name,
-        username: updatedItem.username,
+        username: selectedItem.username, // Keep the original username
         description: updatedItem.description,
         qids: updatedItem.qids,
         notify_bool: updatedItem.notify_bool,
+        tasks:
+          updatedItem.tasks?.filter((item) => item !== null && item !== "") ??
+          [],
         tags:
           updatedItem.tags?.filter((item) => item !== null && item !== "") ??
           [],
@@ -94,10 +101,13 @@ export function TableEditModal({
 
       const menuItem: Menu = {
         name: updatedItem.name,
-        username: updatedItem.username,
+        username: selectedItem.username, // Keep the original username
         description: updatedItem.description,
         qids: updatedItem.qids,
         notify_bool: updatedItem.notify_bool,
+        tasks:
+          updatedItem.tasks?.filter((item) => item !== null && item !== "") ??
+          [],
         tags:
           updatedItem.tags?.filter((item) => item !== null && item !== "") ??
           [],

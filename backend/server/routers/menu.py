@@ -77,6 +77,7 @@ def list_menu(current_user: Annotated[User, Depends(get_current_active_user)]) -
             username=menu.username,
             description=menu.description,
             qids=menu.qids,
+            tasks=menu.tasks,
             notify_bool=menu.notify_bool,
             tags=menu.tags,
         )
@@ -112,6 +113,7 @@ def create_menu(
         username=current_user.username,
         description=request.description,
         qids=request.qids,
+        tasks=request.tasks,
         notify_bool=request.notify_bool,
         tags=request.tags,
     )
@@ -186,6 +188,7 @@ def update_menu(
         existing_menu.name = req.name
         existing_menu.description = req.description
         existing_menu.qids = req.qids
+        existing_menu.tasks = req.tasks
         existing_menu.notify_bool = req.notify_bool
         existing_menu.tags = req.tags
         existing_menu.save()
@@ -235,6 +238,7 @@ def get_menu_by_name(
         username=menu.username,
         description=menu.description,
         qids=menu.qids,
+        tasks=menu.tasks,
         notify_bool=menu.notify_bool,
         tags=menu.tags,
     )

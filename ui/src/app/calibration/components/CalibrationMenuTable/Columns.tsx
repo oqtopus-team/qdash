@@ -19,6 +19,11 @@ qids:
 ${data.qids.map((seq) => `  - ${JSON.stringify(seq)}`).join("\n")}
 notify_bool: ${data.notify_bool}
 ${
+  data.tasks && data.tasks.length > 0
+    ? `tasks:\n  - ${data.tasks.join("\n  - ")}`
+    : ""
+}
+${
   data.tags && data.tags.length > 0
     ? `tags:\n  - ${data.tags.join("\n  - ")}`
     : ""
@@ -46,7 +51,7 @@ export const getColumns = (
   handleEditClick: (item: Menu) => void,
   handleDeleteClick: (item: Menu) => void,
   handleExecuteCalib: (item: Menu) => void,
-  isLocked: boolean
+  isLocked: boolean,
 ) => [
   columnHelper.accessor("name", {
     header: "Name",
@@ -60,13 +65,9 @@ export const getColumns = (
     header: "QIDs",
     cell: (info) => JSON.stringify(info.getValue()),
   }),
-  columnHelper.accessor("username", {
-    header: "Username",
-    cell: (info) => info.getValue(),
-  }),
   columnHelper.accessor("tags", {
     header: "Tags",
-    cell: (info) => JSON.stringify(info.getValue()), // YAML形式にしたい場合は別途変換
+    cell: (info) => JSON.stringify(info.getValue()),
   }),
   columnHelper.display({
     id: "tableEdit",

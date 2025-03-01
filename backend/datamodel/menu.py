@@ -23,5 +23,5 @@ class MenuModel(BaseModel):
     description: str
     qids: list[list[str]]
     notify_bool: bool = False
-    tasks: list[str] | None = Field(default=None, exclude=True)
+    tasks: list[str] | None = Field(default=None)
     tags: list[str] | None = Field(default=None)

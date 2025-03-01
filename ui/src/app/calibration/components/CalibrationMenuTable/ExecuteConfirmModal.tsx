@@ -105,11 +105,15 @@ export function ExecuteConfirmModal({
 function generateYamlWithCustomArrayFormat(data: Menu) {
   return `
 name: ${data.name}
-username: ${data.username}
 description: ${data.description}
 qids:
 ${data.qids.map((seq) => `  - ${JSON.stringify(seq)}`).join("\n")}
 notify_bool: ${data.notify_bool}
+${
+  data.tasks && data.tasks.length > 0
+    ? `tasks:\n  - ${data.tasks.join("\n  - ")}`
+    : ""
+}
 ${
   data.tags && data.tags.length > 0
     ? `tags:\n  - ${data.tags.join("\n  - ")}`

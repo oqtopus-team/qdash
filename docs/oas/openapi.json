@@ -21,7 +21,7 @@
           "calibration"
         ],
         "summary": "Executes a calibration by creating a flow run from a deployment.",
-        "description": "Executes a calibration by creating a flow run from a deployment.\n\nArgs:\n    request (ExecuteCalibRequest): The request object containing the calibration data.\n    settings (Settings): The application settings.\n\nReturns:\n    FLOW_RUN_URL: The URL of the created flow run.\n\nRaises:\n    HTTPException: If the execution of the calibration fails.",
+        "description": "Executes a calibration by creating a flow run from a deployment.\n\nArgs:\n----\n    request (ExecuteCalibRequest): The request object containing the calibration data.\n    settings (Settings): The application settings.\n\nReturns:\n-------\n    FLOW_RUN_URL: The URL of the created flow run.\n\nRaises:\n------\n    HTTPException: If the execution of the calibration fails.",
         "operationId": "execute_calib",
         "requestBody": {
           "content": {
@@ -143,641 +143,6 @@
             "content": {
               "application/json": {
                 "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/calibrations/latest/one_qubit": {
-      "get": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Fetches all the latest one qubit calibrations.",
-        "description": "Fetches all the latest one qubit calibrations.\n\nReturns:\n    A list of OneQubitCalibResponse objects representing the latest one qubit calibrations.",
-        "operationId": "fetch_all_latest_one_qubit_calib",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/OneQubitCalibResponse"
-                  },
-                  "type": "array",
-                  "title": "Response Fetch All Latest One Qubit Calib"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/calibrations/latest/one_qubit/cw_info": {
-      "put": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Updates a one qubit calibration CW info.",
-        "operationId": "update_all_latest_one_qubit_calib_cw_info",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OneQubitCalibCWInfo"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/calibrations/latest/two_qubit": {
-      "get": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Fetches all the latest two qubit calibrations.",
-        "description": "Fetches all the latest two qubit calibrations.\n\nReturns:\n    list: A list of TwoQubitCalibResponse objects representing the latest two qubit calibrations.",
-        "operationId": "fetch_all_latest_two_qubit_calib",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/TwoQubitCalibResponse"
-                  },
-                  "type": "array",
-                  "title": "Response Fetch All Latest Two Qubit Calib"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/calibrations/history/one_qubit/{label}": {
-      "get": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Fetches the calibration history for a specific one-qubit calibration by its label.",
-        "description": "Fetches the calibration history for a specific one-qubit calibration by its ID.\n\nArgs:\n    id (str): The ID of the one-qubit calibration.\n\nReturns:\n    list[OneQubitCalibHistoryResponse]: A list of OneQubitCalibHistoryResponse objects representing the calibration history.",
-        "operationId": "fetch_one_qubit_calib_history_by_label",
-        "parameters": [
-          {
-            "name": "label",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Label"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/OneQubitCalibHistoryResponse"
-                  },
-                  "title": "Response Fetch One Qubit Calib History By Label"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/calibrations/history/two_qubit/{label}": {
-      "get": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Fetches the calibration history for a specific two-qubit calibration by its label.",
-        "operationId": "fetch_two_qubit_calib_history_by_label",
-        "parameters": [
-          {
-            "name": "label",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Label"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TwoQubitCalibHistoryResponse"
-                  },
-                  "title": "Response Fetch Two Qubit Calib History By Label"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/calibrations/one_qubit/summary": {
-      "get": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Fetches all the one qubit calibration summaries.",
-        "operationId": "fetch_all_one_qubit_calib_summary",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/OneQubitCalibDailySummaryResponse"
-                  },
-                  "type": "array",
-                  "title": "Response Fetch All One Qubit Calib Summary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/calibrations/two_qubit/summary": {
-      "get": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Fetches all the two qubit calibration summaries.",
-        "operationId": "fetch_all_two_qubit_calib_summary",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/TwoQubitCalibDailySummaryResponse"
-                  },
-                  "type": "array",
-                  "title": "Response Fetch All Two Qubit Calib Summary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/calibrations/one_qubit/summary/{date}": {
-      "get": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Fetches a one qubit calibration summary by its date.",
-        "operationId": "fetch_one_qubit_calib_summary_by_date",
-        "parameters": [
-          {
-            "name": "date",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Date"
-            }
-          },
-          {
-            "name": "field",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Field"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OneQubitCalibDailySummaryResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Detail"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Updates a one qubit calibration summary by its date.",
-        "operationId": "update_one_qubit_calib_summary_by_date",
-        "parameters": [
-          {
-            "name": "date",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Date"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OneQubitCalibDailySummaryRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OneQubitCalibDailySummaryResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/calibrations/two_qubit/summary/{date}": {
-      "get": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Fetches a two qubit calibration summary by its date.",
-        "operationId": "fetch_two_qubit_calib_summary_by_date",
-        "parameters": [
-          {
-            "name": "date",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Date"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TwoQubitCalibDailySummaryResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Detail"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Updates a two qubit calibration summary by its date.",
-        "operationId": "update_two_qubit_calib_summary_by_date",
-        "parameters": [
-          {
-            "name": "date",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Date"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TwoQubitCalibDailySummaryRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TwoQubitCalibDailySummaryModel"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Detail"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/calibrations/figure/{date}/{qubit}/{path}/{exp}": {
-      "get": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Fetches a calibration figure by its date, qubit, and experiment.",
-        "operationId": "fetch_calib_figure_by_date",
-        "parameters": [
-          {
-            "name": "date",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Date"
-            }
-          },
-          {
-            "name": "qubit",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Qubit"
-            }
-          },
-          {
-            "name": "path",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          },
-          {
-            "name": "exp",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Exp"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Detail"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/calibrations/stats/one_qubit": {
-      "post": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Fetches one qubit calibration stats for dashboard plots.",
-        "description": "Fetches one qubit calibration statistics for generating dashboard plots.\n\nArgs:\n    request (OneQubitCalibStatsRequest): The request object containing the labels.\n\nReturns:\n    list: A list of dictionaries representing the calibration statistics for each date.",
-        "operationId": "fetch_one_qubit_calib_stats",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OneQubitCalibStatsRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/OneQubitCalibStatsResponse"
-                  },
-                  "type": "array",
-                  "title": "Response Fetch One Qubit Calib Stats"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/calibrations/stats/two_qubit": {
-      "post": {
-        "tags": [
-          "calibration"
-        ],
-        "summary": "Fetches two qubit calibration stats for dashboard plots.",
-        "description": "Fetches two qubit calibration statistics for generating dashboard plots.\n\nArgs:\n    request (TwoQubitCalibStatsRequest): The request object containing the labels.\n\nReturns:\n    list: A list of dictionaries representing the calibration statistics for each date.",
-        "operationId": "fetch_two_qubit_calib_stats",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TwoQubitCalibStatsRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/TwoQubitCalibStatsResponse"
-                  },
-                  "type": "array",
-                  "title": "Response Fetch Two Qubit Calib Stats"
-                }
               }
             }
           },
@@ -2886,57 +2251,30 @@
             "type": "string",
             "title": "Name"
           },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
           "description": {
             "type": "string",
             "title": "Description"
           },
-          "one_qubit_calib_plan": {
+          "qids": {
             "items": {
               "items": {
-                "type": "integer"
+                "type": "string"
               },
               "type": "array"
             },
             "type": "array",
-            "title": "One Qubit Calib Plan"
-          },
-          "two_qubit_calib_plan": {
-            "items": {
-              "items": {
-                "prefixItems": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "integer"
-                  }
-                ],
-                "type": "array",
-                "maxItems": 2,
-                "minItems": 2
-              },
-              "type": "array"
-            },
-            "type": "array",
-            "title": "Two Qubit Calib Plan"
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode"
+            "title": "Qids"
           },
           "notify_bool": {
             "type": "boolean",
             "title": "Notify Bool",
-            "default": true
+            "default": false
           },
-          "flow": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Flow"
-          },
-          "exp_list": {
+          "tasks": {
             "anyOf": [
               {
                 "items": {
@@ -2948,8 +2286,7 @@
                 "type": "null"
               }
             ],
-            "title": "Exp List",
-            "default": []
+            "title": "Tasks"
           },
           "tags": {
             "anyOf": [
@@ -2969,69 +2306,35 @@
         "type": "object",
         "required": [
           "name",
+          "username",
           "description",
-          "one_qubit_calib_plan",
-          "two_qubit_calib_plan",
-          "mode",
-          "flow"
+          "qids"
         ],
         "title": "ExecuteCalibRequest",
+        "description": "Menu model.\n\nAttributes\n----------\n    name (str): The name of the menu.\n    username (str): The username of the user who created\n    description (str): Detailed description of the menu.\n    qids (list[list[str]]): The qubit IDs.\n    notify_bool (bool): The notification boolean.\n    tasks (list[str]): The tasks.\n    tags (list[str]): The tags.",
         "examples": [
           {
             "description": "one qubit calibration for mock demo",
-            "flow": [
-              "one-qubit-calibration-flow"
-            ],
-            "mode": "calib",
             "name": "1Q-MOCK-DEMO",
             "notify_bool": false,
-            "one_qubit_calib_plan": [
+            "qids": [
               [
-                0,
-                1,
-                2
+                "Q1"
               ],
               [
-                4,
-                5,
-                6
-              ],
-              [
-                7,
-                8,
-                9
+                "Q2",
+                "Q3"
               ]
             ],
             "tags": [
-              "tag1",
-              "tag2"
+              "calibration",
+              "demo"
             ],
-            "two_qubit_calib_plan": [
-              [
-                [
-                  0,
-                  1
-                ],
-                [
-                  0,
-                  2
-                ],
-                [
-                  3,
-                  4
-                ]
-              ],
-              [
-                [
-                  5,
-                  6
-                ],
-                [
-                  7,
-                  8
-                ]
-              ]
-            ]
+            "tasks": [
+              "task1",
+              "task2"
+            ],
+            "username": "default-user"
           }
         ]
       },
@@ -3648,110 +2951,6 @@
         ],
         "title": "NodeInfo"
       },
-      "OneQubitCalibCWInfo": {
-        "properties": {
-          "cw_info": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/OneQubitCalibData"
-            },
-            "type": "object",
-            "title": "Cw Info"
-          }
-        },
-        "type": "object",
-        "required": [
-          "cw_info"
-        ],
-        "title": "OneQubitCalibCWInfo"
-      },
-      "OneQubitCalibDailySummaryRequest": {
-        "properties": {
-          "date": {
-            "type": "string",
-            "title": "Date"
-          },
-          "labels": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Labels"
-          },
-          "qpu_name": {
-            "type": "string",
-            "title": "Qpu Name"
-          },
-          "cooling_down_id": {
-            "type": "integer",
-            "title": "Cooling Down Id"
-          },
-          "summary": {
-            "items": {
-              "$ref": "#/components/schemas/OneQubitCalibSummary"
-            },
-            "type": "array",
-            "title": "Summary"
-          },
-          "note": {
-            "type": "string",
-            "title": "Note",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": [
-          "date",
-          "labels",
-          "qpu_name",
-          "cooling_down_id",
-          "summary"
-        ],
-        "title": "OneQubitCalibDailySummaryRequest"
-      },
-      "OneQubitCalibDailySummaryResponse": {
-        "properties": {
-          "date": {
-            "type": "string",
-            "title": "Date"
-          },
-          "labels": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Labels"
-          },
-          "qpu_name": {
-            "type": "string",
-            "title": "Qpu Name"
-          },
-          "cooling_down_id": {
-            "type": "integer",
-            "title": "Cooling Down Id"
-          },
-          "summary": {
-            "items": {
-              "$ref": "#/components/schemas/OneQubitCalibSummary"
-            },
-            "type": "array",
-            "title": "Summary"
-          },
-          "note": {
-            "type": "string",
-            "title": "Note",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": [
-          "date",
-          "labels",
-          "qpu_name",
-          "cooling_down_id",
-          "summary"
-        ],
-        "title": "OneQubitCalibDailySummaryResponse"
-      },
       "OneQubitCalibData": {
         "properties": {
           "resonator_frequency": {
@@ -3818,55 +3017,6 @@
         "type": "object",
         "title": "OneQubitCalibData"
       },
-      "OneQubitCalibHistoryResponse": {
-        "properties": {
-          "qpu_name": {
-            "type": "string",
-            "title": "Qpu Name"
-          },
-          "cooling_down_id": {
-            "type": "integer",
-            "title": "Cooling Down Id"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "date": {
-            "type": "string",
-            "title": "Date"
-          },
-          "one_qubit_calib_data": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OneQubitCalibData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "qpu_name",
-          "cooling_down_id",
-          "label",
-          "date",
-          "one_qubit_calib_data"
-        ],
-        "title": "OneQubitCalibHistoryResponse"
-      },
       "OneQubitCalibResponse": {
         "properties": {
           "qpu_name": {
@@ -3919,60 +3069,6 @@
           "one_qubit_calib_data"
         ],
         "title": "OneQubitCalibResponse"
-      },
-      "OneQubitCalibStatsRequest": {
-        "properties": {
-          "labels": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Labels"
-          }
-        },
-        "type": "object",
-        "required": [
-          "labels"
-        ],
-        "title": "OneQubitCalibStatsRequest"
-      },
-      "OneQubitCalibStatsResponse": {
-        "properties": {
-          "date": {
-            "type": "string",
-            "title": "Date"
-          }
-        },
-        "additionalProperties": true,
-        "type": "object",
-        "required": [
-          "date"
-        ],
-        "title": "OneQubitCalibStatsResponse"
-      },
-      "OneQubitCalibSummary": {
-        "properties": {
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "one_qubit_calib_data": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OneQubitCalibData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "label",
-          "one_qubit_calib_data"
-        ],
-        "title": "OneQubitCalibSummary"
       },
       "ParamData": {
         "properties": {
@@ -4281,24 +3377,6 @@
         ],
         "title": "Stats"
       },
-      "SuccessResponse": {
-        "properties": {
-          "message": {
-            "type": "string",
-            "title": "Message"
-          }
-        },
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "title": "SuccessResponse",
-        "examples": [
-          {
-            "message": "Successfuly {message}"
-          }
-        ]
-      },
       "Token": {
         "properties": {
           "access_token": {
@@ -4316,151 +3394,6 @@
           "token_type"
         ],
         "title": "Token"
-      },
-      "TwoQubitCalibDailySummaryModel": {
-        "properties": {
-          "_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "example": "5eb7cf5a86d9755df3a6c593"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Id",
-            "description": "MongoDB document ObjectID"
-          },
-          "date": {
-            "type": "string",
-            "title": "Date"
-          },
-          "labels": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Labels"
-          },
-          "qpu_name": {
-            "type": "string",
-            "title": "Qpu Name"
-          },
-          "cooling_down_id": {
-            "type": "integer",
-            "title": "Cooling Down Id"
-          },
-          "summary": {
-            "items": {
-              "$ref": "#/components/schemas/TwoQubitCalibSummary"
-            },
-            "type": "array",
-            "title": "Summary"
-          },
-          "note": {
-            "type": "string",
-            "title": "Note",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": [
-          "date",
-          "labels",
-          "qpu_name",
-          "cooling_down_id",
-          "summary"
-        ],
-        "title": "TwoQubitCalibDailySummaryModel"
-      },
-      "TwoQubitCalibDailySummaryRequest": {
-        "properties": {
-          "date": {
-            "type": "string",
-            "title": "Date"
-          },
-          "labels": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Labels"
-          },
-          "qpu_name": {
-            "type": "string",
-            "title": "Qpu Name"
-          },
-          "cooling_down_id": {
-            "type": "integer",
-            "title": "Cooling Down Id"
-          },
-          "summary": {
-            "items": {
-              "$ref": "#/components/schemas/TwoQubitCalibSummary"
-            },
-            "type": "array",
-            "title": "Summary"
-          },
-          "note": {
-            "type": "string",
-            "title": "Note",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": [
-          "date",
-          "labels",
-          "qpu_name",
-          "cooling_down_id",
-          "summary"
-        ],
-        "title": "TwoQubitCalibDailySummaryRequest"
-      },
-      "TwoQubitCalibDailySummaryResponse": {
-        "properties": {
-          "date": {
-            "type": "string",
-            "title": "Date"
-          },
-          "labels": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Labels"
-          },
-          "qpu_name": {
-            "type": "string",
-            "title": "Qpu Name"
-          },
-          "cooling_down_id": {
-            "type": "integer",
-            "title": "Cooling Down Id"
-          },
-          "summary": {
-            "items": {
-              "$ref": "#/components/schemas/TwoQubitCalibSummary"
-            },
-            "type": "array",
-            "title": "Summary"
-          },
-          "note": {
-            "type": "string",
-            "title": "Note",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": [
-          "date",
-          "labels",
-          "qpu_name",
-          "cooling_down_id",
-          "summary"
-        ],
-        "title": "TwoQubitCalibDailySummaryResponse"
       },
       "TwoQubitCalibData": {
         "properties": {
@@ -4487,55 +3420,6 @@
         },
         "type": "object",
         "title": "TwoQubitCalibData"
-      },
-      "TwoQubitCalibHistoryResponse": {
-        "properties": {
-          "qpu_name": {
-            "type": "string",
-            "title": "Qpu Name"
-          },
-          "cooling_down_id": {
-            "type": "integer",
-            "title": "Cooling Down Id"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "date": {
-            "type": "string",
-            "title": "Date"
-          },
-          "two_qubit_calib_data": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TwoQubitCalibData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "qpu_name",
-          "cooling_down_id",
-          "label",
-          "date",
-          "two_qubit_calib_data"
-        ],
-        "title": "TwoQubitCalibHistoryResponse"
       },
       "TwoQubitCalibResponse": {
         "properties": {
@@ -4589,60 +3473,6 @@
           "two_qubit_calib_data"
         ],
         "title": "TwoQubitCalibResponse"
-      },
-      "TwoQubitCalibStatsRequest": {
-        "properties": {
-          "labels": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Labels"
-          }
-        },
-        "type": "object",
-        "required": [
-          "labels"
-        ],
-        "title": "TwoQubitCalibStatsRequest"
-      },
-      "TwoQubitCalibStatsResponse": {
-        "properties": {
-          "date": {
-            "type": "string",
-            "title": "Date"
-          }
-        },
-        "additionalProperties": true,
-        "type": "object",
-        "required": [
-          "date"
-        ],
-        "title": "TwoQubitCalibStatsResponse"
-      },
-      "TwoQubitCalibSummary": {
-        "properties": {
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "two_qubit_calib_data": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TwoQubitCalibData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "label",
-          "two_qubit_calib_data"
-        ],
-        "title": "TwoQubitCalibSummary"
       },
       "UpdateMenuRequest": {
         "properties": {
