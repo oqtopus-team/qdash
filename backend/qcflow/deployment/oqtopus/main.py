@@ -22,31 +22,12 @@ if __name__ == "__main__":
         tags=["calibration"],
         parameters={
             "menu": {
-                "name": "mux9-calibration",
+                "name": "mux1-single",
                 "description": "Single qubit calibration for mux1",
-                "one_qubit_calib_plan": [
-                    [0, 1, 2, 3],
-                    [4, 5, 6, 7],
-                    [8, 9, 10, 11],
-                    [12, 13, 14, 15],
-                    [16, 17, 18, 19],
-                    [20, 21, 22, 23],
-                    [24, 25, 26, 27],
-                    [28, 29, 30, 31],
-                    [32, 33, 34, 35],
-                    [36, 37, 38, 39],
-                    [40, 41, 42, 43],
-                    [44, 45, 46, 47],
-                    [48, 49, 50, 51],
-                    [52, 53, 54, 55],
-                    [56, 57, 58, 59],
-                    [60, 61, 62, 63],
-                ],
-                "two_qubit_calib_plan": [[0, 5, 10, 15], [1, 6, 11, 16]],
-                "notify_bool": False,
-                "mode": "calib",
-                "flow": [
-                    "one-qubit-calibration-flow",
+                "qids": [["28", "29", "30", "31"]],
+                "notify_bool": True,
+                "tasks": [
+                    "one-qubit-calibration",
                 ],
             }
         },
@@ -60,11 +41,9 @@ if __name__ == "__main__":
             "menu": {
                 "name": "mux1-single",
                 "description": "Single qubit calibration for mux1",
-                "one_qubit_calib_plan": [[1, 2, 3], [4, 5, 6]],
-                "two_qubit_calib_plan": [[1, 2, 3], [4, 5, 6]],
+                "qids": [["28", "29", "30", "31"]],
                 "notify_bool": True,
-                "mode": "calib",
-                "flow": [
+                "tasks": [
                     "one-qubit-calibration",
                 ],
             }

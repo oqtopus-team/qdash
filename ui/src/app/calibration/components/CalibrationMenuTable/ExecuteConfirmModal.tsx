@@ -18,7 +18,7 @@ export function ExecuteConfirmModal({
   onCancel: () => void;
 }) {
   const [yamlText, setYamlText] = useState(
-    generateYamlWithCustomArrayFormat(selectedItem)
+    generateYamlWithCustomArrayFormat(selectedItem),
   );
   const [validationError, setValidationError] = useState("");
 
@@ -33,7 +33,7 @@ export function ExecuteConfirmModal({
       } catch (error) {
         setValidationError(
           "YAMLの形式が正しくありません: " +
-            (error instanceof Error ? error.message : String(error))
+            (error instanceof Error ? error.message : String(error)),
         );
       }
     }
@@ -47,7 +47,7 @@ export function ExecuteConfirmModal({
       } catch (error) {
         toast.error(
           "YAMLのパースに失敗しました: " +
-            (error instanceof Error ? error.message : String(error))
+            (error instanceof Error ? error.message : String(error)),
         );
       }
     } else {
