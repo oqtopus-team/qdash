@@ -32,6 +32,13 @@ export default function ChipPage() {
   const { data: chips } = useListChips();
   const { data: muxData } = useListMuxes(selectedChip || "");
 
+  // Get all QIDs from mux detail
+  const getQids = (detail: MuxDetailResponseDetail): string[] => {
+    const qids = new Set<string>();
+    Object.keys(detail).forEach((qid) => qids.add(qid));
+    return Array.from(qids).sort((a, b) => Number(a) - Number(b));
+  };
+
   // Group tasks by name for each mux
   const getTaskGroups = (muxId: string, detail: MuxDetailResponseDetail) => {
     const taskGroups: {
@@ -169,6 +176,7 @@ export default function ChipPage() {
                   ? "No updates"
                   : formatRelativeTime(updateInfo.time);
               const isExpanded = expandedMuxes[muxId];
+              const qids = getQids(muxDetail.detail);
 
               return (
                 <div
@@ -220,7 +228,8 @@ export default function ChipPage() {
                               {taskName}
                             </h3>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              {Object.entries(qidResults).map(([qid, task]) => {
+                              {qids.map((qid) => {
+                                const task = qidResults[qid];
                                 const taskId = `${muxId}-${qid}-${taskName}`;
                                 const viewMode = getViewMode(taskId);
 
@@ -233,7 +242,7 @@ export default function ChipPage() {
                                       <div className="text-sm font-medium mb-2">
                                         <div className="flex justify-between items-center mb-1">
                                           <span>QID: {qid}</span>
-                                          {task.output_parameters && (
+                                          {task?.output_parameters && (
                                             <div className="tabs tabs-boxed rounded-lg">
                                               <a
                                                 className={`tab tab-xs ${
@@ -262,7 +271,7 @@ export default function ChipPage() {
                                             </div>
                                           )}
                                         </div>
-                                        {task.end_at && (
+                                        {task?.end_at && (
                                           <div className="text-xs text-base-content/60">
                                             Updated:{" "}
                                             {formatRelativeTime(
@@ -271,7 +280,8 @@ export default function ChipPage() {
                                           </div>
                                         )}
                                       </div>
-                                      {viewMode === "image" &&
+                                      {task &&
+                                        viewMode === "image" &&
                                         task.figure_path && (
                                           <div className="relative h-48 rounded-lg overflow-hidden">
                                             {Array.isArray(task.figure_path) ? (
@@ -298,7 +308,8 @@ export default function ChipPage() {
                                             )}
                                           </div>
                                         )}
-                                      {viewMode === "params" &&
+                                      {task &&
+                                        viewMode === "params" &&
                                         task.output_parameters && (
                                           <div className="h-48 overflow-y-auto rounded-lg">
                                             <table className="table table-xs table-zebra w-full rounded-lg overflow-hidden">

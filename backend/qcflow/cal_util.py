@@ -15,9 +15,9 @@ def label_to_qid(qid: str) -> str:
 
 
 def qid_to_label(qid: str) -> str:
-    """Convert QXX to QXX. e.g. '0' -> 'Q0'."""
+    """Convert a numeric qid string to a label with at least two digits. e.g. '0' -> 'Q00'."""
     if re.fullmatch(r"\d+", qid):
-        return "Q" + qid
+        return "Q" + qid.zfill(2)
     error_message = "Invalid qid format."
     raise ValueError(error_message)
 

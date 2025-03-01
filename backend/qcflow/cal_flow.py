@@ -63,7 +63,6 @@ def cal_flow(
     qubits: list[str],
 ) -> dict[str, bool]:
     """Deployment to run calibration flow for a single qubit or a pair of qubits."""
-    username = "admin"
     logger = get_run_logger()
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
@@ -76,13 +75,13 @@ def cal_flow(
     exp.note.clear()
     task_names = validate_task_name(menu.tasks)
     task_manager = TaskManager(
-        username=username, execution_id=execution_id, qids=qubits, calib_dir=calib_dir
+        username=menu.username, execution_id=execution_id, qids=qubits, calib_dir=calib_dir
     )
     task_manager = build_workflow(task_manager=task_manager, task_names=task_names, qubits=qubits)
     task_manager.save()
-    parameters = update_active_output_parameters(username=username)
+    parameters = update_active_output_parameters(username=menu.username)
     ParameterDocument.insert_parameters(parameters)
-    tasks = update_active_tasks(username=username)
+    tasks = update_active_tasks(username=menu.username)
     logger.info(f"updating tasks: {tasks}")
     TaskDocument.insert_tasks(tasks)
     execution_manager = ExecutionManager.load_from_file(calib_dir).update_with_task_manager(
@@ -145,7 +144,7 @@ async def qubex_one_qubit_cal_flow(
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
     parallel = True
-    plan = [["28", "29", "30", "31"]]
+    plan = menu.qids
     if len(menu.qids) == 1:
         parallel = False
     if parallel:
