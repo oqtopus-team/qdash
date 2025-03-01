@@ -14,8 +14,8 @@ interface TaskCardState {
   [key: string]: ViewMode;
 }
 
-interface ParamDetail {
-  value: number;
+interface ParameterValue {
+  value: number | string;
   unit?: string;
   calibrated_at?: string;
 }
@@ -100,100 +100,75 @@ export default function ChipPage() {
     return viewModes[taskId] || "image";
   };
 
-  // Extract parameter details
-  const extractParamDetails = (params: any): { [key: string]: ParamDetail } => {
-    const details: { [key: string]: ParamDetail } = {};
-
-    Object.entries(params).forEach(([key, value]: [string, any]) => {
-      if (value && typeof value === "object") {
-        if ("value" in value) {
-          details[key] = {
-            value: value.value,
-            unit: value.unit,
-            calibrated_at: value.calibrated_at,
-          };
-        }
-      } else if (typeof value === "number") {
-        details[key] = { value };
-      }
-    });
-
-    return details;
-  };
-
-  // Format value with unit
-  const formatValue = (value: number, unit?: string): string => {
-    const formattedValue = Number.isInteger(value) ? value : value.toFixed(4);
-    return unit ? `${formattedValue} ${unit}` : String(formattedValue);
-  };
-
   return (
-    <div className="container mx-auto p-4">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-4">Chip Experiments</h1>
+    <div className="w-full px-4 py-6" style={{ width: "calc(100vw - 20rem)" }}>
+      <div className="space-y-6">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold mb-4">Chip Experiments</h1>
 
-        {/* Chip Selection */}
-        <select
-          className="select select-bordered w-full max-w-xs"
-          value={selectedChip}
-          onChange={(e) => setSelectedChip(e.target.value)}
-        >
-          <option value="">Select a chip</option>
-          {chips?.data.map((chip) => (
-            <option key={chip.chip_id} value={chip.chip_id}>
-              {chip.chip_id}
-            </option>
-          ))}
-        </select>
-      </div>
+          {/* Chip Selection */}
+          <select
+            className="select select-bordered w-full max-w-xs"
+            value={selectedChip}
+            onChange={(e) => setSelectedChip(e.target.value)}
+          >
+            <option value="">Select a chip</option>
+            {chips?.data.map((chip) => (
+              <option key={chip.chip_id} value={chip.chip_id}>
+                {chip.chip_id}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      {/* MUX Accordions */}
-      {muxData?.data && (
-        <div className="space-y-4">
-          {Object.entries(muxData.data.muxes).map(([muxId, muxDetail]) => {
-            const updateInfo = getLatestUpdateInfo(muxDetail.detail);
-            const lastUpdateText =
-              updateInfo.time.getTime() === 0
-                ? "No updates"
-                : formatRelativeTime(updateInfo.time);
+        {/* MUX Accordions */}
+        {muxData?.data && (
+          <div className="space-y-4">
+            {Object.entries(muxData.data.muxes).map(([muxId, muxDetail]) => {
+              const updateInfo = getLatestUpdateInfo(muxDetail.detail);
+              const lastUpdateText =
+                updateInfo.time.getTime() === 0
+                  ? "No updates"
+                  : formatRelativeTime(updateInfo.time);
 
-            return (
-              <div
-                key={muxId}
-                className={`collapse collapse-arrow bg-base-100 shadow-lg ${
-                  updateInfo.isRecent
-                    ? "border-2 border-primary animate-pulse-light"
-                    : "bg-base-200"
-                }`}
-              >
-                <input type="radio" name="mux-accordion" />
-                <div className="collapse-title">
-                  <div className="flex justify-between items-center">
-                    <div className="text-xl font-medium flex items-center gap-2">
-                      MUX {muxDetail.mux_id}
-                      {updateInfo.isRecent && (
-                        <div className="badge badge-primary gap-2">
-                          <div className="w-2 h-2 bg-primary-content rounded-full animate-ping" />
-                          New
-                        </div>
-                      )}
-                    </div>
-                    <div
-                      className={`text-sm ${
-                        updateInfo.isRecent
-                          ? "text-primary font-medium"
-                          : "text-base-content/60"
-                      }`}
-                    >
-                      Last updated: {lastUpdateText}
+              return (
+                <div
+                  key={muxId}
+                  className={`collapse collapse-arrow bg-base-100 shadow-lg ${
+                    updateInfo.isRecent
+                      ? "border-2 border-primary animate-pulse-light"
+                      : "bg-base-200"
+                  }`}
+                >
+                  <input type="checkbox" />
+                  <div className="collapse-title">
+                    <div className="flex justify-between items-center">
+                      <div className="text-xl font-medium flex items-center gap-2">
+                        MUX {muxDetail.mux_id}
+                        {updateInfo.isRecent && (
+                          <div className="badge badge-primary gap-2">
+                            <div className="w-2 h-2 bg-primary-content rounded-full animate-ping" />
+                            New
+                          </div>
+                        )}
+                      </div>
+                      <div
+                        className={`text-sm ${
+                          updateInfo.isRecent
+                            ? "text-primary font-medium"
+                            : "text-base-content/60"
+                        }`}
+                      >
+                        Last updated: {lastUpdateText}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="collapse-content">
-                  {/* Task Results Grid */}
-                  <div className="space-y-6">
-                    {Object.entries(getTaskGroups(muxId, muxDetail.detail)).map(
-                      ([taskName, qidResults]) => (
+                  <div className="collapse-content">
+                    {/* Task Results Grid */}
+                    <div className="space-y-6">
+                      {Object.entries(
+                        getTaskGroups(muxId, muxDetail.detail)
+                      ).map(([taskName, qidResults]) => (
                         <div
                           key={taskName}
                           className="border-t pt-4 first:border-t-0 first:pt-0"
@@ -205,9 +180,6 @@ export default function ChipPage() {
                             {Object.entries(qidResults).map(([qid, task]) => {
                               const taskId = `${muxId}-${qid}-${taskName}`;
                               const viewMode = getViewMode(taskId);
-                              const paramDetails = task.output_parameters
-                                ? extractParamDetails(task.output_parameters)
-                                : {};
 
                               return (
                                 <div
@@ -215,34 +187,44 @@ export default function ChipPage() {
                                   className="card bg-base-100 shadow-sm"
                                 >
                                   <div className="card-body p-2">
-                                    <div className="text-sm font-medium mb-2 flex justify-between items-center">
-                                      <span>QID: {qid}</span>
-                                      {task.output_parameters && (
-                                        <div className="tabs tabs-boxed">
-                                          <a
-                                            className={`tab tab-xs ${
-                                              viewMode === "image"
-                                                ? "tab-active"
-                                                : ""
-                                            }`}
-                                            onClick={() =>
-                                              toggleViewMode(taskId)
-                                            }
-                                          >
-                                            Image
-                                          </a>
-                                          <a
-                                            className={`tab tab-xs ${
-                                              viewMode === "params"
-                                                ? "tab-active"
-                                                : ""
-                                            }`}
-                                            onClick={() =>
-                                              toggleViewMode(taskId)
-                                            }
-                                          >
-                                            Params
-                                          </a>
+                                    <div className="text-sm font-medium mb-2">
+                                      <div className="flex justify-between items-center mb-1">
+                                        <span>QID: {qid}</span>
+                                        {task.output_parameters && (
+                                          <div className="tabs tabs-boxed">
+                                            <a
+                                              className={`tab tab-xs ${
+                                                viewMode === "image"
+                                                  ? "tab-active"
+                                                  : ""
+                                              }`}
+                                              onClick={() =>
+                                                toggleViewMode(taskId)
+                                              }
+                                            >
+                                              Image
+                                            </a>
+                                            <a
+                                              className={`tab tab-xs ${
+                                                viewMode === "params"
+                                                  ? "tab-active"
+                                                  : ""
+                                              }`}
+                                              onClick={() =>
+                                                toggleViewMode(taskId)
+                                              }
+                                            >
+                                              Params
+                                            </a>
+                                          </div>
+                                        )}
+                                      </div>
+                                      {task.end_at && (
+                                        <div className="text-xs text-base-content/60">
+                                          Updated:{" "}
+                                          {formatRelativeTime(
+                                            new Date(task.end_at)
+                                          )}
                                         </div>
                                       )}
                                     </div>
@@ -283,28 +265,45 @@ export default function ChipPage() {
                                               </tr>
                                             </thead>
                                             <tbody className="text-xs">
-                                              {Object.entries(paramDetails).map(
-                                                ([key, detail]) => (
+                                              {Object.entries(
+                                                task.output_parameters
+                                              ).map(([key, value]) => {
+                                                const paramValue =
+                                                  typeof value === "object" &&
+                                                  value !== null &&
+                                                  "value" in value
+                                                    ? (value as ParameterValue)
+                                                    : ({
+                                                        value,
+                                                      } as ParameterValue);
+                                                return (
                                                   <tr key={key}>
                                                     <td className="font-medium py-0.5">
                                                       {key}
                                                     </td>
                                                     <td className="text-right py-0.5">
-                                                      {formatValue(
-                                                        detail.value,
-                                                        detail.unit
-                                                      )}
+                                                      {typeof paramValue.value ===
+                                                      "number"
+                                                        ? paramValue.value.toFixed(
+                                                            4
+                                                          )
+                                                        : String(
+                                                            paramValue.value
+                                                          )}
+                                                      {paramValue.unit
+                                                        ? ` ${paramValue.unit}`
+                                                        : ""}
                                                     </td>
                                                     <td className="text-right py-0.5 text-base-content/60">
-                                                      {detail.calibrated_at
+                                                      {paramValue.calibrated_at
                                                         ? new Date(
-                                                            detail.calibrated_at
+                                                            paramValue.calibrated_at
                                                           ).toLocaleString()
                                                         : "-"}
                                                     </td>
                                                   </tr>
-                                                )
-                                              )}
+                                                );
+                                              })}
                                             </tbody>
                                           </table>
                                         </div>
@@ -315,15 +314,15 @@ export default function ChipPage() {
                             })}
                           </div>
                         </div>
-                      )
-                    )}
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
