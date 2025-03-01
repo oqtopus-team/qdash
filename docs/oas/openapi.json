@@ -3562,18 +3562,6 @@
             "type": "string",
             "title": "Username"
           },
-          "email": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "email"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Email"
-          },
           "full_name": {
             "anyOf": [
               {
@@ -3609,11 +3597,6 @@
             "type": "string",
             "title": "Username"
           },
-          "email": {
-            "type": "string",
-            "format": "email",
-            "title": "Email"
-          },
           "password": {
             "type": "string",
             "title": "Password"
@@ -3633,7 +3616,6 @@
         "type": "object",
         "required": [
           "username",
-          "email",
           "password"
         ],
         "title": "UserCreate"
