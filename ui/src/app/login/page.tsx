@@ -27,7 +27,7 @@ export default function LoginPage() {
       router.replace("/");
     } catch (err) {
       setError(
-        "ログインに失敗しました。ユーザーIDとパスワードを確認してください。"
+        "ログインに失敗しました。ユーザーIDとパスワードを確認してください。",
       );
     }
   };

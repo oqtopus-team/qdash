@@ -23,7 +23,6 @@ from dbmodel.two_qubit_calib_history import TwoQubitCalibHistoryModel
 from dbmodel.wiring_info import WiringInfoModel
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
 from pymongo import MongoClient
 from server.routers import (

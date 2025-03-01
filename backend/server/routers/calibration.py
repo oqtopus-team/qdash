@@ -2,7 +2,7 @@ import os
 import uuid
 from datetime import datetime
 from logging import getLogger
-from typing import Annotated, List, Optional
+from typing import Annotated, Optional
 
 import dateutil.tz
 from fastapi import APIRouter, Depends, HTTPException, Security
@@ -28,13 +28,13 @@ from server.schemas.calibration import (
 )
 from server.schemas.exception import InternalSeverError
 
-router = APIRouter()
+router = APIRouter(prefix="/calibration")
 logger = getLogger("uvicorn.app")
 prefect_host = os.getenv("PREFECT_HOST")
 
 
 @router.post(
-    "/calibrations",
+    "/",
     response_model=ExecuteCalibResponse,
     summary="Executes a calibration by creating a flow run from a deployment.",
     operation_id="execute_calib",
@@ -82,7 +82,7 @@ local_date = datetime.now(tz=ja)
 
 
 @router.post(
-    "/calibrations/schedule",
+    "/schedule",
     summary="Schedules a calibration.",
     operation_id="schedule_calib",
 )
@@ -130,7 +130,7 @@ async def schedule_calib(
 
 
 @router.get(
-    "/calibrations/schedule",
+    "/schedule",
     response_model=list[ScheduleCalibResponse],
     summary="Fetches all the calibration schedules.",
     operation_id="fetch_all_calib_schedule",
@@ -180,7 +180,7 @@ async def fetch_all_calib_schedule(
 
 
 @router.delete(
-    "/calibrations/schedule/{flow_run_id}",
+    "/schedule/{flow_run_id}",
     summary="Deletes a calibration schedule.",
     operation_id="delete_calib_schedule",
 )

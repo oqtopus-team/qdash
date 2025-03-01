@@ -53,7 +53,7 @@ export const executeCalib = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecuteCalibResponse>> => {
   return axios.post(
-    `http://localhost:5715/calibrations`,
+    `http://localhost:5715/calibration/`,
     executeCalibRequest,
     options,
   );
@@ -133,11 +133,11 @@ export const useExecuteCalib = <
 export const fetchAllCalibSchedule = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ScheduleCalibResponse[]>> => {
-  return axios.get(`http://localhost:5715/calibrations/schedule`, options);
+  return axios.get(`http://localhost:5715/calibration/schedule`, options);
 };
 
 export const getFetchAllCalibScheduleQueryKey = () => {
-  return [`http://localhost:5715/calibrations/schedule`] as const;
+  return [`http://localhost:5715/calibration/schedule`] as const;
 };
 
 export const getFetchAllCalibScheduleQueryOptions = <
@@ -266,7 +266,7 @@ export const scheduleCalib = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<unknown>> => {
   return axios.post(
-    `http://localhost:5715/calibrations/schedule`,
+    `http://localhost:5715/calibration/schedule`,
     scheduleCalibRequest,
     options,
   );
@@ -348,7 +348,7 @@ export const deleteCalibSchedule = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<unknown>> => {
   return axios.delete(
-    `http://localhost:5715/calibrations/schedule/${flowRunId}`,
+    `http://localhost:5715/calibration/schedule/${flowRunId}`,
     options,
   );
 };

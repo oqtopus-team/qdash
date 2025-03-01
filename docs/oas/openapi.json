@@ -15,7 +15,7 @@
     "version": "0.0.1"
   },
   "paths": {
-    "/calibrations": {
+    "/calibration/": {
       "post": {
         "tags": [
           "calibration"
@@ -62,7 +62,7 @@
         ]
       }
     },
-    "/calibrations/schedule": {
+    "/calibration/schedule": {
       "get": {
         "tags": [
           "calibration"
@@ -134,7 +134,7 @@
         ]
       }
     },
-    "/calibrations/schedule/{flow_run_id}": {
+    "/calibration/schedule/{flow_run_id}": {
       "delete": {
         "tags": [
           "calibration"
