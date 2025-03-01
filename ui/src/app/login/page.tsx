@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../contexts/AuthContext";
@@ -14,17 +14,30 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setError("");
+
+    // フォームのデフォルトの動作を完全に防ぐ
+    const form = e.target as HTMLFormElement;
+    form.reset();
 
     try {
       await authLogin(userName, password);
-      router.push("/"); // ログイン成功後はホームページにリダイレクト
+      // replaceを使用してhistoryに残さない
+      router.replace("/");
     } catch (err) {
       setError(
-        "ログインに失敗しました。ユーザーIDとパスワードを確認してください。",
+        "ログインに失敗しました。ユーザーIDとパスワードを確認してください。"
       );
     }
   };
+
+  // コンポーネントマウント時にクエリパラメータをクリア
+  useEffect(() => {
+    if (window.location.search) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -34,7 +47,11 @@ export default function LoginPage() {
             QDash Login
           </h2>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form
+          className="mt-8 space-y-6"
+          onSubmit={handleSubmit}
+          autoComplete="off"
+        >
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="userName" className="sr-only">
@@ -42,9 +59,11 @@ export default function LoginPage() {
               </label>
               <input
                 id="userName"
-                name="userName"
+                name="username"
                 type="text"
                 required
+                autoComplete="off"
+                spellCheck="false"
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="User ID"
                 value={userName}
@@ -60,6 +79,7 @@ export default function LoginPage() {
                 name="password"
                 type="password"
                 required
+                autoComplete="new-password"
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Password"
                 value={password}

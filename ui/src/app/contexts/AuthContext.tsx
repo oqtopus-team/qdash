@@ -112,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // トークンとユーザー名を保存
         const token = response.data.access_token;
         document.cookie = `token=${encodeURIComponent(
-          token,
+          token
         )}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
         saveUsername(username);
       } catch (error) {
@@ -120,20 +120,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [loginMutation, saveUsername],
+    [loginMutation, saveUsername]
   );
 
-  const logout = useCallback(() => {
-    logoutMutation.mutateAsync().then(() => {
+  const logout = useCallback(async () => {
+    try {
+      await logoutMutation.mutateAsync();
+      // すべての状態をクリア
       setUser(null);
       removeUsername();
       // トークンを削除
       document.cookie =
         "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+      // キャッシュをクリア
+      await Promise.all([loginMutation.reset(), logoutMutation.reset()]);
       // ページをリロードしてすべての状態をリセット
-      window.location.href = "/login";
-    });
-  }, [logoutMutation, removeUsername]);
+      // クエリパラメータなしでリダイレクト
+      window.location.replace("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // エラーが発生しても状態をクリーンアップ
+      setUser(null);
+      removeUsername();
+      document.cookie =
+        "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+      // クエリパラメータなしでリダイレクト
+      window.location.replace("/login");
+    }
+  }, [logoutMutation, removeUsername, loginMutation]);
 
   return (
     <AuthContext.Provider value={{ user, username, login, logout, loading }}>

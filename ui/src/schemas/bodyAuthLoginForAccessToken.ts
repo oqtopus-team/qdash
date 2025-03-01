@@ -5,15 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { BodyAuthLoginForAccessTokenGrantType } from "./bodyAuthLoginForAccessTokenGrantType";
-import type { BodyAuthLoginForAccessTokenClientId } from "./bodyAuthLoginForAccessTokenClientId";
-import type { BodyAuthLoginForAccessTokenClientSecret } from "./bodyAuthLoginForAccessTokenClientSecret";
 
 export interface BodyAuthLoginForAccessToken {
-  grant_type?: BodyAuthLoginForAccessTokenGrantType;
   username: string;
   password: string;
-  scope?: string;
-  client_id?: BodyAuthLoginForAccessTokenClientId;
-  client_secret?: BodyAuthLoginForAccessTokenClientSecret;
+  grant_type?: string;
 }

@@ -39,31 +39,10 @@ export const authLoginForAccessToken = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<Token>> => {
   const formUrlEncoded = new URLSearchParams();
-  if (
-    bodyAuthLoginForAccessToken.grant_type !== undefined &&
-    bodyAuthLoginForAccessToken.grant_type !== null
-  ) {
-    formUrlEncoded.append("grant_type", bodyAuthLoginForAccessToken.grant_type);
-  }
   formUrlEncoded.append("username", bodyAuthLoginForAccessToken.username);
   formUrlEncoded.append("password", bodyAuthLoginForAccessToken.password);
-  if (bodyAuthLoginForAccessToken.scope !== undefined) {
-    formUrlEncoded.append("scope", bodyAuthLoginForAccessToken.scope);
-  }
-  if (
-    bodyAuthLoginForAccessToken.client_id !== undefined &&
-    bodyAuthLoginForAccessToken.client_id !== null
-  ) {
-    formUrlEncoded.append("client_id", bodyAuthLoginForAccessToken.client_id);
-  }
-  if (
-    bodyAuthLoginForAccessToken.client_secret !== undefined &&
-    bodyAuthLoginForAccessToken.client_secret !== null
-  ) {
-    formUrlEncoded.append(
-      "client_secret",
-      bodyAuthLoginForAccessToken.client_secret,
-    );
+  if (bodyAuthLoginForAccessToken.grant_type !== undefined) {
+    formUrlEncoded.append("grant_type", bodyAuthLoginForAccessToken.grant_type);
   }
 
   return axios.post(
