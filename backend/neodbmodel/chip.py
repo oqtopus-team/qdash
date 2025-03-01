@@ -22,6 +22,7 @@ class ChipDocument(Document):
     """
 
     chip_id: str = Field("SAMPLE", description="The chip ID")
+    username: str = Field(..., description="The username of the user who created the chip")
     size: int = Field(64, description="The size of the chip")
     qubits: dict[str, QubitModel] = Field({}, description="The qubits of the chip")
     couplings: dict[str, CouplingModel] = Field({}, description="The couplings of the chip")
@@ -36,7 +37,7 @@ class ChipDocument(Document):
         """Settings for the document."""
 
         name = "chip"
-        indexes: ClassVar = [IndexModel([("chip_id", ASCENDING)], unique=True)]
+        indexes: ClassVar = [IndexModel([("chip_id", ASCENDING), ("username")], unique=True)]
 
     def update_qubit(self, qid: str, qubit_data: QubitModel) -> "ChipDocument":
         if qid not in self.qubits:

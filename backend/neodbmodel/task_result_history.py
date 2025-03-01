@@ -29,6 +29,7 @@ class TaskResultHistoryDocument(Document):
 
     """
 
+    username: str = Field(..., description="The username of the user who created the task")
     task_id: str = Field(..., description="The task ID")
     name: str = Field(..., description="The task name")
     upstream_id: str = Field(..., description="The upstream task ID")
@@ -59,13 +60,14 @@ class TaskResultHistoryDocument(Document):
         """Settings for the document."""
 
         name = "task_result_history"
-        indexes: ClassVar = [IndexModel([("task_id", ASCENDING)], unique=True)]
+        indexes: ClassVar = [IndexModel([("task_id", ASCENDING), ("username")], unique=True)]
 
     @classmethod
     def from_datamodel(
         cls, task: BaseTaskResultModel, execution_model: ExecutionModel
     ) -> "TaskResultHistoryDocument":
         return cls(
+            username=execution_model.username,
             task_id=task.task_id,
             name=task.name,
             upstream_id=task.upstream_id,
@@ -97,6 +99,7 @@ class TaskResultHistoryDocument(Document):
             doc = cls.from_datamodel(task=task, execution_model=execution_model)
             doc.save()
             return doc
+        doc.username = execution_model.username
         doc.name = task.name
         doc.upstream_id = task.upstream_id
         doc.status = task.status

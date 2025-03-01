@@ -16,6 +16,7 @@ class ParameterDocument(Document):
 
     """
 
+    username: str = Field(..., description="The username of the user who created the parameter")
     name: str = Field(..., description="The name of the parameter")
     unit: str = Field(..., description="The unit of the parameter")
     description: str = Field(..., description="Detailed description of the parameter")
@@ -29,7 +30,7 @@ class ParameterDocument(Document):
         """Database settings for ParameterDocument."""
 
         name = "parameter"
-        indexes: ClassVar = [IndexModel([("name", ASCENDING)], unique=True)]
+        indexes: ClassVar = [IndexModel([("name", ASCENDING), ("username")], unique=True)]
 
     @classmethod
     def from_parameter_model(cls, model: ParameterModel) -> "ParameterDocument":
@@ -47,6 +48,7 @@ class ParameterDocument(Document):
 
         """
         return cls(
+            username=model.username,
             name=model.name,
             unit=model.unit,
             description=model.description,
@@ -58,9 +60,10 @@ class ParameterDocument(Document):
         for param in parameters:
             doc = cls.find_one(cls.name == param.name).run()
             if doc is None:
-                doc = cls.from_task_model(param)
+                doc = cls.from_parameter_model(param)
                 doc.save()
             else:
+                doc.username = param.username
                 doc.unit = param.unit
                 doc.description = param.description
                 doc.save()

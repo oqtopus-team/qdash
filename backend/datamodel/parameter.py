@@ -12,6 +12,7 @@ class ParameterModel(BaseModel):
 
     """
 
+    username: str = Field(..., description="The username of the user who created the parameter")
     name: str = Field(..., description="The name of the parameter")
     unit: str = Field("", description="The unit of the parameter")
     description: str = Field("", description="Detailed description of the parameter")

@@ -20,6 +20,7 @@ class TaskDocument(Document):
 
     """
 
+    username: str = Field(..., description="The username of the user who created the task")
     name: str = Field(..., description="The name of the task")
     description: str = Field(..., description="Detailed description of the task")
     task_type: str = Field(..., description="The type of the task")
@@ -32,7 +33,7 @@ class TaskDocument(Document):
         """Database settings for ParameterDocument."""
 
         name = "task"
-        indexes: ClassVar = [IndexModel([("name", ASCENDING)], unique=True)]
+        indexes: ClassVar = [IndexModel([("name", ASCENDING), ("username")], unique=True)]
 
     @classmethod
     def from_task_model(cls, model: TaskModel) -> "TaskDocument":
@@ -50,6 +51,7 @@ class TaskDocument(Document):
 
         """
         return cls(
+            username=model.username,
             name=model.name,
             task_type=model.task_type,
             description=model.description,
@@ -68,6 +70,7 @@ class TaskDocument(Document):
                 logger.debug(f"Task {task.name} inserted.")
             else:
                 logger.debug(f"Task {task.name} found. Updating task.")
+                doc.username = task.username
                 doc.task_type = task.task_type
                 doc.description = task.description
                 doc.save()

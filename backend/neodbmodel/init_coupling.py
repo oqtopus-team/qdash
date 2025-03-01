@@ -23,6 +23,7 @@ def generate_coupling(edges: list) -> list:
     """
     return [
         CouplingDocument(
+            username="admin",
             qid=f"{edge[0]}-{edge[1]}",
             status="pending",
             chip_id="SAMPLE",
@@ -36,7 +37,7 @@ def generate_coupling(edges: list) -> list:
 
 def init_coupling() -> None:
     """Initialize coupling documents."""
-    _, edges, _ = qubit_lattice(num_qubits=64, degree=4)
+    _, edges, _ = qubit_lattice(n=64, d=4)
     edges = bi_direction(edges)
     couplings = generate_coupling(edges)
     for c in couplings:
