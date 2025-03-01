@@ -63,6 +63,7 @@ def cal_flow(
     qubits: list[str],
 ) -> dict[str, bool]:
     """Deployment to run calibration flow for a single qubit or a pair of qubits."""
+    username = "admin"
     logger = get_run_logger()
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
@@ -74,12 +75,14 @@ def cal_flow(
     )
     exp.note.clear()
     task_names = validate_task_name(menu.exp_list)
-    task_manager = TaskManager(execution_id=execution_id, qids=qubits, calib_dir=calib_dir)
+    task_manager = TaskManager(
+        username=username, execution_id=execution_id, qids=qubits, calib_dir=calib_dir
+    )
     task_manager = build_workflow(task_manager=task_manager, task_names=task_names, qubits=qubits)
     task_manager.save()
-    parameters = update_active_output_parameters()
+    parameters = update_active_output_parameters(username=username)
     ParameterDocument.insert_parameters(parameters)
-    tasks = update_active_tasks()
+    tasks = update_active_tasks(username=username)
     logger.info(f"updating tasks: {tasks}")
     TaskDocument.insert_tasks(tasks)
     execution_manager = ExecutionManager.load_from_file(calib_dir).update_with_task_manager(

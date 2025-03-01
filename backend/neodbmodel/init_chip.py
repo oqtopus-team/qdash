@@ -70,6 +70,7 @@ def init_chip_document() -> ChipDocument:
     qubits = generate_qubit_data(num_qubits, pos)
     couplings = generate_coupling_data(edges)
     chip = ChipDocument(
+        username="admin",
         chip_id="SAMPLE",
         size=64,
         qubits=qubits,

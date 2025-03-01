@@ -71,6 +71,7 @@ def main_flow(
         If execution ID is None.
 
     """
+    username = "admin"
     logger = get_run_logger()
     execution_id = runtime.flow_run.get_flow_name()
     ui_url = runtime.flow_run.get_flow_run_ui_url()
@@ -96,13 +97,14 @@ def main_flow(
         get_latest_temperature(device_id="XLD", channel_nr=6),
         flow_url=ui_url,
     )
-    calib_dir = f"/app/calib_data/{date_str}/{index}"
+    calib_dir = f"/app/calib_data/{username}/{date_str}/{index}"
     create_directory_task.submit(calib_dir).result()
-    latest_calib_dir = f"/app/calib_data/{date_str}/latest"
+    latest_calib_dir = f"/app/calib_data/{username}/{date_str}/latest"
     create_directory_task.submit(latest_calib_dir).result()
     success_map = {flow_name: False for flow_name in menu.flow}
 
     execution_manager = ExecutionManager(
+        username=username,
         name=menu.name,
         execution_id=execution_id,
         calib_data_path=calib_dir,

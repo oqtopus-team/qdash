@@ -1,4 +1,5 @@
 from datamodel.qubit import NodeInfoModel, PositionModel
+from neodbmodel.initialize import initialize
 from neodbmodel.qubit import QubitDocument
 
 
@@ -57,6 +58,7 @@ def generate_dummy_data(num_qubits, pos: dict):
     data = []
     for i in range(num_qubits):
         qubit_data = QubitDocument(
+            username="admin",
             chip_id="SAMPLE",
             qid=f"{i}",
             status="pending",

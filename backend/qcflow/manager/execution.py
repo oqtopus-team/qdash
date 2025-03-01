@@ -19,6 +19,7 @@ from qcflow.manager.task import TaskManager
 class ExecutionManager(BaseModel):
     """ExecutionManager class to manage the execution of the calibration flow."""
 
+    username: str = "admin"
     name: str = ""
     execution_id: str = ""
     calib_data_path: str = ""
@@ -146,6 +147,7 @@ class ExecutionManager(BaseModel):
 
     def to_datamodel(self) -> ExecutionModel:
         return ExecutionModel(
+            username=self.username,
             name=self.name,
             execution_id=self.execution_id,
             calib_data_path=self.calib_data_path,

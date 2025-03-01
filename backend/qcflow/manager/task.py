@@ -31,6 +31,7 @@ class TaskManager(BaseModel):
 
     """
 
+    username: str = "admin"
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     execution_id: str
     task_result: TaskResultModel = TaskResultModel()  # デフォルト値を指定
@@ -38,8 +39,11 @@ class TaskManager(BaseModel):
     calib_dir: str = ""
     controller_info: dict[str, dict] = {}
 
-    def __init__(self, execution_id: str, qids: list[str] = [], calib_dir: str = ".") -> None:
+    def __init__(
+        self, username: str, execution_id: str, qids: list[str] = [], calib_dir: str = "."
+    ) -> None:
         super().__init__(
+            username=username,
             execution_id=execution_id,
             task_result=TaskResultModel(),
             calib_data=CalibDataModel(qubit={}, coupling={}),

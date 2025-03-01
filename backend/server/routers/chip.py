@@ -3,12 +3,14 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Annotated, Any
 
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Depends
 from neodbmodel.chip import ChipDocument
 from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.initialize import initialize
 from pydantic import BaseModel, Field, field_validator
+from server.lib.auth import get_current_active_user
 from server.lib.current_user import get_current_user_id
+from server.schemas.auth import User
 
 if TYPE_CHECKING:
     from pydantic.validators import FieldValidationInfo
@@ -131,13 +133,15 @@ class ChipResponse(BaseModel):
 @router.get(
     "/chip", response_model=list[ChipResponse], summary="Fetch all chips", operation_id="listChips"
 )
-def list_chips(x_user_id: str | None = Header(None, description="User ID")) -> list[ChipResponse]:
+def list_chips(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> list[ChipResponse]:
     """Fetch all chips.
 
     Parameters
     ----------
-    current_user_id : str
-        Current user ID from authentication
+    current_user : User
+        Current authenticated user
 
     Returns
     -------
@@ -145,10 +149,9 @@ def list_chips(x_user_id: str | None = Header(None, description="User ID")) -> l
         List of available chips
 
     """
-    username = x_user_id or "default_user"
-    logger.debug(f"Listing chips for user: {username}")
+    logger.debug(f"Listing chips for user: {current_user.username}")
     initialize()
-    chips = ChipDocument.find().run()
+    chips = ChipDocument.find({"username": current_user.username}).run()
     return [ChipResponse(chip_id=chip.chip_id) for chip in chips]
 
 
@@ -156,7 +159,7 @@ def list_chips(x_user_id: str | None = Header(None, description="User ID")) -> l
     "/chip/{chip_id}", response_model=ChipResponse, summary="Fetch a chip", operation_id="fetchChip"
 )
 def fetch_chip(
-    chip_id: str, x_user_id: str | None = Header(None, description="User ID")
+    chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> ChipResponse:
     """Fetch a chip by its ID.
 
@@ -173,10 +176,10 @@ def fetch_chip(
         Chip information
 
     """
-    username = x_user_id or "default_user"
-    logger.debug(f"Fetching chip {chip_id} for user: {username}")
+    logger.debug(f"Fetching chip {chip_id} for user: {current_user.username}")
     initialize()
-    chip = ChipDocument.find_one({"chip_id": chip_id}).run()
+
+    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
     return ChipResponse(
         chip_id=chip.chip_id,
         size=chip.size,
@@ -192,7 +195,7 @@ def fetch_chip(
     operation_id="listExecutionsByChipId",
 )
 def list_executions_by_chip_id(
-    chip_id: str, x_user_id: str | None = Header(None, description="User ID")
+    chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> list[ExecutionResponseSummary]:
     """Fetch all executions for a given chip.
 
@@ -209,11 +212,12 @@ def list_executions_by_chip_id(
         List of executions for the chip
 
     """
-    username = x_user_id or "default_user"
-    logger.debug(f"Listing executions for chip {chip_id}, user: {username}")
+    logger.debug(f"Listing executions for chip {chip_id}, user: {current_user.username}")
     initialize()
     executions = (
-        ExecutionHistoryDocument.find({"chip_id": chip_id}, sort=[("start_at", DESCENDING)])
+        ExecutionHistoryDocument.find(
+            {"chip_id": chip_id, "username": current_user.username}, sort=[("start_at", DESCENDING)]
+        )
         .limit(50)
         .run()
     )
@@ -282,7 +286,7 @@ def flatten_tasks(task_results: dict) -> list[dict]:
     operation_id="fetchExecutionByChipId",
 )
 def fetch_execution_by_chip_id(
-    chip_id: str, execution_id: str, x_user_id: str | None = Header(None, description="User ID")
+    chip_id: str, execution_id: str, current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> ExecutionResponseDetail:
     """Return the execution detail by its ID.
 
@@ -301,14 +305,12 @@ def fetch_execution_by_chip_id(
         Detailed execution information
 
     """
-    username = x_user_id or "default_user"
-    logger.debug(f"Fetching execution {execution_id} for chip {chip_id}, user: {username}")
+    logger.debug(
+        f"Fetching execution {execution_id} for chip {chip_id}, user: {current_user.username}"
+    )
     initialize()
     execution = ExecutionHistoryDocument.find_one(
-        {
-            "execution_id": execution_id,
-            "chip_id": chip_id,
-        }
+        {"execution_id": execution_id, "chip_id": chip_id, "username": current_user.username}
     ).run()
     flat_tasks = flatten_tasks(execution.task_results)
     tasks = [Task(**task) for task in flat_tasks]

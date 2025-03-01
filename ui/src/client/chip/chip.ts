@@ -24,11 +24,7 @@ import type {
   ChipResponse,
   ExecutionResponseDetail,
   ExecutionResponseSummary,
-  FetchChipHeaders,
-  FetchExecutionByChipIdHeaders,
   HTTPValidationError,
-  ListChipsHeaders,
-  ListExecutionsByChipIdHeaders,
 } from "../../schemas";
 
 /**
@@ -36,8 +32,8 @@ import type {
 
 Parameters
 ----------
-current_user_id : str
-    Current user ID from authentication
+current_user : User
+    Current authenticated user
 
 Returns
 -------
@@ -46,13 +42,9 @@ list[ChipResponse]
  * @summary Fetch all chips
  */
 export const listChips = (
-  headers?: ListChipsHeaders,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ChipResponse[]>> => {
-  return axios.get(`http://localhost:5715/chip`, {
-    ...options,
-    headers: { ...headers, ...options?.headers },
-  });
+  return axios.get(`http://localhost:5715/chip`, options);
 };
 
 export const getListChipsQueryKey = () => {
@@ -61,23 +53,20 @@ export const getListChipsQueryKey = () => {
 
 export const getListChipsQueryOptions = <
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = AxiosError<HTTPValidationError>,
->(
-  headers?: ListChipsHeaders,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
-    >;
-    axios?: AxiosRequestConfig;
-  },
-) => {
+  TError = AxiosError<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
+  >;
+  axios?: AxiosRequestConfig;
+}) => {
   const { query: queryOptions, axios: axiosOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getListChipsQueryKey();
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listChips>>> = ({
     signal,
-  }) => listChips(headers, { signal, ...axiosOptions });
+  }) => listChips({ signal, ...axiosOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listChips>>,
@@ -89,79 +78,67 @@ export const getListChipsQueryOptions = <
 export type ListChipsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listChips>>
 >;
-export type ListChipsQueryError = AxiosError<HTTPValidationError>;
+export type ListChipsQueryError = AxiosError<unknown>;
 
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = AxiosError<HTTPValidationError>,
->(
-  headers: undefined | ListChipsHeaders,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listChips>>,
-          TError,
-          Awaited<ReturnType<typeof listChips>>
-        >,
-        "initialData"
-      >;
-    axios?: AxiosRequestConfig;
-  },
-): DefinedUseQueryResult<TData, TError> & {
+  TError = AxiosError<unknown>,
+>(options: {
+  query: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
+  > &
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof listChips>>,
+        TError,
+        Awaited<ReturnType<typeof listChips>>
+      >,
+      "initialData"
+    >;
+  axios?: AxiosRequestConfig;
+}): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = AxiosError<HTTPValidationError>,
->(
-  headers?: ListChipsHeaders,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listChips>>,
-          TError,
-          Awaited<ReturnType<typeof listChips>>
-        >,
-        "initialData"
-      >;
-    axios?: AxiosRequestConfig;
-  },
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  TError = AxiosError<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
+  > &
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof listChips>>,
+        TError,
+        Awaited<ReturnType<typeof listChips>>
+      >,
+      "initialData"
+    >;
+  axios?: AxiosRequestConfig;
+}): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = AxiosError<HTTPValidationError>,
->(
-  headers?: ListChipsHeaders,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
-    >;
-    axios?: AxiosRequestConfig;
-  },
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  TError = AxiosError<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
+  >;
+  axios?: AxiosRequestConfig;
+}): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
  * @summary Fetch all chips
  */
 
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = AxiosError<HTTPValidationError>,
->(
-  headers?: ListChipsHeaders,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
-    >;
-    axios?: AxiosRequestConfig;
-  },
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListChipsQueryOptions(headers, options);
+  TError = AxiosError<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
+  >;
+  axios?: AxiosRequestConfig;
+}): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getListChipsQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData>;
@@ -190,13 +167,9 @@ ChipResponse
  */
 export const fetchChip = (
   chipId: string,
-  headers?: FetchChipHeaders,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ChipResponse>> => {
-  return axios.get(`http://localhost:5715/chip/${chipId}`, {
-    ...options,
-    headers: { ...headers, ...options?.headers },
-  });
+  return axios.get(`http://localhost:5715/chip/${chipId}`, options);
 };
 
 export const getFetchChipQueryKey = (chipId: string) => {
@@ -208,7 +181,6 @@ export const getFetchChipQueryOptions = <
   TError = AxiosError<HTTPValidationError>,
 >(
   chipId: string,
-  headers?: FetchChipHeaders,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof fetchChip>>, TError, TData>
@@ -222,7 +194,7 @@ export const getFetchChipQueryOptions = <
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchChip>>> = ({
     signal,
-  }) => fetchChip(chipId, headers, { signal, ...axiosOptions });
+  }) => fetchChip(chipId, { signal, ...axiosOptions });
 
   return {
     queryKey,
@@ -244,7 +216,6 @@ export function useFetchChip<
   TError = AxiosError<HTTPValidationError>,
 >(
   chipId: string,
-  headers: undefined | FetchChipHeaders,
   options: {
     query: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof fetchChip>>, TError, TData>
@@ -267,7 +238,6 @@ export function useFetchChip<
   TError = AxiosError<HTTPValidationError>,
 >(
   chipId: string,
-  headers?: FetchChipHeaders,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof fetchChip>>, TError, TData>
@@ -288,7 +258,6 @@ export function useFetchChip<
   TError = AxiosError<HTTPValidationError>,
 >(
   chipId: string,
-  headers?: FetchChipHeaders,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof fetchChip>>, TError, TData>
@@ -305,7 +274,6 @@ export function useFetchChip<
   TError = AxiosError<HTTPValidationError>,
 >(
   chipId: string,
-  headers?: FetchChipHeaders,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof fetchChip>>, TError, TData>
@@ -313,7 +281,7 @@ export function useFetchChip<
     axios?: AxiosRequestConfig;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getFetchChipQueryOptions(chipId, headers, options);
+  const queryOptions = getFetchChipQueryOptions(chipId, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData>;
@@ -342,13 +310,9 @@ list[ExecutionResponseSummary]
  */
 export const listExecutionsByChipId = (
   chipId: string,
-  headers?: ListExecutionsByChipIdHeaders,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionResponseSummary[]>> => {
-  return axios.get(`http://localhost:5715/chip/${chipId}/execution`, {
-    ...options,
-    headers: { ...headers, ...options?.headers },
-  });
+  return axios.get(`http://localhost:5715/chip/${chipId}/execution`, options);
 };
 
 export const getListExecutionsByChipIdQueryKey = (chipId: string) => {
@@ -360,7 +324,6 @@ export const getListExecutionsByChipIdQueryOptions = <
   TError = AxiosError<HTTPValidationError>,
 >(
   chipId: string,
-  headers?: ListExecutionsByChipIdHeaders,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -380,7 +343,7 @@ export const getListExecutionsByChipIdQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listExecutionsByChipId>>
   > = ({ signal }) =>
-    listExecutionsByChipId(chipId, headers, { signal, ...axiosOptions });
+    listExecutionsByChipId(chipId, { signal, ...axiosOptions });
 
   return {
     queryKey,
@@ -404,7 +367,6 @@ export function useListExecutionsByChipId<
   TError = AxiosError<HTTPValidationError>,
 >(
   chipId: string,
-  headers: undefined | ListExecutionsByChipIdHeaders,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -431,7 +393,6 @@ export function useListExecutionsByChipId<
   TError = AxiosError<HTTPValidationError>,
 >(
   chipId: string,
-  headers?: ListExecutionsByChipIdHeaders,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -456,7 +417,6 @@ export function useListExecutionsByChipId<
   TError = AxiosError<HTTPValidationError>,
 >(
   chipId: string,
-  headers?: ListExecutionsByChipIdHeaders,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -477,7 +437,6 @@ export function useListExecutionsByChipId<
   TError = AxiosError<HTTPValidationError>,
 >(
   chipId: string,
-  headers?: ListExecutionsByChipIdHeaders,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -489,11 +448,7 @@ export function useListExecutionsByChipId<
     axios?: AxiosRequestConfig;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListExecutionsByChipIdQueryOptions(
-    chipId,
-    headers,
-    options,
-  );
+  const queryOptions = getListExecutionsByChipIdQueryOptions(chipId, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData>;
@@ -525,15 +480,11 @@ ExecutionResponseDetail
 export const fetchExecutionByChipId = (
   chipId: string,
   executionId: string,
-  headers?: FetchExecutionByChipIdHeaders,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionResponseDetail>> => {
   return axios.get(
     `http://localhost:5715/chip/${chipId}/execution/${executionId}`,
-    {
-      ...options,
-      headers: { ...headers, ...options?.headers },
-    },
+    options,
   );
 };
 
@@ -552,7 +503,6 @@ export const getFetchExecutionByChipIdQueryOptions = <
 >(
   chipId: string,
   executionId: string,
-  headers?: FetchExecutionByChipIdHeaders,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -573,10 +523,7 @@ export const getFetchExecutionByChipIdQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof fetchExecutionByChipId>>
   > = ({ signal }) =>
-    fetchExecutionByChipId(chipId, executionId, headers, {
-      signal,
-      ...axiosOptions,
-    });
+    fetchExecutionByChipId(chipId, executionId, { signal, ...axiosOptions });
 
   return {
     queryKey,
@@ -601,7 +548,6 @@ export function useFetchExecutionByChipId<
 >(
   chipId: string,
   executionId: string,
-  headers: undefined | FetchExecutionByChipIdHeaders,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -629,7 +575,6 @@ export function useFetchExecutionByChipId<
 >(
   chipId: string,
   executionId: string,
-  headers?: FetchExecutionByChipIdHeaders,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -655,7 +600,6 @@ export function useFetchExecutionByChipId<
 >(
   chipId: string,
   executionId: string,
-  headers?: FetchExecutionByChipIdHeaders,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -677,7 +621,6 @@ export function useFetchExecutionByChipId<
 >(
   chipId: string,
   executionId: string,
-  headers?: FetchExecutionByChipIdHeaders,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -692,7 +635,6 @@ export function useFetchExecutionByChipId<
   const queryOptions = getFetchExecutionByChipIdQueryOptions(
     chipId,
     executionId,
-    headers,
     options,
   );
 

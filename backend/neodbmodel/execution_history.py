@@ -29,6 +29,7 @@ class ExecutionHistoryDocument(Document):
 
     """
 
+    username: str = Field(..., description="The username of the user who created the execution")
     name: str = Field(..., description="The name of the execution")
     execution_id: str = Field(..., description="The execution ID")
     calib_data_path: str = Field(..., description="The path to the calibration data")
@@ -50,11 +51,12 @@ class ExecutionHistoryDocument(Document):
         """Settings for the document."""
 
         name = "execution_history"
-        indexes: ClassVar = [IndexModel([("execution_id", ASCENDING)], unique=True)]
+        indexes: ClassVar = [IndexModel([("execution_id", ASCENDING), ("username")], unique=True)]
 
     @classmethod
     def from_execution_model(cls, execution_model: ExecutionModel) -> "ExecutionHistoryDocument":
         return cls(
+            username=execution_model.username,
             name=execution_model.name,
             execution_id=execution_model.execution_id,
             calib_data_path=execution_model.calib_data_path,
@@ -80,6 +82,7 @@ class ExecutionHistoryDocument(Document):
             doc = cls.from_execution_model(execution_model)
             doc.save()
             return doc
+        doc.username = execution_model.username
         doc.name = execution_model.name
         doc.calib_data_path = execution_model.calib_data_path
         doc.note = execution_model.note

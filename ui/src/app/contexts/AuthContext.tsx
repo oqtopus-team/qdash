@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [loginMutation, saveToken]
+    [loginMutation, saveToken],
   );
 
   const logout = useCallback(() => {

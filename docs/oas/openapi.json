@@ -2228,54 +2228,29 @@
           "chip"
         ],
         "summary": "Fetch all chips",
-        "description": "Fetch all chips.\n\nParameters\n----------\ncurrent_user_id : str\n    Current user ID from authentication\n\nReturns\n-------\nlist[ChipResponse]\n    List of available chips",
+        "description": "Fetch all chips.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nlist[ChipResponse]\n    List of available chips",
         "operationId": "listChips",
-        "parameters": [
-          {
-            "name": "x-user-id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "User ID",
-              "title": "X-User-Id"
-            },
-            "description": "User ID"
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/ChipResponse"
                   },
+                  "type": "array",
                   "title": "Response Listchips"
                 }
               }
             }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/chip/{chip_id}": {
@@ -2286,6 +2261,11 @@
         "summary": "Fetch a chip",
         "description": "Fetch a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user_id : str\n    Current user ID from authentication\n\nReturns\n-------\nChipResponse\n    Chip information",
         "operationId": "fetchChip",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -2295,24 +2275,6 @@
               "type": "string",
               "title": "Chip Id"
             }
-          },
-          {
-            "name": "x-user-id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "User ID",
-              "title": "X-User-Id"
-            },
-            "description": "User ID"
           }
         ],
         "responses": {
@@ -2347,6 +2309,11 @@
         "summary": "Fetch executions",
         "description": "Fetch all executions for a given chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch executions for\ncurrent_user_id : str\n    Current user ID from authentication\n\nReturns\n-------\nlist[ExecutionResponseSummary]\n    List of executions for the chip",
         "operationId": "listExecutionsByChipId",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -2356,24 +2323,6 @@
               "type": "string",
               "title": "Chip Id"
             }
-          },
-          {
-            "name": "x-user-id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "User ID",
-              "title": "X-User-Id"
-            },
-            "description": "User ID"
           }
         ],
         "responses": {
@@ -2412,6 +2361,11 @@
         "summary": "Fetch an execution by its ID",
         "description": "Return the execution detail by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nexecution_id : str\n    ID of the execution to fetch\ncurrent_user_id : str\n    Current user ID from authentication\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
         "operationId": "fetchExecutionByChipId",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -2430,24 +2384,6 @@
               "type": "string",
               "title": "Execution Id"
             }
-          },
-          {
-            "name": "x-user-id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "User ID",
-              "title": "X-User-Id"
-            },
-            "description": "User ID"
           }
         ],
         "responses": {

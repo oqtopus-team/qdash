@@ -21,6 +21,7 @@ class QubitDocument(Document):
 
     """
 
+    username: str = Field(..., description="The username of the user who created the qubit")
     qid: str = Field(..., description="The qubit ID")
     status: str = Field("pending", description="The status of the qubit")
     chip_id: str = Field(..., description="The chip ID")
@@ -37,7 +38,9 @@ class QubitDocument(Document):
         """Settings for the document."""
 
         name = "qubit"
-        indexes: ClassVar = [IndexModel([("chip_id", ASCENDING), ("qid", ASCENDING)], unique=True)]
+        indexes: ClassVar = [
+            IndexModel([("chip_id", ASCENDING), ("qid", ASCENDING), ("username")], unique=True)
+        ]
 
     @staticmethod
     def merge_calib_data(existing: dict, new: dict) -> dict:

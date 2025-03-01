@@ -43,17 +43,19 @@ def pydantic_serializer(obj: BaseModel) -> dict:
     raise TypeError(f"Type {type(obj)} not serializable")
 
 
-def convert_output_parameters(outputs: dict[str, any]) -> dict[str, dict]:  # type: ignore # noqa: PGH003
+def convert_output_parameters(username: str, outputs: dict[str, any]) -> dict[str, dict]:  # type: ignore # noqa: PGH003
     """Convert the output parameters to the Parameter class."""
     converted = {}
     for param_name, output in outputs.items():
-        param = ParameterModel(name=param_name, unit=output.unit, description=output.description)  # type: ignore # noqa: PGH003
+        param = ParameterModel(
+            username=username, name=param_name, unit=output.unit, description=output.description
+        )  # type: ignore # noqa: PGH003
         converted[param_name] = param.model_dump()
     return converted
 
 
 @task
-def update_active_output_parameters() -> list[ParameterModel]:
+def update_active_output_parameters(username: str) -> list[ParameterModel]:
     """Update the active output parameters in the input file.
 
     Args:
@@ -65,7 +67,8 @@ def update_active_output_parameters() -> list[ParameterModel]:
 
     all_outputs = {name: cls.output_parameters for name, cls in BaseTask.registry.items()}
     converted_outputs = {
-        task_name: convert_output_parameters(outputs) for task_name, outputs in all_outputs.items()
+        task_name: convert_output_parameters(username=username, outputs=outputs)
+        for task_name, outputs in all_outputs.items()
     }
 
     unique_parameter_names = {
@@ -73,6 +76,7 @@ def update_active_output_parameters() -> list[ParameterModel]:
     }
     return [
         ParameterModel(
+            username=username,
             name=name,
             unit=converted_outputs[
                 next(task for task in converted_outputs if name in converted_outputs[task])
@@ -86,12 +90,13 @@ def update_active_output_parameters() -> list[ParameterModel]:
 
 
 @task
-def update_active_tasks() -> list[TaskModel]:
+def update_active_tasks(username: str) -> list[TaskModel]:
     """Update the active tasks in the registry and return a list of TaskModel instances."""
     from qcflow.protocols.base import BaseTask
 
     return [
         TaskModel(
+            username=username,
             name=cls.name,
             description=cls.__doc__,
             task_type=cls.task_type,
