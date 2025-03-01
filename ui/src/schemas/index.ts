@@ -7,9 +7,6 @@
  */
 
 export * from "./bodyAuthLoginForAccessToken";
-export * from "./bodyAuthLoginForAccessTokenClientId";
-export * from "./bodyAuthLoginForAccessTokenClientSecret";
-export * from "./bodyAuthLoginForAccessTokenGrantType";
 export * from "./chipResponse";
 export * from "./chipResponseCouplings";
 export * from "./chipResponseQubits";

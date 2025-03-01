@@ -2,9 +2,8 @@ from datetime import timedelta
 from typing import Annotated
 
 from datamodel.system_info import SystemInfoModel
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Form, HTTPException, status
 from fastapi.logger import logger
-from fastapi.security import OAuth2PasswordRequestForm
 from neodbmodel.initialize import initialize
 from neodbmodel.user import UserDocument
 from server.lib.auth import (
@@ -25,12 +24,34 @@ router = APIRouter(
 )
 
 
-@router.post("/token", response_model=Token)
+@router.post(
+    "/token",
+    response_model=Token,
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/x-www-form-urlencoded": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "username": {"type": "string"},
+                            "password": {"type": "string"},
+                            "grant_type": {"type": "string", "default": "password"},
+                        },
+                        "required": ["username", "password"],
+                    }
+                }
+            }
+        }
+    },
+)
 def login_for_access_token(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    username: str = Form(),
+    password: str = Form(),
+    grant_type: str = Form(default="password"),
 ) -> Token:
-    logger.debug(f"Login attempt for user: {form_data.username}")
-    user = authenticate_user(form_data.username, form_data.password)
+    logger.debug(f"Login attempt for user: {username}")
+    user = authenticate_user(username, password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

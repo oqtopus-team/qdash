@@ -1865,7 +1865,24 @@
           "content": {
             "application/x-www-form-urlencoded": {
               "schema": {
-                "$ref": "#/components/schemas/Body_auth-login_for_access_token"
+                "$ref": "#/components/schemas/Body_auth-login_for_access_token",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "grant_type": {
+                    "type": "string",
+                    "default": "password"
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "username",
+                  "password"
+                ]
               }
             }
           },
@@ -2005,18 +2022,6 @@
     "schemas": {
       "Body_auth-login_for_access_token": {
         "properties": {
-          "grant_type": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "password"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Grant Type"
-          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -2025,32 +2030,10 @@
             "type": "string",
             "title": "Password"
           },
-          "scope": {
+          "grant_type": {
             "type": "string",
-            "title": "Scope",
-            "default": ""
-          },
-          "client_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Client Id"
-          },
-          "client_secret": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Client Secret"
+            "title": "Grant Type",
+            "default": "password"
           }
         },
         "type": "object",
