@@ -78,14 +78,17 @@ class ExecutionManager(BaseModel):
 
         self._with_file_lock(updater)
 
-    def update_execution_status_to_running(self) -> None:
+    def update_execution_status_to_running(self) -> "ExecutionManager":
         self.update_status(ExecutionStatusModel.RUNNING)
+        return self
 
-    def update_execution_status_to_completed(self) -> None:
+    def update_execution_status_to_completed(self) -> "ExecutionManager":
         self.update_status(ExecutionStatusModel.COMPLETED)
+        return self
 
-    def update_execution_status_to_failed(self) -> None:
+    def update_execution_status_to_failed(self) -> "ExecutionManager":
         self.update_status(ExecutionStatusModel.FAILED)
+        return self
 
     def reload(self) -> "ExecutionManager":
         """Reload the execution manager from the file and return self for chaining."""
@@ -112,23 +115,44 @@ class ExecutionManager(BaseModel):
             raise ValueError(f"Failed to parse the time. {e}")
         return end_time.diff_for_humans(start_time, absolute=True)  # type: ignore #noqa: PGH003
 
-    def start_execution(self) -> None:
+    def start_execution(self) -> "ExecutionManager":
+        """Start the execution and set the start time."""
+
         def updater(instance: ExecutionManager) -> None:
             instance.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
 
         self._with_file_lock(updater)
+        return ExecutionManager.load_from_file(self.calib_data_path)
 
-    def end_execution(self) -> None:
-        def updater(instance: ExecutionManager) -> None:
-            instance.end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-            instance.elapsed_time = instance.calculate_elapsed_time(
-                instance.start_at, instance.end_at
-            )
+    def complete_execution(self) -> "ExecutionManager":
+        """Complete the execution with success status."""
+        # 最新の状態を読み込む
+        instance = ExecutionManager.load_from_file(self.calib_data_path)
+        # 終了時刻を設定
+        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        instance.end_at = end_at
+        instance.elapsed_time = instance.calculate_elapsed_time(instance.start_at, end_at)
+        # 完了状態を設定
+        instance.status = ExecutionStatusModel.COMPLETED
+        instance.save()
+        return instance
 
-        self._with_file_lock(updater)
+    def fail_execution(self) -> "ExecutionManager":
+        """Complete the execution with failure status."""
+        # 最新の状態を読み込む
+        instance = ExecutionManager.load_from_file(self.calib_data_path)
+        # 終了時刻を設定
+        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        instance.end_at = end_at
+        instance.elapsed_time = instance.calculate_elapsed_time(instance.start_at, end_at)
+        # 失敗状態を設定
+        instance.status = ExecutionStatusModel.FAILED
+        instance.save()
+        return instance
 
-    def save(self) -> None:
+    def save(self) -> "ExecutionManager":
         self._atomic_save()
+        return self
 
     def _atomic_save(self) -> None:
         """Filelock in the save method."""

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pendulum
 from cal_flow import qubex_one_qubit_cal_flow
+from datamodel.execution import ExecutionStatusModel
 
 # from qcflow.schema.menu import Menu
 from datamodel.menu import MenuModel as Menu
@@ -114,27 +115,20 @@ def main_flow(
         fridge_info={"temperature": 0.0},
         chip_id="SAMPLE",
         note={"qubex_version": get_package_version("qubex"), "ui_url": ui_url},
-    )
-    execution_manager.save()
+    ).save()
     ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
-    execution_manager.start_execution()
-    execution_manager.save()
+    execution_manager = execution_manager.start_execution().save()
     ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
-    execution_manager.update_execution_status_to_running()
-    execution_manager.save()
+    execution_manager = execution_manager.update_execution_status_to_running().save()
     ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
     try:
         success_map = qubex_one_qubit_cal_flow(menu, calib_dir, success_map, execution_id)
-        execution_manager.update_execution_status_to_completed()
+        # 最新の状態を読み込んで完了状態に設定
+        execution_manager = ExecutionManager.load_from_file(calib_dir).complete_execution()
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")
-        execution_manager = execution_manager.reload()
-        execution_manager.update_execution_status_to_failed()
-        execution_manager.save()
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
+        # 最新の状態を読み込んで失敗状態に設定
+        execution_manager = ExecutionManager.load_from_file(calib_dir).fail_execution()
     finally:
-        execution_manager = execution_manager.reload()
-        execution_manager.end_execution()
-        execution_manager.save()
         ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
         unlock_execution()
