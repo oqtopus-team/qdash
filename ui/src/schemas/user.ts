@@ -5,13 +5,11 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserEmail } from "./userEmail";
 import type { UserFullName } from "./userFullName";
 import type { UserDisabled } from "./userDisabled";
 
 export interface User {
   username: string;
-  email?: UserEmail;
   full_name?: UserFullName;
   disabled?: UserDisabled;
 }

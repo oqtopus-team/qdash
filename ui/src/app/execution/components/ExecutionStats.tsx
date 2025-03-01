@@ -34,19 +34,19 @@ export function ExecutionStats({
   const stats = useMemo(() => {
     const totalExecutions = filteredExecutions.length;
     const completedExecutions = filteredExecutions.filter(
-      (exec) => exec.status === "completed"
+      (exec) => exec.status === "completed",
     ).length;
     const failedExecutions = filteredExecutions.filter(
-      (exec) => exec.status === "failed"
+      (exec) => exec.status === "failed",
     ).length;
     const runningExecutions = filteredExecutions.filter(
-      (exec) => exec.status === "running"
+      (exec) => exec.status === "running",
     ).length;
 
     // 実行時間の計算（完了した実行のみ対象）
     const completedExecutionTimes = filteredExecutions
       .filter(
-        (exec) => exec.status === "completed" && exec.start_at && exec.end_at
+        (exec) => exec.status === "completed" && exec.start_at && exec.end_at,
       )
       .map((exec) => {
         try {

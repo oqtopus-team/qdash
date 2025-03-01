@@ -43,7 +43,6 @@ def get_user(username: str) -> Optional[UserInDB]:
     if user:
         return UserInDB(
             username=user.username,
-            email=user.email,
             full_name=user.full_name,
             disabled=user.disabled,
             hashed_password=user.hashed_password,
@@ -91,7 +90,6 @@ def _get_cached_user(token_str: str) -> User | None:
             return None
         return User(
             username=user.username,
-            email=user.email,
             full_name=user.full_name,
             disabled=user.disabled,
         )

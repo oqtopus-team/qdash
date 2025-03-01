@@ -63,7 +63,7 @@ function ProfileModal({
           <div className="card-body py-2">
             <h2 className="card-title text-2xl">{user?.username}</h2>
             <ul className="text-left">
-              <li>Email: {user?.email}</li>
+              <li>Full Name: {user?.full_name}</li>
             </ul>
             <div className="modal-action">
               <form method="dialog">

@@ -56,13 +56,13 @@ export function CalibrationMenuTable() {
         onError: (error) => {
           console.error("Error deleting menu:", error);
         },
-      }
+      },
     );
   };
 
   const handleNewItem = () => {
     const newItemModal = document.getElementById(
-      "newItem"
+      "newItem",
     ) as HTMLDialogElement | null;
     if (newItemModal) {
       newItemModal.showModal();
@@ -71,7 +71,7 @@ export function CalibrationMenuTable() {
 
   const handleCreateTemplate = () => {
     const createTemplateModal = document.getElementById(
-      "createTemplate"
+      "createTemplate",
     ) as HTMLDialogElement | null;
     if (createTemplateModal) {
       createTemplateModal.showModal();
@@ -81,7 +81,7 @@ export function CalibrationMenuTable() {
   const handleEditClick = (item: Menu) => {
     setSelectedItem(item);
     const editModal = document.getElementById(
-      "tableEdit"
+      "tableEdit",
     ) as HTMLDialogElement | null;
     if (editModal) {
       editModal.showModal();
@@ -104,7 +104,7 @@ export function CalibrationMenuTable() {
     handleEditClick,
     handleDeleteClick,
     handleExecuteCalib,
-    false // Temporarily disable lock
+    false, // Temporarily disable lock
   );
 
   return (
@@ -161,7 +161,7 @@ export function CalibrationMenuTable() {
                   console.error("Error executing calibration:", error);
                   toast.error("Error executing calibration");
                 },
-              }
+              },
             );
           }}
           onCancel={() => setShowConfirmModal(false)}
