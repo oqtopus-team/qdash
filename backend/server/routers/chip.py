@@ -7,7 +7,9 @@ from fastapi import APIRouter, Depends
 from neodbmodel.chip import ChipDocument
 from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.initialize import initialize
-from pydantic import BaseModel, Field, field_validator
+from neodbmodel.task import TaskDocument
+from neodbmodel.task_result_history import TaskResultHistoryDocument
+from pydantic import BaseModel, field_validator
 from server.lib.auth import get_current_active_user, get_optional_current_user
 from server.lib.current_user import get_current_user_id
 from server.schemas.auth import User
@@ -47,43 +49,24 @@ class ExecutionResponseSummary(BaseModel):
 
 
 class Task(BaseModel):
-    """Task is a Pydantic model that represents a task in the execution response.
+    """Task is a Pydantic model that represents a task."""
 
-    Attributes
-    ----------
-        task_id (str): The ID of the task.
-        name (str): The name of the task.
-        upstream_id (Optional[str]): The ID of the upstream task.
-        status (str): The current status of the task.
-        message (str): The message associated with the task.
-        input_parameters (dict[str, Any]): The input parameters of the task.
-        output_parameters (dict[str, Any]): The output parameters of the task.
-        output_parameter_names (List[str]): The names of the output parameters.
-        note (dict[str, Any]): The note associated with the task.
-        figure_path (List[str]): The paths to the figures associated with the task.
-        start_at (Optional[str]): The start time of the task.
-        end_at (Optional[str]): The end time of the task.
-        elapsed_time (Optional[str]): The total elapsed time of the task.
-        task_type (str): The type of the task.
-
-    """
-
-    task_id: str
-    qid: str = ""
+    task_id: str | None = None
+    qid: str | None = None
     name: str
-    upstream_id: str | None = ""
-    status: str
-    message: str
-    input_parameters: dict[str, Any] = Field(default_factory=dict)
-    output_parameters: dict[str, Any] = Field(default_factory=dict)
-    output_parameter_names: list[str] = Field(default_factory=list)
-    note: dict[str, Any] = Field(default_factory=dict)
-    figure_path: list[str] = Field(default_factory=list)
-    raw_data_path: list[str] = Field(default_factory=list)
+    upstream_id: str | None = None
+    status: str = "pending"
+    message: str | None = None
+    input_parameters: dict[str, Any] | None = None
+    output_parameters: dict[str, Any] | None = None
+    output_parameter_names: list[str] | None = None
+    note: dict[str, Any] | None = None
+    figure_path: list[str] | None = None
+    raw_data_path: list[str] | None = None
     start_at: str | None = None
     end_at: str | None = None
     elapsed_time: str | None = None
-    task_type: str
+    task_type: str | None = None
 
     @field_validator("name", mode="before")
     def modify_name(cls, v: str, info: FieldValidationInfo) -> str:  # noqa: N805
@@ -203,7 +186,7 @@ def list_executions_by_chip_id(
     ----------
     chip_id : str
         ID of the chip to fetch executions for
-    current_user_id : str
+    current_user : str
         Current user ID from authentication
 
     Returns
@@ -324,3 +307,125 @@ def fetch_execution_by_chip_id(
         task=tasks,
         note=execution.note,
     )
+
+
+class MuxDetailResponse(BaseModel):
+    """MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details."""
+
+    mux_id: int
+    detail: dict[str, dict[str, Task]]
+
+
+class ListMuxResponse(BaseModel):
+    """ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers."""
+
+    muxes: dict[int, MuxDetailResponse]
+
+
+def _build_mux_detail(mux_id: int, tasks: list, current_user: User) -> MuxDetailResponse:
+    qids = [str(mux_id * 4 + i) for i in range(4)]
+    detail: dict[str, dict[str, Task]] = {}
+    for qid in qids:
+        detail[qid] = {}  # qidごとの辞書を初期化
+        for task in tasks:
+            logger.debug("Task: %s", task)
+            result = TaskResultHistoryDocument.find_one(
+                {"name": task.name, "username": current_user.username, "qid": qid},
+                sort=[("end_at", DESCENDING)],
+            ).run()
+            if result is None:
+                task_result = Task(
+                    name=task.name,
+                )
+                detail[qid][task.name] = task_result
+            else:
+                task_result = Task(
+                    task_id=result.task_id,
+                    name=result.name,
+                    status=result.status,
+                    message=result.message,
+                    input_parameters=result.input_parameters,
+                    output_parameters=result.output_parameters,
+                    output_parameter_names=result.output_parameter_names,
+                    note=result.note,
+                    figure_path=result.figure_path,
+                    raw_data_path=result.raw_data_path,
+                    start_at=result.start_at,
+                    end_at=result.end_at,
+                    elapsed_time=result.elapsed_time,
+                    task_type=result.task_type,
+                )
+                detail[qid][task.name] = task_result
+    return MuxDetailResponse(mux_id=mux_id, detail=detail)
+
+
+@router.get(
+    "/chip/{chip_id}/mux/{mux_id}",
+    response_model=MuxDetailResponse,
+    summary="Fetch the multiplexer details",
+    operation_id="fetchMuxDetails",
+)
+def fetch_mux_detail(
+    chip_id: str, mux_id: int, current_user: Annotated[User, Depends(get_current_active_user)]
+) -> MuxDetailResponse:
+    """Fetch the multiplexer details.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    mux_id : int
+        ID of the multiplexer
+    current_user : User
+        Current authenticated user
+
+    Returns
+    -------
+    MuxDetailResponse
+        Multiplexer details
+
+    """
+    logger.debug(f"Fetching mux details for chip {chip_id}, user: {current_user.username}")
+    initialize()
+    tasks = TaskDocument.find({"username": current_user.username}).run()
+    logger.debug("Tasks: %s", tasks)
+    return _build_mux_detail(mux_id, tasks, current_user)
+
+
+@router.get(
+    "/chip/{chip_id}/mux",
+    response_model=ListMuxResponse,
+    summary="Fetch the multiplexers",
+    operation_id="listMuxes",
+    response_model_exclude_none=True,
+)
+def list_muxes(
+    chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]
+) -> ListMuxResponse:
+    """Fetch the multiplexers.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    current_user : User
+        Current authenticated user
+
+    Returns
+    -------
+    ListMuxResponse
+        Multiplexdetails
+
+    """
+    logger.debug(f"Fetching muxes for chip {chip_id}, user: {current_user.username}")
+    initialize()
+    tasks = TaskDocument.find({"username": current_user.username}).run()
+    logger.debug("Tasks: %s", tasks)
+    muxes: dict[int, MuxDetailResponse] = {}
+    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    if chip is None:
+        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+    mux_num = int(chip.size // 4)
+    for mux_id in range(mux_num):
+        muxes[mux_id] = _build_mux_detail(mux_id, tasks, current_user)
+    return ListMuxResponse(muxes=muxes)
