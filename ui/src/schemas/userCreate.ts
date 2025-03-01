@@ -9,7 +9,6 @@ import type { UserCreateFullName } from "./userCreateFullName";
 
 export interface UserCreate {
   username: string;
-  email: string;
   password: string;
   full_name?: UserCreateFullName;
 }

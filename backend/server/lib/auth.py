@@ -3,12 +3,13 @@ from datetime import datetime, timedelta
 from typing import Any, Optional, cast
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from fastapi.security import APIKeyHeader
+from jose import jwt
+from jose.constants import ALGORITHMS
 from neodbmodel.initialize import initialize
 from neodbmodel.user import UserDocument
 from passlib.context import CryptContext
-from server.schemas.auth import TokenData, User, UserInDB
+from server.schemas.auth import User, UserInDB
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
@@ -17,17 +18,65 @@ logger.setLevel(logging.DEBUG)
 # モジュールレベルで初期化
 initialize()
 
-# JWT設定
+# 認証設定
 SECRET_KEY = "your-secret-key"  # 本番環境では環境変数から取得すべき
-ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# bcryptのバージョン問題を回避するための設定
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,  # デフォルトのラウンド数
+    bcrypt__ident="2b",  # bcryptのバージョン識別子
+)
+
+
+def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    # jose.jwt.encode returns str in Python 3 when using HS256
+    encoded_jwt: str = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHMS.HS256)
+    return encoded_jwt
+
+
+# Optional authentication scheme
+# Simple username header authentication
+username_header = APIKeyHeader(name="X-Username", auto_error=False)
+
+
+def get_optional_current_user(username: str = Depends(username_header)) -> User:
+    """Get user from username header if provided, otherwise return default user.
+    This allows endpoints to support both authenticated and unauthenticated access.
+
+    Parameters
+    ----------
+    username : str
+        Username from request header (optional)
+
+    Returns
+    -------
+    User
+        User information based on provided username or default user
+
+    """
+    if not username:
+        logger.debug("No username provided, using default user")
+        return User(username="default", full_name="Default User", disabled=False)
+
+    logger.debug(f"Using provided username: {username}")
+    return User(username=username, full_name=f"User {username}", disabled=False)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return cast(bool, pwd_context.verify(plain_password, hashed_password))
+    try:
+        return cast(bool, pwd_context.verify(plain_password, hashed_password))
+    except Exception as e:
+        logger.error(f"Password verification failed: {e}")
+        return False
 
 
 def get_password_hash(password: str) -> str:
@@ -43,7 +92,6 @@ def get_user(username: str) -> Optional[UserInDB]:
     if user:
         return UserInDB(
             username=user.username,
-            email=user.email,
             full_name=user.full_name,
             disabled=user.disabled,
             hashed_password=user.hashed_password,
@@ -64,76 +112,34 @@ def authenticate_user(username: str, password: str) -> Optional[UserInDB]:
     return user
 
 
-def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
-    to_encode: dict[str, Any] = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = cast(str, jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM))
-    return encoded_jwt
-
-
-from functools import lru_cache
-
-
-# ユーザー情報のキャッシュ
-@lru_cache(maxsize=1024)
-def _get_cached_user(token_str: str) -> User | None:
-    try:
-        payload = jwt.decode(token_str, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str | None = payload.get("sub")
-        if not username:
-            return None
-        user = get_user(username)
-        if not user:
-            return None
-        return User(
-            username=user.username,
-            email=user.email,
-            full_name=user.full_name,
-            disabled=user.disabled,
-        )
-    except Exception:
-        return None
-
-
-def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
-    """Get current user from token.
+def get_current_user(username: str = Depends(username_header)) -> User:
+    """Get user from username header.
 
     Parameters
     ----------
-    token : str
-        JWT token from request header
+    username : str
+        Username from request header
 
     Returns
     -------
     User
-        Current user information
+        User information
 
     Raises
     ------
     HTTPException
-        If token is invalid or user not found
+        If username is not provided
 
     """
-    logger.debug("Getting user from cache")
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        user = _get_cached_user(token)
-        if user is None:
-            logger.error("User not found in cache or invalid token")
-            raise credentials_exception
-        logger.debug(f"User found in cache: {user.username}")
-        return user
-    except Exception as e:
-        logger.error(f"Error getting user from cache: {e}")
-        raise credentials_exception
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Username header is required",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+    logger.debug(f"Using provided username: {username}")
+    return User(username=username, full_name=f"User {username}", disabled=False)
 
 
 def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:

@@ -18,7 +18,7 @@ import axios, { AxiosRequestConfig } from "axios";
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
+  username: string | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
@@ -28,23 +28,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // トークンの保存
-  const saveToken = useCallback((token: string) => {
-    const encodedToken = encodeURIComponent(token);
-    document.cookie = `token=${encodedToken}; path=/; max-age=${
+  // ユーザー名の保存
+  const saveUsername = useCallback((username: string) => {
+    const encodedUsername = encodeURIComponent(username);
+    document.cookie = `username=${encodedUsername}; path=/; max-age=${
       7 * 24 * 60 * 60
     }; SameSite=Lax`;
-    setToken(token);
+    setUsername(username);
   }, []);
 
-  // トークンの削除
-  const removeToken = useCallback(() => {
+  // ユーザー名の削除
+  const removeUsername = useCallback(() => {
     document.cookie =
-      "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-    setToken(null);
+      "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+    setUsername(null);
   }, []);
 
   // ログイン処理
@@ -56,11 +56,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ユーザー情報の取得
   const { data: userData, error: userError } = useAuthReadUsersMe({
     query: {
-      enabled: !!token,
+      enabled: !!username,
       retry: false,
     },
     axios: {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers: username ? { "X-Username": username } : undefined,
     } as AxiosRequestConfig,
   });
 
@@ -75,29 +75,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (userError) {
       console.error("Failed to fetch user info:", userError);
-      removeToken();
+      removeUsername();
       setUser(null);
     }
-  }, [userError, removeToken]);
+  }, [userError, removeUsername]);
 
   // 初期化処理
   useEffect(() => {
-    const storedToken = document.cookie
+    const storedUsername = document.cookie
       .split("; ")
-      .find((row) => row.startsWith("token="))
+      .find((row) => row.startsWith("username="))
       ?.split("=")[1];
 
-    if (storedToken) {
+    if (storedUsername) {
       try {
-        const decodedToken = decodeURIComponent(storedToken);
-        setToken(decodedToken);
+        const decodedUsername = decodeURIComponent(storedUsername);
+        setUsername(decodedUsername);
       } catch (error) {
-        console.error("Failed to decode token:", error);
-        removeToken();
+        console.error("Failed to decode username:", error);
+        removeUsername();
       }
     }
     setLoading(false);
-  }, [removeToken]);
+  }, [removeUsername]);
 
   const login = useCallback(
     async (username: string, password: string) => {
@@ -109,24 +109,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             grant_type: "password",
           },
         });
-        const newToken = response.data.access_token;
-        saveToken(newToken);
+        // トークンとユーザー名を保存
+        const token = response.data.access_token;
+        document.cookie = `token=${encodeURIComponent(
+          token
+        )}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+        saveUsername(username);
       } catch (error) {
         console.error("Login failed:", error);
         throw error;
       }
     },
-    [loginMutation, saveToken],
+    [loginMutation, saveUsername]
   );
 
   const logout = useCallback(() => {
-    logoutMutation.mutate();
-    setUser(null);
-    removeToken();
-  }, [logoutMutation, removeToken]);
+    logoutMutation.mutateAsync().then(() => {
+      setUser(null);
+      removeUsername();
+      // トークンを削除
+      document.cookie =
+        "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+      // ページをリロードしてすべての状態をリセット
+      window.location.href = "/login";
+    });
+  }, [logoutMutation, removeUsername]);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, username, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

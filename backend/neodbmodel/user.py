@@ -2,7 +2,7 @@ from typing import ClassVar, Optional
 
 from bunnet import Document
 from datamodel.system_info import SystemInfoModel
-from pydantic import ConfigDict, EmailStr, Field
+from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 
 
@@ -12,7 +12,6 @@ class UserDocument(Document):
     Attributes
     ----------
         username (str): The username.
-        email (EmailStr): The email address.
         hashed_password (str): The hashed password.
         full_name (Optional[str]): The full name of the user.
         disabled (bool): Whether the user is disabled.
@@ -21,7 +20,6 @@ class UserDocument(Document):
     """
 
     username: str = Field(description="The username")
-    email: EmailStr = Field(description="The email address")
     hashed_password: str = Field(description="The hashed password")
     full_name: str | None = Field(default=None, description="The full name of the user")
     disabled: bool = Field(default=False, description="Whether the user is disabled")
@@ -37,5 +35,4 @@ class UserDocument(Document):
         name = "user"
         indexes: ClassVar = [
             IndexModel([("username", ASCENDING)], unique=True),
-            IndexModel([("email", ASCENDING)], unique=True),
         ]

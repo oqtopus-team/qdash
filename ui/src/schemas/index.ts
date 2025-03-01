@@ -121,7 +121,6 @@ export * from "./user";
 export * from "./userCreate";
 export * from "./userCreateFullName";
 export * from "./userDisabled";
-export * from "./userEmail";
 export * from "./userFullName";
 export * from "./validationError";
 export * from "./validationErrorLocItem";

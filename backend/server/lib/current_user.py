@@ -2,7 +2,7 @@ import logging
 from typing import Annotated, cast
 
 from fastapi import Depends, HTTPException, status
-from server.lib.auth import get_current_user, oauth2_scheme
+from server.lib.auth import get_current_user, username_header
 from server.schemas.auth import User
 
 # ロガーの設定
@@ -10,13 +10,13 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-def get_current_user_id(token: str | None = None) -> str:
-    """Get the current user ID from the token.
+def get_current_user_id(username: str | None = Depends(username_header)) -> str:
+    """Get the current user ID from the username header.
 
     Parameters
     ----------
-    token : str | None
-        JWT token from request header (optional)
+    username : str | None
+        Username from request header (optional)
 
     Returns
     -------
@@ -25,16 +25,16 @@ def get_current_user_id(token: str | None = None) -> str:
 
     """
     try:
-        if token:
-            logger.debug("Getting current user ID from token")
-            user = get_current_user(token)
+        if username:
+            logger.debug("Getting current user ID from username")
+            user = get_current_user(username)
             if user and user.username:
                 logger.debug(f"Current user ID: {user.username}")
                 return cast(str, user.username)
     except Exception as e:
-        logger.debug(f"Error getting user from token: {e}")
+        logger.debug(f"Error getting user from username: {e}")
 
     # デフォルトユーザーを返す
-    default_user = "default_user"
+    default_user = "default"
     logger.debug(f"Using default user: {default_user}")
     return default_user

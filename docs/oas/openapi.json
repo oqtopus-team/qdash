@@ -54,7 +54,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/calibrations/schedule": {
@@ -79,7 +84,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -116,7 +126,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     },
     "/calibrations/schedule/{flow_run_id}": {
@@ -126,6 +141,11 @@
         ],
         "summary": "Deletes a calibration schedule.",
         "operationId": "delete_calib_schedule",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "flow_run_id",
@@ -181,7 +201,7 @@
         },
         "security": [
           {
-            "OAuth2PasswordBearer": []
+            "APIKeyHeader": []
           }
         ]
       },
@@ -226,7 +246,7 @@
         },
         "security": [
           {
-            "OAuth2PasswordBearer": []
+            "APIKeyHeader": []
           }
         ]
       }
@@ -241,7 +261,7 @@
         "operationId": "delete_menu",
         "security": [
           {
-            "OAuth2PasswordBearer": []
+            "APIKeyHeader": []
           }
         ],
         "parameters": [
@@ -297,7 +317,7 @@
         "operationId": "update_menu",
         "security": [
           {
-            "OAuth2PasswordBearer": []
+            "APIKeyHeader": []
           }
         ],
         "parameters": [
@@ -363,7 +383,7 @@
         "operationId": "get_menu_by_name",
         "security": [
           {
-            "OAuth2PasswordBearer": []
+            "APIKeyHeader": []
           }
         ],
         "parameters": [
@@ -1634,7 +1654,7 @@
         },
         "security": [
           {
-            "OAuth2PasswordBearer": []
+            "APIKeyHeader": []
           }
         ]
       }
@@ -1649,7 +1669,7 @@
         "operationId": "fetchChip",
         "security": [
           {
-            "OAuth2PasswordBearer": []
+            "APIKeyHeader": []
           }
         ],
         "parameters": [
@@ -1697,7 +1717,7 @@
         "operationId": "listExecutionsByChipId",
         "security": [
           {
-            "OAuth2PasswordBearer": []
+            "APIKeyHeader": []
           }
         ],
         "parameters": [
@@ -1749,7 +1769,7 @@
         "operationId": "fetchExecutionByChipId",
         "security": [
           {
-            "OAuth2PasswordBearer": []
+            "APIKeyHeader": []
           }
         ],
         "parameters": [
@@ -1950,7 +1970,7 @@
         },
         "security": [
           {
-            "OAuth2PasswordBearer": []
+            "APIKeyHeader": []
           }
         ]
       }
@@ -3562,18 +3582,6 @@
             "type": "string",
             "title": "Username"
           },
-          "email": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "email"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Email"
-          },
           "full_name": {
             "anyOf": [
               {
@@ -3609,11 +3617,6 @@
             "type": "string",
             "title": "Username"
           },
-          "email": {
-            "type": "string",
-            "format": "email",
-            "title": "Email"
-          },
           "password": {
             "type": "string",
             "title": "Password"
@@ -3633,7 +3636,6 @@
         "type": "object",
         "required": [
           "username",
-          "email",
           "password"
         ],
         "title": "UserCreate"
@@ -3900,15 +3902,53 @@
       }
     },
     "securitySchemes": {
-      "OAuth2PasswordBearer": {
-        "type": "oauth2",
-        "flows": {
-          "password": {
-            "scopes": {},
-            "tokenUrl": "token"
-          }
-        }
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Username"
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Authentication operations"
+    },
+    {
+      "name": "calibration",
+      "description": "Calibration operations"
+    },
+    {
+      "name": "chip",
+      "description": "Chip operations"
+    },
+    {
+      "name": "execution",
+      "description": "Execution operations"
+    },
+    {
+      "name": "experiment",
+      "description": "Experiment operations"
+    },
+    {
+      "name": "file",
+      "description": "File operations"
+    },
+    {
+      "name": "fridges",
+      "description": "Fridge operations"
+    },
+    {
+      "name": "menu",
+      "description": "Menu operations"
+    },
+    {
+      "name": "qpu",
+      "description": "QPU operations"
+    },
+    {
+      "name": "settings",
+      "description": "Settings operations"
+    }
+  ]
 }
