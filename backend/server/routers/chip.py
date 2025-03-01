@@ -8,7 +8,7 @@ from neodbmodel.chip import ChipDocument
 from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.initialize import initialize
 from pydantic import BaseModel, Field, field_validator
-from server.lib.auth import get_current_active_user
+from server.lib.auth import get_current_active_user, get_optional_current_user
 from server.lib.current_user import get_current_user_id
 from server.schemas.auth import User
 
@@ -134,7 +134,7 @@ class ChipResponse(BaseModel):
     "/chip", response_model=list[ChipResponse], summary="Fetch all chips", operation_id="listChips"
 )
 def list_chips(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    current_user: Annotated[User, Depends(get_optional_current_user)],
 ) -> list[ChipResponse]:
     """Fetch all chips.
 

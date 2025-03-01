@@ -5,7 +5,7 @@ from logging import getLogger
 from typing import Annotated, List, Optional
 
 import dateutil.tz
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Security
 from neodbmodel.menu import MenuDocument
 from prefect.client.orchestration import PrefectClient
 from prefect.client.schemas.filters import (
@@ -18,6 +18,8 @@ from prefect.client.schemas.filters import (
 )
 from prefect.states import Scheduled
 from server.config import Settings, get_settings
+from server.lib.auth import get_current_active_user, get_optional_current_user
+from server.schemas.auth import User
 from server.schemas.calibration import (
     ExecuteCalibRequest,
     ExecuteCalibResponse,
@@ -40,6 +42,7 @@ prefect_host = os.getenv("PREFECT_HOST")
 async def execute_calib(
     request: ExecuteCalibRequest,
     settings: Annotated[Settings, Depends] = Depends(get_settings),
+    current_user: User = Security(get_current_active_user),
 ) -> ExecuteCalibResponse:
     """Executes a calibration by creating a flow run from a deployment.
 
@@ -86,6 +89,7 @@ local_date = datetime.now(tz=ja)
 async def schedule_calib(
     request: ScheduleCalibRequest,
     settings: Annotated[Settings, Depends] = Depends(get_settings),
+    current_user: User = Security(get_current_active_user),
 ):
     logger.warning(f"create menu name: {request.menu_name}")
     menu = MenuDocument.find_one({"name": request.menu_name}).run()
@@ -133,6 +137,7 @@ async def schedule_calib(
 )
 async def fetch_all_calib_schedule(
     settings: Annotated[Settings, Depends] = Depends(get_settings),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ) -> list[ScheduleCalibResponse]:
     client = PrefectClient(api=settings.prefect_api_url)
     env = settings.env
@@ -180,7 +185,9 @@ async def fetch_all_calib_schedule(
     operation_id="delete_calib_schedule",
 )
 async def delete_calib_schedule(
-    flow_run_id: str, settings: Annotated[Settings, Depends] = Depends(get_settings)
+    flow_run_id: str,
+    settings: Annotated[Settings, Depends] = Depends(get_settings),
+    current_user: User = Security(get_current_active_user),
 ):
     client = PrefectClient(api=settings.prefect_api_url)
     id = uuid.UUID(flow_run_id)

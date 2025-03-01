@@ -21,10 +21,10 @@ from dbmodel.two_qubit_calib import TwoQubitCalibModel
 from dbmodel.two_qubit_calib_daily_summary import TwoQubitCalibDailySummaryModel
 from dbmodel.two_qubit_calib_history import TwoQubitCalibHistoryModel
 from dbmodel.wiring_info import WiringInfoModel
-from fastapi import FastAPI, Security
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
-from fastapi.security import OAuth2PasswordBearer
 from pymongo import MongoClient
 from server.routers import (
     auth,
@@ -80,6 +80,7 @@ async def lifespan(app: FastAPI):
     client.close()
 
 
+# APIキーヘッダーのセキュリティスキーマを含むFastAPIアプリケーションを作成
 app = FastAPI(
     title="QDash Server",
     description="API for QDash",
@@ -96,6 +97,32 @@ app = FastAPI(
     generate_unique_id_function=custom_generate_unique_id,
     separate_input_output_schemas=False,
     lifespan=lifespan,
+    openapi_tags=[
+        {"name": "auth", "description": "Authentication operations"},
+        {"name": "calibration", "description": "Calibration operations"},
+        {"name": "chip", "description": "Chip operations"},
+        {"name": "execution", "description": "Execution operations"},
+        {"name": "experiment", "description": "Experiment operations"},
+        {"name": "file", "description": "File operations"},
+        {"name": "fridges", "description": "Fridge operations"},
+        {"name": "menu", "description": "Menu operations"},
+        {"name": "qpu", "description": "QPU operations"},
+        {"name": "settings", "description": "Settings operations"},
+    ],
+    swagger_ui_parameters={"defaultModelsExpandDepth": -1},
+    openapi_extra={
+        "components": {
+            "securitySchemes": {
+                "ApiKeyAuth": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-Username",
+                    "description": "Optional username header for authentication",
+                }
+            }
+        },
+        "security": [{"ApiKeyAuth": []}],
+    },
 )
 
 
