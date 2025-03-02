@@ -1,0 +1,19 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files and .next directory
+COPY ./ui/package*.json ./
+COPY ./ui/.next ./.next
+COPY ./ui/public ./public
+
+# Install production dependencies only
+RUN npm install --production --legacy-peer-deps
+
+ENV HOST 0.0.0.0
+ENV PORT 5714
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV production
+
+# Start the application
+CMD ["npm", "start"]

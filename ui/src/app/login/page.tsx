@@ -17,17 +17,13 @@ export default function LoginPage() {
     e.stopPropagation();
     setError("");
 
-    // フォームのデフォルトの動作を完全に防ぐ
-    const form = e.target as HTMLFormElement;
-    form.reset();
-
     try {
       await authLogin(userName, password);
       // replaceを使用してhistoryに残さない
-      router.replace("/");
+      await router.replace("/");
     } catch (err) {
       setError(
-        "ログインに失敗しました。ユーザーIDとパスワードを確認してください。",
+        "ログインに失敗しました。ユーザーIDとパスワードを確認してください。"
       );
     }
   };

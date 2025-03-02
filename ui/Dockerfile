@@ -15,8 +15,5 @@ ENV HOST 0.0.0.0
 ENV PORT 5714
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Build the application
-RUN npm run build
-
-# Start the application
-CMD ["npm", "start"]
+# Start the development server
+CMD ["npm", "run", "dev"]
