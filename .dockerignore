@@ -1,5 +1,11 @@
+**/node_modules
+**/.next
+**/.git
+**/.env
+**/dist
+**/build
+**/*.log
 .venv
-node_modules
 calib_data
 mongo_data
 postgres_data

@@ -1,20 +1,9 @@
 "use client";
 
-import { useListChips, useFetchChip } from "@/client/chip/chip";
-import { useState, useMemo, Suspense } from "react";
+import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { ChipResponse } from "@/schemas";
-import type { PlotlyHTMLElement, Icon } from "plotly.js";
-import * as Plotly from "plotly.js-dist-min";
-
-const Plot = dynamic(() => import("react-plotly.js"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-[600px]">
-      <div className="loading loading-spinner loading-lg"></div>
-    </div>
-  ),
-});
+import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
 
 interface QubitParameter {
   value: number;
@@ -42,12 +31,56 @@ interface ChipQubit {
   [qid: string]: QubitData;
 }
 
+interface ChipData {
+  data: {
+    qubits: ChipQubit;
+  };
+}
+
+interface Chip {
+  chip_id: string;
+}
+
+interface ChipsResponse {
+  data: Chip[];
+}
+
 interface ParameterValue {
   value: number;
   unit: string;
   description: string;
   updated: string;
 }
+
+const useListChips = () => {
+  return useQuery<ChipsResponse>({
+    queryKey: ["chips"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/chips");
+      return data;
+    },
+  });
+};
+
+const useFetchChip = (chipId: string) => {
+  return useQuery<ChipData>({
+    queryKey: ["chip", chipId],
+    queryFn: async () => {
+      const { data } = await axios.get(`/api/chips/${chipId}`);
+      return data;
+    },
+    enabled: !!chipId,
+  });
+};
+
+const Plot = dynamic(() => import("react-plotly.js"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[600px]">
+      <div className="loading loading-spinner loading-lg"></div>
+    </div>
+  ),
+});
 
 export default function AnalyticsPage() {
   const [selectedChip, setSelectedChip] = useState<string>("SAMPLE");

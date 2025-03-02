@@ -1,45 +1,28 @@
 declare module "reagraph" {
   export interface NodePositionArgs {
-    nodes: {
+    nodes: Array<{
       id: string;
-      data: {
-        position?: {
-          x: number;
-          y: number;
-        };
+      data?: {
+        position?: { x: number; y: number };
       };
-    }[];
-  }
-
-  export interface InternalGraphPosition {
-    id: string;
-    x: number;
-    y: number;
-    z: number;
-    vx: number;
-    vy: number;
-    fx: number | null;
-    fy: number | null;
-    data: any;
-    links: any[];
-    index: number;
+    }>;
   }
 
   export interface GraphCanvasProps {
-    edgeArrowPosition?: "none" | "start" | "end" | "both";
-    layoutType?: "custom" | "force" | "tree";
-    layoutOverrides?: {
-      getNodePosition: (
-        id: string,
-        args: NodePositionArgs,
-      ) => InternalGraphPosition;
-    };
     nodes: any[];
     edges: any[];
+    layoutType?: string;
+    layoutOverrides?: {
+      getNodePosition?: (
+        id: string,
+        args: NodePositionArgs
+      ) => { x: number; y: number; z: number };
+    };
     onNodePointerOver?: (node: any) => void;
     onEdgePointerOver?: (edge: any) => void;
+    onNodeClick?: (node: any) => void;
+    edgeArrowPosition?: string;
   }
 
   export const GraphCanvas: React.FC<GraphCanvasProps>;
-  export function createColumnHelper<T>(): any;
 }

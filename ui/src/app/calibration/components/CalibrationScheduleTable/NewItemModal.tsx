@@ -8,7 +8,7 @@ import {
   addWeeks,
   addMonths,
 } from "date-fns";
-import ja from "date-fns/locale/ja";
+import { ja } from "date-fns/locale/ja";
 import DatePicker from "react-datepicker";
 import { registerLocale } from "react-datepicker";
 import { useState } from "react";
@@ -90,7 +90,7 @@ export function NewItemModal({
       const updatedData = await refetchCalibSchedule();
       if (updatedData.data) {
         setCalibSchedules(
-          mapScheduleCalibResponsetoCalibSchedule(updatedData.data.data),
+          mapScheduleCalibResponsetoCalibSchedule(updatedData.data.data)
         );
       }
       document.getElementById("newItem")?.closest("dialog")?.close();

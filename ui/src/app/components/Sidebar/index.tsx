@@ -9,7 +9,6 @@ import { FaBolt } from "react-icons/fa6";
 import { IoMdSettings } from "react-icons/io";
 import { LuThermometerSnowflake } from "react-icons/lu";
 import { GiGinkgoLeaf } from "react-icons/gi";
-import { TbTestPipe } from "react-icons/tb";
 import { BsCpu } from "react-icons/bs";
 import { IoAnalytics } from "react-icons/io5";
 
@@ -80,19 +79,6 @@ function Sidebar() {
             >
               <FaBolt />
               <span className="ml-2">Execution</span>
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/experiment"
-              className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
-                isActive("/experiment")
-                  ? "bg-neutral text-neutral-content"
-                  : "text-base-content"
-              }`}
-            >
-              <TbTestPipe />
-              <span className="ml-2">Experiment</span>
             </Link>
           </li>
           <li>

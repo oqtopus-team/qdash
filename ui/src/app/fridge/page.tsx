@@ -13,7 +13,7 @@ function FridgePage() {
     setRefreshKey((prevKey) => prevKey + 1);
   };
 
-  const handleCustomHoursChange = (e) => {
+  const handleCustomHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCustomHours(e.target.value);
   };
 

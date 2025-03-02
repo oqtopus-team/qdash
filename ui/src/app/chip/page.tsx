@@ -2,11 +2,7 @@
 
 import { useListChips, useListMuxes } from "@/client/chip/chip";
 import { useState } from "react";
-import {
-  ListMuxResponse,
-  ServerRoutersChipTask,
-  MuxDetailResponseDetail,
-} from "@/schemas";
+import { ServerRoutersChipTask, MuxDetailResponseDetail } from "@/schemas";
 import { BsGrid, BsListUl } from "react-icons/bs";
 
 type ViewMode = "image" | "params";
@@ -40,7 +36,7 @@ export default function ChipPage() {
   };
 
   // Group tasks by name for each mux
-  const getTaskGroups = (muxId: string, detail: MuxDetailResponseDetail) => {
+  const getTaskGroups = (detail: MuxDetailResponseDetail) => {
     const taskGroups: {
       [key: string]: { [key: string]: ServerRoutersChipTask };
     } = {};
@@ -217,164 +213,167 @@ export default function ChipPage() {
                     <div className="p-4 border-t">
                       {/* Task Results Grid */}
                       <div className="space-y-6">
-                        {Object.entries(
-                          getTaskGroups(muxId, muxDetail.detail)
-                        ).map(([taskName, qidResults]) => (
-                          <div
-                            key={taskName}
-                            className="border-t pt-4 first:border-t-0 first:pt-0"
-                          >
-                            <h3 className="text-lg font-medium mb-3">
-                              {taskName}
-                            </h3>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              {qids.map((qid) => {
-                                const task = qidResults[qid];
-                                const taskId = `${muxId}-${qid}-${taskName}`;
-                                const viewMode = getViewMode(taskId);
+                        {Object.entries(getTaskGroups(muxDetail.detail)).map(
+                          ([taskName, qidResults]) => (
+                            <div
+                              key={taskName}
+                              className="border-t pt-4 first:border-t-0 first:pt-0"
+                            >
+                              <h3 className="text-lg font-medium mb-3">
+                                {taskName}
+                              </h3>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {qids.map((qid) => {
+                                  const task = qidResults[qid];
+                                  const taskId = `${muxId}-${qid}-${taskName}`;
+                                  const viewMode = getViewMode(taskId);
 
-                                return (
-                                  <div
-                                    key={qid}
-                                    className="card bg-base-100 shadow-sm rounded-xl overflow-hidden"
-                                  >
-                                    <div className="card-body p-2">
-                                      <div className="text-sm font-medium mb-2">
-                                        <div className="flex justify-between items-center mb-1">
-                                          <span>QID: {qid}</span>
-                                          {task?.output_parameters && (
-                                            <div className="tabs tabs-boxed rounded-lg">
-                                              <a
-                                                className={`tab tab-xs ${
-                                                  viewMode === "image"
-                                                    ? "tab-active"
-                                                    : ""
-                                                }`}
-                                                onClick={() =>
-                                                  toggleViewMode(taskId)
-                                                }
-                                              >
-                                                Image
-                                              </a>
-                                              <a
-                                                className={`tab tab-xs ${
-                                                  viewMode === "params"
-                                                    ? "tab-active"
-                                                    : ""
-                                                }`}
-                                                onClick={() =>
-                                                  toggleViewMode(taskId)
-                                                }
-                                              >
-                                                Params
-                                              </a>
+                                  return (
+                                    <div
+                                      key={qid}
+                                      className="card bg-base-100 shadow-sm rounded-xl overflow-hidden"
+                                    >
+                                      <div className="card-body p-2">
+                                        <div className="text-sm font-medium mb-2">
+                                          <div className="flex justify-between items-center mb-1">
+                                            <span>QID: {qid}</span>
+                                            {task?.output_parameters && (
+                                              <div className="tabs tabs-boxed rounded-lg">
+                                                <a
+                                                  className={`tab tab-xs ${
+                                                    viewMode === "image"
+                                                      ? "tab-active"
+                                                      : ""
+                                                  }`}
+                                                  onClick={() =>
+                                                    toggleViewMode(taskId)
+                                                  }
+                                                >
+                                                  Image
+                                                </a>
+                                                <a
+                                                  className={`tab tab-xs ${
+                                                    viewMode === "params"
+                                                      ? "tab-active"
+                                                      : ""
+                                                  }`}
+                                                  onClick={() =>
+                                                    toggleViewMode(taskId)
+                                                  }
+                                                >
+                                                  Params
+                                                </a>
+                                              </div>
+                                            )}
+                                          </div>
+                                          {task?.end_at && (
+                                            <div className="text-xs text-base-content/60">
+                                              Updated:{" "}
+                                              {formatRelativeTime(
+                                                new Date(task.end_at)
+                                              )}
                                             </div>
                                           )}
                                         </div>
-                                        {task?.end_at && (
-                                          <div className="text-xs text-base-content/60">
-                                            Updated:{" "}
-                                            {formatRelativeTime(
-                                              new Date(task.end_at)
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                      {task &&
-                                        viewMode === "image" &&
-                                        task.figure_path && (
-                                          <div className="relative h-48 rounded-lg overflow-hidden">
-                                            {Array.isArray(task.figure_path) ? (
-                                              task.figure_path.map(
-                                                (path, i) => (
-                                                  <img
-                                                    key={i}
-                                                    src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                                                      path
-                                                    )}`}
-                                                    alt={`Result for QID ${qid}`}
-                                                    className="w-full h-48 object-contain"
-                                                  />
+                                        {task &&
+                                          viewMode === "image" &&
+                                          task.figure_path && (
+                                            <div className="relative h-48 rounded-lg overflow-hidden">
+                                              {Array.isArray(
+                                                task.figure_path
+                                              ) ? (
+                                                task.figure_path.map(
+                                                  (path, i) => (
+                                                    <img
+                                                      key={i}
+                                                      src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
+                                                        path
+                                                      )}`}
+                                                      alt={`Result for QID ${qid}`}
+                                                      className="w-full h-48 object-contain"
+                                                    />
+                                                  )
                                                 )
-                                              )
-                                            ) : (
-                                              <img
-                                                src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                                                  task.figure_path
-                                                )}`}
-                                                alt={`Result for QID ${qid}`}
-                                                className="w-full h-48 object-contain"
-                                              />
-                                            )}
-                                          </div>
-                                        )}
-                                      {task &&
-                                        viewMode === "params" &&
-                                        task.output_parameters && (
-                                          <div className="h-48 overflow-y-auto rounded-lg">
-                                            <table className="table table-xs table-zebra w-full rounded-lg overflow-hidden">
-                                              <thead>
-                                                <tr>
-                                                  <th className="rounded-tl-lg">
-                                                    Parameter
-                                                  </th>
-                                                  <th>Value</th>
-                                                  <th className="rounded-tr-lg">
-                                                    Updated
-                                                  </th>
-                                                </tr>
-                                              </thead>
-                                              <tbody className="text-xs">
-                                                {Object.entries(
-                                                  task.output_parameters
-                                                ).map(([key, value]) => {
-                                                  const paramValue =
-                                                    typeof value === "object" &&
-                                                    value !== null &&
-                                                    "value" in value
-                                                      ? (value as ParameterValue)
-                                                      : ({
-                                                          value,
-                                                        } as ParameterValue);
-                                                  return (
-                                                    <tr key={key}>
-                                                      <td className="font-medium py-0.5">
-                                                        {key}
-                                                      </td>
-                                                      <td className="text-right py-0.5">
-                                                        {typeof paramValue.value ===
-                                                        "number"
-                                                          ? paramValue.value.toFixed(
-                                                              4
-                                                            )
-                                                          : String(
-                                                              paramValue.value
-                                                            )}
-                                                        {paramValue.unit
-                                                          ? ` ${paramValue.unit}`
-                                                          : ""}
-                                                      </td>
-                                                      <td className="text-right py-0.5 text-base-content/60">
-                                                        {paramValue.calibrated_at
-                                                          ? new Date(
-                                                              paramValue.calibrated_at
-                                                            ).toLocaleString()
-                                                          : "-"}
-                                                      </td>
-                                                    </tr>
-                                                  );
-                                                })}
-                                              </tbody>
-                                            </table>
-                                          </div>
-                                        )}
+                                              ) : (
+                                                <img
+                                                  src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
+                                                    task.figure_path
+                                                  )}`}
+                                                  alt={`Result for QID ${qid}`}
+                                                  className="w-full h-48 object-contain"
+                                                />
+                                              )}
+                                            </div>
+                                          )}
+                                        {task &&
+                                          viewMode === "params" &&
+                                          task.output_parameters && (
+                                            <div className="h-48 overflow-y-auto rounded-lg">
+                                              <table className="table table-xs table-zebra w-full rounded-lg overflow-hidden">
+                                                <thead>
+                                                  <tr>
+                                                    <th className="rounded-tl-lg">
+                                                      Parameter
+                                                    </th>
+                                                    <th>Value</th>
+                                                    <th className="rounded-tr-lg">
+                                                      Updated
+                                                    </th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody className="text-xs">
+                                                  {Object.entries(
+                                                    task.output_parameters
+                                                  ).map(([key, value]) => {
+                                                    const paramValue =
+                                                      typeof value ===
+                                                        "object" &&
+                                                      value !== null &&
+                                                      "value" in value
+                                                        ? (value as ParameterValue)
+                                                        : ({
+                                                            value,
+                                                          } as ParameterValue);
+                                                    return (
+                                                      <tr key={key}>
+                                                        <td className="font-medium py-0.5">
+                                                          {key}
+                                                        </td>
+                                                        <td className="text-right py-0.5">
+                                                          {typeof paramValue.value ===
+                                                          "number"
+                                                            ? paramValue.value.toFixed(
+                                                                4
+                                                              )
+                                                            : String(
+                                                                paramValue.value
+                                                              )}
+                                                          {paramValue.unit
+                                                            ? ` ${paramValue.unit}`
+                                                            : ""}
+                                                        </td>
+                                                        <td className="text-right py-0.5 text-base-content/60">
+                                                          {paramValue.calibrated_at
+                                                            ? new Date(
+                                                                paramValue.calibrated_at
+                                                              ).toLocaleString()
+                                                            : "-"}
+                                                        </td>
+                                                      </tr>
+                                                    );
+                                                  })}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          )}
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })}
+                                  );
+                                })}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        )}
                       </div>
                     </div>
                   )}

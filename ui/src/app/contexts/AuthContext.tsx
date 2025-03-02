@@ -14,7 +14,7 @@ import {
   useAuthLogout,
 } from "@/client/auth/auth";
 import type { User } from "../../schemas";
-import axios, { AxiosRequestConfig } from "axios";
+import { AxiosRequestConfig } from "axios";
 
 interface AuthContextType {
   user: User | null;
@@ -112,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // トークンとユーザー名を保存
         const token = response.data.access_token;
         document.cookie = `token=${encodeURIComponent(
-          token,
+          token
         )}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
         saveUsername(username);
       } catch (error) {
@@ -120,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [loginMutation, saveUsername],
+    [loginMutation, saveUsername]
   );
 
   const logout = useCallback(async () => {

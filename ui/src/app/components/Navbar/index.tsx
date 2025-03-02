@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useAuthLogout } from "@/client/auth/auth";
