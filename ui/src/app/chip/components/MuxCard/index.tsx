@@ -23,13 +23,13 @@ export function MuxCard({
 }: MuxCardProps) {
   // Get latest update time info from tasks
   const getLatestUpdateInfo = (
-    detail: MuxDetailResponseDetail
+    detail: MuxDetailResponseDetail,
   ): { time: Date; isRecent: boolean } => {
     let latestTime = new Date(0);
 
     Object.values(detail).forEach((tasksByName) => {
       Object.values(
-        tasksByName as { [key: string]: ServerRoutersChipTask }
+        tasksByName as { [key: string]: ServerRoutersChipTask },
       ).forEach((task) => {
         if (task.end_at) {
           const taskEndTime = new Date(task.end_at);
@@ -73,7 +73,7 @@ export function MuxCard({
 
     Object.entries(detail).forEach(([qid, tasksByName]) => {
       Object.entries(
-        tasksByName as { [key: string]: ServerRoutersChipTask }
+        tasksByName as { [key: string]: ServerRoutersChipTask },
       ).forEach(([taskName, task]) => {
         if (task.status !== "completed" && task.status !== "failed") return;
 

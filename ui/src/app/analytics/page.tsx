@@ -65,7 +65,7 @@ export default function AnalyticsPage() {
             if (task.status === "completed" || task.status === "failed") {
               names.add(taskName);
             }
-          }
+          },
         );
       }
     });

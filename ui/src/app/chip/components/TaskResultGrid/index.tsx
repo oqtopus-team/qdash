@@ -128,7 +128,7 @@ export function TaskResultGrid({
                             <img
                               key={i}
                               src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                                path
+                                path,
                               )}`}
                               alt={`Result for QID ${qid}`}
                               className="w-full h-48 object-contain hover:scale-110 transition-transform"
@@ -137,7 +137,7 @@ export function TaskResultGrid({
                         ) : (
                           <img
                             src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                              task.figure_path
+                              task.figure_path,
                             )}`}
                             alt={`Result for QID ${qid}`}
                             className="w-full h-48 object-contain hover:scale-110 transition-transform"
@@ -181,13 +181,13 @@ export function TaskResultGrid({
                                     <td className="text-right py-0.5 text-base-content/60">
                                       {paramValue.calibrated_at
                                         ? new Date(
-                                            paramValue.calibrated_at
+                                            paramValue.calibrated_at,
                                           ).toLocaleString()
                                         : "-"}
                                     </td>
                                   </tr>
                                 );
-                              }
+                              },
                             )}
                           </tbody>
                         </table>

@@ -26,7 +26,7 @@ import type { ServerRoutersChipTaskTaskType } from "./serverRoutersChipTaskTaskT
 export interface ServerRoutersChipTask {
   task_id?: ServerRoutersChipTaskTaskId;
   qid?: ServerRoutersChipTaskQid;
-  name: string;
+  name?: string;
   upstream_id?: ServerRoutersChipTaskUpstreamId;
   status?: string;
   message?: ServerRoutersChipTaskMessage;

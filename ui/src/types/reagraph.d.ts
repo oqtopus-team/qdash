@@ -15,7 +15,7 @@ declare module "reagraph" {
     layoutOverrides?: {
       getNodePosition?: (
         id: string,
-        args: NodePositionArgs
+        args: NodePositionArgs,
       ) => { x: number; y: number; z: number };
     };
     onNodePointerOver?: (node: any) => void;

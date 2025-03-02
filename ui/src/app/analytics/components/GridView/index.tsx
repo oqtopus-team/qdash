@@ -73,7 +73,7 @@ export function GridView({
           const col = index % gridSize;
           const qid = Object.keys(gridPositions).find(
             (key) =>
-              gridPositions[key].row === row && gridPositions[key].col === col
+              gridPositions[key].row === row && gridPositions[key].col === col,
           );
 
           if (!qid) {
@@ -111,7 +111,7 @@ export function GridView({
                       <img
                         key={i}
                         src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                          path
+                          path,
                         )}`}
                         alt={`Result for QID ${qid}`}
                         className="w-full h-full object-contain"
@@ -120,7 +120,7 @@ export function GridView({
                   ) : (
                     <img
                       src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                        task.figure_path
+                        task.figure_path,
                       )}`}
                       alt={`Result for QID ${qid}`}
                       className="w-full h-full object-contain"
@@ -136,8 +136,8 @@ export function GridView({
                   task.status === "completed"
                     ? "bg-success"
                     : task.status === "failed"
-                    ? "bg-error"
-                    : "bg-warning"
+                      ? "bg-error"
+                      : "bg-warning"
                 }`}
               />
               {task.output_parameters && (
@@ -161,7 +161,7 @@ export function GridView({
                             {paramValue.unit ? ` ${paramValue.unit}` : ""}
                           </div>
                         );
-                      }
+                      },
                     )}
                   </div>
                 </div>

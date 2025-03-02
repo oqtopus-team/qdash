@@ -25,6 +25,7 @@ import type {
   ExecutionResponseDetail,
   ExecutionResponseSummary,
   HTTPValidationError,
+  LatestTaskGroupedByChipResponse,
   ListMuxResponse,
   MuxDetailResponse,
 } from "../../schemas";
@@ -959,6 +960,179 @@ export function useListMuxes<
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getListMuxesQueryOptions(chipId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Fetch the multiplexers.
+ * @summary Fetch the multiplexers
+ */
+export const fetchLatestTaskGroupedByChip = (
+  chipId: string,
+  taskName: string,
+  options?: AxiosRequestConfig,
+): Promise<AxiosResponse<LatestTaskGroupedByChipResponse>> => {
+  return axios.get(
+    `http://localhost:5715/chip/${chipId}/task/${taskName}`,
+    options,
+  );
+};
+
+export const getFetchLatestTaskGroupedByChipQueryKey = (
+  chipId: string,
+  taskName: string,
+) => {
+  return [`http://localhost:5715/chip/${chipId}/task/${taskName}`] as const;
+};
+
+export const getFetchLatestTaskGroupedByChipQueryOptions = <
+  TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    >;
+    axios?: AxiosRequestConfig;
+  },
+) => {
+  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getFetchLatestTaskGroupedByChipQueryKey(chipId, taskName);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>
+  > = ({ signal }) =>
+    fetchLatestTaskGroupedByChip(chipId, taskName, { signal, ...axiosOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(chipId && taskName),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type FetchLatestTaskGroupedByChipQueryResult = NonNullable<
+  Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>
+>;
+export type FetchLatestTaskGroupedByChipQueryError =
+  AxiosError<HTTPValidationError>;
+
+export function useFetchLatestTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+          TError,
+          Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>
+        >,
+        "initialData"
+      >;
+    axios?: AxiosRequestConfig;
+  },
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useFetchLatestTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+          TError,
+          Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>
+        >,
+        "initialData"
+      >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useFetchLatestTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Fetch the multiplexers
+ */
+
+export function useFetchLatestTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getFetchLatestTaskGroupedByChipQueryOptions(
+    chipId,
+    taskName,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData>;

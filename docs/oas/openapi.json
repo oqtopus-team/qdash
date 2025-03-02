@@ -1921,6 +1921,63 @@
         }
       }
     },
+    "/chip/{chip_id}/task/{task_name}": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Fetch the multiplexers",
+        "description": "Fetch the multiplexers.",
+        "operationId": "fetchLatestTaskGroupedByChip",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestTaskGroupedByChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/file/raw_data": {
       "get": {
         "tags": [
@@ -2904,6 +2961,28 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "LatestTaskGroupedByChipResponse": {
+        "properties": {
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "result": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/server__routers__chip__Task"
+            },
+            "type": "object",
+            "title": "Result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_name",
+          "result"
+        ],
+        "title": "LatestTaskGroupedByChipResponse",
+        "description": "ChipTaskResponse is a Pydantic model that represents the response for fetching the tasks of a chip."
+      },
       "ListAllFridgeResponse": {
         "properties": {
           "device_id": {
@@ -3829,7 +3908,8 @@
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "default": ""
           },
           "upstream_id": {
             "anyOf": [
@@ -3979,9 +4059,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "name"
-        ],
         "title": "Task",
         "description": "Task is a Pydantic model that represents a task."
       },

@@ -206,7 +206,7 @@ const TopologyVisualization = ({
     if (!chipData.qubits) return;
 
     const newNodes = Object.entries(
-      chipData.qubits as Record<string, QubitData>
+      chipData.qubits as Record<string, QubitData>,
     ).map(([id, qubit]) => {
       const isCalibrated = qubit.data && Object.keys(qubit.data).length > 0;
       const x = qubit.node_info.position.x;
@@ -233,7 +233,7 @@ const TopologyVisualization = ({
     if (!chipData.couplings) return;
 
     const newEdges = Object.entries(
-      chipData.couplings as Record<string, CouplingData>
+      chipData.couplings as Record<string, CouplingData>,
     ).map(([id, coupling]) => ({
       id,
       source: coupling.edge_info.source,
@@ -320,7 +320,7 @@ const CalibrationDetails = ({ qubit }: { qubit: QubitData }) => {
 const calculateMetrics = (qubits: Record<string, QubitData>) => {
   const totalQubits = Object.keys(qubits).length;
   const calibratedQubits = Object.values(qubits).filter(
-    (q) => q.data && Object.keys(q.data).length > 0
+    (q) => q.data && Object.keys(q.data).length > 0,
   ).length;
 
   const averageGateFidelity =
@@ -434,7 +434,7 @@ export default function ChipMetrics() {
           <Select
             options={chipOptions}
             value={chipOptions.find(
-              (option) => option.value === selectedChipId
+              (option) => option.value === selectedChipId,
             )}
             onChange={(option: SingleValue<SelectOption>) => {
               setSelectedChipId(option?.value || "");
@@ -468,8 +468,8 @@ export default function ChipMetrics() {
                       {hoveredNode
                         ? `Qubit ${hoveredNode.id}`
                         : hoveredEdge
-                        ? `Coupling ${hoveredEdge.id}`
-                        : "Information"}
+                          ? `Coupling ${hoveredEdge.id}`
+                          : "Information"}
                     </h3>
                     <div className="divider my-2"></div>
                   </div>
@@ -502,7 +502,7 @@ export default function ChipMetrics() {
                                       {value.value} {value.unit || ""}
                                     </td>
                                   </tr>
-                                )
+                                ),
                               )}
                             </>
                           )}
