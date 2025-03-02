@@ -4,6 +4,8 @@ import { useListChips, useFetchChip } from "@/client/chip/chip";
 import { useState, useMemo, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { ChipResponse } from "@/schemas";
+import type { PlotlyHTMLElement, Icon } from "plotly.js";
+import * as Plotly from "plotly.js-dist-min";
 
 const Plot = dynamic(() => import("react-plotly.js"), {
   ssr: false,
@@ -40,6 +42,13 @@ interface ChipQubit {
   [qid: string]: QubitData;
 }
 
+interface ParameterValue {
+  value: number;
+  unit: string;
+  description: string;
+  updated: string;
+}
+
 export default function AnalyticsPage() {
   const [selectedChip, setSelectedChip] = useState<string>("SAMPLE");
   const [xAxis, setXAxis] = useState<string>("");
@@ -50,7 +59,7 @@ export default function AnalyticsPage() {
   // Extract available parameters from qubit data
   const availableParameters = useMemo(() => {
     if (!chipData?.data?.qubits) return [];
-    const params = new Set<string>();
+    const params = new Set<string>(["qid"]);
 
     Object.values(chipData.data.qubits as ChipQubit).forEach((qubit) => {
       if (qubit.data) {
@@ -63,31 +72,57 @@ export default function AnalyticsPage() {
     return Array.from(params).sort();
   }, [chipData]);
 
+  // Get parameter value for a qubit
+  const getParameterValue = (
+    qubit: QubitData,
+    param: string
+  ): ParameterValue => {
+    if (param === "qid") {
+      return {
+        value: Number(qubit.qid),
+        unit: "",
+        description: "Qubit ID",
+        updated: "",
+      };
+    }
+
+    const paramData = qubit.data[param];
+    const value = paramData.value;
+    const unit = paramData.unit === "ns" ? "μs" : paramData.unit;
+
+    return {
+      value: paramData.unit === "ns" ? value / 1000 : value,
+      unit,
+      description: paramData.description,
+      updated: new Date(paramData.calibrated_at).toLocaleString(),
+    };
+  };
+
   // Prepare plot data
   const plotData = useMemo(() => {
     if (!chipData?.data?.qubits || !xAxis || !yAxis) return null;
 
     const data = Object.entries(chipData.data.qubits as ChipQubit)
-      .filter(
-        ([_, qubit]) => qubit.data && qubit.data[xAxis] && qubit.data[yAxis]
-      )
+      .filter(([_, qubit]) => {
+        if (xAxis === "qid" && yAxis === "qid") return true;
+        if (xAxis === "qid") return qubit.data && qubit.data[yAxis];
+        if (yAxis === "qid") return qubit.data && qubit.data[xAxis];
+        return qubit.data && qubit.data[xAxis] && qubit.data[yAxis];
+      })
       .map(([qid, qubit]) => {
-        // Convert ns to μs for time parameters
-        const xValue = qubit.data[xAxis].value;
-        const yValue = qubit.data[yAxis].value;
-        const xUnit = qubit.data[xAxis].unit;
-        const yUnit = qubit.data[yAxis].unit;
+        const xData = getParameterValue(qubit, xAxis);
+        const yData = getParameterValue(qubit, yAxis);
 
         return {
           qid,
-          x: xUnit === "ns" ? xValue / 1000 : xValue,
-          xUnit: xUnit === "ns" ? "μs" : xUnit,
-          xDescription: qubit.data[xAxis].description,
-          xUpdated: new Date(qubit.data[xAxis].calibrated_at).toLocaleString(),
-          y: yUnit === "ns" ? yValue / 1000 : yValue,
-          yUnit: yUnit === "ns" ? "μs" : yUnit,
-          yDescription: qubit.data[yAxis].description,
-          yUpdated: new Date(qubit.data[yAxis].calibrated_at).toLocaleString(),
+          x: xData.value,
+          xUnit: xData.unit,
+          xDescription: xData.description,
+          xUpdated: xData.updated,
+          y: yData.value,
+          yUnit: yData.unit,
+          yDescription: yData.description,
+          yUpdated: yData.updated,
         };
       });
 
@@ -180,9 +215,14 @@ export default function AnalyticsPage() {
                     `QID: ${d.qid}<br>` +
                       `${xAxis}: ${d.x.toFixed(4)} ${d.xUnit}<br>` +
                       `${yAxis}: ${d.y.toFixed(4)} ${d.yUnit}<br>` +
-                      `Description (X): ${d.xDescription}<br>` +
-                      `Description (Y): ${d.yDescription}<br>` +
-                      `Updated: ${d.xUpdated}`,
+                      (d.xDescription
+                        ? `Description (X): ${d.xDescription}<br>`
+                        : "") +
+                      (d.yDescription
+                        ? `Description (Y): ${d.yDescription}<br>`
+                        : "") +
+                      (d.xUpdated ? `Updated (X): ${d.xUpdated}<br>` : "") +
+                      (d.yUpdated ? `Updated (Y): ${d.yUpdated}` : ""),
                   ],
                 }))}
                 layout={{
@@ -233,18 +273,17 @@ export default function AnalyticsPage() {
                   plot_bgcolor: "rgba(0,0,0,0)",
                   paper_bgcolor: "rgba(0,0,0,0)",
                   hovermode: "closest",
-                  margin: { t: 50, r: 50, b: 100, l: 50 },
+                  margin: { t: 50, r: 50, b: 150, l: 50 },
                   showlegend: true,
                   legend: {
                     orientation: "h",
                     yanchor: "bottom",
-                    y: -0.4,
+                    y: -0.6,
                     xanchor: "center",
                     x: 0.5,
                   },
                 }}
                 config={{
-                  responsive: true,
                   displaylogo: false,
                   toImageButtonOptions: {
                     format: "svg",
@@ -268,29 +307,37 @@ export default function AnalyticsPage() {
                     <tr>
                       <th>QID</th>
                       <th>{xAxis}</th>
-                      <th>Description (X)</th>
-                      <th>Updated (X)</th>
+                      {xAxis !== "qid" && <th>Description (X)</th>}
+                      {xAxis !== "qid" && <th>Updated (X)</th>}
                       <th>{yAxis}</th>
-                      <th>Description (Y)</th>
-                      <th>Updated (Y)</th>
+                      {yAxis !== "qid" && <th>Description (Y)</th>}
+                      {yAxis !== "qid" && <th>Updated (Y)</th>}
                     </tr>
                   </thead>
                   <tbody>
-                    {plotData.map((data) => (
-                      <tr key={data.qid}>
-                        <td>{data.qid}</td>
-                        <td>
-                          {data.x.toFixed(4)} {data.xUnit}
-                        </td>
-                        <td>{data.xDescription}</td>
-                        <td>{data.xUpdated}</td>
-                        <td>
-                          {data.y.toFixed(4)} {data.yUnit}
-                        </td>
-                        <td>{data.yDescription}</td>
-                        <td>{data.yUpdated}</td>
-                      </tr>
-                    ))}
+                    {chipData?.data?.qubits &&
+                      Object.entries(chipData.data.qubits as ChipQubit).map(
+                        ([qid, _]) => {
+                          const data = plotData.find((d) => d.qid === qid);
+                          if (!data) return null;
+
+                          return (
+                            <tr key={data.qid}>
+                              <td>{data.qid}</td>
+                              <td>
+                                {data.x.toFixed(4)} {data.xUnit}
+                              </td>
+                              {xAxis !== "qid" && <td>{data.xDescription}</td>}
+                              {xAxis !== "qid" && <td>{data.xUpdated}</td>}
+                              <td>
+                                {data.y.toFixed(4)} {data.yUnit}
+                              </td>
+                              {yAxis !== "qid" && <td>{data.yDescription}</td>}
+                              {yAxis !== "qid" && <td>{data.yUpdated}</td>}
+                            </tr>
+                          );
+                        }
+                      )}
                   </tbody>
                 </table>
               </div>
