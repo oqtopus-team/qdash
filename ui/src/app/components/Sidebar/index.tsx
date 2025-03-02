@@ -11,6 +11,7 @@ import { LuThermometerSnowflake } from "react-icons/lu";
 import { GiGinkgoLeaf } from "react-icons/gi";
 import { TbTestPipe } from "react-icons/tb";
 import { BsCpu } from "react-icons/bs";
+import { IoAnalytics } from "react-icons/io5";
 
 function Sidebar() {
   const pathname = usePathname();
@@ -40,6 +41,19 @@ function Sidebar() {
             >
               <BsCpu />
               <span className="ml-2">Chip</span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/analytics"
+              className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
+                isActive("/analytics")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
+              }`}
+            >
+              <IoAnalytics />
+              <span className="ml-2">Analytics</span>
             </Link>
           </li>
           <li>
