@@ -19,6 +19,11 @@ tasks:
     cmds:
       - npm run docs:dev
 
+  build:
+    dir: ui
+    cmds:
+      - npm run build
+
   build-docs:
     dir: docs
     cmds:

@@ -30,7 +30,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 RUN uv pip install --system --no-cache -r requirements.txt
 RUN uv pip install --system --no-cache prefect==2.20.0
 
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 RUN apt-get install -y nodejs
 
 # COPY ./client/package*.json ./client/pnpm-lock.yaml ./

@@ -4,7 +4,7 @@ import "react18-json-view/src/style.css";
 import { toast } from "react-toastify";
 import yaml from "js-yaml";
 import { useEffect, useState } from "react";
-import { useTheme } from "@/app/hooks/useTheme";
+import { useTheme } from "@/app/providers/theme-provider";
 import Editor from "@monaco-editor/react";
 
 import { mapListMenuResponseToListMenu } from "../../model";

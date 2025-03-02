@@ -3,7 +3,8 @@
   "editor.formatOnSave": true,
   "files.associations": {
     "*.env.qiqb": "plaintext",
-    ".gitmessage": "plaintext"
+    ".gitmessage": "plaintext",
+    "*.css": "tailwindcss"
   },
   "[python]": {
     "editor.formatOnSave": true,
