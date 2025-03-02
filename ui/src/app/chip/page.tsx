@@ -7,7 +7,6 @@ import { ServerRoutersChipTask, MuxDetailResponseDetail } from "@/schemas";
 import { TaskResultGrid } from "./components/TaskResultGrid";
 
 type ViewMode = "chip" | "mux";
-type LayoutMode = "list" | "grid";
 
 interface SelectedTaskInfo {
   path: string;
@@ -18,7 +17,6 @@ interface SelectedTaskInfo {
 export default function ChipPage() {
   const [selectedChip, setSelectedChip] = useState<string>("SAMPLE");
   const [viewMode, setViewMode] = useState<ViewMode>("chip");
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>("list");
   const [expandedMuxes, setExpandedMuxes] = useState<{
     [key: string]: boolean;
   }>({});
@@ -204,11 +202,7 @@ export default function ChipPage() {
           ) : viewMode === "chip" ? (
             <TaskResultGrid chipId={selectedChip} />
           ) : (
-            <div
-              className={
-                layoutMode === "grid" ? "grid grid-cols-4 gap-4" : "space-y-4"
-              }
-            >
+            <div className="space-y-4">
               {Object.entries(muxData.data.muxes).map(([muxId, muxDetail]) => {
                 const updateInfo = getLatestUpdateInfo(muxDetail.detail);
                 const lastUpdateText =
@@ -225,10 +219,7 @@ export default function ChipPage() {
                       updateInfo.isRecent
                         ? "border-2 border-primary animate-pulse-light"
                         : "bg-base-200"
-                    } ${layoutMode === "grid" ? "min-h-[3rem]" : ""}`}
-                    style={{
-                      gridColumn: isExpanded ? "1 / -1" : "auto",
-                    }}
+                    }`}
                   >
                     <div
                       className="p-4 cursor-pointer flex justify-between items-center hover:bg-base-200/50 transition-colors"
