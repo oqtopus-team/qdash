@@ -17,7 +17,7 @@ interface SelectedTaskInfo {
   task: ServerRoutersChipTask;
 }
 
-export function TaskList({ taskGroups, qids, muxId }: TaskListProps) {
+export function TaskList({ taskGroups, qids }: TaskListProps) {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
 

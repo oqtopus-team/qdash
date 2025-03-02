@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useListChips, useFetchChip } from "@/client/chip/chip";
-import { GridView } from "./components/GridView";
+import { TimeSeriesView } from "./components/TimeSeriesView";
 
 interface ParameterValue {
   value: number;
@@ -21,14 +21,13 @@ const Plot = dynamic(() => import("react-plotly.js"), {
   ),
 });
 
-type AnalyticsView = "correlation" | "grid";
+type AnalyzeView = "correlation" | "timeseries";
 
-export default function AnalyticsPage() {
+export default function AnalyzePage() {
   const [selectedChip, setSelectedChip] = useState<string>("SAMPLE");
   const [xAxis, setXAxis] = useState<string>("");
   const [yAxis, setYAxis] = useState<string>("");
-  const [selectedTask, setSelectedTask] = useState<string>("");
-  const [currentView, setCurrentView] = useState<AnalyticsView>("correlation");
+  const [currentView, setCurrentView] = useState<AnalyzeView>("correlation");
   const { data: chipsResponse } = useListChips();
   const { data: chipResponse } = useFetchChip(selectedChip);
 
@@ -51,26 +50,6 @@ export default function AnalyticsPage() {
     });
 
     return Array.from(params).sort();
-  }, [chipData]);
-
-  // Get task names from qubit data
-  const taskNames = useMemo(() => {
-    const names = new Set<string>();
-    if (!chipData?.qubits) return [];
-
-    Object.values(chipData.qubits).forEach((qubit: any) => {
-      if (qubit?.data) {
-        Object.entries(qubit.data).forEach(
-          ([taskName, task]: [string, any]) => {
-            if (task.status === "completed" || task.status === "failed") {
-              names.add(taskName);
-            }
-          },
-        );
-      }
-    });
-
-    return Array.from(names).sort();
   }, [chipData]);
 
   // Get parameter value for a qubit
@@ -144,7 +123,7 @@ export default function AnalyticsPage() {
         {/* Header Section */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Chip Analytics</h1>
+            <h1 className="text-3xl font-bold mb-2">Chip Analysis</h1>
             <p className="text-base-content/70">
               Analyze and visualize chip parameters
             </p>
@@ -179,10 +158,12 @@ export default function AnalyticsPage() {
             Correlation Plot
           </button>
           <button
-            className={`tab ${currentView === "grid" ? "tab-active" : ""}`}
-            onClick={() => setCurrentView("grid")}
+            className={`tab ${
+              currentView === "timeseries" ? "tab-active" : ""
+            }`}
+            onClick={() => setCurrentView("timeseries")}
           >
-            Grid View
+            Time Series
           </button>
         </div>
 
@@ -647,17 +628,7 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {currentView === "grid" && chipData && (
-          <div className="card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
-            <h2 className="text-2xl font-semibold mb-6">Grid View</h2>
-            <GridView
-              chipData={chipData}
-              selectedTask={selectedTask}
-              tasks={taskNames}
-              onTaskChange={setSelectedTask}
-            />
-          </div>
-        )}
+        {currentView === "timeseries" && <TimeSeriesView />}
       </div>
     </div>
   );

@@ -44,7 +44,7 @@ function Sidebar() {
           </li>
           <li>
             <Link
-              href="/analytics"
+              href="/analysis"
               className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
                 isActive("/analytics")
                   ? "bg-neutral text-neutral-content"
@@ -52,7 +52,7 @@ function Sidebar() {
               }`}
             >
               <IoAnalytics />
-              <span className="ml-2">Analytics</span>
+              <span className="ml-2">Analysis</span>
             </Link>
           </li>
           <li>
