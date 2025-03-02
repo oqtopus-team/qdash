@@ -28,23 +28,26 @@ export function GridView({
 
   // For SAMPLE chip, create an 8x8 grid
   const gridSize = 8;
-
-  // Fetch task results for CheckRabi
-  const { data: taskResponse } = useFetchLatestTaskGroupedByChip(
-    chipData?.chip_id,
-    "CheckRabi"
-  );
+  const muxSize = 2; // 2x2 blocks for each mux
 
   // Create a mapping of QID to grid position
   const gridPositions = useMemo(() => {
     const positions: { [key: string]: { row: number; col: number } } = {};
     if (!chipData?.qubits) return positions;
 
+    // Calculate positions based on mux layout
     Object.keys(chipData.qubits).forEach((qid) => {
       const qidNum = parseInt(qid);
+      const muxIndex = Math.floor(qidNum / 4); // Which mux block (0, 1, 2, ...)
+      const muxRow = Math.floor(muxIndex / (gridSize / muxSize)); // Row of mux blocks
+      const muxCol = muxIndex % (gridSize / muxSize); // Column of mux blocks
+      const localIndex = qidNum % 4; // Position within mux (0-3)
+      const localRow = Math.floor(localIndex / 2); // Row within mux (0-1)
+      const localCol = localIndex % 2; // Column within mux (0-1)
+
       positions[qid] = {
-        row: Math.floor(qidNum / gridSize),
-        col: qidNum % gridSize,
+        row: muxRow * muxSize + localRow,
+        col: muxCol * muxSize + localCol,
       };
     });
 
@@ -65,6 +68,12 @@ export function GridView({
     }
     return task.figure_path;
   };
+
+  // Fetch task results for CheckRabi
+  const { data: taskResponse } = useFetchLatestTaskGroupedByChip(
+    chipData?.chip_id,
+    "CheckRabi"
+  );
 
   return (
     <div className="space-y-6">
