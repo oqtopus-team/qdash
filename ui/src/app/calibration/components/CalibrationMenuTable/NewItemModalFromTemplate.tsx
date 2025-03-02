@@ -49,7 +49,7 @@ export function NewItemModalFromTemplate({
       } catch (error) {
         setValidationError(
           "YAMLの形式が正しくありません: " +
-            (error instanceof Error ? error.message : String(error))
+            (error instanceof Error ? error.message : String(error)),
         );
       }
     }
@@ -67,7 +67,7 @@ export function NewItemModalFromTemplate({
               const updatedData = await refetchMenu();
               if (updatedData.data) {
                 setTableData(
-                  mapListMenuResponseToListMenu(updatedData.data.data)
+                  mapListMenuResponseToListMenu(updatedData.data.data),
                 );
                 toast.success("Template item created successfully!");
               }
@@ -76,7 +76,7 @@ export function NewItemModalFromTemplate({
               console.error("Error creating template item:", error);
               toast.error("Error creating template item");
             },
-          }
+          },
         );
       }
     } catch (error) {

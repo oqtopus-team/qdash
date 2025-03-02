@@ -25,7 +25,7 @@ export default function LoginPage() {
       window.location.href = "/";
     } catch (err) {
       setError(
-        "ログインに失敗しました。ユーザーIDとパスワードを確認してください。"
+        "ログインに失敗しました。ユーザーIDとパスワードを確認してください。",
       );
     }
   };

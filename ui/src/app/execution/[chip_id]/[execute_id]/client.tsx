@@ -56,7 +56,7 @@ export default function ExecutionDetailClient({
     .filter((task) => task.task_id)
     .map((task) => ({
       task_id: task.task_id as string,
-      name: task.name,
+      name: task.name || "Unnamed Task",
       status: task.status || "unknown",
       upstream_id: task.upstream_id || undefined,
       start_at: task.start_at || undefined,

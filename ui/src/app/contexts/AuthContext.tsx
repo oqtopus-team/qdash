@@ -112,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // トークンとユーザー名を保存
         const token = response.data.access_token;
         document.cookie = `token=${encodeURIComponent(
-          token
+          token,
         )}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
         saveUsername(username);
         // ログイン成功後に直接リダイレクト
@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [loginMutation, saveUsername]
+    [loginMutation, saveUsername],
   );
 
   const logout = useCallback(async () => {

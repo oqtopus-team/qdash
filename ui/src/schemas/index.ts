@@ -57,6 +57,8 @@ export * from "./getMenuResponse";
 export * from "./getMenuResponseTags";
 export * from "./getMenuResponseTasks";
 export * from "./hTTPValidationError";
+export * from "./latestTaskGroupedByChipResponse";
+export * from "./latestTaskGroupedByChipResponseResult";
 export * from "./listAllFridgeResponse";
 export * from "./listFridgeResponse";
 export * from "./listMenuResponse";

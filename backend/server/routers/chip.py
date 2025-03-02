@@ -53,9 +53,9 @@ class Task(BaseModel):
 
     task_id: str | None = None
     qid: str | None = None
-    name: str
+    name: str = ""  # Default empty string for name
     upstream_id: str | None = None
-    status: str = "pending"
+    status: str = "pending"  # Default status
     message: str | None = None
     input_parameters: dict[str, Any] | None = None
     output_parameters: dict[str, Any] | None = None
@@ -429,3 +429,56 @@ def list_muxes(
     for mux_id in range(mux_num):
         muxes[mux_id] = _build_mux_detail(mux_id, tasks, current_user)
     return ListMuxResponse(muxes=muxes)
+
+
+class LatestTaskGroupedByChipResponse(BaseModel):
+    """ChipTaskResponse is a Pydantic model that represents the response for fetching the tasks of a chip."""
+
+    task_name: str
+    result: dict[str, Task]
+
+
+@router.get(
+    "/chip/{chip_id}/task/{task_name}",
+    summary="Fetch the multiplexers",
+    operation_id="fetchLatestTaskGroupedByChip",
+    response_model=LatestTaskGroupedByChipResponse,
+    response_model_exclude_none=True,
+)
+def fetch_latest_task_grouped_by_chip(
+    chip_id: str, task_name: str, current_user: Annotated[User, Depends(get_current_active_user)]
+) -> LatestTaskGroupedByChipResponse:
+    """Fetch the multiplexers."""
+    logger.debug(f"Fetching muxes for chip {chip_id}, user: {current_user.username}")
+    initialize()
+    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    if chip is None:
+        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+    qids = [str(qid) for qid in range(chip.size)]
+    results = {}
+    for qid in qids:
+        result = TaskResultHistoryDocument.find_one(
+            {"name": task_name, "username": current_user.username, "qid": qid},
+            sort=[("end_at", DESCENDING)],
+        ).run()
+        if result is not None:
+            task_result = Task(
+                task_id=result.task_id,
+                name=result.name,
+                status=result.status,
+                message=result.message,
+                input_parameters=result.input_parameters,
+                output_parameters=result.output_parameters,
+                output_parameter_names=result.output_parameter_names,
+                note=result.note,
+                figure_path=result.figure_path,
+                raw_data_path=result.raw_data_path,
+                start_at=result.start_at,
+                end_at=result.end_at,
+                elapsed_time=result.elapsed_time,
+                task_type=result.task_type,
+            )
+        else:
+            task_result = Task(name=task_name)
+        results[qid] = task_result
+    return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
