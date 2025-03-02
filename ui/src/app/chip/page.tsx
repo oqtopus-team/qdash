@@ -5,28 +5,19 @@ import { useListMuxes } from "@/client/chip/chip";
 import { BsGrid, BsListUl } from "react-icons/bs";
 import { ChipSelector } from "./components/ChipSelector";
 import { MuxCard } from "./components/MuxCard";
+import { TaskResultGrid } from "./components/TaskResultGrid";
 
-type LayoutMode = "list" | "grid";
+type ViewMode = "chip" | "mux";
 
 export default function ChipPage() {
   const [selectedChip, setSelectedChip] = useState<string>("SAMPLE");
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>("list");
-  const [expandedMuxes, setExpandedMuxes] = useState<{
-    [key: string]: boolean;
-  }>({});
+  const [viewMode, setViewMode] = useState<ViewMode>("chip");
 
   const {
     data: muxData,
     isLoading,
     isError,
   } = useListMuxes(selectedChip || "");
-
-  const toggleMuxExpansion = (muxId: string) => {
-    setExpandedMuxes((prev) => ({
-      ...prev,
-      [muxId]: !prev[muxId],
-    }));
-  };
 
   return (
     <div className="w-full px-6 py-6" style={{ width: "calc(100vw - 20rem)" }}>
@@ -38,19 +29,21 @@ export default function ChipPage() {
             <div className="join rounded-lg overflow-hidden">
               <button
                 className={`join-item btn btn-sm ${
-                  layoutMode === "list" ? "btn-active" : ""
+                  viewMode === "chip" ? "btn-active" : ""
                 }`}
-                onClick={() => setLayoutMode("list")}
+                onClick={() => setViewMode("chip")}
               >
-                <BsListUl className="text-lg" />
+                <BsGrid className="text-lg" />
+                <span className="ml-2">Chip View</span>
               </button>
               <button
                 className={`join-item btn btn-sm ${
-                  layoutMode === "grid" ? "btn-active" : ""
+                  viewMode === "mux" ? "btn-active" : ""
                 }`}
-                onClick={() => setLayoutMode("grid")}
+                onClick={() => setViewMode("mux")}
               >
-                <BsGrid className="text-lg" />
+                <BsListUl className="text-lg" />
+                <span className="ml-2">MUX View</span>
               </button>
             </div>
           </div>
@@ -99,22 +92,20 @@ export default function ChipPage() {
                   d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <span>Select a chip to view MUX data</span>
+              <span>Select a chip to view data</span>
             </div>
+          ) : viewMode === "chip" ? (
+            <TaskResultGrid chipId={selectedChip} />
           ) : (
-            <div
-              className={
-                layoutMode === "grid" ? "grid grid-cols-4 gap-4" : "space-y-4"
-              }
-            >
+            <div className="space-y-4">
               {Object.entries(muxData.data.muxes).map(([muxId, muxDetail]) => (
                 <MuxCard
                   key={muxId}
                   muxId={muxId}
                   muxDetail={muxDetail}
-                  layoutMode={layoutMode}
-                  isExpanded={expandedMuxes[muxId] || false}
-                  onToggleExpand={() => toggleMuxExpansion(muxId)}
+                  layoutMode="list"
+                  isExpanded={false}
+                  onToggleExpand={() => {}}
                 />
               ))}
             </div>
