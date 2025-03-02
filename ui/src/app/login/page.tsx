@@ -20,7 +20,9 @@ export default function LoginPage() {
     try {
       await authLogin(userName, password);
       // replaceを使用してhistoryに残さない
-      await router.replace("/");
+      // Next.jsのルーターとwindow.location.hrefの両方を使用
+      router.replace("/");
+      window.location.href = "/";
     } catch (err) {
       setError(
         "ログインに失敗しました。ユーザーIDとパスワードを確認してください。"

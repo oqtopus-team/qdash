@@ -115,6 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           token
         )}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
         saveUsername(username);
+        // ログイン成功後に直接リダイレクト
+        window.location.href = "/";
       } catch (error) {
         console.error("Login failed:", error);
         throw error;
