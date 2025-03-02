@@ -1,123 +1,123 @@
 "use client";
 
-import { useListChips, useFetchChip } from "@/client/chip/chip";
-import { ChipResponse, NodeInfo, EdgeInfo } from "@/schemas";
 import { useEffect, useState } from "react";
-import Select from "react-select";
-import { GraphCanvas } from "reagraph";
-import { ColorRepresentation } from "three";
+import Select, { SingleValue } from "react-select";
+import { GraphCanvas, NodePositionArgs } from "reagraph";
+// import { ColorRepresentation } from "three";
+import { useListChips, useFetchChip } from "@/client/chip/chip";
+import type { ChipResponse } from "@/schemas";
 
-type ThemeColor = number | string;
+// type ThemeColor = number | string;
 
-interface Theme {
-  canvas: {
-    background: ThemeColor;
-    fog: ThemeColor;
-  };
-  node: {
-    fill: ThemeColor;
-    activeFill: ThemeColor;
-    opacity: number;
-    selectedOpacity: number;
-    inactiveOpacity: number;
-    label: {
-      color: ThemeColor;
-      stroke: ThemeColor;
-      activeColor: ThemeColor;
-    };
-    subLabel?: {
-      color: ColorRepresentation;
-      stroke?: ColorRepresentation;
-      activeColor: ColorRepresentation;
-    };
-  };
-  ring: {
-    fill: ThemeColor;
-    activeFill: ThemeColor;
-  };
-  edge: {
-    fill: ThemeColor;
-    activeFill: ThemeColor;
-    opacity: number;
-    selectedOpacity: number;
-    inactiveOpacity: number;
-    label: {
-      color: ThemeColor;
-      stroke: ThemeColor;
-      activeColor: ThemeColor;
-      fontSize: number;
-    };
-  };
-  arrow: {
-    fill: ThemeColor;
-    activeFill: ThemeColor;
-  };
-  lasso: {
-    background: string;
-    border: string;
-  };
-  cluster?: {
-    stroke?: ColorRepresentation;
-    fill?: ColorRepresentation;
-    opacity?: number;
-    selectedOpacity?: number;
-    inactiveOpacity?: number;
-    label?: {
-      stroke?: ColorRepresentation;
-      color: ColorRepresentation;
-      fontSize?: number;
-      offset?: [number, number, number];
-    };
-  };
-}
+// interface Theme {
+//   canvas: {
+//     background: ThemeColor;
+//     fog: ThemeColor;
+//   };
+//   node: {
+//     fill: ThemeColor;
+//     activeFill: ThemeColor;
+//     opacity: number;
+//     selectedOpacity: number;
+//     inactiveOpacity: number;
+//     label: {
+//       color: ThemeColor;
+//       stroke: ThemeColor;
+//       activeColor: ThemeColor;
+//     };
+//     subLabel?: {
+//       color: ColorRepresentation;
+//       stroke?: ColorRepresentation;
+//       activeColor: ColorRepresentation;
+//     };
+//   };
+//   ring: {
+//     fill: ThemeColor;
+//     activeFill: ThemeColor;
+//   };
+//   edge: {
+//     fill: ThemeColor;
+//     activeFill: ThemeColor;
+//     opacity: number;
+//     selectedOpacity: number;
+//     inactiveOpacity: number;
+//     label: {
+//       color: ThemeColor;
+//       stroke: ThemeColor;
+//       activeColor: ThemeColor;
+//       fontSize: number;
+//     };
+//   };
+//   arrow: {
+//     fill: ThemeColor;
+//     activeFill: ThemeColor;
+//   };
+//   lasso: {
+//     background: string;
+//     border: string;
+//   };
+//   cluster?: {
+//     stroke?: ColorRepresentation;
+//     fill?: ColorRepresentation;
+//     opacity?: number;
+//     selectedOpacity?: number;
+//     inactiveOpacity?: number;
+//     label?: {
+//       stroke?: ColorRepresentation;
+//       color: ColorRepresentation;
+//       fontSize?: number;
+//       offset?: [number, number, number];
+//     };
+//   };
+// }
 
-const darkTheme: Theme = {
-  canvas: {
-    background: "#1a1b1e",
-    fog: "#1a1b1e",
-  },
-  node: {
-    fill: "#2b2b2b",
-    activeFill: "#3b3b3b",
-    opacity: 1,
-    selectedOpacity: 1,
-    inactiveOpacity: 0.4,
-    label: {
-      color: "#fff",
-      stroke: "#1a1b1e",
-      activeColor: "#fff",
-    },
-  },
-  ring: {
-    fill: "#666",
-    activeFill: "#888",
-  },
-  edge: {
-    fill: "#666",
-    activeFill: "#888",
-    opacity: 0.8,
-    selectedOpacity: 1,
-    inactiveOpacity: 0.4,
-    label: {
-      color: "#fff",
-      stroke: "#1a1b1e",
-      activeColor: "#fff",
-      fontSize: 12,
-    },
-  },
-  arrow: {
-    fill: "#666",
-    activeFill: "#888",
-  },
-  lasso: {
-    background: "rgba(255, 255, 255, 0.1)",
-    border: "#fff",
-  },
-};
+// const darkTheme: Theme = {
+//   canvas: {
+//     background: "#1a1b1e",
+//     fog: "#1a1b1e",
+//   },
+//   node: {
+//     fill: "#2b2b2b",
+//     activeFill: "#3b3b3b",
+//     opacity: 1,
+//     selectedOpacity: 1,
+//     inactiveOpacity: 0.4,
+//     label: {
+//       color: "#fff",
+//       stroke: "#1a1b1e",
+//       activeColor: "#fff",
+//     },
+//   },
+//   ring: {
+//     fill: "#666",
+//     activeFill: "#888",
+//   },
+//   edge: {
+//     fill: "#666",
+//     activeFill: "#888",
+//     opacity: 0.8,
+//     selectedOpacity: 1,
+//     inactiveOpacity: 0.4,
+//     label: {
+//       color: "#fff",
+//       stroke: "#1a1b1e",
+//       activeColor: "#fff",
+//       fontSize: 12,
+//     },
+//   },
+//   arrow: {
+//     fill: "#666",
+//     activeFill: "#888",
+//   },
+//   lasso: {
+//     background: "rgba(255, 255, 255, 0.1)",
+//     border: "#fff",
+//   },
+// };
 
-// Define types for reagraph nodes and edges
-interface NodePositionArgs {
-  nodes: any[];
+interface SelectOption {
+  value: string;
+  label: string;
 }
 
 interface QubitNode {
@@ -150,7 +150,18 @@ interface QubitEdge {
   fill?: string;
 }
 
-// Types for API data
+interface NodeInfo {
+  position: {
+    x: number;
+    y: number;
+  };
+}
+
+interface EdgeInfo {
+  source: string;
+  target: string;
+}
+
 interface QubitData {
   qid: string;
   status: string;
@@ -191,16 +202,13 @@ const TopologyVisualization = ({
   const [nodes, setNodes] = useState<QubitNode[]>([]);
   const [edges, setEdges] = useState<QubitEdge[]>([]);
 
-  // Initialize nodes from qubit data
   useEffect(() => {
     if (!chipData.qubits) return;
 
     const newNodes = Object.entries(
-      chipData.qubits as Record<string, QubitData>,
+      chipData.qubits as Record<string, QubitData>
     ).map(([id, qubit]) => {
       const isCalibrated = qubit.data && Object.keys(qubit.data).length > 0;
-
-      // Use position from API
       const x = qubit.node_info.position.x;
       const y = qubit.node_info.position.y;
 
@@ -221,12 +229,11 @@ const TopologyVisualization = ({
     setNodes(newNodes);
   }, [chipData.qubits]);
 
-  // Convert couplings to edges
   useEffect(() => {
     if (!chipData.couplings) return;
 
     const newEdges = Object.entries(
-      chipData.couplings as Record<string, CouplingData>,
+      chipData.couplings as Record<string, CouplingData>
     ).map(([id, coupling]) => ({
       id,
       source: coupling.edge_info.source,
@@ -237,13 +244,12 @@ const TopologyVisualization = ({
     setEdges(newEdges);
   }, [chipData.couplings]);
 
-  // Custom node position function for reagraph - uses the node's position data
   const getNodePosition = (id: string, { nodes }: NodePositionArgs) => {
-    const idx = nodes.findIndex((n) => n.id === id);
-    if (idx !== -1 && nodes[idx].data.position) {
+    const node = nodes.find((n) => n.id === id);
+    if (node?.data?.position) {
       return {
-        x: nodes[idx].data.position.x,
-        y: nodes[idx].data.position.y,
+        x: node.data.position.x,
+        y: node.data.position.y,
         z: 1,
       };
     }
@@ -269,27 +275,20 @@ const TopologyVisualization = ({
   return (
     <div style={{ height: "400px" }}>
       <GraphCanvas
-        // @ts-ignore - Ignore TypeScript errors for edge arrow position
-        edgeArrowPosition="none"
-        // @ts-ignore - Ignore TypeScript errors for custom layout
-        layoutType="custom"
-        // @ts-ignore - Ignore TypeScript errors for layout overrides
-        layoutOverrides={{ getNodePosition }}
-        theme={darkTheme}
         nodes={nodes}
         edges={edges}
-        // @ts-ignore - Ignore TypeScript errors for node pointer over
+        // theme={darkTheme}
+        layoutType="custom"
+        layoutOverrides={{ getNodePosition }}
         onNodePointerOver={handleNodePointerOver}
-        // @ts-ignore - Ignore TypeScript errors for edge pointer over
         onEdgePointerOver={handleEdgePointerOver}
-        // @ts-ignore - Ignore TypeScript errors for node click handler
         onNodeClick={handleNodeClick}
+        edgeArrowPosition="none"
       />
     </div>
   );
 };
 
-// Calibration details component
 const CalibrationDetails = ({ qubit }: { qubit: QubitData }) => {
   if (!qubit || !qubit.data || Object.keys(qubit.data).length === 0) {
     return <div>No calibration data available</div>;
@@ -297,7 +296,7 @@ const CalibrationDetails = ({ qubit }: { qubit: QubitData }) => {
 
   return (
     <div className="space-y-4">
-      {Object.entries(qubit.data).map(([key, value]: [string, any]) => (
+      {Object.entries(qubit.data).map(([key, value]) => (
         <div key={key} className="card bg-base-200 shadow-sm">
           <div className="card-body p-4">
             <h3 className="card-title text-sm">{key}</h3>
@@ -318,11 +317,10 @@ const CalibrationDetails = ({ qubit }: { qubit: QubitData }) => {
   );
 };
 
-// Calculate calibration metrics
 const calculateMetrics = (qubits: Record<string, QubitData>) => {
   const totalQubits = Object.keys(qubits).length;
   const calibratedQubits = Object.values(qubits).filter(
-    (q) => q.data && Object.keys(q.data).length > 0,
+    (q) => q.data && Object.keys(q.data).length > 0
   ).length;
 
   const averageGateFidelity =
@@ -346,7 +344,6 @@ const calculateMetrics = (qubits: Record<string, QubitData>) => {
   };
 };
 
-// Summary metrics component
 const CalibrationSummary = ({
   metrics,
 }: {
@@ -381,7 +378,7 @@ const CalibrationSummary = ({
   );
 };
 
-export const ChipMetrics = () => {
+export default function ChipMetrics() {
   const [selectedChipId, setSelectedChipId] = useState<string>("");
   const [selectedQubitId, setSelectedQubitId] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<QubitNode | null>(null);
@@ -398,11 +395,7 @@ export const ChipMetrics = () => {
     isLoading: isChipLoading,
     isError: isChipError,
     refetch: refetchChip,
-  } = useFetchChip(selectedChipId, {
-    query: {
-      enabled: !!selectedChipId,
-    },
-  });
+  } = useFetchChip(selectedChipId);
 
   useEffect(() => {
     if (chips?.data && chips.data.length > 0 && !selectedChipId) {
@@ -441,9 +434,9 @@ export const ChipMetrics = () => {
           <Select
             options={chipOptions}
             value={chipOptions.find(
-              (option) => option.value === selectedChipId,
+              (option) => option.value === selectedChipId
             )}
-            onChange={(option) => {
+            onChange={(option: SingleValue<SelectOption>) => {
               setSelectedChipId(option?.value || "");
               setSelectedQubitId(null);
             }}
@@ -475,8 +468,8 @@ export const ChipMetrics = () => {
                       {hoveredNode
                         ? `Qubit ${hoveredNode.id}`
                         : hoveredEdge
-                          ? `Coupling ${hoveredEdge.id}`
-                          : "Information"}
+                        ? `Coupling ${hoveredEdge.id}`
+                        : "Information"}
                     </h3>
                     <div className="divider my-2"></div>
                   </div>
@@ -509,7 +502,7 @@ export const ChipMetrics = () => {
                                       {value.value} {value.unit || ""}
                                     </td>
                                   </tr>
-                                ),
+                                )
                               )}
                             </>
                           )}
@@ -546,4 +539,4 @@ export const ChipMetrics = () => {
       </div>
     </div>
   );
-};
+}

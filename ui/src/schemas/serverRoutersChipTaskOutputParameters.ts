@@ -5,5 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ServerRoutersChipTaskOutputParametersAnyOf } from "./serverRoutersChipTaskOutputParametersAnyOf";
 
-export type ServerRoutersChipTaskOutputParameters = { [key: string]: unknown };
+export type ServerRoutersChipTaskOutputParameters =
+  ServerRoutersChipTaskOutputParametersAnyOf | null;

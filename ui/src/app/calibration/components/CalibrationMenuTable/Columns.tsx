@@ -5,7 +5,6 @@ import { createColumnHelper } from "@tanstack/react-table";
 import { FaEdit } from "react-icons/fa";
 import { RiDeleteBin6Line } from "react-icons/ri";
 import { FiDownload } from "react-icons/fi";
-import yaml from "js-yaml";
 import type { Menu } from "../../model";
 import { FaRegCirclePlay } from "react-icons/fa6";
 const columnHelper = createColumnHelper<Menu>();
@@ -51,7 +50,7 @@ export const getColumns = (
   handleEditClick: (item: Menu) => void,
   handleDeleteClick: (item: Menu) => void,
   handleExecuteCalib: (item: Menu) => void,
-  isLocked: boolean,
+  isLocked: boolean
 ) => [
   columnHelper.accessor("name", {
     header: "Name",

@@ -5,5 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ServerRoutersChipTaskNoteAnyOf } from "./serverRoutersChipTaskNoteAnyOf";
 
-export type ServerRoutersChipTaskNote = { [key: string]: unknown };
+export type ServerRoutersChipTaskNote = ServerRoutersChipTaskNoteAnyOf | null;

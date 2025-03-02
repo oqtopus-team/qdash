@@ -68,6 +68,7 @@ services:
     networks:
       qdash:
         ipv4_address: 172.22.0.5
+
   qcflow:
     build:
       context: .
@@ -108,8 +109,6 @@ services:
       - .env
     ports:
       - "5715:5715"
-    # expose:
-    #   - "80"
     volumes:
       - ./backend/server:/app/server
       - ./backend/dbmodel:/app/dbmodel
@@ -134,13 +133,26 @@ services:
       - PREFECT_API_URL=http://${PREFECT_HOST}:4200/api
     network_mode: host
 
+  # ui:
+  #   build:
+  #     context: .
+  #     dockerfile: ./ui/Dockerfile
+  #   volumes:
+  #     - ./ui:/app
+  #     - /app/node_modules
+  #   restart: always
+  #   env_file:
+  #     - .env
+  #   ports:
+  #     - "5714:5714"
+  #   depends_on:
+  #     - server
+  #   network_mode: host
+
   ui:
     build:
       context: .
-      dockerfile: ./ui/Dockerfile
-    volumes:
-      - ./ui:/app
-      - /app/node_modules
+      dockerfile: ./ui/Dockerfile.prod
     restart: always
     env_file:
       - .env

@@ -6,7 +6,11 @@ import { ToastContainer } from "react-toastify";
 
 import { CalibrationMenuTable } from "./components/CalibrationMenuTable";
 import { CalibrationScheduleTable } from "./components/CalibrationScheduleTable";
-import { ChipMetrics } from "./components/ChipMetrics";
+import dynamic from "next/dynamic";
+
+const ChipMetrics = dynamic(() => import("./components/ChipMetrics"), {
+  ssr: false,
+});
 
 export default function CalibrationPage() {
   const [activeTab, setActiveTab] = useState("Menu");

@@ -1713,7 +1713,7 @@
           "chip"
         ],
         "summary": "Fetch executions",
-        "description": "Fetch all executions for a given chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch executions for\ncurrent_user_id : str\n    Current user ID from authentication\n\nReturns\n-------\nlist[ExecutionResponseSummary]\n    List of executions for the chip",
+        "description": "Fetch all executions for a given chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch executions for\ncurrent_user : str\n    Current user ID from authentication\n\nReturns\n-------\nlist[ExecutionResponseSummary]\n    List of executions for the chip",
         "operationId": "listExecutionsByChipId",
         "security": [
           {
@@ -1799,6 +1799,111 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExecutionResponseDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chip/{chip_id}/mux/{mux_id}": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Fetch the multiplexer details",
+        "description": "Fetch the multiplexer details.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmux_id : int\n    ID of the multiplexer\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nMuxDetailResponse\n    Multiplexer details",
+        "operationId": "fetchMuxDetails",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "mux_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mux Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MuxDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chip/{chip_id}/mux": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Fetch the multiplexers",
+        "description": "Fetch the multiplexers.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListMuxResponse\n    Multiplexdetails",
+        "operationId": "listMuxes",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListMuxResponse"
                 }
               }
             }
@@ -2848,6 +2953,23 @@
         "title": "ListMenuResponse",
         "description": "ListMenuResponse is a Pydantic model that represents a menu item."
       },
+      "ListMuxResponse": {
+        "properties": {
+          "muxes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MuxDetailResponse"
+            },
+            "type": "object",
+            "title": "Muxes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "muxes"
+        ],
+        "title": "ListMuxResponse",
+        "description": "ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers."
+      },
       "MenuModel": {
         "properties": {
           "name": {
@@ -2936,6 +3058,31 @@
           "data"
         ],
         "title": "MetricsResponse"
+      },
+      "MuxDetailResponse": {
+        "properties": {
+          "mux_id": {
+            "type": "integer",
+            "title": "Mux Id"
+          },
+          "detail": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/server__routers__chip__Task"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mux_id",
+          "detail"
+        ],
+        "title": "MuxDetailResponse",
+        "description": "MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details."
       },
       "NodeInfo": {
         "properties": {
@@ -3659,13 +3806,26 @@
       "server__routers__chip__Task": {
         "properties": {
           "task_id": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Task Id"
           },
           "qid": {
-            "type": "string",
-            "title": "Qid",
-            "default": ""
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qid"
           },
           "name": {
             "type": "string",
@@ -3680,48 +3840,97 @@
                 "type": "null"
               }
             ],
-            "title": "Upstream Id",
-            "default": ""
+            "title": "Upstream Id"
           },
           "status": {
             "type": "string",
-            "title": "Status"
+            "title": "Status",
+            "default": "pending"
           },
           "message": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Message"
           },
           "input_parameters": {
-            "type": "object",
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Input Parameters"
           },
           "output_parameters": {
-            "type": "object",
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Output Parameters"
           },
           "output_parameter_names": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Output Parameter Names"
           },
           "note": {
-            "type": "object",
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Note"
           },
           "figure_path": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Figure Path"
           },
           "raw_data_path": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Raw Data Path"
           },
           "start_at": {
@@ -3758,20 +3967,23 @@
             "title": "Elapsed Time"
           },
           "task_type": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Task Type"
           }
         },
         "type": "object",
         "required": [
-          "task_id",
-          "name",
-          "status",
-          "message",
-          "task_type"
+          "name"
         ],
         "title": "Task",
-        "description": "Task is a Pydantic model that represents a task in the execution response.\n\nAttributes\n----------\n    task_id (str): The ID of the task.\n    name (str): The name of the task.\n    upstream_id (Optional[str]): The ID of the upstream task.\n    status (str): The current status of the task.\n    message (str): The message associated with the task.\n    input_parameters (dict[str, Any]): The input parameters of the task.\n    output_parameters (dict[str, Any]): The output parameters of the task.\n    output_parameter_names (List[str]): The names of the output parameters.\n    note (dict[str, Any]): The note associated with the task.\n    figure_path (List[str]): The paths to the figures associated with the task.\n    start_at (Optional[str]): The start time of the task.\n    end_at (Optional[str]): The end time of the task.\n    elapsed_time (Optional[str]): The total elapsed time of the task.\n    task_type (str): The type of the task."
+        "description": "Task is a Pydantic model that represents a task."
       },
       "server__routers__execution_v2__Task": {
         "properties": {

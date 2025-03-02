@@ -1,5 +1,1 @@
-import { ChipMetricsClient } from "./ChipMetricsClient";
-
-export function ChipMetrics() {
-  return <ChipMetricsClient />;
-}
+export { default } from "./ChipMetricsGraph";

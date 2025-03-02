@@ -5,49 +5,39 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ServerRoutersChipTaskTaskId } from "./serverRoutersChipTaskTaskId";
+import type { ServerRoutersChipTaskQid } from "./serverRoutersChipTaskQid";
 import type { ServerRoutersChipTaskUpstreamId } from "./serverRoutersChipTaskUpstreamId";
+import type { ServerRoutersChipTaskMessage } from "./serverRoutersChipTaskMessage";
 import type { ServerRoutersChipTaskInputParameters } from "./serverRoutersChipTaskInputParameters";
 import type { ServerRoutersChipTaskOutputParameters } from "./serverRoutersChipTaskOutputParameters";
+import type { ServerRoutersChipTaskOutputParameterNames } from "./serverRoutersChipTaskOutputParameterNames";
 import type { ServerRoutersChipTaskNote } from "./serverRoutersChipTaskNote";
+import type { ServerRoutersChipTaskFigurePath } from "./serverRoutersChipTaskFigurePath";
+import type { ServerRoutersChipTaskRawDataPath } from "./serverRoutersChipTaskRawDataPath";
 import type { ServerRoutersChipTaskStartAt } from "./serverRoutersChipTaskStartAt";
 import type { ServerRoutersChipTaskEndAt } from "./serverRoutersChipTaskEndAt";
 import type { ServerRoutersChipTaskElapsedTime } from "./serverRoutersChipTaskElapsedTime";
+import type { ServerRoutersChipTaskTaskType } from "./serverRoutersChipTaskTaskType";
 
 /**
- * Task is a Pydantic model that represents a task in the execution response.
-
-Attributes
-----------
-    task_id (str): The ID of the task.
-    name (str): The name of the task.
-    upstream_id (Optional[str]): The ID of the upstream task.
-    status (str): The current status of the task.
-    message (str): The message associated with the task.
-    input_parameters (dict[str, Any]): The input parameters of the task.
-    output_parameters (dict[str, Any]): The output parameters of the task.
-    output_parameter_names (List[str]): The names of the output parameters.
-    note (dict[str, Any]): The note associated with the task.
-    figure_path (List[str]): The paths to the figures associated with the task.
-    start_at (Optional[str]): The start time of the task.
-    end_at (Optional[str]): The end time of the task.
-    elapsed_time (Optional[str]): The total elapsed time of the task.
-    task_type (str): The type of the task.
+ * Task is a Pydantic model that represents a task.
  */
 export interface ServerRoutersChipTask {
-  task_id: string;
-  qid?: string;
+  task_id?: ServerRoutersChipTaskTaskId;
+  qid?: ServerRoutersChipTaskQid;
   name: string;
   upstream_id?: ServerRoutersChipTaskUpstreamId;
-  status: string;
-  message: string;
+  status?: string;
+  message?: ServerRoutersChipTaskMessage;
   input_parameters?: ServerRoutersChipTaskInputParameters;
   output_parameters?: ServerRoutersChipTaskOutputParameters;
-  output_parameter_names?: string[];
+  output_parameter_names?: ServerRoutersChipTaskOutputParameterNames;
   note?: ServerRoutersChipTaskNote;
-  figure_path?: string[];
-  raw_data_path?: string[];
+  figure_path?: ServerRoutersChipTaskFigurePath;
+  raw_data_path?: ServerRoutersChipTaskRawDataPath;
   start_at?: ServerRoutersChipTaskStartAt;
   end_at?: ServerRoutersChipTaskEndAt;
   elapsed_time?: ServerRoutersChipTaskElapsedTime;
-  task_type: string;
+  task_type?: ServerRoutersChipTaskTaskType;
 }

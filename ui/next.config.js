@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ["react-plotly.js", "plotly.js"],
   images: {
     remotePatterns: [
       {
@@ -12,6 +13,13 @@ const nextConfig = {
   },
   pageExtensions: ["tsx", "ts"],
   useFileSystemPublicRoutes: true,
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "plotly.js": "plotly.js/dist/plotly",
+    };
+    return config;
+  },
 };
 
 module.exports = nextConfig;

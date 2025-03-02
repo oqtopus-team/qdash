@@ -25,6 +25,8 @@ import type {
   ExecutionResponseDetail,
   ExecutionResponseSummary,
   HTTPValidationError,
+  ListMuxResponse,
+  MuxDetailResponse,
 } from "../../schemas";
 
 /**
@@ -299,7 +301,7 @@ Parameters
 ----------
 chip_id : str
     ID of the chip to fetch executions for
-current_user_id : str
+current_user : str
     Current user ID from authentication
 
 Returns
@@ -637,6 +639,326 @@ export function useFetchExecutionByChipId<
     executionId,
     options,
   );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Fetch the multiplexer details.
+
+Parameters
+----------
+chip_id : str
+    ID of the chip
+mux_id : int
+    ID of the multiplexer
+current_user : User
+    Current authenticated user
+
+Returns
+-------
+MuxDetailResponse
+    Multiplexer details
+ * @summary Fetch the multiplexer details
+ */
+export const fetchMuxDetails = (
+  chipId: string,
+  muxId: number,
+  options?: AxiosRequestConfig,
+): Promise<AxiosResponse<MuxDetailResponse>> => {
+  return axios.get(
+    `http://localhost:5715/chip/${chipId}/mux/${muxId}`,
+    options,
+  );
+};
+
+export const getFetchMuxDetailsQueryKey = (chipId: string, muxId: number) => {
+  return [`http://localhost:5715/chip/${chipId}/mux/${muxId}`] as const;
+};
+
+export const getFetchMuxDetailsQueryOptions = <
+  TData = Awaited<ReturnType<typeof fetchMuxDetails>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  muxId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchMuxDetails>>,
+        TError,
+        TData
+      >
+    >;
+    axios?: AxiosRequestConfig;
+  },
+) => {
+  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getFetchMuxDetailsQueryKey(chipId, muxId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchMuxDetails>>> = ({
+    signal,
+  }) => fetchMuxDetails(chipId, muxId, { signal, ...axiosOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(chipId && muxId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof fetchMuxDetails>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type FetchMuxDetailsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof fetchMuxDetails>>
+>;
+export type FetchMuxDetailsQueryError = AxiosError<HTTPValidationError>;
+
+export function useFetchMuxDetails<
+  TData = Awaited<ReturnType<typeof fetchMuxDetails>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  muxId: number,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchMuxDetails>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof fetchMuxDetails>>,
+          TError,
+          Awaited<ReturnType<typeof fetchMuxDetails>>
+        >,
+        "initialData"
+      >;
+    axios?: AxiosRequestConfig;
+  },
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useFetchMuxDetails<
+  TData = Awaited<ReturnType<typeof fetchMuxDetails>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  muxId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchMuxDetails>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof fetchMuxDetails>>,
+          TError,
+          Awaited<ReturnType<typeof fetchMuxDetails>>
+        >,
+        "initialData"
+      >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useFetchMuxDetails<
+  TData = Awaited<ReturnType<typeof fetchMuxDetails>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  muxId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchMuxDetails>>,
+        TError,
+        TData
+      >
+    >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Fetch the multiplexer details
+ */
+
+export function useFetchMuxDetails<
+  TData = Awaited<ReturnType<typeof fetchMuxDetails>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  muxId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchMuxDetails>>,
+        TError,
+        TData
+      >
+    >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getFetchMuxDetailsQueryOptions(chipId, muxId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Fetch the multiplexers.
+
+Parameters
+----------
+chip_id : str
+    ID of the chip
+current_user : User
+    Current authenticated user
+
+Returns
+-------
+ListMuxResponse
+    Multiplexdetails
+ * @summary Fetch the multiplexers
+ */
+export const listMuxes = (
+  chipId: string,
+  options?: AxiosRequestConfig,
+): Promise<AxiosResponse<ListMuxResponse>> => {
+  return axios.get(`http://localhost:5715/chip/${chipId}/mux`, options);
+};
+
+export const getListMuxesQueryKey = (chipId: string) => {
+  return [`http://localhost:5715/chip/${chipId}/mux`] as const;
+};
+
+export const getListMuxesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMuxes>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listMuxes>>, TError, TData>
+    >;
+    axios?: AxiosRequestConfig;
+  },
+) => {
+  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListMuxesQueryKey(chipId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listMuxes>>> = ({
+    signal,
+  }) => listMuxes(chipId, { signal, ...axiosOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!chipId,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listMuxes>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData>;
+  };
+};
+
+export type ListMuxesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listMuxes>>
+>;
+export type ListMuxesQueryError = AxiosError<HTTPValidationError>;
+
+export function useListMuxes<
+  TData = Awaited<ReturnType<typeof listMuxes>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listMuxes>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listMuxes>>,
+          TError,
+          Awaited<ReturnType<typeof listMuxes>>
+        >,
+        "initialData"
+      >;
+    axios?: AxiosRequestConfig;
+  },
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useListMuxes<
+  TData = Awaited<ReturnType<typeof listMuxes>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listMuxes>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listMuxes>>,
+          TError,
+          Awaited<ReturnType<typeof listMuxes>>
+        >,
+        "initialData"
+      >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useListMuxes<
+  TData = Awaited<ReturnType<typeof listMuxes>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listMuxes>>, TError, TData>
+    >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Fetch the multiplexers
+ */
+
+export function useListMuxes<
+  TData = Awaited<ReturnType<typeof listMuxes>>,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listMuxes>>, TError, TData>
+    >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getListMuxesQueryOptions(chipId, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData>;
