@@ -4,6 +4,7 @@ from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
 from qcflow.protocols.base import (
     BaseTask,
+    InputParameter,
     OutputParameter,
     PostProcessResult,
     PreProcessResult,
@@ -19,8 +20,28 @@ class CheckRabi(BaseTask):
 
     name: str = "CheckRabi"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, InputParameter]] = {
+        "time_range": InputParameter(
+            unit="ns",
+            value_type="ndarray",
+            value="[0, 201, 4]",
+            description="Time range for Rabi oscillation",
+        ),
+        "shots": InputParameter(
+            unit="",
+            value_type="int",
+            value=DEFAULT_SHOTS,
+            description="Number of shots for Rabi oscillation",
+        ),
+        "interval": InputParameter(
+            unit="ns",
+            value_type="int",
+            value=DEFAULT_INTERVAL,
+            description="Time interval for Rabi oscillation",
+        ),
+    }
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
-        "rabi_amplitude": OutputParameter(unit="", description="Rabi oscillation amplitude"),
+        "rabi_amplitude": OutputParameter(unit="a.u.", description="Rabi oscillation amplitude"),
         "rabi_frequency": OutputParameter(unit="GHz", description="Rabi oscillation frequency"),
     }
 
@@ -30,26 +51,16 @@ class CheckRabi(BaseTask):
         shots=DEFAULT_SHOTS,  # noqa: ANN001
         interval=DEFAULT_INTERVAL,  # noqa: ANN001
     ) -> None:
-        self.input_parameters: dict = {
-            "time_range": time_range,
-            "shots": shots,
-            "interval": interval,
-            "qubit_frequency": {},
-            "control_amplitude": {},
-            "readout_frequency": {},
-            "readout_amplitude": {},
-        }
+        super().__init__(time_range=time_range, shots=shots, interval=interval)
+        self.input_parameters["time_range"].value = time_range
+        self.input_parameters["shots"].value = shots
+        self.input_parameters["interval"].value = interval
 
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
-        label = qid_to_label(qid)
         input_param = {
             "time_range": self.input_parameters["time_range"],
             "shots": self.input_parameters["shots"],
             "interval": self.input_parameters["interval"],
-            "qubit_frequency": exp.targets[label].frequency,
-            "control_amplitude": exp.params.control_amplitude[label],
-            "readout_frequency": exp.resonators[label].frequency,
-            "readout_amplitude": exp.params.readout_amplitude[label],
         }
         return PreProcessResult(input_parameters=input_param)
 

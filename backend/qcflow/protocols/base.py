@@ -7,6 +7,15 @@ from pydantic import BaseModel
 from qubex.experiment import Experiment
 
 
+class InputParameter(BaseModel):
+    """Input parameter class."""
+
+    unit: str = ""
+    value_type: str = "float"
+    value: Any = None
+    description: str = ""
+
+
 class OutputParameter(BaseModel):
     """Output parameter class."""
 
