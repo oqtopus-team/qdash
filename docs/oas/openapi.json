@@ -2988,6 +2988,46 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "InputParameter": {
+        "properties": {
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type",
+            "default": "float"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "InputParameter",
+        "description": "Input parameter class."
+      },
       "LatestTaskGroupedByChipResponse": {
         "properties": {
           "task_name": {
@@ -3663,13 +3703,29 @@
           "task_type": {
             "type": "string",
             "title": "Task Type"
+          },
+          "input_parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/InputParameter"
+            },
+            "type": "object",
+            "title": "Input Parameters"
+          },
+          "output_parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/InputParameter"
+            },
+            "type": "object",
+            "title": "Output Parameters"
           }
         },
         "type": "object",
         "required": [
           "name",
           "description",
-          "task_type"
+          "task_type",
+          "input_parameters",
+          "output_parameters"
         ],
         "title": "TaskResponse",
         "description": "Response model for a task."

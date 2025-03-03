@@ -1,8 +1,16 @@
 import json
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Dict
 
 import numpy as np
-from qcflow.protocols.base import BaseTask, InputParameter, OutputParameter
+from qcflow.cal_util import qid_to_label
+from qcflow.protocols.base import (
+    BaseTask,
+    InputParameter,
+    OutputParameter,
+    PostProcessResult,
+    PreProcessResult,
+    RunResult,
+)
 from qcflow.utils.task_converter import convert_json_to_task_parameters
 from qubex.experiment import Experiment
 from qubex.experiment.experiment import RABI_TIME_RANGE
@@ -14,52 +22,79 @@ class DynamicCheckRabi(BaseTask):
 
     name: str = "CheckRabi"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, InputParameter]] = {
+        "time_range": InputParameter(
+            unit="ns",
+            value_type="ndarray",
+            value=RABI_TIME_RANGE,
+            description="Time range for Rabi oscillation",
+        ),
+        "shots": InputParameter(
+            unit="",
+            value_type="int",
+            value=DEFAULT_SHOTS,
+            description="Number of shots for Rabi oscillation",
+        ),
+        "interval": InputParameter(
+            unit="ns",
+            value_type="int",
+            value=DEFAULT_INTERVAL,
+            description="Time interval for Rabi oscillation",
+        ),
+    }
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "rabi_amplitude": OutputParameter(unit="a.u.", description="Rabi oscillation amplitude"),
+        "rabi_frequency": OutputParameter(unit="GHz", description="Rabi oscillation frequency"),
+    }
 
-    def __init__(self, json_path: str) -> None:
-        """Initialize the task from JSON configuration.
+    def __init__(self, params: Dict[str, Any]) -> None:
+        """Initialize the task with parameters.
 
         Args:
         ----
-            json_path: Path to the JSON configuration file
+            params: Dictionary containing task parameters
 
         """
-        # Read and convert JSON parameters
-        with open(json_path) as f:
-            json_data = json.load(f)
-        converted = convert_json_to_task_parameters(json_data)
-
-        # Set up input parameters
-        self.input_parameters: dict[str, InputParameter] = {
-            name: InputParameter(**param) for name, param in converted["input_parameters"].items()
-        }
-
-        # Set up output parameters
-        self.output_parameters: ClassVar[dict[str, OutputParameter]] = {
-            name: OutputParameter(**param) for name, param in converted["output_parameters"].items()
-        }
-
-        # Initialize with default values
         super().__init__()
-        self.input_parameters["time_range"].value = RABI_TIME_RANGE
-        self.input_parameters["shots"].value = DEFAULT_SHOTS
-        self.input_parameters["interval"].value = DEFAULT_INTERVAL
 
-    def preprocess(self, exp: Experiment, qid: str) -> Any:
-        """Required by BaseTask but not used in this example."""
+        # Convert parameters
+        converted = convert_json_to_task_parameters(params)
 
-    def postprocess(self, execution_id: str, run_result: Any, qid: str) -> Any:
-        """Required by BaseTask but not used in this example."""
+        # Set input parameter values
+        self.input_parameters["time_range"].value = converted["input_parameters"]["time_range"][
+            "value"
+        ]
+        self.input_parameters["shots"].value = converted["input_parameters"]["shots"]["value"]
+        self.input_parameters["interval"].value = converted["input_parameters"]["interval"]["value"]
 
-    def run(self, exp: Experiment, qid: str) -> Any:
+    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
+        """Preprocess the task."""
+        input_param = {
+            "time_range": self.input_parameters["time_range"],
+            "shots": self.input_parameters["shots"],
+            "interval": self.input_parameters["interval"],
+        }
+        return PreProcessResult(input_parameters=input_param)
+
+    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         """Required by BaseTask but not used in this example."""
+        return PostProcessResult(output_parameters={}, figures=[], raw_data=[])
+
+    def run(self, exp: Experiment, qid: str) -> RunResult:
+        """Required by BaseTask but not used in this example."""
+        return RunResult(raw_result=None)
 
 
 def main():
-    # Create task from JSON
-    task = DynamicCheckRabi("check_rabi.json")
+    # Load JSON file into dictionary
+    with open("check_rabi.json") as f:
+        params = json.load(f)
 
-    # Print the converted parameters to verify
-    print("\nConverted Input Parameters:")
+    # Create task with parameters dictionary
+    task = DynamicCheckRabi(params)
+
+    # Print task information
+    print("\nInput Parameters:")
     for name, param in task.input_parameters.items():
         print(f"\n{name}:")
         print(f"  Unit: {param.unit}")
@@ -71,7 +106,7 @@ def main():
                 print(f"  Shape: {param.value.shape}")
         print(f"  Description: {param.description}")
 
-    print("\nConverted Output Parameters:")
+    print("\nOutput Parameters:")
     for name, param in task.output_parameters.items():
         print(f"\n{name}:")
         print(f"  Unit: {param.unit}")

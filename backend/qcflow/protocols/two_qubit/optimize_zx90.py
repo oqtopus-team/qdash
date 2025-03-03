@@ -2,6 +2,7 @@ from typing import ClassVar
 
 from qcflow.protocols.base import (
     BaseTask,
+    InputParameter,
     OutputParameter,
     PostProcessResult,
     PreProcessResult,
@@ -15,16 +16,13 @@ class OptimizeZX90(BaseTask):
 
     name: str = "OptimizeZX90"
     task_type: str = "coupling"
-
+    input_parameters: ClassVar[dict[str, InputParameter]] = {}
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "cr_amplitude": OutputParameter(unit="", description=""),
         "cr_phase": OutputParameter(unit="", description=""),
         "cancel_amplitude": OutputParameter(unit="", description=""),
         "cancel_phase": OutputParameter(unit="", description=""),
     }
-
-    def __init__(self) -> None:
-        pass
 
     # @staticmethod
     # def determine_cr_pair(exp: Experiment) -> tuple[tuple[str, str], str]:

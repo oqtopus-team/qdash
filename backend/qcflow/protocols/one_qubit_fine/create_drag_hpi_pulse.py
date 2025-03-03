@@ -6,6 +6,7 @@ from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
 from qcflow.protocols.base import (
     BaseTask,
+    InputParameter,
     OutputParameter,
     PostProcessResult,
     PreProcessResult,
@@ -21,43 +22,33 @@ class CreateDRAGHPIPulse(BaseTask):
 
     name: str = "CreateDRAGHPIPulse"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, InputParameter]] = {
+        "hpi_length": InputParameter(
+            unit="ns",
+            value_type="int",
+            value=HPI_DURATION,
+            description="HPI pulse length",
+        ),
+        "shots": InputParameter(
+            unit="a.u.",
+            value_type="int",
+            value=CALIBRATION_SHOTS,
+            description="Number of shots",
+        ),
+        "interval": InputParameter(
+            unit="ns",
+            value_type="int",
+            value=DEFAULT_INTERVAL,
+            description="Time interval",
+        ),
+    }
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "drag_hpi_beta": OutputParameter(unit="", description="DRAG HPI pulse beta"),
         "drag_hpi_amplitude": OutputParameter(unit="", description="DRAG HPI pulse amplitude"),
     }
 
-    def __init__(
-        self,
-        hpi_length=HPI_DURATION,  # noqa: ANN001
-        shots=CALIBRATION_SHOTS,  # noqa: ANN001
-        interval=DEFAULT_INTERVAL,  # noqa: ANN001
-    ) -> None:
-        self.input_parameters = {
-            "hpi_length": hpi_length,
-            "shots": shots,
-            "interval": interval,
-            "qubit_frequency": {},
-            "control_amplitude": {},
-            "readout_frequency": {},
-            "readout_amplitude": {},
-            "rabi_frequency": {},
-            "rabi_amplitude": {},
-        }
-
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
-        label = qid_to_label(qid)
-        input_param = {
-            "hpi_length": self.input_parameters["hpi_length"],
-            "shots": self.input_parameters["shots"],
-            "interval": self.input_parameters["interval"],
-            "qubit_frequency": exp.targets[label].frequency,
-            "control_amplitude": exp.params.control_amplitude[label],
-            "readout_frequency": exp.resonators[label].frequency,
-            "readout_amplitude": exp.params.readout_amplitude[label],
-            "rabi_frequency": exp.rabi_params[label].frequency,
-            "rabi_amplitude": exp.rabi_params[label].amplitude,
-        }
-        return PreProcessResult(input_parameters=input_param)
+        return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = qid_to_label(qid)
@@ -87,8 +78,8 @@ class CreateDRAGHPIPulse(BaseTask):
             n_rotations=4,
             n_turns=1,
             n_iterations=2,
-            shots=self.input_parameters["shots"],
-            interval=self.input_parameters["interval"],
+            shots=self.input_parameters["shots"].get_value(),
+            interval=self.input_parameters["interval"].get_value(),
         )
         exp.calib_note.save()
         return RunResult(raw_result=result)

@@ -2,6 +2,7 @@ from typing import ClassVar
 
 from qcflow.protocols.base import (
     BaseTask,
+    InputParameter,
     OutputParameter,
     PostProcessResult,
     PreProcessResult,
@@ -15,10 +16,8 @@ class CheckNoise(BaseTask):
 
     name: str = "CheckNoise"
     task_type: str = "global"
+    input_parameters: ClassVar[dict[str, InputParameter]] = {}
     output_parameters: ClassVar[dict[str, OutputParameter]] = {}
-
-    def __init__(self) -> None:
-        pass
 
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
         pass

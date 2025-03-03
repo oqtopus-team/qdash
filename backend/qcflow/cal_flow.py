@@ -16,7 +16,7 @@ from neodbmodel.task import TaskDocument
 from prefect import flow, get_run_logger
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
-from protocols.active_protocols import task_classes
+from protocols.active_protocols import generate_task_instances
 from qcflow.manager.execution import ExecutionManager
 from qcflow.manager.task import TaskManager
 from qubex.experiment import Experiment
@@ -33,9 +33,10 @@ def cal_sequence(
     """Calibrate in sequence."""
     logger = get_run_logger()
     try:
+        task_instances = generate_task_instances(task_names=task_names)
         for task_name in task_names:
-            if task_name in task_classes:
-                task_type = task_classes[task_name].get_task_type()
+            if task_name in task_instances:
+                task_type = task_instances[task_name].get_task_type()
                 if task_manager.this_task_is_completed(
                     task_name=task_name, task_type=task_type, qid=qid
                 ):
@@ -43,7 +44,10 @@ def cal_sequence(
                     continue
                 logger.info(f"Starting task: {task_name}")
                 task_manager = execute_dynamic_task_by_qid(
-                    exp=exp, task_manager=task_manager, task_name=task_name, qid=qid
+                    exp=exp,
+                    task_manager=task_manager,
+                    task_instance=task_instances[task_name],
+                    qid=qid,
                 )
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")

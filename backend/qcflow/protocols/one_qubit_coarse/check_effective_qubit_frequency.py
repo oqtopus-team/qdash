@@ -1,10 +1,10 @@
 from typing import ClassVar
 
-import numpy as np
 from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
 from qcflow.protocols.base import (
     BaseTask,
+    InputParameter,
     OutputParameter,
     PostProcessResult,
     PreProcessResult,
@@ -19,6 +19,29 @@ class CheckEffectiveQubitFrequency(BaseTask):
 
     name: str = "CheckEffectiveQubitFrequency"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, InputParameter]] = {
+        "detuning": InputParameter(
+            unit="GHz", value_type="float", value=0.001, description="Detuning"
+        ),
+        "time_range": InputParameter(
+            unit="ns",
+            value_type="np.arange",
+            value=(0, 20001, 100),
+            description="Time range for effective qubit frequency",
+        ),
+        "shots": InputParameter(
+            unit="",
+            value_type="int",
+            value=DEFAULT_SHOTS,
+            description="Number of shots for effective qubit frequency",
+        ),
+        "interval": InputParameter(
+            unit="ns",
+            value_type="int",
+            value=DEFAULT_INTERVAL,
+            description="Time interval for effective qubit frequency",
+        ),
+    }
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "effective_qubit_frequency": OutputParameter(
             unit="GHz", description="Effective qubit frequency"
@@ -31,31 +54,8 @@ class CheckEffectiveQubitFrequency(BaseTask):
         ),
     }
 
-    def __init__(
-        self,
-        detuning=0.001,  # noqa: ANN001
-        time_range=None,  # noqa: ANN001
-        shots=DEFAULT_SHOTS,  # noqa: ANN001
-        interval=DEFAULT_INTERVAL,  # noqa: ANN001
-    ) -> None:
-        if time_range is None:
-            time_range = np.arange(0, 20001, 100)
-
-        self.input_parameters = {
-            "detuning": detuning,
-            "time_range": time_range,
-            "shots": shots,
-            "interval": interval,
-        }
-
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
-        input_param = {
-            "detuning": self.input_parameters["detuning"],
-            "time_range": self.input_parameters["time_range"],
-            "shots": self.input_parameters["shots"],
-            "interval": self.input_parameters["interval"],
-        }
-        return PreProcessResult(input_parameters=input_param)
+        return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = qid_to_label(qid)
@@ -92,10 +92,10 @@ class CheckEffectiveQubitFrequency(BaseTask):
         label = qid_to_label(qid)
         result = exp.obtain_effective_control_frequency(
             targets=[label],
-            time_range=self.input_parameters["time_range"],
-            detuning=self.input_parameters["detuning"],
-            shots=self.input_parameters["shots"],
-            interval=self.input_parameters["interval"],
+            time_range=self.input_parameters["time_range"].get_value(),
+            detuning=self.input_parameters["detuning"].get_value(),
+            shots=self.input_parameters["shots"].get_value(),
+            interval=self.input_parameters["interval"].get_value(),
         )
         exp.calib_note.save()
         return RunResult(raw_result=result)
