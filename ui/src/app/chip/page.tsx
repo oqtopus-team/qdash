@@ -280,12 +280,8 @@ export default function ChipPage() {
                       <div className="p-4 border-t">
                         {/* Task Results Grid */}
                         <div className="space-y-6">
-                          {Object.entries(getTaskGroups(muxDetail.detail))
-                            .filter(
-                              ([taskName]) =>
-                                !selectedTask || taskName === selectedTask
-                            )
-                            .map(([taskName, qidResults]) => (
+                          {Object.entries(getTaskGroups(muxDetail.detail)).map(
+                            ([taskName, qidResults]) => (
                               <div
                                 key={taskName}
                                 className="border-t pt-4 first:border-t-0 first:pt-0"
@@ -371,7 +367,8 @@ export default function ChipPage() {
                                   })}
                                 </div>
                               </div>
-                            ))}
+                            )
+                          )}
                         </div>
                       </div>
                     )}
