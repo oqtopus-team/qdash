@@ -2,6 +2,7 @@ from typing import ClassVar
 
 from qcflow.protocols.base import (
     BaseTask,
+    InputParameter,
     OutputParameter,
     PostProcessResult,
     PreProcessResult,
@@ -15,13 +16,10 @@ class CreateZX90(BaseTask):
 
     name: str = "CreateZX90"
     task_type: str = "coupling"
-
+    input_parameters: ClassVar[dict[str, InputParameter]] = {}
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "cr_amplitude": OutputParameter(unit="", description="Amplitude of the ZX90 gate."),
     }
-
-    def __init__(self) -> None:
-        pass
 
     # @staticmethod
     # def determine_cr_pair(exp: Experiment) -> tuple:

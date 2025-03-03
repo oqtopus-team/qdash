@@ -4,13 +4,13 @@ from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
 from qcflow.protocols.base import (
     BaseTask,
+    InputParameter,
     OutputParameter,
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
 from qubex.experiment import Experiment
-from qubex.experiment.experiment import RABI_TIME_RANGE
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 
@@ -19,41 +19,37 @@ class CheckRabi(BaseTask):
 
     name: str = "CheckRabi"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, InputParameter]] = {
+        "time_range": InputParameter(
+            unit="ns",
+            value_type="range",
+            value=(0, 201, 4),
+            description="Time range for Rabi oscillation",
+        ),
+        "shots": InputParameter(
+            unit="a.u.",
+            value_type="int",
+            value=DEFAULT_SHOTS,
+            description="Number of shots for Rabi oscillation",
+        ),
+        "interval": InputParameter(
+            unit="ns",
+            value_type="int",
+            value=DEFAULT_INTERVAL,
+            description="Time interval for Rabi oscillation",
+        ),
+    }
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
-        "rabi_amplitude": OutputParameter(unit="", description="Rabi oscillation amplitude"),
+        "rabi_amplitude": OutputParameter(unit="a.u.", description="Rabi oscillation amplitude"),
         "rabi_frequency": OutputParameter(unit="GHz", description="Rabi oscillation frequency"),
     }
 
-    def __init__(
-        self,
-        time_range=RABI_TIME_RANGE,  # noqa: ANN001
-        shots=DEFAULT_SHOTS,  # noqa: ANN001
-        interval=DEFAULT_INTERVAL,  # noqa: ANN001
-    ) -> None:
-        self.input_parameters: dict = {
-            "time_range": time_range,
-            "shots": shots,
-            "interval": interval,
-            "qubit_frequency": {},
-            "control_amplitude": {},
-            "readout_frequency": {},
-            "readout_amplitude": {},
-        }
-
-    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
-        label = qid_to_label(qid)
-        input_param = {
-            "time_range": self.input_parameters["time_range"],
-            "shots": self.input_parameters["shots"],
-            "interval": self.input_parameters["interval"],
-            "qubit_frequency": exp.targets[label].frequency,
-            "control_amplitude": exp.params.control_amplitude[label],
-            "readout_frequency": exp.resonators[label].frequency,
-            "readout_amplitude": exp.params.readout_amplitude[label],
-        }
-        return PreProcessResult(input_parameters=input_param)
+    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
+        """Preprocess the task."""
+        return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
+        """Process the results of the task."""
         label = qid_to_label(qid)
         result = run_result.raw_result
         op = self.output_parameters
@@ -76,11 +72,12 @@ class CheckRabi(BaseTask):
         return PostProcessResult(output_parameters=output_param, figures=figures, raw_data=raw_data)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
+        """Run the task."""
         label = qid_to_label(qid)
         result = exp.obtain_rabi_params(
-            time_range=self.input_parameters["time_range"],
-            shots=self.input_parameters["shots"],
-            interval=self.input_parameters["interval"],
+            time_range=self.input_parameters["time_range"].get_value(),
+            shots=self.input_parameters["shots"].get_value(),
+            interval=self.input_parameters["interval"].get_value(),
             targets=label,
         )
         exp.calib_note.save()

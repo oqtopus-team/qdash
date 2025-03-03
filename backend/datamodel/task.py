@@ -255,3 +255,5 @@ class TaskModel(BaseModel):
     name: str = Field(..., description="The name of the task")
     description: str = Field(..., description="Detailed description of the task")
     task_type: str = Field(..., description="The type of the task")
+    input_parameters: dict = Field(..., description="The input parameters of the task")
+    output_parameters: dict = Field(..., description="The output parameters of the task")

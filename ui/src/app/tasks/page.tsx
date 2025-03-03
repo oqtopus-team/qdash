@@ -3,13 +3,141 @@
 import { useFetchAllTasks } from "@/client/task/task";
 import { TaskResponse } from "@/schemas";
 import { useState } from "react";
-import { BsGrid, BsListUl, BsArrowRight } from "react-icons/bs";
+import { BsGrid, BsListUl, BsArrowRight, BsX } from "react-icons/bs";
+import {
+  BsInfoCircle,
+  BsArrowDownSquare,
+  BsArrowUpSquare,
+} from "react-icons/bs";
 
 type ViewMode = "grid" | "list";
+
+interface Parameter {
+  unit?: string;
+  value_type?: string;
+  value?: any;
+  description?: string;
+}
+
+interface TaskDetailModalProps {
+  task: TaskResponse | null;
+  onClose: () => void;
+}
+
+const TaskDetailModal = ({ task, onClose }: TaskDetailModalProps) => {
+  if (!task) return null;
+
+  const renderParameterValue = (value: any) => {
+    if (Array.isArray(value)) {
+      return `[${value.join(", ")}]`;
+    }
+    return String(value);
+  };
+
+  const renderParameters = (parameters: Record<string, Parameter>) => {
+    return Object.entries(parameters).map(([name, param]) => (
+      <div
+        key={name}
+        className="mb-6 last:mb-0 bg-base-100/40 rounded-lg p-4 hover:bg-base-100/60 transition-colors"
+      >
+        <div className="flex items-start gap-3">
+          <h4 className="font-semibold text-base flex-1">{name}</h4>
+          {param.unit && (
+            <span className="badge badge-neutral badge-sm font-mono">
+              {param.unit}
+            </span>
+          )}
+        </div>
+        <div className="mt-3 space-y-3">
+          {param.description && (
+            <p className="text-sm text-base-content/70 leading-relaxed">
+              {param.description}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <span className="font-mono text-xs bg-base-300/50 px-3 py-1.5 rounded-full">
+              {param.value_type}
+            </span>
+            {param.value !== null && (
+              <span className="font-mono text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full">
+                {renderParameterValue(param.value)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    ));
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-base-100 rounded-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 py-4 border-b border-base-300 flex items-center justify-between bg-base-100/80 backdrop-blur supports-[backdrop-filter]:bg-base-100/60">
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold">{task.name}</h2>
+            <div className="badge badge-primary badge-outline font-medium">
+              {task.task_type}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="btn btn-ghost btn-sm btn-square hover:rotate-90 transition-transform"
+          >
+            <BsX className="text-xl" />
+          </button>
+        </div>
+        <div className="p-8 overflow-y-auto">
+          {task.description && (
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-base-content/80">
+                <BsInfoCircle className="text-lg" />
+                Description
+              </h3>
+              <p className="text-base-content/70 leading-relaxed">
+                {task.description}
+              </p>
+            </div>
+          )}
+
+          {Object.keys(task.input_parameters || {}).length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-base-content/80">
+                <BsArrowDownSquare className="text-lg" />
+                Input Parameters
+              </h3>
+              <div className="bg-base-200/50 rounded-xl p-6 border border-base-300">
+                {renderParameters(task.input_parameters)}
+              </div>
+            </div>
+          )}
+
+          {Object.keys(task.output_parameters || {}).length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-base-content/80">
+                <BsArrowUpSquare className="text-lg" />
+                Output Parameters
+              </h3>
+              <div className="bg-base-200/50 rounded-xl p-6 border border-base-300">
+                {renderParameters(task.output_parameters)}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function TasksPage() {
   const { data: tasksData } = useFetchAllTasks();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [selectedTask, setSelectedTask] = useState<TaskResponse | null>(null);
 
   // Group tasks by type
   const groupedTasks =
@@ -26,7 +154,10 @@ export default function TasksPage() {
     ) || {};
 
   const TaskCard = ({ task }: { task: TaskResponse }) => (
-    <div className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 group h-full">
+    <div
+      className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 group h-full cursor-pointer hover:scale-[1.02]"
+      onClick={() => setSelectedTask(task)}
+    >
       <div className="card-body flex flex-col p-4">
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2 items-start">
@@ -43,17 +174,15 @@ export default function TasksPage() {
             </p>
           )}
         </div>
-        <div className="card-actions justify-end mt-auto pt-4">
-          <button className="btn btn-ghost btn-sm group-hover:text-primary transition-colors">
-            View Details <BsArrowRight className="ml-2" />
-          </button>
-        </div>
       </div>
     </div>
   );
 
   const TaskRow = ({ task }: { task: TaskResponse }) => (
-    <div className="bg-base-100 p-4 rounded-lg shadow hover:shadow-md transition-all duration-300 group">
+    <div
+      className="bg-base-100 p-4 rounded-lg shadow hover:shadow-md transition-all duration-300 group cursor-pointer hover:scale-[1.01]"
+      onClick={() => setSelectedTask(task)}
+    >
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -70,9 +199,6 @@ export default function TasksPage() {
             </p>
           )}
         </div>
-        <button className="btn btn-ghost btn-sm group-hover:text-primary transition-colors shrink-0">
-          View Details <BsArrowRight className="ml-2" />
-        </button>
       </div>
     </div>
   );
@@ -125,6 +251,13 @@ export default function TasksPage() {
             </div>
           </div>
         ))}
+
+        {selectedTask && (
+          <TaskDetailModal
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+          />
+        )}
 
         {!tasksData?.data?.tasks?.length && (
           <div className="alert alert-info">

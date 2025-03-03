@@ -2,6 +2,7 @@ from typing import ClassVar
 
 from qcflow.protocols.base import (
     BaseTask,
+    InputParameter,
     OutputParameter,
     PostProcessResult,
     PreProcessResult,
@@ -15,15 +16,13 @@ class CheckCrossResonance(BaseTask):
 
     name: str = "CheckCrossResonance"
     task_type: str = "coupling"
+    input_parameters: ClassVar[dict[str, InputParameter]] = {}
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "cr_amplitude": OutputParameter(unit="", description="Amplitude of the CR pulse."),
         "cr_phase": OutputParameter(unit="", description="Phase of the CR pulse."),
         "cancel_amplitude": OutputParameter(unit="", description="Amplitude of the cancel pulse."),
         "cancel_phase": OutputParameter(unit="", description="Phase of the cancel pulse."),
     }
-
-    def __init__(self) -> None:
-        pass
 
     # @staticmethod
     # def determine_cr_pair(exp: Experiment):

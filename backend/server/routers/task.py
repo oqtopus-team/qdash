@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 from neodbmodel.initialize import initialize
@@ -17,12 +17,23 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
+class InputParameter(BaseModel):
+    """Input parameter class."""
+
+    unit: str = ""
+    value_type: str = "float"
+    value: tuple | int | float | None = None
+    description: str = ""
+
+
 class TaskResponse(BaseModel):
     """Response model for a task."""
 
     name: str
     description: str
     task_type: str
+    input_parameters: dict[str, InputParameter]
+    output_parameters: dict[str, InputParameter]
 
 
 class ListTaskResponse(BaseModel):
@@ -59,6 +70,12 @@ def fetch_all_tasks(
                 name=task.name,
                 description=task.description,
                 task_type=task.task_type,
+                input_parameters={
+                    name: InputParameter(**param) for name, param in task.input_parameters.items()
+                },
+                output_parameters={
+                    name: InputParameter(**param) for name, param in task.output_parameters.items()
+                },
             )
             for task in tasks
         ]

@@ -3,6 +3,7 @@ from typing import ClassVar
 from qcflow.cal_util import qid_to_label
 from qcflow.protocols.base import (
     BaseTask,
+    InputParameter,
     OutputParameter,
     PostProcessResult,
     PreProcessResult,
@@ -16,10 +17,8 @@ class CheckDRAGPIPulse(BaseTask):
 
     name: str = "CheckDRAGPIPulse"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, InputParameter]] = {}
     output_parameters: ClassVar[dict[str, OutputParameter]] = {}
-
-    def __init__(self) -> None:
-        pass
 
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
         pass

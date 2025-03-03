@@ -5,6 +5,7 @@ from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
 from qcflow.protocols.base import (
     BaseTask,
+    InputParameter,
     OutputParameter,
     PostProcessResult,
     PreProcessResult,
@@ -19,35 +20,32 @@ class CheckT1(BaseTask):
 
     name: str = "CheckT1"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, InputParameter]] = {
+        "time_range": InputParameter(
+            unit="ns",
+            value_type="np.logspace",
+            value=(np.log10(100), np.log10(500 * 1000), 51),
+            description="Time range for T1 time",
+        ),
+        "shots": InputParameter(
+            unit="",
+            value_type="int",
+            value=DEFAULT_SHOTS,
+            description="Number of shots for T1 time",
+        ),
+        "interval": InputParameter(
+            unit="ns",
+            value_type="int",
+            value=DEFAULT_INTERVAL,
+            description="Time interval for T1 time",
+        ),
+    }
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "t1": OutputParameter(unit="ns", description="T1 time"),
     }
 
-    def __init__(
-        self,
-        time_range=None,  # noqa: ANN001
-        shots=DEFAULT_SHOTS,  # noqa: ANN001
-        interval=DEFAULT_INTERVAL,  # noqa: ANN001
-    ) -> None:
-        if time_range is None:
-            time_range = np.logspace(
-                np.log10(100),
-                np.log10(500 * 1000),
-                51,
-            )
-        self.input_parameters = {
-            "time_range": time_range,
-            "shots": shots,
-            "interval": interval,
-        }
-
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
-        input_param = {
-            "time_range": self.input_parameters["time_range"],
-            "shots": self.input_parameters["shots"],
-            "interval": self.input_parameters["interval"],
-        }
-        return PreProcessResult(input_parameters=input_param)
+        return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = qid_to_label(qid)
@@ -67,9 +65,9 @@ class CheckT1(BaseTask):
     def run(self, exp: Experiment, qid: str) -> RunResult:
         labels = [qid_to_label(qid)]
         result = exp.t1_experiment(
-            time_range=self.input_parameters["time_range"],
-            shots=self.input_parameters["shots"],
-            interval=self.input_parameters["interval"],
+            time_range=self.input_parameters["time_range"].get_value(),
+            shots=self.input_parameters["shots"].get_value(),
+            interval=self.input_parameters["interval"].get_value(),
             targets=labels,
         )
         exp.calib_note.save()

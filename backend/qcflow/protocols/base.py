@@ -1,10 +1,61 @@
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Literal
 
+import numpy as np
 import plotly.graph_objs as go
 from datamodel.task import DataModel
 from pydantic import BaseModel
 from qubex.experiment import Experiment
+
+
+class InputParameter(BaseModel):
+    """Input parameter class."""
+
+    unit: str = ""
+    value_type: str = "float"
+    value: tuple | int | float | None = None
+    description: str = ""
+
+    def get_value(self) -> Any:
+        """Get the actual value based on value_type.
+
+        Returns
+        -------
+            The converted value based on value_type
+
+        """
+        if self.value_type == "np.linspace":
+            if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
+                raise ValueError("np.linspace requires a tuple/list of (start, stop, num)")
+            start, stop, num = self.value
+            return np.linspace(float(start), float(stop), int(num))
+        elif self.value_type == "np.logspace":
+            if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
+                raise ValueError("np.logspace requires a tuple/list of (start, stop, num)")
+            start, stop, num = self.value
+            return np.logspace(float(start), float(stop), int(num))
+        elif self.value_type == "np.arange":
+            if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
+                raise ValueError("np.arange requires a tuple/list of (start, stop, step)")
+            start, stop, step = self.value
+            return np.arange(float(start), float(stop), float(step))
+        elif self.value_type == "range":
+            if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
+                raise ValueError("range requires a tuple/list of (start, stop, step)")
+            start, stop, step = self.value
+            return range(int(start), int(stop), int(step))
+        elif self.value_type == "int":
+            if isinstance(self.value, str) and "*" in self.value:
+                # Handle expressions like "150 * 1024"
+                parts = [int(p.strip()) for p in self.value.split("*")]
+                result = 1
+                for p in parts:
+                    result *= p
+                return result
+            return int(self.value)
+        elif self.value_type == "float":
+            return float(self.value)
+        return self.value
 
 
 class OutputParameter(BaseModel):
@@ -44,6 +95,7 @@ class BaseTask(ABC):
 
     name: str = ""
     task_type: Literal["global", "qubit", "coupling"]
+    input_parameters: ClassVar[dict[str, InputParameter]] = {}
     output_parameters: ClassVar[dict[str, OutputParameter]] = {}
     registry: ClassVar[dict] = {}
 
@@ -52,11 +104,66 @@ class BaseTask(ABC):
         super().__init_subclass__(**kwargs)
         BaseTask.registry[cls.__name__] = cls
 
-    @abstractmethod
-    def __init__(
-        self,
-    ) -> None:
-        pass
+    def __init__(self, params: dict[str, Any] | None = None) -> None:
+        """Initialize task with parameters.
+
+        Args:
+        ----
+            params: Optional dictionary containing task parameters
+
+        """
+        if params is not None:
+            self._convert_and_set_parameters(params)
+
+    def _convert_value_to_type(self, value: Any, value_type: str) -> Any:
+        """Convert value to the specified type.
+
+        Args:
+        ----
+            value: Value to convert
+            value_type: Target type
+
+        Returns:
+        -------
+            Converted value
+
+        """
+        if value_type in ["np.linspace", "np.logspace", "np.arange", "range"]:
+            if isinstance(value, (list, tuple)) and len(value) == 3:
+                return tuple(value)  # Convert to tuple for storage
+            raise ValueError(f"{value_type} requires a tuple/list of 3 values")
+        elif value_type == "int":
+            if isinstance(value, str) and "*" in value:
+                # Handle expressions like "150 * 1024"
+                parts = [int(p.strip()) for p in value.split("*")]
+                result = 1
+                for p in parts:
+                    result *= p
+                return result
+            return int(value)
+        elif value_type == "float":
+            return float(value)
+        return value
+
+    def _convert_and_set_parameters(self, params: dict[str, Any]) -> None:
+        """Convert and set parameters from dictionary.
+
+        Args:
+        ----
+            params: Dictionary containing task parameters
+
+        """
+        if "input_parameters" in params:
+            input_params = params["input_parameters"]
+            for name, param_data in input_params.items():
+                if name in self.input_parameters:
+                    value = param_data.get("value")
+                    if value is not None:
+                        value_type = param_data.get(
+                            "value_type", self.input_parameters[name].value_type
+                        )
+                        converted_value = self._convert_value_to_type(value, value_type)
+                        self.input_parameters[name].value = converted_value
 
     @abstractmethod
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:

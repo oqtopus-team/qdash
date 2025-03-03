@@ -1,5 +1,5 @@
 import logging
-from typing import ClassVar
+from typing import ClassVar, Optional
 
 from bunnet import Document
 from datamodel.task import TaskModel
@@ -24,6 +24,8 @@ class TaskDocument(Document):
     name: str = Field(..., description="The name of the task")
     description: str = Field(..., description="Detailed description of the task")
     task_type: str = Field(..., description="The type of the task")
+    input_parameters: Optional[dict] = Field(None, description="The input parameters")
+    output_parameters: Optional[dict] = Field(None, description="The output parameters")
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -73,6 +75,8 @@ class TaskDocument(Document):
                 doc.username = task.username
                 doc.task_type = task.task_type
                 doc.description = task.description
+                doc.input_parameters = task.input_parameters
+                doc.output_parameters = task.output_parameters
                 doc.save()
                 logger.debug(f"Task {task.name} updated with new values.")
             inserted_documents.append(doc)

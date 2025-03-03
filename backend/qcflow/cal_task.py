@@ -2,18 +2,24 @@ from datamodel.task import CouplingTaskModel, GlobalTaskModel, QubitTaskModel, T
 from neodbmodel.execution_history import ExecutionHistoryDocument
 from neodbmodel.initialize import initialize
 from neodbmodel.qubit import QubitDocument
+from neodbmodel.task import TaskDocument
+
+# from neodbmodel.task import TaskDocument
 from neodbmodel.task_result_history import TaskResultHistoryDocument
 from prefect import get_run_logger, task
+from protocols.base import BaseTask
 from qcflow.manager.execution import ExecutionManager
 from qcflow.manager.task import TaskManager
-from qcflow.protocols.active_protocols import task_classes
+from qcflow.protocols.active_protocols import generate_task_instances
 from qubex.experiment import Experiment
 
 
 def validate_task_name(task_names: list[str]) -> list[str]:
     """Validate task names."""
+    tasks = TaskDocument.find({"username": "admin"}).run()
+    task_list = [task.name for task in tasks]
     for task_name in task_names:
-        if task_name not in task_classes:
+        if task_name not in task_list:
             raise ValueError(f"Invalid task name: {task_name}")
     return task_names
 
@@ -27,10 +33,10 @@ def build_workflow(
     global_previous_task_id = ""
     qubit_previous_task_id = {qubit: "" for qubit in qubits}
     coupling_previous_task_id = {qubit: "" for qubit in qubits}
+    task_instances = generate_task_instances(task_names=task_names)
     for name in task_names:
-        if name in task_classes:
-            this_task = task_classes[name]
-
+        if name in task_instances:
+            this_task = task_instances[name]
             if this_task.is_global_task():
                 task = GlobalTaskModel(name=name, upstream_id=global_previous_task_id)
                 task_result.global_tasks.append(task)
@@ -61,18 +67,19 @@ def build_workflow(
 initialize()
 
 
-@task(name="execute-dynamic-task", task_run_name="{task_name}")
+@task(name="execute-dynamic-task", task_run_name="{task_instance.name}")
 def execute_dynamic_task_by_qid(
     exp: Experiment,
     task_manager: TaskManager,
-    task_name: str,
+    task_instance: BaseTask,
     qid: str,
 ) -> TaskManager:
     """Execute dynamic task."""
     logger = get_run_logger()
     task_manager.diagnose()
     try:
-        this_task = task_classes[task_name]
+        this_task = task_instance
+        task_name = this_task.get_name()
         task_type = this_task.get_task_type()
         execution_id = task_manager.execution_id
         execution_manager = ExecutionManager.load_from_file(task_manager.calib_dir)

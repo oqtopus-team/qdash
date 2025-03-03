@@ -1,10 +1,10 @@
 from typing import ClassVar
 
-import numpy as np
 from datamodel.task import DataModel
 from qcflow.cal_util import qid_to_label
 from qcflow.protocols.base import (
     BaseTask,
+    InputParameter,
     OutputParameter,
     PostProcessResult,
     PreProcessResult,
@@ -20,6 +20,32 @@ class RandomizedBenchmarking(BaseTask):
 
     name: str = "RandomizedBenchmarking"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, InputParameter]] = {
+        "n_cliffords_range": InputParameter(
+            unit="a.u.",
+            value_type="np.arange",
+            value=(0, 1001, 100),
+            description="Number of cliffords range",
+        ),
+        "n_trials": InputParameter(
+            unit="a.u.",
+            value_type="int",
+            value=30,
+            description="Number of trials",
+        ),
+        "shots": InputParameter(
+            unit="a.u.",
+            value_type="int",
+            value=CALIBRATION_SHOTS,
+            description="Number of shots",
+        ),
+        "interval": InputParameter(
+            unit="ns",
+            value_type="int",
+            value=DEFAULT_INTERVAL,
+            description="Time interval",
+        ),
+    }
     output_parameters: ClassVar[dict[str, OutputParameter]] = {
         "average_gate_fidelity": OutputParameter(
             unit="",
@@ -27,31 +53,8 @@ class RandomizedBenchmarking(BaseTask):
         ),
     }
 
-    def __init__(
-        self,
-        shots=CALIBRATION_SHOTS,  # noqa: ANN001
-        interval=DEFAULT_INTERVAL,  # noqa: ANN001
-        n_cliffords_range=None,  # noqa: ANN001
-        n_trials=30,  # noqa: ANN001
-    ) -> None:
-        if n_cliffords_range is None:
-            n_cliffords_range = np.arange(0, 1001, 100)
-
-        self.input_parameters = {
-            "n_cliffords_range": n_cliffords_range,
-            "n_trials": n_trials,
-            "shots": shots,
-            "interval": interval,
-        }
-
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
-        input_param = {
-            "n_cliffords_range": self.input_parameters["n_cliffords_range"],
-            "n_trials": self.input_parameters["n_trials"],
-            "shots": self.input_parameters["shots"],
-            "interval": self.input_parameters["interval"],
-        }
-        return PreProcessResult(input_parameters=input_param)
+        return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:  # noqa: ARG002
         result = run_result.raw_result
@@ -71,12 +74,12 @@ class RandomizedBenchmarking(BaseTask):
         label = qid_to_label(qid)
         result = exp.randomized_benchmarking(
             target=label,
-            n_cliffords_range=self.input_parameters["n_cliffords_range"],
-            n_trials=self.input_parameters["n_trials"],
+            n_cliffords_range=self.input_parameters["n_cliffords_range"].get_value(),
+            n_trials=self.input_parameters["n_trials"].get_value(),
             x90=exp.drag_hpi_pulse[label],
             save_image=False,
-            shots=self.input_parameters["shots"],
-            interval=self.input_parameters["interval"],
+            shots=self.input_parameters["shots"].get_value(),
+            interval=self.input_parameters["interval"].get_value(),
         )
         exp.calib_note.save()
         return RunResult(raw_result=result)
