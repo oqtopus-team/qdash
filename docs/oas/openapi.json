@@ -2178,6 +2178,33 @@
           }
         }
       }
+    },
+    "/tasks": {
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Fetch all tasks",
+        "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
+        "operationId": "fetch_all_tasks",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTaskResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3049,6 +3076,23 @@
         "title": "ListMuxResponse",
         "description": "ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers."
       },
+      "ListTaskResponse": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskResponse"
+            },
+            "type": "array",
+            "title": "Tasks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tasks"
+        ],
+        "title": "ListTaskResponse",
+        "description": "Response model for a list of tasks."
+      },
       "MenuModel": {
         "properties": {
           "name": {
@@ -3605,6 +3649,30 @@
           "fig_path"
         ],
         "title": "Stats"
+      },
+      "TaskResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "task_type": {
+            "type": "string",
+            "title": "Task Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "task_type"
+        ],
+        "title": "TaskResponse",
+        "description": "Response model for a task."
       },
       "Token": {
         "properties": {
@@ -4221,6 +4289,14 @@
     {
       "name": "settings",
       "description": "Settings operations"
+    },
+    {
+      "name": "task",
+      "description": "Task operations"
+    },
+    {
+      "name": "executionV2",
+      "description": "Execution V2 operations"
     }
   ]
 }

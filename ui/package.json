@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "fmt": "eslint . --fix",
+    "fmt": "eslint . --fix -c eslint.config.js",
     "generate-qdash": "curl http://localhost:5715/openapi.json | jq > ../docs/openapi/qdash-openapi.json && openapi-typescript ../docs/openapi/qdash-openapi.json -o ./src/qdash.d.ts"
   },
   "dependencies": {

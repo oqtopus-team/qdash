@@ -2,10 +2,14 @@
 
 import { useState } from "react";
 import { useListChips, useListMuxes } from "@/client/chip/chip";
+import { useFetchAllTasks } from "@/client/task/task";
 import { BsGrid, BsListUl } from "react-icons/bs";
-import { ServerRoutersChipTask, MuxDetailResponseDetail } from "@/schemas";
+import {
+  ServerRoutersChipTask,
+  MuxDetailResponseDetail,
+  TaskResponse,
+} from "@/schemas";
 import { TaskResultGrid } from "./components/TaskResultGrid";
-
 type ViewMode = "chip" | "mux";
 
 interface SelectedTaskInfo {
@@ -22,8 +26,10 @@ export default function ChipPage() {
   }>({});
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
+  const [selectedTask, setSelectedTask] = useState<string>("CheckRabi");
 
   const { data: chips } = useListChips();
+  const { data: tasks } = useFetchAllTasks();
   const {
     data: muxData,
     isLoading,
@@ -115,6 +121,17 @@ export default function ChipPage() {
     }));
   };
 
+  // Get qubit tasks
+  const qubitTasks =
+    tasks?.data?.tasks?.filter(
+      (task: TaskResponse) => task.task_type === "qubit"
+    ) || [];
+
+  // Set first qubit task as default if none selected and qubit tasks available
+  if (selectedTask === "" && qubitTasks.length > 0) {
+    setSelectedTask(qubitTasks[0].name);
+  }
+
   return (
     <div className="w-full px-6 py-6" style={{ width: "calc(100vw - 20rem)" }}>
       <div className="space-y-6">
@@ -144,19 +161,34 @@ export default function ChipPage() {
             </div>
           </div>
 
-          {/* Chip Selection */}
-          <select
-            className="select select-bordered w-full max-w-xs rounded-lg"
-            value={selectedChip}
-            onChange={(e) => setSelectedChip(e.target.value)}
-          >
-            <option value="">Select a chip</option>
-            {chips?.data.map((chip) => (
-              <option key={chip.chip_id} value={chip.chip_id}>
-                {chip.chip_id}
-              </option>
-            ))}
-          </select>
+          {/* Selection Controls */}
+          <div className="flex gap-4">
+            <select
+              className="select select-bordered w-full max-w-xs rounded-lg"
+              value={selectedChip}
+              onChange={(e) => setSelectedChip(e.target.value)}
+            >
+              <option value="">Select a chip</option>
+              {chips?.data.map((chip) => (
+                <option key={chip.chip_id} value={chip.chip_id}>
+                  {chip.chip_id}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="select select-bordered w-full max-w-xs rounded-lg"
+              value={selectedTask}
+              onChange={(e) => setSelectedTask(e.target.value)}
+              disabled={viewMode !== "chip"}
+            >
+              {qubitTasks.map((task: TaskResponse) => (
+                <option key={task.name} value={task.name}>
+                  {task.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Content Section */}
@@ -200,7 +232,7 @@ export default function ChipPage() {
               <span>Select a chip to view data</span>
             </div>
           ) : viewMode === "chip" ? (
-            <TaskResultGrid chipId={selectedChip} />
+            <TaskResultGrid chipId={selectedChip} selectedTask={selectedTask} />
           ) : (
             <div className="space-y-4">
               {Object.entries(muxData.data.muxes).map(([muxId, muxDetail]) => {
@@ -248,8 +280,12 @@ export default function ChipPage() {
                       <div className="p-4 border-t">
                         {/* Task Results Grid */}
                         <div className="space-y-6">
-                          {Object.entries(getTaskGroups(muxDetail.detail)).map(
-                            ([taskName, qidResults]) => (
+                          {Object.entries(getTaskGroups(muxDetail.detail))
+                            .filter(
+                              ([taskName]) =>
+                                !selectedTask || taskName === selectedTask
+                            )
+                            .map(([taskName, qidResults]) => (
                               <div
                                 key={taskName}
                                 className="border-t pt-4 first:border-t-0 first:pt-0"
@@ -335,8 +371,7 @@ export default function ChipPage() {
                                   })}
                                 </div>
                               </div>
-                            )
-                          )}
+                            ))}
                         </div>
                       </div>
                     )}
