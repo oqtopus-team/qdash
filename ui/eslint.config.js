@@ -17,7 +17,7 @@ module.exports = [
       },
       parser: require("@typescript-eslint/parser"),
     },
-    ignores: ["dist", ".eslintrc.cjs"],
+    ignores: ["node_modules/**", ".next/**"],
     plugins: {
       import: importPlugin,
       "react-hooks": reactHooks,

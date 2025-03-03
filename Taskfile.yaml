@@ -11,7 +11,7 @@ tasks:
       - curl http://localhost:5715/openapi.json | jq > ../docs/oas/openapi.json
       - npx orval --config ./orval.config.cjs
       - npx prettier . --write
-      - npx eslint . --fix
+      - npm run fmt
     desc: Generate the client
 
   docs:

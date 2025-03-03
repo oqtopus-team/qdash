@@ -9,6 +9,7 @@ import {
 
 interface TaskResultGridProps {
   chipId: string;
+  selectedTask: string;
 }
 
 interface SelectedTaskInfo {
@@ -17,10 +18,9 @@ interface SelectedTaskInfo {
   task: ServerRoutersChipTask;
 }
 
-export function TaskResultGrid({ chipId }: TaskResultGridProps) {
+export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
-  const [selectedTask, setSelectedTask] = useState<string>("CheckRabi");
 
   // For SAMPLE chip, create an 8x8 grid
   const gridSize = 8;
@@ -72,44 +72,8 @@ export function TaskResultGrid({ chipId }: TaskResultGridProps) {
     return task.figure_path;
   };
 
-  // Get available tasks
-  const availableTasks = useMemo(() => {
-    if (!chipResponse?.data?.qubits) return [];
-    const tasks = new Set<string>();
-
-    Object.values(chipResponse.data.qubits).forEach((qubit: any) => {
-      if (qubit?.data) {
-        Object.entries(qubit.data).forEach(
-          ([taskName, task]: [string, any]) => {
-            if (task.status === "completed" || task.status === "failed") {
-              tasks.add(taskName);
-            }
-          }
-        );
-      }
-    });
-
-    return Array.from(tasks).sort();
-  }, [chipResponse]);
-
   return (
     <div className="space-y-6">
-      {/* Task Selection */}
-      <div className="flex items-center gap-4">
-        <label className="font-medium">Task:</label>
-        <select
-          className="select select-bordered w-64"
-          value={selectedTask}
-          onChange={(e) => setSelectedTask(e.target.value)}
-        >
-          {availableTasks.map((task) => (
-            <option key={task} value={task}>
-              {task}
-            </option>
-          ))}
-        </select>
-      </div>
-
       {/* Grid Display */}
       <div className="grid grid-cols-8 gap-2 p-4 bg-base-200/50 rounded-xl">
         {Array.from({ length: gridSize * gridSize }).map((_, index) => {

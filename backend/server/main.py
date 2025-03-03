@@ -37,6 +37,7 @@ from server.routers import (
     menu,
     qpu,
     settings,
+    task,
 )
 
 
@@ -107,6 +108,8 @@ app = FastAPI(
         {"name": "menu", "description": "Menu operations"},
         {"name": "qpu", "description": "QPU operations"},
         {"name": "settings", "description": "Settings operations"},
+        {"name": "task", "description": "Task operations"},
+        {"name": "executionV2", "description": "Execution V2 operations"},
     ],
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
     openapi_extra={
@@ -145,3 +148,4 @@ app.include_router(execution_v2.router, tags=["executionV2"])
 app.include_router(chip.router, tags=["chip"])
 app.include_router(file.router, tags=["file"])
 app.include_router(auth.router, tags=["auth", "authentication"])
+app.include_router(task.router, tags=["task"])
