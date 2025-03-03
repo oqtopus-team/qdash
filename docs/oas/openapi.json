@@ -2304,6 +2304,17 @@
             ],
             "title": "Tasks"
           },
+          "task_details": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Details"
+          },
           "tags": {
             "anyOf": [
               {
@@ -2327,7 +2338,34 @@
           "qids"
         ],
         "title": "CreateMenuRequest",
-        "description": "CreateMenuRequest is a Pydantic model for creating a menu item."
+        "description": "CreateMenuRequest is a Pydantic model for creating a menu item.",
+        "example": {
+          "description": "This is a sample menu item.",
+          "name": "CheckOneQubit",
+          "notify_bool": false,
+          "qids": [
+            [
+              "28",
+              "29"
+            ]
+          ],
+          "tags": [
+            "debug"
+          ],
+          "tasks": [
+            "CheckStatus",
+            "DumpBox",
+            "CheckNoise",
+            "CheckRabi",
+            "CreateHPIPulse",
+            "CheckHPIPulse",
+            "CreatePIPulse",
+            "CheckPIPulse",
+            "CheckT1",
+            "CheckT2Echo"
+          ],
+          "username": "admin"
+        }
       },
       "CreateMenuResponse": {
         "properties": {
@@ -2950,6 +2988,17 @@
             ],
             "title": "Tasks"
           },
+          "task_details": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Details"
+          },
           "tags": {
             "anyOf": [
               {
@@ -3175,6 +3224,17 @@
               }
             ],
             "title": "Tasks"
+          },
+          "task_details": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Details"
           },
           "tags": {
             "anyOf": [
@@ -3869,6 +3929,17 @@
               }
             ],
             "title": "Tasks"
+          },
+          "task_details": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Details"
           },
           "tags": {
             "anyOf": [

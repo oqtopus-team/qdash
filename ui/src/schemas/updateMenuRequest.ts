@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { UpdateMenuRequestTasks } from "./updateMenuRequestTasks";
+import type { UpdateMenuRequestTaskDetails } from "./updateMenuRequestTaskDetails";
 import type { UpdateMenuRequestTags } from "./updateMenuRequestTags";
 
 /**
@@ -18,5 +19,6 @@ export interface UpdateMenuRequest {
   qids: string[][];
   notify_bool?: boolean;
   tasks?: UpdateMenuRequestTasks;
+  task_details?: UpdateMenuRequestTaskDetails;
   tags?: UpdateMenuRequestTags;
 }

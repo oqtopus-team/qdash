@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { GetMenuResponseTasks } from "./getMenuResponseTasks";
+import type { GetMenuResponseTaskDetails } from "./getMenuResponseTaskDetails";
 import type { GetMenuResponseTags } from "./getMenuResponseTags";
 
 /**
@@ -18,5 +19,6 @@ export interface GetMenuResponse {
   qids: string[][];
   notify_bool?: boolean;
   tasks?: GetMenuResponseTasks;
+  task_details?: GetMenuResponseTaskDetails;
   tags?: GetMenuResponseTags;
 }

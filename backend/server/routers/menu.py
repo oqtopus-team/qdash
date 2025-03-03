@@ -1,10 +1,12 @@
 from logging import getLogger
-from typing import Annotated
+from typing import Annotated, ClassVar
 
 from datamodel.menu import MenuModel
+from datamodel.task import TaskModel
 from fastapi import APIRouter, Depends
 from neodbmodel.initialize import initialize
 from neodbmodel.menu import MenuDocument
+from neodbmodel.task import TaskDocument
 from pydantic import BaseModel
 from server.lib.auth import get_current_active_user
 from server.schemas.auth import User
@@ -26,6 +28,31 @@ class ListMenuResponse(BaseModel):
 
 class CreateMenuRequest(MenuModel):
     """CreateMenuRequest is a Pydantic model for creating a menu item."""
+
+    model_config: ClassVar[dict] = {
+        "json_schema_extra": {
+            "example": {
+                "name": "CheckOneQubit",
+                "username": "admin",
+                "description": "This is a sample menu item.",
+                "qids": [["28", "29"]],
+                "notify_bool": False,
+                "tasks": [
+                    "CheckStatus",
+                    "DumpBox",
+                    "CheckNoise",
+                    "CheckRabi",
+                    "CreateHPIPulse",
+                    "CheckHPIPulse",
+                    "CreatePIPulse",
+                    "CheckPIPulse",
+                    "CheckT1",
+                    "CheckT2Echo",
+                ],
+                "tags": ["debug"],
+            }
+        }
+    }
 
 
 class CreateMenuResponse(BaseModel):
@@ -80,6 +107,7 @@ def list_menu(current_user: Annotated[User, Depends(get_current_active_user)]) -
             tasks=menu.tasks,
             notify_bool=menu.notify_bool,
             tags=menu.tags,
+            task_details=menu.task_details,
         )
         menu_list.append(menu_item)
     return ListMenuResponse(menus=menu_list)
@@ -108,6 +136,19 @@ def create_menu(
 
     """
     initialize()
+    task_details = {}
+    for task_name in request.tasks:
+        task_doc = TaskDocument.find_one({"name": task_name}).run()
+        task = TaskModel(
+            name=task_doc.name,
+            username=task_doc.username,
+            description=task_doc.description,
+            task_type=task_doc.task_type,
+            input_parameters=task_doc.input_parameters,
+            output_parameters=task_doc.output_parameters,
+        )
+        task_details[task_name] = task
+
     menu_doc = MenuDocument(
         name=request.name,
         username=current_user.username,
@@ -116,6 +157,7 @@ def create_menu(
         tasks=request.tasks,
         notify_bool=request.notify_bool,
         tags=request.tags,
+        task_details=task_details,
     )
     try:
         menu_doc.save()

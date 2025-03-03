@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { CreateMenuRequestTasks } from "./createMenuRequestTasks";
+import type { CreateMenuRequestTaskDetails } from "./createMenuRequestTaskDetails";
 import type { CreateMenuRequestTags } from "./createMenuRequestTags";
 
 /**
@@ -18,5 +19,6 @@ export interface CreateMenuRequest {
   qids: string[][];
   notify_bool?: boolean;
   tasks?: CreateMenuRequestTasks;
+  task_details?: CreateMenuRequestTaskDetails;
   tags?: CreateMenuRequestTags;
 }
