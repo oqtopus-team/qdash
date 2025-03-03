@@ -358,157 +358,158 @@ export default function MenuEditorPage() {
   }, [menuContent, selectedMenu]);
 
   return (
-    <div
-      className="flex h-screen overflow-hidden"
-      style={{ width: "calc(100vw - 20rem)" }}
-    >
-      {/* Menu Editor */}
-      <div className="flex-1 flex">
-        {/* File explorer */}
-        <div className="w-64 bg-base-200 border-r border-base-300 flex flex-col">
-          <div className="p-4 border-b border-base-300 flex justify-between items-center">
-            <h2 className="font-bold">MENUS</h2>
-            <button
-              className="btn btn-ghost btn-sm btn-square"
-              onClick={() => {
-                setSelectedMenu(null);
-                setSelectedTaskDetail(null);
-                setMenuContent("");
-                setTaskDetailContent("");
-              }}
-            >
-              <BsPlus className="text-xl" />
-            </button>
-          </div>
-          <div className="overflow-y-auto flex-1 p-2">
-            {menusData?.data?.menus?.map((menu) => (
-              <div
-                key={menu.name}
-                className={`p-2 rounded cursor-pointer hover:bg-base-300 flex items-center gap-2 ${
-                  selectedMenu?.name === menu.name ? "bg-base-300" : ""
-                }`}
-                onClick={() => handleMenuSelect(menu)}
-              >
-                <BsFileEarmarkText className="text-base-content/70" />
-                <span className="font-medium">{menu.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Editor */}
-        <div className="flex-1 flex flex-col">
-          {/* Editor toolbar */}
-          <div className="bg-base-200 border-b border-base-300 p-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {selectedMenu && (
-                <>
-                  <span className="font-medium">{selectedMenu.name}</span>
-                  <div className="badge badge-sm">json</div>
-                </>
-              )}
-            </div>
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={handleSave}
-              disabled={!selectedMenu}
-            >
-              Save
-            </button>
-          </div>
-
-          {/* Editor content */}
-          <div className="flex-1 overflow-hidden">
-            <Editor
-              defaultLanguage="json"
-              value={menuContent}
-              onChange={(value) => setMenuContent(value || "")}
-              options={{
-                minimap: { enabled: true },
-                scrollBeyondLastLine: false,
-                fontSize: 14,
-                lineNumbers: "on",
-                renderLineHighlight: "all",
-                automaticLayout: true,
-                tabSize: 2,
-                wordWrap: "on",
-                theme: "vs-dark",
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Task Detail Editor */}
-      <div className="flex-1 flex border-l border-base-300">
-        {/* File explorer */}
-        <div className="w-64 bg-base-200 border-r border-base-300 flex flex-col">
-          <div className="p-4 border-b border-base-300 flex justify-between items-center">
-            <h2 className="font-bold">TASK DETAILS</h2>
-            {selectedMenu && (
+    <div className="h-screen w-full">
+      <div className="flex flex-col md:flex-row h-full">
+        {/* Menu Editor */}
+        <div className="flex-1 md:w-[35%] flex flex-col md:flex-row h-1/2 md:h-full min-w-0">
+          {/* File explorer */}
+          <div className="w-full md:w-48 h-48 md:h-full bg-base-200 border-r border-base-300 flex flex-col shrink-0 overflow-hidden">
+            <div className="p-4 border-b border-base-300 flex justify-between items-center">
+              <h2 className="font-bold">MENUS</h2>
               <button
                 className="btn btn-ghost btn-sm btn-square"
-                onClick={() => setIsTaskSelectOpen(true)}
+                onClick={() => {
+                  setSelectedMenu(null);
+                  setSelectedTaskDetail(null);
+                  setMenuContent("");
+                  setTaskDetailContent("");
+                }}
               >
                 <BsPlus className="text-xl" />
               </button>
-            )}
-          </div>
-          {selectedMenu?.task_details && (
-            <TaskDetailList
-              tasks={selectedMenu.task_details}
-              selectedTask={selectedTaskDetail}
-              onTaskSelect={handleTaskDetailSelect}
-              onDragEnd={handleDragEnd}
-            />
-          )}
-        </div>
-
-        {/* Editor */}
-        <div className="flex-1 flex flex-col">
-          {/* Editor toolbar */}
-          <div className="bg-base-200 border-b border-base-300 p-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {selectedMenu && selectedTaskDetail && (
-                <>
-                  <span className="font-medium">{selectedMenu.name}</span>
-                  <span className="text-base-content/70">/</span>
-                  <span className="font-medium">{selectedTaskDetail}</span>
-                  <div className="badge badge-sm">json</div>
-                </>
-              )}
+            </div>
+            <div className="overflow-y-auto flex-1 p-2">
+              {menusData?.data?.menus?.map((menu) => (
+                <div
+                  key={menu.name}
+                  className={`p-2 rounded cursor-pointer hover:bg-base-300 flex items-center gap-2 ${
+                    selectedMenu?.name === menu.name ? "bg-base-300" : ""
+                  }`}
+                  onClick={() => handleMenuSelect(menu)}
+                >
+                  <BsFileEarmarkText className="text-base-content/70" />
+                  <span className="font-medium">{menu.name}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Editor content */}
-          <div className="flex-1 overflow-hidden">
-            <Editor
-              defaultLanguage="json"
-              value={taskDetailContent}
-              onChange={(value) => setTaskDetailContent(value || "")}
-              options={{
-                minimap: { enabled: true },
-                scrollBeyondLastLine: false,
-                fontSize: 14,
-                lineNumbers: "on",
-                renderLineHighlight: "all",
-                automaticLayout: true,
-                tabSize: 2,
-                wordWrap: "on",
-                theme: "vs-dark",
-              }}
-            />
+          {/* Editor */}
+          <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+            {/* Editor toolbar */}
+            <div className="bg-base-200 border-b border-base-300 p-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {selectedMenu && (
+                  <>
+                    <span className="font-medium">{selectedMenu.name}</span>
+                    <div className="badge badge-sm">json</div>
+                  </>
+                )}
+              </div>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleSave}
+                disabled={!selectedMenu}
+              >
+                Save
+              </button>
+            </div>
+
+            {/* Editor content */}
+            <div className="flex-1 overflow-hidden">
+              <Editor
+                defaultLanguage="json"
+                value={menuContent}
+                onChange={(value) => setMenuContent(value || "")}
+                options={{
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 14,
+                  lineNumbers: "on",
+                  renderLineHighlight: "all",
+                  automaticLayout: true,
+                  tabSize: 2,
+                  wordWrap: "on",
+                  theme: "vs-dark",
+                }}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Task Select Modal */}
-      {isTaskSelectOpen && (
-        <TaskSelectModal
-          onClose={() => setIsTaskSelectOpen(false)}
-          onSelect={handleAddTaskDetail}
-        />
-      )}
+        {/* Task Detail Editor */}
+        <div className="flex-1 md:w-[65%] flex flex-col md:flex-row h-1/2 md:h-full border-t md:border-t-0 md:border-l border-base-300 min-w-0">
+          {/* File explorer */}
+          <div className="w-full md:w-48 h-48 md:h-full bg-base-200 border-r border-base-300 flex flex-col shrink-0 overflow-hidden">
+            <div className="p-4 border-b border-base-300 flex justify-between items-center">
+              <h2 className="font-bold">TASK DETAILS</h2>
+              {selectedMenu && (
+                <button
+                  className="btn btn-ghost btn-sm btn-square"
+                  onClick={() => setIsTaskSelectOpen(true)}
+                >
+                  <BsPlus className="text-xl" />
+                </button>
+              )}
+            </div>
+            {selectedMenu?.task_details && (
+              <div className="flex-1 overflow-hidden">
+                <TaskDetailList
+                  tasks={selectedMenu.task_details}
+                  selectedTask={selectedTaskDetail}
+                  onTaskSelect={handleTaskDetailSelect}
+                  onDragEnd={handleDragEnd}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Editor */}
+          <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+            {/* Editor toolbar */}
+            <div className="bg-base-200 border-b border-base-300 p-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {selectedMenu && selectedTaskDetail && (
+                  <>
+                    <span className="font-medium">{selectedMenu.name}</span>
+                    <span className="text-base-content/70">/</span>
+                    <span className="font-medium">{selectedTaskDetail}</span>
+                    <div className="badge badge-sm">json</div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Editor content */}
+            <div className="flex-1 overflow-hidden">
+              <Editor
+                defaultLanguage="json"
+                value={taskDetailContent}
+                onChange={(value) => setTaskDetailContent(value || "")}
+                options={{
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 14,
+                  lineNumbers: "on",
+                  renderLineHighlight: "all",
+                  automaticLayout: true,
+                  tabSize: 2,
+                  wordWrap: "on",
+                  theme: "vs-dark",
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Task Select Modal */}
+        {isTaskSelectOpen && (
+          <TaskSelectModal
+            onClose={() => setIsTaskSelectOpen(false)}
+            onSelect={handleAddTaskDetail}
+          />
+        )}
+      </div>
     </div>
   );
 }
