@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { FaScrewdriverWrench } from "react-icons/fa6";
+import { BsListTask } from "react-icons/bs";
 import { GoWorkflow } from "react-icons/go";
 import { FaBolt } from "react-icons/fa6";
 import { IoMdSettings } from "react-icons/io";
@@ -40,6 +41,19 @@ function Sidebar() {
             >
               <BsCpu />
               <span className="ml-2">Chip</span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/tasks"
+              className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
+                isActive("/tasks")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
+              }`}
+            >
+              <BsListTask />
+              <span className="ml-2">Tasks</span>
             </Link>
           </li>
           <li>
