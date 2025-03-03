@@ -6,7 +6,6 @@ import { CreateMenuRequest, GetMenuResponse, TaskResponse } from "@/schemas";
 import { useState, useRef, useEffect } from "react";
 import Editor from "@monaco-editor/react";
 import { BsPlus, BsFolder, BsFileEarmarkText } from "react-icons/bs";
-import { DropResult } from "react-beautiful-dnd";
 import TaskDetailList from "./TaskDetailList";
 
 interface TaskSelectModalProps {
@@ -255,7 +254,7 @@ export default function MenuEditorPage() {
   };
 
   // ドラッグアンドドロップの処理
-  const handleDragEnd = (result: DropResult) => {
+  const handleDragEnd = (result: any) => {
     if (!result.destination || !selectedMenu) return;
 
     try {
@@ -358,15 +357,17 @@ export default function MenuEditorPage() {
   }, [menuContent, selectedMenu]);
 
   return (
-    <div className="min-h-screen w-full p-4 md:p-6 bg-base-300">
-      <div className="container mx-auto max-w-[1600px]">
-        <div className="flex flex-col md:flex-row bg-base-200 rounded-lg shadow-lg overflow-hidden mb-4">
+    <div className="fixed inset-0 bg-base-300 overflow-hidden">
+      <div className="container mx-auto h-full max-w-[1000px] p-4">
+        <div className="flex flex-col md:flex-row bg-base-200/50 backdrop-blur-sm rounded-lg shadow-xl overflow-hidden border border-base-300 h-[calc(100vh-2rem)]">
           {/* Menu Editor */}
-          <div className="flex-1 md:w-[35%] flex flex-col md:flex-row h-[calc(100vh-12rem)] min-w-0">
+          <div className="flex-1 md:w-[45%] flex flex-col md:flex-row h-full min-w-0">
             {/* File explorer */}
-            <div className="w-full md:w-48 h-48 md:h-full bg-base-200 border-r border-base-300 flex flex-col shrink-0">
-              <div className="p-4 border-b border-base-300 flex justify-between items-center shrink-0">
-                <h2 className="font-bold">MENUS</h2>
+            <div className="w-full md:w-36 h-48 md:h-full bg-base-200/80 border-r border-base-300 flex flex-col shrink-0">
+              <div className="px-4 py-3 border-b border-base-300 flex justify-between items-center shrink-0 bg-base-200/90">
+                <h2 className="font-bold text-sm uppercase tracking-wide">
+                  Menus
+                </h2>
                 <button
                   className="btn btn-ghost btn-sm btn-square"
                   onClick={() => {
@@ -376,34 +377,38 @@ export default function MenuEditorPage() {
                     setTaskDetailContent("");
                   }}
                 >
-                  <BsPlus className="text-xl" />
+                  <BsPlus className="text-lg" />
                 </button>
               </div>
               <div className="overflow-y-auto flex-1 p-2">
                 {menusData?.data?.menus?.map((menu) => (
                   <div
                     key={menu.name}
-                    className={`p-2 rounded cursor-pointer hover:bg-base-300 flex items-center gap-2 ${
-                      selectedMenu?.name === menu.name ? "bg-base-300" : ""
+                    className={`p-2 rounded cursor-pointer hover:bg-base-300/50 flex items-center gap-2 transition-colors ${
+                      selectedMenu?.name === menu.name ? "bg-primary/10" : ""
                     }`}
                     onClick={() => handleMenuSelect(menu)}
                   >
                     <BsFileEarmarkText className="text-base-content/70" />
-                    <span className="font-medium">{menu.name}</span>
+                    <span className="font-medium text-sm truncate">
+                      {menu.name}
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Editor */}
-            <div className="flex-1 flex flex-col min-w-0 h-full bg-base-100">
+            <div className="flex-1 flex flex-col min-w-0 h-full bg-base-100/50">
               {/* Editor toolbar */}
-              <div className="bg-base-200 border-b border-base-300 p-2 flex items-center justify-between shrink-0">
+              <div className="px-4 py-2 border-b border-base-300 flex items-center justify-between shrink-0 bg-base-200/90">
                 <div className="flex items-center gap-2">
                   {selectedMenu && (
                     <>
-                      <span className="font-medium">{selectedMenu.name}</span>
-                      <div className="badge badge-sm">json</div>
+                      <span className="font-medium text-sm">
+                        {selectedMenu.name}
+                      </span>
+                      <div className="badge badge-sm badge-ghost">json</div>
                     </>
                   )}
                 </div>
@@ -417,8 +422,8 @@ export default function MenuEditorPage() {
               </div>
 
               {/* Editor content */}
-              <div className="flex-1 overflow-auto p-4">
-                <div className="h-full rounded-lg overflow-hidden bg-base-300">
+              <div className="flex-1 overflow-auto p-3">
+                <div className="h-full rounded-lg overflow-hidden bg-base-300/30 shadow-inner">
                   <Editor
                     defaultLanguage="json"
                     value={menuContent}
@@ -444,17 +449,19 @@ export default function MenuEditorPage() {
           </div>
 
           {/* Task Detail Editor */}
-          <div className="flex-1 md:w-[65%] flex flex-col md:flex-row h-[calc(100vh-12rem)] border-t md:border-t-0 md:border-l border-base-300 min-w-0">
+          <div className="flex-1 md:w-[55%] flex flex-col md:flex-row h-full border-t md:border-t-0 md:border-l border-base-300 min-w-0">
             {/* File explorer */}
-            <div className="w-full md:w-48 h-48 md:h-full bg-base-200 border-r border-base-300 flex flex-col shrink-0">
-              <div className="p-4 border-b border-base-300 flex justify-between items-center shrink-0">
-                <h2 className="font-bold">TASK DETAILS</h2>
+            <div className="w-full md:w-36 h-48 md:h-full bg-base-200/80 border-r border-base-300 flex flex-col shrink-0">
+              <div className="px-4 py-3 border-b border-base-300 flex justify-between items-center shrink-0 bg-base-200/90">
+                <h2 className="font-bold text-sm uppercase tracking-wide">
+                  Task Details
+                </h2>
                 {selectedMenu && (
                   <button
                     className="btn btn-ghost btn-sm btn-square"
                     onClick={() => setIsTaskSelectOpen(true)}
                   >
-                    <BsPlus className="text-xl" />
+                    <BsPlus className="text-lg" />
                   </button>
                 )}
               </div>
@@ -471,24 +478,28 @@ export default function MenuEditorPage() {
             </div>
 
             {/* Editor */}
-            <div className="flex-1 flex flex-col min-w-0 h-full bg-base-100">
+            <div className="flex-1 flex flex-col min-w-0 h-full bg-base-100/50">
               {/* Editor toolbar */}
-              <div className="bg-base-200 border-b border-base-300 p-2 flex items-center justify-between shrink-0">
+              <div className="px-4 py-2 border-b border-base-300 flex items-center justify-between shrink-0 bg-base-200/90">
                 <div className="flex items-center gap-2">
                   {selectedMenu && selectedTaskDetail && (
                     <>
-                      <span className="font-medium">{selectedMenu.name}</span>
+                      <span className="font-medium text-sm">
+                        {selectedMenu.name}
+                      </span>
                       <span className="text-base-content/70">/</span>
-                      <span className="font-medium">{selectedTaskDetail}</span>
-                      <div className="badge badge-sm">json</div>
+                      <span className="font-medium text-sm">
+                        {selectedTaskDetail}
+                      </span>
+                      <div className="badge badge-sm badge-ghost">json</div>
                     </>
                   )}
                 </div>
               </div>
 
               {/* Editor content */}
-              <div className="flex-1 overflow-auto p-4">
-                <div className="h-full rounded-lg overflow-hidden bg-base-300">
+              <div className="flex-1 overflow-auto p-3">
+                <div className="h-full rounded-lg overflow-hidden bg-base-300/30 shadow-inner">
                   <Editor
                     defaultLanguage="json"
                     value={taskDetailContent}

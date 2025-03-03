@@ -1,40 +1,72 @@
-"use client";
-
-import { GetMenuResponseTaskDetails } from "@/schemas";
 import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  DropResult,
-  DroppableProvided,
-  DraggableProvided,
-  DraggableStateSnapshot,
-  DroppableProps,
-} from "react-beautiful-dnd";
-import { BsFileEarmarkText } from "react-icons/bs";
-import { useEffect, useState } from "react";
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { BsGripVertical } from "react-icons/bs";
 
 interface TaskDetailListProps {
-  tasks: GetMenuResponseTaskDetails;
+  tasks: Record<string, any>;
   selectedTask: string | null;
   onTaskSelect: (taskName: string, content: any) => void;
-  onDragEnd: (result: DropResult) => void;
+  onDragEnd: (result: any) => void;
 }
 
-// StrictModeに対応したDnDコンポーネント
-function StrictModeDroppable({ children, ...props }: DroppableProps) {
-  const [enabled, setEnabled] = useState(false);
-  useEffect(() => {
-    const animation = requestAnimationFrame(() => setEnabled(true));
-    return () => {
-      cancelAnimationFrame(animation);
-      setEnabled(false);
-    };
-  }, []);
-  if (!enabled) {
-    return null;
-  }
-  return <Droppable {...props}>{children}</Droppable>;
+function SortableItem({
+  id,
+  content,
+  isSelected,
+  onSelect,
+}: {
+  id: string;
+  content: any;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+        isSelected ? "bg-primary/10" : "hover:bg-base-300/50"
+      } ${isDragging ? "shadow-lg bg-base-300/50" : ""}`}
+      onClick={onSelect}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="text-base-content/50 hover:text-base-content/70 transition-colors"
+      >
+        <BsGripVertical className="text-lg" />
+      </div>
+      <span className="font-medium text-sm truncate">{id}</span>
+    </div>
+  );
 }
 
 export default function TaskDetailList({
@@ -43,42 +75,50 @@ export default function TaskDetailList({
   onTaskSelect,
   onDragEnd,
 }: TaskDetailListProps) {
+  const taskNames = Object.keys(tasks);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      onDragEnd({
+        source: { index: taskNames.indexOf(active.id.toString()) },
+        destination: { index: taskNames.indexOf(over.id.toString()) },
+      });
+    }
+  };
+
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
-      <StrictModeDroppable droppableId="task-details">
-        {(provided: DroppableProvided) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            className="overflow-y-auto flex-1 p-2"
-          >
-            <div className="space-y-1">
-              {Object.entries(tasks || {}).map(([taskName, content], index) => (
-                <Draggable key={taskName} draggableId={taskName} index={index}>
-                  {(
-                    provided: DraggableProvided,
-                    snapshot: DraggableStateSnapshot
-                  ) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...provided.dragHandleProps}
-                      className={`p-2 rounded cursor-pointer hover:bg-base-300 flex items-center gap-2 ${
-                        selectedTask === taskName ? "bg-base-300" : ""
-                      } ${snapshot.isDragging ? "bg-base-300/50" : ""}`}
-                      onClick={() => onTaskSelect(taskName, content)}
-                    >
-                      <BsFileEarmarkText className="text-base-content/70" />
-                      <span className="font-medium">{taskName}</span>
-                    </div>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </div>
+    <div className="h-full overflow-y-auto">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={taskNames}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="p-2 space-y-1">
+            {taskNames.map((taskName) => (
+              <SortableItem
+                key={taskName}
+                id={taskName}
+                content={tasks[taskName]}
+                isSelected={selectedTask === taskName}
+                onSelect={() => onTaskSelect(taskName, tasks[taskName])}
+              />
+            ))}
           </div>
-        )}
-      </StrictModeDroppable>
-    </DragDropContext>
+        </SortableContext>
+      </DndContext>
+    </div>
   );
 }
