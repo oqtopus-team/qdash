@@ -3,7 +3,7 @@
 import { useFetchAllTasks } from "@/client/task/task";
 import { TaskResponse } from "@/schemas";
 import { useState } from "react";
-import { BsGrid, BsListUl, BsArrowRight, BsX } from "react-icons/bs";
+import { BsGrid, BsListUl, BsX } from "react-icons/bs";
 import {
   BsInfoCircle,
   BsArrowDownSquare,
