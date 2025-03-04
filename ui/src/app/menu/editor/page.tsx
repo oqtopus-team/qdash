@@ -3,7 +3,8 @@
 import { useListMenu, useUpdateMenu, useDeleteMenu } from "@/client/menu/menu";
 import { useFetchAllTasks } from "@/client/task/task";
 import { GetMenuResponse, TaskResponse } from "@/schemas";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import Editor from "@monaco-editor/react";
 import {
   BsPlus,
@@ -11,6 +12,7 @@ import {
   BsTrash,
   BsPlay,
   BsFileEarmarkPlus,
+  BsDownload,
 } from "react-icons/bs";
 import TaskDetailList from "./TaskDetailList";
 
@@ -37,7 +39,7 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
         acc[type].push(task);
         return acc;
       },
-      {},
+      {}
     ) || {};
 
   return (
@@ -112,47 +114,70 @@ import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { CreateFromTemplateModal } from "./CreateFromTemplateModal";
 
 export default function MenuEditorPage() {
+  const searchParams = useSearchParams();
   const [showExecuteModal, setShowExecuteModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const { data: menusData, refetch: refetchMenus } = useListMenu();
+
   const updateMenu = useUpdateMenu();
   const deleteMutation = useDeleteMenu();
   const [selectedMenu, setSelectedMenu] = useState<GetMenuResponse | null>(
-    null,
+    null
   );
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<string | null>(
-    null,
+    null
   );
   const [menuContent, setMenuContent] = useState<string>("");
   const [taskDetailContent, setTaskDetailContent] = useState<string>("");
   const [isTaskSelectOpen, setIsTaskSelectOpen] = useState(false);
   const [showCreateFromTemplate, setShowCreateFromTemplate] = useState(false);
 
-  // メニューが選択された時の処理
-  const handleMenuSelect = (menu: GetMenuResponse) => {
-    setSelectedMenu(menu);
-    setMenuContent(
-      JSON.stringify(
-        {
-          ...menu,
-          task_details: undefined, // task_detailsは左側のエディターには表示しない
-        },
-        null,
-        2,
-      ),
-    );
-    // 最初のtask_detailを選択
-    const firstTask = Object.keys(menu.task_details || {})[0];
-    handleTaskDetailSelect(firstTask, menu.task_details?.[firstTask]);
-  };
-
   // task_detailが選択された時の処理
-  const handleTaskDetailSelect = (taskName: string, content: any) => {
-    setSelectedTaskDetail(taskName);
-    setTaskDetailContent(JSON.stringify(content, null, 2));
-  };
+  const handleTaskDetailSelect = useCallback(
+    (taskName: string, content: any) => {
+      setSelectedTaskDetail(taskName);
+      setTaskDetailContent(JSON.stringify(content, null, 2));
+    },
+    []
+  );
 
-  // メニューの保存（メニュー全体とtask_detailsを同時に保存）
+  // メニューが選択された時の処理
+  const handleMenuSelect = useCallback(
+    (menu: GetMenuResponse) => {
+      setSelectedMenu(menu);
+      setMenuContent(
+        JSON.stringify(
+          {
+            ...menu,
+            task_details: undefined, // task_detailsは左側のエディターには表示しない
+          },
+          null,
+          2
+        )
+      );
+      // 最初のtask_detailを選択
+      const firstTask = Object.keys(menu.task_details || {})[0];
+      handleTaskDetailSelect(firstTask, menu.task_details?.[firstTask]);
+    },
+    [handleTaskDetailSelect]
+  );
+
+  useEffect(() => {
+    if (menusData?.data?.menus && menusData.data.menus.length > 0) {
+      const menuName = searchParams.get("name");
+      if (menuName) {
+        // URLパラメータで指定されたメニューを開く
+        const menu = menusData.data.menus.find((m) => m.name === menuName);
+        if (menu) {
+          handleMenuSelect(menu);
+        }
+      } else if (!selectedMenu) {
+        // メニューが選択されていない場合は最初のメニューを開く
+        handleMenuSelect(menusData.data.menus[0]);
+      }
+    }
+  }, [menusData, searchParams, selectedMenu, handleMenuSelect]);
+
   const handleSave = () => {
     if (!selectedMenu) return;
     try {
@@ -192,7 +217,7 @@ export default function MenuEditorPage() {
               task_details: updatedTaskDetails,
             });
           },
-        },
+        }
       );
     } catch (e) {
       // メニューのJSONが不正な場合
@@ -227,8 +252,8 @@ export default function MenuEditorPage() {
             tasks: updatedTasks,
           },
           null,
-          2,
-        ),
+          2
+        )
       );
 
       // task_detailsを更新
@@ -251,8 +276,8 @@ export default function MenuEditorPage() {
                   output_parameters: task.output_parameters || {},
                 },
                 null,
-                2,
-              ),
+                2
+              )
             );
             setSelectedMenu({
               ...selectedMenu,
@@ -261,7 +286,7 @@ export default function MenuEditorPage() {
             });
             setIsTaskSelectOpen(false);
           },
-        },
+        }
       );
     } catch (e) {
       // JSON解析エラー
@@ -298,8 +323,8 @@ export default function MenuEditorPage() {
             tasks: currentTasks,
           },
           null,
-          2,
-        ),
+          2
+        )
       );
 
       // task_detailsを更新
@@ -320,7 +345,7 @@ export default function MenuEditorPage() {
               task_details: updatedTaskDetails,
             });
           },
-        },
+        }
       );
     } catch (e) {
       // JSON解析エラー
@@ -402,6 +427,32 @@ export default function MenuEditorPage() {
                     >
                       <BsPlay className="text-lg" />
                       <span>Execute</span>
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        const menuData = {
+                          ...selectedMenu,
+                          task_details: selectedMenu.task_details || {},
+                        };
+                        const blob = new Blob(
+                          [JSON.stringify(menuData, null, 2)],
+                          {
+                            type: "application/json",
+                          }
+                        );
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `${selectedMenu.name}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                      }}
+                    >
+                      <BsDownload className="text-lg" />
+                      <span>Download</span>
                     </button>
                     <button
                       className="btn btn-ghost btn-sm"
@@ -557,7 +608,7 @@ export default function MenuEditorPage() {
                   setTaskDetailContent("");
                   refetchMenus(); // 一覧を更新
                 },
-              },
+              }
             );
           }}
           onClose={() => setShowDeleteModal(false)}

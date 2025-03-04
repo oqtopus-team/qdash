@@ -11,8 +11,11 @@ import { NewItemModal } from "./NewItemModal";
 import { TableEditModal } from "./TableEditModal";
 import { NewItemModalFromTemplate } from "./NewItemModalFromTemplate";
 import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
+import { MenuPreviewModal } from "./MenuPreviewModal";
+import { EditConfirmModal } from "./EditConfirmModal";
 
 import type { Menu } from "../../model";
+import type { GetMenuResponse } from "@/schemas";
 import { useListMenu, useDeleteMenu } from "@/client/menu/menu";
 import { useExecuteCalib } from "@/client/calibration/calibration";
 import { useAuth } from "@/app/contexts/AuthContext";
@@ -35,7 +38,10 @@ export function CalibrationMenuTable() {
   const { user } = useAuth();
   const [tableData, setTableData] = useState<Menu[]>([]);
   const [selectedItem, setSelectedItem] = useState<Menu>(INITIAL_SELECTED_ITEM);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [selectedMenuForPreview, setSelectedMenuForPreview] =
+    useState<GetMenuResponse | null>(null);
+  const [showExecuteConfirmModal, setShowExecuteConfirmModal] = useState(false);
+  const [showMenuPreview, setShowMenuPreview] = useState(false);
 
   useEffect(() => {
     if (data) {
@@ -56,13 +62,13 @@ export function CalibrationMenuTable() {
         onError: (error) => {
           console.error("Error deleting menu:", error);
         },
-      },
+      }
     );
   };
 
   const handleNewItem = () => {
     const newItemModal = document.getElementById(
-      "newItem",
+      "newItem"
     ) as HTMLDialogElement | null;
     if (newItemModal) {
       newItemModal.showModal();
@@ -71,20 +77,31 @@ export function CalibrationMenuTable() {
 
   const handleCreateTemplate = () => {
     const createTemplateModal = document.getElementById(
-      "createTemplate",
+      "createTemplate"
     ) as HTMLDialogElement | null;
     if (createTemplateModal) {
       createTemplateModal.showModal();
     }
   };
 
-  const handleEditClick = (item: Menu) => {
+  const handleEditClick = async (item: Menu) => {
     setSelectedItem(item);
-    const editModal = document.getElementById(
-      "tableEdit",
-    ) as HTMLDialogElement | null;
-    if (editModal) {
-      editModal.showModal();
+    // メニューの詳細情報を取得
+    const menuData = await refetchMenu();
+    if (menuData.data) {
+      const menuWithDetails = menuData.data.data.menus.find(
+        (menu: GetMenuResponse) => menu.name === item.name
+      );
+      if (menuWithDetails) {
+        setSelectedMenuForPreview(menuWithDetails);
+        setShowMenuPreview(true);
+        const menuPreviewModal = document.getElementById(
+          "menuPreview"
+        ) as HTMLDialogElement | null;
+        if (menuPreviewModal) {
+          menuPreviewModal.showModal();
+        }
+      }
     }
   };
 
@@ -97,14 +114,14 @@ export function CalibrationMenuTable() {
 
   const handleExecuteCalib = (item: Menu) => {
     setSelectedItem(item);
-    setShowConfirmModal(true);
+    setShowExecuteConfirmModal(true);
   };
 
   const columns = getColumns(
     handleEditClick,
     handleDeleteClick,
     handleExecuteCalib,
-    false, // Temporarily disable lock
+    false // Temporarily disable lock
   );
 
   return (
@@ -141,7 +158,7 @@ export function CalibrationMenuTable() {
         setTableData={setTableData}
         refetchMenu={refetchMenu}
       />
-      {showConfirmModal && (
+      {showExecuteConfirmModal && (
         <ExecuteConfirmModal
           selectedItem={selectedItem}
           onConfirm={(updatedItem) => {
@@ -155,16 +172,25 @@ export function CalibrationMenuTable() {
               {
                 onSuccess: () => {
                   toast.success("Calibration execution started!");
-                  setShowConfirmModal(false);
+                  setShowExecuteConfirmModal(false);
                 },
                 onError: (error) => {
                   console.error("Error executing calibration:", error);
                   toast.error("Error executing calibration");
                 },
-              },
+              }
             );
           }}
-          onCancel={() => setShowConfirmModal(false)}
+          onCancel={() => setShowExecuteConfirmModal(false)}
+        />
+      )}
+      {showMenuPreview && selectedMenuForPreview && (
+        <MenuPreviewModal
+          selectedItem={selectedMenuForPreview}
+          onClose={() => {
+            setShowMenuPreview(false);
+            setSelectedMenuForPreview(null);
+          }}
         />
       )}
     </div>
