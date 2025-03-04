@@ -32,20 +32,7 @@ import type {
 } from "../../schemas";
 
 /**
- * Executes a calibration by creating a flow run from a deployment.
-
-Args:
-----
-    request (ExecuteCalibRequest): The request object containing the calibration data.
-    settings (Settings): The application settings.
-
-Returns:
--------
-    FLOW_RUN_URL: The URL of the created flow run.
-
-Raises:
-------
-    HTTPException: If the execution of the calibration fails.
+ * Create a flow run from a deployment.
  * @summary Executes a calibration by creating a flow run from a deployment.
  */
 export const executeCalib = (

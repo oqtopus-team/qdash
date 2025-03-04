@@ -7,6 +7,9 @@
  */
 import type { ExecuteCalibRequest } from "./executeCalibRequest";
 
+/**
+ * ScheduleCalibResponse is a subclass of BaseModel.
+ */
 export interface ScheduleCalibResponse {
   menu_name: string;
   menu: ExecuteCalibRequest;

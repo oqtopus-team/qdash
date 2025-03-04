@@ -5,10 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { TaskNoteAnyOf } from "./taskNoteAnyOf";
 
-/**
- * ExecuteCalibResponse is a subclass of BaseModel.
- */
-export interface ExecuteCalibResponse {
-  flow_run_url: string;
-}
+export type TaskNote = TaskNoteAnyOf | null;

@@ -41,26 +41,12 @@ prefect_host = os.getenv("PREFECT_HOST")
 )
 async def execute_calib(
     request: ExecuteCalibRequest,
-    settings: Annotated[Settings, Depends] = Depends(get_settings),
-    current_user: User = Security(get_current_active_user),
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> ExecuteCalibResponse:
-    """Executes a calibration by creating a flow run from a deployment.
-
-    Args:
-    ----
-        request (ExecuteCalibRequest): The request object containing the calibration data.
-        settings (Settings): The application settings.
-
-    Returns:
-    -------
-        FLOW_RUN_URL: The URL of the created flow run.
-
-    Raises:
-    ------
-        HTTPException: If the execution of the calibration fails.
-
-    """
+    """Create a flow run from a deployment."""
     client = PrefectClient(api=settings.prefect_api_url)
+    logger.info(f"current user: {current_user.username}")
     env = settings.env
     target_deployment = await client.read_deployment_by_name(f"main/{env}-main")
     try:

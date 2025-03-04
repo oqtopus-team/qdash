@@ -6,20 +6,11 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ExecuteCalibRequestTasks } from "./executeCalibRequestTasks";
+import type { ExecuteCalibRequestTaskDetails } from "./executeCalibRequestTaskDetails";
 import type { ExecuteCalibRequestTags } from "./executeCalibRequestTags";
 
 /**
- * Menu model.
-
-Attributes
-----------
-    name (str): The name of the menu.
-    username (str): The username of the user who created
-    description (str): Detailed description of the menu.
-    qids (list[list[str]]): The qubit IDs.
-    notify_bool (bool): The notification boolean.
-    tasks (list[str]): The tasks.
-    tags (list[str]): The tags.
+ * ExecuteCalibRequest is a subclass of MenuModel.
  */
 export interface ExecuteCalibRequest {
   name: string;
@@ -28,5 +19,6 @@ export interface ExecuteCalibRequest {
   qids: string[][];
   notify_bool?: boolean;
   tasks?: ExecuteCalibRequestTasks;
+  task_details?: ExecuteCalibRequestTaskDetails;
   tags?: ExecuteCalibRequestTags;
 }

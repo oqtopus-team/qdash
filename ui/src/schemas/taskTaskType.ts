@@ -6,9 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-/**
- * ExecuteCalibResponse is a subclass of BaseModel.
- */
-export interface ExecuteCalibResponse {
-  flow_run_url: string;
-}
+export type TaskTaskType = string | null;

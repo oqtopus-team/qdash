@@ -46,14 +46,14 @@ from qcflow.protocols.two_qubit.optimize_zx90 import OptimizeZX90
 from qcflow.protocols.base import BaseTask
 
 
-def generate_task_instances(task_names: list[str]) -> dict[str, BaseTask]:
+def generate_task_instances(task_names: list[str], task_details: dict) -> dict[str, BaseTask]:
     task_instances = {}
     initialize()
     for task_name in task_names:
-        task = TaskDocument.find_one({"username": "admin"}, {"name": task_name}).run()
+        # task = TaskDocument.find_one({"username": "admin"}, {"name": task_name}).run()
         task_class = BaseTask.registry.get(task_name)
         if task_class is None:
             raise ValueError(f"タスク '{task_name}' は登録されていません")
-        task_instance = task_class(task.input_parameters)
+        task_instance = task_class(task_details[task_name])
         task_instances[task_name] = task_instance
     return task_instances
