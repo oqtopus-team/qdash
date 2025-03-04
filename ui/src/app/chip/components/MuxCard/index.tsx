@@ -1,6 +1,6 @@
 "use client";
 
-import { ServerRoutersChipTask, MuxDetailResponseDetail } from "@/schemas";
+import { Task, MuxDetailResponseDetail } from "@/schemas";
 import { TaskList } from "../TaskList";
 
 interface MuxCardProps {
@@ -23,14 +23,12 @@ export function MuxCard({
 }: MuxCardProps) {
   // Get latest update time info from tasks
   const getLatestUpdateInfo = (
-    detail: MuxDetailResponseDetail,
+    detail: MuxDetailResponseDetail
   ): { time: Date; isRecent: boolean } => {
     let latestTime = new Date(0);
 
     Object.values(detail).forEach((tasksByName) => {
-      Object.values(
-        tasksByName as { [key: string]: ServerRoutersChipTask },
-      ).forEach((task) => {
+      Object.values(tasksByName as { [key: string]: Task }).forEach((task) => {
         if (task.end_at) {
           const taskEndTime = new Date(task.end_at);
           if (taskEndTime > latestTime) {
@@ -68,20 +66,20 @@ export function MuxCard({
   // Group tasks by name for each mux
   const getTaskGroups = (detail: MuxDetailResponseDetail) => {
     const taskGroups: {
-      [key: string]: { [key: string]: ServerRoutersChipTask };
+      [key: string]: { [key: string]: Task };
     } = {};
 
     Object.entries(detail).forEach(([qid, tasksByName]) => {
-      Object.entries(
-        tasksByName as { [key: string]: ServerRoutersChipTask },
-      ).forEach(([taskName, task]) => {
-        if (task.status !== "completed" && task.status !== "failed") return;
+      Object.entries(tasksByName as { [key: string]: Task }).forEach(
+        ([taskName, task]) => {
+          if (task.status !== "completed" && task.status !== "failed") return;
 
-        if (!taskGroups[taskName]) {
-          taskGroups[taskName] = {};
+          if (!taskGroups[taskName]) {
+            taskGroups[taskName] = {};
+          }
+          taskGroups[taskName][qid] = task;
         }
-        taskGroups[taskName][qid] = task;
-      });
+      );
     });
 
     return taskGroups;

@@ -1,11 +1,11 @@
 "use client";
 
-import { ServerRoutersChipTask } from "@/schemas";
+import { Task } from "@/schemas";
 import { useState } from "react";
 
 interface TaskListProps {
   taskGroups: {
-    [key: string]: { [key: string]: ServerRoutersChipTask };
+    [key: string]: { [key: string]: Task };
   };
   qids: string[];
   muxId: string;
@@ -14,7 +14,7 @@ interface TaskListProps {
 interface SelectedTaskInfo {
   path: string;
   qid: string;
-  task: ServerRoutersChipTask;
+  task: Task;
 }
 
 export function TaskList({ taskGroups, qids }: TaskListProps) {
@@ -22,7 +22,7 @@ export function TaskList({ taskGroups, qids }: TaskListProps) {
     useState<SelectedTaskInfo | null>(null);
 
   // Get figure path from task
-  const getFigurePath = (task: ServerRoutersChipTask): string | null => {
+  const getFigurePath = (task: Task): string | null => {
     if (!task.figure_path) return null;
     if (Array.isArray(task.figure_path)) {
       return task.figure_path[0] || null;
@@ -64,8 +64,8 @@ export function TaskList({ taskGroups, qids }: TaskListProps) {
                           task.status === "completed"
                             ? "bg-success"
                             : task.status === "failed"
-                              ? "bg-error"
-                              : "bg-warning"
+                            ? "bg-error"
+                            : "bg-warning"
                         }`}
                       />
                     </div>
@@ -93,7 +93,7 @@ export function TaskList({ taskGroups, qids }: TaskListProps) {
                                 </span>
                               </div>
                             );
-                          },
+                          }
                         )}
                       </div>
                     )}
@@ -124,7 +124,7 @@ export function TaskList({ taskGroups, qids }: TaskListProps) {
               <div className="aspect-square bg-base-200/50 rounded-xl p-4">
                 <img
                   src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                    selectedTaskInfo.path,
+                    selectedTaskInfo.path
                   )}`}
                   alt={`Result for QID ${selectedTaskInfo.qid}`}
                   className="w-full h-full object-contain"
@@ -138,8 +138,8 @@ export function TaskList({ taskGroups, qids }: TaskListProps) {
                       selectedTaskInfo.task.status === "completed"
                         ? "badge-success"
                         : selectedTaskInfo.task.status === "failed"
-                          ? "badge-error"
-                          : "badge-warning"
+                        ? "badge-error"
+                        : "badge-warning"
                     }`}
                   >
                     {selectedTaskInfo.task.status}
@@ -150,7 +150,7 @@ export function TaskList({ taskGroups, qids }: TaskListProps) {
                     <h4 className="font-medium mb-2">Parameters</h4>
                     <div className="space-y-2">
                       {Object.entries(
-                        selectedTaskInfo.task.output_parameters,
+                        selectedTaskInfo.task.output_parameters
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&

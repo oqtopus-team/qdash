@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ServerRoutersChipTask } from "@/schemas";
+import { Task } from "@/schemas";
 import {
   useFetchChip,
   useFetchLatestTaskGroupedByChip,
@@ -15,7 +15,7 @@ interface TaskResultGridProps {
 interface SelectedTaskInfo {
   path: string;
   qid: string;
-  task: ServerRoutersChipTask;
+  task: Task;
 }
 
 export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
@@ -30,7 +30,7 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
   const { data: chipResponse } = useFetchChip(chipId);
   const { data: taskResponse } = useFetchLatestTaskGroupedByChip(
     chipId,
-    selectedTask,
+    selectedTask
   );
 
   // Create a mapping of QID to grid position
@@ -58,13 +58,13 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
   }, [chipResponse]);
 
   // Get task result for a specific QID
-  const getTaskResult = (qid: string): ServerRoutersChipTask | null => {
+  const getTaskResult = (qid: string): Task | null => {
     if (!taskResponse?.data?.result?.[qid]) return null;
     return taskResponse.data.result[qid];
   };
 
   // Get figure path from task
-  const getFigurePath = (task: ServerRoutersChipTask): string | null => {
+  const getFigurePath = (task: Task): string | null => {
     if (!task.figure_path) return null;
     if (Array.isArray(task.figure_path)) {
       return task.figure_path[0] || null;
@@ -81,7 +81,7 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
           const col = index % gridSize;
           const qid = Object.keys(gridPositions).find(
             (key) =>
-              gridPositions[key].row === row && gridPositions[key].col === col,
+              gridPositions[key].row === row && gridPositions[key].col === col
           );
 
           if (!qid) {
@@ -130,7 +130,7 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
                       <img
                         key={i}
                         src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                          path,
+                          path
                         )}`}
                         alt={`Result for QID ${qid}`}
                         className="w-full h-full object-contain"
@@ -139,7 +139,7 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
                   ) : (
                     <img
                       src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                        task.figure_path,
+                        task.figure_path
                       )}`}
                       alt={`Result for QID ${qid}`}
                       className="w-full h-full object-contain"
@@ -155,8 +155,8 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
                   task.status === "completed"
                     ? "bg-success"
                     : task.status === "failed"
-                      ? "bg-error"
-                      : "bg-warning"
+                    ? "bg-error"
+                    : "bg-warning"
                 }`}
               />
             </button>
@@ -183,7 +183,7 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
               <div className="aspect-square bg-base-200/50 rounded-xl p-4">
                 <img
                   src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                    selectedTaskInfo.path,
+                    selectedTaskInfo.path
                   )}`}
                   alt={`Result for QID ${selectedTaskInfo.qid}`}
                   className="w-full h-full object-contain"
@@ -197,8 +197,8 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
                       selectedTaskInfo.task.status === "completed"
                         ? "badge-success"
                         : selectedTaskInfo.task.status === "failed"
-                          ? "badge-error"
-                          : "badge-warning"
+                        ? "badge-error"
+                        : "badge-warning"
                     }`}
                   >
                     {selectedTaskInfo.task.status}
@@ -209,7 +209,7 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
                     <h4 className="font-medium mb-2">Parameters</h4>
                     <div className="space-y-2">
                       {Object.entries(
-                        selectedTaskInfo.task.output_parameters,
+                        selectedTaskInfo.task.output_parameters
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&
