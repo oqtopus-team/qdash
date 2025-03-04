@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import Editor from "@monaco-editor/react";
-import { BsPlay } from "react-icons/bs";
 import type { GetMenuResponse } from "@/schemas";
 
 interface MenuPreviewModalProps {
