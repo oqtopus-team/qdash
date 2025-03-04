@@ -1,7 +1,7 @@
 "use client";
 
 import { createColumnHelper } from "@tanstack/react-table";
-import { FaEdit } from "react-icons/fa";
+import { FaEdit, FaTrash } from "react-icons/fa";
 import { FaRegCirclePlay } from "react-icons/fa6";
 import type { Menu } from "../../model";
 
@@ -59,6 +59,12 @@ export const getColumns = (
           onClick={() => handleEditClick(props.row.original)}
         >
           <FaEdit className="text-lg" />
+        </button>
+        <button
+          className="btn btn-sm btn-ghost text-error hover:bg-error/10"
+          onClick={() => handleDeleteClick(props.row.original)}
+        >
+          <FaTrash className="text-lg" />
         </button>
         <button
           className={`btn btn-sm btn-ghost text-accent hover:bg-accent/10 ${

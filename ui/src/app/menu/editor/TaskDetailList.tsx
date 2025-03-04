@@ -14,24 +14,27 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { BsGripVertical } from "react-icons/bs";
+import { BsGripVertical, BsTrash } from "react-icons/bs";
 
 interface TaskDetailListProps {
   tasks: Record<string, any>;
   selectedTask: string | null;
   onTaskSelect: (taskName: string, content: any) => void;
   onDragEnd: (result: any) => void;
+  onDeleteTask?: (taskName: string) => void;
 }
 
 function SortableItem({
   id,
   isSelected,
   onSelect,
+  onDelete,
 }: {
   id: string;
   content: any;
   isSelected: boolean;
   onSelect: () => void;
+  onDelete?: (e: React.MouseEvent) => void;
 }) {
   const {
     attributes,
@@ -64,6 +67,17 @@ function SortableItem({
         <BsGripVertical className="text-lg" />
       </div>
       <span className="font-medium text-sm truncate">{id}</span>
+      {onDelete && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(e);
+          }}
+          className="ml-auto btn btn-ghost btn-xs btn-square hover:text-error"
+        >
+          <BsTrash className="text-sm" />
+        </button>
+      )}
     </div>
   );
 }
@@ -73,6 +87,7 @@ export default function TaskDetailList({
   selectedTask,
   onTaskSelect,
   onDragEnd,
+  onDeleteTask,
 }: TaskDetailListProps) {
   const taskNames = Object.keys(tasks);
 
@@ -80,7 +95,7 @@ export default function TaskDetailList({
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    }),
+    })
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -113,6 +128,14 @@ export default function TaskDetailList({
                 content={tasks[taskName]}
                 isSelected={selectedTask === taskName}
                 onSelect={() => onTaskSelect(taskName, tasks[taskName])}
+                onDelete={
+                  onDeleteTask
+                    ? (e) => {
+                        e.stopPropagation();
+                        onDeleteTask(taskName);
+                      }
+                    : undefined
+                }
               />
             ))}
           </div>

@@ -8,10 +8,11 @@ import { mapListMenuResponseToListMenu } from "../../model";
 import { getColumns } from "./Columns";
 import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
 import { MenuPreviewModal } from "./MenuPreviewModal";
+import { DeleteConfirmModal } from "./DeleteConfirmModal";
 
 import type { Menu } from "../../model";
 import type { GetMenuResponse } from "@/schemas";
-import { useListMenu } from "@/client/menu/menu";
+import { useListMenu, useDeleteMenu } from "@/client/menu/menu";
 import { useExecuteCalib } from "@/client/calibration/calibration";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { Table } from "@/app/components/Table";
@@ -29,12 +30,14 @@ const INITIAL_SELECTED_ITEM: Menu = {
 export function CalibrationMenuTable() {
   const { data, isError, isLoading, refetch: refetchMenu } = useListMenu();
   const executeCalibMutation = useExecuteCalib();
+  const deleteMutation = useDeleteMenu();
   const { user } = useAuth();
   const [tableData, setTableData] = useState<Menu[]>([]);
   const [selectedItem, setSelectedItem] = useState<Menu>(INITIAL_SELECTED_ITEM);
   const [selectedMenuForPreview, setSelectedMenuForPreview] =
     useState<GetMenuResponse | null>(null);
   const [showExecuteConfirmModal, setShowExecuteConfirmModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [showMenuPreview, setShowMenuPreview] = useState(false);
 
   useEffect(() => {
@@ -85,11 +88,16 @@ export function CalibrationMenuTable() {
     setShowExecuteConfirmModal(true);
   };
 
+  const handleDeleteClick = (item: Menu) => {
+    setSelectedItem(item);
+    setShowDeleteConfirmModal(true);
+  };
+
   const columns = getColumns(
     handleEditClick,
-    () => {}, // Delete handler is no longer needed
+    handleDeleteClick,
     handleExecuteCalib,
-    false // Temporarily disable lock
+    false // isLocked
   );
 
   return (
@@ -124,6 +132,28 @@ export function CalibrationMenuTable() {
             );
           }}
           onCancel={() => setShowExecuteConfirmModal(false)}
+        />
+      )}
+      {showDeleteConfirmModal && (
+        <DeleteConfirmModal
+          selectedItem={selectedItem}
+          onConfirm={() => {
+            deleteMutation.mutate(
+              { name: selectedItem.name },
+              {
+                onSuccess: () => {
+                  toast.success("Menu deleted successfully");
+                  setShowDeleteConfirmModal(false);
+                  refetchMenu(); // 一覧を更新
+                },
+                onError: (error) => {
+                  console.error("Error deleting menu:", error);
+                  toast.error("Error deleting menu");
+                },
+              }
+            );
+          }}
+          onCancel={() => setShowDeleteConfirmModal(false)}
         />
       )}
       {showMenuPreview && selectedMenuForPreview && (

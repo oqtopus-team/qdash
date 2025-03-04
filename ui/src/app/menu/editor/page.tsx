@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useListMenu, useUpdateMenu, useDeleteMenu } from "@/client/menu/menu";
 import { useFetchAllTasks } from "@/client/task/task";
 import { GetMenuResponse, TaskResponse } from "@/schemas";
@@ -15,6 +16,11 @@ import {
   BsDownload,
 } from "react-icons/bs";
 import TaskDetailList from "./TaskDetailList";
+import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
+import { DeleteConfirmModal } from "./DeleteConfirmModal";
+import { DeleteTaskConfirmModal } from "./DeleteTaskConfirmModal";
+import { CreateFromTemplateModal } from "./CreateFromTemplateModal";
+import { Toast } from "@/app/setting/components/Toast";
 
 interface TaskSelectModalProps {
   onClose: () => void;
@@ -109,14 +115,12 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
   );
 };
 
-import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
-import { DeleteConfirmModal } from "./DeleteConfirmModal";
-import { CreateFromTemplateModal } from "./CreateFromTemplateModal";
-
-export default function MenuEditorPage() {
+function MenuEditor() {
   const searchParams = useSearchParams();
   const [showExecuteModal, setShowExecuteModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeleteTaskModal, setShowDeleteTaskModal] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
   const { data: menusData, refetch: refetchMenus } = useListMenu();
 
   const updateMenu = useUpdateMenu();
@@ -131,6 +135,7 @@ export default function MenuEditorPage() {
   const [taskDetailContent, setTaskDetailContent] = useState<string>("");
   const [isTaskSelectOpen, setIsTaskSelectOpen] = useState(false);
   const [showCreateFromTemplate, setShowCreateFromTemplate] = useState(false);
+  const [showSaveToast, setShowSaveToast] = useState(false);
 
   // task_detailが選択された時の処理
   const handleTaskDetailSelect = useCallback(
@@ -216,6 +221,7 @@ export default function MenuEditorPage() {
               ...menuData,
               task_details: updatedTaskDetails,
             });
+            setShowSaveToast(true);
           },
         }
       );
@@ -524,6 +530,10 @@ export default function MenuEditorPage() {
                   selectedTask={selectedTaskDetail}
                   onTaskSelect={handleTaskDetailSelect}
                   onDragEnd={handleDragEnd}
+                  onDeleteTask={(taskName) => {
+                    setTaskToDelete(taskName);
+                    setShowDeleteTaskModal(true);
+                  }}
                 />
               </div>
             )}
@@ -577,6 +587,16 @@ export default function MenuEditorPage() {
         </div>
       </div>
 
+      {/* Save Success Toast */}
+      {showSaveToast && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Toast
+            message="変更を保存しました"
+            onClose={() => setShowSaveToast(false)}
+          />
+        </div>
+      )}
+
       {/* Task Select Modal */}
       {isTaskSelectOpen && (
         <TaskSelectModal
@@ -615,6 +635,71 @@ export default function MenuEditorPage() {
         />
       )}
 
+      {/* Delete Task Confirm Modal */}
+      {showDeleteTaskModal && taskToDelete && selectedMenu && (
+        <DeleteTaskConfirmModal
+          taskName={taskToDelete}
+          onConfirm={() => {
+            try {
+              // メニューデータを取得
+              const menuData = JSON.parse(menuContent);
+              const currentTasks = menuData.tasks || [];
+              const currentTaskDetails = { ...selectedMenu.task_details };
+
+              // タスクを削除
+              const taskIndex = currentTasks.indexOf(taskToDelete);
+              if (taskIndex > -1) {
+                currentTasks.splice(taskIndex, 1);
+              }
+              delete currentTaskDetails[taskToDelete];
+
+              // メニューを更新
+              updateMenu.mutate(
+                {
+                  name: selectedMenu.name,
+                  data: {
+                    ...selectedMenu,
+                    tasks: currentTasks,
+                    task_details: currentTaskDetails,
+                  },
+                },
+                {
+                  onSuccess: () => {
+                    setShowDeleteTaskModal(false);
+                    setTaskToDelete(null);
+                    if (selectedTaskDetail === taskToDelete) {
+                      setSelectedTaskDetail(null);
+                      setTaskDetailContent("");
+                    }
+                    setSelectedMenu({
+                      ...selectedMenu,
+                      tasks: currentTasks,
+                      task_details: currentTaskDetails,
+                    });
+                    setMenuContent(
+                      JSON.stringify(
+                        {
+                          ...menuData,
+                          tasks: currentTasks,
+                        },
+                        null,
+                        2
+                      )
+                    );
+                  },
+                }
+              );
+            } catch (e) {
+              console.error("Invalid JSON:", e);
+            }
+          }}
+          onClose={() => {
+            setShowDeleteTaskModal(false);
+            setTaskToDelete(null);
+          }}
+        />
+      )}
+
       {/* Create from Template Modal */}
       {showCreateFromTemplate && (
         <CreateFromTemplateModal
@@ -625,5 +710,19 @@ export default function MenuEditorPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function MenuEditorPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+          <div className="loading loading-spinner loading-lg text-primary"></div>
+        </div>
+      }
+    >
+      <MenuEditor />
+    </Suspense>
   );
 }
