@@ -5,6 +5,7 @@ on:
     - develop
 jobs:
   git-pr-release:
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
