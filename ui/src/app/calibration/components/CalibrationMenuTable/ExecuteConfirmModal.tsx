@@ -1,11 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useTheme } from "@/app/providers/theme-provider";
-import Editor from "@monaco-editor/react";
-import { toast } from "react-toastify";
-import yaml from "js-yaml";
-
+import { BsPlus } from "react-icons/bs";
 import type { Menu } from "../../model";
 
 export function ExecuteConfirmModal({
@@ -17,80 +13,102 @@ export function ExecuteConfirmModal({
   onConfirm: (updatedItem: Menu) => void;
   onCancel: () => void;
 }) {
-  const [yamlText, setYamlText] = useState(
-    generateYamlWithCustomArrayFormat(selectedItem),
-  );
-  const [validationError, setValidationError] = useState("");
-
-  const { theme } = useTheme();
-
-  const handleYamlChange = (value: string | undefined) => {
-    if (value !== undefined) {
-      setYamlText(value);
-      try {
-        yaml.load(value); // Validate YAML format
-        setValidationError("");
-      } catch (error) {
-        setValidationError(
-          "YAMLの形式が正しくありません: " +
-            (error instanceof Error ? error.message : String(error)),
-        );
-      }
-    }
-  };
+  const [menu, setMenu] = useState(selectedItem);
 
   const handleConfirmClick = () => {
-    if (!validationError) {
-      try {
-        const updatedItem = yaml.load(yamlText) as Menu;
-        onConfirm(updatedItem);
-      } catch (error) {
-        toast.error(
-          "YAMLのパースに失敗しました: " +
-            (error instanceof Error ? error.message : String(error)),
-        );
-      }
-    } else {
-      toast.error("YAMLの形式が正しくありません");
-    }
+    onConfirm(menu);
   };
 
   return (
     <dialog open className="modal">
-      <div className="modal-box">
-        <h3 className="font-bold text-lg">Confirm Execution</h3>
-        <p>
-          Are you sure you want to execute the calibration with the following
-          settings?
-        </p>
-        <Editor
-          height="600px"
-          defaultLanguage="yaml"
-          value={yamlText}
-          onChange={handleYamlChange}
-          theme={theme === "dark" ? "vs-dark" : "light"}
-          options={{
-            fontSize: 16,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            lineNumbers: "off",
-          }}
-        />
-        {validationError && (
-          <div style={{ color: "red", marginTop: "8px" }}>
-            {validationError}
+      <div className="modal-box max-w-3xl">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-2xl font-bold">Execute Calibration</h3>
+            <p className="text-base-content/70 mt-1">
+              Review and confirm the calibration settings
+            </p>
           </div>
-        )}
-        <div className="modal-action">
           <button
-            className="btn"
-            onClick={handleConfirmClick}
-            disabled={!!validationError}
+            onClick={onCancel}
+            className="btn btn-ghost btn-sm btn-square hover:rotate-90 transition-transform"
           >
-            Confirm
+            <BsPlus className="text-xl rotate-45" />
           </button>
-          <button className="btn" onClick={onCancel}>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-medium mb-2">Name</h3>
+            <p className="text-base-content/80">{menu.name}</p>
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-2">Description</h3>
+            <p className="text-base-content/80">{menu.description}</p>
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-2">Qubit IDs</h3>
+            <div className="space-y-1">
+              {menu.qids.map((qidGroup, index) => (
+                <p key={index} className="text-base-content/80">
+                  Group {index + 1}: {qidGroup.join(", ")}
+                </p>
+              ))}
+            </div>
+          </div>
+
+          {menu.tasks && menu.tasks.length > 0 && (
+            <div>
+              <h3 className="font-medium mb-2">Tasks</h3>
+              <div className="space-y-1">
+                {menu.tasks.map((task, index) => (
+                  <p key={index} className="text-base-content/80">
+                    {task}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {menu.tags && menu.tags.length > 0 && (
+            <div>
+              <h3 className="font-medium mb-2">Tags</h3>
+              <div className="flex flex-wrap gap-2">
+                {menu.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="px-2 py-1 bg-base-200 rounded text-sm"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="checkbox"
+                checked={menu.notify_bool}
+                onChange={(e) =>
+                  setMenu({ ...menu, notify_bool: e.target.checked })
+                }
+              />
+              <span>Notify on completion</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="modal-action">
+          <button className="btn btn-ghost" onClick={onCancel}>
             Cancel
+          </button>
+          <button className="btn btn-primary" onClick={handleConfirmClick}>
+            Execute
           </button>
         </div>
       </div>
@@ -99,26 +117,4 @@ export function ExecuteConfirmModal({
       </form>
     </dialog>
   );
-}
-
-// YAML 形式でデータを生成する関数
-function generateYamlWithCustomArrayFormat(data: Menu) {
-  return `
-name: ${data.name}
-username: ${data.username}
-description: ${data.description}
-qids:
-${data.qids.map((seq) => `  - ${JSON.stringify(seq)}`).join("\n")}
-notify_bool: ${data.notify_bool}
-${
-  data.tasks && data.tasks.length > 0
-    ? `tasks:\n  - ${data.tasks.join("\n  - ")}`
-    : ""
-}
-${
-  data.tags && data.tags.length > 0
-    ? `tags:\n  - ${data.tags.join("\n  - ")}`
-    : ""
-}
-  `;
 }

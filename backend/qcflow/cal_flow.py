@@ -25,6 +25,7 @@ from qubex.version import get_package_version
 
 @flow(flow_run_name="{qid}")
 def cal_sequence(
+    menu: Menu,
     exp: Experiment,
     task_manager: TaskManager,
     task_names: list[str],
@@ -33,7 +34,9 @@ def cal_sequence(
     """Calibrate in sequence."""
     logger = get_run_logger()
     try:
-        task_instances = generate_task_instances(task_names=task_names)
+        task_instances = generate_task_instances(
+            task_names=task_names, task_details=menu.task_details
+        )
         for task_name in task_names:
             if task_name in task_instances:
                 task_type = task_instances[task_name].get_task_type()
@@ -81,7 +84,12 @@ def cal_flow(
     task_manager = TaskManager(
         username=menu.username, execution_id=execution_id, qids=qubits, calib_dir=calib_dir
     )
-    task_manager = build_workflow(task_manager=task_manager, task_names=task_names, qubits=qubits)
+    task_manager = build_workflow(
+        task_manager=task_manager,
+        task_names=task_names,
+        qubits=qubits,
+        task_details=menu.task_details,
+    )
     task_manager.save()
     parameters = update_active_output_parameters(username=menu.username)
     ParameterDocument.insert_parameters(parameters)
@@ -95,7 +103,9 @@ def cal_flow(
     initialize()
     ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
     for qid in qubits:
-        task_manager = cal_sequence(exp, task_manager, task_names, qid)
+        task_manager = cal_sequence(
+            menu=menu, exp=exp, task_manager=task_manager, task_names=task_names, qid=qid
+        )
     return successMap
 
 

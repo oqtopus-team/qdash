@@ -30,12 +30,10 @@ from server.routers import (
     calibration,
     chip,
     execution,
-    execution_v2,
     experiment,
     file,
     fridges,
     menu,
-    qpu,
     settings,
     task,
 )
@@ -139,12 +137,10 @@ app.add_middleware(
 )
 app.include_router(calibration.router, tags=["calibration"])
 app.include_router(menu.router, tags=["menu"])
-app.include_router(qpu.router, tags=["qpu"])
 app.include_router(settings.router, tags=["settings"])
 app.include_router(fridges.router, tags=["fridges"])
 app.include_router(execution.router, tags=["execution"])
 app.include_router(experiment.router, tags=["experiment"])
-app.include_router(execution_v2.router, tags=["executionV2"])
 app.include_router(chip.router, tags=["chip"])
 app.include_router(file.router, tags=["file"])
 app.include_router(auth.router, tags=["auth", "authentication"])

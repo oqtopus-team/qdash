@@ -47,7 +47,7 @@ export function CreateFromTemplateModal({
       } catch (error) {
         setValidationError(
           "YAMLの形式が正しくありません: " +
-            (error instanceof Error ? error.message : String(error))
+            (error instanceof Error ? error.message : String(error)),
         );
       }
     }
@@ -70,7 +70,7 @@ export function CreateFromTemplateModal({
               console.error("Error creating template item:", error);
               toast.error("Error creating template item");
             },
-          }
+          },
         );
       }
     } catch (error) {
@@ -113,7 +113,7 @@ export function CreateFromTemplateModal({
                   return;
                 }
                 const selectedPreset = presetData?.data.menus.find(
-                  (menu) => menu.name === e.target.value
+                  (menu) => menu.name === e.target.value,
                 );
                 if (selectedPreset) {
                   setTemplateText(yaml.dump(selectedPreset));

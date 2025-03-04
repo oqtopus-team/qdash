@@ -26,14 +26,14 @@ def validate_task_name(task_names: list[str]) -> list[str]:
 
 @task(name="build-workflow")
 def build_workflow(
-    task_manager: TaskManager, task_names: list[str], qubits: list[str]
+    task_manager: TaskManager, task_names: list[str], qubits: list[str], task_details: dict
 ) -> TaskManager:
     """Build workflow."""
     task_result = TaskResultModel()
     global_previous_task_id = ""
     qubit_previous_task_id = {qubit: "" for qubit in qubits}
     coupling_previous_task_id = {qubit: "" for qubit in qubits}
-    task_instances = generate_task_instances(task_names=task_names)
+    task_instances = generate_task_instances(task_names=task_names, task_details=task_details)
     for name in task_names:
         if name in task_instances:
             this_task = task_instances[name]

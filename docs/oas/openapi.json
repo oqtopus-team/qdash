@@ -21,7 +21,7 @@
           "calibration"
         ],
         "summary": "Executes a calibration by creating a flow run from a deployment.",
-        "description": "Executes a calibration by creating a flow run from a deployment.\n\nArgs:\n----\n    request (ExecuteCalibRequest): The request object containing the calibration data.\n    settings (Settings): The application settings.\n\nReturns:\n-------\n    FLOW_RUN_URL: The URL of the created flow run.\n\nRaises:\n------\n    HTTPException: If the execution of the calibration fails.",
+        "description": "Create a flow run from a deployment.",
         "operationId": "execute_calib",
         "requestBody": {
           "content": {
@@ -454,673 +454,6 @@
               }
             },
             "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/figure": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetches a calibration figure by its path",
-        "operationId": "fetch_qpu_figure_by_path",
-        "parameters": [
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Detail"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/info/{name}": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetchqpuinfo",
-        "operationId": "fetch_qpu_info",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QPUInfoResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "List Qpu",
-        "operationId": "list_qpu",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/QPUInfoResponse"
-                  },
-                  "type": "array",
-                  "title": "Response List Qpu"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/active": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetch Active Qpu",
-        "operationId": "fetch_active_qpu",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QPUInfoResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/{name}": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetch Qpu By Name",
-        "operationId": "fetch_qpu",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QPUInfoResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/{name}/executions": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetch all executions",
-        "operationId": "fetch_all_executions_by_qpu_name",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ExecutionRunResponse"
-                  },
-                  "title": "Response Fetch All Executions By Qpu Name"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/{name}/one_qubit_calib/nodes": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetch One Qubit Calib By Qpu Name",
-        "operationId": "fetch_one_qubit_calib_by_qpu_name",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          },
-          {
-            "name": "param_list[]",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Param List[]"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/OneQubitCalibResponse"
-                  },
-                  "title": "Response Fetch One Qubit Calib By Qpu Name"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/{name}/one_qubit_calib/nodes/{label}": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetch One Qubit Calib By Label",
-        "operationId": "fetch_one_qubit_calib_by_label",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          },
-          {
-            "name": "label",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Label"
-            }
-          },
-          {
-            "name": "param_list[]",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Param List[]"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OneQubitCalibResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/{name}/one_qubit_calib/params/{param_name}": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetch One Qubit Calib By Param Name",
-        "operationId": "fetch_one_qubit_calib_by_param_name",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          },
-          {
-            "name": "param_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Param Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ParamResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/{name}/history/one_qubit_calib/{param_name}": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetch One Qubit Calib History By Param Name",
-        "operationId": "fetch_one_qubit_calib_history_by_param_name",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          },
-          {
-            "name": "param_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Param Name"
-            }
-          },
-          {
-            "name": "tags[]",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Tags[]"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MetricsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/{name}/two_qubit_calib/edges": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetch Two Qubit Calib By Qpu Name",
-        "operationId": "fetch_two_qubit_calib_by_qpu_name",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TwoQubitCalibResponse"
-                  },
-                  "title": "Response Fetch Two Qubit Calib By Qpu Name"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/{name}/two_qubit_calib/edges/{label}": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetch Two Qubit Calib By Label",
-        "operationId": "fetch_two_qubit_calib_by_label",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          },
-          {
-            "name": "label",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Label"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TwoQubitCalibResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/{name}/two_qubit_calib/params/{param_name}": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetch Two Qubit Calib By Param Name",
-        "operationId": "fetch_two_qubit_calib_by_param_name",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          },
-          {
-            "name": "param_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Param Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ParamResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/qpu/{name}/stats": {
-      "get": {
-        "tags": [
-          "qpu"
-        ],
-        "summary": "Fetch QPU stats by name",
-        "operationId": "fetch_qpu_stats_by_name",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QPUStatsResponse"
-                }
-              }
-            }
           },
           "422": {
             "description": "Validation Error",
@@ -1589,75 +922,6 @@
                   },
                   "type": "array",
                   "title": "Response Fetch All Experiment"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v2/execution": {
-      "get": {
-        "tags": [
-          "executionV2"
-        ],
-        "summary": "Fetch executions",
-        "description": "Fetch all executions.",
-        "operationId": "fetchExecutionsV2",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ExecutionResponseSummaryV2"
-                  },
-                  "type": "array",
-                  "title": "Response Fetchexecutionsv2"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v2/execution/{execution_id}": {
-      "get": {
-        "tags": [
-          "executionV2"
-        ],
-        "summary": "Fetch an execution by its ID",
-        "description": "Return the execution detail by its ID.",
-        "operationId": "fetchExecutionByIdV2",
-        "parameters": [
-          {
-            "name": "execution_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Execution Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExecutionResponseDetailV2"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2418,44 +1682,6 @@
         "title": "CreateMenuResponse",
         "description": "CreateMenuResponse is a Pydantic model for the create menu response."
       },
-      "Data": {
-        "properties": {
-          "value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "items": {},
-                "type": "array"
-              },
-              {
-                "items": {
-                  "items": {},
-                  "type": "array"
-                },
-                "type": "array"
-              }
-            ],
-            "title": "Value"
-          },
-          "unit": {
-            "type": "string",
-            "title": "Unit"
-          },
-          "type": {
-            "type": "string",
-            "title": "Type"
-          }
-        },
-        "type": "object",
-        "required": [
-          "value",
-          "unit",
-          "type"
-        ],
-        "title": "Data"
-      },
       "DeleteMenuResponse": {
         "properties": {
           "name": {
@@ -2483,34 +1709,6 @@
         ],
         "title": "Detail",
         "description": "A simple message response.\n\nArgs:\n    BaseModel: The base class for Pydantic models.\n\nAttributes:\n    message (str): The message to return."
-      },
-      "EdgeInfo": {
-        "properties": {
-          "source": {
-            "type": "string",
-            "title": "Source"
-          },
-          "target": {
-            "type": "string",
-            "title": "Target"
-          },
-          "size": {
-            "type": "integer",
-            "title": "Size"
-          },
-          "fill": {
-            "type": "string",
-            "title": "Fill"
-          }
-        },
-        "type": "object",
-        "required": [
-          "source",
-          "target",
-          "size",
-          "fill"
-        ],
-        "title": "EdgeInfo"
       },
       "ExecuteCalibRequest": {
         "properties": {
@@ -2555,6 +1753,17 @@
             ],
             "title": "Tasks"
           },
+          "task_details": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Details"
+          },
           "tags": {
             "anyOf": [
               {
@@ -2578,30 +1787,66 @@
           "qids"
         ],
         "title": "ExecuteCalibRequest",
-        "description": "Menu model.\n\nAttributes\n----------\n    name (str): The name of the menu.\n    username (str): The username of the user who created\n    description (str): Detailed description of the menu.\n    qids (list[list[str]]): The qubit IDs.\n    notify_bool (bool): The notification boolean.\n    tasks (list[str]): The tasks.\n    tags (list[str]): The tags.",
+        "description": "ExecuteCalibRequest is a subclass of MenuModel.",
         "examples": [
           {
-            "description": "one qubit calibration for mock demo",
-            "name": "1Q-MOCK-DEMO",
+            "description": "check one qubit characteristics short",
+            "name": "CheckRabi",
             "notify_bool": false,
             "qids": [
               [
-                "Q1"
-              ],
-              [
-                "Q2",
-                "Q3"
+                "28"
               ]
             ],
             "tags": [
-              "calibration",
-              "demo"
+              "debug"
             ],
+            "task_details": {
+              "CheckRabi": {
+                "description": "Task to check the Rabi oscillation.",
+                "input_parameters": {
+                  "interval": {
+                    "description": "Time interval for Rabi oscillation",
+                    "unit": "ns",
+                    "value": 153600,
+                    "value_type": "int"
+                  },
+                  "shots": {
+                    "description": "Number of shots for Rabi oscillation",
+                    "unit": "a.u.",
+                    "value": 1024,
+                    "value_type": "int"
+                  },
+                  "time_range": {
+                    "description": "Time range for Rabi oscillation",
+                    "unit": "ns",
+                    "value": [
+                      0,
+                      201,
+                      4
+                    ],
+                    "value_type": "range"
+                  }
+                },
+                "name": "CheckRabi",
+                "output_parameters": {
+                  "rabi_amplitude": {
+                    "description": "Rabi oscillation amplitude",
+                    "unit": "a.u."
+                  },
+                  "rabi_frequency": {
+                    "description": "Rabi oscillation frequency",
+                    "unit": "GHz"
+                  }
+                },
+                "task_type": "qubit",
+                "username": "admin"
+              }
+            },
             "tasks": [
-              "task1",
-              "task2"
+              "CheckRabi"
             ],
-            "username": "default-user"
+            "username": "admin"
           }
         ]
       },
@@ -2616,7 +1861,8 @@
         "required": [
           "flow_run_url"
         ],
-        "title": "ExecuteCalibResponse"
+        "title": "ExecuteCalibResponse",
+        "description": "ExecuteCalibResponse is a subclass of BaseModel."
       },
       "ExecutionLockStatusResponse": {
         "properties": {
@@ -2722,7 +1968,7 @@
           },
           "task": {
             "items": {
-              "$ref": "#/components/schemas/server__routers__chip__Task"
+              "$ref": "#/components/schemas/Task"
             },
             "type": "array",
             "title": "Task"
@@ -2743,48 +1989,6 @@
           "note"
         ],
         "title": "ExecutionResponseDetail",
-        "description": "ExecutionResponseDetailV2 is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time"
-      },
-      "ExecutionResponseDetailV2": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "start_at": {
-            "type": "string",
-            "title": "Start At"
-          },
-          "end_at": {
-            "type": "string",
-            "title": "End At"
-          },
-          "elapsed_time": {
-            "type": "string",
-            "title": "Elapsed Time"
-          },
-          "task": {
-            "items": {
-              "$ref": "#/components/schemas/server__routers__execution_v2__Task"
-            },
-            "type": "array",
-            "title": "Task"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "status",
-          "start_at",
-          "end_at",
-          "elapsed_time",
-          "task"
-        ],
-        "title": "ExecutionResponseDetailV2",
         "description": "ExecutionResponseDetailV2 is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time"
       },
       "ExecutionResponseSummary": {
@@ -2837,45 +2041,6 @@
           "note"
         ],
         "title": "ExecutionResponseSummary",
-        "description": "ExecutionResponseSummaryV2 is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution."
-      },
-      "ExecutionResponseSummaryV2": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "execution_id": {
-            "type": "string",
-            "title": "Execution Id"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "start_at": {
-            "type": "string",
-            "title": "Start At"
-          },
-          "end_at": {
-            "type": "string",
-            "title": "End At"
-          },
-          "elapsed_time": {
-            "type": "string",
-            "title": "Elapsed Time"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "execution_id",
-          "status",
-          "start_at",
-          "end_at",
-          "elapsed_time"
-        ],
-        "title": "ExecutionResponseSummaryV2",
         "description": "ExecutionResponseSummaryV2 is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution."
       },
       "ExecutionRunResponse": {
@@ -3122,7 +2287,7 @@
           },
           "result": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/server__routers__chip__Task"
+              "$ref": "#/components/schemas/Task"
             },
             "type": "object",
             "title": "Result"
@@ -3298,27 +2463,6 @@
         "title": "MenuModel",
         "description": "Menu model.\n\nAttributes\n----------\n    name (str): The name of the menu.\n    username (str): The username of the user who created\n    description (str): Detailed description of the menu.\n    cal_plan (list[list[int]]): The calibration plan.\n    notify_bool (bool): The notification boolean.\n    tasks (list[str]): The tasks.\n    tags (list[str]): The tags."
       },
-      "MetricsResponse": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "data": {
-            "items": {
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Data"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "data"
-        ],
-        "title": "MetricsResponse"
-      },
       "MuxDetailResponse": {
         "properties": {
           "mux_id": {
@@ -3328,7 +2472,7 @@
           "detail": {
             "additionalProperties": {
               "additionalProperties": {
-                "$ref": "#/components/schemas/server__routers__chip__Task"
+                "$ref": "#/components/schemas/Task"
               },
               "type": "object"
             },
@@ -3343,276 +2487,6 @@
         ],
         "title": "MuxDetailResponse",
         "description": "MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details."
-      },
-      "NodeInfo": {
-        "properties": {
-          "fill": {
-            "type": "string",
-            "title": "Fill"
-          },
-          "position": {
-            "$ref": "#/components/schemas/Position"
-          }
-        },
-        "type": "object",
-        "required": [
-          "fill",
-          "position"
-        ],
-        "title": "NodeInfo"
-      },
-      "OneQubitCalibData": {
-        "properties": {
-          "resonator_frequency": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Data"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "qubit_frequency": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Data"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "t1": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Data"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "t2_echo": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Data"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "t2_star": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Data"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "average_gate_fidelity": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Data"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "title": "OneQubitCalibData"
-      },
-      "OneQubitCalibResponse": {
-        "properties": {
-          "qpu_name": {
-            "type": "string",
-            "title": "Qpu Name"
-          },
-          "cooling_down_id": {
-            "type": "integer",
-            "title": "Cooling Down Id"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "node_info": {
-            "$ref": "#/components/schemas/NodeInfo"
-          },
-          "one_qubit_calib_data": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OneQubitCalibData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "qpu_name",
-          "cooling_down_id",
-          "label",
-          "status",
-          "node_info",
-          "one_qubit_calib_data"
-        ],
-        "title": "OneQubitCalibResponse"
-      },
-      "ParamData": {
-        "properties": {
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "value": {
-            "type": "number",
-            "title": "Value"
-          },
-          "unit": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Unit"
-          }
-        },
-        "type": "object",
-        "required": [
-          "label",
-          "value"
-        ],
-        "title": "ParamData"
-      },
-      "ParamResponse": {
-        "properties": {
-          "param_name": {
-            "type": "string",
-            "title": "Param Name"
-          },
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/ParamData"
-            },
-            "type": "array",
-            "title": "Data"
-          }
-        },
-        "type": "object",
-        "required": [
-          "param_name",
-          "data"
-        ],
-        "title": "ParamResponse"
-      },
-      "Position": {
-        "properties": {
-          "x": {
-            "type": "number",
-            "title": "X"
-          },
-          "y": {
-            "type": "number",
-            "title": "Y"
-          }
-        },
-        "type": "object",
-        "required": [
-          "x",
-          "y"
-        ],
-        "title": "Position"
-      },
-      "QPUInfoResponse": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "nodes": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Nodes"
-          },
-          "edges": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Edges"
-          },
-          "active": {
-            "type": "boolean",
-            "title": "Active"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "nodes",
-          "edges",
-          "active"
-        ],
-        "title": "QPUInfoResponse"
-      },
-      "QPUStatsResponse": {
-        "properties": {
-          "average_gate_fidelity": {
-            "$ref": "#/components/schemas/Stats"
-          },
-          "resonator_frequency": {
-            "$ref": "#/components/schemas/Stats"
-          },
-          "qubit_frequency": {
-            "$ref": "#/components/schemas/Stats"
-          },
-          "t1": {
-            "$ref": "#/components/schemas/Stats"
-          },
-          "t2_echo": {
-            "$ref": "#/components/schemas/Stats"
-          },
-          "t2_star": {
-            "$ref": "#/components/schemas/Stats"
-          }
-        },
-        "type": "object",
-        "required": [
-          "average_gate_fidelity",
-          "resonator_frequency",
-          "qubit_frequency",
-          "t1",
-          "t2_echo",
-          "t2_star"
-        ],
-        "title": "QPUStatsResponse"
       },
       "ScheduleCalibRequest": {
         "properties": {
@@ -3630,7 +2504,8 @@
           "menu_name",
           "scheduled"
         ],
-        "title": "ScheduleCalibRequest"
+        "title": "ScheduleCalibRequest",
+        "description": "ScheduleCalibRequest is a subclass of BaseModel."
       },
       "ScheduleCalibResponse": {
         "properties": {
@@ -3672,7 +2547,8 @@
           "scheduled_time",
           "flow_run_id"
         ],
-        "title": "ScheduleCalibResponse"
+        "title": "ScheduleCalibResponse",
+        "description": "ScheduleCalibResponse is a subclass of BaseModel."
       },
       "Settings": {
         "properties": {
@@ -3738,54 +2614,185 @@
         ],
         "title": "Settings"
       },
-      "Stats": {
+      "Task": {
         "properties": {
-          "average_value": {
+          "task_id": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Average Value"
+            "title": "Task Id"
           },
-          "max_value": {
+          "qid": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Max Value"
+            "title": "Qid"
           },
-          "min_value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Min Value"
-          },
-          "fig_path": {
+          "name": {
             "type": "string",
-            "title": "Fig Path"
+            "title": "Name",
+            "default": ""
+          },
+          "upstream_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "pending"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "input_parameters": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Parameters"
+          },
+          "output_parameters": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Parameters"
+          },
+          "output_parameter_names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Parameter Names"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "figure_path": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Figure Path"
+          },
+          "raw_data_path": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Data Path"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Time"
+          },
+          "task_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Type"
           }
         },
         "type": "object",
-        "required": [
-          "average_value",
-          "max_value",
-          "min_value",
-          "fig_path"
-        ],
-        "title": "Stats"
+        "title": "Task",
+        "description": "Task is a Pydantic model that represents a task."
       },
       "TaskResponse": {
         "properties": {
@@ -3844,85 +2851,6 @@
           "token_type"
         ],
         "title": "Token"
-      },
-      "TwoQubitCalibData": {
-        "properties": {
-          "cross_resonance_power": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Data"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "average_gate_fidelity": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Data"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "title": "TwoQubitCalibData"
-      },
-      "TwoQubitCalibResponse": {
-        "properties": {
-          "qpu_name": {
-            "type": "string",
-            "title": "Qpu Name"
-          },
-          "cooling_down_id": {
-            "type": "integer",
-            "title": "Cooling Down Id"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "edge_info": {
-            "$ref": "#/components/schemas/EdgeInfo"
-          },
-          "two_qubit_calib_data": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TwoQubitCalibData"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "qpu_name",
-          "cooling_down_id",
-          "label",
-          "status",
-          "edge_info",
-          "two_qubit_calib_data"
-        ],
-        "title": "TwoQubitCalibResponse"
       },
       "UpdateMenuRequest": {
         "properties": {
@@ -4113,296 +3041,6 @@
           "type"
         ],
         "title": "ValidationError"
-      },
-      "server__routers__chip__Task": {
-        "properties": {
-          "task_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Task Id"
-          },
-          "qid": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Qid"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "default": ""
-          },
-          "upstream_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Upstream Id"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status",
-            "default": "pending"
-          },
-          "message": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Message"
-          },
-          "input_parameters": {
-            "anyOf": [
-              {
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Input Parameters"
-          },
-          "output_parameters": {
-            "anyOf": [
-              {
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Output Parameters"
-          },
-          "output_parameter_names": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Output Parameter Names"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          },
-          "figure_path": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Figure Path"
-          },
-          "raw_data_path": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Raw Data Path"
-          },
-          "start_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Start At"
-          },
-          "end_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "End At"
-          },
-          "elapsed_time": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Elapsed Time"
-          },
-          "task_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Task Type"
-          }
-        },
-        "type": "object",
-        "title": "Task",
-        "description": "Task is a Pydantic model that represents a task."
-      },
-      "server__routers__execution_v2__Task": {
-        "properties": {
-          "task_id": {
-            "type": "string",
-            "title": "Task Id"
-          },
-          "qid": {
-            "type": "string",
-            "title": "Qid",
-            "default": ""
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "upstream_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Upstream Id",
-            "default": ""
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "input_parameters": {
-            "type": "object",
-            "title": "Input Parameters"
-          },
-          "output_parameters": {
-            "type": "object",
-            "title": "Output Parameters"
-          },
-          "output_parameter_names": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Output Parameter Names"
-          },
-          "note": {
-            "type": "object",
-            "title": "Note"
-          },
-          "figure_path": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Figure Path"
-          },
-          "start_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Start At"
-          },
-          "end_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "End At"
-          },
-          "elapsed_time": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Elapsed Time"
-          },
-          "task_type": {
-            "type": "string",
-            "title": "Task Type"
-          }
-        },
-        "type": "object",
-        "required": [
-          "task_id",
-          "name",
-          "status",
-          "message",
-          "task_type"
-        ],
-        "title": "Task",
-        "description": "Task is a Pydantic model that represents a task in the execution response.\n\nAttributes\n----------\n    task_id (str): The ID of the task.\n    name (str): The name of the task.\n    upstream_id (Optional[str]): The ID of the upstream task.\n    status (str): The current status of the task.\n    message (str): The message associated with the task.\n    input_parameters (dict[str, Any]): The input parameters of the task.\n    output_parameters (dict[str, Any]): The output parameters of the task.\n    output_parameter_names (List[str]): The names of the output parameters.\n    note (dict[str, Any]): The note associated with the task.\n    figure_path (List[str]): The paths to the figures associated with the task.\n    start_at (Optional[str]): The start time of the task.\n    end_at (Optional[str]): The end time of the task.\n    elapsed_time (Optional[str]): The total elapsed time of the task.\n    task_type (str): The type of the task.\ndef modify_name(cls, v: str, values: dict[str, Any]) -> str:"
       }
     },
     "securitySchemes": {

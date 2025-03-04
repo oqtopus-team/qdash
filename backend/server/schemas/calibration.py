@@ -1,91 +1,65 @@
-from datetime import datetime
-from typing import Generic, Optional, TypeVar
+from typing import ClassVar, TypeVar
 
-from dbmodel.one_qubit_calib import NodeInfo, OneQubitCalibData
-from dbmodel.one_qubit_calib_daily_summary import OneQubitCalibSummary
-from dbmodel.two_qubit_calib import EdgeInfo, TwoQubitCalibData
-from dbmodel.two_qubit_calib_daily_summary import TwoQubitCalibSummary
-from pydantic import BaseModel, Field
+from datamodel.menu import MenuModel
+from pydantic import BaseModel
 
 T = TypeVar("T")
 
 
-class OneQubitCalibResponse(BaseModel):
-    qpu_name: str
-    cooling_down_id: int
-    label: str
-    status: str
-    node_info: NodeInfo
-    one_qubit_calib_data: Optional[OneQubitCalibData]
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+class ExecuteCalibRequest(MenuModel):
+    """ExecuteCalibRequest is a subclass of MenuModel."""
 
-
-class TwoQubitCalibResponse(BaseModel):
-    qpu_name: str
-    cooling_down_id: int
-    label: str
-    status: str
-    edge_info: EdgeInfo
-    two_qubit_calib_data: Optional[TwoQubitCalibData]
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
-
-
-class OneQubitCalibHistoryResponse(BaseModel):
-    qpu_name: str
-    cooling_down_id: int
-    label: str
-    date: str
-    one_qubit_calib_data: Optional[OneQubitCalibData]
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
-
-
-class TwoQubitCalibHistoryResponse(BaseModel):
-    qpu_name: str
-    cooling_down_id: int
-    label: str
-    date: str
-    two_qubit_calib_data: Optional[TwoQubitCalibData]
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
-
-
-class ExecuteCalibRequest(BaseModel):
-    """Menu model.
-
-    Attributes
-    ----------
-        name (str): The name of the menu.
-        username (str): The username of the user who created
-        description (str): Detailed description of the menu.
-        qids (list[list[str]]): The qubit IDs.
-        notify_bool (bool): The notification boolean.
-        tasks (list[str]): The tasks.
-        tags (list[str]): The tags.
-
-    """
-
-    name: str
-    username: str
-    description: str
-    qids: list[list[str]]
-    notify_bool: bool = False
-    tasks: list[str] | None = Field(default=None)
-    tags: list[str] | None = Field(default=None)
-
-    model_config = {
+    model_config: ClassVar[dict] = {
         "json_schema_extra": {
             "examples": [
                 {
-                    "name": "1Q-MOCK-DEMO",
-                    "username": "default-user",
-                    "description": "one qubit calibration for mock demo",
-                    "qids": [["Q1"], ["Q2", "Q3"]],
+                    "name": "CheckRabi",
+                    "username": "admin",
+                    "description": "check one qubit characteristics short",
+                    "qids": [["28"]],
                     "notify_bool": False,
-                    "tasks": ["task1", "task2"],
-                    "tags": ["calibration", "demo"],
+                    "tasks": [
+                        "CheckRabi",
+                    ],
+                    "task_details": {
+                        "CheckRabi": {
+                            "username": "admin",
+                            "name": "CheckRabi",
+                            "description": "Task to check the Rabi oscillation.",
+                            "task_type": "qubit",
+                            "input_parameters": {
+                                "time_range": {
+                                    "unit": "ns",
+                                    "value_type": "range",
+                                    "value": [0, 201, 4],
+                                    "description": "Time range for Rabi oscillation",
+                                },
+                                "shots": {
+                                    "unit": "a.u.",
+                                    "value_type": "int",
+                                    "value": 1024,
+                                    "description": "Number of shots for Rabi oscillation",
+                                },
+                                "interval": {
+                                    "unit": "ns",
+                                    "value_type": "int",
+                                    "value": 153600,
+                                    "description": "Time interval for Rabi oscillation",
+                                },
+                            },
+                            "output_parameters": {
+                                "rabi_amplitude": {
+                                    "unit": "a.u.",
+                                    "description": "Rabi oscillation amplitude",
+                                },
+                                "rabi_frequency": {
+                                    "unit": "GHz",
+                                    "description": "Rabi oscillation frequency",
+                                },
+                            },
+                        },
+                    },
+                    "tags": ["debug"],
                 },
             ]
         }
@@ -93,15 +67,21 @@ class ExecuteCalibRequest(BaseModel):
 
 
 class ExecuteCalibResponse(BaseModel):
+    """ExecuteCalibResponse is a subclass of BaseModel."""
+
     flow_run_url: str
 
 
 class ScheduleCalibRequest(BaseModel):
+    """ScheduleCalibRequest is a subclass of BaseModel."""
+
     menu_name: str
     scheduled: str
 
 
 class ScheduleCalibResponse(BaseModel):
+    """ScheduleCalibResponse is a subclass of BaseModel."""
+
     menu_name: str
     menu: ExecuteCalibRequest
     description: str
@@ -109,72 +89,3 @@ class ScheduleCalibResponse(BaseModel):
     timezone: str
     scheduled_time: str
     flow_run_id: str
-
-
-class BaseCalibDailySummary(BaseModel, Generic[T]):
-    date: str
-    labels: list[str]
-    qpu_name: str
-    cooling_down_id: int
-    summary: list[T]
-    note: str = ""
-
-
-class OneQubitCalibDailySummaryRequest(BaseCalibDailySummary[OneQubitCalibSummary]):
-    pass
-
-
-class OneQubitCalibDailySummaryResponse(BaseCalibDailySummary[OneQubitCalibSummary]):
-    pass
-
-
-class TwoQubitCalibDailySummaryRequest(BaseCalibDailySummary[TwoQubitCalibSummary]):
-    pass
-
-
-class TwoQubitCalibDailySummaryResponse(BaseCalibDailySummary[TwoQubitCalibSummary]):
-    pass
-
-
-class OneQubitCalibStatsRequest(BaseModel):
-    labels: list[str]
-
-
-class TwoQubitCalibStatsRequest(BaseModel):
-    labels: list[str]
-
-
-class OneQubitCalibStatsResponse(BaseModel):
-    date: str
-
-    class Config:
-        arbitrary_types_allowed = True
-        extra = "allow"
-
-    def simplify(self):
-        for key, value in self.__dict__.items():
-            if isinstance(value, OneQubitCalibData):
-                value.simplify()
-
-    def add_stats(self, label: str, stats: OneQubitCalibData):
-        setattr(self, label, stats)
-
-
-class TwoQubitCalibStatsResponse(BaseModel):
-    date: str
-
-    class Config:
-        arbitrary_types_allowed = True
-        extra = "allow"
-
-    def simplify(self):
-        for key, value in self.__dict__.items():
-            if isinstance(value, TwoQubitCalibData):
-                value.simplify()
-
-    def add_stats(self, label: str, stats: TwoQubitCalibData):
-        setattr(self, label, stats)
-
-
-class OneQubitCalibCWInfo(BaseModel):
-    cw_info: dict[str, OneQubitCalibData]

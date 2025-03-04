@@ -1,14 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useTheme } from "@/app/providers/theme-provider";
-import Editor from "@monaco-editor/react";
+import { BsPlus } from "react-icons/bs";
 import { toast } from "react-toastify";
-import yaml from "js-yaml";
 import { GetMenuResponse } from "@/schemas";
 import { useExecuteCalib } from "@/client/calibration/calibration";
 import { useAuth } from "@/app/contexts/AuthContext";
-import { BsPlus } from "react-icons/bs";
 
 export function ExecuteConfirmModal({
   selectedMenu,
@@ -19,58 +16,33 @@ export function ExecuteConfirmModal({
 }) {
   const { user } = useAuth();
   const executeCalibMutation = useExecuteCalib();
-  const [yamlText, setYamlText] = useState(
-    generateYamlWithCustomArrayFormat(selectedMenu),
-  );
-  const [validationError, setValidationError] = useState("");
-  const { theme } = useTheme();
-
-  const handleYamlChange = (value: string | undefined) => {
-    if (value !== undefined) {
-      setYamlText(value);
-      try {
-        yaml.load(value); // Validate YAML format
-        setValidationError("");
-      } catch (error) {
-        setValidationError(
-          "YAMLの形式が正しくありません: " +
-            (error instanceof Error ? error.message : String(error)),
-        );
-      }
-    }
-  };
+  const [menu, setMenu] = useState(selectedMenu);
 
   const handleConfirmClick = () => {
-    if (!validationError) {
-      try {
-        const updatedMenu = yaml.load(yamlText) as GetMenuResponse;
-        executeCalibMutation.mutate(
-          {
-            data: {
-              ...updatedMenu,
-              username: user?.username ?? "default-user",
-            },
-          },
-          {
-            onSuccess: () => {
-              toast.success("Calibration execution started!");
-              onClose();
-            },
-            onError: (error) => {
-              console.error("Error executing calibration:", error);
-              toast.error("Error executing calibration");
-            },
-          },
-        );
-      } catch (error) {
-        toast.error(
-          "YAMLのパースに失敗しました: " +
-            (error instanceof Error ? error.message : String(error)),
-        );
+    executeCalibMutation.mutate(
+      {
+        data: {
+          name: menu.name,
+          username: user?.username ?? "default-user",
+          description: menu.description,
+          qids: menu.qids,
+          notify_bool: menu.notify_bool,
+          tasks: menu.tasks,
+          tags: menu.tags,
+          task_details: menu.task_details,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Calibration execution started!");
+          onClose();
+        },
+        onError: (error) => {
+          console.error("Error executing calibration:", error);
+          toast.error("Error executing calibration");
+        },
       }
-    } else {
-      toast.error("YAMLの形式が正しくありません");
-    }
+    );
   };
 
   return (
@@ -98,61 +70,82 @@ export function ExecuteConfirmModal({
         </div>
 
         <div className="flex-1 overflow-auto p-6">
-          <div className="h-[500px] rounded-lg overflow-hidden bg-base-300/30 shadow-inner">
-            <Editor
-              defaultLanguage="yaml"
-              value={yamlText}
-              onChange={handleYamlChange}
-              theme={theme === "dark" ? "vs-dark" : "light"}
-              options={{
-                fontSize: 14,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                lineNumbers: "off",
-                automaticLayout: true,
-              }}
-            />
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-medium mb-2">Name</h3>
+              <p className="text-base-content/80">{menu.name}</p>
+            </div>
+
+            <div>
+              <h3 className="font-medium mb-2">Description</h3>
+              <p className="text-base-content/80">{menu.description}</p>
+            </div>
+
+            <div>
+              <h3 className="font-medium mb-2">Qubit IDs</h3>
+              <div className="space-y-1">
+                {menu.qids.map((qidGroup, index) => (
+                  <p key={index} className="text-base-content/80">
+                    Group {index + 1}: {qidGroup.join(", ")}
+                  </p>
+                ))}
+              </div>
+            </div>
+
+            {menu.tasks && menu.tasks.length > 0 && (
+              <div>
+                <h3 className="font-medium mb-2">Tasks</h3>
+                <div className="space-y-1">
+                  {menu.tasks.map((task, index) => (
+                    <p key={index} className="text-base-content/80">
+                      {task}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {menu.tags && menu.tags.length > 0 && (
+              <div>
+                <h3 className="font-medium mb-2">Tags</h3>
+                <div className="flex flex-wrap gap-2">
+                  {menu.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="px-2 py-1 bg-base-200 rounded text-sm"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="checkbox"
+                  checked={menu.notify_bool}
+                  onChange={(e) =>
+                    setMenu({ ...menu, notify_bool: e.target.checked })
+                  }
+                />
+                <span>Notify on completion</span>
+              </label>
+            </div>
           </div>
-          {validationError && (
-            <div className="mt-4 text-error text-sm">{validationError}</div>
-          )}
         </div>
 
         <div className="px-6 py-4 border-t border-base-300 flex justify-end gap-2">
           <button className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleConfirmClick}
-            disabled={!!validationError}
-          >
+          <button className="btn btn-primary" onClick={handleConfirmClick}>
             Execute
           </button>
         </div>
       </div>
     </div>
   );
-}
-
-// YAML 形式でデータを生成する関数
-function generateYamlWithCustomArrayFormat(data: GetMenuResponse) {
-  return `
-name: ${data.name}
-username: ${data.username}
-description: ${data.description}
-qids:
-${data.qids.map((seq) => `  - ${JSON.stringify(seq)}`).join("\n")}
-notify_bool: ${data.notify_bool}
-${
-  data.tasks && data.tasks.length > 0
-    ? `tasks:\n  - ${data.tasks.join("\n  - ")}`
-    : ""
-}
-${
-  data.tags && data.tags.length > 0
-    ? `tags:\n  - ${data.tags.join("\n  - ")}`
-    : ""
-}
-  `;
 }

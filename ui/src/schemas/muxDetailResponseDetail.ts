@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ServerRoutersChipTask } from "./serverRoutersChipTask";
+import type { Task } from "./task";
 
 export type MuxDetailResponseDetail = {
-  [key: string]: { [key: string]: ServerRoutersChipTask };
+  [key: string]: { [key: string]: Task };
 };
