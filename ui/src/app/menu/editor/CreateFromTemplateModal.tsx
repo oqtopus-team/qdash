@@ -6,11 +6,11 @@ import { toast } from "react-toastify";
 import yaml from "js-yaml";
 import Editor from "@monaco-editor/react";
 import { BsPlus } from "react-icons/bs";
-import { useCreateMenu } from "@/client/menu/menu";
+import { useCreateMenu, useListPreset } from "@/client/menu/menu";
 import type { CreateMenuRequest } from "@/schemas";
 
-// テンプレートの初期データ
-const templateData = `
+// Default template data
+const defaultTemplate = `
 name: template
 description: calibration menu template
 qids:
@@ -33,7 +33,8 @@ export function CreateFromTemplateModal({
   onSuccess: () => void;
 }) {
   const createMutation = useCreateMenu();
-  const [templateText, setTemplateText] = useState(templateData);
+  const [templateText, setTemplateText] = useState(defaultTemplate);
+  const { data: presetData } = useListPreset();
   const [validationError, setValidationError] = useState("");
   const { theme } = useTheme();
 
@@ -46,7 +47,7 @@ export function CreateFromTemplateModal({
       } catch (error) {
         setValidationError(
           "YAMLの形式が正しくありません: " +
-            (error instanceof Error ? error.message : String(error)),
+            (error instanceof Error ? error.message : String(error))
         );
       }
     }
@@ -69,7 +70,7 @@ export function CreateFromTemplateModal({
               console.error("Error creating template item:", error);
               toast.error("Error creating template item");
             },
-          },
+          }
         );
       }
     } catch (error) {
@@ -87,19 +88,46 @@ export function CreateFromTemplateModal({
         className="bg-base-100 rounded-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-6 py-4 border-b border-base-300 flex items-center justify-between bg-base-100/80 backdrop-blur supports-[backdrop-filter]:bg-base-100/60">
-          <div>
-            <h2 className="text-2xl font-bold">Create Menu from Template</h2>
-            <p className="text-base-content/70 mt-1">
-              Edit the template below to create a new menu
-            </p>
+        <div className="px-6 py-4 border-b border-base-300 flex flex-col gap-4 bg-base-100/80 backdrop-blur supports-[backdrop-filter]:bg-base-100/60">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">Create Menu from Template</h2>
+              <p className="text-base-content/70 mt-1">
+                Select a preset or edit the template below to create a new menu
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="btn btn-ghost btn-sm btn-square hover:rotate-90 transition-transform"
+            >
+              <BsPlus className="text-xl rotate-45" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="btn btn-ghost btn-sm btn-square hover:rotate-90 transition-transform"
-          >
-            <BsPlus className="text-xl rotate-45" />
-          </button>
+
+          <div className="flex items-center gap-4">
+            <select
+              className="select select-bordered w-full"
+              onChange={(e) => {
+                if (e.target.value === "") {
+                  setTemplateText(defaultTemplate);
+                  return;
+                }
+                const selectedPreset = presetData?.data.menus.find(
+                  (menu) => menu.name === e.target.value
+                );
+                if (selectedPreset) {
+                  setTemplateText(yaml.dump(selectedPreset));
+                }
+              }}
+            >
+              <option value="">Select a preset...</option>
+              {presetData?.data.menus.map((menu) => (
+                <option key={menu.name} value={menu.name}>
+                  {menu.name} - {menu.description}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto p-6">
