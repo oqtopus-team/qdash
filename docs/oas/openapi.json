@@ -251,14 +251,51 @@
         ]
       }
     },
-    "/menu/{name}": {
-      "delete": {
+    "/menu/preset": {
+      "get": {
         "tags": [
           "menu"
         ],
-        "summary": "Delete a menu by its name.",
-        "description": "Delete a menu by its name.\n\nArgs:\n----\n    name (str): The name of the menu to be deleted.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    DeleteMenuResponse | NotFoundErrorResponse: The response indicating the success or failure of the deletion.",
-        "operationId": "delete_menu",
+        "summary": "Retrieve a list of preset menu items.",
+        "description": "Retrieve a list of preset menu items.\n\nReturns\n-------\n    ListMenuResponse: A response containing the list of preset menu items.",
+        "operationId": "listPreset",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListMenuResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/menu/{name}": {
+      "get": {
+        "tags": [
+          "menu"
+        ],
+        "summary": "Retrieve a menu by its name.",
+        "description": "Retrieve a menu by its name.\n\nArgs:\n----\n    name (str): The name of the menu.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    GetMenuResponse: The response containing the menu details.\n\nRaises:\n------\n    InternalServerError: If there is an error retrieving the menu.\n    NotFoundErrorResponse: If the menu is not found.",
+        "operationId": "get_menu_by_name",
         "security": [
           {
             "APIKeyHeader": []
@@ -281,7 +318,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeleteMenuResponse"
+                  "$ref": "#/components/schemas/GetMenuResponse"
                 }
               }
             }
@@ -374,13 +411,13 @@
           }
         }
       },
-      "get": {
+      "delete": {
         "tags": [
           "menu"
         ],
-        "summary": "Retrieve a menu by its name.",
-        "description": "Retrieve a menu by its name.\n\nArgs:\n----\n    name (str): The name of the menu.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    GetMenuResponse: The response containing the menu details.\n\nRaises:\n------\n    InternalServerError: If there is an error retrieving the menu.\n    NotFoundErrorResponse: If the menu is not found.",
-        "operationId": "get_menu_by_name",
+        "summary": "Delete a menu by its name.",
+        "description": "Delete a menu by its name.\n\nArgs:\n----\n    name (str): The name of the menu to be deleted.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    DeleteMenuResponse | NotFoundErrorResponse: The response indicating the success or failure of the deletion.",
+        "operationId": "delete_menu",
         "security": [
           {
             "APIKeyHeader": []
@@ -403,7 +440,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GetMenuResponse"
+                  "$ref": "#/components/schemas/DeleteMenuResponse"
                 }
               }
             }
