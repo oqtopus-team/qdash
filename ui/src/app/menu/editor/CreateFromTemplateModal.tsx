@@ -46,7 +46,7 @@ export function CreateFromTemplateModal({
       } catch (error) {
         setValidationError(
           "YAMLの形式が正しくありません: " +
-            (error instanceof Error ? error.message : String(error))
+            (error instanceof Error ? error.message : String(error)),
         );
       }
     }
@@ -69,7 +69,7 @@ export function CreateFromTemplateModal({
               console.error("Error creating template item:", error);
               toast.error("Error creating template item");
             },
-          }
+          },
         );
       }
     } catch (error) {

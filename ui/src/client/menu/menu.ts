@@ -240,187 +240,121 @@ export const useCreateMenu = <
   return useMutation(mutationOptions);
 };
 /**
- * Delete a menu by its name.
+ * Retrieve a list of preset menu items.
 
-Args:
-----
-    name (str): The name of the menu to be deleted.
-    current_user (User): The current authenticated user.
-
-Returns:
+Returns
 -------
-    DeleteMenuResponse | NotFoundErrorResponse: The response indicating the success or failure of the deletion.
- * @summary Delete a menu by its name.
+    ListMenuResponse: A response containing the list of preset menu items.
+ * @summary Retrieve a list of preset menu items.
  */
-export const deleteMenu = (
-  name: string,
+export const listPreset = (
   options?: AxiosRequestConfig,
-): Promise<AxiosResponse<DeleteMenuResponse>> => {
-  return axios.delete(`http://localhost:5715/menu/${name}`, options);
+): Promise<AxiosResponse<ListMenuResponse>> => {
+  return axios.get(`http://localhost:5715/menu/preset`, options);
 };
 
-export const getDeleteMenuMutationOptions = <
-  TError = AxiosError<Detail | HTTPValidationError>,
-  TContext = unknown,
+export const getListPresetQueryKey = () => {
+  return [`http://localhost:5715/menu/preset`] as const;
+};
+
+export const getListPresetQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPreset>>,
+  TError = AxiosError<Detail>,
 >(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteMenu>>,
-    TError,
-    { name: string },
-    TContext
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listPreset>>, TError, TData>
   >;
   axios?: AxiosRequestConfig;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteMenu>>,
-  TError,
-  { name: string },
-  TContext
-> => {
-  const mutationKey = ["deleteMenu"];
-  const { mutation: mutationOptions, axios: axiosOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, axios: undefined };
+}) => {
+  const { query: queryOptions, axios: axiosOptions } = options ?? {};
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteMenu>>,
-    { name: string }
-  > = (props) => {
-    const { name } = props ?? {};
+  const queryKey = queryOptions?.queryKey ?? getListPresetQueryKey();
 
-    return deleteMenu(name, axiosOptions);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listPreset>>> = ({
+    signal,
+  }) => listPreset({ signal, ...axiosOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPreset>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type ListPresetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPreset>>
+>;
+export type ListPresetQueryError = AxiosError<Detail>;
+
+export function useListPreset<
+  TData = Awaited<ReturnType<typeof listPreset>>,
+  TError = AxiosError<Detail>,
+>(options: {
+  query: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listPreset>>, TError, TData>
+  > &
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof listPreset>>,
+        TError,
+        Awaited<ReturnType<typeof listPreset>>
+      >,
+      "initialData"
+    >;
+  axios?: AxiosRequestConfig;
+}): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useListPreset<
+  TData = Awaited<ReturnType<typeof listPreset>>,
+  TError = AxiosError<Detail>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listPreset>>, TError, TData>
+  > &
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof listPreset>>,
+        TError,
+        Awaited<ReturnType<typeof listPreset>>
+      >,
+      "initialData"
+    >;
+  axios?: AxiosRequestConfig;
+}): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useListPreset<
+  TData = Awaited<ReturnType<typeof listPreset>>,
+  TError = AxiosError<Detail>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listPreset>>, TError, TData>
+  >;
+  axios?: AxiosRequestConfig;
+}): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Retrieve a list of preset menu items.
+ */
+
+export function useListPreset<
+  TData = Awaited<ReturnType<typeof listPreset>>,
+  TError = AxiosError<Detail>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listPreset>>, TError, TData>
+  >;
+  axios?: AxiosRequestConfig;
+}): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getListPresetQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData>;
   };
 
-  return { mutationFn, ...mutationOptions };
-};
+  query.queryKey = queryOptions.queryKey;
 
-export type DeleteMenuMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteMenu>>
->;
+  return query;
+}
 
-export type DeleteMenuMutationError = AxiosError<Detail | HTTPValidationError>;
-
-/**
- * @summary Delete a menu by its name.
- */
-export const useDeleteMenu = <
-  TError = AxiosError<Detail | HTTPValidationError>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteMenu>>,
-    TError,
-    { name: string },
-    TContext
-  >;
-  axios?: AxiosRequestConfig;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof deleteMenu>>,
-  TError,
-  { name: string },
-  TContext
-> => {
-  const mutationOptions = getDeleteMenuMutationOptions(options);
-
-  return useMutation(mutationOptions);
-};
-/**
- * Update a menu with the given name.
-
-Args:
-----
-    name (str): The name of the menu to update.
-    req (UpdateMenuRequest): The request object containing the updated menu data.
-    current_user (User): The current authenticated user.
-
-Returns:
--------
-    Union[UpdateMenuResponse, NotFoundErrorResponse]: The response object indicating the success of the update or an error if the menu is not found.
- * @summary Update a menu with the given name.
- */
-export const updateMenu = (
-  name: string,
-  updateMenuRequest: UpdateMenuRequest,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<UpdateMenuResponse>> => {
-  return axios.put(
-    `http://localhost:5715/menu/${name}`,
-    updateMenuRequest,
-    options,
-  );
-};
-
-export const getUpdateMenuMutationOptions = <
-  TError = AxiosError<Detail | HTTPValidationError>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateMenu>>,
-    TError,
-    { name: string; data: UpdateMenuRequest },
-    TContext
-  >;
-  axios?: AxiosRequestConfig;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateMenu>>,
-  TError,
-  { name: string; data: UpdateMenuRequest },
-  TContext
-> => {
-  const mutationKey = ["updateMenu"];
-  const { mutation: mutationOptions, axios: axiosOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, axios: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateMenu>>,
-    { name: string; data: UpdateMenuRequest }
-  > = (props) => {
-    const { name, data } = props ?? {};
-
-    return updateMenu(name, data, axiosOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type UpdateMenuMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateMenu>>
->;
-export type UpdateMenuMutationBody = UpdateMenuRequest;
-export type UpdateMenuMutationError = AxiosError<Detail | HTTPValidationError>;
-
-/**
- * @summary Update a menu with the given name.
- */
-export const useUpdateMenu = <
-  TError = AxiosError<Detail | HTTPValidationError>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateMenu>>,
-    TError,
-    { name: string; data: UpdateMenuRequest },
-    TContext
-  >;
-  axios?: AxiosRequestConfig;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof updateMenu>>,
-  TError,
-  { name: string; data: UpdateMenuRequest },
-  TContext
-> => {
-  const mutationOptions = getUpdateMenuMutationOptions(options);
-
-  return useMutation(mutationOptions);
-};
 /**
  * Retrieve a menu by its name.
 
@@ -567,3 +501,186 @@ export function useGetMenuByName<
 
   return query;
 }
+
+/**
+ * Update a menu with the given name.
+
+Args:
+----
+    name (str): The name of the menu to update.
+    req (UpdateMenuRequest): The request object containing the updated menu data.
+    current_user (User): The current authenticated user.
+
+Returns:
+-------
+    Union[UpdateMenuResponse, NotFoundErrorResponse]: The response object indicating the success of the update or an error if the menu is not found.
+ * @summary Update a menu with the given name.
+ */
+export const updateMenu = (
+  name: string,
+  updateMenuRequest: UpdateMenuRequest,
+  options?: AxiosRequestConfig,
+): Promise<AxiosResponse<UpdateMenuResponse>> => {
+  return axios.put(
+    `http://localhost:5715/menu/${name}`,
+    updateMenuRequest,
+    options,
+  );
+};
+
+export const getUpdateMenuMutationOptions = <
+  TError = AxiosError<Detail | HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMenu>>,
+    TError,
+    { name: string; data: UpdateMenuRequest },
+    TContext
+  >;
+  axios?: AxiosRequestConfig;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateMenu>>,
+  TError,
+  { name: string; data: UpdateMenuRequest },
+  TContext
+> => {
+  const mutationKey = ["updateMenu"];
+  const { mutation: mutationOptions, axios: axiosOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, axios: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateMenu>>,
+    { name: string; data: UpdateMenuRequest }
+  > = (props) => {
+    const { name, data } = props ?? {};
+
+    return updateMenu(name, data, axiosOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateMenuMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateMenu>>
+>;
+export type UpdateMenuMutationBody = UpdateMenuRequest;
+export type UpdateMenuMutationError = AxiosError<Detail | HTTPValidationError>;
+
+/**
+ * @summary Update a menu with the given name.
+ */
+export const useUpdateMenu = <
+  TError = AxiosError<Detail | HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMenu>>,
+    TError,
+    { name: string; data: UpdateMenuRequest },
+    TContext
+  >;
+  axios?: AxiosRequestConfig;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateMenu>>,
+  TError,
+  { name: string; data: UpdateMenuRequest },
+  TContext
+> => {
+  const mutationOptions = getUpdateMenuMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Delete a menu by its name.
+
+Args:
+----
+    name (str): The name of the menu to be deleted.
+    current_user (User): The current authenticated user.
+
+Returns:
+-------
+    DeleteMenuResponse | NotFoundErrorResponse: The response indicating the success or failure of the deletion.
+ * @summary Delete a menu by its name.
+ */
+export const deleteMenu = (
+  name: string,
+  options?: AxiosRequestConfig,
+): Promise<AxiosResponse<DeleteMenuResponse>> => {
+  return axios.delete(`http://localhost:5715/menu/${name}`, options);
+};
+
+export const getDeleteMenuMutationOptions = <
+  TError = AxiosError<Detail | HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteMenu>>,
+    TError,
+    { name: string },
+    TContext
+  >;
+  axios?: AxiosRequestConfig;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteMenu>>,
+  TError,
+  { name: string },
+  TContext
+> => {
+  const mutationKey = ["deleteMenu"];
+  const { mutation: mutationOptions, axios: axiosOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, axios: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteMenu>>,
+    { name: string }
+  > = (props) => {
+    const { name } = props ?? {};
+
+    return deleteMenu(name, axiosOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteMenuMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteMenu>>
+>;
+
+export type DeleteMenuMutationError = AxiosError<Detail | HTTPValidationError>;
+
+/**
+ * @summary Delete a menu by its name.
+ */
+export const useDeleteMenu = <
+  TError = AxiosError<Detail | HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteMenu>>,
+    TError,
+    { name: string },
+    TContext
+  >;
+  axios?: AxiosRequestConfig;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteMenu>>,
+  TError,
+  { name: string },
+  TContext
+> => {
+  const mutationOptions = getDeleteMenuMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};

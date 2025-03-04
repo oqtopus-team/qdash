@@ -20,7 +20,7 @@ export function ExecuteConfirmModal({
   const { user } = useAuth();
   const executeCalibMutation = useExecuteCalib();
   const [yamlText, setYamlText] = useState(
-    generateYamlWithCustomArrayFormat(selectedMenu)
+    generateYamlWithCustomArrayFormat(selectedMenu),
   );
   const [validationError, setValidationError] = useState("");
   const { theme } = useTheme();
@@ -34,7 +34,7 @@ export function ExecuteConfirmModal({
       } catch (error) {
         setValidationError(
           "YAMLの形式が正しくありません: " +
-            (error instanceof Error ? error.message : String(error))
+            (error instanceof Error ? error.message : String(error)),
         );
       }
     }
@@ -60,12 +60,12 @@ export function ExecuteConfirmModal({
               console.error("Error executing calibration:", error);
               toast.error("Error executing calibration");
             },
-          }
+          },
         );
       } catch (error) {
         toast.error(
           "YAMLのパースに失敗しました: " +
-            (error instanceof Error ? error.message : String(error))
+            (error instanceof Error ? error.message : String(error)),
         );
       }
     } else {
