@@ -2,18 +2,16 @@
 
 import "react18-json-view/src/style.css";
 import { useEffect, useState } from "react";
-import { FaRegSquarePlus } from "react-icons/fa6";
 import { toast } from "react-toastify";
 
 import { mapListMenuResponseToListMenu } from "../../model";
 import { getColumns } from "./Columns";
-import { NewItemModal } from "./NewItemModal";
-import { TableEditModal } from "./TableEditModal";
-import { NewItemModalFromTemplate } from "./NewItemModalFromTemplate";
 import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
+import { MenuPreviewModal } from "./MenuPreviewModal";
 
 import type { Menu } from "../../model";
-import { useListMenu, useDeleteMenu } from "@/client/menu/menu";
+import type { GetMenuResponse } from "@/schemas";
+import { useListMenu } from "@/client/menu/menu";
 import { useExecuteCalib } from "@/client/calibration/calibration";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { Table } from "@/app/components/Table";
@@ -30,12 +28,14 @@ const INITIAL_SELECTED_ITEM: Menu = {
 
 export function CalibrationMenuTable() {
   const { data, isError, isLoading, refetch: refetchMenu } = useListMenu();
-  const deleteMutation = useDeleteMenu();
   const executeCalibMutation = useExecuteCalib();
   const { user } = useAuth();
   const [tableData, setTableData] = useState<Menu[]>([]);
   const [selectedItem, setSelectedItem] = useState<Menu>(INITIAL_SELECTED_ITEM);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [selectedMenuForPreview, setSelectedMenuForPreview] =
+    useState<GetMenuResponse | null>(null);
+  const [showExecuteConfirmModal, setShowExecuteConfirmModal] = useState(false);
+  const [showMenuPreview, setShowMenuPreview] = useState(false);
 
   useEffect(() => {
     if (data) {
@@ -43,105 +43,64 @@ export function CalibrationMenuTable() {
     }
   }, [data]);
 
-  const handleDeleteClick = (item: Menu) => {
-    deleteMutation.mutate(
-      { name: item.name },
-      {
-        onSuccess: async () => {
-          const updatedData = await refetchMenu();
-          if (updatedData.data) {
-            setTableData(mapListMenuResponseToListMenu(updatedData.data.data));
-          }
-        },
-        onError: (error) => {
-          console.error("Error deleting menu:", error);
-        },
-      },
-    );
-  };
-
-  const handleNewItem = () => {
-    const newItemModal = document.getElementById(
-      "newItem",
-    ) as HTMLDialogElement | null;
-    if (newItemModal) {
-      newItemModal.showModal();
-    }
-  };
-
-  const handleCreateTemplate = () => {
-    const createTemplateModal = document.getElementById(
-      "createTemplate",
-    ) as HTMLDialogElement | null;
-    if (createTemplateModal) {
-      createTemplateModal.showModal();
-    }
-  };
-
-  const handleEditClick = (item: Menu) => {
+  const handleEditClick = async (item: Menu) => {
     setSelectedItem(item);
-    const editModal = document.getElementById(
-      "tableEdit",
-    ) as HTMLDialogElement | null;
-    if (editModal) {
-      editModal.showModal();
+    // メニューの詳細情報を取得
+    const menuData = await refetchMenu();
+    if (menuData.data) {
+      const menuWithDetails = menuData.data.data.menus.find(
+        (menu: GetMenuResponse) => menu.name === item.name
+      );
+      if (menuWithDetails) {
+        setSelectedMenuForPreview(menuWithDetails);
+        setShowMenuPreview(true);
+        const menuPreviewModal = document.getElementById(
+          "menuPreview"
+        ) as HTMLDialogElement | null;
+        if (menuPreviewModal) {
+          menuPreviewModal.showModal();
+        }
+      }
     }
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="loading loading-spinner loading-lg text-primary"></div>
+      </div>
+    );
   }
+
   if (isError) {
-    return <div>Error</div>;
+    return (
+      <div className="alert alert-error">
+        <span>Failed to load calibration menus</span>
+      </div>
+    );
   }
 
   const handleExecuteCalib = (item: Menu) => {
     setSelectedItem(item);
-    setShowConfirmModal(true);
+    setShowExecuteConfirmModal(true);
   };
 
   const columns = getColumns(
     handleEditClick,
-    handleDeleteClick,
+    () => {}, // Delete handler is no longer needed
     handleExecuteCalib,
-    false, // Temporarily disable lock
+    false // Temporarily disable lock
   );
 
   return (
-    <div>
-      <div className="flex justify-between">
-        <h2 className="text-left text-2xl font-bold px-4 pb-4 py-4">
-          Calibration Menu
-        </h2>
-        <div className="flex justify-end py-4">
-          <div className="flex items-center">
-            <button className="btn mx-4 bg-neutral" onClick={handleNewItem}>
-              <FaRegSquarePlus className="text-neutral-content" />
-              <div className="text-neutral-content">From File</div>
-            </button>
-            <button
-              className="btn mx-4 bg-neutral"
-              onClick={handleCreateTemplate}
-            >
-              <FaRegSquarePlus className="text-neutral-content" />
-              <div className="text-neutral-content">From Template</div>
-            </button>
-          </div>
-        </div>
+    <div className="bg-base-100 rounded-box shadow-lg">
+      <div className="border-b border-base-300 px-6 py-4">
+        <h2 className="text-2xl font-bold">Calibration Menu</h2>
       </div>
-      <Table data={tableData} columns={columns} filter={"name"} />
-      <TableEditModal
-        selectedItem={selectedItem}
-        setSelectedItem={setSelectedItem}
-        setTableData={setTableData}
-        refetchMenu={refetchMenu}
-      />
-      <NewItemModal setTableData={setTableData} refetchMenu={refetchMenu} />
-      <NewItemModalFromTemplate
-        setTableData={setTableData}
-        refetchMenu={refetchMenu}
-      />
-      {showConfirmModal && (
+      <div className="p-6">
+        <Table data={tableData} columns={columns} filter={"name"} />
+      </div>
+      {showExecuteConfirmModal && (
         <ExecuteConfirmModal
           selectedItem={selectedItem}
           onConfirm={(updatedItem) => {
@@ -155,16 +114,25 @@ export function CalibrationMenuTable() {
               {
                 onSuccess: () => {
                   toast.success("Calibration execution started!");
-                  setShowConfirmModal(false);
+                  setShowExecuteConfirmModal(false);
                 },
                 onError: (error) => {
                   console.error("Error executing calibration:", error);
                   toast.error("Error executing calibration");
                 },
-              },
+              }
             );
           }}
-          onCancel={() => setShowConfirmModal(false)}
+          onCancel={() => setShowExecuteConfirmModal(false)}
+        />
+      )}
+      {showMenuPreview && selectedMenuForPreview && (
+        <MenuPreviewModal
+          selectedItem={selectedMenuForPreview}
+          onClose={() => {
+            setShowMenuPreview(false);
+            setSelectedMenuForPreview(null);
+          }}
         />
       )}
     </div>
