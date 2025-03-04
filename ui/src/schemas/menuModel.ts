@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { MenuModelTasks } from "./menuModelTasks";
+import type { MenuModelTaskDetails } from "./menuModelTaskDetails";
 import type { MenuModelTags } from "./menuModelTags";
 
 /**
@@ -28,5 +29,6 @@ export interface MenuModel {
   qids: string[][];
   notify_bool?: boolean;
   tasks?: MenuModelTasks;
+  task_details?: MenuModelTaskDetails;
   tags?: MenuModelTags;
 }

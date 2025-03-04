@@ -1,6 +1,19 @@
+from typing import Any
+
 from bunnet import Document
 from datamodel.system_info import SystemInfoModel
 from pydantic import ConfigDict, Field
+
+
+def get_default_system_info() -> SystemInfoModel:
+    """Get default system info with current timestamps.
+
+    Returns
+    -------
+        SystemInfoModel: Default system info instance
+
+    """
+    return SystemInfoModel()
 
 
 class MenuDocument(Document):
@@ -23,7 +36,10 @@ class MenuDocument(Document):
     notify_bool: bool = False
     tasks: list[str] | None = Field(default=None, exclude=True)
     tags: list[str] | None = Field(default=None)
-    system_info: SystemInfoModel = Field(..., description="The system information")
+    task_details: dict[str, Any] | None = Field(default=None)
+    system_info: SystemInfoModel = Field(
+        default_factory=get_default_system_info, description="The system information"
+    )
 
     model_config = ConfigDict(
         from_attributes=True,

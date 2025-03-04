@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -24,4 +26,5 @@ class MenuModel(BaseModel):
     qids: list[list[str]]
     notify_bool: bool = False
     tasks: list[str] | None = Field(default=None)
+    task_details: dict[str, Any] | None = Field(default=None)
     tags: list[str] | None = Field(default=None)
