@@ -315,12 +315,12 @@ export default function MenuEditorPage() {
   };
 
   return (
-    <div className="container mx-auto h-[calc(100vh-4rem)] max-w-[1200px] p-4">
+    <div className="container mx-auto h-[calc(100vh-4rem)] max-w-[3000px] p-4">
       <div className="flex flex-col md:flex-row bg-base-200/50 backdrop-blur-sm rounded-lg shadow-xl overflow-hidden border border-base-300 h-full">
         {/* Menu Editor */}
         <div className="flex-1 md:w-[45%] flex flex-col md:flex-row h-full min-w-0">
           {/* File explorer */}
-          <div className="w-full md:w-36 h-48 md:h-full bg-base-200/80 border-r border-base-300 flex flex-col shrink-0">
+          <div className="w-full md:w-[25%] h-48 md:h-full bg-base-200/80 border-r border-base-300 flex flex-col shrink-0">
             <div className="px-4 py-3 border-b border-base-300 flex justify-between items-center shrink-0 bg-base-200/90">
               <h2 className="font-bold text-sm uppercase tracking-wide">
                 Menus
@@ -408,7 +408,7 @@ export default function MenuEditorPage() {
         {/* Task Detail Editor */}
         <div className="flex-1 md:w-[55%] flex flex-col md:flex-row h-full border-t md:border-t-0 md:border-l border-base-300 min-w-0">
           {/* File explorer */}
-          <div className="w-full md:w-36 h-48 md:h-full bg-base-200/80 border-r border-base-300 flex flex-col shrink-0">
+          <div className="w-full md:w-[25%] h-48 md:h-full bg-base-200/80 border-r border-base-300 flex flex-col shrink-0">
             <div className="px-4 py-3 border-b border-base-300 flex justify-between items-center shrink-0 bg-base-200/90">
               <h2 className="font-bold text-sm uppercase tracking-wide">
                 Task Details
