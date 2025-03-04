@@ -12,17 +12,15 @@ import { ja } from "date-fns/locale/ja";
 import DatePicker from "react-datepicker";
 import { registerLocale } from "react-datepicker";
 import { useState } from "react";
-
 import "react-datepicker/dist/react-datepicker.css";
 
 import { mapScheduleCalibResponsetoCalibSchedule } from "../../model";
-
 import type { Menu, CalibSchedule } from "../../model";
 import type { UseQueryResult } from "@tanstack/react-query";
-
 import { useScheduleCalib } from "@/client/calibration/calibration";
 
 registerLocale("ja", ja);
+
 export function NewItemModal({
   selectedMenuName,
   setSelectedMenuName,
@@ -90,7 +88,7 @@ export function NewItemModal({
       const updatedData = await refetchCalibSchedule();
       if (updatedData.data) {
         setCalibSchedules(
-          mapScheduleCalibResponsetoCalibSchedule(updatedData.data.data),
+          mapScheduleCalibResponsetoCalibSchedule(updatedData.data.data)
         );
       }
       document.getElementById("newItem")?.closest("dialog")?.close();
@@ -100,95 +98,122 @@ export function NewItemModal({
   };
 
   return (
-    <dialog
-      id="newItem"
-      className="modal"
-      style={{ width: "80%", height: "80%" }}
-    >
-      <div className="modal-box" style={{ width: "100%", height: "80%" }}>
-        <h3 className="font-bold text-lg my-4">Schedule Calibration</h3>
-        <form onSubmit={handleSubmit}>
-          <div className="flex flex-col items-start">
-            <label className="form-control w-full max-w-xs">
-              <div className="label">
-                <span className="label-text">Pick the menu</span>
-              </div>
-              <select
-                value={selectedMenuName}
-                className="select select-bordered"
-                onChange={(e) => setSelectedMenuName(e.target.value)}
-              >
-                <option disabled value="">
-                  Pick one
-                </option>
-                {menu.map((menu) => (
-                  <option key={menu.name} value={menu.name}>
-                    {menu.name}
+    <dialog id="newItem" className="modal">
+      <form
+        method="dialog"
+        className="modal-backdrop bg-base-100/30 backdrop-blur-sm"
+      >
+        <button>close</button>
+      </form>
+      <div className="modal-box w-[90vw] max-w-[1200px] h-3/5 overflow-auto">
+        <h3 className="text-2xl font-bold mb-8">Schedule Calibration</h3>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-8">
+              <div className="form-control w-full">
+                <label className="label">
+                  <span className="label-text font-medium">Menu</span>
+                </label>
+                <select
+                  value={selectedMenuName}
+                  className="select select-bordered w-full text-base"
+                  onChange={(e) => setSelectedMenuName(e.target.value)}
+                >
+                  <option disabled value="">
+                    Select menu
                   </option>
-                ))}
-              </select>
-            </label>
-            <p className="mx-5 mt-4">Scheduled Time</p>
-            <DatePicker
-              dateFormat="yyyy-MM-dd'T'HH:mm:ssXXX"
-              locale="ja"
-              selected={selectedDate}
-              onChange={(date) => setSelectedDate(date)}
-              showTimeSelect
-              timeIntervals={30}
-              className="react-datepicker input-sm input-bordered w-72 my-5"
-            />
-            <p className="mx-5 mt-4">Repeat</p>
-            <select
-              value={repeatType}
-              className="select select-bordered"
-              onChange={(e) => setRepeatType(e.target.value)}
-            >
-              <option value="none">None</option>
-              <option value="minutely">Minutely</option>
-              <option value="hourly">Hourly</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </select>
-            {repeatType !== "none" && (
-              <>
-                <p className="mx-5 mt-4">Repeat Interval</p>
-                <input
-                  type="number"
-                  value={repeatInterval}
-                  onChange={(e) => setRepeatInterval(Number(e.target.value))}
-                  className="input input-bordered w-24"
-                  min="1"
-                />
-                <p className="mx-5 mt-4">Repeat End Date</p>
+                  {menu.map((menu) => (
+                    <option key={menu.name} value={menu.name}>
+                      {menu.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-control w-full">
+                <label className="label">
+                  <span className="label-text font-medium">Scheduled Time</span>
+                </label>
                 <DatePicker
-                  dateFormat="yyyy-MM-dd'T'HH:mm:ssXXX"
+                  dateFormat="yyyy/MM/dd HH:mm"
                   locale="ja"
-                  selected={repeatEndDate}
-                  onChange={(date) => setRepeatEndDate(date)}
+                  selected={selectedDate}
+                  onChange={(date) => setSelectedDate(date)}
                   showTimeSelect
                   timeIntervals={30}
-                  className="react-datepicker input-sm input-bordered w-72 my-5"
+                  className="input input-bordered w-full text-base"
+                  placeholderText="Select date and time"
                 />
-              </>
+              </div>
+
+              <div className="form-control w-full">
+                <label className="label">
+                  <span className="label-text font-medium">Repeat</span>
+                </label>
+                <select
+                  value={repeatType}
+                  className="select select-bordered w-full text-base"
+                  onChange={(e) => setRepeatType(e.target.value)}
+                >
+                  <option value="none">None</option>
+                  <option value="minutely">Every Minute</option>
+                  <option value="hourly">Every Hour</option>
+                  <option value="daily">Every Day</option>
+                  <option value="weekly">Every Week</option>
+                  <option value="monthly">Every Month</option>
+                </select>
+              </div>
+            </div>
+
+            {repeatType !== "none" && (
+              <div className="space-y-8">
+                <div className="form-control w-full">
+                  <label className="label">
+                    <span className="label-text font-medium">
+                      Repeat Interval
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    value={repeatInterval}
+                    onChange={(e) => setRepeatInterval(Number(e.target.value))}
+                    className="input input-bordered w-full text-base"
+                    min="1"
+                    placeholder="Enter interval"
+                  />
+                </div>
+
+                <div className="form-control w-full">
+                  <label className="label">
+                    <span className="label-text font-medium">End Date</span>
+                  </label>
+                  <DatePicker
+                    dateFormat="yyyy/MM/dd HH:mm"
+                    locale="ja"
+                    selected={repeatEndDate}
+                    onChange={(date) => setRepeatEndDate(date)}
+                    showTimeSelect
+                    timeIntervals={30}
+                    className="input input-bordered w-full text-base"
+                    placeholderText="Select end date and time"
+                  />
+                </div>
+              </div>
             )}
           </div>
-          <div className="modal-action">
-            <button type="submit" className="btn">
-              Submit
-            </button>
+
+          <div className="modal-action pt-4">
             <button
               type="button"
-              className="btn"
+              className="btn btn-ghost"
               onClick={() => {
-                const newItemElement = document.getElementById("newItem");
-                if (newItemElement) {
-                  newItemElement.closest("dialog")?.close();
-                }
+                document.getElementById("newItem")?.closest("dialog")?.close();
               }}
             >
-              Close
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary">
+              Schedule
             </button>
           </div>
         </form>
