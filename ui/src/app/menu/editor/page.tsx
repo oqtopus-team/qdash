@@ -1,11 +1,17 @@
 "use client";
 
-import { useListMenu, useUpdateMenu } from "@/client/menu/menu";
+import { useListMenu, useUpdateMenu, useDeleteMenu } from "@/client/menu/menu";
 import { useFetchAllTasks } from "@/client/task/task";
 import { GetMenuResponse, TaskResponse } from "@/schemas";
 import { useState } from "react";
 import Editor from "@monaco-editor/react";
-import { BsPlus, BsFileEarmarkText } from "react-icons/bs";
+import {
+  BsPlus,
+  BsFileEarmarkText,
+  BsTrash,
+  BsPlay,
+  BsFileEarmarkPlus,
+} from "react-icons/bs";
 import TaskDetailList from "./TaskDetailList";
 
 interface TaskSelectModalProps {
@@ -31,7 +37,7 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
         acc[type].push(task);
         return acc;
       },
-      {},
+      {}
     ) || {};
 
   return (
@@ -101,18 +107,26 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
   );
 };
 
+import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
+import { DeleteConfirmModal } from "./DeleteConfirmModal";
+import { CreateFromTemplateModal } from "./CreateFromTemplateModal";
+
 export default function MenuEditorPage() {
-  const { data: menusData } = useListMenu();
+  const [showExecuteModal, setShowExecuteModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const { data: menusData, refetch: refetchMenus } = useListMenu();
   const updateMenu = useUpdateMenu();
+  const deleteMutation = useDeleteMenu();
   const [selectedMenu, setSelectedMenu] = useState<GetMenuResponse | null>(
-    null,
+    null
   );
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<string | null>(
-    null,
+    null
   );
   const [menuContent, setMenuContent] = useState<string>("");
   const [taskDetailContent, setTaskDetailContent] = useState<string>("");
   const [isTaskSelectOpen, setIsTaskSelectOpen] = useState(false);
+  const [showCreateFromTemplate, setShowCreateFromTemplate] = useState(false);
 
   // メニューが選択された時の処理
   const handleMenuSelect = (menu: GetMenuResponse) => {
@@ -124,8 +138,8 @@ export default function MenuEditorPage() {
           task_details: undefined, // task_detailsは左側のエディターには表示しない
         },
         null,
-        2,
-      ),
+        2
+      )
     );
     // 最初のtask_detailを選択
     const firstTask = Object.keys(menu.task_details || {})[0];
@@ -178,7 +192,7 @@ export default function MenuEditorPage() {
               task_details: updatedTaskDetails,
             });
           },
-        },
+        }
       );
     } catch (e) {
       // メニューのJSONが不正な場合
@@ -213,8 +227,8 @@ export default function MenuEditorPage() {
             tasks: updatedTasks,
           },
           null,
-          2,
-        ),
+          2
+        )
       );
 
       // task_detailsを更新
@@ -237,8 +251,8 @@ export default function MenuEditorPage() {
                   output_parameters: task.output_parameters || {},
                 },
                 null,
-                2,
-              ),
+                2
+              )
             );
             setSelectedMenu({
               ...selectedMenu,
@@ -247,7 +261,7 @@ export default function MenuEditorPage() {
             });
             setIsTaskSelectOpen(false);
           },
-        },
+        }
       );
     } catch (e) {
       // JSON解析エラー
@@ -284,8 +298,8 @@ export default function MenuEditorPage() {
             tasks: currentTasks,
           },
           null,
-          2,
-        ),
+          2
+        )
       );
 
       // task_detailsを更新
@@ -306,7 +320,7 @@ export default function MenuEditorPage() {
               task_details: updatedTaskDetails,
             });
           },
-        },
+        }
       );
     } catch (e) {
       // JSON解析エラー
@@ -325,17 +339,27 @@ export default function MenuEditorPage() {
               <h2 className="font-bold text-sm uppercase tracking-wide">
                 Menus
               </h2>
-              <button
-                className="btn btn-ghost btn-sm btn-square"
-                onClick={() => {
-                  setSelectedMenu(null);
-                  setSelectedTaskDetail(null);
-                  setMenuContent("");
-                  setTaskDetailContent("");
-                }}
-              >
-                <BsPlus className="text-lg" />
-              </button>
+              <div className="flex gap-1">
+                <button
+                  className="btn btn-ghost btn-sm btn-square"
+                  onClick={() => setShowCreateFromTemplate(true)}
+                  title="Create from template"
+                >
+                  <BsFileEarmarkPlus className="text-lg" />
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm btn-square"
+                  onClick={() => {
+                    setSelectedMenu(null);
+                    setSelectedTaskDetail(null);
+                    setMenuContent("");
+                    setTaskDetailContent("");
+                  }}
+                  title="Create new"
+                >
+                  <BsPlus className="text-lg" />
+                </button>
+              </div>
             </div>
             <div className="overflow-y-auto flex-1 p-2">
               {menusData?.data?.menus?.map((menu) => (
@@ -369,13 +393,33 @@ export default function MenuEditorPage() {
                   </>
                 )}
               </div>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={handleSave}
-                disabled={!selectedMenu}
-              >
-                Save
-              </button>
+              <div className="flex items-center gap-2">
+                {selectedMenu && (
+                  <>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setShowExecuteModal(true)}
+                    >
+                      <BsPlay className="text-lg" />
+                      <span>Execute</span>
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setShowDeleteModal(true)}
+                    >
+                      <BsTrash className="text-lg" />
+                      <span>Delete</span>
+                    </button>
+                  </>
+                )}
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleSave}
+                  disabled={!selectedMenu}
+                >
+                  Save
+                </button>
+              </div>
             </div>
 
             {/* Editor content */}
@@ -487,6 +531,46 @@ export default function MenuEditorPage() {
         <TaskSelectModal
           onClose={() => setIsTaskSelectOpen(false)}
           onSelect={handleAddTaskDetail}
+        />
+      )}
+      {/* Execute Confirm Modal */}
+      {showExecuteModal && selectedMenu && (
+        <ExecuteConfirmModal
+          selectedMenu={selectedMenu}
+          onClose={() => setShowExecuteModal(false)}
+        />
+      )}
+
+      {/* Delete Confirm Modal */}
+      {showDeleteModal && selectedMenu && (
+        <DeleteConfirmModal
+          selectedMenu={selectedMenu}
+          onConfirm={() => {
+            deleteMutation.mutate(
+              { name: selectedMenu.name },
+              {
+                onSuccess: () => {
+                  setShowDeleteModal(false);
+                  setSelectedMenu(null);
+                  setSelectedTaskDetail(null);
+                  setMenuContent("");
+                  setTaskDetailContent("");
+                  refetchMenus(); // 一覧を更新
+                },
+              }
+            );
+          }}
+          onClose={() => setShowDeleteModal(false)}
+        />
+      )}
+
+      {/* Create from Template Modal */}
+      {showCreateFromTemplate && (
+        <CreateFromTemplateModal
+          onClose={() => setShowCreateFromTemplate(false)}
+          onSuccess={() => {
+            refetchMenus();
+          }}
         />
       )}
     </div>
