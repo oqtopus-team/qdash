@@ -1,8 +1,8 @@
 "use client";
 
-import { useListMenu, useCreateMenu, useUpdateMenu } from "@/client/menu/menu";
+import { useListMenu, useUpdateMenu } from "@/client/menu/menu";
 import { useFetchAllTasks } from "@/client/task/task";
-import { CreateMenuRequest, GetMenuResponse, TaskResponse } from "@/schemas";
+import { GetMenuResponse, TaskResponse } from "@/schemas";
 import { useState } from "react";
 import Editor from "@monaco-editor/react";
 import { BsPlus, BsFileEarmarkText } from "react-icons/bs";
@@ -103,7 +103,6 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
 
 export default function MenuEditorPage() {
   const { data: menusData } = useListMenu();
-  const createMenu = useCreateMenu();
   const updateMenu = useUpdateMenu();
   const [selectedMenu, setSelectedMenu] = useState<GetMenuResponse | null>(
     null

@@ -25,7 +25,6 @@ interface TaskDetailListProps {
 
 function SortableItem({
   id,
-  content,
   isSelected,
   onSelect,
 }: {
