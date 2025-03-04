@@ -233,6 +233,7 @@ def update_menu(
         existing_menu.tasks = req.tasks
         existing_menu.notify_bool = req.notify_bool
         existing_menu.tags = req.tags
+        existing_menu.task_details = req.task_details
         existing_menu.save()
         return UpdateMenuResponse(name=existing_menu.name)
     logger.warning(f"menu not found: {name}")
@@ -283,4 +284,5 @@ def get_menu_by_name(
         tasks=menu.tasks,
         notify_bool=menu.notify_bool,
         tags=menu.tags,
+        task_details=menu.task_details,
     )

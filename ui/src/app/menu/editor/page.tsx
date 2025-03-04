@@ -31,7 +31,7 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
         acc[type].push(task);
         return acc;
       },
-      {}
+      {},
     ) || {};
 
   return (
@@ -105,10 +105,10 @@ export default function MenuEditorPage() {
   const { data: menusData } = useListMenu();
   const updateMenu = useUpdateMenu();
   const [selectedMenu, setSelectedMenu] = useState<GetMenuResponse | null>(
-    null
+    null,
   );
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<string | null>(
-    null
+    null,
   );
   const [menuContent, setMenuContent] = useState<string>("");
   const [taskDetailContent, setTaskDetailContent] = useState<string>("");
@@ -124,8 +124,8 @@ export default function MenuEditorPage() {
           task_details: undefined, // task_detailsは左側のエディターには表示しない
         },
         null,
-        2
-      )
+        2,
+      ),
     );
     // 最初のtask_detailを選択
     const firstTask = Object.keys(menu.task_details || {})[0];
@@ -178,7 +178,7 @@ export default function MenuEditorPage() {
               task_details: updatedTaskDetails,
             });
           },
-        }
+        },
       );
     } catch (e) {
       // メニューのJSONが不正な場合
@@ -213,8 +213,8 @@ export default function MenuEditorPage() {
             tasks: updatedTasks,
           },
           null,
-          2
-        )
+          2,
+        ),
       );
 
       // task_detailsを更新
@@ -237,8 +237,8 @@ export default function MenuEditorPage() {
                   output_parameters: task.output_parameters || {},
                 },
                 null,
-                2
-              )
+                2,
+              ),
             );
             setSelectedMenu({
               ...selectedMenu,
@@ -247,7 +247,7 @@ export default function MenuEditorPage() {
             });
             setIsTaskSelectOpen(false);
           },
-        }
+        },
       );
     } catch (e) {
       // JSON解析エラー
@@ -284,8 +284,8 @@ export default function MenuEditorPage() {
             tasks: currentTasks,
           },
           null,
-          2
-        )
+          2,
+        ),
       );
 
       // task_detailsを更新
@@ -306,7 +306,7 @@ export default function MenuEditorPage() {
               task_details: updatedTaskDetails,
             });
           },
-        }
+        },
       );
     } catch (e) {
       // JSON解析エラー
