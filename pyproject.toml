@@ -1,22 +1,22 @@
 [tool.poetry]
-name = "backend"
+name = "qdash"
 version = "0.1.0"
 description = ""
 authors = ["orangekame3 <oqtopus-team[at]googlegroups.com>"]
 readme = "README.md"
 packages = [
-    { include = "backend" },
-    { include = "server", from = "backend" },
-    { include = "qcflow", from = "backend" },
-    { include = "dbmodel", from = "backend" },
-    { include = "datamodel", from = "backend" },
-    { include = "neodbmodel", from = "backend"}
+    { include = "src" },
+    { include = "api", from = "src" },
+    { include = "workflow", from = "src" },
+    { include = "dbmodel", from = "src" },
+    { include = "datamodel", from = "src" },
+    { include = "neodbmodel", from = "src"}
 ]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
 
-[tool.poetry.group.server.dependencies]
+[tool.poetry.group.api.dependencies]
 fastapi = "^0.111.1"
 gunicorn = "^22.0.0"
 python-dotenv = "^1.0.1"
@@ -45,36 +45,13 @@ typer = "^0.14.0"
 python-jose = "^3.4.0"
 
 
-[tool.poetry.group.qcflow.dependencies]
+[tool.poetry.group.workflow.dependencies]
 pymongo = "^4.8.0"
 bunnet = "^1.3.0"
 slack-sdk = "^3.31.0"
-sentry-sdk = "^2.11.0"
 python-dotenv = "^1.0.1"
-pylabrad = "^0.98.2"
 numpy = ">=1.26.0,<1.27.0"
-matplotlib = ">=3.8.0,<4.0.0"
-pyyaml = "^6.0.1"
-qutip = "^5.0.4"
-scipy = "^1.11.4"
-h5py = "^3.10.0"
-qupy = "^1.1.1"
-lmfit = "^1.2.2"
-scikit-learn = "1.5.0"
-tqdm = "^4.66.2"
-sqe-fitting = {git = "https://github.com/orangekame3/sqe_fitting"}
-ipython = "^8.27.0"
-cirq = "^1.4.1"
 qubex = {git = "https://github.com/amachino/qubex.git@1.2.9", extras = ["backend"]}
-mermaid-py = "^0.7.0"
-
-
-
-[tool.poetry.group.qube.dependencies]
-gunicorn = "^22.0.0"
-uvicorn = "^0.30.6"
-fastapi = "0.111.1"
-
 
 
 [build-system]

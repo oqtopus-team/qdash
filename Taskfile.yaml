@@ -49,30 +49,30 @@ tasks:
       - tbls doc -c .tbls.yml -f
     desc: Generate DB Schema Docs
 
-  export-server:
+  export-api:
     cmds:
-      - poetry export -f requirements.txt --output ./backend/server/requirements.txt --without-hashes --with=server,dev
+      - poetry export -f requirements.txt --output ./src/qdash/api/requirements.txt --without-hashes --with=api,dev
     desc: Export server requirements
 
-  export-qcflow:
+  export-workflow:
     cmds:
-      - poetry export -f requirements.txt --output ./backend/qcflow/requirements.txt --without-hashes --with=qcflow,dev
+      - poetry export -f requirements.txt --output ./src/qdash/workflow/requirements.txt --without-hashes --with=workflow,dev
     desc: Export qcflow requirements
 
   export-all:
     cmds:
-      - poetry export -f requirements.txt --output ./.devcontainer/requirements.txt --without-hashes --with=server,qcflow,dev
+      - poetry export -f requirements.txt --output ./.devcontainer/requirements.txt --without-hashes --with=api,workflow,dev
     desc: Export all requirements
 
-  build-server:
+  build-api:
     cmds:
-      - poetry export -f requirements.txt --output ./backend/server/requirements.txt --without-hashes --with=server,dev
-      - docker compose build --no-cache server
+      - poetry export -f requirements.txt --output ./src/qdash/api/requirements.txt --without-hashes --with=api,dev
+      - docker compose build --no-cache api
 
-  build-qcflow:
+  build-workflow:
     cmds:
-      - poetry export -f requirements.txt --output qcflow.requirements.txt --without-hashes --with=qcflow,dev
-      - docker compose build --no-cache qcflow
+      - poetry export -f requirements.txt --output ./src/qdash/workflow/requirements.txt --without-hashes --with=workflow,dev
+      - docker compose build --no-cache workflow
 
   requirements:
     cmds:
