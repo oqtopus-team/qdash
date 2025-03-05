@@ -86,7 +86,7 @@ services:
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/neodbmodel:/app/qdash/neodbmodel
       - ${CALIB_DATA_PATH}:/app/calib_data
-      # - /home/shared/config:/home/shared/config
+      - /home/shared/config:/home/shared/config
     working_dir: /app/qdash/workflow
     command: python deployment/${ENV}/main.py
     environment:

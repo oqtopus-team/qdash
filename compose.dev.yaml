@@ -10,9 +10,9 @@ services:
     volumes:
       - .:/workspace/qdash
       - /var/run/docker.sock:/var/run/docker.sock
-      # - /workspace/qdash/.venv
-      # - /workspace/qdash/ui/node_modules
-      # - /home/shared/config:/home/shared/config
+      - /workspace/qdash/.venv
+      - /workspace/qdash/ui/node_modules
+      - /home/shared/config:/home/shared/config
     environment:
       - PYTHONPATH=/workspace:/workspace/src:/workspace/src/qdash/workflow:/workspace/src/qdash/dbmodel:/workspace/src/qdash/datamodel:/workspace/src/qdash/neodbmodel
     network_mode: host
