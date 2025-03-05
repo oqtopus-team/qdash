@@ -69,10 +69,10 @@ services:
       qdash:
         ipv4_address: 172.22.0.5
 
-  qcflow:
+  workflow:
     build:
       context: .
-      dockerfile: ./backend/qcflow/Dockerfile
+      dockerfile: ./src/qdash/workflow/Dockerfile
     restart: always
     env_file:
       - .env
@@ -81,14 +81,13 @@ services:
       - prefect-server
       - mongo
     volumes:
-      - ./backend/qcflow:/app/qcflow
-      - ./backend/dbmodel:/app/dbmodel
-      - ./backend/datamodel:/app/datamodel
-      - ./backend/neodbmodel:/app/neodbmodel
-      - ./backend/repository:/app/repository
+      - ./src/qdash/workflow:/app/qdash/workflow
+      - ./src/qdash/dbmodel:/app/qdash/dbmodel
+      - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./src/qdash/neodbmodel:/app/qdash/neodbmodel
       - ${CALIB_DATA_PATH}:/app/calib_data
-      - /home/shared/config:/home/shared/config
-    working_dir: /app/qcflow
+      # - /home/shared/config:/home/shared/config
+    working_dir: /app/qdash/workflow
     command: python deployment/${ENV}/main.py
     environment:
       - BACKEND_URL=http://${QDASH_SERVER_HOST}:5715
@@ -96,13 +95,13 @@ services:
       - PREFECT_EXPERIMENTAL_ENABLE_EXTRA_RUNNER_ENDPOINTS=True
       - PREFECT_EXPERIMENTAL_ENABLE_ENHANCED_CANCELLATION=True
       - PREFECT_RUNNER_SERVER_HOST=127.0.0.1
-      - PYTHONPATH=/app:/app/qcflow:/app/dbmodel
+      - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel
     network_mode: host
 
-  server:
+  api:
     build:
       context: .
-      dockerfile: ./backend/server/Dockerfile
+      dockerfile: ./src/qdash/api/Dockerfile
     restart: always
     privileged: true
     env_file:
@@ -110,44 +109,28 @@ services:
     ports:
       - "5715:5715"
     volumes:
-      - ./backend/server:/app/server
-      - ./backend/dbmodel:/app/dbmodel
-      - ./backend/datamodel:/app/datamodel
-      - ./backend/neodbmodel:/app/neodbmodel
+      - ./src/qdash/api:/app/qdash/api
+      - ./src/qdash/dbmodel:/app/qdash/dbmodel
+      - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./src/qdash/neodbmodel:/app/qdash/neodbmodel
       - ${CALIB_DATA_PATH}:/app/calib_data
       - ${QPU_DATA_PATH}:/app/qpu_data
-    working_dir: /app/server
+    working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind 0.0.0.0:5715 --log-level info
     develop:
       watch:
         - action: sync
-          path: ./backend/server
-          target: /app/server
+          path: ./src/qdash/api
+          target: /app/api
     depends_on:
       - mongo
       - prefect-server
     environment:
-      - PYTHONPATH=/app:/app/dbmodel
+      - PYTHONPATH=/app:/app/qdash:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash/neodbmodel
       - CALIB_DATA_PATH=/app/calib_data
       - QPU_DATA_PATH=/app/qpu_data
       - PREFECT_API_URL=http://${PREFECT_HOST}:4200/api
     network_mode: host
-
-  # ui:
-  #   build:
-  #     context: .
-  #     dockerfile: ./ui/Dockerfile
-  #   volumes:
-  #     - ./ui:/app
-  #     - /app/node_modules
-  #   restart: always
-  #   env_file:
-  #     - .env
-  #   ports:
-  #     - "5714:5714"
-  #   depends_on:
-  #     - server
-  #   network_mode: host
 
   ui:
     build:
@@ -159,7 +142,7 @@ services:
     ports:
       - "5714:5714"
     depends_on:
-      - server
+      - api
     network_mode: host
 
 networks:

@@ -1,0 +1,86 @@
+from typing import TYPE_CHECKING, ClassVar
+
+if TYPE_CHECKING:
+    import plotly.graph_objs as go
+from qubex.experiment import Experiment
+from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, PI_DURATION
+from qubex.measurement.measurement import DEFAULT_INTERVAL
+
+from qdash.datamodel.task import DataModel
+from qdash.workflow.cal_util import qid_to_label
+from qdash.workflow.tasks.base import (
+    BaseTask,
+    InputParameter,
+    OutputParameter,
+    PostProcessResult,
+    PreProcessResult,
+    RunResult,
+)
+
+
+class CreateDRAGPIPulse(BaseTask):
+    """Task to create the DRAG pi pulse."""
+
+    name: str = "CreateDRAGPIPulse"
+    task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, InputParameter]] = {
+        "pi_length": InputParameter(
+            unit="ns",
+            value_type="int",
+            value=PI_DURATION,
+            description="PI pulse length",
+        ),
+        "shots": InputParameter(
+            unit="a.u.",
+            value_type="int",
+            value=CALIBRATION_SHOTS,
+            description="Number of shots",
+        ),
+        "interval": InputParameter(
+            unit="ns",
+            value_type="int",
+            value=DEFAULT_INTERVAL,
+            description="Time interval",
+        ),
+    }
+    output_parameters: ClassVar[dict[str, OutputParameter]] = {
+        "drag_pi_beta": OutputParameter(unit="", description="DRAG PI pulse beta"),
+        "drag_pi_amplitude": OutputParameter(unit="", description="DRAG PI pulse amplitude"),
+    }
+
+    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
+        return PreProcessResult(input_parameters=self.input_parameters)
+
+    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
+        label = qid_to_label(qid)
+        result = run_result.raw_result
+        op = self.output_parameters
+        output_param = {
+            "drag_pi_beta": DataModel(
+                value=result["beta"][label],
+                unit=op["drag_pi_beta"].unit,
+                description=op["drag_pi_beta"].description,
+                execution_id=execution_id,
+            ),
+            "drag_pi_amplitude": DataModel(
+                value=result["amplitude"][label],
+                unit=op["drag_pi_amplitude"].unit,
+                description=op["drag_pi_amplitude"].description,
+                execution_id=execution_id,
+            ),
+        }
+        figures: list[go.Figure] = []
+        return PostProcessResult(output_parameters=output_param, figures=figures)
+
+    def run(self, exp: Experiment, qid: str) -> RunResult:
+        labels = [qid_to_label(qid)]
+        result = exp.calibrate_drag_pi_pulse(
+            targets=labels,
+            n_rotations=4,
+            n_turns=1,
+            n_iterations=2,
+            shots=self.input_parameters["shots"].get_value(),
+            interval=self.input_parameters["interval"].get_value(),
+        )
+        exp.calib_note.save()
+        return RunResult(raw_result=result)
