@@ -4,6 +4,7 @@ from prefect import task
 from pydantic import BaseModel
 from qdash.datamodel.parameter import ParameterModel
 from qdash.datamodel.task import TaskModel
+from qdash.workflow.tasks.base import BaseTask
 
 
 def label_to_qid(qid: str) -> str:
@@ -63,8 +64,6 @@ def update_active_output_parameters(username: str) -> list[ParameterModel]:
         file_path: The path to the input file.
 
     """
-    from workflow.tasks.base import BaseTask
-
     all_outputs = {name: cls.output_parameters for name, cls in BaseTask.registry.items()}
     converted_outputs = {
         task_name: convert_output_parameters(username=username, outputs=outputs)
@@ -92,8 +91,6 @@ def update_active_output_parameters(username: str) -> list[ParameterModel]:
 @task
 def update_active_tasks(username: str) -> list[TaskModel]:
     """Update the active tasks in the registry and return a list of TaskModel instances."""
-    from workflow.tasks.base import BaseTask
-
     return [
         TaskModel(
             username=username,

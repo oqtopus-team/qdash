@@ -216,7 +216,7 @@ qpu_data/
 docs/.vitepress/cache/
 ui/.vite/
 
-backend/qcflow/images/*
-backend/qcflow/.system_note.json
-backend/qcflow/*.json
-backend/qcflow/.calibration/*.json
+src/qdash/workflow/images/*
+src/qdash/workflow/.system_note.json
+src/qdash/workflow/*.json
+src/qdash/workflow/.calibration/*.json
