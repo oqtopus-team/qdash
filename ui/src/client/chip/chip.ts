@@ -24,10 +24,13 @@ import type {
   ChipResponse,
   ExecutionResponseDetail,
   ExecutionResponseSummary,
+  FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
+  FetchTimeseriesTaskResultByTagAndParameterParams,
   HTTPValidationError,
   LatestTaskGroupedByChipResponse,
   ListMuxResponse,
   MuxDetailResponse,
+  TimeSeriesData,
 } from "../../schemas";
 
 /**
@@ -1133,6 +1136,461 @@ export function useFetchLatestTaskGroupedByChip<
     taskName,
     options,
   );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Fetch the timeseries task result by tag and parameter for a specific qid.
+
+Returns
+-------
+    TimeSeriesData: Time series data for the specified qid.
+ * @summary Fetch the timeseries task result by tag and parameter for a specific qid
+ */
+export const fetchTimeseriesTaskResultByTagAndParameterAndQid = (
+  chipId: string,
+  parameter: string,
+  qid: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
+  options?: AxiosRequestConfig,
+): Promise<AxiosResponse<TimeSeriesData>> => {
+  return axios.get(
+    `http://localhost:5715/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
+    {
+      ...options,
+      params: { ...params, ...options?.params },
+    },
+  );
+};
+
+export const getFetchTimeseriesTaskResultByTagAndParameterAndQidQueryKey = (
+  chipId: string,
+  parameter: string,
+  qid: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
+) => {
+  return [
+    `http://localhost:5715/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getFetchTimeseriesTaskResultByTagAndParameterAndQidQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+  >,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  parameter: string,
+  qid: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+        >,
+        TError,
+        TData
+      >
+    >;
+    axios?: AxiosRequestConfig;
+  },
+) => {
+  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getFetchTimeseriesTaskResultByTagAndParameterAndQidQueryKey(
+      chipId,
+      parameter,
+      qid,
+      params,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>>
+  > = ({ signal }) =>
+    fetchTimeseriesTaskResultByTagAndParameterAndQid(
+      chipId,
+      parameter,
+      qid,
+      params,
+      { signal, ...axiosOptions },
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(chipId && parameter && qid),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<
+      ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+    >,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type FetchTimeseriesTaskResultByTagAndParameterAndQidQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>>
+  >;
+export type FetchTimeseriesTaskResultByTagAndParameterAndQidQueryError =
+  AxiosError<HTTPValidationError>;
+
+export function useFetchTimeseriesTaskResultByTagAndParameterAndQid<
+  TData = Awaited<
+    ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+  >,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  parameter: string,
+  qid: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+          >
+        >,
+        "initialData"
+      >;
+    axios?: AxiosRequestConfig;
+  },
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useFetchTimeseriesTaskResultByTagAndParameterAndQid<
+  TData = Awaited<
+    ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+  >,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  parameter: string,
+  qid: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+          >,
+          TError,
+          Awaited<
+            ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+          >
+        >,
+        "initialData"
+      >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useFetchTimeseriesTaskResultByTagAndParameterAndQid<
+  TData = Awaited<
+    ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+  >,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  parameter: string,
+  qid: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+        >,
+        TError,
+        TData
+      >
+    >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Fetch the timeseries task result by tag and parameter for a specific qid
+ */
+
+export function useFetchTimeseriesTaskResultByTagAndParameterAndQid<
+  TData = Awaited<
+    ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+  >,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  parameter: string,
+  qid: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
+        >,
+        TError,
+        TData
+      >
+    >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions =
+    getFetchTimeseriesTaskResultByTagAndParameterAndQidQueryOptions(
+      chipId,
+      parameter,
+      qid,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Fetch the timeseries task result by tag and parameter for all qids.
+
+Returns
+-------
+    TimeSeriesData: Time series data for all qids.
+ * @summary Fetch the timeseries task result by tag and parameter for all qids
+ */
+export const fetchTimeseriesTaskResultByTagAndParameter = (
+  chipId: string,
+  parameter: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterParams,
+  options?: AxiosRequestConfig,
+): Promise<AxiosResponse<TimeSeriesData>> => {
+  return axios.get(
+    `http://localhost:5715/chip/${chipId}/parameter/${parameter}`,
+    {
+      ...options,
+      params: { ...params, ...options?.params },
+    },
+  );
+};
+
+export const getFetchTimeseriesTaskResultByTagAndParameterQueryKey = (
+  chipId: string,
+  parameter: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterParams,
+) => {
+  return [
+    `http://localhost:5715/chip/${chipId}/parameter/${parameter}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getFetchTimeseriesTaskResultByTagAndParameterQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>
+  >,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  parameter: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>>,
+        TError,
+        TData
+      >
+    >;
+    axios?: AxiosRequestConfig;
+  },
+) => {
+  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getFetchTimeseriesTaskResultByTagAndParameterQueryKey(
+      chipId,
+      parameter,
+      params,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>>
+  > = ({ signal }) =>
+    fetchTimeseriesTaskResultByTagAndParameter(chipId, parameter, params, {
+      signal,
+      ...axiosOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(chipId && parameter),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type FetchTimeseriesTaskResultByTagAndParameterQueryResult = NonNullable<
+  Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>>
+>;
+export type FetchTimeseriesTaskResultByTagAndParameterQueryError =
+  AxiosError<HTTPValidationError>;
+
+export function useFetchTimeseriesTaskResultByTagAndParameter<
+  TData = Awaited<
+    ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>
+  >,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  parameter: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>
+          >,
+          TError,
+          Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>>
+        >,
+        "initialData"
+      >;
+    axios?: AxiosRequestConfig;
+  },
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useFetchTimeseriesTaskResultByTagAndParameter<
+  TData = Awaited<
+    ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>
+  >,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  parameter: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>
+          >,
+          TError,
+          Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>>
+        >,
+        "initialData"
+      >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useFetchTimeseriesTaskResultByTagAndParameter<
+  TData = Awaited<
+    ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>
+  >,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  parameter: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>>,
+        TError,
+        TData
+      >
+    >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Fetch the timeseries task result by tag and parameter for all qids
+ */
+
+export function useFetchTimeseriesTaskResultByTagAndParameter<
+  TData = Awaited<
+    ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>
+  >,
+  TError = AxiosError<HTTPValidationError>,
+>(
+  chipId: string,
+  parameter: string,
+  params: FetchTimeseriesTaskResultByTagAndParameterParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>>,
+        TError,
+        TData
+      >
+    >;
+    axios?: AxiosRequestConfig;
+  },
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions =
+    getFetchTimeseriesTaskResultByTagAndParameterQueryOptions(
+      chipId,
+      parameter,
+      params,
+      options,
+    );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData>;

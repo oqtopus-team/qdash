@@ -5,7 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { DataModel } from "./dataModel";
 
-export interface ListAllFridgeResponse {
-  device_id: string;
-}
+export type TimeSeriesDataData = { [key: string]: DataModel[] };

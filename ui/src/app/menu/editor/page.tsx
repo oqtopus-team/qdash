@@ -46,7 +46,7 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
         acc[type].push(task);
         return acc;
       },
-      {}
+      {},
     ) || {};
 
   return (
@@ -133,10 +133,10 @@ function MenuEditor() {
   const updateMenu = useUpdateMenu();
   const deleteMutation = useDeleteMenu();
   const [selectedMenu, setSelectedMenu] = useState<GetMenuResponse | null>(
-    null
+    null,
   );
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<string | null>(
-    null
+    null,
   );
   const [menuContent, setMenuContent] = useState<string>("");
   const [taskDetailContent, setTaskDetailContent] = useState<string>("");
@@ -150,7 +150,7 @@ function MenuEditor() {
       setSelectedTaskDetail(taskName);
       setTaskDetailContent(JSON.stringify(content, null, 2));
     },
-    []
+    [],
   );
 
   // メニューが選択された時の処理
@@ -164,14 +164,14 @@ function MenuEditor() {
             task_details: undefined, // task_detailsは左側のエディターには表示しない
           },
           null,
-          2
-        )
+          2,
+        ),
       );
       // 最初のtask_detailを選択
       const firstTask = Object.keys(menu.task_details || {})[0];
       handleTaskDetailSelect(firstTask, menu.task_details?.[firstTask]);
     },
-    [handleTaskDetailSelect]
+    [handleTaskDetailSelect],
   );
 
   useEffect(() => {
@@ -230,7 +230,7 @@ function MenuEditor() {
             });
             setShowSaveToast(true);
           },
-        }
+        },
       );
     } catch (e) {
       // メニューのJSONが不正な場合
@@ -265,8 +265,8 @@ function MenuEditor() {
             tasks: updatedTasks,
           },
           null,
-          2
-        )
+          2,
+        ),
       );
 
       // task_detailsを更新
@@ -289,8 +289,8 @@ function MenuEditor() {
                   output_parameters: task.output_parameters || {},
                 },
                 null,
-                2
-              )
+                2,
+              ),
             );
             setSelectedMenu({
               ...selectedMenu,
@@ -299,7 +299,7 @@ function MenuEditor() {
             });
             setIsTaskSelectOpen(false);
           },
-        }
+        },
       );
     } catch (e) {
       // JSON解析エラー
@@ -336,8 +336,8 @@ function MenuEditor() {
             tasks: currentTasks,
           },
           null,
-          2
-        )
+          2,
+        ),
       );
 
       // task_detailsを更新
@@ -358,7 +358,7 @@ function MenuEditor() {
               task_details: updatedTaskDetails,
             });
           },
-        }
+        },
       );
     } catch (e) {
       // JSON解析エラー
@@ -457,7 +457,7 @@ function MenuEditor() {
                           [JSON.stringify(menuData, null, 2)],
                           {
                             type: "application/json",
-                          }
+                          },
                         );
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement("a");
@@ -640,7 +640,7 @@ function MenuEditor() {
                   setTaskDetailContent("");
                   refetchMenus(); // 一覧を更新
                 },
-              }
+              },
             );
           }}
           onClose={() => setShowDeleteModal(false)}
@@ -695,11 +695,11 @@ function MenuEditor() {
                           tasks: currentTasks,
                         },
                         null,
-                        2
-                      )
+                        2,
+                      ),
                     );
                   },
-                }
+                },
               );
             } catch (e) {
               console.error("Invalid JSON:", e);

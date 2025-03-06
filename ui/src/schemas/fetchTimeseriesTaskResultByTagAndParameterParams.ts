@@ -6,6 +6,6 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type FridgesGetFridgeTemperatureParams = {
-  h?: number;
+export type FetchTimeseriesTaskResultByTagAndParameterParams = {
+  tag: string;
 };
