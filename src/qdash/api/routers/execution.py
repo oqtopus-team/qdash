@@ -1,5 +1,6 @@
 import logging
 from io import BytesIO
+from pathlib import Path
 
 from fastapi import APIRouter
 from fastapi.logger import logger
@@ -8,7 +9,8 @@ from pydantic import BaseModel
 from qdash.api.schemas.error import (
     Detail,
 )
-from qdash.dbmodel.execution_lock import ExecutionLockModel
+from qdash.neodbmodel.execution_lock import ExecutionLockDocument
+from starlette.exceptions import HTTPException
 
 router = APIRouter()
 gunicorn_logger = logging.getLogger("gunicorn.error")
@@ -24,26 +26,35 @@ else:
     responses={404: {"model": Detail}},
     response_class=StreamingResponse,
     summary="Fetches a calibration figure by its path",
-    operation_id="fetch_figure_by_path",
+    operation_id="fetchFigureByPath",
 )
 def fetch_figure_by_path(path: str):
-    with open(path, "rb") as file:
+    """Fetch a calibration figure by its path."""
+    if not Path(path).exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"File not found: {path}",
+        )
+    with Path(path).open("rb") as file:
         image_data = file.read()
     return StreamingResponse(BytesIO(image_data), media_type="image/png")
 
 
 class ExecutionLockStatusResponse(BaseModel):
+    """Response model for the fetch_execution_lock_status endpoint."""
+
     lock: bool
 
 
 @router.get(
     "/executions/lock_status",
     summary="Fetches the status of a calibration.",
-    operation_id="fetch_execution_lock_status",
+    operation_id="fetchExecutionLockStatus",
     response_model=ExecutionLockStatusResponse,
 )
-def fetch_execution_lock_status():
-    status = ExecutionLockModel.find_one().run()
+def fetch_execution_lock_status() -> ExecutionLockStatusResponse:
+    """Fetch the status of the execution lock."""
+    status = ExecutionLockDocument.get_lock_status()
     if status is None:
         return ExecutionLockStatusResponse(lock=False)
     return ExecutionLockStatusResponse(lock=status.lock)

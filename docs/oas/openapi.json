@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "QDash Server",
+    "title": "QDash API",
     "summary": "QDash API",
     "description": "API for QDash",
     "contact": {
@@ -573,7 +573,8 @@
           "execution"
         ],
         "summary": "Fetches a calibration figure by its path",
-        "operationId": "fetch_figure_by_path",
+        "description": "Fetch a calibration figure by its path.",
+        "operationId": "fetchFigureByPath",
         "parameters": [
           {
             "name": "path",
@@ -618,7 +619,8 @@
           "execution"
         ],
         "summary": "Fetches the status of a calibration.",
-        "operationId": "fetch_execution_lock_status",
+        "description": "Fetch the status of the execution lock.",
+        "operationId": "fetchExecutionLockStatus",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1023,7 +1025,6 @@
       "post": {
         "tags": [
           "auth",
-          "authentication",
           "authentication"
         ],
         "summary": "Login For Access Token",
@@ -1086,7 +1087,6 @@
       "post": {
         "tags": [
           "auth",
-          "authentication",
           "authentication"
         ],
         "summary": "Register User",
@@ -1132,7 +1132,6 @@
       "get": {
         "tags": [
           "auth",
-          "authentication",
           "authentication"
         ],
         "summary": "Read Users Me",
@@ -1163,7 +1162,6 @@
       "post": {
         "tags": [
           "auth",
-          "authentication",
           "authentication"
         ],
         "summary": "Logout",
@@ -1579,7 +1577,8 @@
         "required": [
           "lock"
         ],
-        "title": "ExecutionLockStatusResponse"
+        "title": "ExecutionLockStatusResponse",
+        "description": "Response model for the fetch_execution_lock_status endpoint."
       },
       "ExecutionResponseDetail": {
         "properties": {
@@ -2583,55 +2582,5 @@
         "name": "X-Username"
       }
     }
-  },
-  "tags": [
-    {
-      "name": "auth",
-      "description": "Authentication operations"
-    },
-    {
-      "name": "calibration",
-      "description": "Calibration operations"
-    },
-    {
-      "name": "chip",
-      "description": "Chip operations"
-    },
-    {
-      "name": "execution",
-      "description": "Execution operations"
-    },
-    {
-      "name": "experiment",
-      "description": "Experiment operations"
-    },
-    {
-      "name": "file",
-      "description": "File operations"
-    },
-    {
-      "name": "fridges",
-      "description": "Fridge operations"
-    },
-    {
-      "name": "menu",
-      "description": "Menu operations"
-    },
-    {
-      "name": "qpu",
-      "description": "QPU operations"
-    },
-    {
-      "name": "settings",
-      "description": "Settings operations"
-    },
-    {
-      "name": "task",
-      "description": "Task operations"
-    },
-    {
-      "name": "executionV2",
-      "description": "Execution V2 operations"
-    }
-  ]
+  }
 }

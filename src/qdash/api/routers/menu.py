@@ -12,7 +12,6 @@ from qdash.api.schemas.error import (
 from qdash.api.schemas.exception import InternalSeverError
 from qdash.datamodel.menu import MenuModel
 from qdash.datamodel.task import TaskModel
-from qdash.neodbmodel.initialize import initialize
 from qdash.neodbmodel.menu import MenuDocument
 from qdash.neodbmodel.task import TaskDocument
 
@@ -98,7 +97,6 @@ def list_menu(current_user: Annotated[User, Depends(get_current_active_user)]) -
         ListMenuResponse: A response containing the list of menu items.
 
     """
-    initialize()
     menus = MenuDocument.find({"username": current_user.username}).run()
     menu_list = []
     for menu in menus:
@@ -138,7 +136,6 @@ def create_menu(
         CreateMenuResponse: The response object containing the name of the created menu item.
 
     """
-    initialize()
     task_details = {}
     for task_name in request.tasks:
         task_doc = TaskDocument.find_one({"name": task_name}).run()
@@ -255,7 +252,6 @@ def list_preset(
         ListMenuResponse: A response containing the list of preset menu items.
 
     """
-    initialize()
     menu_list = [check_one_qubit_preset, one_qubit_coarse_preset, one_qubit_fine_preset]
     task_docs = TaskDocument.find({"username": current_user.username}).run()
     task_map = {
@@ -305,7 +301,6 @@ def get_menu_by_name(
 
     """
     try:
-        initialize()
         menu = MenuDocument.find_one({"name": name, "username": current_user.username}).run()
     except Exception as e:
         logger.error(f"Failed to get menu: {e}")
@@ -349,7 +344,6 @@ def update_menu(
         Union[UpdateMenuResponse, NotFoundErrorResponse]: The response object indicating the success of the update or an error if the menu is not found.
 
     """
-    initialize()
     existing_menu = MenuDocument.find_one({"name": name, "username": current_user.username}).run()
     if existing_menu:
         existing_menu.name = req.name
@@ -388,7 +382,6 @@ def delete_menu(
         DeleteMenuResponse | NotFoundErrorResponse: The response indicating the success or failure of the deletion.
 
     """
-    initialize()
     existing_menu = MenuDocument.find_one({"name": name, "username": current_user.username}).run()
     if existing_menu is not None:
         existing_menu.delete()
