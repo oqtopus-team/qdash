@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { BsPlus } from "react-icons/bs";
+import { BsPlus, BsLock } from "react-icons/bs";
 import { toast } from "react-toastify";
 import { GetMenuResponse } from "@/schemas";
 import { useExecuteCalib } from "@/client/calibration/calibration";
+import { useFetchExecutionLockStatus } from "@/client/execution/execution";
 import { useAuth } from "@/app/contexts/AuthContext";
 
 export function ExecuteConfirmModal({
@@ -18,7 +19,23 @@ export function ExecuteConfirmModal({
   const executeCalibMutation = useExecuteCalib();
   const [menu, setMenu] = useState(selectedMenu);
 
+  const { data: lockStatus, isLoading: isLockStatusLoading } =
+    useFetchExecutionLockStatus({
+      query: {
+        refetchInterval: 5000, // 5秒ごとに更新
+      },
+    });
+
+  const isLocked = lockStatus?.data.lock ?? false;
+
   const handleConfirmClick = () => {
+    if (isLocked) {
+      toast.error(
+        "実行がロックされています。他のキャリブレーションが完了するまでお待ちください。"
+      );
+      return;
+    }
+
     executeCalibMutation.mutate(
       {
         data: {
@@ -154,8 +171,19 @@ export function ExecuteConfirmModal({
           <button className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn btn-primary" onClick={handleConfirmClick}>
-            Execute
+          <button
+            className={`btn ${isLocked ? "btn-disabled" : "btn-success"}`}
+            onClick={handleConfirmClick}
+            disabled={isLocked || isLockStatusLoading}
+          >
+            {isLocked ? (
+              <>
+                <BsLock className="mr-2" />
+                Locked
+              </>
+            ) : (
+              "Execute"
+            )}
           </button>
         </div>
       </div>
