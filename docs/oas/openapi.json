@@ -1557,11 +1557,16 @@
           "flow_run_url": {
             "type": "string",
             "title": "Flow Run Url"
+          },
+          "qdash_ui_url": {
+            "type": "string",
+            "title": "Qdash Ui Url"
           }
         },
         "type": "object",
         "required": [
-          "flow_run_url"
+          "flow_run_url",
+          "qdash_ui_url"
         ],
         "title": "ExecuteCalibResponse",
         "description": "ExecuteCalibResponse is a subclass of BaseModel."

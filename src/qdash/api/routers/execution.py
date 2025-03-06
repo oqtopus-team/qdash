@@ -57,4 +57,4 @@ def fetch_execution_lock_status() -> ExecutionLockStatusResponse:
     status = ExecutionLockDocument.get_lock_status()
     if status is None:
         return ExecutionLockStatusResponse(lock=False)
-    return ExecutionLockStatusResponse(lock=status.lock)
+    return ExecutionLockStatusResponse(lock=status)

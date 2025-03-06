@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./providers/theme-provider";
+import { ThemedToastContainer } from "./components/ThemedToastContainer";
 import "../lib/axios"; // Import axios configuration
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -12,7 +13,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <ThemedToastContainer />
+        </ThemeProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

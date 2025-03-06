@@ -70,6 +70,7 @@ class ExecuteCalibResponse(BaseModel):
     """ExecuteCalibResponse is a subclass of BaseModel."""
 
     flow_run_url: str
+    qdash_ui_url: str
 
 
 class ScheduleCalibRequest(BaseModel):

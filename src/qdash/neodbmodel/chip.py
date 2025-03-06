@@ -46,3 +46,10 @@ class ChipDocument(Document):
         self.system_info.update_time()
         self.save()
         return self
+
+    @classmethod
+    def get_current_chip(cls, username: str) -> "ChipDocument":
+        chip = cls.find_one({"username": username}).run()
+        if chip is None:
+            raise ValueError(f"Chip not found for user {username}")
+        return chip

@@ -5,6 +5,7 @@ from logging import getLogger
 from typing import Annotated
 
 import dateutil.tz
+import pendulum
 from fastapi import APIRouter, Depends, HTTPException, Security
 from prefect.client.orchestration import PrefectClient
 from prefect.client.schemas.filters import (
@@ -26,11 +27,27 @@ from qdash.api.schemas.calibration import (
     ScheduleCalibResponse,
 )
 from qdash.api.schemas.exception import InternalSeverError
+from qdash.neodbmodel.chip import ChipDocument
+from qdash.neodbmodel.execution_counter import ExecutionCounterDocument
 from qdash.neodbmodel.menu import MenuDocument
 
 router = APIRouter(prefix="/calibration")
 logger = getLogger("uvicorn.app")
 prefect_host = os.getenv("PREFECT_HOST")
+qdash_host = "localhost"
+
+
+def generate_execution_id() -> str:
+    """Generate a unique execution ID based on the current date and an execution index. e.g. 20220101-001.
+
+    Returns
+    -------
+        str: The generated execution ID.
+
+    """
+    date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
+    execution_index = ExecutionCounterDocument.get_next_index(date_str)
+    return f"{date_str}-{execution_index:03d}"
 
 
 @router.post(
@@ -50,16 +67,19 @@ async def execute_calib(
     env = settings.env
     target_deployment = await client.read_deployment_by_name(f"main/{env}-main")
     try:
+        execution_id = generate_execution_id()
         resp = await client.create_flow_run_from_deployment(
             deployment_id=target_deployment.id,
-            parameters={"menu": request.model_dump()},
+            parameters={"menu": request.model_dump(), "execution_id": execution_id},
         )
     except Exception as e:
         logger.warning(e)
         raise InternalSeverError(detail=f"Failed to execute calibration {e!s}")
     logger.warning(resp)
+    chip_id = ChipDocument.get_current_chip(current_user.username).chip_id
     return ExecuteCalibResponse(
-        flow_run_url=f"http://{prefect_host}:4200/flow-runs/flow-run/{resp.id}"
+        flow_run_url=f"http://{prefect_host}:4200/flow-runs/flow-run/{resp.id}",
+        qdash_ui_url=f"http://{qdash_host}:5714/execution/{chip_id}/{execution_id}",
     )
 
 
@@ -105,10 +125,11 @@ async def schedule_calib(
         raise HTTPException(status_code=404, detail="deployment not found")
     print(scheduled_time)
     try:
+        execution_id = generate_execution_id()
         _ = await client.create_flow_run_from_deployment(
             deployment_id=target_deployment.id,
             state=Scheduled(scheduled_time=scheduled_time),
-            parameters={"menu": menu_request.model_dump()},
+            parameters={"menu": menu_request.model_dump(), "execution_id": execution_id},
         )
     except Exception as e:
         logger.warning(e)
