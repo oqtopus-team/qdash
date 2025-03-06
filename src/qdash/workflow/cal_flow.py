@@ -4,10 +4,10 @@ from prefect import flow, get_run_logger
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
 from qdash.datamodel.menu import MenuModel as Menu
-from qdash.neodbmodel.execution_history import ExecutionHistoryDocument
-from qdash.neodbmodel.initialize import initialize
-from qdash.neodbmodel.parameter import ParameterDocument
-from qdash.neodbmodel.task import TaskDocument
+from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+from qdash.dbmodel.initialize import initialize
+from qdash.dbmodel.parameter import ParameterDocument
+from qdash.dbmodel.task import TaskDocument
 from qdash.workflow.cal_task import (
     build_workflow,
     execute_dynamic_task_by_qid,

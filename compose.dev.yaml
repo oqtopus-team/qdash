@@ -14,7 +14,7 @@ services:
       - /workspace/qdash/ui/node_modules
       - /home/shared/config:/home/shared/config
     environment:
-      - PYTHONPATH=/workspace:/workspace/src:/workspace/src/qdash/workflow:/workspace/src/qdash/dbmodel:/workspace/src/qdash/datamodel:/workspace/src/qdash/neodbmodel
+      - PYTHONPATH=/workspace:/workspace/src:/workspace/src/qdash/workflow:/workspace/src/qdash/dbmodel:/workspace/src/qdash/datamodel
     network_mode: host
 
     develop:

@@ -5,7 +5,7 @@ from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.qubit import NodeInfoModel, QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.neodbmodel.chip import ChipDocument
+from qdash.dbmodel.chip import ChipDocument
 
 
 class QubitDocument(Document):

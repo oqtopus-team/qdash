@@ -8,8 +8,8 @@ from jose import jwt
 from jose.constants import ALGORITHMS
 from passlib.context import CryptContext
 from qdash.api.schemas.auth import User, UserInDB
-from qdash.neodbmodel.initialize import initialize
-from qdash.neodbmodel.user import UserDocument
+from qdash.dbmodel.initialize import initialize
+from qdash.dbmodel.user import UserDocument
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ pwd_context = CryptContext(
 )
 
 
-def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -83,7 +83,7 @@ def get_password_hash(password: str) -> str:
     return cast(str, pwd_context.hash(password))
 
 
-def get_user(username: str) -> Optional[UserInDB]:
+def get_user(username: str) -> UserInDB | None:
     logger.debug(f"Looking up user in database: {username}")
     query = UserDocument.find_one({"username": username}).run()
     user = query
@@ -99,7 +99,7 @@ def get_user(username: str) -> Optional[UserInDB]:
     return None
 
 
-def authenticate_user(username: str, password: str) -> Optional[UserInDB]:
+def authenticate_user(username: str, password: str) -> UserInDB | None:
     logger.debug(f"Authenticating user: {username}")
     user = get_user(username)
     if not user:

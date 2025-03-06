@@ -27,9 +27,9 @@ from qdash.api.schemas.calibration import (
     ScheduleCalibResponse,
 )
 from qdash.api.schemas.exception import InternalSeverError
-from qdash.neodbmodel.chip import ChipDocument
-from qdash.neodbmodel.execution_counter import ExecutionCounterDocument
-from qdash.neodbmodel.menu import MenuDocument
+from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.execution_counter import ExecutionCounterDocument
+from qdash.dbmodel.menu import MenuDocument
 
 router = APIRouter(prefix="/calibration")
 logger = getLogger("uvicorn.app")

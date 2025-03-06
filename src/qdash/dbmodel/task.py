@@ -1,5 +1,5 @@
 import logging
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
@@ -24,8 +24,8 @@ class TaskDocument(Document):
     name: str = Field(..., description="The name of the task")
     description: str = Field(..., description="Detailed description of the task")
     task_type: str = Field(..., description="The type of the task")
-    input_parameters: Optional[dict] = Field(None, description="The input parameters")
-    output_parameters: Optional[dict] = Field(None, description="The output parameters")
+    input_parameters: dict | None = Field(None, description="The input parameters")
+    output_parameters: dict | None = Field(None, description="The output parameters")
 
     model_config = ConfigDict(
         from_attributes=True,

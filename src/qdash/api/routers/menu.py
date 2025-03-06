@@ -12,8 +12,8 @@ from qdash.api.schemas.error import (
 from qdash.api.schemas.exception import InternalSeverError
 from qdash.datamodel.menu import MenuModel
 from qdash.datamodel.task import TaskModel
-from qdash.neodbmodel.menu import MenuDocument
-from qdash.neodbmodel.task import TaskDocument
+from qdash.dbmodel.menu import MenuDocument
+from qdash.dbmodel.task import TaskDocument
 
 router = APIRouter()
 

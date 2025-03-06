@@ -43,7 +43,7 @@ def convert_value(value: Any, value_type: str) -> Any:
     return value
 
 
-def convert_json_to_task_parameters(json_data: Dict) -> Dict[str, Dict]:
+def convert_json_to_task_parameters(json_data: dict) -> dict[str, dict]:
     """Convert JSON task parameters to the format expected by Pydantic models.
 
     Args:

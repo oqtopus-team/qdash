@@ -14,9 +14,11 @@ class Detail(BaseModel):
     """A simple message response.
 
     Args:
+    ----
         BaseModel: The base class for Pydantic models.
 
     Attributes:
+    ----------
         message (str): The message to return.
 
     """
@@ -25,13 +27,14 @@ class Detail(BaseModel):
 
 
 class BadRequestResponse(ErrorResponse):
-    """
-    Represents a response for a bad request.
+    """Represents a response for a bad request.
 
     Args:
+    ----
         detail (str): The detailed error message.
 
     Attributes:
+    ----------
         status_code (int): The HTTP status code for the response.
         content (dict): The content of the response.
 
@@ -48,13 +51,14 @@ class BadRequestResponse(ErrorResponse):
 
 
 class InternalServerErrorResponse(ErrorResponse):
-    """
-    Represents an internal server error response.
+    """Represents an internal server error response.
 
     Args:
+    ----
         detail (str): The error message or details of the internal server error.
 
     Attributes:
+    ----------
         status_code (int): The HTTP status code for the internal server error response.
         content (dict): The content of the internal server error response, containing the error detail.
 
@@ -71,13 +75,14 @@ class InternalServerErrorResponse(ErrorResponse):
 
 
 class NotFoundErrorResponse(ErrorResponse):
-    """
-    Represents an error response for a resource not found.
+    """Represents an error response for a resource not found.
 
     Args:
+    ----
         detail (str): The detailed error message.
 
     Attributes:
+    ----------
         status_code (int): The HTTP status code of the error response.
         content (dict): The content of the error response.
 
@@ -94,13 +99,14 @@ class NotFoundErrorResponse(ErrorResponse):
 
 
 class ConflictErrorResponse(ErrorResponse):
-    """
-    Represents an error response for a conflict (HTTP status code 409).
+    """Represents an error response for a conflict (HTTP status code 409).
 
     Args:
+    ----
         detail (str): The detailed error message.
 
     Attributes:
+    ----------
         status_code (int): The HTTP status code for the error response (409).
         content (dict): The content of the error response, containing the detail message.
 

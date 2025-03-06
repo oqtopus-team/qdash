@@ -1,11 +1,11 @@
 # from neodbmodel.task import TaskDocument
 from prefect import get_run_logger, task
 from qdash.datamodel.task import CouplingTaskModel, GlobalTaskModel, QubitTaskModel, TaskResultModel
-from qdash.neodbmodel.execution_history import ExecutionHistoryDocument
-from qdash.neodbmodel.initialize import initialize
-from qdash.neodbmodel.qubit import QubitDocument
-from qdash.neodbmodel.task import TaskDocument
-from qdash.neodbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+from qdash.dbmodel.initialize import initialize
+from qdash.dbmodel.qubit import QubitDocument
+from qdash.dbmodel.task import TaskDocument
+from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.workflow.manager.execution import ExecutionManager
 from qdash.workflow.manager.task import TaskManager
 from qdash.workflow.tasks.active_protocols import generate_task_instances

@@ -12,7 +12,7 @@ from qdash.api.lib.auth import (
 )
 from qdash.api.schemas.auth import Token, User, UserCreate
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.neodbmodel.user import UserDocument
+from qdash.dbmodel.user import UserDocument
 
 router = APIRouter(
     prefix="/auth",

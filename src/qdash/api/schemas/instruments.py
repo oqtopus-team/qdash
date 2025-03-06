@@ -17,16 +17,16 @@ class BoxStatusResponse(BoxStatus):
 
 
 class PortConfig(BaseModel):
-    port: Optional[int] = Field(default=0)
-    direction: Optional[str] = Field(default="")
-    lo_freq: Optional[float] = Field(default=0)
-    cnco_freq: Optional[float] = Field(default=0)
-    fullscale_current: Optional[int] = Field(default=0)
-    sideband: Optional[str] = Field(default="")
+    port: int | None = Field(default=0)
+    direction: str | None = Field(default="")
+    lo_freq: float | None = Field(default=0)
+    cnco_freq: float | None = Field(default=0)
+    fullscale_current: int | None = Field(default=0)
+    sideband: str | None = Field(default="")
 
 
 class BoxDetailResponse(BoxStatus):
-    detail: Optional[list[PortConfig]] = Field(default=[])
+    detail: list[PortConfig] | None = Field(default=[])
 
 
 class IQData(BaseModel):

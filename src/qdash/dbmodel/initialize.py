@@ -2,7 +2,7 @@ import os
 
 from bunnet import init_bunnet
 from pymongo import MongoClient
-from qdash.neodbmodel.document_models import document_models
+from qdash.dbmodel.document_models import document_models
 
 mongo_ip = os.getenv("MONGO_HOST")
 client: MongoClient = MongoClient(mongo_ip, 27017, username="root", password="example")  # noqa: S106

@@ -17,6 +17,6 @@ class Settings(BaseSettings):
     qpu_data_path: str
 
 
-@lru_cache()
+@lru_cache
 def get_settings():
     return Settings()  # type: ignore

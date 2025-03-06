@@ -1,7 +1,5 @@
 from typing import ClassVar
 
-from qubex.experiment import Experiment
-
 from qdash.workflow.cal_util import qid_to_label
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -11,6 +9,7 @@ from qdash.workflow.tasks.base import (
     PreProcessResult,
     RunResult,
 )
+from qubex.experiment import Experiment
 
 
 class CheckDRAGHPIPulse(BaseTask):

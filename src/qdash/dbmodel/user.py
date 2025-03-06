@@ -1,4 +1,4 @@
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 from bunnet import Document
 from pydantic import ConfigDict, Field

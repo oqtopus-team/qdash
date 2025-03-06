@@ -84,7 +84,6 @@ services:
       - ./src/qdash/workflow:/app/qdash/workflow
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
-      - ./src/qdash/neodbmodel:/app/qdash/neodbmodel
       - ${CALIB_DATA_PATH}:/app/calib_data
       - /home/shared/config:/home/shared/config
     working_dir: /app/qdash/workflow
@@ -112,7 +111,6 @@ services:
       - ./src/qdash/api:/app/qdash/api
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
-      - ./src/qdash/neodbmodel:/app/qdash/neodbmodel
       - ${CALIB_DATA_PATH}:/app/calib_data
       - ${QPU_DATA_PATH}:/app/qpu_data
     working_dir: /app/qdash/api
@@ -126,7 +124,7 @@ services:
       - mongo
       - prefect-server
     environment:
-      - PYTHONPATH=/app:/app/qdash:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash/neodbmodel
+      - PYTHONPATH=/app:/app/qdash:/app/qdash/dbmodel:/app/qdash/datamodel
       - CALIB_DATA_PATH=/app/calib_data
       - QPU_DATA_PATH=/app/qpu_data
       - PREFECT_API_URL=http://${PREFECT_HOST}:4200/api

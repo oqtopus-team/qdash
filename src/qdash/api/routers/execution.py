@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from qdash.api.schemas.error import (
     Detail,
 )
-from qdash.neodbmodel.execution_lock import ExecutionLockDocument
+from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from starlette.exceptions import HTTPException
 
 router = APIRouter()
