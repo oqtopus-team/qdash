@@ -6,7 +6,7 @@ from qdash.datamodel.menu import MenuModel as Menu
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.initialize import initialize
-from qdash.workflow.cal_flow import qubex_one_qubit_cal_flow
+from qdash.workflow.calibration.flow import qubex_one_qubit_cal_flow
 from qdash.workflow.manager.execution import ExecutionManager
 from qdash.workflow.utiltask.create_directory import (
     create_directory_task,

@@ -3,8 +3,8 @@ from prefect import serve
 
 # from prefect.client.schemas.schedules import CronSchedule
 # from qcflow.subflow.concurrent.flow import concurrent_flow
-from qdash.workflow.cal_flow import cal_flow
-from qdash.workflow.main import main_flow
+from qdash.workflow.calibration.flow import cal_flow
+from qdash.workflow.handler import main_flow
 
 # from qdash.workflow.subflow.scheduler.flow import scheduler_flow
 # from qdash.workflow.subflow.service_close.service_close import (
