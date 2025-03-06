@@ -5,17 +5,6 @@ from pydantic import ConfigDict, Field
 from qdash.datamodel.system_info import SystemInfoModel
 
 
-def get_default_system_info() -> SystemInfoModel:
-    """Get default system info with current timestamps.
-
-    Returns
-    -------
-        SystemInfoModel: Default system info instance
-
-    """
-    return SystemInfoModel()
-
-
 class MenuDocument(Document):
     """Data model for a qubit.
 
@@ -38,7 +27,7 @@ class MenuDocument(Document):
     tags: list[str] | None = Field(default=None)
     task_details: dict[str, Any] | None = Field(default=None)
     system_info: SystemInfoModel = Field(
-        default_factory=get_default_system_info, description="The system information"
+        default_factory=SystemInfoModel, description="The system information"
     )
 
     model_config = ConfigDict(

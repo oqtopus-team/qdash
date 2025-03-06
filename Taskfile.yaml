@@ -1,10 +1,14 @@
 version: 3
 
+env:
+  UV_LINK_MODE: copy
+
 tasks:
   default:
     desc: Display available tasks
     cmds:
       - task -l
+
   generate:
     dir: ui
     cmds:
@@ -28,7 +32,6 @@ tasks:
     dir: docs
     cmds:
       - npm run docs:build
-      # - poetry run mkdocs serve
 
   fmt-client:
     dir: client
@@ -39,7 +42,7 @@ tasks:
 
   fmt:
     cmds:
-      - poetry run ruff format .
+      - ruff format .
       - npx prettier . --write
       - npx eslint . --fix
     desc: Format common code
@@ -51,30 +54,32 @@ tasks:
 
   export-api:
     cmds:
-      - poetry export -f requirements.txt --output ./src/qdash/api/requirements.txt --without-hashes --with=api,dev
+      - uv export --group api --no-hashes --no-emit-project --no-editable --format requirements-txt > ./src/qdash/api/requirements.txt
     desc: Export server requirements
 
   export-workflow:
     cmds:
-      - poetry export -f requirements.txt --output ./src/qdash/workflow/requirements.txt --without-hashes --with=workflow,dev
+      - uv export --group workflow --no-hashes --no-emit-project --no-editable --format requirements-txt > ./src/qdash/workflow/requirements.txt
     desc: Export qcflow requirements
+
+  export-dev:
+    cmds:
+      - uv export --all-groups --no-hashes --no-emit-project --no-editable --format requirements-txt > .devcontainer/requirements.txt
+    desc: Export all requirements
 
   export-all:
     cmds:
-      - poetry export -f requirements.txt --output ./.devcontainer/requirements.txt --without-hashes --with=api,workflow,dev
+      - task export-api
+      - task export-workflow
+      - task export-dev
     desc: Export all requirements
 
   build-api:
     cmds:
-      - poetry export -f requirements.txt --output ./src/qdash/api/requirements.txt --without-hashes --with=api,dev
+      - task export-api
       - docker compose build --no-cache api
 
   build-workflow:
     cmds:
-      - poetry export -f requirements.txt --output ./src/qdash/workflow/requirements.txt --without-hashes --with=workflow,dev
+      - task export-workflow
       - docker compose build --no-cache workflow
-
-  requirements:
-    cmds:
-      - poetry export -f requirements.txt --output requirements.txt --without-hashes
-    desc: Generate requirements.txt

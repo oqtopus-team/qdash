@@ -4,7 +4,9 @@ from bunnet import init_bunnet
 from pymongo import MongoClient
 from qdash.neodbmodel.chip import ChipDocument
 from qdash.neodbmodel.coupling import CouplingDocument
+from qdash.neodbmodel.execution_counter import ExecutionCounterDocument
 from qdash.neodbmodel.execution_history import ExecutionHistoryDocument
+from qdash.neodbmodel.execution_lock import ExecutionLockDocument
 from qdash.neodbmodel.menu import MenuDocument
 from qdash.neodbmodel.parameter import ParameterDocument
 from qdash.neodbmodel.qubit import QubitDocument
@@ -30,5 +32,7 @@ def initialize() -> None:
             CouplingDocument,
             UserDocument,
             MenuDocument,
+            ExecutionCounterDocument,
+            ExecutionLockDocument,
         ],
     )

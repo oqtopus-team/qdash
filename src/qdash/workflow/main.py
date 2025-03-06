@@ -3,25 +3,17 @@ from pathlib import Path
 import pendulum
 from dotenv import load_dotenv
 from prefect import flow, get_run_logger, runtime
-from qubex.version import get_package_version
-
-# from qcflow.schema.menu import Menu
 from qdash.datamodel.menu import MenuModel as Menu
+from qdash.neodbmodel.execution_counter import ExecutionCounterDocument
 from qdash.neodbmodel.execution_history import ExecutionHistoryDocument
+from qdash.neodbmodel.execution_lock import ExecutionLockDocument
 from qdash.neodbmodel.initialize import initialize
 from qdash.workflow.cal_flow import qubex_one_qubit_cal_flow
-from qdash.workflow.db.bluefors import get_latest_temperature
-from qdash.workflow.db.execution_lock import (
-    get_execution_lock,
-    lock_execution,
-    unlock_execution,
-)
-from qdash.workflow.db.execution_run import get_next_execution_index
-from qdash.workflow.db.execution_run_history import insert_execution_run
 from qdash.workflow.manager.execution import ExecutionManager
 from qdash.workflow.utiltask.create_directory import (
     create_directory_task,
 )
+from qubex.version import get_package_version
 
 
 class CalibrationRunningError(Exception):
@@ -48,9 +40,7 @@ def generate_execution_id() -> str:
 
     """
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
-    execution_index = get_next_execution_index(date_str)
-    if execution_index is None:
-        execution_index = 1  # Default to 1 if None is returned
+    execution_index = ExecutionCounterDocument.get_next_index(date_str)
     return f"{date_str}-{execution_index:03d}"
 
 
@@ -79,11 +69,12 @@ def main_flow(
     if ui_url:
         ui_url = ui_url.replace("172.22.0.5", "localhost")
     logger.info(f"Execution ID: {execution_id}")
-    if get_execution_lock():
+    exectuion_is_locked = ExecutionLockDocument.get_lock_status()
+    if exectuion_is_locked:
         logger.error("Calibration is already running.")
         error_message = "Calibration is already running."
         raise CalibrationRunningError(error_message)
-    lock_execution()
+    ExecutionLockDocument.lock()
     execution_id = runtime.flow_run.name
     if execution_id:
         date_str, index = execution_id.split("-")
@@ -91,13 +82,6 @@ def main_flow(
         logger.error("Execution ID is None.")
         error_message = "Execution ID is None."
         raise ValueError(error_message)
-    insert_execution_run(
-        date_str,
-        execution_id,
-        menu.model_dump(),
-        get_latest_temperature(device_id="XLD", channel_nr=6),
-        flow_url=ui_url,
-    )
     calib_dir = f"/app/calib_data/{menu.username}/{date_str}/{index}"
     create_directory_task.submit(calib_dir).result()
     latest_calib_dir = f"/app/calib_data/{menu.username}/{date_str}/latest"
@@ -121,12 +105,10 @@ def main_flow(
     ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
     try:
         success_map = qubex_one_qubit_cal_flow(menu, calib_dir, success_map, execution_id)
-        # 最新の状態を読み込んで完了状態に設定
         execution_manager = ExecutionManager.load_from_file(calib_dir).complete_execution()
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")
-        # 最新の状態を読み込んで失敗状態に設定
         execution_manager = ExecutionManager.load_from_file(calib_dir).fail_execution()
     finally:
         ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
-        unlock_execution()
+        ExecutionLockDocument.unlock()

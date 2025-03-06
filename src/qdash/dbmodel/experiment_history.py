@@ -19,11 +19,11 @@ class ExperimentHistoryModel(Document):
     experiment_name: str
     label: str
     timestamp: datetime = Field(default_factory=datetime.now)
-    status: Optional[str] = Field("running")
-    fig_path: Optional[str] = Field(None)
+    status: str | None = Field("running")
+    fig_path: str | None = Field(None)
     input_parameter: dict
     output_parameter: dict
-    execution_id: Optional[str] = Field(None)  # 20241116#0
+    execution_id: str | None = Field(None)  # 20241116#0
 
     class Settings:
         name = "experiment_history"

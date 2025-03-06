@@ -41,7 +41,7 @@ export function ExecuteConfirmModal({
           console.error("Error executing calibration:", error);
           toast.error("Error executing calibration");
         },
-      }
+      },
     );
   };
 

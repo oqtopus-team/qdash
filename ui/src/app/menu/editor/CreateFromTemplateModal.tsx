@@ -29,7 +29,7 @@ export function CreateFromTemplateModal({
 
   const handleInputChange = (
     field: keyof CreateMenuRequest,
-    value: string | boolean | string[][] | string[]
+    value: string | boolean | string[][] | string[],
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -37,7 +37,7 @@ export function CreateFromTemplateModal({
   const handleQidsChange = (
     groupIndex: number,
     qubitIndex: number,
-    value: string
+    value: string,
   ) => {
     const newQids = [...formData.qids];
     if (!newQids[groupIndex]) {
@@ -65,7 +65,7 @@ export function CreateFromTemplateModal({
   const removeQubitFromGroup = (groupIndex: number, qubitIndex: number) => {
     const newQids = [...formData.qids];
     newQids[groupIndex] = newQids[groupIndex].filter(
-      (_, i) => i !== qubitIndex
+      (_, i) => i !== qubitIndex,
     );
     if (newQids[groupIndex].length === 0) {
       removeQubitGroup(groupIndex);
@@ -103,7 +103,7 @@ export function CreateFromTemplateModal({
           console.error("Error creating template item:", error);
           toast.error("Error creating template item");
         },
-      }
+      },
     );
   };
 
@@ -141,7 +141,7 @@ export function CreateFromTemplateModal({
                   return;
                 }
                 const selectedPreset = presetData?.data.menus.find(
-                  (menu) => menu.name === e.target.value
+                  (menu) => menu.name === e.target.value,
                 );
                 if (selectedPreset) {
                   setFormData(selectedPreset);
@@ -256,7 +256,7 @@ export function CreateFromTemplateModal({
                               handleQidsChange(
                                 groupIndex,
                                 qubitIndex,
-                                e.target.value
+                                e.target.value,
                               )
                             }
                             placeholder={`Q${qubitIndex + 1}`}
