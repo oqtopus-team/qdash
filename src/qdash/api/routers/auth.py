@@ -12,10 +12,7 @@ from qdash.api.lib.auth import (
 )
 from qdash.api.schemas.auth import Token, User, UserCreate
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.neodbmodel.initialize import initialize
 from qdash.neodbmodel.user import UserDocument
-
-initialize()
 
 router = APIRouter(
     prefix="/auth",
@@ -70,7 +67,6 @@ def login_for_access_token(
 def register_user(user_data: UserCreate) -> User:
     logger.debug(f"Registration attempt for user: {user_data.username}")
     # Check if username already exists
-    initialize()
     query = UserDocument.find_one({"username": user_data.username}).run()
     existing_user = query
     if existing_user:

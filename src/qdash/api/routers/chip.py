@@ -10,7 +10,6 @@ from qdash.api.lib.current_user import get_current_user_id
 from qdash.api.schemas.auth import User
 from qdash.neodbmodel.chip import ChipDocument
 from qdash.neodbmodel.execution_history import ExecutionHistoryDocument
-from qdash.neodbmodel.initialize import initialize
 from qdash.neodbmodel.task import TaskDocument
 from qdash.neodbmodel.task_result_history import TaskResultHistoryDocument
 
@@ -133,7 +132,6 @@ def list_chips(
 
     """
     logger.debug(f"Listing chips for user: {current_user.username}")
-    initialize()
     chips = ChipDocument.find({"username": current_user.username}).run()
     return [ChipResponse(chip_id=chip.chip_id) for chip in chips]
 
@@ -160,7 +158,6 @@ def fetch_chip(
 
     """
     logger.debug(f"Fetching chip {chip_id} for user: {current_user.username}")
-    initialize()
 
     chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
     return ChipResponse(
@@ -196,7 +193,6 @@ def list_executions_by_chip_id(
 
     """
     logger.debug(f"Listing executions for chip {chip_id}, user: {current_user.username}")
-    initialize()
     executions = (
         ExecutionHistoryDocument.find(
             {"chip_id": chip_id, "username": current_user.username}, sort=[("start_at", DESCENDING)]
@@ -291,7 +287,6 @@ def fetch_execution_by_chip_id(
     logger.debug(
         f"Fetching execution {execution_id} for chip {chip_id}, user: {current_user.username}"
     )
-    initialize()
     execution = ExecutionHistoryDocument.find_one(
         {"execution_id": execution_id, "chip_id": chip_id, "username": current_user.username}
     ).run()
@@ -386,7 +381,6 @@ def fetch_mux_detail(
 
     """
     logger.debug(f"Fetching mux details for chip {chip_id}, user: {current_user.username}")
-    initialize()
     tasks = TaskDocument.find({"username": current_user.username}).run()
     logger.debug("Tasks: %s", tasks)
     return _build_mux_detail(mux_id, tasks, current_user)
@@ -418,7 +412,6 @@ def list_muxes(
 
     """
     logger.debug(f"Fetching muxes for chip {chip_id}, user: {current_user.username}")
-    initialize()
     tasks = TaskDocument.find({"username": current_user.username}).run()
     logger.debug("Tasks: %s", tasks)
     muxes: dict[int, MuxDetailResponse] = {}
@@ -450,7 +443,6 @@ def fetch_latest_task_grouped_by_chip(
 ) -> LatestTaskGroupedByChipResponse:
     """Fetch the multiplexers."""
     logger.debug(f"Fetching muxes for chip {chip_id}, user: {current_user.username}")
-    initialize()
     chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")

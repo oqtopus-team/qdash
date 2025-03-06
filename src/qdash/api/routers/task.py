@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
-from qdash.neodbmodel.initialize import initialize
 from qdash.neodbmodel.task import TaskDocument
 
 router = APIRouter()
@@ -62,7 +61,6 @@ def fetch_all_tasks(
         list[TaskResponse]: The list of tasks.
 
     """
-    initialize()
     tasks = TaskDocument.find({"username": current_user.username}).run()
     return ListTaskResponse(
         tasks=[
