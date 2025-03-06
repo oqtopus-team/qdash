@@ -3,7 +3,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, status
 from fastapi.logger import logger
-
 from qdash.api.lib.auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     authenticate_user,

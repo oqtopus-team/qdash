@@ -2,7 +2,7 @@ import os
 import uuid
 from datetime import datetime
 from logging import getLogger
-from typing import Annotated, Optional
+from typing import Annotated
 
 import dateutil.tz
 from fastapi import APIRouter, Depends, HTTPException, Security
@@ -123,7 +123,7 @@ async def schedule_calib(
 )
 async def fetch_all_calib_schedule(
     settings: Annotated[Settings, Depends] = Depends(get_settings),
-    current_user: Optional[User] = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> list[ScheduleCalibResponse]:
     client = PrefectClient(api=settings.prefect_api_url)
     env = settings.env

@@ -18,7 +18,7 @@ class BlueforsModel(Document):
     magnitude: float
     angle: float
     channel_nr: int
-    status_flags: Optional[int] = Field(None)
+    status_flags: int | None = Field(None)
     model_config = ConfigDict(
         from_attributes=True,
     )

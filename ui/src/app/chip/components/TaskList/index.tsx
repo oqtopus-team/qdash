@@ -64,8 +64,8 @@ export function TaskList({ taskGroups, qids }: TaskListProps) {
                           task.status === "completed"
                             ? "bg-success"
                             : task.status === "failed"
-                            ? "bg-error"
-                            : "bg-warning"
+                              ? "bg-error"
+                              : "bg-warning"
                         }`}
                       />
                     </div>
@@ -93,7 +93,7 @@ export function TaskList({ taskGroups, qids }: TaskListProps) {
                                 </span>
                               </div>
                             );
-                          }
+                          },
                         )}
                       </div>
                     )}
@@ -124,7 +124,7 @@ export function TaskList({ taskGroups, qids }: TaskListProps) {
               <div className="aspect-square bg-base-200/50 rounded-xl p-4">
                 <img
                   src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                    selectedTaskInfo.path
+                    selectedTaskInfo.path,
                   )}`}
                   alt={`Result for QID ${selectedTaskInfo.qid}`}
                   className="w-full h-full object-contain"
@@ -138,8 +138,8 @@ export function TaskList({ taskGroups, qids }: TaskListProps) {
                       selectedTaskInfo.task.status === "completed"
                         ? "badge-success"
                         : selectedTaskInfo.task.status === "failed"
-                        ? "badge-error"
-                        : "badge-warning"
+                          ? "badge-error"
+                          : "badge-warning"
                     }`}
                   >
                     {selectedTaskInfo.task.status}
@@ -150,7 +150,7 @@ export function TaskList({ taskGroups, qids }: TaskListProps) {
                     <h4 className="font-medium mb-2">Parameters</h4>
                     <div className="space-y-2">
                       {Object.entries(
-                        selectedTaskInfo.task.output_parameters
+                        selectedTaskInfo.task.output_parameters,
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&

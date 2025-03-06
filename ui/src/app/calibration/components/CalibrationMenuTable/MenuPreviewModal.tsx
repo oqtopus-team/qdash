@@ -25,13 +25,13 @@ export function MenuPreviewModal({
       task_details: undefined,
     },
     null,
-    2
+    2,
   );
 
   const taskDetailsContent = JSON.stringify(
     selectedItem.task_details || {},
     null,
-    2
+    2,
   );
 
   return (

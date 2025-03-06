@@ -88,7 +88,7 @@ export function NewItemModal({
       const updatedData = await refetchCalibSchedule();
       if (updatedData.data) {
         setCalibSchedules(
-          mapScheduleCalibResponsetoCalibSchedule(updatedData.data.data)
+          mapScheduleCalibResponsetoCalibSchedule(updatedData.data.data),
         );
       }
       document.getElementById("newItem")?.closest("dialog")?.close();

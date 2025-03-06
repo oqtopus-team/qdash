@@ -7,7 +7,7 @@ from pymongo import IndexModel
 
 class ChannelInfo(BaseModel):
     status: str = "normal"  # normal, abnormal
-    threshold: Optional[float] = Field(None)
+    threshold: float | None = Field(None)
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -16,10 +16,10 @@ class ChannelInfo(BaseModel):
 
 class FridgeStatusModel(Document):
     device_id: str
-    ch1: Optional[ChannelInfo] = Field(None)
-    ch2: Optional[ChannelInfo] = Field(None)
-    ch5: Optional[ChannelInfo] = Field(None)
-    ch6: Optional[ChannelInfo] = Field(None)
+    ch1: ChannelInfo | None = Field(None)
+    ch2: ChannelInfo | None = Field(None)
+    ch5: ChannelInfo | None = Field(None)
+    ch6: ChannelInfo | None = Field(None)
 
     class Settings:
         name = "fridge_status"

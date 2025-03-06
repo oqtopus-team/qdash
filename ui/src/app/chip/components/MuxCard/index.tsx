@@ -23,7 +23,7 @@ export function MuxCard({
 }: MuxCardProps) {
   // Get latest update time info from tasks
   const getLatestUpdateInfo = (
-    detail: MuxDetailResponseDetail
+    detail: MuxDetailResponseDetail,
   ): { time: Date; isRecent: boolean } => {
     let latestTime = new Date(0);
 
@@ -78,7 +78,7 @@ export function MuxCard({
             taskGroups[taskName] = {};
           }
           taskGroups[taskName][qid] = task;
-        }
+        },
       );
     });
 

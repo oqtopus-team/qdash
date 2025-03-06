@@ -46,7 +46,7 @@ export function CalibrationScheduleTable() {
   useEffect(() => {
     if (scheduleData) {
       setCalibSchedules(
-        mapScheduleCalibResponsetoCalibSchedule(scheduleData.data)
+        mapScheduleCalibResponsetoCalibSchedule(scheduleData.data),
       );
     }
     if (menuData) {
@@ -56,7 +56,7 @@ export function CalibrationScheduleTable() {
 
   const handleNewItem = () => {
     const editModal = document.getElementById(
-      "newItem"
+      "newItem",
     ) as HTMLDialogElement | null;
     if (editModal) {
       editModal.showModal();
@@ -71,14 +71,14 @@ export function CalibrationScheduleTable() {
           const updatedData = await refetchCalibSchedule();
           if (updatedData.data) {
             setCalibSchedules(
-              mapScheduleCalibResponsetoCalibSchedule(updatedData.data.data)
+              mapScheduleCalibResponsetoCalibSchedule(updatedData.data.data),
             );
           }
         },
         onError: (error) => {
           console.error("Error delete schedule calibration:", error);
         },
-      }
+      },
     );
   };
 
