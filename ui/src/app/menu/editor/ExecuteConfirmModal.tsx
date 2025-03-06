@@ -33,15 +33,28 @@ export function ExecuteConfirmModal({
         },
       },
       {
-        onSuccess: () => {
-          toast.success("Calibration execution started!");
+        onSuccess: (data) => {
+          toast.success(
+            <div>
+              Calibration execution started!
+              <br />
+              <a
+                href={data.data.qdash_ui_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                View Details →
+              </a>
+            </div>
+          );
           onClose();
         },
         onError: (error) => {
           console.error("Error executing calibration:", error);
           toast.error("Error executing calibration");
         },
-      },
+      }
     );
   };
 

@@ -11,4 +11,5 @@
  */
 export interface ExecuteCalibResponse {
   flow_run_url: string;
+  qdash_ui_url: string;
 }
