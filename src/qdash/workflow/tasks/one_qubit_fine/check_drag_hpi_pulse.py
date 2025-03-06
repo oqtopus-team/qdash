@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.workflow.cal_util import qid_to_label
+from qdash.workflow.calibration.util import qid_to_label
 from qdash.workflow.tasks.base import (
     BaseTask,
     InputParameter,
