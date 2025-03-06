@@ -2,10 +2,6 @@
 
 import { useState, useEffect } from "react";
 import {
-  useAddExecutionTags,
-  useRemoveExecutionTags,
-} from "@/client/execution/execution";
-import {
   useListChips,
   useListExecutionsByChipId,
   useFetchExecutionByChipId,
@@ -24,13 +20,12 @@ interface ChipOption {
 export default function ExecutionPage() {
   const [selectedChipId, setSelectedChipId] = useState<string>("SAMPLE");
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
-    null,
+    null
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(
-    null,
+    null
   );
-  const [newTag, setNewTag] = useState<string>("");
   const [cardData, setCardData] = useState<ExecutionResponseSummary[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
@@ -42,7 +37,6 @@ export default function ExecutionPage() {
     data: executionData,
     isError,
     isLoading,
-    refetch,
   } = useListExecutionsByChipId(selectedChipId, {
     query: {
       // Refresh every 5 seconds
@@ -57,7 +51,6 @@ export default function ExecutionPage() {
     data: executionDetailData,
     isLoading: isDetailLoading,
     isError: isDetailError,
-    refetch: refetchDetail,
   } = useFetchExecutionByChipId(
     selectedChipId,
     selectedExecutionId ? selectedExecutionId : "",
@@ -70,32 +63,8 @@ export default function ExecutionPage() {
         // Only enable polling when an execution is selected
         enabled: !!selectedExecutionId,
       },
-    },
+    }
   );
-
-  const addTagMutation = useAddExecutionTags({
-    mutation: {
-      onSuccess: () => {
-        refetch();
-        refetchDetail();
-      },
-      onError: (error: any) => {
-        console.error("Error adding tag:", error);
-      },
-    },
-  });
-
-  const removeTagMutation = useRemoveExecutionTags({
-    mutation: {
-      onSuccess: () => {
-        refetch();
-        refetchDetail();
-      },
-      onError: (error: any) => {
-        console.error("Error removing tag:", error);
-      },
-    },
-  });
 
   // 実行データ取得時にカードデータをセット
   useEffect(() => {
@@ -125,37 +94,6 @@ export default function ExecutionPage() {
     setSelectedExecutionId(execution.execution_id);
     setIsSidebarOpen(true);
     setExpandedTaskIndex(null);
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    if (selectedExecutionId) {
-      removeTagMutation.mutate(
-        {
-          executionId: selectedExecutionId,
-          data: [tagToRemove],
-        },
-        {
-          onSuccess: () => refetch(),
-        },
-      );
-    }
-  };
-
-  const handleAddTag = () => {
-    if (newTag.trim() !== "" && selectedExecutionId) {
-      addTagMutation.mutate(
-        {
-          executionId: selectedExecutionId,
-          data: [newTag.trim()],
-        },
-        {
-          onSuccess: () => {
-            setNewTag("");
-            refetch();
-          },
-        },
-      );
-    }
   };
 
   const handleCloseSidebar = () => {
@@ -241,19 +179,19 @@ export default function ExecutionPage() {
                       execution.status === "running"
                         ? "text-info"
                         : execution.status === "completed"
-                          ? "text-success"
-                          : execution.status === "scheduled"
-                            ? "text-warning"
-                            : "text-error"
+                        ? "text-success"
+                        : execution.status === "scheduled"
+                        ? "text-warning"
+                        : "text-error"
                     }`}
                   >
                     {execution.status === "running"
                       ? "Running"
                       : execution.status === "completed"
-                        ? "Completed"
-                        : execution.status === "scheduled"
-                          ? "Scheduled"
-                          : "Failed"}
+                      ? "Completed"
+                      : execution.status === "scheduled"
+                      ? "Scheduled"
+                      : "Failed"}
                   </span>
                 </div>
               </div>
@@ -282,7 +220,7 @@ export default function ExecutionPage() {
               <h2 className="text-2xl font-bold">
                 {
                   cardData.find(
-                    (exec) => getExecutionKey(exec) === selectedExecutionId,
+                    (exec) => getExecutionKey(exec) === selectedExecutionId
                   )?.name
                 }
               </h2>
@@ -297,8 +235,8 @@ export default function ExecutionPage() {
                 <a
                   href={String(
                     cardData.find(
-                      (exec) => getExecutionKey(exec) === selectedExecutionId,
-                    )?.note?.ui_url || "#",
+                      (exec) => getExecutionKey(exec) === selectedExecutionId
+                    )?.note?.ui_url || "#"
                   )}
                   className="bg-accent text-accent-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
                 >
@@ -307,43 +245,7 @@ export default function ExecutionPage() {
                 </a>
               </div>
             </div>
-            <div className="bg-base-100">
-              <div className="flex flex-wrap mb-4">
-                {cardData
-                  .find((exec) => getExecutionKey(exec) === selectedExecutionId)
-                  ?.tags?.map((tag, tagIndex) => (
-                    <span
-                      key={tagIndex}
-                      className="inline-block bg-base-200 rounded-full px-3 py-1 text-sm font-semibold text-base-content mr-2 mb-1"
-                    >
-                      {tag}
-                      <button
-                        type="button"
-                        className="ml-2 text-error hover:text-error/80"
-                        onClick={() => handleRemoveTag(tag)}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-              </div>
-              <div className="flex my-4">
-                <input
-                  type="text"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Enter tag and press Add"
-                  className="input input-bordered w-full max-w-xs"
-                />
-                <button
-                  type="button"
-                  className="btn ml-2"
-                  onClick={handleAddTag}
-                >
-                  Add
-                </button>
-              </div>
-            </div>
+            <div className="bg-base-100"></div>
             <div>
               <h3 className="text-xl font-bold mb-4">Execution Details</h3>
               {isDetailLoading && <div>Loading details...</div>}
@@ -352,7 +254,7 @@ export default function ExecutionPage() {
                 executionDetailData.data.task &&
                 executionDetailData.data.task.map((detailTask, idx) => {
                   const taskBorderStyle = getStatusBorderStyle(
-                    detailTask.status ?? "unknown",
+                    detailTask.status ?? "unknown"
                   );
 
                   return (
@@ -378,19 +280,19 @@ export default function ExecutionPage() {
                           detailTask.status === "running"
                             ? "text-info"
                             : detailTask.status === "completed"
-                              ? "text-success"
-                              : detailTask.status === "scheduled"
-                                ? "text-warning"
-                                : "text-error"
+                            ? "text-success"
+                            : detailTask.status === "scheduled"
+                            ? "text-warning"
+                            : "text-error"
                         }`}
                       >
                         {detailTask.status === "running"
                           ? "Running"
                           : detailTask.status === "completed"
-                            ? "Completed"
-                            : detailTask.status === "scheduled"
-                              ? "Scheduled"
-                              : "Failed"}
+                          ? "Completed"
+                          : detailTask.status === "scheduled"
+                          ? "Scheduled"
+                          : "Failed"}
                       </p>
                       {expandedTaskIndex === idx && (
                         <div className="mt-2">
@@ -402,7 +304,7 @@ export default function ExecutionPage() {
                                 </h5>
                                 <img
                                   src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                                    path,
+                                    path
                                   )}`}
                                   alt={`Task Figure ${i + 1}`}
                                   className="w-full h-auto max-h-[60vh] object-contain rounded border"
@@ -416,7 +318,7 @@ export default function ExecutionPage() {
                               </h5>
                               <img
                                 src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                                  detailTask.figure_path,
+                                  detailTask.figure_path
                                 )}`}
                                 alt="Task Figure"
                                 className="w-full h-auto max-h-[60vh] object-contain rounded border"
