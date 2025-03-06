@@ -8,10 +8,10 @@ from pydantic import BaseModel, field_validator
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
 from qdash.api.lib.current_user import get_current_user_id
 from qdash.api.schemas.auth import User
-from qdash.neodbmodel.chip import ChipDocument
-from qdash.neodbmodel.execution_history import ExecutionHistoryDocument
-from qdash.neodbmodel.task import TaskDocument
-from qdash.neodbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+from qdash.dbmodel.task import TaskDocument
+from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 if TYPE_CHECKING:
     from pydantic.validators import FieldValidationInfo

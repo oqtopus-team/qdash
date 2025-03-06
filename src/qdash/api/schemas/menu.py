@@ -12,10 +12,10 @@ class Mode(Enum):
 
 
 class BaseMenu(BaseModel):
-    """
-    Represents a base menu.
+    """Represents a base menu.
 
-    Attributes:
+    Attributes
+    ----------
         name (str): The name of the menu.
         description (str): The description of the menu.
         plan (list[list[int]]): The plan for the menu.
@@ -24,6 +24,7 @@ class BaseMenu(BaseModel):
         notify_bool (bool, optional): Whether to notify or not. Defaults to True.
         flow (list[str]): The flow of the menu.
         exp_list (list[str], optional): The list of experiments. Defaults to None.
+
     """
 
     name: str
@@ -33,8 +34,8 @@ class BaseMenu(BaseModel):
     mode: str
     notify_bool: bool = True
     flow: list[str]
-    exp_list: Optional[list[str]] = Field(default=[])
-    tags: Optional[list[str]] = Field(default=[])
+    exp_list: list[str] | None = Field(default=[])
+    tags: list[str] | None = Field(default=[])
 
     model_config = {
         "json_schema_extra": {

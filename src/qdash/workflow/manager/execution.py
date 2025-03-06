@@ -1,12 +1,11 @@
 # application code for the execution manager.
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import pendulum
 from filelock import FileLock
 from pydantic import BaseModel, Field
-
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionModel,

@@ -1,6 +1,6 @@
 # ruff: noqa
-from qdash.neodbmodel.initialize import initialize
-from qdash.neodbmodel.task import TaskModel, TaskDocument
+from qdash.dbmodel.initialize import initialize
+from qdash.dbmodel.task import TaskModel, TaskDocument
 from qdash.workflow.tasks.benchmark.randomized_benchmarking import RandomizedBenchmarking
 from qdash.workflow.tasks.benchmark.x90_interleaved_randomized_benchmarking import (
     X90InterleavedRandomizedBenchmarking,

@@ -1,6 +1,6 @@
 from qdash.datamodel.qubit import NodeInfoModel, PositionModel
-from qdash.neodbmodel.initialize import initialize
-from qdash.neodbmodel.qubit import QubitDocument
+from qdash.dbmodel.initialize import initialize
+from qdash.dbmodel.qubit import QubitDocument
 
 
 def qubit_lattice(n, d):
@@ -50,7 +50,7 @@ def qubit_lattice(n, d):
 
 def correct(original: tuple, s: float):
     offset = (1 / 3, 10 / 3)
-    offset_applied = tuple(x + y for x, y in zip(original, offset))
+    offset_applied = tuple(x + y for x, y in zip(original, offset, strict=False))
     return tuple(x * s for x in offset_applied)
 
 

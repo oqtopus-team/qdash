@@ -2,10 +2,6 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
-from qubex.experiment import Experiment
-from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, HPI_DURATION
-from qubex.measurement.measurement import DEFAULT_INTERVAL
-
 from qdash.datamodel.task import DataModel
 from qdash.workflow.cal_util import qid_to_label
 from qdash.workflow.tasks.base import (
@@ -16,6 +12,9 @@ from qdash.workflow.tasks.base import (
     PreProcessResult,
     RunResult,
 )
+from qubex.experiment import Experiment
+from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, HPI_DURATION
+from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class CreateDRAGHPIPulse(BaseTask):

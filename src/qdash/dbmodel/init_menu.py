@@ -1,5 +1,5 @@
-from qdash.neodbmodel.initialize import initialize
-from qdash.neodbmodel.menu import MenuDocument
+from qdash.dbmodel.initialize import initialize
+from qdash.dbmodel.menu import MenuDocument
 
 if __name__ == "__main__":
     initialize()

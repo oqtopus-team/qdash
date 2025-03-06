@@ -3,7 +3,7 @@ import os
 from contextlib import asynccontextmanager
 
 from bunnet import init_bunnet
-from qdash.neodbmodel.document_models import document_models
+from qdash.dbmodel.document_models import document_models
 from fastapi import FastAPI
 from pymongo import MongoClient
 

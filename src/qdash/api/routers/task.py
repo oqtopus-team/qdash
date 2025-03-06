@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
-from qdash.neodbmodel.task import TaskDocument
+from qdash.dbmodel.task import TaskDocument
 
 router = APIRouter()
 

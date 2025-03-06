@@ -1,9 +1,9 @@
 from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
 from qdash.datamodel.qubit import NodeInfoModel, PositionModel, QubitModel
-from qdash.neodbmodel.chip import ChipDocument
-from qdash.neodbmodel.init_coupling import bi_direction
-from qdash.neodbmodel.init_qubit import qubit_lattice
-from qdash.neodbmodel.initialize import initialize
+from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.init_coupling import bi_direction
+from qdash.dbmodel.init_qubit import qubit_lattice
+from qdash.dbmodel.initialize import initialize
 
 
 def generate_qubit_data(num_qubits: int, pos: dict) -> dict:

@@ -1,7 +1,7 @@
 from qdash.datamodel.coupling import EdgeInfoModel
-from qdash.neodbmodel.coupling import CouplingDocument
-from qdash.neodbmodel.init_qubit import qubit_lattice
-from qdash.neodbmodel.initialize import initialize
+from qdash.dbmodel.coupling import CouplingDocument
+from qdash.dbmodel.init_qubit import qubit_lattice
+from qdash.dbmodel.initialize import initialize
 
 
 def bi_direction(edges: list) -> list:
