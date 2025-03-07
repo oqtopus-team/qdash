@@ -5,6 +5,8 @@ import { useListAllTag } from "@/client/tag/tag";
 import { useFetchTimeseriesTaskResultByTagAndParameter } from "@/client/chip/chip";
 import { useMemo, useState, useEffect } from "react";
 import { DataModel } from "@/schemas/dataModel";
+import { TimeSeriesData } from "@/schemas/timeSeriesData";
+import { TimeSeriesDataData } from "@/schemas/timeSeriesDataData";
 import { ParameterModel } from "@/schemas/parameterModel";
 import { Tag } from "@/schemas/tag";
 import dynamic from "next/dynamic";
@@ -22,6 +24,7 @@ interface ExtendedDataModel extends DataModel {
 export function TimeSeriesView() {
   const [selectedParameter, setSelectedParameter] = useState<string>("");
   const [selectedTag, setSelectedTag] = useState<string>("");
+  const [selectedQid, setSelectedQid] = useState<string>("");
 
   // パラメータとタグの取得
   const { data: parametersResponse, isLoading: isLoadingParameters } =
@@ -40,29 +43,6 @@ export function TimeSeriesView() {
         },
       }
     );
-
-  // データ構造の確認
-  useEffect(() => {
-    if (timeseriesResponse?.data) {
-      console.log("Time series response:", timeseriesResponse.data);
-      console.log("Time series data:", timeseriesResponse.data.data);
-      if (timeseriesResponse.data.data) {
-        Object.entries(timeseriesResponse.data.data).forEach(
-          ([qid, dataPoints]) => {
-            if (Array.isArray(dataPoints)) {
-              console.log(`QID ${qid} first point:`, dataPoints[0]);
-              if (dataPoints[0]) {
-                console.log(
-                  "First point output_parameters:",
-                  (dataPoints[0] as ExtendedDataModel).output_parameters
-                );
-              }
-            }
-          }
-        );
-      }
-    }
-  }, [timeseriesResponse]);
 
   // プロットデータの準備
   const plotData = useMemo(() => {
@@ -94,8 +74,6 @@ export function TimeSeriesView() {
                 return 0;
               }),
             };
-          } else {
-            console.error("dataPoints is not an array:", dataPoints);
           }
         });
       }
@@ -185,8 +163,7 @@ export function TimeSeriesView() {
         yanchor: "top",
         bgcolor: "rgba(255, 255, 255, 0.8)",
       },
-      width: 900,
-      height: 600,
+      autosize: true,
       margin: {
         l: 80,
         r: 150,
@@ -201,67 +178,221 @@ export function TimeSeriesView() {
 
   const parameters = parametersResponse?.data?.parameters || [];
   const tags = tagsResponse?.data?.tags || [];
+  const qids = useMemo(() => {
+    if (!timeseriesResponse?.data?.data) return [];
+    return Object.keys(timeseriesResponse.data.data).sort((a, b) => {
+      const numA = parseInt(a);
+      const numB = parseInt(b);
+      return numA - numB;
+    });
+  }, [timeseriesResponse]);
+
+  // 選択されたQIDのデータ
+  const selectedQidData = useMemo(() => {
+    if (!selectedQid || !timeseriesResponse?.data?.data) return [];
+    const data = timeseriesResponse.data.data[selectedQid];
+    if (!Array.isArray(data)) return [];
+    return data.map((point: ExtendedDataModel) => ({
+      time: point.calibrated_at || "",
+      value:
+        point.output_parameters && selectedParameter
+          ? point.output_parameters[selectedParameter]
+          : 0,
+    }));
+  }, [timeseriesResponse, selectedQid, selectedParameter]);
 
   return (
-    <div className="card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
-      <div className="flex items-center gap-4 mb-6">
-        <h2 className="text-2xl font-semibold">Time Series Analysis</h2>
-      </div>
-
-      {/* パラメータとタグの選択 */}
-      <div className="flex gap-4 mb-6">
-        <select
-          className="select select-bordered w-full max-w-xs"
-          value={selectedParameter}
-          onChange={(e) => setSelectedParameter(e.target.value)}
-          disabled={isLoadingParameters}
-        >
-          <option value="">Select Parameter</option>
-          {parameters.map((param: ParameterModel) => (
-            <option key={param.name} value={param.name}>
-              {param.name}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className="select select-bordered w-full max-w-xs"
-          value={selectedTag}
-          onChange={(e) => setSelectedTag(e.target.value)}
-          disabled={isLoadingTags}
-        >
-          <option value="">Select Tag</option>
-          {tags.map((tag: Tag) => (
-            <option key={tag.name} value={tag.name}>
-              {tag.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* ローディング状態の表示 */}
-      {isLoadingTimeseries && (
-        <div className="alert alert-info">
-          <span className="loading loading-spinner"></span>
-          <span>Loading time series data...</span>
-        </div>
-      )}
-
-      {/* エラー状態の表示 */}
-      {!isLoadingTimeseries &&
-        selectedParameter &&
-        selectedTag &&
-        !timeseriesResponse?.data?.data && (
-          <div className="alert alert-error">
-            <span>No data available for the selected parameters</span>
+    <div className="grid grid-cols-3 gap-8">
+      {/* Parameter Selection Card */}
+      <div className="col-span-3 card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
+        <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-5 h-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3 3v18h18"></path>
+            <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
+          </svg>
+          Parameter Selection
+        </h2>
+        <div className="grid grid-cols-2 gap-12">
+          <div className="form-control">
+            <label className="label font-medium">Parameter</label>
+            <select
+              className="select select-bordered w-full"
+              value={selectedParameter}
+              onChange={(e) => setSelectedParameter(e.target.value)}
+              disabled={isLoadingParameters}
+            >
+              <option value="">Select Parameter</option>
+              {parameters.map((param: ParameterModel) => (
+                <option key={param.name} value={param.name}>
+                  {param.name}
+                </option>
+              ))}
+            </select>
           </div>
-        )}
+          <div className="form-control">
+            <label className="label font-medium">Tag</label>
+            <select
+              className="select select-bordered w-full"
+              value={selectedTag}
+              onChange={(e) => setSelectedTag(e.target.value)}
+              disabled={isLoadingTags}
+            >
+              <option value="">Select Tag</option>
+              {tags.map((tag: Tag) => (
+                <option key={tag.name} value={tag.name}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
 
-      {/* プロット表示エリア */}
-      <div className="w-full">
-        {plotData.length > 0 && (
-          <Plot data={plotData} layout={layout} config={{ responsive: true }} />
-        )}
+      {/* Plot Area */}
+      <div className="col-span-3 card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
+        <h2 className="text-2xl font-semibold mb-6 text-center flex items-center justify-center gap-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-6 h-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3 3v18h18"></path>
+            <path d="M3 12h18"></path>
+            <path d="M12 3v18"></path>
+          </svg>
+          Time Series Plot
+        </h2>
+        <div
+          className="w-full bg-base-200/50 rounded-xl p-4"
+          style={{ height: "550px" }}
+        >
+          {/* ローディング状態の表示 */}
+          {isLoadingTimeseries && (
+            <div className="flex items-center justify-center h-full">
+              <div className="loading loading-spinner loading-lg text-primary"></div>
+            </div>
+          )}
+
+          {/* エラー状態の表示 */}
+          {!isLoadingTimeseries &&
+            selectedParameter &&
+            selectedTag &&
+            !timeseriesResponse?.data?.data && (
+              <div className="flex items-center justify-center h-full text-error">
+                <span>No data available for the selected parameters</span>
+              </div>
+            )}
+
+          {/* プロット表示エリア */}
+          {plotData.length > 0 && (
+            <Plot
+              data={plotData}
+              layout={layout}
+              config={{
+                displaylogo: false,
+                responsive: true,
+                toImageButtonOptions: {
+                  format: "svg",
+                  filename: "time_series",
+                  height: 600,
+                  width: 800,
+                  scale: 2,
+                },
+              }}
+              style={{ width: "100%", height: "100%" }}
+              useResizeHandler={true}
+            />
+          )}
+
+          {/* 未選択時の表示 */}
+          {!selectedParameter || !selectedTag ? (
+            <div className="flex items-center justify-center h-full text-base-content/70">
+              <div className="text-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-12 h-12 mx-auto mb-4 opacity-50"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 3v18h18"></path>
+                  <path d="M3 12h18"></path>
+                  <path d="M12 3v18"></path>
+                </svg>
+                <p className="text-lg">Select parameters to visualize data</p>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div className="col-span-3 card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-semibold">Data Table</h2>
+          <div className="form-control w-64">
+            <select
+              className="select select-bordered w-full"
+              value={selectedQid}
+              onChange={(e) => setSelectedQid(e.target.value)}
+              disabled={!plotData.length}
+            >
+              <option value="">Select QID</option>
+              {qids.map((qid) => (
+                <option key={qid} value={qid}>
+                  {qid}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="overflow-x-auto" style={{ minHeight: "300px" }}>
+          {selectedQid ? (
+            <table className="table table-compact table-zebra w-full border border-base-300 bg-base-100">
+              <thead>
+                <tr>
+                  <th className="text-center bg-base-200">Time</th>
+                  <th className="text-center bg-base-200">Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedQidData.map((point, index) => (
+                  <tr key={index}>
+                    <td className="text-center">{point.time}</td>
+                    <td className="text-center">
+                      {typeof point.value === "number"
+                        ? point.value.toFixed(4)
+                        : point.value}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="flex items-center justify-center h-full text-base-content/70">
+              <div className="text-center">
+                <p className="text-lg">Select a QID to view data</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
