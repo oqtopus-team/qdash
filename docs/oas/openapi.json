@@ -1299,6 +1299,33 @@
           }
         ]
       }
+    },
+    "/tag": {
+      "get": {
+        "tags": [
+          "tag"
+        ],
+        "summary": "list all tag",
+        "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n\nReturns:\n-------\n    ListTaskResponse: The list of tasks.",
+        "operationId": "listAllTag",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTagResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2019,6 +2046,23 @@
         "title": "ListParameterResponse",
         "description": "Response model for a list of parameters."
       },
+      "ListTagResponse": {
+        "properties": {
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tags"
+        ],
+        "title": "ListTagResponse",
+        "description": "Response model for a list of tasks."
+      },
       "ListTaskResponse": {
         "properties": {
           "tasks": {
@@ -2298,6 +2342,20 @@
           "qpu_data_path"
         ],
         "title": "Settings"
+      },
+      "Tag": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "Tag",
+        "description": "Response model for a task."
       },
       "Task": {
         "properties": {

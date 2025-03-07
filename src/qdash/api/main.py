@@ -11,6 +11,7 @@ from qdash.api.routers import (
     menu,
     parameter,
     settings,
+    tag,
     task,
 )
 
@@ -71,3 +72,4 @@ app.include_router(file.router, tags=["file"])
 app.include_router(auth.router, tags=["auth"])
 app.include_router(task.router, tags=["task"])
 app.include_router(parameter.router, tags=["parameter"])
+app.include_router(tag.router, tags=["tag"])
