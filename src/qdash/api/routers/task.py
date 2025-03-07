@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-class InputParameter(BaseModel):
+class InputParameterModel(BaseModel):
     """Input parameter class."""
 
     unit: str = ""
@@ -31,8 +31,8 @@ class TaskResponse(BaseModel):
     name: str
     description: str
     task_type: str
-    input_parameters: dict[str, InputParameter]
-    output_parameters: dict[str, InputParameter]
+    input_parameters: dict[str, InputParameterModel]
+    output_parameters: dict[str, InputParameterModel]
 
 
 class ListTaskResponse(BaseModel):
@@ -69,10 +69,12 @@ def fetch_all_tasks(
                 description=task.description,
                 task_type=task.task_type,
                 input_parameters={
-                    name: InputParameter(**param) for name, param in task.input_parameters.items()
+                    name: InputParameterModel(**param)
+                    for name, param in task.input_parameters.items()
                 },
                 output_parameters={
-                    name: InputParameter(**param) for name, param in task.output_parameters.items()
+                    name: InputParameterModel(**param)
+                    for name, param in task.output_parameters.items()
                 },
             )
             for task in tasks

@@ -1,68 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Literal
 
-import numpy as np
 import plotly.graph_objs as go
 from pydantic import BaseModel
-from qdash.datamodel.task import DataModel
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qubex.experiment import Experiment
-
-
-class InputParameter(BaseModel):
-    """Input parameter class."""
-
-    unit: str = ""
-    value_type: str = "float"
-    value: tuple | int | float | None = None
-    description: str = ""
-
-    def get_value(self) -> Any:
-        """Get the actual value based on value_type.
-
-        Returns
-        -------
-            The converted value based on value_type
-
-        """
-        if self.value_type == "np.linspace":
-            if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
-                raise ValueError("np.linspace requires a tuple/list of (start, stop, num)")
-            start, stop, num = self.value
-            return np.linspace(float(start), float(stop), int(num))
-        elif self.value_type == "np.logspace":
-            if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
-                raise ValueError("np.logspace requires a tuple/list of (start, stop, num)")
-            start, stop, num = self.value
-            return np.logspace(float(start), float(stop), int(num))
-        elif self.value_type == "np.arange":
-            if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
-                raise ValueError("np.arange requires a tuple/list of (start, stop, step)")
-            start, stop, step = self.value
-            return np.arange(float(start), float(stop), float(step))
-        elif self.value_type == "range":
-            if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
-                raise ValueError("range requires a tuple/list of (start, stop, step)")
-            start, stop, step = self.value
-            return range(int(start), int(stop), int(step))
-        elif self.value_type == "int":
-            if isinstance(self.value, str) and "*" in self.value:
-                # Handle expressions like "150 * 1024"
-                parts = [int(p.strip()) for p in self.value.split("*")]
-                result = 1
-                for p in parts:
-                    result *= p
-                return result
-            return int(self.value)
-        elif self.value_type == "float":
-            return float(self.value)
-        return self.value
-
-
-class OutputParameter(BaseModel):
-    """Output parameter class."""
-
-    unit: str = ""
-    description: str = ""
 
 
 class PreProcessResult(BaseModel):
@@ -74,7 +16,7 @@ class PreProcessResult(BaseModel):
 class PostProcessResult(BaseModel):
     """Result class."""
 
-    output_parameters: dict[str, DataModel]
+    output_parameters: dict[str, OutputParameterModel]
     figures: list[go.Figure] = []
     raw_data: list[Any] = []
 
@@ -95,8 +37,8 @@ class BaseTask(ABC):
 
     name: str = ""
     task_type: Literal["global", "qubit", "coupling"]
-    input_parameters: ClassVar[dict[str, InputParameter]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameter]] = {}
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
     registry: ClassVar[dict] = {}
 
     def __init_subclass__(cls, **kwargs) -> None:  # noqa: ANN003

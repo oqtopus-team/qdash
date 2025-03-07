@@ -1,9 +1,8 @@
 from typing import ClassVar
 
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.tasks.base import (
     BaseTask,
-    InputParameter,
-    OutputParameter,
     PostProcessResult,
     PreProcessResult,
     RunResult,
@@ -16,12 +15,14 @@ class CheckCrossResonance(BaseTask):
 
     name: str = "CheckCrossResonance"
     task_type: str = "coupling"
-    input_parameters: ClassVar[dict[str, InputParameter]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameter]] = {
-        "cr_amplitude": OutputParameter(unit="", description="Amplitude of the CR pulse."),
-        "cr_phase": OutputParameter(unit="", description="Phase of the CR pulse."),
-        "cancel_amplitude": OutputParameter(unit="", description="Amplitude of the cancel pulse."),
-        "cancel_phase": OutputParameter(unit="", description="Phase of the cancel pulse."),
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
+        "cr_amplitude": OutputParameterModel(unit="", description="Amplitude of the CR pulse."),
+        "cr_phase": OutputParameterModel(unit="", description="Phase of the CR pulse."),
+        "cancel_amplitude": OutputParameterModel(
+            unit="", description="Amplitude of the cancel pulse."
+        ),
+        "cancel_phase": OutputParameterModel(unit="", description="Phase of the cancel pulse."),
     }
 
     # @staticmethod

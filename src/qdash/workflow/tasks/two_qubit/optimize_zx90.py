@@ -1,9 +1,8 @@
 from typing import ClassVar
 
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.tasks.base import (
     BaseTask,
-    InputParameter,
-    OutputParameter,
     PostProcessResult,
     PreProcessResult,
     RunResult,
@@ -16,12 +15,12 @@ class OptimizeZX90(BaseTask):
 
     name: str = "OptimizeZX90"
     task_type: str = "coupling"
-    input_parameters: ClassVar[dict[str, InputParameter]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameter]] = {
-        "cr_amplitude": OutputParameter(unit="", description=""),
-        "cr_phase": OutputParameter(unit="", description=""),
-        "cancel_amplitude": OutputParameter(unit="", description=""),
-        "cancel_phase": OutputParameter(unit="", description=""),
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
+        "cr_amplitude": OutputParameterModel(unit="", description=""),
+        "cr_phase": OutputParameterModel(unit="", description=""),
+        "cancel_amplitude": OutputParameterModel(unit="", description=""),
+        "cancel_phase": OutputParameterModel(unit="", description=""),
     }
 
     # @staticmethod

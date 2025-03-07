@@ -1,7 +1,7 @@
 import uuid
 from copy import deepcopy
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import pendulum
@@ -13,6 +13,77 @@ RUNNING = "running"
 COMPLETED = "completed"
 FAILED = "failed"
 PENDING = "pending"
+
+
+class InputParameterModel(BaseModel):
+    """Input parameter class."""
+
+    unit: str = ""
+    value_type: str = "float"
+    value: tuple | int | float | None = None
+    description: str = ""
+
+    def get_value(self) -> Any:
+        """Get the actual value based on value_type.
+
+        Returns
+        -------
+            The converted value based on value_type
+
+        """
+        if self.value_type == "np.linspace":
+            if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
+                raise ValueError("np.linspace requires a tuple/list of (start, stop, num)")
+            start, stop, num = self.value
+            return np.linspace(float(start), float(stop), int(num))
+        elif self.value_type == "np.logspace":
+            if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
+                raise ValueError("np.logspace requires a tuple/list of (start, stop, num)")
+            start, stop, num = self.value
+            return np.logspace(float(start), float(stop), int(num))
+        elif self.value_type == "np.arange":
+            if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
+                raise ValueError("np.arange requires a tuple/list of (start, stop, step)")
+            start, stop, step = self.value
+            return np.arange(float(start), float(stop), float(step))
+        elif self.value_type == "range":
+            if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
+                raise ValueError("range requires a tuple/list of (start, stop, step)")
+            start, stop, step = self.value
+            return range(int(start), int(stop), int(step))
+        elif self.value_type == "int":
+            if isinstance(self.value, str) and "*" in self.value:
+                # Handle expressions like "150 * 1024"
+                parts = [int(p.strip()) for p in self.value.split("*")]
+                result = 1
+                for p in parts:
+                    result *= p
+                return result
+            return int(self.value)
+        elif self.value_type == "float":
+            return float(self.value)
+        return self.value
+
+
+class OutputParameterModel(BaseModel):
+    """Data model.
+
+    Attributes
+    ----------
+        qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.
+        coupling (dict[str, dict[str, float | int]]): The calibration data for couplings.
+
+    """
+
+    value: float | int = 0
+    value_type: str = "float"
+    unit: str = ""
+    description: str = ""
+    calibrated_at: str = Field(
+        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+        description="The time when the system information was created",
+    )
+    execution_id: str = ""
 
 
 class TaskStatusModel(str, Enum):
@@ -35,24 +106,24 @@ class TaskStatusModel(str, Enum):
     PENDING = PENDING
 
 
-class DataModel(BaseModel):
-    """Data model.
+# class DataModel(BaseModel):
+#     """Data model.
 
-    Attributes
-    ----------
-        qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.
-        coupling (dict[str, dict[str, float | int]]): The calibration data for couplings.
+#     Attributes
+#     ----------
+#         qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.
+#         coupling (dict[str, dict[str, float | int]]): The calibration data for couplings.
 
-    """
+#     """
 
-    value: float | int = 0
-    unit: str = ""
-    description: str = ""
-    calibrated_at: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
-        description="The time when the system information was created",
-    )
-    execution_id: str = ""
+#     value: float | int = 0
+#     unit: str = ""
+#     description: str = ""
+#     calibrated_at: str = Field(
+#         default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+#         description="The time when the system information was created",
+#     )
+#     execution_id: str = ""
 
 
 class CalibDataModel(BaseModel):
@@ -65,13 +136,13 @@ class CalibDataModel(BaseModel):
 
     """
 
-    qubit: dict[str, dict[str, DataModel]] = Field(default_factory=dict)
-    coupling: dict[str, dict[str, DataModel]] = Field(default_factory=dict)
+    qubit: dict[str, dict[str, OutputParameterModel]] = Field(default_factory=dict)
+    coupling: dict[str, dict[str, OutputParameterModel]] = Field(default_factory=dict)
 
-    def put_qubit_data(self, qid: str, parameter_name: str, data: DataModel) -> None:
+    def put_qubit_data(self, qid: str, parameter_name: str, data: OutputParameterModel) -> None:
         self.qubit[qid][parameter_name] = data
 
-    def put_coupling_data(self, qid: str, parameter_name: str, data: DataModel) -> None:
+    def put_coupling_data(self, qid: str, parameter_name: str, data: OutputParameterModel) -> None:
         self.coupling[qid][parameter_name] = data
 
     def __getitem__(self, key: str) -> dict:

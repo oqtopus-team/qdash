@@ -2,12 +2,10 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
-from qdash.datamodel.task import DataModel
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibration.util import qid_to_label
 from qdash.workflow.tasks.base import (
     BaseTask,
-    InputParameter,
-    OutputParameter,
     PostProcessResult,
     PreProcessResult,
     RunResult,
@@ -21,34 +19,34 @@ class CheckQubitFrequency(BaseTask):
 
     name: str = "CheckQubitFrequency"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameter]] = {
-        "detuning_range": InputParameter(
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
+        "detuning_range": InputParameterModel(
             unit="GHz",
             value_type="np.linspace",
             value=(-0.01, 0.01, 21),
             description="Detuning range",
         ),
-        "time_range": InputParameter(
+        "time_range": InputParameterModel(
             unit="ns",
             value_type="range",
             value=(0, 101, 4),
             description="Time range",
         ),
-        "shots": InputParameter(
+        "shots": InputParameterModel(
             unit="a.u.",
             value_type="int",
             value=DEFAULT_SHOTS,
             description="Number of shots",
         ),
-        "interval": InputParameter(
+        "interval": InputParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameter]] = {
-        "qubit_frequency": OutputParameter(unit="GHz", description="Qubit frequency"),
+    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
+        "qubit_frequency": OutputParameterModel(unit="GHz", description="Qubit frequency"),
     }
 
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
@@ -59,7 +57,7 @@ class CheckQubitFrequency(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "qubit_frequency": DataModel(
+            "qubit_frequency": OutputParameterModel(
                 value=result[label],
                 unit=op["qubit_frequency"].unit,
                 description=op["qubit_frequency"].description,

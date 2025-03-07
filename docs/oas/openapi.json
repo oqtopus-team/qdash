@@ -1933,7 +1933,7 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "InputParameter": {
+      "InputParameterModel": {
         "properties": {
           "unit": {
             "type": "string",
@@ -1970,7 +1970,7 @@
           }
         },
         "type": "object",
-        "title": "InputParameter",
+        "title": "InputParameterModel",
         "description": "Input parameter class."
       },
       "LatestTaskGroupedByChipResponse": {
@@ -2553,14 +2553,14 @@
           },
           "input_parameters": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/InputParameter"
+              "$ref": "#/components/schemas/InputParameterModel"
             },
             "type": "object",
             "title": "Input Parameters"
           },
           "output_parameters": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/InputParameter"
+              "$ref": "#/components/schemas/InputParameterModel"
             },
             "type": "object",
             "title": "Output Parameters"

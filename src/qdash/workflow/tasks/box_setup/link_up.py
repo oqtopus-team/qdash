@@ -1,9 +1,8 @@
 from typing import ClassVar
 
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.tasks.base import (
     BaseTask,
-    InputParameter,
-    OutputParameter,
     PostProcessResult,
     PreProcessResult,
     RunResult,
@@ -16,8 +15,8 @@ class LinkUp(BaseTask):
 
     name: str = "LinkUp"
     task_type: str = "global"
-    input_parameters: ClassVar[dict[str, InputParameter]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameter]] = {}
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
         pass

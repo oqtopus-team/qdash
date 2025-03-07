@@ -2,12 +2,10 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
-from qdash.datamodel.task import DataModel
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibration.util import qid_to_label
 from qdash.workflow.tasks.base import (
     BaseTask,
-    InputParameter,
-    OutputParameter,
     PostProcessResult,
     PreProcessResult,
     RunResult,
@@ -22,29 +20,29 @@ class CreateDRAGHPIPulse(BaseTask):
 
     name: str = "CreateDRAGHPIPulse"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameter]] = {
-        "hpi_length": InputParameter(
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
+        "hpi_length": InputParameterModel(
             unit="ns",
             value_type="int",
             value=HPI_DURATION,
             description="HPI pulse length",
         ),
-        "shots": InputParameter(
+        "shots": InputParameterModel(
             unit="a.u.",
             value_type="int",
             value=CALIBRATION_SHOTS,
             description="Number of shots",
         ),
-        "interval": InputParameter(
+        "interval": InputParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameter]] = {
-        "drag_hpi_beta": OutputParameter(unit="", description="DRAG HPI pulse beta"),
-        "drag_hpi_amplitude": OutputParameter(unit="", description="DRAG HPI pulse amplitude"),
+    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
+        "drag_hpi_beta": OutputParameterModel(unit="", description="DRAG HPI pulse beta"),
+        "drag_hpi_amplitude": OutputParameterModel(unit="", description="DRAG HPI pulse amplitude"),
     }
 
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
@@ -55,13 +53,13 @@ class CreateDRAGHPIPulse(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "drag_hpi_beta": DataModel(
+            "drag_hpi_beta": OutputParameterModel(
                 value=result["beta"][label],
                 unit=op["drag_hpi_beta"].unit,
                 description=op["drag_hpi_beta"].description,
                 execution_id=execution_id,
             ),
-            "drag_hpi_amplitude": DataModel(
+            "drag_hpi_amplitude": OutputParameterModel(
                 value=result["amplitude"][label],
                 unit=op["drag_hpi_amplitude"].unit,
                 description=op["drag_hpi_amplitude"].description,

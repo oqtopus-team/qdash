@@ -1,11 +1,9 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import DataModel
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibration.util import qid_to_label
 from qdash.workflow.tasks.base import (
     BaseTask,
-    InputParameter,
-    OutputParameter,
     PostProcessResult,
     PreProcessResult,
     RunResult,
@@ -19,37 +17,37 @@ class CheckEffectiveQubitFrequency(BaseTask):
 
     name: str = "CheckEffectiveQubitFrequency"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameter]] = {
-        "detuning": InputParameter(
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
+        "detuning": InputParameterModel(
             unit="GHz", value_type="float", value=0.001, description="Detuning"
         ),
-        "time_range": InputParameter(
+        "time_range": InputParameterModel(
             unit="ns",
             value_type="np.arange",
             value=(0, 20001, 100),
             description="Time range for effective qubit frequency",
         ),
-        "shots": InputParameter(
+        "shots": InputParameterModel(
             unit="",
             value_type="int",
             value=DEFAULT_SHOTS,
             description="Number of shots for effective qubit frequency",
         ),
-        "interval": InputParameter(
+        "interval": InputParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval for effective qubit frequency",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameter]] = {
-        "effective_qubit_frequency": OutputParameter(
+    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
+        "effective_qubit_frequency": OutputParameterModel(
             unit="GHz", description="Effective qubit frequency"
         ),
-        "effective_qubit_frequency_0": OutputParameter(
+        "effective_qubit_frequency_0": OutputParameterModel(
             unit="GHz", description="Effective qubit frequency for qubit 0"
         ),
-        "effective_qubit_frequency_1": OutputParameter(
+        "effective_qubit_frequency_1": OutputParameterModel(
             unit="GHz", description="Effective qubit frequency for qubit 1"
         ),
     }
@@ -62,19 +60,19 @@ class CheckEffectiveQubitFrequency(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "effective_qubit_frequency": DataModel(
+            "effective_qubit_frequency": OutputParameterModel(
                 value=result["effective_freq"][label],
                 unit=op["effective_qubit_frequency"].unit,
                 description=op["effective_qubit_frequency"].description,
                 execution_id=execution_id,
             ),
-            "effective_qubit_frequency_0": DataModel(
+            "effective_qubit_frequency_0": OutputParameterModel(
                 value=result["result_0"].data[label].bare_freq,
                 unit=op["effective_qubit_frequency_0"].unit,
                 description=op["effective_qubit_frequency_0"].description,
                 execution_id=execution_id,
             ),
-            "effective_qubit_frequency_1": DataModel(
+            "effective_qubit_frequency_1": OutputParameterModel(
                 value=result["result_1"].data[label].bare_freq,
                 unit=op["effective_qubit_frequency_1"].unit,
                 description=op["effective_qubit_frequency_1"].description,
