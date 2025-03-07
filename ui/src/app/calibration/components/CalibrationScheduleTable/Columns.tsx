@@ -2,12 +2,12 @@
 
 import { createColumnHelper } from "@tanstack/react-table";
 import { RiDeleteBin6Line } from "react-icons/ri";
-import type { CalibSchedule } from "../../model";
+import type { ScheduleCalibResponse } from "@/schemas";
 
-const columnHelper = createColumnHelper<CalibSchedule>();
+const columnHelper = createColumnHelper<ScheduleCalibResponse>();
 
 export const getColumns = (
-  handleDeleteClick: (item: CalibSchedule) => void,
+  handleDeleteClick: (item: ScheduleCalibResponse) => void
 ) => [
   columnHelper.accessor("menu_name", {
     header: "Menu Name",

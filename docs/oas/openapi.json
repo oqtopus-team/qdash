@@ -96,6 +96,7 @@
           "calibration"
         ],
         "summary": "Schedules a calibration.",
+        "description": "Schedule a calibration.",
         "operationId": "schedule_calib",
         "requestBody": {
           "content": {
@@ -112,7 +113,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleCalibResponse"
+                }
               }
             }
           },

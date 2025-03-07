@@ -96,10 +96,12 @@ local_date = datetime.now(tz=ja)
 )
 async def schedule_calib(
     request: ScheduleCalibRequest,
-    settings: Annotated[Settings, Depends] = Depends(get_settings),
-    current_user: User = Security(get_current_active_user),
-):
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ScheduleCalibResponse:
+    """Schedule a calibration."""
     logger.warning(f"create menu name: {request.menu_name}")
+    logger.info(f"current user: {current_user.username}")
     menu = MenuDocument.find_one({"name": request.menu_name}).run()
     if menu is None:
         raise HTTPException(status_code=404, detail="menu not found")
@@ -112,6 +114,7 @@ async def schedule_calib(
         qids=menu.qids,
         notify_bool=menu.notify_bool,
         tasks=menu.tasks,
+        task_details=menu.task_details,
         tags=menu.tags,
     )
 
@@ -119,13 +122,12 @@ async def schedule_calib(
     datetime_str = request.scheduled
     scheduled_time = datetime.fromisoformat(datetime_str)
     env = settings.env
-    print(env)
     try:
         target_deployment = await client.read_deployment_by_name(f"main/{env}-main")
     except Exception as e:
         logger.warning(e)
         raise HTTPException(status_code=404, detail="deployment not found")
-    print(scheduled_time)
+    logger.info(f"scheduled time: {scheduled_time}")
     try:
         execution_id = generate_execution_id()
         _ = await client.create_flow_run_from_deployment(
@@ -136,6 +138,16 @@ async def schedule_calib(
     except Exception as e:
         logger.warning(e)
         raise InternalSeverError(detail=f"Failed to schedule calibration {e!s}")
+
+    return ScheduleCalibResponse(
+        menu_name=menu.name,
+        description=menu.description,
+        note="foo bar",
+        menu=menu_request,
+        timezone="Asia/Tokyo",
+        scheduled_time=scheduled_time.strftime("%Y-%m-%d %H:%M:%S%z"),
+        flow_run_id="",
+    )
 
 
 @router.get(

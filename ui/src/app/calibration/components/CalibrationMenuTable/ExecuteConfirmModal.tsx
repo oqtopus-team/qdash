@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { BsPlus } from "react-icons/bs";
-import type { Menu } from "../../model";
+import type { MenuModel } from "@/schemas";
 
 export function ExecuteConfirmModal({
   selectedItem,
   onConfirm,
   onCancel,
 }: {
-  selectedItem: Menu;
-  onConfirm: (updatedItem: Menu) => void;
+  selectedItem: MenuModel;
+  onConfirm: (updatedItem: MenuModel) => void;
   onCancel: () => void;
 }) {
   const [menu, setMenu] = useState(selectedItem);

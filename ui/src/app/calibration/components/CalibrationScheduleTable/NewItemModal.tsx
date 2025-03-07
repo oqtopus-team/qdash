@@ -14,8 +14,7 @@ import { registerLocale } from "react-datepicker";
 import { useState } from "react";
 import "react-datepicker/dist/react-datepicker.css";
 
-import { mapScheduleCalibResponsetoCalibSchedule } from "../../model";
-import type { Menu, CalibSchedule } from "../../model";
+import type { MenuModel, ScheduleCalibResponse } from "@/schemas";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { useScheduleCalib } from "@/client/calibration/calibration";
 
@@ -32,10 +31,10 @@ export function NewItemModal({
 }: {
   selectedMenuName: string;
   setSelectedMenuName: (selectedItem: string) => void;
-  menu: Menu[];
+  menu: MenuModel[];
   selectedDate: Date | null;
   setSelectedDate: (date: Date | null) => void;
-  setCalibSchedules: (calibSchedules: CalibSchedule[]) => void;
+  setCalibSchedules: (calibSchedules: ScheduleCalibResponse[]) => void;
   refetchCalibSchedule: () => Promise<UseQueryResult<any, any>>;
 }) {
   const scheduleMutation = useScheduleCalib();
@@ -87,9 +86,7 @@ export function NewItemModal({
 
       const updatedData = await refetchCalibSchedule();
       if (updatedData.data) {
-        setCalibSchedules(
-          mapScheduleCalibResponsetoCalibSchedule(updatedData.data.data),
-        );
+        setCalibSchedules(updatedData.data.data);
       }
       document.getElementById("newItem")?.closest("dialog")?.close();
     } catch (error) {

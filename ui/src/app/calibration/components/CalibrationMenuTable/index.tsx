@@ -4,21 +4,19 @@ import "react18-json-view/src/style.css";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
-import { mapListMenuResponseToListMenu } from "../../model";
 import { getColumns } from "./Columns";
 import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
 import { MenuPreviewModal } from "./MenuPreviewModal";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 
-import type { Menu } from "../../model";
-import type { GetMenuResponse } from "@/schemas";
+import type { MenuModel, GetMenuResponse } from "@/schemas";
 import { useListMenu, useDeleteMenu } from "@/client/menu/menu";
 import { useExecuteCalib } from "@/client/calibration/calibration";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { Table } from "@/app/components/Table";
 
 // Initial selected item
-const INITIAL_SELECTED_ITEM: Menu = {
+const INITIAL_SELECTED_ITEM: MenuModel = {
   name: "default-menu",
   username: "default-user",
   description: "Default calibration menu",
@@ -32,8 +30,10 @@ export function CalibrationMenuTable() {
   const executeCalibMutation = useExecuteCalib();
   const deleteMutation = useDeleteMenu();
   const { user } = useAuth();
-  const [tableData, setTableData] = useState<Menu[]>([]);
-  const [selectedItem, setSelectedItem] = useState<Menu>(INITIAL_SELECTED_ITEM);
+  const [tableData, setTableData] = useState<MenuModel[]>([]);
+  const [selectedItem, setSelectedItem] = useState<MenuModel>(
+    INITIAL_SELECTED_ITEM
+  );
   const [selectedMenuForPreview, setSelectedMenuForPreview] =
     useState<GetMenuResponse | null>(null);
   const [showExecuteConfirmModal, setShowExecuteConfirmModal] = useState(false);
@@ -41,24 +41,24 @@ export function CalibrationMenuTable() {
   const [showMenuPreview, setShowMenuPreview] = useState(false);
 
   useEffect(() => {
-    if (data) {
-      setTableData(mapListMenuResponseToListMenu(data.data));
+    if (data?.data?.menus) {
+      setTableData(data.data.menus);
     }
   }, [data]);
 
-  const handleEditClick = async (item: Menu) => {
+  const handleEditClick = async (item: MenuModel) => {
     setSelectedItem(item);
     // メニューの詳細情報を取得
     const menuData = await refetchMenu();
     if (menuData.data) {
       const menuWithDetails = menuData.data.data.menus.find(
-        (menu: GetMenuResponse) => menu.name === item.name,
+        (menu: GetMenuResponse) => menu.name === item.name
       );
       if (menuWithDetails) {
         setSelectedMenuForPreview(menuWithDetails);
         setShowMenuPreview(true);
         const menuPreviewModal = document.getElementById(
-          "menuPreview",
+          "menuPreview"
         ) as HTMLDialogElement | null;
         if (menuPreviewModal) {
           menuPreviewModal.showModal();
@@ -83,12 +83,12 @@ export function CalibrationMenuTable() {
     );
   }
 
-  const handleExecuteCalib = (item: Menu) => {
+  const handleExecuteCalib = (item: MenuModel) => {
     setSelectedItem(item);
     setShowExecuteConfirmModal(true);
   };
 
-  const handleDeleteClick = (item: Menu) => {
+  const handleDeleteClick = (item: MenuModel) => {
     setSelectedItem(item);
     setShowDeleteConfirmModal(true);
   };
@@ -97,7 +97,7 @@ export function CalibrationMenuTable() {
     handleEditClick,
     handleDeleteClick,
     handleExecuteCalib,
-    false, // isLocked
+    false // isLocked
   );
 
   return (
@@ -128,7 +128,7 @@ export function CalibrationMenuTable() {
                   console.error("Error executing calibration:", error);
                   toast.error("Error executing calibration");
                 },
-              },
+              }
             );
           }}
           onCancel={() => setShowExecuteConfirmModal(false)}
@@ -150,7 +150,7 @@ export function CalibrationMenuTable() {
                   console.error("Error deleting menu:", error);
                   toast.error("Error deleting menu");
                 },
-              },
+              }
             );
           }}
           onCancel={() => setShowDeleteConfirmModal(false)}

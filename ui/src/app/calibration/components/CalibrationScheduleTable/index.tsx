@@ -6,15 +6,10 @@ import { registerLocale } from "react-datepicker";
 import { FaRegSquarePlus } from "react-icons/fa6";
 import "react-datepicker/dist/react-datepicker.css";
 
-import {
-  mapListMenuResponseToListMenu,
-  mapScheduleCalibResponsetoCalibSchedule,
-} from "../../model";
-
 import { getColumns } from "./Columns";
 import { NewItemModal } from "./NewItemModal";
 
-import type { Menu, CalibSchedule } from "../../model";
+import type { MenuModel, ScheduleCalibResponse } from "@/schemas";
 import {
   useFetchAllCalibSchedule,
   useDeleteCalibSchedule,
@@ -25,8 +20,10 @@ import { Table } from "@/app/components/Table";
 registerLocale("ja", ja);
 
 export function CalibrationScheduleTable() {
-  const [calibSchedules, setCalibSchedules] = useState<CalibSchedule[]>([]);
-  const [menu, setMenu] = useState<Menu[]>([]);
+  const [calibSchedules, setCalibSchedules] = useState<ScheduleCalibResponse[]>(
+    []
+  );
+  const [menu, setMenu] = useState<MenuModel[]>([]);
   const [selectedMenuName, setSelectedMenuName] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -45,40 +42,36 @@ export function CalibrationScheduleTable() {
 
   useEffect(() => {
     if (scheduleData) {
-      setCalibSchedules(
-        mapScheduleCalibResponsetoCalibSchedule(scheduleData.data),
-      );
+      setCalibSchedules(scheduleData.data);
     }
-    if (menuData) {
-      setMenu(mapListMenuResponseToListMenu(menuData.data));
+    if (menuData?.data?.menus) {
+      setMenu(menuData.data.menus);
     }
   }, [scheduleData, menuData]);
 
   const handleNewItem = () => {
     const editModal = document.getElementById(
-      "newItem",
+      "newItem"
     ) as HTMLDialogElement | null;
     if (editModal) {
       editModal.showModal();
     }
   };
 
-  const handleDeleteClick = (item: CalibSchedule) => {
+  const handleDeleteClick = (item: ScheduleCalibResponse) => {
     deleteMutation.mutate(
       { flowRunId: item.flow_run_id },
       {
         onSuccess: async () => {
           const updatedData = await refetchCalibSchedule();
           if (updatedData.data) {
-            setCalibSchedules(
-              mapScheduleCalibResponsetoCalibSchedule(updatedData.data.data),
-            );
+            setCalibSchedules(updatedData.data.data);
           }
         },
         onError: (error) => {
           console.error("Error delete schedule calibration:", error);
         },
-      },
+      }
     );
   };
 

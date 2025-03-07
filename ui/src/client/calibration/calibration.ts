@@ -246,12 +246,13 @@ export function useFetchAllCalibSchedule<
 }
 
 /**
+ * Schedule a calibration.
  * @summary Schedules a calibration.
  */
 export const scheduleCalib = (
   scheduleCalibRequest: ScheduleCalibRequest,
   options?: AxiosRequestConfig,
-): Promise<AxiosResponse<unknown>> => {
+): Promise<AxiosResponse<ScheduleCalibResponse>> => {
   return axios.post(
     `http://localhost:5715/calibration/schedule`,
     scheduleCalibRequest,
