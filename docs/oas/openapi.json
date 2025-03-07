@@ -1502,45 +1502,6 @@
         "title": "CreateMenuResponse",
         "description": "CreateMenuResponse is a Pydantic model for the create menu response."
       },
-      "DataModel": {
-        "properties": {
-          "value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "integer"
-              }
-            ],
-            "title": "Value",
-            "default": 0
-          },
-          "unit": {
-            "type": "string",
-            "title": "Unit",
-            "default": ""
-          },
-          "description": {
-            "type": "string",
-            "title": "Description",
-            "default": ""
-          },
-          "calibrated_at": {
-            "type": "string",
-            "title": "Calibrated At",
-            "description": "The time when the system information was created"
-          },
-          "execution_id": {
-            "type": "string",
-            "title": "Execution Id",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "title": "DataModel",
-        "description": "Data model.\n\nAttributes\n----------\n    qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.\n    coupling (dict[str, dict[str, float | int]]): The calibration data for couplings."
-      },
       "DeleteMenuResponse": {
         "properties": {
           "name": {
@@ -2184,6 +2145,50 @@
         "title": "MuxDetailResponse",
         "description": "MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details."
       },
+      "OutputParameterModel": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Value",
+            "default": 0
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type",
+            "default": "float"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "calibrated_at": {
+            "type": "string",
+            "title": "Calibrated At",
+            "description": "The time when the system information was created"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "OutputParameterModel",
+        "description": "Data model.\n\nAttributes\n----------\n    qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.\n    coupling (dict[str, dict[str, float | int]]): The calibration data for couplings."
+      },
       "ParameterModel": {
         "properties": {
           "username": {
@@ -2582,7 +2587,7 @@
           "data": {
             "additionalProperties": {
               "items": {
-                "$ref": "#/components/schemas/DataModel"
+                "$ref": "#/components/schemas/OutputParameterModel"
               },
               "type": "array"
             },

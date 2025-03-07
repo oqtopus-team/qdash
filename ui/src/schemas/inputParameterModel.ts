@@ -5,14 +5,14 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { InputParameterValue } from "./inputParameterValue";
+import type { InputParameterModelValue } from "./inputParameterModelValue";
 
 /**
  * Input parameter class.
  */
-export interface InputParameter {
+export interface InputParameterModel {
   unit?: string;
   value_type?: string;
-  value?: InputParameterValue;
+  value?: InputParameterModelValue;
   description?: string;
 }
