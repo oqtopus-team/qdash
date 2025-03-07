@@ -164,3 +164,9 @@ class BaseTask(ABC):
     def is_coupling_task(self) -> bool:
         """Return True if the task is a coupling task."""
         return self.task_type == "coupling"
+
+    def attach_execution_id(self, execution_id: str) -> dict[str, OutputParameterModel]:
+        """Attach the execution id to the output parameters."""
+        for value in self.output_parameters.values():
+            value.execution_id = execution_id
+        return self.output_parameters

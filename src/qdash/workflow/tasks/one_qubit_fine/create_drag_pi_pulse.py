@@ -51,23 +51,11 @@ class CreateDRAGPIPulse(BaseTask):
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = qid_to_label(qid)
         result = run_result.raw_result
-        op = self.output_parameters
-        output_param = {
-            "drag_pi_beta": OutputParameterModel(
-                value=result["beta"][label],
-                unit=op["drag_pi_beta"].unit,
-                description=op["drag_pi_beta"].description,
-                execution_id=execution_id,
-            ),
-            "drag_pi_amplitude": OutputParameterModel(
-                value=result["amplitude"][label],
-                unit=op["drag_pi_amplitude"].unit,
-                description=op["drag_pi_amplitude"].description,
-                execution_id=execution_id,
-            ),
-        }
+        self.output_parameters["drag_pi_beta"].value = result["beta"][label]
+        self.output_parameters["drag_pi_amplitude"].value = result["amplitude"][label]
+        output_parameters = self.attach_execution_id(execution_id)
         figures: list[go.Figure] = []
-        return PostProcessResult(output_parameters=output_param, figures=figures)
+        return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         labels = [qid_to_label(qid)]

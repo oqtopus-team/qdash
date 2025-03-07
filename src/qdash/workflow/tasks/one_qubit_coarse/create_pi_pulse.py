@@ -45,17 +45,10 @@ class CreatePIPulse(BaseTask):
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = qid_to_label(qid)
         result = run_result.raw_result
-        op = self.output_parameters
-        output_param = {
-            "pi_amplitude": OutputParameterModel(
-                value=result.data[label].calib_value,
-                unit=op["pi_amplitude"].unit,
-                description=op["pi_amplitude"].description,
-                execution_id=execution_id,
-            ),
-        }
+        self.output_parameters["pi_amplitude"].value = result.data[label].calib_value
+        output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
-        return PostProcessResult(output_parameters=output_param, figures=figures)
+        return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         labels = [qid_to_label(qid)]

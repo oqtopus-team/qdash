@@ -57,17 +57,10 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = qid_to_label(qid)
         result = run_result.raw_result
-        op = self.output_parameters
-        output_param = {
-            "zx90_gate_fidelity": OutputParameterModel(
-                value=result["mean"][label],
-                unit=op["zx90_gate_fidelity"].unit,
-                description=op["zx90_gate_fidelity"].description,
-                execution_id=execution_id,
-            ),
-        }
+        self.output_parameters["zx90_gate_fidelity"].value = result["mean"][label]
+        output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
-        return PostProcessResult(output_parameters=output_param, figures=figures)
+        return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         label = qid_to_label(qid)

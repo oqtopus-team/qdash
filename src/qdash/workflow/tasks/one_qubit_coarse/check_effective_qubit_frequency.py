@@ -58,33 +58,19 @@ class CheckEffectiveQubitFrequency(BaseTask):
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = qid_to_label(qid)
         result = run_result.raw_result
-        op = self.output_parameters
-        output_param = {
-            "effective_qubit_frequency": OutputParameterModel(
-                value=result["effective_freq"][label],
-                unit=op["effective_qubit_frequency"].unit,
-                description=op["effective_qubit_frequency"].description,
-                execution_id=execution_id,
-            ),
-            "effective_qubit_frequency_0": OutputParameterModel(
-                value=result["result_0"].data[label].bare_freq,
-                unit=op["effective_qubit_frequency_0"].unit,
-                description=op["effective_qubit_frequency_0"].description,
-                execution_id=execution_id,
-            ),
-            "effective_qubit_frequency_1": OutputParameterModel(
-                value=result["result_1"].data[label].bare_freq,
-                unit=op["effective_qubit_frequency_1"].unit,
-                description=op["effective_qubit_frequency_1"].description,
-                execution_id=execution_id,
-            ),
-        }
-
+        self.output_parameters["effective_qubit_frequency"].value = result["effective_freq"][label]
+        self.output_parameters["effective_qubit_frequency_0"].value = (
+            result["result_0"].data[label].bare_freq
+        )
+        self.output_parameters["effective_qubit_frequency_1"].value = (
+            result["result_1"].data[label].bare_freq
+        )
+        output_parameters = self.attach_execution_id(execution_id)
         figures = [
             result["result_0"].data[label].fit()["fig"],
             result["result_1"].data[label].fit()["fig"],
         ]
-        return PostProcessResult(output_parameters=output_param, figures=figures)
+        return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         label = qid_to_label(qid)
