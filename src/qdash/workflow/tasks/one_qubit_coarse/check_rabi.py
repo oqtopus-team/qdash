@@ -42,7 +42,7 @@ class CheckRabi(BaseTask):
             unit="a.u.", description="Rabi oscillation amplitude"
         ),
         "rabi_frequency": OutputParameterModel(
-            unit="GHz", description="Rabi oscillation frequency"
+            unit="MHz", description="Rabi oscillation frequency"
         ),
     }
 
@@ -54,24 +54,16 @@ class CheckRabi(BaseTask):
         """Process the results of the task."""
         label = qid_to_label(qid)
         result = run_result.raw_result
-        op = self.output_parameters
-        output_param = {
-            "rabi_amplitude": OutputParameterModel(
-                value=result.rabi_params[label].amplitude,
-                unit=op["rabi_amplitude"].unit,
-                description=op["rabi_amplitude"].description,
-                execution_id=execution_id,
-            ),
-            "rabi_frequency": OutputParameterModel(
-                value=result.rabi_params[label].frequency,
-                unit=op["rabi_frequency"].unit,
-                description=op["rabi_frequency"].description,
-                execution_id=execution_id,
-            ),
-        }
+        self.output_parameters["rabi_amplitude"].value = result.rabi_params[label].amplitude
+        self.output_parameters["rabi_frequency"].value = (
+            result.rabi_params[label].frequency * 1000
+        )  # convert to MHz
+        output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
         raw_data = [result.data[label].data]
-        return PostProcessResult(output_parameters=output_param, figures=figures, raw_data=raw_data)
+        return PostProcessResult(
+            output_parameters=output_parameters, figures=figures, raw_data=raw_data
+        )
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         """Run the task."""

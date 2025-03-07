@@ -57,17 +57,10 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:  # noqa: ARG002
         result = run_result.raw_result
-        op = self.output_parameters
-        output_param = {
-            "x90_gate_fidelity": OutputParameterModel(
-                value=result["gate_fidelity"],
-                unit=op["x90_gate_fidelity"].unit,
-                description=op["x90_gate_fidelity"].description,
-                execution_id=execution_id,
-            ),
-        }
+        self.output_parameters["x90_gate_fidelity"].value = result["gate_fidelity"]
+        output_parameters = self.attach_execution_id(execution_id)
         figures = [result["fig"]]
-        return PostProcessResult(output_parameters=output_param, figures=figures)
+        return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         label = qid_to_label(qid)

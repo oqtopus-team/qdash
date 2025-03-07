@@ -42,29 +42,15 @@ class ReadoutClassification(BaseTask):
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = qid_to_label(qid)
         result = run_result.raw_result
-        op = self.output_parameters
-        output_param = {
-            "average_readout_fidelity": OutputParameterModel(
-                value=result["average_readout_fidelity"][label],
-                unit=op["average_readout_fidelity"].unit,
-                description=op["average_readout_fidelity"].description,
-                execution_id=execution_id,
-            ),
-            "readout_fidelity_0": OutputParameterModel(
-                value=result["readout_fidelties"][label][0],
-                unit=op["readout_fidelity_0"].unit,
-                description=op["readout_fidelity_0"].description,
-                execution_id=execution_id,
-            ),
-            "readout_fidelity_1": OutputParameterModel(
-                value=result["readout_fidelties"][label][1],
-                unit=op["readout_fidelity_1"].unit,
-                description=op["readout_fidelity_1"].description,
-                execution_id=execution_id,
-            ),
-        }
+        self.output_parameters["average_readout_fidelity"].value = result[
+            "average_readout_fidelity"
+        ][label]
+        self.output_parameters["readout_fidelity_0"].value = result["readout_fidelties"][label][0]
+        self.output_parameters["readout_fidelity_1"].value = result["readout_fidelties"][label][1]
+        output_parameters = self.attach_execution_id(execution_id)
+
         figures: list[go.Figure] = []
-        return PostProcessResult(output_parameters=output_param, figures=figures)
+        return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         label = qid_to_label(qid)

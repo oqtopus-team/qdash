@@ -39,7 +39,7 @@ class CheckT1(BaseTask):
         ),
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "t1": OutputParameterModel(unit="ns", description="T1 time"),
+        "t1": OutputParameterModel(unit="μs", description="T1 time"),
     }
 
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
@@ -48,17 +48,10 @@ class CheckT1(BaseTask):
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = qid_to_label(qid)
         result = run_result.raw_result
-        op = self.output_parameters
-        output_param = {
-            "t1": OutputParameterModel(
-                value=result.data[label].t1,
-                unit=op["t1"].unit,
-                description=op["t1"].description,
-                execution_id=execution_id,
-            ),
-        }
+        self.output_parameters["t1"].value = result.data[label].t1 * 0.001  # convert to μs
+        output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
-        return PostProcessResult(output_parameters=output_param, figures=figures)
+        return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         labels = [qid_to_label(qid)]

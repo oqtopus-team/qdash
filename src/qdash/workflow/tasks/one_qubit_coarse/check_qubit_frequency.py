@@ -55,17 +55,10 @@ class CheckQubitFrequency(BaseTask):
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = qid_to_label(qid)
         result = run_result.raw_result
-        op = self.output_parameters
-        output_param = {
-            "qubit_frequency": OutputParameterModel(
-                value=result[label],
-                unit=op["qubit_frequency"].unit,
-                description=op["qubit_frequency"].description,
-                execution_id=execution_id,
-            ),
-        }
+        self.output_parameters["qubit_frequency"].value = result[label]
+        output_parameters = self.attach_execution_id(execution_id)
         figures: list[go.Figure] = []
-        return PostProcessResult(output_parameters=output_param, figures=figures)
+        return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         labels = [qid_to_label(qid)]
