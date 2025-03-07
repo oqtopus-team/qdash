@@ -1,14 +1,14 @@
 "use client";
 
 import { BsPlus } from "react-icons/bs";
-import type { Menu } from "../../model";
+import type { MenuModel } from "@/schemas";
 
 export function DeleteConfirmModal({
   selectedItem,
   onConfirm,
   onCancel,
 }: {
-  selectedItem: Menu;
+  selectedItem: MenuModel;
   onConfirm: () => void;
   onCancel: () => void;
 }) {

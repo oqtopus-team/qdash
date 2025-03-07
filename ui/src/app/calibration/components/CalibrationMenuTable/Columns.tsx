@@ -3,15 +3,15 @@
 import { createColumnHelper } from "@tanstack/react-table";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import { FaRegCirclePlay } from "react-icons/fa6";
-import type { Menu } from "../../model";
+import type { MenuModel } from "@/schemas";
 
-const columnHelper = createColumnHelper<Menu>();
+const columnHelper = createColumnHelper<MenuModel>();
 
 export const getColumns = (
-  handleEditClick: (item: Menu) => void,
-  handleDeleteClick: (item: Menu) => void,
-  handleExecuteCalib: (item: Menu) => void,
-  isLocked: boolean,
+  handleEditClick: (item: MenuModel) => void,
+  handleDeleteClick: (item: MenuModel) => void,
+  handleExecuteCalib: (item: MenuModel) => void,
+  isLocked: boolean
 ) => [
   columnHelper.accessor("name", {
     header: "Name",
