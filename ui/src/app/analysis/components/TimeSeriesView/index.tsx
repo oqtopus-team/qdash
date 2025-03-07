@@ -3,23 +3,18 @@
 import { useFetchAllParameters } from "@/client/parameter/parameter";
 import { useListAllTag } from "@/client/tag/tag";
 import { useFetchTimeseriesTaskResultByTagAndParameter } from "@/client/chip/chip";
-import { useMemo, useState, useEffect } from "react";
-import { DataModel } from "@/schemas/dataModel";
-import { TimeSeriesData } from "@/schemas/timeSeriesData";
-import { TimeSeriesDataData } from "@/schemas/timeSeriesDataData";
+import { useMemo, useState } from "react";
+
 import { ParameterModel } from "@/schemas/parameterModel";
 import { Tag } from "@/schemas/tag";
 import dynamic from "next/dynamic";
 import { Layout } from "plotly.js";
+import { DataModel } from "@/schemas";
 
 const Plot = dynamic(() => import("react-plotly.js"), {
   ssr: false,
   loading: () => <div>Loading Plot...</div>,
 });
-
-interface ExtendedDataModel extends DataModel {
-  output_parameters?: { [key: string]: any };
-}
 
 export function TimeSeriesView() {
   const [selectedParameter, setSelectedParameter] = useState<string>("");
@@ -59,11 +54,11 @@ export function TimeSeriesView() {
           if (Array.isArray(dataPoints)) {
             qidData[qid] = {
               x: dataPoints.map(
-                (point: ExtendedDataModel) => point.calibrated_at || ""
+                (point: DataModel) => point.calibrated_at || ""
               ),
-              y: dataPoints.map((point: ExtendedDataModel) => {
-                if (point.output_parameters && selectedParameter) {
-                  const value = point.output_parameters[selectedParameter];
+              y: dataPoints.map((point: DataModel) => {
+                if (point.value && selectedParameter) {
+                  const value = point.value;
                   if (typeof value === "number") {
                     return value;
                   }
@@ -123,7 +118,7 @@ export function TimeSeriesView() {
       if (entries.length > 0) {
         const [, firstDataPoints] = entries[0];
         if (Array.isArray(firstDataPoints) && firstDataPoints.length > 0) {
-          const firstPoint = firstDataPoints[0] as ExtendedDataModel;
+          const firstPoint = firstDataPoints[0] as DataModel;
           if (firstPoint.unit) {
             unit = firstPoint.unit || "a.u.";
           }
@@ -192,12 +187,10 @@ export function TimeSeriesView() {
     if (!selectedQid || !timeseriesResponse?.data?.data) return [];
     const data = timeseriesResponse.data.data[selectedQid];
     if (!Array.isArray(data)) return [];
-    return data.map((point: ExtendedDataModel) => ({
+    return data.map((point: DataModel) => ({
       time: point.calibrated_at || "",
-      value:
-        point.output_parameters && selectedParameter
-          ? point.output_parameters[selectedParameter]
-          : 0,
+      value: point.value || 0,
+      unit: point.unit || "a.u.",
     }));
   }, [timeseriesResponse, selectedQid, selectedParameter]);
 
@@ -368,19 +361,21 @@ export function TimeSeriesView() {
             <table className="table table-compact table-zebra w-full border border-base-300 bg-base-100">
               <thead>
                 <tr>
-                  <th className="text-center bg-base-200">Time</th>
+                  <th className="text-left bg-base-200">Time</th>
                   <th className="text-center bg-base-200">Value</th>
+                  <th className="text-center bg-base-200">Unit</th>
                 </tr>
               </thead>
               <tbody>
                 {selectedQidData.map((point, index) => (
                   <tr key={index}>
-                    <td className="text-center">{point.time}</td>
+                    <td className="text-left">{point.time}</td>
                     <td className="text-center">
                       {typeof point.value === "number"
                         ? point.value.toFixed(4)
                         : point.value}
                     </td>
+                    <td className="text-center">{point.unit}</td>
                   </tr>
                 ))}
               </tbody>
