@@ -7,7 +7,7 @@ import type { ScheduleCalibResponse } from "@/schemas";
 const columnHelper = createColumnHelper<ScheduleCalibResponse>();
 
 export const getColumns = (
-  handleDeleteClick: (item: ScheduleCalibResponse) => void
+  handleDeleteClick: (item: ScheduleCalibResponse) => void,
 ) => [
   columnHelper.accessor("menu_name", {
     header: "Menu Name",
