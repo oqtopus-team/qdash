@@ -9,7 +9,7 @@ import { ParameterModel } from "@/schemas/parameterModel";
 import { Tag } from "@/schemas/tag";
 import dynamic from "next/dynamic";
 import { Layout } from "plotly.js";
-import { DataModel } from "@/schemas";
+import { OutputParameterModel } from "@/schemas";
 
 const Plot = dynamic(() => import("react-plotly.js"), {
   ssr: false,
@@ -54,9 +54,9 @@ export function TimeSeriesView() {
           if (Array.isArray(dataPoints)) {
             qidData[qid] = {
               x: dataPoints.map(
-                (point: DataModel) => point.calibrated_at || ""
+                (point: OutputParameterModel) => point.calibrated_at || ""
               ),
-              y: dataPoints.map((point: DataModel) => {
+              y: dataPoints.map((point: OutputParameterModel) => {
                 if (point.value && selectedParameter) {
                   const value = point.value;
                   if (typeof value === "number") {
@@ -118,7 +118,7 @@ export function TimeSeriesView() {
       if (entries.length > 0) {
         const [, firstDataPoints] = entries[0];
         if (Array.isArray(firstDataPoints) && firstDataPoints.length > 0) {
-          const firstPoint = firstDataPoints[0] as DataModel;
+          const firstPoint = firstDataPoints[0] as OutputParameterModel;
           if (firstPoint.unit) {
             unit = firstPoint.unit || "a.u.";
           }
@@ -187,7 +187,7 @@ export function TimeSeriesView() {
     if (!selectedQid || !timeseriesResponse?.data?.data) return [];
     const data = timeseriesResponse.data.data[selectedQid];
     if (!Array.isArray(data)) return [];
-    return data.map((point: DataModel) => ({
+    return data.map((point: OutputParameterModel) => ({
       time: point.calibrated_at || "",
       value: point.value || 0,
       unit: point.unit || "a.u.",

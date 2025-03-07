@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { DataModelValue } from "./dataModelValue";
+import type { OutputParameterModelValue } from "./outputParameterModelValue";
 
 /**
  * Data model.
@@ -15,8 +15,9 @@ Attributes
     qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.
     coupling (dict[str, dict[str, float | int]]): The calibration data for couplings.
  */
-export interface DataModel {
-  value?: DataModelValue;
+export interface OutputParameterModel {
+  value?: OutputParameterModelValue;
+  value_type?: string;
   unit?: string;
   description?: string;
   /** The time when the system information was created */

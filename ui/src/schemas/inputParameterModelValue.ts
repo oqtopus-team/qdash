@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type InputParameterValue = unknown[] | number | number | null;
+export type InputParameterModelValue = unknown[] | number | number | null;
