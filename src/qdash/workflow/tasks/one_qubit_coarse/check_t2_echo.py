@@ -1,12 +1,10 @@
 from typing import ClassVar
 
 import numpy as np
-from qdash.datamodel.task import DataModel
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibration.util import qid_to_label
 from qdash.workflow.tasks.base import (
     BaseTask,
-    InputParameter,
-    OutputParameter,
     PostProcessResult,
     PreProcessResult,
     RunResult,
@@ -20,28 +18,28 @@ class CheckT2Echo(BaseTask):
 
     name: str = "CheckT2Echo"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameter]] = {
-        "time_range": InputParameter(
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
+        "time_range": InputParameterModel(
             unit="ns",
             value_type="np.logspace",
             value=(np.log10(300), np.log10(100 * 1000), 51),
             description="Time range for T2 echo time",
         ),
-        "shots": InputParameter(
+        "shots": InputParameterModel(
             unit="",
             value_type="int",
             value=DEFAULT_SHOTS,
             description="Number of shots for T2 echo time",
         ),
-        "interval": InputParameter(
+        "interval": InputParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval for T2 echo time",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameter]] = {
-        "t2_echo": OutputParameter(unit="ns", description="T2 echo time"),
+    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
+        "t2_echo": OutputParameterModel(unit="ns", description="T2 echo time"),
     }
 
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
@@ -52,7 +50,7 @@ class CheckT2Echo(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "t2_echo": DataModel(
+            "t2_echo": OutputParameterModel(
                 value=result.data[label].t2,
                 unit=op["t2_echo"].unit,
                 description=op["t2_echo"].description,

@@ -1,11 +1,9 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import DataModel
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibration.util import qid_to_label
 from qdash.workflow.tasks.base import (
     BaseTask,
-    InputParameter,
-    OutputParameter,
     PostProcessResult,
     PreProcessResult,
     RunResult,
@@ -19,29 +17,33 @@ class CheckRabi(BaseTask):
 
     name: str = "CheckRabi"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameter]] = {
-        "time_range": InputParameter(
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
+        "time_range": InputParameterModel(
             unit="ns",
             value_type="range",
             value=(0, 201, 4),
             description="Time range for Rabi oscillation",
         ),
-        "shots": InputParameter(
+        "shots": InputParameterModel(
             unit="a.u.",
             value_type="int",
             value=DEFAULT_SHOTS,
             description="Number of shots for Rabi oscillation",
         ),
-        "interval": InputParameter(
+        "interval": InputParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval for Rabi oscillation",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameter]] = {
-        "rabi_amplitude": OutputParameter(unit="a.u.", description="Rabi oscillation amplitude"),
-        "rabi_frequency": OutputParameter(unit="GHz", description="Rabi oscillation frequency"),
+    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
+        "rabi_amplitude": OutputParameterModel(
+            unit="a.u.", description="Rabi oscillation amplitude"
+        ),
+        "rabi_frequency": OutputParameterModel(
+            unit="GHz", description="Rabi oscillation frequency"
+        ),
     }
 
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
@@ -54,13 +56,13 @@ class CheckRabi(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "rabi_amplitude": DataModel(
+            "rabi_amplitude": OutputParameterModel(
                 value=result.rabi_params[label].amplitude,
                 unit=op["rabi_amplitude"].unit,
                 description=op["rabi_amplitude"].description,
                 execution_id=execution_id,
             ),
-            "rabi_frequency": DataModel(
+            "rabi_frequency": OutputParameterModel(
                 value=result.rabi_params[label].frequency,
                 unit=op["rabi_frequency"].unit,
                 description=op["rabi_frequency"].description,

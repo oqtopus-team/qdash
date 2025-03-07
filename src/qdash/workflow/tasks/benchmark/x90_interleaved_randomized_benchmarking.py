@@ -1,11 +1,9 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import DataModel
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibration.util import qid_to_label
 from qdash.workflow.tasks.base import (
     BaseTask,
-    InputParameter,
-    OutputParameter,
     PostProcessResult,
     PreProcessResult,
     RunResult,
@@ -21,34 +19,34 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
 
     name: str = "X90InterleavedRandomizedBenchmarking"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameter]] = {
-        "n_cliffords_range": InputParameter(
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
+        "n_cliffords_range": InputParameterModel(
             unit="a.u.",
             value_type="np.arange",
             value=(0, 1001, 100),
             description="Number of cliffords range",
         ),
-        "n_trials": InputParameter(
+        "n_trials": InputParameterModel(
             unit="a.u.",
             value_type="int",
             value=30,
             description="Number of trials",
         ),
-        "shots": InputParameter(
+        "shots": InputParameterModel(
             unit="a.u.",
             value_type="int",
             value=CALIBRATION_SHOTS,
             description="Number of shots",
         ),
-        "interval": InputParameter(
+        "interval": InputParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameter]] = {
-        "x90_gate_fidelity": OutputParameter(
+    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
+        "x90_gate_fidelity": OutputParameterModel(
             unit="",
             description="X90 gate fidelity",
         ),
@@ -61,7 +59,7 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "x90_gate_fidelity": DataModel(
+            "x90_gate_fidelity": OutputParameterModel(
                 value=result["gate_fidelity"],
                 unit=op["x90_gate_fidelity"].unit,
                 description=op["x90_gate_fidelity"].description,

@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
 from qdash.api.lib.current_user import get_current_user_id
 from qdash.api.schemas.auth import User
-from qdash.datamodel.task import DataModel
+from qdash.datamodel.task import OutputParameterModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.task import TaskDocument
@@ -496,7 +496,7 @@ class TimeSeriesProjection(BaseModel):
 class TimeSeriesData(BaseModel):
     """TimeSeriesData is a Pydantic model that represents the time series data."""
 
-    data: dict[str, list[DataModel]] = {}
+    data: dict[str, list[OutputParameterModel]] = {}
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -543,7 +543,7 @@ def _fetch_timeseries_data(
     )
 
     # Create a dictionary to store time series data for each qid
-    timeseries_by_qid: dict[str, list[DataModel]] = {}
+    timeseries_by_qid: dict[str, list[OutputParameterModel]] = {}
 
     # Process task results
     for task_result in task_results:

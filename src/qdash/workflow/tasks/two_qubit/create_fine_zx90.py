@@ -1,9 +1,8 @@
 from typing import ClassVar
 
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.tasks.base import (
     BaseTask,
-    InputParameter,
-    OutputParameter,
     PostProcessResult,
     PreProcessResult,
     RunResult,
@@ -16,8 +15,10 @@ class CreateFineZX90(BaseTask):
 
     name: str = "CreateFineZX90"
     task_type: str = "coupling"
-    input_parameters: ClassVar[dict[str, InputParameter]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameter]] = {"cr_amplitude": OutputParameter()}
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
+        "cr_amplitude": OutputParameterModel()
+    }
 
     # @staticmethod
     # def determine_cr_pair(exp: Experiment) -> tuple[tuple[str, str], str]:

@@ -2,11 +2,10 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
-from qdash.datamodel.task import DataModel
+from qdash.datamodel.task import OutputParameterModel
 from qdash.workflow.calibration.util import qid_to_label
 from qdash.workflow.tasks.base import (
     BaseTask,
-    OutputParameter,
     PostProcessResult,
     PreProcessResult,
     RunResult,
@@ -19,16 +18,16 @@ class ReadoutClassification(BaseTask):
 
     name: str = "ReadoutClassification"
     task_type: str = "qubit"
-    output_parameters: ClassVar[dict[str, OutputParameter]] = {
-        "average_readout_fidelity": OutputParameter(
+    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
+        "average_readout_fidelity": OutputParameterModel(
             unit="GHz",
             description="Average readout fidelity",
         ),
-        "readout_fidelity_0": OutputParameter(
+        "readout_fidelity_0": OutputParameterModel(
             unit="GHz",
             description="Readout fidelity with preparation state 0",
         ),
-        "readout_fidelity_1": OutputParameter(
+        "readout_fidelity_1": OutputParameterModel(
             unit="GHz",
             description="Readout fidelity with preparation state 1",
         ),
@@ -45,19 +44,19 @@ class ReadoutClassification(BaseTask):
         result = run_result.raw_result
         op = self.output_parameters
         output_param = {
-            "average_readout_fidelity": DataModel(
+            "average_readout_fidelity": OutputParameterModel(
                 value=result["average_readout_fidelity"][label],
                 unit=op["average_readout_fidelity"].unit,
                 description=op["average_readout_fidelity"].description,
                 execution_id=execution_id,
             ),
-            "readout_fidelity_0": DataModel(
+            "readout_fidelity_0": OutputParameterModel(
                 value=result["readout_fidelties"][label][0],
                 unit=op["readout_fidelity_0"].unit,
                 description=op["readout_fidelity_0"].description,
                 execution_id=execution_id,
             ),
-            "readout_fidelity_1": DataModel(
+            "readout_fidelity_1": OutputParameterModel(
                 value=result["readout_fidelties"][label][1],
                 unit=op["readout_fidelity_1"].unit,
                 description=op["readout_fidelity_1"].description,
