@@ -30,6 +30,7 @@ from qdash.api.schemas.exception import InternalSeverError
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.menu import MenuDocument
+from qdash.dbmodel.tag import TagDocument
 
 router = APIRouter(prefix="/calibration")
 logger = getLogger("uvicorn.app")
@@ -68,6 +69,7 @@ async def execute_calib(
     target_deployment = await client.read_deployment_by_name(f"main/{env}-main")
     try:
         execution_id = generate_execution_id()
+        TagDocument.insert_tags(request.tags, current_user.username)
         resp = await client.create_flow_run_from_deployment(
             deployment_id=target_deployment.id,
             parameters={"menu": request.model_dump(), "execution_id": execution_id},

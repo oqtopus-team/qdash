@@ -10,9 +10,11 @@
  * A simple message response.
 
 Args:
+----
     BaseModel: The base class for Pydantic models.
 
 Attributes:
+----------
     message (str): The message to return.
  */
 export interface Detail {

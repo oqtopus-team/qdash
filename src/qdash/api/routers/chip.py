@@ -4,10 +4,11 @@ import logging
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
 from qdash.api.lib.current_user import get_current_user_id
 from qdash.api.schemas.auth import User
+from qdash.datamodel.task import DataModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.task import TaskDocument
@@ -15,7 +16,7 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 if TYPE_CHECKING:
     from pydantic.validators import FieldValidationInfo
-from pymongo import DESCENDING
+from pymongo import ASCENDING, DESCENDING
 
 router = APIRouter()
 
@@ -474,3 +475,133 @@ def fetch_latest_task_grouped_by_chip(
             task_result = Task(name=task_name)
         results[qid] = task_result
     return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+
+
+class TimeSeriesProjection(BaseModel):
+    """TimeSeriesProjection is a Pydantic model that represents the projection for time series data."""
+
+    qid: str
+    output_parameters: dict[str, Any]
+    start_at: str
+
+    class Settings:
+        projection = {
+            "qid": 1,
+            "output_parameters": 1,
+            "start_at": 1,
+            "_id": 0,
+        }
+
+
+class TimeSeriesData(BaseModel):
+    """TimeSeriesData is a Pydantic model that represents the time series data."""
+
+    data: dict[str, list[DataModel]] = {}
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+def _fetch_timeseries_data(
+    chip_id: str,
+    tag: str,
+    parameter: str,
+    current_user: User,
+    target_qid: str | None = None,
+) -> TimeSeriesData:
+    """Fetch timeseries data for all qids or a specific qid.
+
+    Parameters
+    ----------
+    tag : str
+        The tag to filter by
+    parameter : str
+        The parameter to fetch
+    current_user : User
+        The current user
+    target_qid : str | None
+        If provided, only return data for this specific qid
+
+    Returns
+    -------
+    TimeSeriesData
+        The timeseries data
+
+    """
+    # Find all task results for the given tag and parameter
+    task_results = (
+        TaskResultHistoryDocument.find(
+            {
+                "username": current_user.username,
+                "chip_id": chip_id,
+                "tags": tag,
+                "output_parameter_names": parameter,
+            }
+        )
+        .sort([("start_at", ASCENDING)])
+        .project(TimeSeriesProjection)
+        .run()
+    )
+
+    # Create a dictionary to store time series data for each qid
+    timeseries_by_qid: dict[str, list[DataModel]] = {}
+
+    # Process task results
+    for task_result in task_results:
+        qid = task_result.qid
+        # Skip if we're looking for a specific qid and this isn't it
+        if target_qid is not None and qid != target_qid:
+            continue
+
+        if qid not in timeseries_by_qid:
+            timeseries_by_qid[qid] = []
+
+        timeseries_by_qid[qid].append(task_result.output_parameters[parameter])
+
+    return TimeSeriesData(data=timeseries_by_qid)
+
+
+@router.get(
+    "/chip/{chip_id}/parameter/{parameter}/qid/{qid}",
+    summary="Fetch the timeseries task result by tag and parameter for a specific qid",
+    response_model=TimeSeriesData,
+    operation_id="fetchTimeseriesTaskResultByTagAndParameterAndQid",
+)
+def fetch_timeseries_task_result_by_tag_and_parameter_and_qid(
+    chip_id: str,
+    tag: str,
+    parameter: str,
+    qid: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> TimeSeriesData:
+    """Fetch the timeseries task result by tag and parameter for a specific qid.
+
+    Returns
+    -------
+        TimeSeriesData: Time series data for the specified qid.
+
+    """
+    logger.debug(f"Fetching timeseries task result for tag {tag}, parameter {parameter}, qid {qid}")
+    return _fetch_timeseries_data(chip_id, tag, parameter, current_user, qid)
+
+
+@router.get(
+    "/chip/{chip_id}/parameter/{parameter}",
+    summary="Fetch the timeseries task result by tag and parameter for all qids",
+    response_model=TimeSeriesData,
+    operation_id="fetchTimeseriesTaskResultByTagAndParameter",
+)
+def fetch_timeseries_task_result_by_tag_and_parameter(
+    chip_id: str,
+    tag: str,
+    parameter: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> TimeSeriesData:
+    """Fetch the timeseries task result by tag and parameter for all qids.
+
+    Returns
+    -------
+        TimeSeriesData: Time series data for all qids.
+
+    """
+    logger.debug(f"Fetching timeseries task result for tag {tag}, parameter {parameter}")
+    return _fetch_timeseries_data(chip_id, tag, parameter, current_user)
