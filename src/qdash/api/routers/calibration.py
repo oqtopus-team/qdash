@@ -16,7 +16,10 @@ from prefect.client.schemas.filters import (
     FlowRunFilterStateType,
     StateType,
 )
+from prefect.client.schemas.objects import Deployment
+from prefect.client.schemas.schedules import construct_schedule
 from prefect.states import Scheduled
+from pydantic import BaseModel
 from qdash.api.config import Settings, get_settings
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
 from qdash.api.schemas.auth import User
@@ -32,10 +35,34 @@ from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.menu import MenuDocument
 from qdash.dbmodel.tag import TagDocument
 
-router = APIRouter(prefix="/calibration")
+router = APIRouter()
 logger = getLogger("uvicorn.app")
 prefect_host = os.getenv("PREFECT_HOST")
 qdash_host = "localhost"
+
+
+class ScheduleCronCalibRequest(BaseModel):
+    """ScheduleCronCalibRequest is a subclass of BaseModel."""
+
+    scheduler_name: str
+    menu_name: str
+    cron: str
+    active: bool = True
+
+
+class ScheduleCronCalibResponse(BaseModel):
+    """ScheduleCronCalibResponse is a subclass of BaseModel."""
+
+    scheduler_name: str
+    menu_name: str
+    cron: str
+    active: bool = True
+
+
+class ListCronScheduleResponse(BaseModel):
+    """ListCronScheduleResponse is a subclass of BaseModel."""
+
+    schedules: list[ScheduleCronCalibResponse]
 
 
 def generate_execution_id() -> str:
@@ -51,8 +78,93 @@ def generate_execution_id() -> str:
     return f"{date_str}-{execution_index:03d}"
 
 
+@router.get(
+    "/calibration/cron-schedule",
+    response_model=ListCronScheduleResponse,
+    summary="Fetches all the cron schedules.",
+    operation_id="listCronSchedules",
+)
+async def list_cron_schedules(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ListCronScheduleResponse:
+    """List all the cron schedules."""
+    env = settings.env
+    scheduler_list = [f"cron-scheduler/{env}-cron-scheduler-{i}" for i in range(1, 4)]
+    client = PrefectClient(api=settings.prefect_api_url)
+    schedules = []
+    for scheduler_name in scheduler_list:
+        try:
+            target_deployment = await client.read_deployment_by_name(scheduler_name)
+        except Exception as e:
+            logger.warning(e)
+            raise HTTPException(status_code=404, detail="deployment not found")
+        schedules.append(
+            ScheduleCronCalibResponse(
+                scheduler_name=scheduler_name,
+                menu_name=target_deployment.parameters["menu_name"],
+                cron=target_deployment.schedule.cron,  # type: ignore
+                active=target_deployment.is_schedule_active,
+            )
+        )
+    return ListCronScheduleResponse(schedules=schedules)
+
+
 @router.post(
-    "/",
+    "/calibration/cron-schedule",
+    response_model=ScheduleCronCalibResponse,
+    summary="Schedules a calibration with cron.",
+    operation_id="scheduleCronCalib",
+)
+async def schedule_cron_calib(
+    request: ScheduleCronCalibRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ScheduleCronCalibResponse:
+    """Schedule a calibration."""
+    from fastapi.encoders import jsonable_encoder
+
+    logger.warning(f"Raw request body: {jsonable_encoder(request)}")
+    logger.warning(f"Request model dump: {request.model_dump()}")
+    logger.warning(f"Request dict: {request.dict()}")
+    logger.warning(f"Current user: {current_user.model_dump()}")
+    logger.info(f"current user: {current_user.username}")
+    menu = MenuDocument.find_one({"name": request.menu_name}).run()
+    if menu is None:
+        raise HTTPException(status_code=404, detail="menu not found")
+    client = PrefectClient(api=settings.prefect_api_url)
+    try:
+        target_deployment = await client.read_deployment_by_name(request.scheduler_name)
+    except Exception as e:
+        logger.warning(e)
+        raise HTTPException(status_code=404, detail="deployment not found")
+    try:
+        cron = construct_schedule(cron=request.cron, timezone="Asia/Tokyo")
+        new_deployment = Deployment(
+            **target_deployment.dict(),
+        )
+        new_deployment.schedule = cron
+        new_deployment.parameters = {"menu_name": request.menu_name}
+        new_deployment.is_schedule_active = request.active
+        logger.info(f"flow id: {target_deployment.flow_id}")
+        _ = await client.update_deployment(
+            deployment=new_deployment,
+            schedule=cron,
+            is_schedule_active=request.active,
+        )
+    except Exception as e:
+        logger.warning(e)
+        raise InternalSeverError(detail=f"Failed to schedule calibration {e!s}")
+
+    return ScheduleCronCalibResponse(
+        scheduler_name=request.scheduler_name,
+        menu_name=request.menu_name,
+        cron=request.cron,
+        active=request.active,
+    )
+
+
+@router.post(
+    "/calibration",
     response_model=ExecuteCalibResponse,
     summary="Executes a calibration by creating a flow run from a deployment.",
     operation_id="execute_calib",
@@ -90,7 +202,7 @@ local_date = datetime.now(tz=ja)
 
 
 @router.post(
-    "/schedule",
+    "/calibration/schedule",
     summary="Schedules a calibration.",
     operation_id="schedule_calib",
 )
@@ -151,7 +263,7 @@ async def schedule_calib(
 
 
 @router.get(
-    "/schedule",
+    "/calibration/schedule",
     response_model=list[ScheduleCalibResponse],
     summary="Fetches all the calibration schedules.",
     operation_id="fetch_all_calib_schedule",
@@ -201,7 +313,7 @@ async def fetch_all_calib_schedule(
 
 
 @router.delete(
-    "/schedule/{flow_run_id}",
+    "/calibration/schedule/{flow_run_id}",
     summary="Deletes a calibration schedule.",
     operation_id="delete_calib_schedule",
 )

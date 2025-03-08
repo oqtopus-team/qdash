@@ -15,7 +15,74 @@
     "version": "0.0.1"
   },
   "paths": {
-    "/calibration/": {
+    "/calibration/cron-schedule": {
+      "get": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Fetches all the cron schedules.",
+        "description": "List all the cron schedules.",
+        "operationId": "listCronSchedules",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCronScheduleResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Schedules a calibration with cron.",
+        "description": "Schedule a calibration.",
+        "operationId": "scheduleCronCalib",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleCronCalibRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleCronCalibResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/calibration": {
       "post": {
         "tags": [
           "calibration"
@@ -1959,6 +2026,23 @@
         "title": "LatestTaskGroupedByChipResponse",
         "description": "ChipTaskResponse is a Pydantic model that represents the response for fetching the tasks of a chip."
       },
+      "ListCronScheduleResponse": {
+        "properties": {
+          "schedules": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleCronCalibResponse"
+            },
+            "type": "array",
+            "title": "Schedules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedules"
+        ],
+        "title": "ListCronScheduleResponse",
+        "description": "ListCronScheduleResponse is a subclass of BaseModel."
+      },
       "ListMenuResponse": {
         "properties": {
           "menus": {
@@ -2286,6 +2370,64 @@
         ],
         "title": "ScheduleCalibResponse",
         "description": "ScheduleCalibResponse is a subclass of BaseModel."
+      },
+      "ScheduleCronCalibRequest": {
+        "properties": {
+          "scheduler_name": {
+            "type": "string",
+            "title": "Scheduler Name"
+          },
+          "menu_name": {
+            "type": "string",
+            "title": "Menu Name"
+          },
+          "cron": {
+            "type": "string",
+            "title": "Cron"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "scheduler_name",
+          "menu_name",
+          "cron"
+        ],
+        "title": "ScheduleCronCalibRequest",
+        "description": "ScheduleCronCalibRequest is a subclass of BaseModel."
+      },
+      "ScheduleCronCalibResponse": {
+        "properties": {
+          "scheduler_name": {
+            "type": "string",
+            "title": "Scheduler Name"
+          },
+          "menu_name": {
+            "type": "string",
+            "title": "Menu Name"
+          },
+          "cron": {
+            "type": "string",
+            "title": "Cron"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "scheduler_name",
+          "menu_name",
+          "cron"
+        ],
+        "title": "ScheduleCronCalibResponse",
+        "description": "ScheduleCronCalibResponse is a subclass of BaseModel."
       },
       "Settings": {
         "properties": {

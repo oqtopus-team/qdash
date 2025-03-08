@@ -6,6 +6,7 @@ import { ToastContainer } from "react-toastify";
 
 import { CalibrationMenuTable } from "./components/CalibrationMenuTable";
 import { CalibrationScheduleTable } from "./components/CalibrationScheduleTable";
+import { CalibrationCronScheduleTable } from "./components/CalibrationCronScheduleTable";
 import dynamic from "next/dynamic";
 
 const ChipMetrics = dynamic(() => import("./components/ChipMetrics"), {
@@ -16,6 +17,9 @@ export default function CalibrationPage() {
   const [activeTab, setActiveTab] = useState("Menu");
   const MemoizedCalibrationMenuTable = React.memo(CalibrationMenuTable);
   const MemoizedCalibrationScheduleTable = React.memo(CalibrationScheduleTable);
+  const MemoizedCalibrationCronScheduleTable = React.memo(
+    CalibrationCronScheduleTable,
+  );
 
   const getComponent = (tabName: string) => {
     switch (tabName) {
@@ -23,6 +27,8 @@ export default function CalibrationPage() {
         return <MemoizedCalibrationMenuTable />;
       case "Schedule":
         return <MemoizedCalibrationScheduleTable />;
+      case "Cron Schedule":
+        return <MemoizedCalibrationCronScheduleTable />;
       default:
         return null;
     }
@@ -57,6 +63,15 @@ export default function CalibrationPage() {
                   onClick={() => setActiveTab("Schedule")}
                 >
                   Schedule
+                </a>
+                <a
+                  role="tab"
+                  className={
+                    activeTab === "Cron Schedule" ? "tab tab-active" : "tab"
+                  }
+                  onClick={() => setActiveTab("Cron Schedule")}
+                >
+                  Cron Schedule
                 </a>
               </div>
               {getComponent(activeTab)}

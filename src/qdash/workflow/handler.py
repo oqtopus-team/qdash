@@ -1,8 +1,10 @@
 from pathlib import Path
 
+import pendulum
 from dotenv import load_dotenv
 from prefect import flow, get_run_logger, runtime
 from qdash.datamodel.menu import MenuModel as Menu
+from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.initialize import initialize
@@ -27,6 +29,19 @@ initialize()
 load_dotenv(verbose=True)
 dotenv_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path)
+
+
+def generate_execution_id() -> str:
+    """Generate a unique execution ID based on the current date and an execution index. e.g. 20220101-001.
+
+    Returns
+    -------
+        str: The generated execution ID.
+
+    """
+    date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
+    execution_index = ExecutionCounterDocument.get_next_index(date_str)
+    return f"{date_str}-{execution_index:03d}"
 
 
 @flow(name="main", log_prints=True, flow_run_name="{execution_id}")
@@ -54,8 +69,7 @@ def main_flow(
     """
     logger = get_run_logger()
     if execution_id is None:
-        error_message = "Execution ID is None."
-        raise ValueError(error_message)
+        execution_id = generate_execution_id()
     ui_url = runtime.flow_run.get_flow_run_ui_url()
     if ui_url:
         ui_url = ui_url.replace("172.22.0.5", "localhost")
@@ -66,7 +80,6 @@ def main_flow(
         error_message = "Calibration is already running."
         raise CalibrationRunningError(error_message)
     ExecutionLockDocument.lock()
-    execution_id = runtime.flow_run.name
     if execution_id:
         date_str, index = execution_id.split("-")
     else:

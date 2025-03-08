@@ -1,12 +1,13 @@
 # ruff: noqa
 from prefect import serve
 
-# from prefect.client.schemas.schedules import CronSchedule
+from prefect.client.schemas.schedules import CronSchedule
+
 # from qcflow.subflow.concurrent.flow import concurrent_flow
 from qdash.workflow.calibration.flow import cal_flow
 from qdash.workflow.handler import main_flow
 
-# from qdash.workflow.subflow.scheduler.flow import scheduler_flow
+from qdash.workflow.subflow.scheduler.flow import cron_scheduler_flow
 # from qdash.workflow.subflow.service_close.service_close import (
 #     qpu_close_flow,
 #     simulator_close_flow,
@@ -33,23 +34,56 @@ if __name__ == "__main__":
             }
         },
     )
-    # scheduler_deploy = scheduler_flow.to_deployment(
-    #     name=f"{deployment_name}-scheduler",
-    #     description="""This is a scheduler.
-    #     """,
-    #     tags=["calibration"],
-    #     parameters={
-    #         "menu": {
-    #             "name": "mux1-single",
-    #             "description": "Single qubit calibration for mux1",
-    #             "qids": [["28", "29", "30", "31"]],
-    #             "notify_bool": True,
-    #             "tasks": [
-    #                 "one-qubit-calibration",
-    #             ],
-    #         }
-    #     },
-    # )
+    # cron_schedulers = []
+    # for i in range(1,3):
+    #     cron_schedulers.append(cron_scheduler_flow.to_deployment(
+    #         name=f"{deployment_name}-scheduler-{i}",
+    #         description="""This is a scheduler.
+    #         """,
+    #         tags=["calibration"],
+    #         schedule=CronSchedule(
+    #             cron="*/5 * * * *",
+    #             timezone="Asia/Tokyo",
+    #         ),
+    #         is_schedule_active=False,
+    #         parameters={"menu_name": "CheckRabi"},
+    #     ))
+    cron_scheduler_deploy_1 = cron_scheduler_flow.to_deployment(
+        name=f"{deployment_name}-cron-scheduler-1",
+        description="""This is a scheduler.
+        """,
+        tags=["calibration"],
+        schedule=CronSchedule(
+            cron="*/5 * * * *",
+            timezone="Asia/Tokyo",
+        ),
+        is_schedule_active=False,
+        parameters={"menu_name": "CheckRabi"},
+    )
+    cron_scheduler_deploy_2 = cron_scheduler_flow.to_deployment(
+        name=f"{deployment_name}-cron-scheduler-2",
+        description="""This is a scheduler.
+        """,
+        tags=["calibration"],
+        schedule=CronSchedule(
+            cron="*/5 * * * *",
+            timezone="Asia/Tokyo",
+        ),
+        is_schedule_active=False,
+        parameters={"menu_name": "CheckRabi"},
+    )
+    cron_scheduler_deploy_3 = cron_scheduler_flow.to_deployment(
+        name=f"{deployment_name}-cron-scheduler-3",
+        description="""This is a scheduler.
+        """,
+        tags=["calibration"],
+        schedule=CronSchedule(
+            cron="*/5 * * * *",
+            timezone="Asia/Tokyo",
+        ),
+        is_schedule_active=False,
+        parameters={"menu_name": "CheckRabi"},
+    )
     # qpu_open_deploy = qpu_open_flow.to_deployment(
     #     name=f"{deployment_name}-qpu-open",
     #     description="""Open QPU access.
@@ -113,7 +147,9 @@ if __name__ == "__main__":
 
     _ = serve(
         main_deploy,  # type: ignore
-        # scheduler_deploy,  # type: ignore
+        cron_scheduler_deploy_1,  # type: ignore
+        cron_scheduler_deploy_2,  # type: ignore
+        cron_scheduler_deploy_3,  # type: ignore
         # qpu_open_deploy,  # type: ignore
         # qpu_close_deploy,  # type: ignore
         # simulator_open_deploy,  # type: ignore

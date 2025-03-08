@@ -27,10 +27,228 @@ import type {
   ExecuteCalibRequest,
   ExecuteCalibResponse,
   HTTPValidationError,
+  ListCronScheduleResponse,
   ScheduleCalibRequest,
   ScheduleCalibResponse,
+  ScheduleCronCalibRequest,
+  ScheduleCronCalibResponse,
 } from "../../schemas";
 
+/**
+ * List all the cron schedules.
+ * @summary Fetches all the cron schedules.
+ */
+export const listCronSchedules = (
+  options?: AxiosRequestConfig,
+): Promise<AxiosResponse<ListCronScheduleResponse>> => {
+  return axios.get(`http://localhost:5715/calibration/cron-schedule`, options);
+};
+
+export const getListCronSchedulesQueryKey = () => {
+  return [`http://localhost:5715/calibration/cron-schedule`] as const;
+};
+
+export const getListCronSchedulesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCronSchedules>>,
+  TError = AxiosError<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof listCronSchedules>>,
+      TError,
+      TData
+    >
+  >;
+  axios?: AxiosRequestConfig;
+}) => {
+  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCronSchedulesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listCronSchedules>>
+  > = ({ signal }) => listCronSchedules({ signal, ...axiosOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCronSchedules>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type ListCronSchedulesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCronSchedules>>
+>;
+export type ListCronSchedulesQueryError = AxiosError<unknown>;
+
+export function useListCronSchedules<
+  TData = Awaited<ReturnType<typeof listCronSchedules>>,
+  TError = AxiosError<unknown>,
+>(options: {
+  query: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof listCronSchedules>>,
+      TError,
+      TData
+    >
+  > &
+    Pick<
+      DefinedInitialDataOptions<
+        Awaited<ReturnType<typeof listCronSchedules>>,
+        TError,
+        Awaited<ReturnType<typeof listCronSchedules>>
+      >,
+      "initialData"
+    >;
+  axios?: AxiosRequestConfig;
+}): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useListCronSchedules<
+  TData = Awaited<ReturnType<typeof listCronSchedules>>,
+  TError = AxiosError<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof listCronSchedules>>,
+      TError,
+      TData
+    >
+  > &
+    Pick<
+      UndefinedInitialDataOptions<
+        Awaited<ReturnType<typeof listCronSchedules>>,
+        TError,
+        Awaited<ReturnType<typeof listCronSchedules>>
+      >,
+      "initialData"
+    >;
+  axios?: AxiosRequestConfig;
+}): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useListCronSchedules<
+  TData = Awaited<ReturnType<typeof listCronSchedules>>,
+  TError = AxiosError<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof listCronSchedules>>,
+      TError,
+      TData
+    >
+  >;
+  axios?: AxiosRequestConfig;
+}): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Fetches all the cron schedules.
+ */
+
+export function useListCronSchedules<
+  TData = Awaited<ReturnType<typeof listCronSchedules>>,
+  TError = AxiosError<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof listCronSchedules>>,
+      TError,
+      TData
+    >
+  >;
+  axios?: AxiosRequestConfig;
+}): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getListCronSchedulesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Schedule a calibration.
+ * @summary Schedules a calibration with cron.
+ */
+export const scheduleCronCalib = (
+  scheduleCronCalibRequest: ScheduleCronCalibRequest,
+  options?: AxiosRequestConfig,
+): Promise<AxiosResponse<ScheduleCronCalibResponse>> => {
+  return axios.post(
+    `http://localhost:5715/calibration/cron-schedule`,
+    scheduleCronCalibRequest,
+    options,
+  );
+};
+
+export const getScheduleCronCalibMutationOptions = <
+  TError = AxiosError<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof scheduleCronCalib>>,
+    TError,
+    { data: ScheduleCronCalibRequest },
+    TContext
+  >;
+  axios?: AxiosRequestConfig;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof scheduleCronCalib>>,
+  TError,
+  { data: ScheduleCronCalibRequest },
+  TContext
+> => {
+  const mutationKey = ["scheduleCronCalib"];
+  const { mutation: mutationOptions, axios: axiosOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, axios: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof scheduleCronCalib>>,
+    { data: ScheduleCronCalibRequest }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return scheduleCronCalib(data, axiosOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ScheduleCronCalibMutationResult = NonNullable<
+  Awaited<ReturnType<typeof scheduleCronCalib>>
+>;
+export type ScheduleCronCalibMutationBody = ScheduleCronCalibRequest;
+export type ScheduleCronCalibMutationError = AxiosError<HTTPValidationError>;
+
+/**
+ * @summary Schedules a calibration with cron.
+ */
+export const useScheduleCronCalib = <
+  TError = AxiosError<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof scheduleCronCalib>>,
+    TError,
+    { data: ScheduleCronCalibRequest },
+    TContext
+  >;
+  axios?: AxiosRequestConfig;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof scheduleCronCalib>>,
+  TError,
+  { data: ScheduleCronCalibRequest },
+  TContext
+> => {
+  const mutationOptions = getScheduleCronCalibMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
 /**
  * Create a flow run from a deployment.
  * @summary Executes a calibration by creating a flow run from a deployment.
@@ -40,7 +258,7 @@ export const executeCalib = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecuteCalibResponse>> => {
   return axios.post(
-    `http://localhost:5715/calibration/`,
+    `http://localhost:5715/calibration`,
     executeCalibRequest,
     options,
   );
