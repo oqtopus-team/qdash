@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FaRegSquarePlus } from "react-icons/fa6";
 
 import { getColumns } from "./Columns";
-import type { MenuModel, ScheduleCronCalibResponse } from "@/schemas";
+import { EditScheduleModal } from "./EditScheduleModal";
+import { MenuPreviewModal } from "./MenuPreviewModal";
+import type {
+  MenuModel,
+  ScheduleCronCalibResponse,
+  GetMenuResponse,
+} from "@/schemas";
 import {
   useListCronSchedules,
   useScheduleCronCalib,
@@ -17,6 +22,12 @@ export function CalibrationCronScheduleTable() {
     ScheduleCronCalibResponse[]
   >([]);
   const [menu, setMenu] = useState<MenuModel[]>([]);
+  const [selectedSchedule, setSelectedSchedule] =
+    useState<ScheduleCronCalibResponse | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedMenuForPreview, setSelectedMenuForPreview] =
+    useState<GetMenuResponse | null>(null);
+  const [showMenuPreview, setShowMenuPreview] = useState(false);
 
   const {
     data: scheduleData,
@@ -29,6 +40,7 @@ export function CalibrationCronScheduleTable() {
     data: menuData,
     isError: isMenuError,
     isLoading: isMenuLoading,
+    refetch: refetchMenu,
   } = useListMenu();
 
   const scheduleMutation = useScheduleCronCalib();
@@ -42,9 +54,22 @@ export function CalibrationCronScheduleTable() {
     }
   }, [scheduleData, menuData]);
 
-  const handleNewItem = () => {
-    // TODO: Implement new cron schedule modal
-    console.log("New cron schedule");
+  const handleEdit = (schedule: ScheduleCronCalibResponse) => {
+    setSelectedSchedule(schedule);
+    setIsEditModalOpen(true);
+  };
+
+  const handleMenuClick = async (menuName: string) => {
+    setShowMenuPreview(true);
+    const menuData = await refetchMenu();
+    if (menuData.data) {
+      const menuWithDetails = menuData.data.data.menus.find(
+        (menu: GetMenuResponse) => menu.name === menuName
+      );
+      if (menuWithDetails) {
+        setSelectedMenuForPreview(menuWithDetails);
+      }
+    }
   };
 
   const handleToggle = (item: ScheduleCronCalibResponse, active: boolean) => {
@@ -67,7 +92,7 @@ export function CalibrationCronScheduleTable() {
         onError: (error: Error) => {
           console.error("Error updating cron schedule:", error);
         },
-      },
+      }
     );
   };
 
@@ -89,17 +114,39 @@ export function CalibrationCronScheduleTable() {
 
   return (
     <div className="bg-base-100 rounded-box shadow-lg">
-      <div className="flex justify-between items-center border-b border-base-300 px-6 py-4">
+      {showMenuPreview && selectedMenuForPreview && (
+        <MenuPreviewModal
+          selectedItem={selectedMenuForPreview}
+          onClose={() => {
+            setShowMenuPreview(false);
+            setSelectedMenuForPreview(null);
+          }}
+        />
+      )}
+      {selectedSchedule && (
+        <EditScheduleModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedSchedule(null);
+          }}
+          schedule={selectedSchedule}
+          menus={menu}
+          onSuccess={async () => {
+            const updatedData = await refetchCronSchedule();
+            if (updatedData.data) {
+              setCronSchedules(updatedData.data.data.schedules);
+            }
+          }}
+        />
+      )}
+      <div className="border-b border-base-300 px-6 py-4">
         <h2 className="text-2xl font-bold">Cron Schedule</h2>
-        <button className="btn btn-primary btn-sm" onClick={handleNewItem}>
-          <FaRegSquarePlus className="text-lg" />
-          New Cron Schedule
-        </button>
       </div>
       <div className="p-6">
         <Table
           data={cronSchedules}
-          columns={getColumns(handleToggle)}
+          columns={getColumns(handleToggle, handleEdit, handleMenuClick, menu)}
           filter={"menu_name"}
         />
       </div>
