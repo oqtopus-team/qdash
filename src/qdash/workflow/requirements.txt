@@ -139,7 +139,7 @@ pyyaml==6.0.1
 pyzmq==26.2.1
 qctrl-visualizer==8.0.2
 qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@9f83c1eb4488198a019261d52c847b386f24ea5d
-qubex @ git+https://github.com/amachino/qubex.git@cbfdda624a27c1065acf5c46176eafb2822db73c
+qubex @ git+https://github.com/amachino/qubex.git@8390ab9d80054ae70ceba8f3f70f3a3c4eb6f9d8
 quel-clock-master @ git+https://github.com/quel-inc/quelware.git@7e41cd7b02416fca5fb9a7459d2fd05e961c2fe2#subdirectory=quel_clock_master
 quel-ic-config @ git+https://github.com/quel-inc/quelware.git@7e41cd7b02416fca5fb9a7459d2fd05e961c2fe2#subdirectory=quel_ic_config
 qutip==5.1.1

@@ -82,10 +82,10 @@ def execute_dynamic_task_by_qid(
         task_type = this_task.get_task_type()
         execution_id = task_manager.execution_id
         execution_manager = ExecutionManager.load_from_file(task_manager.calib_dir)
-        logger.info(f"execution manager: {execution_manager.model_dump()}")
+        logger.info(f"execution manager: {execution_manager.model_dump(mode='json')}")
         logger.info(f"Starting task: {task_name}, execution_id: {task_manager.execution_id}")
         task_manager.start_task(task_name, task_type, qid)
-        logger.info(f"task manager: {task_manager.model_dump()}")
+        logger.info(f"task manager: {task_manager.model_dump(mode='json')}")
         logger.info(f"Running task: {task_name}, id: {task_manager.id}")
         # task_manager.save()
         executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
@@ -163,9 +163,16 @@ def execute_dynamic_task_by_qid(
             )
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
+
         task_manager.update_task_status_to_failed(
             task_name=task_name, message=f"{task_name} failed", task_type=task_type, qid=qid
         )
+        task_manager.save()
+        execution_manager = execution_manager.reload().update_with_task_manager(
+            task_manager=task_manager
+        )
+        task_manager.update_not_executed_tasks_to_skipped(task_type=task_type, qid=qid)
+        task_manager.save()
         execution_manager = execution_manager.reload().update_with_task_manager(
             task_manager=task_manager
         )

@@ -1,5 +1,0 @@
-SCHDULED = "scheduled"
-RUNNING = "running"
-COMPLETED = "completed"
-FAILED = "failed"
-PENDING = "pending"

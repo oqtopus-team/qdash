@@ -13,6 +13,7 @@ RUNNING = "running"
 COMPLETED = "completed"
 FAILED = "failed"
 PENDING = "pending"
+SKIPPED = "skipped"
 
 
 class InputParameterModel(BaseModel):
@@ -96,6 +97,7 @@ class TaskStatusModel(str, Enum):
         COMPLETED (str): The task is completed.
         FAILED (str): The task is failed.
         PENDING (str): The task is pending
+        SKIPPED (str): The task is skipped
 
     """
 
@@ -104,6 +106,7 @@ class TaskStatusModel(str, Enum):
     COMPLETED = COMPLETED
     FAILED = FAILED
     PENDING = PENDING
+    SKIPPED = SKIPPED
 
 
 # class DataModel(BaseModel):

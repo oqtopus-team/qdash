@@ -122,7 +122,7 @@ class TaskManager(BaseModel):
         container = self._get_task_container(task_type, qid)
         for t in container:
             if t.name == task_name:
-                t.status = TaskStatusModel.COMPLETED
+                # t.status = TaskStatusModel.COMPLETED
                 t.end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
                 t.elapsed_time = t.calculate_elapsed_time(t.start_at, t.end_at)
                 t.system_info.update_time()
@@ -180,6 +180,17 @@ class TaskManager(BaseModel):
             qid=qid,
         )
 
+    def update_task_status_to_skipped(
+        self, task_name: str, message: str = "", task_type: str = "global", qid: str = ""
+    ) -> None:
+        self.update_task_status(
+            task_name=task_name,
+            new_status=TaskStatusModel.SKIPPED,
+            message=message,
+            task_type=task_type,
+            qid=qid,
+        )
+
     def update_all_qid_task_status_to_running(
         self, task_name: str, message: str = "", task_type: str = "qubit", qids: list[str] = []
     ) -> None:
@@ -203,6 +214,16 @@ class TaskManager(BaseModel):
             self.update_task_status_to_failed(
                 task_name=task_name, message=message, task_type=task_type, qid=qid
             )
+
+    def update_not_executed_tasks_to_skipped(
+        self, task_type: str = "global", qid: str = ""
+    ) -> None:
+        container = self._get_task_container(task_type, qid)
+        for t in container:
+            if t.status not in {TaskStatusModel.COMPLETED, TaskStatusModel.FAILED}:
+                t.status = TaskStatusModel.SKIPPED
+                t.message = f"{t.name} is skipped."
+                t.system_info.update_time()
 
     def _find_task_in_container(
         self,
