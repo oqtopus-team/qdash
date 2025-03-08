@@ -1,15 +1,19 @@
-from qdash.dbmodel.initialize import initialize
+"""Menu initialization module."""
+
+from qdash.db.init.initialize import initialize
 from qdash.dbmodel.menu import MenuDocument
 
-if __name__ == "__main__":
+
+def init_menu(username: str) -> None:
+    """Initialize menu document."""
     initialize()
-    menu = MenuDocument(
+    MenuDocument(
         name="OneQubitCheck",
-        username="admin",
+        username=username,
         description="description",
         qids=[["28", "29", "30", "31"]],
         tasks=["CheckStatus", "DumpBox", "CheckNoise", "CheckRabi"],
         notify_bool=False,
-        tags=["tag1", "tag2"],
+        tags=["debug"],
         system_info={},
     ).insert()
