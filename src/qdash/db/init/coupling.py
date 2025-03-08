@@ -1,7 +1,9 @@
+"""Coupling initialization module."""
+
 from qdash.datamodel.coupling import EdgeInfoModel
+from qdash.db.init.initialize import initialize
+from qdash.db.init.qubit import qubit_lattice
 from qdash.dbmodel.coupling import CouplingDocument
-from qdash.dbmodel.init_qubit import qubit_lattice
-from qdash.dbmodel.initialize import initialize
 
 
 def bi_direction(edges: list) -> list:
@@ -9,12 +11,14 @@ def bi_direction(edges: list) -> list:
     return edges + [(j, i) for i, j in edges]
 
 
-def generate_coupling(edges: list) -> list:
+def generate_coupling(edges: list, username: str, chip_id: str) -> list:
     """Generate coupling documents from edges.
 
     Args:
     ----
         edges (list): List of edges.
+        username (str): Username.
+        chip_id (str): Chip ID.
 
     Returns:
     -------
@@ -23,10 +27,10 @@ def generate_coupling(edges: list) -> list:
     """
     return [
         CouplingDocument(
-            username="admin",
+            username=username,
             qid=f"{edge[0]}-{edge[1]}",
             status="pending",
-            chip_id="SAMPLE",
+            chip_id=chip_id,
             data={},
             edge_info=EdgeInfoModel(size=4, fill="", source=f"{edge[0]}", target=f"{edge[1]}"),
             system_info={},
@@ -35,15 +39,11 @@ def generate_coupling(edges: list) -> list:
     ]
 
 
-def init_coupling() -> None:
+def init_coupling_document(username: str, chip_id: str) -> None:
     """Initialize coupling documents."""
+    initialize()
     _, edges, _ = qubit_lattice(n=64, d=4)
     edges = bi_direction(edges)
-    couplings = generate_coupling(edges)
+    couplings = generate_coupling(edges, username=username, chip_id=chip_id)
     for c in couplings:
         c.insert()
-
-
-if __name__ == "__main__":
-    initialize()
-    init_coupling()

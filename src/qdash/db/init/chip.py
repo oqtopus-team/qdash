@@ -1,9 +1,11 @@
+"""Chip initialization module."""
+
 from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
 from qdash.datamodel.qubit import NodeInfoModel, PositionModel, QubitModel
+from qdash.db.init.coupling import bi_direction
+from qdash.db.init.initialize import initialize
+from qdash.db.init.qubit import qubit_lattice
 from qdash.dbmodel.chip import ChipDocument
-from qdash.dbmodel.init_coupling import bi_direction
-from qdash.dbmodel.init_qubit import qubit_lattice
-from qdash.dbmodel.initialize import initialize
 
 
 def generate_qubit_data(num_qubits: int, pos: dict) -> dict:
@@ -61,7 +63,7 @@ def generate_coupling_data(edges: list[tuple[int, int]]) -> dict:
     return coupling
 
 
-def init_chip_document() -> ChipDocument:
+def init_chip_document(username: str, chip_id: str) -> ChipDocument:
     """Initialize and return a ChipDocument."""
     initialize()
     num_qubits = 64
@@ -70,8 +72,8 @@ def init_chip_document() -> ChipDocument:
     qubits = generate_qubit_data(num_qubits, pos)
     couplings = generate_coupling_data(edges)
     chip = ChipDocument(
-        username="admin",
-        chip_id="SAMPLE",
+        username=username,
+        chip_id=chip_id,
         size=64,
         qubits=qubits,
         couplings=couplings,
@@ -79,7 +81,3 @@ def init_chip_document() -> ChipDocument:
     )
     chip.save()
     return chip
-
-
-if __name__ == "__main__":
-    init_chip_document()
