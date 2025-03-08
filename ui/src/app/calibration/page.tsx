@@ -18,7 +18,7 @@ export default function CalibrationPage() {
   const MemoizedCalibrationMenuTable = React.memo(CalibrationMenuTable);
   const MemoizedCalibrationScheduleTable = React.memo(CalibrationScheduleTable);
   const MemoizedCalibrationCronScheduleTable = React.memo(
-    CalibrationCronScheduleTable,
+    CalibrationCronScheduleTable
   );
 
   const getComponent = (tabName: string) => {
@@ -58,20 +58,20 @@ export default function CalibrationPage() {
                 <a
                   role="tab"
                   className={
-                    activeTab === "Schedule" ? "tab tab-active" : "tab"
-                  }
-                  onClick={() => setActiveTab("Schedule")}
-                >
-                  Schedule
-                </a>
-                <a
-                  role="tab"
-                  className={
                     activeTab === "Cron Schedule" ? "tab tab-active" : "tab"
                   }
                   onClick={() => setActiveTab("Cron Schedule")}
                 >
                   Cron Schedule
+                </a>
+                <a
+                  role="tab"
+                  className={
+                    activeTab === "Schedule" ? "tab tab-active" : "tab"
+                  }
+                  onClick={() => setActiveTab("Schedule")}
+                >
+                  Date time Schedule
                 </a>
               </div>
               {getComponent(activeTab)}
