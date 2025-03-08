@@ -21,7 +21,7 @@ registerLocale("ja", ja);
 
 export function CalibrationScheduleTable() {
   const [calibSchedules, setCalibSchedules] = useState<ScheduleCalibResponse[]>(
-    [],
+    []
   );
   const [menu, setMenu] = useState<MenuModel[]>([]);
   const [selectedMenuName, setSelectedMenuName] = useState("");
@@ -51,7 +51,7 @@ export function CalibrationScheduleTable() {
 
   const handleNewItem = () => {
     const editModal = document.getElementById(
-      "newItem",
+      "newItem"
     ) as HTMLDialogElement | null;
     if (editModal) {
       editModal.showModal();
@@ -71,7 +71,7 @@ export function CalibrationScheduleTable() {
         onError: (error) => {
           console.error("Error delete schedule calibration:", error);
         },
-      },
+      }
     );
   };
 
@@ -94,7 +94,7 @@ export function CalibrationScheduleTable() {
   return (
     <div className="bg-base-100 rounded-box shadow-lg">
       <div className="flex justify-between items-center border-b border-base-300 px-6 py-4">
-        <h2 className="text-2xl font-bold">Calibration Schedule</h2>
+        <h2 className="text-2xl font-bold">Date time Schedule</h2>
         <button className="btn btn-primary btn-sm" onClick={handleNewItem}>
           <FaRegSquarePlus className="text-lg" />
           New Schedule
