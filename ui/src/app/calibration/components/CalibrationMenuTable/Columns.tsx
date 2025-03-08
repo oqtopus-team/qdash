@@ -1,7 +1,7 @@
 "use client";
 
 import { createColumnHelper } from "@tanstack/react-table";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { FaTrash } from "react-icons/fa";
 import { FaRegCirclePlay } from "react-icons/fa6";
 import type { MenuModel } from "@/schemas";
 
@@ -11,11 +11,19 @@ export const getColumns = (
   handleEditClick: (item: MenuModel) => void,
   handleDeleteClick: (item: MenuModel) => void,
   handleExecuteCalib: (item: MenuModel) => void,
-  isLocked: boolean,
+  isLocked: boolean
 ) => [
   columnHelper.accessor("name", {
     header: "Name",
-    cell: (info) => info.getValue(),
+    cell: (info) => (
+      <button
+        className="link link-hover font-medium text-primary hover:text-primary-focus flex items-center gap-1"
+        onClick={() => handleEditClick(info.row.original)}
+      >
+        <span>{info.getValue()}</span>
+        <span className="text-xs opacity-50">(click to edit)</span>
+      </button>
+    ),
   }),
   columnHelper.accessor("description", {
     header: "Description",
@@ -54,12 +62,6 @@ export const getColumns = (
     header: "Actions",
     cell: (props) => (
       <div className="flex items-center gap-2">
-        <button
-          className="btn btn-sm btn-ghost text-primary hover:bg-primary/10"
-          onClick={() => handleEditClick(props.row.original)}
-        >
-          <FaEdit className="text-lg" />
-        </button>
         <button
           className="btn btn-sm btn-ghost text-error hover:bg-error/10"
           onClick={() => handleDeleteClick(props.row.original)}

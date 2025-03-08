@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { getColumns } from "./Columns";
 import { EditScheduleModal } from "./EditScheduleModal";
@@ -29,8 +28,6 @@ export function CalibrationCronScheduleTable() {
   const [selectedMenuForPreview, setSelectedMenuForPreview] =
     useState<GetMenuResponse | null>(null);
   const [showMenuPreview, setShowMenuPreview] = useState(false);
-
-  const router = useRouter();
 
   const {
     data: scheduleData,
@@ -62,7 +59,8 @@ export function CalibrationCronScheduleTable() {
     setIsEditModalOpen(true);
   };
 
-  const handleMenuClick = async (menuName: string, menu: MenuModel) => {
+  const handleMenuClick = async (menuName: string) => {
+    setShowMenuPreview(true);
     const menuData = await refetchMenu();
     if (menuData.data) {
       const menuWithDetails = menuData.data.data.menus.find(
@@ -70,13 +68,6 @@ export function CalibrationCronScheduleTable() {
       );
       if (menuWithDetails) {
         setSelectedMenuForPreview(menuWithDetails);
-        setShowMenuPreview(true);
-        const menuPreviewModal = document.getElementById(
-          "menuPreview"
-        ) as HTMLDialogElement | null;
-        if (menuPreviewModal) {
-          menuPreviewModal.showModal();
-        }
       }
     }
   };

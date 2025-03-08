@@ -35,7 +35,7 @@ export function MenuPreviewModal({
   );
 
   return (
-    <dialog id="menuPreview" className="modal">
+    <dialog open className="modal modal-open">
       <form
         method="dialog"
         className="modal-backdrop bg-base-100/30 backdrop-blur-sm"
