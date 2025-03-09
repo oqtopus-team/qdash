@@ -37,11 +37,11 @@ Returns:
 export const fetchAllTasks = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ListTaskResponse>> => {
-  return axios.get(`http://localhost:5716/api/tasks`, options);
+  return axios.get(`http://localhost:5715/api/tasks`, options);
 };
 
 export const getFetchAllTasksQueryKey = () => {
-  return [`http://localhost:5716/api/tasks`] as const;
+  return [`http://localhost:5715/api/tasks`] as const;
 };
 
 export const getFetchAllTasksQueryOptions = <

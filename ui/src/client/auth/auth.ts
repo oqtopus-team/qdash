@@ -46,7 +46,7 @@ export const authLoginForAccessToken = (
   }
 
   return axios.post(
-    `http://localhost:5716/api/auth/token`,
+    `http://localhost:5715/api/auth/token`,
     formUrlEncoded,
     options,
   );
@@ -129,7 +129,7 @@ export const authRegisterUser = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<User>> => {
   return axios.post(
-    `http://localhost:5716/api/auth/register`,
+    `http://localhost:5715/api/auth/register`,
     userCreate,
     options,
   );
@@ -210,11 +210,11 @@ export const useAuthRegisterUser = <
 export const authReadUsersMe = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<User>> => {
-  return axios.get(`http://localhost:5716/api/auth/me`, options);
+  return axios.get(`http://localhost:5715/api/auth/me`, options);
 };
 
 export const getAuthReadUsersMeQueryKey = () => {
-  return [`http://localhost:5716/api/auth/me`] as const;
+  return [`http://localhost:5715/api/auth/me`] as const;
 };
 
 export const getAuthReadUsersMeQueryOptions = <
@@ -326,7 +326,7 @@ export const authLogout = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<unknown>> => {
   return axios.post(
-    `http://localhost:5716/api/auth/logout`,
+    `http://localhost:5715/api/auth/logout`,
     undefined,
     options,
   );

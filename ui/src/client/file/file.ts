@@ -30,7 +30,7 @@ export const downloadFile = (
   params: DownloadFileParams,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<void>> => {
-  return axios.get(`http://localhost:5716/api/file/raw_data`, {
+  return axios.get(`http://localhost:5715/api/file/raw_data`, {
     ...options,
     params: { ...params, ...options?.params },
   });
@@ -38,7 +38,7 @@ export const downloadFile = (
 
 export const getDownloadFileQueryKey = (params: DownloadFileParams) => {
   return [
-    `http://localhost:5716/api/file/raw_data`,
+    `http://localhost:5715/api/file/raw_data`,
     ...(params ? [params] : []),
   ] as const;
 };

@@ -50,11 +50,11 @@ list[ChipResponse]
 export const listChips = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ChipResponse[]>> => {
-  return axios.get(`http://localhost:5716/api/chip`, options);
+  return axios.get(`http://localhost:5715/api/chip`, options);
 };
 
 export const getListChipsQueryKey = () => {
-  return [`http://localhost:5716/api/chip`] as const;
+  return [`http://localhost:5715/api/chip`] as const;
 };
 
 export const getListChipsQueryOptions = <
@@ -175,11 +175,11 @@ export const fetchChip = (
   chipId: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ChipResponse>> => {
-  return axios.get(`http://localhost:5716/api/chip/${chipId}`, options);
+  return axios.get(`http://localhost:5715/api/chip/${chipId}`, options);
 };
 
 export const getFetchChipQueryKey = (chipId: string) => {
-  return [`http://localhost:5716/api/chip/${chipId}`] as const;
+  return [`http://localhost:5715/api/chip/${chipId}`] as const;
 };
 
 export const getFetchChipQueryOptions = <
@@ -319,13 +319,13 @@ export const listExecutionsByChipId = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionResponseSummary[]>> => {
   return axios.get(
-    `http://localhost:5716/api/chip/${chipId}/execution`,
+    `http://localhost:5715/api/chip/${chipId}/execution`,
     options,
   );
 };
 
 export const getListExecutionsByChipIdQueryKey = (chipId: string) => {
-  return [`http://localhost:5716/api/chip/${chipId}/execution`] as const;
+  return [`http://localhost:5715/api/chip/${chipId}/execution`] as const;
 };
 
 export const getListExecutionsByChipIdQueryOptions = <
@@ -492,7 +492,7 @@ export const fetchExecutionByChipId = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionResponseDetail>> => {
   return axios.get(
-    `http://localhost:5716/api/chip/${chipId}/execution/${executionId}`,
+    `http://localhost:5715/api/chip/${chipId}/execution/${executionId}`,
     options,
   );
 };
@@ -502,7 +502,7 @@ export const getFetchExecutionByChipIdQueryKey = (
   executionId: string,
 ) => {
   return [
-    `http://localhost:5716/api/chip/${chipId}/execution/${executionId}`,
+    `http://localhost:5715/api/chip/${chipId}/execution/${executionId}`,
   ] as const;
 };
 
@@ -680,13 +680,13 @@ export const fetchMuxDetails = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<MuxDetailResponse>> => {
   return axios.get(
-    `http://localhost:5716/api/chip/${chipId}/mux/${muxId}`,
+    `http://localhost:5715/api/chip/${chipId}/mux/${muxId}`,
     options,
   );
 };
 
 export const getFetchMuxDetailsQueryKey = (chipId: string, muxId: number) => {
-  return [`http://localhost:5716/api/chip/${chipId}/mux/${muxId}`] as const;
+  return [`http://localhost:5715/api/chip/${chipId}/mux/${muxId}`] as const;
 };
 
 export const getFetchMuxDetailsQueryOptions = <
@@ -853,11 +853,11 @@ export const listMuxes = (
   chipId: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ListMuxResponse>> => {
-  return axios.get(`http://localhost:5716/api/chip/${chipId}/mux`, options);
+  return axios.get(`http://localhost:5715/api/chip/${chipId}/mux`, options);
 };
 
 export const getListMuxesQueryKey = (chipId: string) => {
-  return [`http://localhost:5716/api/chip/${chipId}/mux`] as const;
+  return [`http://localhost:5715/api/chip/${chipId}/mux`] as const;
 };
 
 export const getListMuxesQueryOptions = <
@@ -986,7 +986,7 @@ export const fetchLatestTaskGroupedByChip = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<LatestTaskGroupedByChipResponse>> => {
   return axios.get(
-    `http://localhost:5716/api/chip/${chipId}/task/${taskName}`,
+    `http://localhost:5715/api/chip/${chipId}/task/${taskName}`,
     options,
   );
 };
@@ -995,7 +995,7 @@ export const getFetchLatestTaskGroupedByChipQueryKey = (
   chipId: string,
   taskName: string,
 ) => {
-  return [`http://localhost:5716/api/chip/${chipId}/task/${taskName}`] as const;
+  return [`http://localhost:5715/api/chip/${chipId}/task/${taskName}`] as const;
 };
 
 export const getFetchLatestTaskGroupedByChipQueryOptions = <
@@ -1165,7 +1165,7 @@ export const fetchTimeseriesTaskResultByTagAndParameterAndQid = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<TimeSeriesData>> => {
   return axios.get(
-    `http://localhost:5716/api/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
+    `http://localhost:5715/api/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
     {
       ...options,
       params: { ...params, ...options?.params },
@@ -1180,7 +1180,7 @@ export const getFetchTimeseriesTaskResultByTagAndParameterAndQidQueryKey = (
   params: FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
 ) => {
   return [
-    `http://localhost:5716/api/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
+    `http://localhost:5715/api/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
     ...(params ? [params] : []),
   ] as const;
 };
@@ -1406,7 +1406,7 @@ export const fetchTimeseriesTaskResultByTagAndParameter = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<TimeSeriesData>> => {
   return axios.get(
-    `http://localhost:5716/api/chip/${chipId}/parameter/${parameter}`,
+    `http://localhost:5715/api/chip/${chipId}/parameter/${parameter}`,
     {
       ...options,
       params: { ...params, ...options?.params },
@@ -1420,7 +1420,7 @@ export const getFetchTimeseriesTaskResultByTagAndParameterQueryKey = (
   params: FetchTimeseriesTaskResultByTagAndParameterParams,
 ) => {
   return [
-    `http://localhost:5716/api/chip/${chipId}/parameter/${parameter}`,
+    `http://localhost:5715/api/chip/${chipId}/parameter/${parameter}`,
     ...(params ? [params] : []),
   ] as const;
 };

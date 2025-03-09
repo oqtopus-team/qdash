@@ -29,11 +29,11 @@ import type { Settings } from "../../schemas";
 export const fetchConfig = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<Settings>> => {
-  return axios.get(`http://localhost:5716/api/settings`, options);
+  return axios.get(`http://localhost:5715/api/settings`, options);
 };
 
 export const getFetchConfigQueryKey = () => {
-  return [`http://localhost:5716/api/settings`] as const;
+  return [`http://localhost:5715/api/settings`] as const;
 };
 
 export const getFetchConfigQueryOptions = <

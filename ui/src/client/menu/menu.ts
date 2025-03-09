@@ -46,11 +46,11 @@ Returns
 export const listMenu = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ListMenuResponse>> => {
-  return axios.get(`http://localhost:5716/api/menu`, options);
+  return axios.get(`http://localhost:5715/api/menu`, options);
 };
 
 export const getListMenuQueryKey = () => {
-  return [`http://localhost:5716/api/menu`] as const;
+  return [`http://localhost:5715/api/menu`] as const;
 };
 
 export const getListMenuQueryOptions = <
@@ -169,7 +169,7 @@ export const createMenu = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<CreateMenuResponse>> => {
   return axios.post(
-    `http://localhost:5716/api/menu`,
+    `http://localhost:5715/api/menu`,
     createMenuRequest,
     options,
   );
@@ -254,11 +254,11 @@ Returns
 export const listPreset = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ListMenuResponse>> => {
-  return axios.get(`http://localhost:5716/api/menu/preset`, options);
+  return axios.get(`http://localhost:5715/api/menu/preset`, options);
 };
 
 export const getListPresetQueryKey = () => {
-  return [`http://localhost:5716/api/menu/preset`] as const;
+  return [`http://localhost:5715/api/menu/preset`] as const;
 };
 
 export const getListPresetQueryOptions = <
@@ -381,11 +381,11 @@ export const getMenuByName = (
   name: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<GetMenuResponse>> => {
-  return axios.get(`http://localhost:5716/api/menu/${name}`, options);
+  return axios.get(`http://localhost:5715/api/menu/${name}`, options);
 };
 
 export const getGetMenuByNameQueryKey = (name: string) => {
-  return [`http://localhost:5716/api/menu/${name}`] as const;
+  return [`http://localhost:5715/api/menu/${name}`] as const;
 };
 
 export const getGetMenuByNameQueryOptions = <
@@ -526,7 +526,7 @@ export const updateMenu = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<UpdateMenuResponse>> => {
   return axios.put(
-    `http://localhost:5716/api/menu/${name}`,
+    `http://localhost:5715/api/menu/${name}`,
     updateMenuRequest,
     options,
   );
@@ -617,7 +617,7 @@ export const deleteMenu = (
   name: string,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<DeleteMenuResponse>> => {
-  return axios.delete(`http://localhost:5716/api/menu/${name}`, options);
+  return axios.delete(`http://localhost:5715/api/menu/${name}`, options);
 };
 
 export const getDeleteMenuMutationOptions = <
