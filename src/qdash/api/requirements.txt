@@ -16,6 +16,7 @@ exceptiongroup==1.2.2 ; python_full_version < '3.11'
 fastapi==0.111.1
 fastapi-cli==0.0.7
 filelock==3.17.0
+go-task-bin==3.41.0
 gunicorn==22.0.0
 h11==0.14.0
 httpcore==1.0.7

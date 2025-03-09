@@ -789,6 +789,22 @@ wheels = [
 ]
 
 [[package]]
+name = "go-task-bin"
+version = "3.41.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/fb/97b74204cac66bdc92f9985859400e240871f3343af6507cc9c7f18bdb38/go_task_bin-3.41.0.tar.gz", hash = "sha256:07c7bb0028ab46484f41f9d0fcc7cad79e3c77fdfc252adf17544a449a203cf6", size = 530957 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cc/4b/4e88a4b38c6436375f33a6fcc60b99d97a0966cef3886bdcd0b5e0e12caf/go_task_bin-3.41.0-py3-none-macosx_10_7_x86_64.whl", hash = "sha256:eb8b76ad9383cfccc7ef0ac00af17ba54ce4d4050756f1564aed0a228b97ed97", size = 6442750 },
+    { url = "https://files.pythonhosted.org/packages/a7/8b/686059e6a2a5b9200d43da0a5cf3c3ea959756e45464f825361a40b79917/go_task_bin-3.41.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:5e6193113dd6265fed1bc8d4fe10c054ade2a609c31f38f767c4cd9fa0ff52b3", size = 6020329 },
+    { url = "https://files.pythonhosted.org/packages/34/bd/dabf55b545caf25107327231fce788d1fea6386cf5ddcdb778fc301707d7/go_task_bin-3.41.0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.musllinux_1_1_aarch64.whl", hash = "sha256:0d5c46f158ac70d2cc10e63055f9805772aafe06d6ad23714ae0dc4a2e59913f", size = 5804022 },
+    { url = "https://files.pythonhosted.org/packages/d1/ff/6127992f50962f746b9398c57d11cfe0ac380e04eabf4b12bd47a85b8746/go_task_bin-3.41.0-py3-none-manylinux2014_ppc64le.manylinux_2_17_ppc64le.musllinux_1_1_ppc64le.whl", hash = "sha256:af60dbc89aa1de67bac982ef050bd3b01ae029fa3e282ef05fb303ba5756d6b1", size = 5767202 },
+    { url = "https://files.pythonhosted.org/packages/c1/5d/4f53fc6170089fff73a08049ef8a313fd0220eb8ca21c0aa827bbc13dbac/go_task_bin-3.41.0-py3-none-manylinux2014_s390x.manylinux_2_17_s390x.musllinux_1_1_s390x.whl", hash = "sha256:984c3cc71ad8eb1364e09ed6aaa1a0cddbfe29f5eae7a2316cb1ea5f021e8baa", size = 6214112 },
+    { url = "https://files.pythonhosted.org/packages/53/23/57d9d43364ff22e9e65faba4fd8878c03716244d8e681ade39b852710175/go_task_bin-3.41.0-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.musllinux_1_1_x86_64.whl", hash = "sha256:9604504d6cf12aa2756be3ddaa092af4d73fecc73e58a8d7ab504b3f048efd4c", size = 6343275 },
+    { url = "https://files.pythonhosted.org/packages/45/6c/ffb7475747d91ad834783ef5a0196c14025c03f1fa737fe44f106d04d319/go_task_bin-3.41.0-py3-none-win_amd64.whl", hash = "sha256:df0859f3dc2ddfb3b4f5f8ca729ec74ccee417d4bf6c12791b724972ba5cde6f", size = 6529481 },
+    { url = "https://files.pythonhosted.org/packages/9b/6b/413a5ccc4ba43ada34343f49030cf72312e40008fecc8545b354bd8ba071/go_task_bin-3.41.0-py3-none-win_arm64.whl", hash = "sha256:12dd18b40394a6b12bb9835fd97ef4cdfcda17e58b4a13efc869846cd5e01cb0", size = 5902666 },
+]
+
+[[package]]
 name = "gunicorn"
 version = "22.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2448,6 +2464,7 @@ api = [
     { name = "uvicorn", extra = ["standard"] },
 ]
 dev = [
+    { name = "go-task-bin" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-env" },
@@ -2484,6 +2501,7 @@ api = [
     { name = "uvicorn", extras = ["standard"], specifier = "==0.34.0" },
 ]
 dev = [
+    { name = "go-task-bin", specifier = ">=3.41.0" },
     { name = "pytest", specifier = "==8.3.2" },
     { name = "pytest-cov", specifier = "==5.0.0" },
     { name = "pytest-env", specifier = "==1.1.3" },
