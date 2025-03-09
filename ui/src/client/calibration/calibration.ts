@@ -41,11 +41,14 @@ import type {
 export const listCronSchedules = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ListCronScheduleResponse>> => {
-  return axios.get(`http://localhost:5715/calibration/cron-schedule`, options);
+  return axios.get(
+    `http://localhost:5716/api/calibration/cron-schedule`,
+    options,
+  );
 };
 
 export const getListCronSchedulesQueryKey = () => {
-  return [`http://localhost:5715/calibration/cron-schedule`] as const;
+  return [`http://localhost:5716/api/calibration/cron-schedule`] as const;
 };
 
 export const getListCronSchedulesQueryOptions = <
@@ -175,7 +178,7 @@ export const scheduleCronCalib = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ScheduleCronCalibResponse>> => {
   return axios.post(
-    `http://localhost:5715/calibration/cron-schedule`,
+    `http://localhost:5716/api/calibration/cron-schedule`,
     scheduleCronCalibRequest,
     options,
   );
@@ -258,7 +261,7 @@ export const executeCalib = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecuteCalibResponse>> => {
   return axios.post(
-    `http://localhost:5715/calibration`,
+    `http://localhost:5716/api/calibration`,
     executeCalibRequest,
     options,
   );
@@ -338,11 +341,11 @@ export const useExecuteCalib = <
 export const fetchAllCalibSchedule = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ScheduleCalibResponse[]>> => {
-  return axios.get(`http://localhost:5715/calibration/schedule`, options);
+  return axios.get(`http://localhost:5716/api/calibration/schedule`, options);
 };
 
 export const getFetchAllCalibScheduleQueryKey = () => {
-  return [`http://localhost:5715/calibration/schedule`] as const;
+  return [`http://localhost:5716/api/calibration/schedule`] as const;
 };
 
 export const getFetchAllCalibScheduleQueryOptions = <
@@ -472,7 +475,7 @@ export const scheduleCalib = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ScheduleCalibResponse>> => {
   return axios.post(
-    `http://localhost:5715/calibration/schedule`,
+    `http://localhost:5716/api/calibration/schedule`,
     scheduleCalibRequest,
     options,
   );
@@ -554,7 +557,7 @@ export const deleteCalibSchedule = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<unknown>> => {
   return axios.delete(
-    `http://localhost:5715/calibration/schedule/${flowRunId}`,
+    `http://localhost:5716/api/calibration/schedule/${flowRunId}`,
     options,
   );
 };

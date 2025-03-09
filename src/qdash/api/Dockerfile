@@ -18,6 +18,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 RUN uv pip install --system --no-cache-dir -r requirements.txt
 RUN uv pip install --upgrade --system --no-cache-dir pydantic-settings==2.3.4
 RUN uv pip install --upgrade --system --no-cache-dir prefect-client==2.19.9
+
 FROM python:3.10.14-slim-bookworm
 
 WORKDIR /app

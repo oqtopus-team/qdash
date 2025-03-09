@@ -1,5 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  rewrites: async () => {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "http://localhost:5716/api/:path*",
+      },
+    ];
+  },
   transpilePackages: ["react-plotly.js", "plotly.js"],
   images: {
     remotePatterns: [

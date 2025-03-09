@@ -73,7 +73,8 @@ def main_flow(
         execution_id = generate_execution_id()
     ui_url = runtime.flow_run.get_flow_run_ui_url()
     if ui_url:
-        ui_url = ui_url.replace("172.22.0.5", "localhost")
+        # Replace both 127.0.0.1 and prefect-server with localhost
+        ui_url = ui_url.replace("127.0.0.1", "localhost").replace("prefect-server", "localhost")
     logger.info(f"Execution ID: {execution_id}")
     exectuion_is_locked = ExecutionLockDocument.get_lock_status()
     if exectuion_is_locked:

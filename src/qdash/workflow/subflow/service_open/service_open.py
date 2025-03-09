@@ -3,8 +3,10 @@
 # from pydantic import BaseModel
 # from qdash.workflow.utils.slack import SlackContents, Status
 
-# restart_url = "http://localhost:5715/service"
-# url = "http://localhost:5715/service/status"
+# from qdash.api.config import get_settings
+# settings = get_settings()
+# restart_url = f"http://localhost:{settings.api_port}/service"
+# url = f"http://localhost:{settings.api_port}/service/status"
 
 
 # class CloudSetting(BaseModel):

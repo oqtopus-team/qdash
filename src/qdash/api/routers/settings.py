@@ -2,7 +2,7 @@ from logging import getLogger
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from qdash.api.config import Settings, get_settings
+from qdash.config import Settings, get_settings
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")

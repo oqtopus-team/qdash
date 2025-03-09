@@ -13,16 +13,15 @@ initialize()
 
 router = APIRouter(prefix="/calibration")
 logger = getLogger("uvicorn.app")
-prefect_host = os.getenv("PREFECT_HOST")
-qdash_host = "localhost"
-prefect_host = os.getenv("PREFECT_HOST")
+from qdash.config import get_settings
 
 
-async def main(menu_name: str, cron_str: str, env: str):
+async def main(menu_name: str, cron_str: str, env: str) -> None:
     menu = MenuDocument.find_one({"name": menu_name}).run()
     if menu is None:
         raise HTTPException(status_code=404, detail="menu not found")
-    client = PrefectClient(api="http://localhost:4200")
+    settings = get_settings()
+    client = PrefectClient(api=f"http://prefect-server:{settings.prefect_port}/api")
     target_deployment = await client.read_deployment_by_name(f"cron-scheduler/{env}-scheduler")
     cron = construct_schedule(cron=cron_str, timezone="Asia/Tokyo")
     new_deployment = Deployment(
@@ -44,4 +43,11 @@ async def main(menu_name: str, cron_str: str, env: str):
 
 
 if __name__ == "__main__":
-    main("CheckRabi", "*/5 * * * *", "oqtopus")
+    import asyncio
+
+    env = os.getenv("ENV", "oqtopus")
+    try:
+        asyncio.run(main("CheckRabi", "*/5 * * * *", env))
+        print("Successfully updated deployment")
+    except Exception as e:
+        print(f"Error updating deployment: {e}")

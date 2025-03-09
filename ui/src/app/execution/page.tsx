@@ -14,11 +14,11 @@ import { ExecutionStats } from "./components/ExecutionStats";
 export default function ExecutionPage() {
   const [selectedChipId, setSelectedChipId] = useState<string>("");
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
-    null
+    null,
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(
-    null
+    null,
   );
   const [cardData, setCardData] = useState<ExecutionResponseSummary[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -54,7 +54,7 @@ export default function ExecutionPage() {
         // Only enable polling when an execution is selected
         enabled: !!selectedExecutionId,
       },
-    }
+    },
   );
 
   // 実行データ取得時にカードデータをセット
@@ -160,19 +160,19 @@ export default function ExecutionPage() {
                       execution.status === "running"
                         ? "text-info"
                         : execution.status === "completed"
-                        ? "text-success"
-                        : execution.status === "scheduled"
-                        ? "text-warning"
-                        : "text-error"
+                          ? "text-success"
+                          : execution.status === "scheduled"
+                            ? "text-warning"
+                            : "text-error"
                     }`}
                   >
                     {execution.status === "running"
                       ? "Running"
                       : execution.status === "completed"
-                      ? "Completed"
-                      : execution.status === "scheduled"
-                      ? "Scheduled"
-                      : "Failed"}
+                        ? "Completed"
+                        : execution.status === "scheduled"
+                          ? "Scheduled"
+                          : "Failed"}
                   </span>
                 </div>
               </div>
@@ -201,7 +201,7 @@ export default function ExecutionPage() {
               <h2 className="text-2xl font-bold">
                 {
                   cardData.find(
-                    (exec) => getExecutionKey(exec) === selectedExecutionId
+                    (exec) => getExecutionKey(exec) === selectedExecutionId,
                   )?.name
                 }
               </h2>
@@ -216,8 +216,8 @@ export default function ExecutionPage() {
                 <a
                   href={String(
                     cardData.find(
-                      (exec) => getExecutionKey(exec) === selectedExecutionId
-                    )?.note?.ui_url || "#"
+                      (exec) => getExecutionKey(exec) === selectedExecutionId,
+                    )?.note?.ui_url || "#",
                   )}
                   className="bg-accent text-accent-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
                 >
@@ -235,7 +235,7 @@ export default function ExecutionPage() {
                 executionDetailData.data.task &&
                 executionDetailData.data.task.map((detailTask, idx) => {
                   const taskBorderStyle = getStatusBorderStyle(
-                    detailTask.status ?? "unknown"
+                    detailTask.status ?? "unknown",
                   );
 
                   return (
@@ -261,19 +261,19 @@ export default function ExecutionPage() {
                           detailTask.status === "running"
                             ? "text-info"
                             : detailTask.status === "completed"
-                            ? "text-success"
-                            : detailTask.status === "scheduled"
-                            ? "text-warning"
-                            : "text-error"
+                              ? "text-success"
+                              : detailTask.status === "scheduled"
+                                ? "text-warning"
+                                : "text-error"
                         }`}
                       >
                         {detailTask.status === "running"
                           ? "Running"
                           : detailTask.status === "completed"
-                          ? "Completed"
-                          : detailTask.status === "scheduled"
-                          ? "Scheduled"
-                          : "Failed"}
+                            ? "Completed"
+                            : detailTask.status === "scheduled"
+                              ? "Scheduled"
+                              : "Failed"}
                       </p>
                       {expandedTaskIndex === idx && (
                         <div className="mt-2">
@@ -285,7 +285,7 @@ export default function ExecutionPage() {
                                 </h5>
                                 <img
                                   src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                                    path
+                                    path,
                                   )}`}
                                   alt={`Task Figure ${i + 1}`}
                                   className="w-full h-auto max-h-[60vh] object-contain rounded border"
@@ -299,7 +299,7 @@ export default function ExecutionPage() {
                               </h5>
                               <img
                                 src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                                  detailTask.figure_path
+                                  detailTask.figure_path,
                                 )}`}
                                 alt="Task Figure"
                                 className="w-full h-auto max-h-[60vh] object-contain rounded border"

@@ -14,8 +14,11 @@ export interface Settings {
   postgres_data_path: string;
   mongo_data_path: string;
   calib_data_path: string;
-  mongo_host: string;
-  prefect_host: string;
-  postgres_host: string;
   qpu_data_path: string;
+  mongo_port?: number;
+  mongo_express_port?: number;
+  postgres_port?: number;
+  prefect_port?: number;
+  api_port?: number;
+  ui_port?: number;
 }

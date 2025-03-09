@@ -4,6 +4,12 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const token = request.cookies.get("token");
   const isLoginPage = request.nextUrl.pathname === "/login";
+  const isApiRequest = request.nextUrl.pathname.startsWith("/api/");
+
+  // APIリクエストはスキップ
+  if (isApiRequest) {
+    return NextResponse.next();
+  }
 
   // ログインページにいる場合、トークンがあればホームにリダイレクト
   if (isLoginPage && token) {
@@ -11,7 +17,7 @@ export function middleware(request: NextRequest) {
   }
 
   // ログインページ以外でトークンがない場合、ログインページにリダイレクト
-  if (!isLoginPage && !token) {
+  if (!isLoginPage && !token && !isApiRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -25,6 +31,7 @@ export const config = {
      * 以下のパスに対してミドルウェアを適用:
      * - /login
      * - /calibration, /chip, /execution, /experiment, /fridge, /setting
+     * - /api/* (APIリクエストをスキップするため)
      */
     "/login",
     "/calibration/:path*",
@@ -33,5 +40,6 @@ export const config = {
     "/experiment/:path*",
     "/fridge/:path*",
     "/setting/:path*",
+    "/api/:path*",
   ],
 };

@@ -35,7 +35,7 @@ export const fetchFigureByPath = (
   params: FetchFigureByPathParams,
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<void>> => {
-  return axios.get(`http://localhost:5715/executions/figure`, {
+  return axios.get(`http://localhost:5716/api/executions/figure`, {
     ...options,
     params: { ...params, ...options?.params },
   });
@@ -45,7 +45,7 @@ export const getFetchFigureByPathQueryKey = (
   params: FetchFigureByPathParams,
 ) => {
   return [
-    `http://localhost:5715/executions/figure`,
+    `http://localhost:5716/api/executions/figure`,
     ...(params ? [params] : []),
   ] as const;
 };
@@ -193,11 +193,11 @@ export function useFetchFigureByPath<
 export const fetchExecutionLockStatus = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ExecutionLockStatusResponse>> => {
-  return axios.get(`http://localhost:5715/executions/lock_status`, options);
+  return axios.get(`http://localhost:5716/api/executions/lock_status`, options);
 };
 
 export const getFetchExecutionLockStatusQueryKey = () => {
-  return [`http://localhost:5715/executions/lock_status`] as const;
+  return [`http://localhost:5716/api/executions/lock_status`] as const;
 };
 
 export const getFetchExecutionLockStatusQueryOptions = <
