@@ -19,9 +19,10 @@ const Plot = dynamic(() => import("react-plotly.js"), {
 
 export function TimeSeriesView() {
   const [selectedChip, setSelectedChip] = useState<string>("");
-  const [selectedParameter, setSelectedParameter] = useState<string>("");
-  const [selectedTag, setSelectedTag] = useState<string>("");
+  const [selectedParameter, setSelectedParameter] = useState<string>("t1");
+  const [selectedTag, setSelectedTag] = useState<string>("daily");
   const [selectedQid, setSelectedQid] = useState<string>("");
+  const REFRESH_INTERVAL = 30; // 30秒固定
 
   // パラメータとタグの取得
   const { data: parametersResponse, isLoading: isLoadingParameters } =
@@ -37,6 +38,7 @@ export function TimeSeriesView() {
       {
         query: {
           enabled: Boolean(selectedChip && selectedParameter && selectedTag),
+          refetchInterval: REFRESH_INTERVAL * 1000,
         },
       },
     );
@@ -200,6 +202,9 @@ export function TimeSeriesView() {
     <div className="grid grid-cols-3 gap-8">
       {/* Parameter Selection Card */}
       <div className="col-span-3 card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
+        <div className="text-xs text-base-content/70 mb-2">
+          auto refresh every {REFRESH_INTERVAL} seconds
+        </div>
         <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
           <svg
             xmlns="http://www.w3.org/2000/svg"
