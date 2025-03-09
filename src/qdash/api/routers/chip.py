@@ -111,6 +111,7 @@ class ChipResponse(BaseModel):
     size: int = 64
     qubits: dict[str, Any] = {}
     couplings: dict[str, Any] = {}
+    installed_at: str = ""
 
 
 @router.get(
@@ -134,7 +135,16 @@ def list_chips(
     """
     logger.debug(f"Listing chips for user: {current_user.username}")
     chips = ChipDocument.find({"username": current_user.username}).run()
-    return [ChipResponse(chip_id=chip.chip_id) for chip in chips]
+    return [
+        ChipResponse(
+            chip_id=chip.chip_id,
+            size=chip.size,
+            qubits=chip.qubits,
+            couplings=chip.couplings,
+            installed_at=chip.installed_at,
+        )
+        for chip in chips
+    ]
 
 
 @router.get(
@@ -166,6 +176,7 @@ def fetch_chip(
         size=chip.size,
         qubits=chip.qubits,
         couplings=chip.couplings,
+        installed_at=chip.installed_at,
     )
 
 

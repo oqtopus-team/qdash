@@ -4,9 +4,9 @@ import { useFetchAllParameters } from "@/client/parameter/parameter";
 import { useListAllTag } from "@/client/tag/tag";
 import { useFetchTimeseriesTaskResultByTagAndParameter } from "@/client/chip/chip";
 import { useMemo, useState } from "react";
-
-import { ParameterModel } from "@/schemas/parameterModel";
-import { Tag } from "@/schemas/tag";
+import { ParameterSelector } from "@/app/components/ParameterSelector";
+import { TagSelector } from "@/app/components/TagSelector";
+import { QIDSelector } from "@/app/components/QIDSelector";
 import dynamic from "next/dynamic";
 import { Layout } from "plotly.js";
 import { OutputParameterModel } from "@/schemas";
@@ -36,7 +36,7 @@ export function TimeSeriesView() {
         query: {
           enabled: Boolean(selectedParameter && selectedTag),
         },
-      },
+      }
     );
 
   // プロットデータの準備
@@ -54,7 +54,7 @@ export function TimeSeriesView() {
           if (Array.isArray(dataPoints)) {
             qidData[qid] = {
               x: dataPoints.map(
-                (point: OutputParameterModel) => point.calibrated_at || "",
+                (point: OutputParameterModel) => point.calibrated_at || ""
               ),
               y: dataPoints.map((point: OutputParameterModel) => {
                 if (point.value && selectedParameter) {
@@ -215,38 +215,19 @@ export function TimeSeriesView() {
           Parameter Selection
         </h2>
         <div className="grid grid-cols-2 gap-12">
-          <div className="form-control">
-            <label className="label font-medium">Parameter</label>
-            <select
-              className="select select-bordered w-full"
-              value={selectedParameter}
-              onChange={(e) => setSelectedParameter(e.target.value)}
-              disabled={isLoadingParameters}
-            >
-              <option value="">Select Parameter</option>
-              {parameters.map((param: ParameterModel) => (
-                <option key={param.name} value={param.name}>
-                  {param.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="form-control">
-            <label className="label font-medium">Tag</label>
-            <select
-              className="select select-bordered w-full"
-              value={selectedTag}
-              onChange={(e) => setSelectedTag(e.target.value)}
-              disabled={isLoadingTags}
-            >
-              <option value="">Select Tag</option>
-              {tags.map((tag: Tag) => (
-                <option key={tag.name} value={tag.name}>
-                  {tag.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <ParameterSelector
+            label="Parameter"
+            parameters={parameters.map((p) => p.name)}
+            selectedParameter={selectedParameter}
+            onParameterSelect={setSelectedParameter}
+            disabled={isLoadingParameters}
+          />
+          <TagSelector
+            tags={tags}
+            selectedTag={selectedTag}
+            onTagSelect={setSelectedTag}
+            disabled={isLoadingTags}
+          />
         </div>
       </div>
 
@@ -340,20 +321,13 @@ export function TimeSeriesView() {
       <div className="col-span-3 card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold">Data Table</h2>
-          <div className="form-control w-64">
-            <select
-              className="select select-bordered w-full"
-              value={selectedQid}
-              onChange={(e) => setSelectedQid(e.target.value)}
+          <div className="w-64">
+            <QIDSelector
+              qids={qids}
+              selectedQid={selectedQid}
+              onQidSelect={setSelectedQid}
               disabled={!plotData.length}
-            >
-              <option value="">Select QID</option>
-              {qids.map((qid) => (
-                <option key={qid} value={qid}>
-                  {qid}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         </div>
         <div className="overflow-x-auto" style={{ minHeight: "300px" }}>

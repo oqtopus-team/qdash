@@ -8,7 +8,7 @@ from qdash.db.init.qubit import qubit_lattice
 from qdash.dbmodel.chip import ChipDocument
 
 
-def generate_qubit_data(num_qubits: int, pos: dict) -> dict:
+def generate_qubit_data(num_qubits: int, pos: dict, chip_id: str) -> dict:
     """Generate qubit data for the given number of qubits and positions.
 
     Args:
@@ -24,7 +24,7 @@ def generate_qubit_data(num_qubits: int, pos: dict) -> dict:
     qubits = {}
     for i in range(num_qubits):
         qubits[f"{i}"] = QubitModel(
-            chip_id="SAMPLE",
+            chip_id=chip_id,
             qid=f"{i}",
             status="pending",
             node_info=NodeInfoModel(
@@ -38,7 +38,7 @@ def generate_qubit_data(num_qubits: int, pos: dict) -> dict:
     return qubits
 
 
-def generate_coupling_data(edges: list[tuple[int, int]]) -> dict:
+def generate_coupling_data(edges: list[tuple[int, int]], chip_id: str) -> dict:
     """Generate coupling data for the given edges.
 
     Args:
@@ -56,7 +56,7 @@ def generate_coupling_data(edges: list[tuple[int, int]]) -> dict:
         coupling[f"{edge[0]}-{edge[1]}"] = CouplingModel(
             qid=f"{edge[0]}-{edge[1]}",
             status="pending",
-            chip_id="SAMPLE",
+            chip_id=chip_id,
             data={},
             edge_info=EdgeInfoModel(size=4, fill="", source=f"{edge[0]}", target=f"{edge[1]}"),
         )
@@ -69,8 +69,8 @@ def init_chip_document(username: str, chip_id: str) -> ChipDocument:
     num_qubits = 64
     _, edges, pos = qubit_lattice(64, 4)
     nodes, edges, pos = qubit_lattice(64, 4)
-    qubits = generate_qubit_data(num_qubits, pos)
-    couplings = generate_coupling_data(edges)
+    qubits = generate_qubit_data(num_qubits, pos, chip_id)
+    couplings = generate_coupling_data(edges, chip_id)
     chip = ChipDocument(
         username=username,
         chip_id=chip_id,

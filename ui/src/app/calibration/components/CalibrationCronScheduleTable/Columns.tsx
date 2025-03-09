@@ -10,7 +10,7 @@ export const getColumns = (
   handleToggle: (item: ScheduleCronCalibResponse, active: boolean) => void,
   handleEdit: (item: ScheduleCronCalibResponse) => void,
   handleMenuClick: (menuName: string, menu: MenuModel) => void,
-  menus: MenuModel[]
+  menus: MenuModel[],
 ) => [
   columnHelper.accessor("scheduler_name", {
     header: "Scheduler Name",

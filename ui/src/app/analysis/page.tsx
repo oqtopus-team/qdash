@@ -2,7 +2,9 @@
 
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { useListChips, useFetchChip } from "@/client/chip/chip";
+import { useFetchChip } from "@/client/chip/chip";
+import { ChipSelector } from "@/app/components/ChipSelector";
+import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TimeSeriesView } from "./components/TimeSeriesView";
 
 interface ParameterValue {
@@ -24,14 +26,11 @@ const Plot = dynamic(() => import("react-plotly.js"), {
 type AnalyzeView = "correlation" | "timeseries";
 
 export default function AnalyzePage() {
-  const [selectedChip, setSelectedChip] = useState<string>("SAMPLE");
+  const [selectedChip, setSelectedChip] = useState<string>("");
   const [xAxis, setXAxis] = useState<string>("");
   const [yAxis, setYAxis] = useState<string>("");
   const [currentView, setCurrentView] = useState<AnalyzeView>("correlation");
-  const { data: chipsResponse } = useListChips();
   const { data: chipResponse } = useFetchChip(selectedChip);
-
-  const chips = useMemo(() => chipsResponse?.data ?? [], [chipsResponse]);
   const chipData = useMemo(() => chipResponse?.data, [chipResponse]);
 
   // Extract available parameters from qubit data
@@ -129,21 +128,10 @@ export default function AnalyzePage() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-right">
-              <label className="label font-medium">Selected Chip</label>
-              <select
-                className="select select-bordered w-64 rounded-lg"
-                value={selectedChip}
-                onChange={(e) => setSelectedChip(e.target.value)}
-              >
-                <option value="">Select a chip</option>
-                {chips.map((chip) => (
-                  <option key={chip.chip_id} value={chip.chip_id}>
-                    {chip.chip_id}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <ChipSelector
+              selectedChip={selectedChip}
+              onChipSelect={setSelectedChip}
+            />
           </div>
         </div>
 
@@ -188,50 +176,20 @@ export default function AnalyzePage() {
                 Parameter Selection
               </h2>
               <div className="grid grid-cols-2 gap-12">
-                <div className="form-control">
-                  <label className="label font-medium">X-Axis Parameter</label>
-                  <select
-                    className="select select-bordered w-full"
-                    value={xAxis}
-                    onChange={(e) => setXAxis(e.target.value)}
-                  >
-                    <option value="">Select parameter</option>
-                    {availableParameters.map((param) => (
-                      <option key={param} value={param}>
-                        {param}
-                      </option>
-                    ))}
-                  </select>
-                  {xAxis && plotData && plotData[0]?.xDescription && (
-                    <label className="label">
-                      <span className="label-text-alt text-base-content/70">
-                        {plotData[0].xDescription}
-                      </span>
-                    </label>
-                  )}
-                </div>
-                <div className="form-control">
-                  <label className="label font-medium">Y-Axis Parameter</label>
-                  <select
-                    className="select select-bordered w-full"
-                    value={yAxis}
-                    onChange={(e) => setYAxis(e.target.value)}
-                  >
-                    <option value="">Select parameter</option>
-                    {availableParameters.map((param) => (
-                      <option key={param} value={param}>
-                        {param}
-                      </option>
-                    ))}
-                  </select>
-                  {yAxis && plotData && plotData[0]?.yDescription && (
-                    <label className="label">
-                      <span className="label-text-alt text-base-content/70">
-                        {plotData[0].yDescription}
-                      </span>
-                    </label>
-                  )}
-                </div>
+                <ParameterSelector
+                  label="X-Axis Parameter"
+                  parameters={availableParameters}
+                  selectedParameter={xAxis}
+                  onParameterSelect={setXAxis}
+                  description={plotData?.[0]?.xDescription}
+                />
+                <ParameterSelector
+                  label="Y-Axis Parameter"
+                  parameters={availableParameters}
+                  selectedParameter={yAxis}
+                  onParameterSelect={setYAxis}
+                  description={plotData?.[0]?.yDescription}
+                />
               </div>
             </div>
 

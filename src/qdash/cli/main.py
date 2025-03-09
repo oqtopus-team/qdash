@@ -6,6 +6,7 @@ from qdash.db.init import (
     init_coupling_document,
     init_menu,
     init_qubit_document,
+    init_task_document,
 )
 
 app = typer.Typer(
@@ -86,6 +87,20 @@ def init_menu_data(
 
 
 @app.command()
+def init_task_data(
+    username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
+) -> None:
+    """Initialize task data."""
+    try:
+        typer.echo(f"Initializing task data for username: {username}")
+        init_task_document(username=username)
+        typer.echo(f"Task data initialized successfully (username: {username})")
+    except Exception as e:
+        typer.echo(f"Error initializing task data: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
 def init_all_data(
     username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
     chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),
@@ -106,6 +121,9 @@ def init_all_data(
 
         init_menu(username=username)
         typer.echo("Menu data initialized")
+
+        init_task_document(username=username)
+        typer.echo("Task data initialized")
 
         typer.echo("\nAll data initialized successfully")
     except Exception as e:

@@ -42,6 +42,7 @@ class ExecutionManager(BaseModel):
 
     def __init__(
         self,
+        username: str,
         execution_id: str,
         calib_data_path: str,
         tags: list[str] = [],
@@ -52,6 +53,7 @@ class ExecutionManager(BaseModel):
         **kwargs,  # noqa: ANN003
     ) -> None:
         super().__init__(**kwargs)
+        self.username = username
         self.name = name
         self.execution_id = execution_id
         self.calib_data_path = calib_data_path

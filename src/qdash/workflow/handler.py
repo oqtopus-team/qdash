@@ -4,6 +4,7 @@ import pendulum
 from dotenv import load_dotenv
 from prefect import flow, get_run_logger, runtime
 from qdash.datamodel.menu import MenuModel as Menu
+from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
@@ -91,7 +92,7 @@ def main_flow(
     latest_calib_dir = f"/app/calib_data/{menu.username}/{date_str}/latest"
     create_directory_task.submit(latest_calib_dir).result()
     success_map = {flow_name: False for flow_name in calibration_flow_map}
-
+    chip_id = ChipDocument.get_current_chip(username=menu.username).chip_id
     execution_manager = ExecutionManager(
         username=menu.username,
         name=menu.name,
@@ -99,7 +100,7 @@ def main_flow(
         calib_data_path=calib_dir,
         tags=menu.tags,
         fridge_info={"temperature": 0.0},
-        chip_id="SAMPLE",
+        chip_id=chip_id,
         note={"qubex_version": get_package_version("qubex"), "ui_url": ui_url},
     ).save()
     ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())

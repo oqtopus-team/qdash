@@ -21,4 +21,5 @@ export interface ChipResponse {
   size?: number;
   qubits?: ChipResponseQubits;
   couplings?: ChipResponseCouplings;
+  installed_at?: string;
 }

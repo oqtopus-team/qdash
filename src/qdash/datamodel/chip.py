@@ -21,5 +21,6 @@ class ChipModel(BaseModel):
     size: int = Field(..., description="The size of the chip")
     qubits: dict[str, QubitModel] = Field(..., description="The qubits of the chip")
     couplings: dict[str, CouplingModel] = Field(..., description="The couplings of the chip")
+    installed_at: str = Field(..., description="The time when the system information was created")
 
     system_info: SystemInfoModel = Field(..., description="The system information")

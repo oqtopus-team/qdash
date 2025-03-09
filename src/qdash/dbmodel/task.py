@@ -57,6 +57,8 @@ class TaskDocument(Document):
             name=model.name,
             task_type=model.task_type,
             description=model.description,
+            input_parameters=model.input_parameters,
+            output_parameters=model.output_parameters,
         )
 
     @classmethod

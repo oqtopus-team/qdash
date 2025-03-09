@@ -34,7 +34,7 @@ class TagDocument(Document):
         for tag in tags:
             doc = cls.find_one({"name": tag, "username": username}).run()
             if doc is None:
-                doc = cls(username=username, tag=tag)
+                doc = cls(username=username, name=tag)
                 doc.save()
                 inserted_documents.append(doc)
         return inserted_documents
