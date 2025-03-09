@@ -38,4 +38,6 @@ class CouplingDocument(Document):
         """Settings for the document."""
 
         name = "coupling"
-        indexes: ClassVar = [IndexModel([("chip_id", ASCENDING), ("qid", ASCENDING)], unique=True)]
+        indexes: ClassVar = [
+            IndexModel([("chip_id", ASCENDING), ("qid", ASCENDING), ("username")], unique=True)
+        ]

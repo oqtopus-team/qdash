@@ -82,7 +82,7 @@ def cal_flow(
         config_dir="/home/shared/config",
     )
     exp.note.clear()
-    task_names = validate_task_name(menu.tasks)
+    task_names = validate_task_name(menu.tasks, username=menu.username)
     task_manager = TaskManager(
         username=menu.username, execution_id=execution_id, qids=qubits, calib_dir=calib_dir
     )

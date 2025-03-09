@@ -13,9 +13,9 @@ from qdash.workflow.tasks.base import BaseTask
 from qubex.experiment import Experiment
 
 
-def validate_task_name(task_names: list[str]) -> list[str]:
+def validate_task_name(task_names: list[str], username: str) -> list[str]:
     """Validate task names."""
-    tasks = TaskDocument.find({"username": "admin"}).run()
+    tasks = TaskDocument.find({"username": username}).run()
     task_list = [task.name for task in tasks]
     for task_name in task_names:
         if task_name not in task_list:
