@@ -1,14 +1,15 @@
-FROM node:20-alpine
+FROM oven/bun:1
 
 WORKDIR /app
 
 # Copy package files and .next directory
-COPY ./ui/package*.json ./
+COPY ./ui/package.json ./
+COPY ./ui/bun.lock ./
 COPY ./ui/.next ./.next
 COPY ./ui/public ./public
 
 # Install production dependencies only
-RUN npm install --production --legacy-peer-deps
+RUN bun install --production
 
 ENV HOST 0.0.0.0
 ENV PORT 5714
@@ -16,4 +17,4 @@ ENV NEXT_TELEMETRY_DISABLED 1
 ENV NODE_ENV production
 
 # Start the application
-CMD ["npm", "start"]
+CMD ["bun", "run", "start"]
