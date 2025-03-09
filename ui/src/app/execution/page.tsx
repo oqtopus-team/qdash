@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from "react";
 import {
-  useListChips,
   useListExecutionsByChipId,
   useFetchExecutionByChipId,
 } from "@/client/chip/chip";
-import { ChipResponse, ExecutionResponseSummary } from "@/schemas";
+import { ExecutionResponseSummary } from "@/schemas";
 import JsonView from "react18-json-view";
 import { FaExternalLinkAlt } from "react-icons/fa";
 import { ChipSelector } from "@/app/components/ChipSelector";
@@ -23,9 +22,6 @@ export default function ExecutionPage() {
   );
   const [cardData, setCardData] = useState<ExecutionResponseSummary[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-
-  // チップ一覧取得
-  const { data: chipData } = useListChips();
 
   // chip_id による実行概要一覧の取得
   const {

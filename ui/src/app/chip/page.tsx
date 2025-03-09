@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useListChips, useListMuxes } from "@/client/chip/chip";
+import { useListMuxes } from "@/client/chip/chip";
 import { useFetchAllTasks } from "@/client/task/task";
 import { BsGrid, BsListUl } from "react-icons/bs";
 import { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
@@ -26,7 +26,6 @@ export default function ChipPage() {
     useState<SelectedTaskInfo | null>(null);
   const [selectedTask, setSelectedTask] = useState<string>("CheckRabi");
 
-  const { data: chips } = useListChips();
   const { data: tasks } = useFetchAllTasks();
   const {
     data: muxData,
