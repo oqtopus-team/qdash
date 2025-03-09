@@ -21,7 +21,7 @@ registerLocale("ja", ja);
 
 export function CalibrationScheduleTable() {
   const [calibSchedules, setCalibSchedules] = useState<ScheduleCalibResponse[]>(
-    []
+    [],
   );
   const [menu, setMenu] = useState<MenuModel[]>([]);
   const [selectedMenuName, setSelectedMenuName] = useState("");
@@ -51,7 +51,7 @@ export function CalibrationScheduleTable() {
 
   const handleNewItem = () => {
     const editModal = document.getElementById(
-      "newItem"
+      "newItem",
     ) as HTMLDialogElement | null;
     if (editModal) {
       editModal.showModal();
@@ -71,7 +71,7 @@ export function CalibrationScheduleTable() {
         onError: (error) => {
           console.error("Error delete schedule calibration:", error);
         },
-      }
+      },
     );
   };
 

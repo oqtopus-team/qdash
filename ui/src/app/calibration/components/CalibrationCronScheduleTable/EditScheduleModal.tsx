@@ -52,7 +52,7 @@ export function EditScheduleModal({
         onError: (error: Error) => {
           console.error("Error updating cron schedule:", error);
         },
-      }
+      },
     );
   };
 

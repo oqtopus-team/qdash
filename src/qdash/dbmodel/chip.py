@@ -1,5 +1,6 @@
 from typing import ClassVar
 
+import pendulum
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
@@ -17,6 +18,7 @@ class ChipDocument(Document):
         size (int): The size of the chip.
         qubits (dict): The qubits of the chip.
         couplings (dict): The couplings of the chip.
+        installed_at (str): The time when the system information was created.
         system_info (SystemInfo): The system information. e.g. {"created_at": "2021-01-01T00:00:00Z", "updated_at": "2021-01-01T00:00:00Z"}.
 
     """
@@ -26,6 +28,10 @@ class ChipDocument(Document):
     size: int = Field(64, description="The size of the chip")
     qubits: dict[str, QubitModel] = Field({}, description="The qubits of the chip")
     couplings: dict[str, CouplingModel] = Field({}, description="The couplings of the chip")
+    installed_at: str = Field(
+        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+        description="The time when the system information was created",
+    )
 
     system_info: SystemInfoModel = Field(..., description="The system information")
 

@@ -18,7 +18,7 @@ export default function CalibrationPage() {
   const MemoizedCalibrationMenuTable = React.memo(CalibrationMenuTable);
   const MemoizedCalibrationScheduleTable = React.memo(CalibrationScheduleTable);
   const MemoizedCalibrationCronScheduleTable = React.memo(
-    CalibrationCronScheduleTable
+    CalibrationCronScheduleTable,
   );
 
   const getComponent = (tabName: string) => {

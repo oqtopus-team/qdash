@@ -1443,6 +1443,11 @@
             "type": "object",
             "title": "Couplings",
             "default": {}
+          },
+          "installed_at": {
+            "type": "string",
+            "title": "Installed At",
+            "default": ""
           }
         },
         "type": "object",

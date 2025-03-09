@@ -64,7 +64,7 @@ export function CalibrationCronScheduleTable() {
     const menuData = await refetchMenu();
     if (menuData.data) {
       const menuWithDetails = menuData.data.data.menus.find(
-        (menu: GetMenuResponse) => menu.name === menuName
+        (menu: GetMenuResponse) => menu.name === menuName,
       );
       if (menuWithDetails) {
         setSelectedMenuForPreview(menuWithDetails);
@@ -92,7 +92,7 @@ export function CalibrationCronScheduleTable() {
         onError: (error: Error) => {
           console.error("Error updating cron schedule:", error);
         },
-      }
+      },
     );
   };
 
