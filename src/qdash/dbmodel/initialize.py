@@ -2,10 +2,16 @@ import os
 
 from bunnet import init_bunnet
 from pymongo import MongoClient
+from qdash.config import get_settings
 from qdash.dbmodel.document_models import document_models
 
-mongo_ip = os.getenv("MONGO_HOST")
-client: MongoClient = MongoClient(mongo_ip, 27017, username="root", password="example")  # noqa: S106
+settings = get_settings()
+client: MongoClient = MongoClient(
+    "mongo",  # Docker service name
+    port=27017,  # Docker internal port
+    username=os.getenv("MONGO_INITDB_ROOT_USERNAME"),
+    password=os.getenv("MONGO_INITDB_ROOT_PASSWORD"),
+)
 
 
 def initialize() -> None:

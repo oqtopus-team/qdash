@@ -36,11 +36,11 @@ Returns: ListParameterResponse
 export const fetchAllParameters = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ListParameterResponse>> => {
-  return axios.get(`http://localhost:5715/parameter`, options);
+  return axios.get(`http://localhost:5716/api/parameter`, options);
 };
 
 export const getFetchAllParametersQueryKey = () => {
-  return [`http://localhost:5715/parameter`] as const;
+  return [`http://localhost:5716/api/parameter`] as const;
 };
 
 export const getFetchAllParametersQueryOptions = <

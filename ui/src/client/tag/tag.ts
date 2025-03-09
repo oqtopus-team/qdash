@@ -37,11 +37,11 @@ Returns:
 export const listAllTag = (
   options?: AxiosRequestConfig,
 ): Promise<AxiosResponse<ListTagResponse>> => {
-  return axios.get(`http://localhost:5715/tag`, options);
+  return axios.get(`http://localhost:5716/api/tag`, options);
 };
 
 export const getListAllTagQueryKey = () => {
-  return [`http://localhost:5715/tag`] as const;
+  return [`http://localhost:5716/api/tag`] as const;
 };
 
 export const getListAllTagQueryOptions = <

@@ -38,7 +38,7 @@ export function TimeSeriesView() {
         query: {
           enabled: Boolean(selectedChip && selectedParameter && selectedTag),
         },
-      }
+      },
     );
 
   // プロットデータの準備
@@ -56,7 +56,7 @@ export function TimeSeriesView() {
           if (Array.isArray(dataPoints)) {
             qidData[qid] = {
               x: dataPoints.map(
-                (point: OutputParameterModel) => point.calibrated_at || ""
+                (point: OutputParameterModel) => point.calibrated_at || "",
               ),
               y: dataPoints.map((point: OutputParameterModel) => {
                 if (point.value && selectedParameter) {

@@ -13,7 +13,7 @@
     "start": "next start",
     "lint": "bunx eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "fmt": "bunx eslint . --fix -c eslint.config.js",
-    "generate-qdash": "curl http://localhost:5715/openapi.json | jq > ../docs/openapi/qdash-openapi.json && bunx openapi-typescript ../docs/openapi/qdash-openapi.json -o ./src/qdash.d.ts"
+    "generate-qdash": "curl http://localhost:${API_PORT:-5715}/openapi.json | jq > ../docs/openapi/qdash-openapi.json && bunx openapi-typescript ../docs/openapi/qdash-openapi.json -o ./src/qdash.d.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

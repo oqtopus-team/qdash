@@ -1,4 +1,3 @@
-import os
 import uuid
 from datetime import datetime
 from logging import getLogger
@@ -20,7 +19,6 @@ from prefect.client.schemas.objects import Deployment
 from prefect.client.schemas.schedules import construct_schedule
 from prefect.states import Scheduled
 from pydantic import BaseModel
-from qdash.api.config import Settings, get_settings
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.calibration import (
@@ -30,6 +28,7 @@ from qdash.api.schemas.calibration import (
     ScheduleCalibResponse,
 )
 from qdash.api.schemas.exception import InternalSeverError
+from qdash.config import Settings, get_settings
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.menu import MenuDocument
@@ -37,8 +36,6 @@ from qdash.dbmodel.tag import TagDocument
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
-prefect_host = os.getenv("PREFECT_HOST")
-qdash_host = "localhost"
 
 
 class ScheduleCronCalibRequest(BaseModel):
@@ -90,7 +87,7 @@ async def list_cron_schedules(
     """List all the cron schedules."""
     env = settings.env
     scheduler_list = [f"cron-scheduler/{env}-cron-scheduler-{i}" for i in range(1, 4)]
-    client = PrefectClient(api=settings.prefect_api_url)
+    client = PrefectClient(api=f"http://prefect-server:{settings.prefect_port}/api")
     schedules = []
     for scheduler_name in scheduler_list:
         try:
@@ -131,7 +128,7 @@ async def schedule_cron_calib(
     menu = MenuDocument.find_one({"name": request.menu_name}).run()
     if menu is None:
         raise HTTPException(status_code=404, detail="menu not found")
-    client = PrefectClient(api=settings.prefect_api_url)
+    client = PrefectClient(api=f"http://prefect-server:{settings.prefect_port}/api")
     try:
         target_deployment = await client.read_deployment_by_name(request.scheduler_name)
     except Exception as e:
@@ -175,7 +172,7 @@ async def execute_calib(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ExecuteCalibResponse:
     """Create a flow run from a deployment."""
-    client = PrefectClient(api=settings.prefect_api_url)
+    client = PrefectClient(api=f"http://prefect-server:{settings.prefect_port}/api")
     logger.info(f"current user: {current_user.username}")
     env = settings.env
     target_deployment = await client.read_deployment_by_name(f"main/{env}-main")
@@ -192,8 +189,8 @@ async def execute_calib(
     logger.warning(resp)
     chip_id = ChipDocument.get_current_chip(current_user.username).chip_id
     return ExecuteCalibResponse(
-        flow_run_url=f"http://{prefect_host}:4200/flow-runs/flow-run/{resp.id}",
-        qdash_ui_url=f"http://{qdash_host}:5714/execution/{chip_id}/{execution_id}",
+        flow_run_url=f"http://127.0.0.1:{settings.prefect_port}/flow-runs/flow-run/{resp.id}",
+        qdash_ui_url=f"http://127.0.0.1:{settings.ui_port}/execution/{chip_id}/{execution_id}",
     )
 
 
@@ -230,7 +227,7 @@ async def schedule_calib(
         tags=menu.tags,
     )
 
-    client = PrefectClient(api=settings.prefect_api_url)
+    client = PrefectClient(api=f"http://prefect-server:{settings.prefect_port}/api")
     datetime_str = request.scheduled
     scheduled_time = datetime.fromisoformat(datetime_str)
     env = settings.env
@@ -272,7 +269,7 @@ async def fetch_all_calib_schedule(
     settings: Annotated[Settings, Depends] = Depends(get_settings),
     current_user: User | None = Depends(get_optional_current_user),
 ) -> list[ScheduleCalibResponse]:
-    client = PrefectClient(api=settings.prefect_api_url)
+    client = PrefectClient(api=f"http://prefect-server:{settings.prefect_port}/api")
     env = settings.env
     target_deployment = await client.read_deployment_by_name(f"main/{env}-main")
     flow_id = target_deployment.flow_id
@@ -322,7 +319,7 @@ async def delete_calib_schedule(
     settings: Annotated[Settings, Depends] = Depends(get_settings),
     current_user: User = Security(get_current_active_user),
 ):
-    client = PrefectClient(api=settings.prefect_api_url)
+    client = PrefectClient(api=f"http://prefect-server:{settings.prefect_port}/api")
     id = uuid.UUID(flow_run_id)
     try:
         await client.delete_flow_run(flow_run_id=id)

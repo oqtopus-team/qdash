@@ -15,7 +15,7 @@
     "version": "0.0.1"
   },
   "paths": {
-    "/calibration/cron-schedule": {
+    "/api/calibration/cron-schedule": {
       "get": {
         "tags": [
           "calibration"
@@ -82,7 +82,7 @@
         ]
       }
     },
-    "/calibration": {
+    "/api/calibration": {
       "post": {
         "tags": [
           "calibration"
@@ -129,7 +129,7 @@
         ]
       }
     },
-    "/calibration/schedule": {
+    "/api/calibration/schedule": {
       "get": {
         "tags": [
           "calibration"
@@ -204,7 +204,7 @@
         ]
       }
     },
-    "/calibration/schedule/{flow_run_id}": {
+    "/api/calibration/schedule/{flow_run_id}": {
       "delete": {
         "tags": [
           "calibration"
@@ -249,7 +249,7 @@
         }
       }
     },
-    "/menu": {
+    "/api/menu": {
       "get": {
         "tags": [
           "menu"
@@ -321,7 +321,7 @@
         ]
       }
     },
-    "/menu/preset": {
+    "/api/menu/preset": {
       "get": {
         "tags": [
           "menu"
@@ -358,7 +358,7 @@
         ]
       }
     },
-    "/menu/{name}": {
+    "/api/menu/{name}": {
       "get": {
         "tags": [
           "menu"
@@ -538,7 +538,7 @@
         }
       }
     },
-    "/settings": {
+    "/api/settings": {
       "get": {
         "tags": [
           "settings"
@@ -560,7 +560,7 @@
         }
       }
     },
-    "/executions/figure": {
+    "/api/executions/figure": {
       "get": {
         "tags": [
           "execution"
@@ -606,7 +606,7 @@
         }
       }
     },
-    "/executions/lock_status": {
+    "/api/executions/lock_status": {
       "get": {
         "tags": [
           "execution"
@@ -628,7 +628,7 @@
         }
       }
     },
-    "/chip": {
+    "/api/chip": {
       "get": {
         "tags": [
           "chip"
@@ -659,7 +659,7 @@
         ]
       }
     },
-    "/chip/{chip_id}": {
+    "/api/chip/{chip_id}": {
       "get": {
         "tags": [
           "chip"
@@ -707,7 +707,7 @@
         }
       }
     },
-    "/chip/{chip_id}/execution": {
+    "/api/chip/{chip_id}/execution": {
       "get": {
         "tags": [
           "chip"
@@ -759,7 +759,7 @@
         }
       }
     },
-    "/chip/{chip_id}/execution/{execution_id}": {
+    "/api/chip/{chip_id}/execution/{execution_id}": {
       "get": {
         "tags": [
           "chip"
@@ -816,7 +816,7 @@
         }
       }
     },
-    "/chip/{chip_id}/mux/{mux_id}": {
+    "/api/chip/{chip_id}/mux/{mux_id}": {
       "get": {
         "tags": [
           "chip"
@@ -873,7 +873,7 @@
         }
       }
     },
-    "/chip/{chip_id}/mux": {
+    "/api/chip/{chip_id}/mux": {
       "get": {
         "tags": [
           "chip"
@@ -921,7 +921,7 @@
         }
       }
     },
-    "/chip/{chip_id}/task/{task_name}": {
+    "/api/chip/{chip_id}/task/{task_name}": {
       "get": {
         "tags": [
           "chip"
@@ -978,7 +978,7 @@
         }
       }
     },
-    "/chip/{chip_id}/parameter/{parameter}/qid/{qid}": {
+    "/api/chip/{chip_id}/parameter/{parameter}/qid/{qid}": {
       "get": {
         "tags": [
           "chip"
@@ -1053,7 +1053,7 @@
         }
       }
     },
-    "/chip/{chip_id}/parameter/{parameter}": {
+    "/api/chip/{chip_id}/parameter/{parameter}": {
       "get": {
         "tags": [
           "chip"
@@ -1119,7 +1119,7 @@
         }
       }
     },
-    "/file/raw_data": {
+    "/api/file/raw_data": {
       "get": {
         "tags": [
           "file"
@@ -1155,7 +1155,7 @@
         }
       }
     },
-    "/auth/token": {
+    "/api/auth/token": {
       "post": {
         "tags": [
           "auth",
@@ -1217,7 +1217,7 @@
         }
       }
     },
-    "/auth/register": {
+    "/api/auth/register": {
       "post": {
         "tags": [
           "auth",
@@ -1262,7 +1262,7 @@
         }
       }
     },
-    "/auth/me": {
+    "/api/auth/me": {
       "get": {
         "tags": [
           "auth",
@@ -1292,7 +1292,7 @@
         ]
       }
     },
-    "/auth/logout": {
+    "/api/auth/logout": {
       "post": {
         "tags": [
           "auth",
@@ -1316,7 +1316,7 @@
         }
       }
     },
-    "/tasks": {
+    "/api/tasks": {
       "get": {
         "tags": [
           "task"
@@ -1343,7 +1343,7 @@
         ]
       }
     },
-    "/parameter": {
+    "/api/parameter": {
       "get": {
         "tags": [
           "parameter"
@@ -1370,7 +1370,7 @@
         ]
       }
     },
-    "/tag": {
+    "/api/tag": {
       "get": {
         "tags": [
           "tag"
@@ -2464,21 +2464,39 @@
             "type": "string",
             "title": "Calib Data Path"
           },
-          "mongo_host": {
-            "type": "string",
-            "title": "Mongo Host"
-          },
-          "prefect_host": {
-            "type": "string",
-            "title": "Prefect Host"
-          },
-          "postgres_host": {
-            "type": "string",
-            "title": "Postgres Host"
-          },
           "qpu_data_path": {
             "type": "string",
             "title": "Qpu Data Path"
+          },
+          "mongo_port": {
+            "type": "integer",
+            "title": "Mongo Port",
+            "default": 27017
+          },
+          "mongo_express_port": {
+            "type": "integer",
+            "title": "Mongo Express Port",
+            "default": 8081
+          },
+          "postgres_port": {
+            "type": "integer",
+            "title": "Postgres Port",
+            "default": 5432
+          },
+          "prefect_port": {
+            "type": "integer",
+            "title": "Prefect Port",
+            "default": 4200
+          },
+          "api_port": {
+            "type": "integer",
+            "title": "Api Port",
+            "default": 5715
+          },
+          "ui_port": {
+            "type": "integer",
+            "title": "Ui Port",
+            "default": 5714
           }
         },
         "additionalProperties": false,
@@ -2491,9 +2509,6 @@
           "postgres_data_path",
           "mongo_data_path",
           "calib_data_path",
-          "mongo_host",
-          "prefect_host",
-          "postgres_host",
           "qpu_data_path"
         ],
         "title": "Settings"

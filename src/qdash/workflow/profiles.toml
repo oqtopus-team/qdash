@@ -2,4 +2,4 @@ active = "default"
 
 [profiles.default]
 PREFECT_API_KEY = ""
-PREFECT_API_URL = "http://127.0.0.1:4200/api"
+PREFECT_API_URL = "http://127.0.0.1:${PREFECT_PORT:-4200}/api"
