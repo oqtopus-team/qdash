@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useFetchChip } from "@/client/chip/chip";
 import { ChipSelector } from "@/app/components/ChipSelector";
+import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TimeSeriesView } from "./components/TimeSeriesView";
 
 interface ParameterValue {
@@ -175,50 +176,20 @@ export default function AnalyzePage() {
                 Parameter Selection
               </h2>
               <div className="grid grid-cols-2 gap-12">
-                <div className="form-control">
-                  <label className="label font-medium">X-Axis Parameter</label>
-                  <select
-                    className="select select-bordered w-full"
-                    value={xAxis}
-                    onChange={(e) => setXAxis(e.target.value)}
-                  >
-                    <option value="">Select parameter</option>
-                    {availableParameters.map((param) => (
-                      <option key={param} value={param}>
-                        {param}
-                      </option>
-                    ))}
-                  </select>
-                  {xAxis && plotData && plotData[0]?.xDescription && (
-                    <label className="label">
-                      <span className="label-text-alt text-base-content/70">
-                        {plotData[0].xDescription}
-                      </span>
-                    </label>
-                  )}
-                </div>
-                <div className="form-control">
-                  <label className="label font-medium">Y-Axis Parameter</label>
-                  <select
-                    className="select select-bordered w-full"
-                    value={yAxis}
-                    onChange={(e) => setYAxis(e.target.value)}
-                  >
-                    <option value="">Select parameter</option>
-                    {availableParameters.map((param) => (
-                      <option key={param} value={param}>
-                        {param}
-                      </option>
-                    ))}
-                  </select>
-                  {yAxis && plotData && plotData[0]?.yDescription && (
-                    <label className="label">
-                      <span className="label-text-alt text-base-content/70">
-                        {plotData[0].yDescription}
-                      </span>
-                    </label>
-                  )}
-                </div>
+                <ParameterSelector
+                  label="X-Axis Parameter"
+                  parameters={availableParameters}
+                  selectedParameter={xAxis}
+                  onParameterSelect={setXAxis}
+                  description={plotData?.[0]?.xDescription}
+                />
+                <ParameterSelector
+                  label="Y-Axis Parameter"
+                  parameters={availableParameters}
+                  selectedParameter={yAxis}
+                  onParameterSelect={setYAxis}
+                  description={plotData?.[0]?.yDescription}
+                />
               </div>
             </div>
 
