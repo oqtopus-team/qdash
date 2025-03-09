@@ -40,7 +40,7 @@ def cron_scheduler_flow(menu_name: str) -> None:
         task_details=menu.task_details,
         tags=menu.tags,
     )
-    calc_min = timedelta(minutes=1)
+    calc_min = timedelta(seconds=10)
     target = now + calc_min
 
     execution_id = generate_execution_id()
