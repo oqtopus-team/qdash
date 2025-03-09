@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TagSelector } from "@/app/components/TagSelector";
 import { QIDSelector } from "@/app/components/QIDSelector";
+import { ChipSelector } from "@/app/components/ChipSelector";
 import dynamic from "next/dynamic";
 import { Layout } from "plotly.js";
 import { OutputParameterModel } from "@/schemas";
@@ -17,6 +18,7 @@ const Plot = dynamic(() => import("react-plotly.js"), {
 });
 
 export function TimeSeriesView() {
+  const [selectedChip, setSelectedChip] = useState<string>("");
   const [selectedParameter, setSelectedParameter] = useState<string>("");
   const [selectedTag, setSelectedTag] = useState<string>("");
   const [selectedQid, setSelectedQid] = useState<string>("");
@@ -29,12 +31,12 @@ export function TimeSeriesView() {
   // 時系列データの取得
   const { data: timeseriesResponse, isLoading: isLoadingTimeseries } =
     useFetchTimeseriesTaskResultByTagAndParameter(
-      "SAMPLE", // chipId
+      selectedChip,
       selectedParameter,
       { tag: selectedTag },
       {
         query: {
-          enabled: Boolean(selectedParameter && selectedTag),
+          enabled: Boolean(selectedChip && selectedParameter && selectedTag),
         },
       }
     );
@@ -214,7 +216,11 @@ export function TimeSeriesView() {
           </svg>
           Parameter Selection
         </h2>
-        <div className="grid grid-cols-2 gap-12">
+        <div className="grid grid-cols-3 gap-12">
+          <ChipSelector
+            selectedChip={selectedChip}
+            onChipSelect={setSelectedChip}
+          />
           <ParameterSelector
             label="Parameter"
             parameters={parameters.map((p) => p.name)}
@@ -263,6 +269,7 @@ export function TimeSeriesView() {
 
           {/* エラー状態の表示 */}
           {!isLoadingTimeseries &&
+            selectedChip &&
             selectedParameter &&
             selectedTag &&
             !timeseriesResponse?.data?.data && (
@@ -293,7 +300,7 @@ export function TimeSeriesView() {
           )}
 
           {/* 未選択時の表示 */}
-          {!selectedParameter || !selectedTag ? (
+          {!selectedChip || !selectedParameter || !selectedTag ? (
             <div className="flex items-center justify-center h-full text-base-content/70">
               <div className="text-center">
                 <svg
@@ -310,7 +317,9 @@ export function TimeSeriesView() {
                   <path d="M3 12h18"></path>
                   <path d="M12 3v18"></path>
                 </svg>
-                <p className="text-lg">Select parameters to visualize data</p>
+                <p className="text-lg">
+                  Select chip and parameters to visualize data
+                </p>
               </div>
             </div>
           ) : null}
