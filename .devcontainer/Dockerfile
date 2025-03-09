@@ -37,4 +37,3 @@ ENV PATH="/root/.bun/bin:${PATH}"
 
 COPY ./ui/package.json ./
 COPY ./ui/bun.lock ./
-RUN cd ui && bun install
