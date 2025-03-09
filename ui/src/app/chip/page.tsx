@@ -8,6 +8,7 @@ import { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
 import { TaskResultGrid } from "./components/TaskResultGrid";
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { TaskSelector } from "@/app/components/TaskSelector";
+import { TaskFigure } from "@/app/components/TaskFigure";
 type ViewMode = "chip" | "mux";
 
 interface SelectedTaskInfo {
@@ -57,7 +58,7 @@ export default function ChipPage() {
             taskGroups[taskName] = {};
           }
           taskGroups[taskName][qid] = task;
-        },
+        }
       );
     });
 
@@ -66,7 +67,7 @@ export default function ChipPage() {
 
   // Get latest update time info from tasks
   const getLatestUpdateInfo = (
-    detail: MuxDetailResponseDetail,
+    detail: MuxDetailResponseDetail
   ): { time: Date; isRecent: boolean } => {
     let latestTime = new Date(0);
 
@@ -119,7 +120,7 @@ export default function ChipPage() {
   // Get qubit tasks
   const qubitTasks =
     tasks?.data?.tasks?.filter(
-      (task: TaskResponse) => task.task_type === "qubit",
+      (task: TaskResponse) => task.task_type === "qubit"
     ) || [];
 
   // Set first qubit task as default if none selected and qubit tasks available
@@ -300,8 +301,8 @@ export default function ChipPage() {
                                                   task.status === "completed"
                                                     ? "bg-success"
                                                     : task.status === "failed"
-                                                      ? "bg-error"
-                                                      : "bg-warning"
+                                                    ? "bg-error"
+                                                    : "bg-warning"
                                                 }`}
                                               />
                                             </div>
@@ -309,37 +310,18 @@ export default function ChipPage() {
                                               <div className="text-xs text-base-content/60">
                                                 Updated:{" "}
                                                 {formatRelativeTime(
-                                                  new Date(task.end_at),
+                                                  new Date(task.end_at)
                                                 )}
                                               </div>
                                             )}
                                           </div>
                                           {task.figure_path && (
                                             <div className="relative h-48 rounded-lg overflow-hidden">
-                                              {Array.isArray(
-                                                task.figure_path,
-                                              ) ? (
-                                                task.figure_path.map(
-                                                  (path, i) => (
-                                                    <img
-                                                      key={i}
-                                                      src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                                                        path,
-                                                      )}`}
-                                                      alt={`Result for QID ${qid}`}
-                                                      className="w-full h-48 object-contain"
-                                                    />
-                                                  ),
-                                                )
-                                              ) : (
-                                                <img
-                                                  src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                                                    task.figure_path,
-                                                  )}`}
-                                                  alt={`Result for QID ${qid}`}
-                                                  className="w-full h-48 object-contain"
-                                                />
-                                              )}
+                                              <TaskFigure
+                                                path={task.figure_path}
+                                                qid={qid}
+                                                className="w-full h-48 object-contain"
+                                              />
                                             </div>
                                           )}
                                         </div>
@@ -348,7 +330,7 @@ export default function ChipPage() {
                                   })}
                                 </div>
                               </div>
-                            ),
+                            )
                           )}
                         </div>
                       </div>
@@ -378,11 +360,9 @@ export default function ChipPage() {
             </div>
             <div className="grid grid-cols-2 gap-8">
               <div className="aspect-square bg-base-200/50 rounded-xl p-4">
-                <img
-                  src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                    selectedTaskInfo.path,
-                  )}`}
-                  alt={`Result for QID ${selectedTaskInfo.qid}`}
+                <TaskFigure
+                  path={selectedTaskInfo.path}
+                  qid={selectedTaskInfo.qid}
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -394,8 +374,8 @@ export default function ChipPage() {
                       selectedTaskInfo.task.status === "completed"
                         ? "badge-success"
                         : selectedTaskInfo.task.status === "failed"
-                          ? "badge-error"
-                          : "badge-warning"
+                        ? "badge-error"
+                        : "badge-warning"
                     }`}
                   >
                     {selectedTaskInfo.task.status}
@@ -406,7 +386,7 @@ export default function ChipPage() {
                     <h4 className="font-medium mb-2">Parameters</h4>
                     <div className="space-y-2">
                       {Object.entries(
-                        selectedTaskInfo.task.output_parameters,
+                        selectedTaskInfo.task.output_parameters
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&
