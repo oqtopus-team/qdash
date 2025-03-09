@@ -31,7 +31,7 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
   const { data: chipResponse } = useFetchChip(chipId);
   const { data: taskResponse } = useFetchLatestTaskGroupedByChip(
     chipId,
-    selectedTask
+    selectedTask,
   );
 
   // Create a mapping of QID to grid position
@@ -82,7 +82,7 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
           const col = index % gridSize;
           const qid = Object.keys(gridPositions).find(
             (key) =>
-              gridPositions[key].row === row && gridPositions[key].col === col
+              gridPositions[key].row === row && gridPositions[key].col === col,
           );
 
           if (!qid) {
@@ -141,8 +141,8 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
                   task.status === "completed"
                     ? "bg-success"
                     : task.status === "failed"
-                    ? "bg-error"
-                    : "bg-warning"
+                      ? "bg-error"
+                      : "bg-warning"
                 }`}
               />
             </button>
@@ -181,8 +181,8 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
                       selectedTaskInfo.task.status === "completed"
                         ? "badge-success"
                         : selectedTaskInfo.task.status === "failed"
-                        ? "badge-error"
-                        : "badge-warning"
+                          ? "badge-error"
+                          : "badge-warning"
                     }`}
                   >
                     {selectedTaskInfo.task.status}
@@ -193,7 +193,7 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
                     <h4 className="font-medium mb-2">Parameters</h4>
                     <div className="space-y-2">
                       {Object.entries(
-                        selectedTaskInfo.task.output_parameters
+                        selectedTaskInfo.task.output_parameters,
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&

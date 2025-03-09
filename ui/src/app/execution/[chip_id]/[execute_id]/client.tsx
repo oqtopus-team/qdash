@@ -162,10 +162,10 @@ export default function ExecutionDetailClient({
                           task.status === "running"
                             ? "text-info"
                             : task.status === "completed"
-                            ? "text-success"
-                            : task.status === "scheduled"
-                            ? "text-warning"
-                            : "text-error"
+                              ? "text-success"
+                              : task.status === "scheduled"
+                                ? "text-warning"
+                                : "text-error"
                         }`}
                       >
                         {task.status}
@@ -211,7 +211,7 @@ export default function ExecutionDetailClient({
                                               ? path
                                               : `/${path}`;
                                           link.href = `http://localhost:5715/file/raw_data?path=${encodeURIComponent(
-                                            normalizedPath
+                                            normalizedPath,
                                           )}`;
                                           // Get just the filename for download
                                           const filename =
@@ -227,7 +227,7 @@ export default function ExecutionDetailClient({
                                         Download
                                       </button>
                                     </div>
-                                  )
+                                  ),
                                 )}
                               </div>
                             </div>

@@ -16,7 +16,7 @@ export function TaskFigure({ path, qid, className = "" }: TaskFigureProps) {
           <img
             key={i}
             src={`${apiUrl}/api/executions/figure?path=${encodeURIComponent(
-              p
+              p,
             )}`}
             alt={`Result for QID ${qid}`}
             className={className}

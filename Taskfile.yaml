@@ -12,7 +12,7 @@ tasks:
   generate:
     dir: ui
     cmds:
-      - curl http://localhost:5716/openapi.json | jq > ../docs/oas/openapi.json
+      - curl http://localhost:5715/openapi.json | jq > ../docs/oas/openapi.json
       - bunx orval --config ./orval.config.cjs
       - bunx prettier . --write
       - bunx run fmt
