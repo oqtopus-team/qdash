@@ -4,15 +4,16 @@
   "private": true,
   "version": "0.0.0",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.0.0",
+    "bun": ">=1.0.0"
   },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "fmt": "eslint . --fix -c eslint.config.js",
-    "generate-qdash": "curl http://localhost:5715/openapi.json | jq > ../docs/openapi/qdash-openapi.json && openapi-typescript ../docs/openapi/qdash-openapi.json -o ./src/qdash.d.ts"
+    "lint": "bunx eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "fmt": "bunx eslint . --fix -c eslint.config.js",
+    "generate-qdash": "curl http://localhost:5715/openapi.json | jq > ../docs/openapi/qdash-openapi.json && bunx openapi-typescript ../docs/openapi/qdash-openapi.json -o ./src/qdash.d.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -93,7 +94,7 @@
     "tailwindcss": "^4.0.9",
     "typescript": "^5.6.3"
   },
-  "resolutions": {
+  "overrides": {
     "three": "^0.159.0",
     "three-mesh-bvh": "^0.8.0"
   }
