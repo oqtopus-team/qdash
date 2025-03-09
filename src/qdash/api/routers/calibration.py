@@ -138,6 +138,7 @@ async def schedule_cron_calib(
         logger.warning(e)
         raise HTTPException(status_code=404, detail="deployment not found")
     try:
+        TagDocument.insert_tags(menu.tags, current_user.username)
         cron = construct_schedule(cron=request.cron, timezone="Asia/Tokyo")
         new_deployment = Deployment(
             **target_deployment.dict(),
@@ -235,6 +236,7 @@ async def schedule_calib(
     scheduled_time = datetime.fromisoformat(datetime_str)
     env = settings.env
     try:
+        TagDocument.insert_tags(menu_request.tags, current_user.username)
         target_deployment = await client.read_deployment_by_name(f"main/{env}-main")
     except Exception as e:
         logger.warning(e)
