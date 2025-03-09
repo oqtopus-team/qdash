@@ -5,7 +5,7 @@ module.exports = {
       mode: "tags-split",
       target: "./src/client",
       schemas: "./src/schemas",
-      baseUrl: "http://localhost:5716",
+      baseUrl: process.env.NEXT_PUBLIC_API_URL,
       clean: true,
       mock: false,
       headers: {

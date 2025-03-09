@@ -6,6 +6,7 @@ import {
   useFetchChip,
   useFetchLatestTaskGroupedByChip,
 } from "@/client/chip/chip";
+import { TaskFigure } from "@/app/components/TaskFigure";
 
 interface TaskResultGridProps {
   chipId: string;
@@ -30,7 +31,7 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
   const { data: chipResponse } = useFetchChip(chipId);
   const { data: taskResponse } = useFetchLatestTaskGroupedByChip(
     chipId,
-    selectedTask,
+    selectedTask
   );
 
   // Create a mapping of QID to grid position
@@ -81,7 +82,7 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
           const col = index % gridSize;
           const qid = Object.keys(gridPositions).find(
             (key) =>
-              gridPositions[key].row === row && gridPositions[key].col === col,
+              gridPositions[key].row === row && gridPositions[key].col === col
           );
 
           if (!qid) {
@@ -125,26 +126,11 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
             >
               {task.figure_path && (
                 <div className="absolute inset-0">
-                  {Array.isArray(task.figure_path) ? (
-                    task.figure_path.map((path, i) => (
-                      <img
-                        key={i}
-                        src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                          path,
-                        )}`}
-                        alt={`Result for QID ${qid}`}
-                        className="w-full h-full object-contain"
-                      />
-                    ))
-                  ) : (
-                    <img
-                      src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                        task.figure_path,
-                      )}`}
-                      alt={`Result for QID ${qid}`}
-                      className="w-full h-full object-contain"
-                    />
-                  )}
+                  <TaskFigure
+                    path={task.figure_path}
+                    qid={qid}
+                    className="w-full h-full object-contain"
+                  />
                 </div>
               )}
               <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
@@ -155,8 +141,8 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
                   task.status === "completed"
                     ? "bg-success"
                     : task.status === "failed"
-                      ? "bg-error"
-                      : "bg-warning"
+                    ? "bg-error"
+                    : "bg-warning"
                 }`}
               />
             </button>
@@ -181,11 +167,9 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
             </div>
             <div className="grid grid-cols-2 gap-8">
               <div className="aspect-square bg-base-200/50 rounded-xl p-4">
-                <img
-                  src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                    selectedTaskInfo.path,
-                  )}`}
-                  alt={`Result for QID ${selectedTaskInfo.qid}`}
+                <TaskFigure
+                  path={selectedTaskInfo.path}
+                  qid={selectedTaskInfo.qid}
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -197,8 +181,8 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
                       selectedTaskInfo.task.status === "completed"
                         ? "badge-success"
                         : selectedTaskInfo.task.status === "failed"
-                          ? "badge-error"
-                          : "badge-warning"
+                        ? "badge-error"
+                        : "badge-warning"
                     }`}
                   >
                     {selectedTaskInfo.task.status}
@@ -209,7 +193,7 @@ export function TaskResultGrid({ chipId, selectedTask }: TaskResultGridProps) {
                     <h4 className="font-medium mb-2">Parameters</h4>
                     <div className="space-y-2">
                       {Object.entries(
-                        selectedTaskInfo.task.output_parameters,
+                        selectedTaskInfo.task.output_parameters
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&
