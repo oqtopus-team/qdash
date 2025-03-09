@@ -37,7 +37,4 @@ ENV PATH="/root/.bun/bin:${PATH}"
 
 COPY ./ui/package.json ./
 COPY ./ui/bun.lock ./
-RUN bun install
-
-# Install task runner
-RUN bun install -g @go-task/cli
+RUN cd ui && bun install

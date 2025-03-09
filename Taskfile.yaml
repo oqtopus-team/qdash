@@ -26,7 +26,7 @@ tasks:
   build:
     dir: ui
     cmds:
-      - npm run build
+      - bun run build
 
   build-docs:
     dir: docs
