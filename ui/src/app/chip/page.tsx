@@ -7,6 +7,7 @@ import { BsGrid, BsListUl } from "react-icons/bs";
 import { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
 import { TaskResultGrid } from "./components/TaskResultGrid";
 import { ChipSelector } from "@/app/components/ChipSelector";
+import { TaskSelector } from "@/app/components/TaskSelector";
 type ViewMode = "chip" | "mux";
 
 interface SelectedTaskInfo {
@@ -163,18 +164,12 @@ export default function ChipPage() {
               onChipSelect={setSelectedChip}
             />
 
-            <select
-              className="select select-bordered w-full max-w-xs rounded-lg"
-              value={selectedTask}
-              onChange={(e) => setSelectedTask(e.target.value)}
+            <TaskSelector
+              tasks={qubitTasks}
+              selectedTask={selectedTask}
+              onTaskSelect={setSelectedTask}
               disabled={viewMode !== "chip"}
-            >
-              {qubitTasks.map((task: TaskResponse) => (
-                <option key={task.name} value={task.name}>
-                  {task.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         </div>
 
