@@ -7,8 +7,6 @@ import { useMemo, useState } from "react";
 import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TagSelector } from "@/app/components/TagSelector";
 import { QIDSelector } from "@/app/components/QIDSelector";
-import { ParameterModel } from "@/schemas/parameterModel";
-import { Tag } from "@/schemas/tag";
 import dynamic from "next/dynamic";
 import { Layout } from "plotly.js";
 import { OutputParameterModel } from "@/schemas";
