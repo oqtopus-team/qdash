@@ -16,6 +16,7 @@ import {
   MarkerType,
 } from "@xyflow/react";
 import React from "react";
+import { TaskFigure } from "@/app/components/TaskFigure";
 import JsonView from "react18-json-view";
 import "@xyflow/react/dist/style.css";
 
@@ -272,10 +273,10 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
                   selectedTask.status === "running"
                     ? "text-info"
                     : selectedTask.status === "completed"
-                      ? "text-success"
-                      : selectedTask.status === "scheduled"
-                        ? "text-warning"
-                        : "text-error"
+                    ? "text-success"
+                    : selectedTask.status === "scheduled"
+                    ? "text-warning"
+                    : "text-error"
                 }`}
               >
                 {selectedTask.status}
@@ -302,16 +303,11 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
               <div>
                 <div className="font-medium mb-2">Figures</div>
                 <div className="space-y-2">
-                  {selectedTask.figurePath.map((path, i) => (
-                    <img
-                      key={i}
-                      src={`http://localhost:5715/executions/figure?path=${encodeURIComponent(
-                        path,
-                      )}`}
-                      alt={`Task Figure ${i + 1}`}
-                      className="w-full h-auto rounded border max-h-[200px] object-contain"
-                    />
-                  ))}
+                  <TaskFigure
+                    path={selectedTask.figurePath}
+                    qid={selectedTask.name}
+                    className="w-full h-auto rounded border max-h-[200px] object-contain"
+                  />
                 </div>
               </div>
             )}
