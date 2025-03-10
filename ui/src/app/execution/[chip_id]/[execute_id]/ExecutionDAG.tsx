@@ -82,16 +82,21 @@ const CustomNode = ({ data }: NodeProps) => {
   const nodeData = data as NodeData;
   return (
     <div
-      className="group px-4 py-2 shadow-lg rounded-lg border relative transition-colors"
+      className="group px-4 shadow-lg rounded-lg border relative transition-colors"
       style={{
         ...getStatusStyles(nodeData.status),
         borderWidth: "2px",
         minWidth: "150px",
+        maxWidth: "300px",
+        height: "60px", // 固定の高さ
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
       }}
     >
       <Handle type="target" position={Position.Left} />
-      <div className="font-semibold">{nodeData.name}</div>
-      <div className="text-sm font-medium">{nodeData.status}</div>
+      <div className="font-semibold truncate">{nodeData.name}</div>
+      <div className="text-sm font-medium truncate">{nodeData.status}</div>
       {nodeData.startAt && (
         <div className="tooltip tooltip-bottom absolute -bottom-12 opacity-0 group-hover:opacity-100 transition-opacity bg-base-300 p-2 rounded text-xs whitespace-nowrap z-10">
           <div>Start: {new Date(nodeData.startAt).toLocaleString()}</div>
@@ -148,7 +153,7 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
         outputParameters: task.output_parameters,
       },
       width: 180,
-      height: 80,
+      height: 60,
     }));
 
     const initialEdges: Edge[] = tasks
