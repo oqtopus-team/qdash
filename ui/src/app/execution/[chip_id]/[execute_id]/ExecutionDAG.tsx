@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
+import dagre from "dagre";
 import {
   ReactFlow,
   Background,
@@ -123,86 +124,72 @@ interface ExecutionDAGProps {
 export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
   const [selectedTask, setSelectedTask] = useState<TaskDetails | null>(null);
   const getLayoutedElements = useCallback(() => {
-    const nodes: Node[] = [];
-    const edges: Edge[] = [];
-    const levelMap = new Map<string, number>();
-    const visited = new Set<string>();
-
-    // Calculate levels for each node using DFS
-    const calculateLevel = (taskId: string, level: number) => {
-      if (visited.has(taskId)) return;
-      visited.add(taskId);
-
-      levelMap.set(taskId, Math.max(level, levelMap.get(taskId) || 0));
-
-      // Find children (tasks that have this task as upstream)
-      tasks.forEach((task) => {
-        if (task.upstream_id === taskId) {
-          calculateLevel(task.task_id, level + 1);
-        }
-      });
-    };
-
-    // Find root nodes (tasks with no upstream) and calculate levels
-    tasks.forEach((task) => {
-      if (task.upstream_id === undefined || task.upstream_id === "") {
-        calculateLevel(task.task_id, 0);
-      }
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+    dagreGraph.setGraph({
+      rankdir: "LR",
+      nodesep: 80,
+      ranksep: 200,
+      ranker: "network-simplex",
     });
 
-    // Create nodes with positions based on levels
-    const HORIZONTAL_SPACING = 300;
-    const VERTICAL_SPACING = 120;
-    const nodesAtLevel = new Map<number, string[]>();
+    // Create initial nodes and edges
+    const initialNodes: Node[] = tasks.map((task) => ({
+      id: task.task_id,
+      type: "custom",
+      position: { x: 0, y: 0 },
+      data: {
+        name: task.name,
+        status: task.status,
+        startAt: task.start_at,
+        elapsedTime: task.elapsed_time,
+        figurePath: task.figure_path,
+        inputParameters: task.input_parameters,
+        outputParameters: task.output_parameters,
+      },
+      width: 180,
+      height: 80,
+    }));
 
-    // First pass: Group nodes by level
-    tasks.forEach((task) => {
-      const level = levelMap.get(task.task_id) || 0;
-      const nodesInLevel = nodesAtLevel.get(level) || [];
-      nodesInLevel.push(task.task_id);
-      nodesAtLevel.set(level, nodesInLevel);
+    const initialEdges: Edge[] = tasks
+      .filter(
+        (task): task is TaskNode & { upstream_id: string } =>
+          typeof task.upstream_id === "string" && task.upstream_id !== ""
+      )
+      .map((task) => ({
+        id: `${task.upstream_id}-${task.task_id}`,
+        source: task.upstream_id,
+        target: task.task_id,
+        type: "smoothstep",
+        animated: true,
+        style: { stroke: "#64748b", strokeWidth: 2 },
+      }));
+
+    // Add nodes and edges to dagre graph
+    initialNodes.forEach((node) => {
+      dagreGraph.setNode(node.id, { width: node.width, height: node.height });
     });
 
-    // Second pass: Position nodes with vertical centering for each level
-    tasks.forEach((task) => {
-      const level = levelMap.get(task.task_id) || 0;
-      const nodesInLevel = nodesAtLevel.get(level) || [];
-      const index = nodesInLevel.indexOf(task.task_id);
-      const totalNodesInLevel = nodesInLevel.length;
+    initialEdges.forEach((edge) => {
+      dagreGraph.setEdge(edge.source, edge.target);
+    });
 
-      // Center nodes vertically within their level
-      const verticalCenter = ((totalNodesInLevel - 1) * VERTICAL_SPACING) / 2;
-      const yPosition = index * VERTICAL_SPACING - verticalCenter;
+    // Calculate layout
+    dagre.layout(dagreGraph);
 
-      nodes.push({
-        id: task.task_id,
-        type: "custom",
+    // Apply layout to nodes
+    const nodes = initialNodes.map((node) => {
+      const nodeWithPosition = dagreGraph.node(node.id);
+      return {
+        ...node,
         position: {
-          x: level * HORIZONTAL_SPACING,
-          y: yPosition,
+          x: nodeWithPosition.x - node.width! / 2,
+          y: nodeWithPosition.y - node.height! / 2,
         },
-        data: {
-          name: task.name,
-          status: task.status,
-          startAt: task.start_at,
-          elapsedTime: task.elapsed_time,
-          figurePath: task.figure_path,
-          inputParameters: task.input_parameters,
-          outputParameters: task.output_parameters,
-        },
-      });
-
-      if (task.upstream_id) {
-        edges.push({
-          id: `${task.upstream_id}-${task.task_id}`,
-          source: task.upstream_id,
-          target: task.task_id,
-          type: "step",
-        });
-      }
+      };
     });
 
-    return { nodes, edges };
+    return { nodes, edges: initialEdges };
   }, [tasks]);
 
   const { nodes, edges } = getLayoutedElements();
@@ -218,11 +205,12 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
             fitView
             className="bg-base-200"
             defaultEdgeOptions={{
-              type: "step",
+              type: "smoothstep",
               animated: true,
               style: { strokeWidth: 2 },
               markerEnd: {
                 type: MarkerType.ArrowClosed,
+                color: "#64748b",
               },
             }}
             fitViewOptions={{
