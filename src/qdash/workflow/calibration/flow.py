@@ -161,6 +161,7 @@ async def qubex_one_qubit_cal_flow(
     logger.info(f"Qubex version: {get_package_version('qubex')}")
     parallel = True
     plan = menu.qids
+    logger.info(f"Qubit calibration plan: {plan}")
     if len(menu.qids) == 1:
         parallel = False
     if parallel:

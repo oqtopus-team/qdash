@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import dagre from "dagre";
 import {
   ReactFlow,
   Background,
@@ -81,16 +82,21 @@ const CustomNode = ({ data }: NodeProps) => {
   const nodeData = data as NodeData;
   return (
     <div
-      className="group px-4 py-2 shadow-lg rounded-lg border relative transition-colors"
+      className="group px-4 shadow-lg rounded-lg border relative transition-colors"
       style={{
         ...getStatusStyles(nodeData.status),
         borderWidth: "2px",
         minWidth: "150px",
+        maxWidth: "300px",
+        height: "60px", // 固定の高さ
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
       }}
     >
       <Handle type="target" position={Position.Left} />
-      <div className="font-semibold">{nodeData.name}</div>
-      <div className="text-sm font-medium">{nodeData.status}</div>
+      <div className="font-semibold truncate">{nodeData.name}</div>
+      <div className="text-sm font-medium truncate">{nodeData.status}</div>
       {nodeData.startAt && (
         <div className="tooltip tooltip-bottom absolute -bottom-12 opacity-0 group-hover:opacity-100 transition-opacity bg-base-300 p-2 rounded text-xs whitespace-nowrap z-10">
           <div>Start: {new Date(nodeData.startAt).toLocaleString()}</div>
@@ -122,95 +128,93 @@ interface ExecutionDAGProps {
 
 export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
   const [selectedTask, setSelectedTask] = useState<TaskDetails | null>(null);
+  const [isMaximized, setIsMaximized] = useState(false);
   const getLayoutedElements = useCallback(() => {
-    const nodes: Node[] = [];
-    const edges: Edge[] = [];
-    const levelMap = new Map<string, number>();
-    const visited = new Set<string>();
-
-    // Calculate levels for each node using DFS
-    const calculateLevel = (taskId: string, level: number) => {
-      if (visited.has(taskId)) return;
-      visited.add(taskId);
-
-      levelMap.set(taskId, Math.max(level, levelMap.get(taskId) || 0));
-
-      // Find children (tasks that have this task as upstream)
-      tasks.forEach((task) => {
-        if (task.upstream_id === taskId) {
-          calculateLevel(task.task_id, level + 1);
-        }
-      });
-    };
-
-    // Find root nodes (tasks with no upstream) and calculate levels
-    tasks.forEach((task) => {
-      if (task.upstream_id === undefined || task.upstream_id === "") {
-        calculateLevel(task.task_id, 0);
-      }
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+    dagreGraph.setGraph({
+      rankdir: "LR",
+      nodesep: 80,
+      ranksep: 200,
+      ranker: "network-simplex",
     });
 
-    // Create nodes with positions based on levels
-    const HORIZONTAL_SPACING = 300;
-    const VERTICAL_SPACING = 120;
-    const nodesAtLevel = new Map<number, string[]>();
+    // Create initial nodes and edges
+    const initialNodes: Node[] = tasks.map((task) => ({
+      id: task.task_id,
+      type: "custom",
+      position: { x: 0, y: 0 },
+      data: {
+        name: task.name,
+        status: task.status,
+        startAt: task.start_at,
+        elapsedTime: task.elapsed_time,
+        figurePath: task.figure_path,
+        inputParameters: task.input_parameters,
+        outputParameters: task.output_parameters,
+      },
+      width: 180,
+      height: 60,
+    }));
 
-    // First pass: Group nodes by level
-    tasks.forEach((task) => {
-      const level = levelMap.get(task.task_id) || 0;
-      const nodesInLevel = nodesAtLevel.get(level) || [];
-      nodesInLevel.push(task.task_id);
-      nodesAtLevel.set(level, nodesInLevel);
+    const initialEdges: Edge[] = tasks
+      .filter(
+        (task): task is TaskNode & { upstream_id: string } =>
+          typeof task.upstream_id === "string" && task.upstream_id !== ""
+      )
+      .map((task) => ({
+        id: `${task.upstream_id}-${task.task_id}`,
+        source: task.upstream_id,
+        target: task.task_id,
+        type: "smoothstep",
+        animated: true,
+        style: { stroke: "#64748b", strokeWidth: 2 },
+      }));
+
+    // Add nodes and edges to dagre graph
+    initialNodes.forEach((node) => {
+      dagreGraph.setNode(node.id, { width: node.width, height: node.height });
     });
 
-    // Second pass: Position nodes with vertical centering for each level
-    tasks.forEach((task) => {
-      const level = levelMap.get(task.task_id) || 0;
-      const nodesInLevel = nodesAtLevel.get(level) || [];
-      const index = nodesInLevel.indexOf(task.task_id);
-      const totalNodesInLevel = nodesInLevel.length;
+    initialEdges.forEach((edge) => {
+      dagreGraph.setEdge(edge.source, edge.target);
+    });
 
-      // Center nodes vertically within their level
-      const verticalCenter = ((totalNodesInLevel - 1) * VERTICAL_SPACING) / 2;
-      const yPosition = index * VERTICAL_SPACING - verticalCenter;
+    // Calculate layout
+    dagre.layout(dagreGraph);
 
-      nodes.push({
-        id: task.task_id,
-        type: "custom",
+    // Apply layout to nodes
+    const nodes = initialNodes.map((node) => {
+      const nodeWithPosition = dagreGraph.node(node.id);
+      return {
+        ...node,
         position: {
-          x: level * HORIZONTAL_SPACING,
-          y: yPosition,
+          x: nodeWithPosition.x - node.width! / 2,
+          y: nodeWithPosition.y - node.height! / 2,
         },
-        data: {
-          name: task.name,
-          status: task.status,
-          startAt: task.start_at,
-          elapsedTime: task.elapsed_time,
-          figurePath: task.figure_path,
-          inputParameters: task.input_parameters,
-          outputParameters: task.output_parameters,
-        },
-      });
-
-      if (task.upstream_id) {
-        edges.push({
-          id: `${task.upstream_id}-${task.task_id}`,
-          source: task.upstream_id,
-          target: task.task_id,
-          type: "step",
-        });
-      }
+      };
     });
 
-    return { nodes, edges };
+    return { nodes, edges: initialEdges };
   }, [tasks]);
 
   const { nodes, edges } = getLayoutedElements();
 
   return (
-    <div className="flex gap-4">
+    <div className="flex gap-4 relative">
       <ReactFlowProvider>
-        <div style={{ width: selectedTask ? "70%" : "100%", height: "400px" }}>
+        <div
+          style={{
+            width: selectedTask ? "70%" : "100%",
+            height: isMaximized ? "90vh" : "400px",
+            position: isMaximized ? "fixed" : "relative",
+            top: isMaximized ? "5vh" : "auto",
+            left: isMaximized ? "5vw" : "auto",
+            right: isMaximized ? "5vw" : "auto",
+            zIndex: isMaximized ? 50 : "auto",
+          }}
+          className={isMaximized ? "bg-base-100 p-4 rounded-lg shadow-xl" : ""}
+        >
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -218,11 +222,12 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
             fitView
             className="bg-base-200"
             defaultEdgeOptions={{
-              type: "step",
+              type: "smoothstep",
               animated: true,
               style: { strokeWidth: 2 },
               markerEnd: {
                 type: MarkerType.ArrowClosed,
+                color: "#64748b",
               },
             }}
             fitViewOptions={{
@@ -243,26 +248,101 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
           >
             <Background />
             <Controls />
-            <Panel position="top-left" className="bg-base-100 p-2 rounded">
+            <Panel
+              position="top-left"
+              className="bg-base-100 p-2 rounded flex items-center gap-4"
+            >
               <div className="text-sm">Click nodes to see details</div>
+              <button
+                onClick={() => setIsMaximized(!isMaximized)}
+                className="btn btn-sm btn-ghost"
+              >
+                {isMaximized ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
+                    />
+                  </svg>
+                )}
+              </button>
             </Panel>
           </ReactFlow>
         </div>
       </ReactFlowProvider>
 
+      {isMaximized && !selectedTask && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={() => setIsMaximized(false)}
+        />
+      )}
       {selectedTask && (
         <div
-          className="w-[30%] bg-base-100 p-4 rounded-lg shadow overflow-y-auto"
-          style={{ height: "600px" }}
+          className={`bg-base-100 p-4 rounded-lg shadow overflow-y-auto ${
+            isMaximized
+              ? "fixed right-8 top-[5vh] w-[400px] z-50 max-h-[90vh]"
+              : "w-[30%]"
+          }`}
+          style={{ height: isMaximized ? "auto" : "600px" }}
         >
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">{selectedTask.name}</h3>
-            <button
-              onClick={() => setSelectedTask(null)}
-              className="text-base-content/60 hover:text-base-content"
-            >
-              ×
-            </button>
+            <div className="flex gap-2">
+              {isMaximized && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMaximized(false);
+                  }}
+                  className="text-base-content/60 hover:text-base-content"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
+                    />
+                  </svg>
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedTask(null)}
+                className="text-base-content/60 hover:text-base-content"
+              >
+                ×
+              </button>
+            </div>
           </div>
 
           <div className="space-y-4">
