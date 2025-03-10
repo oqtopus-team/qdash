@@ -1,5 +1,6 @@
 # application code for the execution manager.
 import json
+import logging
 from collections.abc import Callable
 from pathlib import Path
 
@@ -14,6 +15,10 @@ from qdash.datamodel.execution import (
 )
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.workflow.manager.task import TaskManager
+from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class ExecutionManager(BaseModel):
@@ -96,15 +101,57 @@ class ExecutionManager(BaseModel):
         """Reload the execution manager from the file and return self for chaining."""
         return ExecutionManager.load_from_file(self.calib_data_path)
 
+    def _merge_calib_notes(self, task_id: str) -> None:
+        """Merge calibration notes from task with master note.
+
+        Args:
+        ----
+            task_id: ID of the task whose note to merge
+
+        Note:
+        ----
+            This function handles the loading, merging and saving of calibration notes.
+            It uses timestamp-based merging to ensure the most recent data is kept.
+
+        """
+        note_path = f"{self.calib_data_path}/calib_note/{task_id}.json"
+        try:
+            # Load master calib note
+            with Path(self.note["calib_note_path"]).open() as f:
+                calib_note = json.load(f)
+
+            # Load and merge task note
+            with Path(note_path).open() as f:
+                task_note = json.load(f)
+                # Merge notes based on timestamp
+                merged_note = merge_notes_by_timestamp(calib_note, task_note)
+
+            # Save merged result back to master calib note
+            with Path(self.note["calib_note_path"]).open("w") as f:
+                json.dump(merged_note, f, indent=2)
+
+        except FileNotFoundError:
+            pass  # Skip if note file doesn't exist
+        except Exception as e:
+            logger.info(f"Error merging notes: {e}")  # Log error but continue execution
+
     def update_with_task_manager(self, task_manager: TaskManager) -> "ExecutionManager":
         def updater(updated: ExecutionManager) -> None:
+            # Update task results
             updated.task_results[task_manager.id] = task_manager.task_result
+
+            # Update calibration data
             for qid in task_manager.calib_data.qubit:
                 updated.calib_data.qubit[qid] = task_manager.calib_data.qubit[qid]
             for qid in task_manager.calib_data.coupling:
                 updated.calib_data.coupling[qid] = task_manager.calib_data.coupling[qid]
+
+            # Update controller info
             for _id in task_manager.controller_info:
                 updated.controller_info[_id] = task_manager.controller_info[_id]
+
+            # Merge calibration notes
+            self._merge_calib_notes(task_manager.id)
 
         self._with_file_lock(updater)
         return ExecutionManager.load_from_file(self.calib_data_path)

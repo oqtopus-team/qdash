@@ -1,4 +1,6 @@
 import asyncio
+import shutil
+from pathlib import Path
 
 from prefect import flow, get_run_logger
 from prefect.deployments import run_deployment
@@ -76,12 +78,6 @@ def cal_flow(
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
     labels = [qid_to_label(q) for q in qubits]
-    exp = Experiment(
-        chip_id="64Q",
-        qubits=labels,
-        config_dir="/home/shared/config",
-    )
-    exp.note.clear()
     task_names = validate_task_name(menu.tasks, username=menu.username)
     task_manager = TaskManager(
         username=menu.username, execution_id=execution_id, qids=qubits, calib_dir=calib_dir
@@ -93,6 +89,19 @@ def cal_flow(
         task_details=menu.task_details,
     )
     task_manager.save()
+
+    source_path = Path(f"/app/calib_data/{menu.username}/.calibration/64Q.json")
+    destination_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(source_path, destination_path)
+
+    exp = Experiment(
+        chip_id="64Q",
+        qubits=labels,
+        config_dir="/home/shared/config",
+        calib_note_path=f"{calib_dir}/calib_note/{task_manager.id}.json",
+    )
+    exp.note.clear()
     parameters = update_active_output_parameters(username=menu.username)
     ParameterDocument.insert_parameters(parameters)
     tasks = update_active_tasks(username=menu.username)

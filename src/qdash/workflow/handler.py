@@ -94,6 +94,12 @@ def main_flow(
     create_directory_task.submit(latest_calib_dir).result()
     success_map = {flow_name: False for flow_name in calibration_flow_map}
     chip_id = ChipDocument.get_current_chip(username=menu.username).chip_id
+    # with Path(".calibration/64Q.json").open() as f:
+    #     chip_info = json.load(f)
+    calib_note_path = Path(f"/app/calib_data/{menu.username}/.calibration/64Q.json")
+    if not calib_note_path.exists():
+        calib_note_path.parent.mkdir(parents=True, exist_ok=True)
+        calib_note_path.touch()
     execution_manager = ExecutionManager(
         username=menu.username,
         name=menu.name,
@@ -102,7 +108,11 @@ def main_flow(
         tags=menu.tags,
         fridge_info={"temperature": 0.0},
         chip_id=chip_id,
-        note={"qubex_version": get_package_version("qubex"), "ui_url": ui_url},
+        note={
+            "qubex_version": get_package_version("qubex"),
+            "ui_url": ui_url,
+            "calib_note_path": str(calib_note_path),
+        },
     ).save()
     ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
     execution_manager = execution_manager.start_execution().save()
@@ -112,6 +122,9 @@ def main_flow(
     try:
         success_map = qubex_one_qubit_cal_flow(menu, calib_dir, success_map, execution_id)
         execution_manager = ExecutionManager.load_from_file(calib_dir).complete_execution()
+        # for note_name in list(execution_manager.task_results.keys()):
+        #     note_path = f"{calib_dir}/calib_note/{note_name}.json"
+        #     # merge the note
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")
         execution_manager = ExecutionManager.load_from_file(calib_dir).fail_execution()
