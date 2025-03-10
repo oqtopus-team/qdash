@@ -128,6 +128,7 @@ interface ExecutionDAGProps {
 
 export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
   const [selectedTask, setSelectedTask] = useState<TaskDetails | null>(null);
+  const [isMaximized, setIsMaximized] = useState(false);
   const getLayoutedElements = useCallback(() => {
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -200,9 +201,20 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
   const { nodes, edges } = getLayoutedElements();
 
   return (
-    <div className="flex gap-4">
+    <div className="flex gap-4 relative">
       <ReactFlowProvider>
-        <div style={{ width: selectedTask ? "70%" : "100%", height: "400px" }}>
+        <div
+          style={{
+            width: selectedTask ? "70%" : "100%",
+            height: isMaximized ? "90vh" : "400px",
+            position: isMaximized ? "fixed" : "relative",
+            top: isMaximized ? "5vh" : "auto",
+            left: isMaximized ? "5vw" : "auto",
+            right: isMaximized ? "5vw" : "auto",
+            zIndex: isMaximized ? 50 : "auto",
+          }}
+          className={isMaximized ? "bg-base-100 p-4 rounded-lg shadow-xl" : ""}
+        >
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -236,26 +248,101 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
           >
             <Background />
             <Controls />
-            <Panel position="top-left" className="bg-base-100 p-2 rounded">
+            <Panel
+              position="top-left"
+              className="bg-base-100 p-2 rounded flex items-center gap-4"
+            >
               <div className="text-sm">Click nodes to see details</div>
+              <button
+                onClick={() => setIsMaximized(!isMaximized)}
+                className="btn btn-sm btn-ghost"
+              >
+                {isMaximized ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
+                    />
+                  </svg>
+                )}
+              </button>
             </Panel>
           </ReactFlow>
         </div>
       </ReactFlowProvider>
 
+      {isMaximized && !selectedTask && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={() => setIsMaximized(false)}
+        />
+      )}
       {selectedTask && (
         <div
-          className="w-[30%] bg-base-100 p-4 rounded-lg shadow overflow-y-auto"
-          style={{ height: "600px" }}
+          className={`bg-base-100 p-4 rounded-lg shadow overflow-y-auto ${
+            isMaximized
+              ? "fixed right-8 top-[5vh] w-[400px] z-50 max-h-[90vh]"
+              : "w-[30%]"
+          }`}
+          style={{ height: isMaximized ? "auto" : "600px" }}
         >
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">{selectedTask.name}</h3>
-            <button
-              onClick={() => setSelectedTask(null)}
-              className="text-base-content/60 hover:text-base-content"
-            >
-              ×
-            </button>
+            <div className="flex gap-2">
+              {isMaximized && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMaximized(false);
+                  }}
+                  className="text-base-content/60 hover:text-base-content"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
+                    />
+                  </svg>
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedTask(null)}
+                className="text-base-content/60 hover:text-base-content"
+              >
+                ×
+              </button>
+            </div>
           </div>
 
           <div className="space-y-4">
