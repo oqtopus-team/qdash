@@ -22,14 +22,16 @@ export function TimeSeriesView() {
   const [selectedChip, setSelectedChip] = useState<string>("");
   const [selectedParameter, setSelectedParameter] = useState<string>("t1");
   const [selectedTag, setSelectedTag] = useState<string>("daily");
-  const [selectedQid, setSelectedQid] = useState<string>("");
   const [endAt, setEndAt] = useState<string>(new Date().toISOString());
   const [startAt, setStartAt] = useState<string>(
     new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   );
   const [isStartAtLocked, setIsStartAtLocked] = useState(false);
   const [isEndAtLocked, setIsEndAtLocked] = useState(false);
+  const [filter, setFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const REFRESH_INTERVAL = 30; // 30 seconds fixed
+  const ROWS_PER_PAGE = 50;
 
   // Update current time every 30 seconds
   useEffect(() => {
@@ -45,6 +47,11 @@ export function TimeSeriesView() {
     }, REFRESH_INTERVAL * 1000);
     return () => clearInterval(timer);
   }, [isStartAtLocked, isEndAtLocked]);
+
+  // Reset page when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]);
 
   // Handle time range changes
   const handleStartAtChange = useCallback(
@@ -104,6 +111,44 @@ export function TimeSeriesView() {
         },
       }
     );
+
+  // Table data
+  const tableData = useMemo(() => {
+    if (!timeseriesResponse?.data?.data) return [];
+    const rows: {
+      qid: string;
+      time: string;
+      value: number | string;
+      unit: string;
+    }[] = [];
+
+    Object.entries(timeseriesResponse.data.data).forEach(
+      ([qid, dataPoints]) => {
+        if (Array.isArray(dataPoints)) {
+          dataPoints.forEach((point: OutputParameterModel) => {
+            rows.push({
+              qid,
+              time: point.calibrated_at || "",
+              value: point.value || 0,
+              unit: point.unit || "a.u.",
+            });
+          });
+        }
+      }
+    );
+
+    // Sort by QID and time
+    return rows.sort((a, b) => {
+      const qidCompare = parseInt(a.qid) - parseInt(b.qid);
+      if (qidCompare !== 0) return qidCompare;
+      return a.time.localeCompare(b.time);
+    });
+  }, [timeseriesResponse]);
+
+  // Filtered data
+  const filteredData = useMemo(() => {
+    return tableData.filter((row) => row.qid.includes(filter));
+  }, [tableData, filter]);
 
   // Prepare plot data
   const plotData = useMemo(() => {
@@ -239,26 +284,6 @@ export function TimeSeriesView() {
 
   const parameters = parametersResponse?.data?.parameters || [];
   const tags = tagsResponse?.data?.tags || [];
-  const qids = useMemo(() => {
-    if (!timeseriesResponse?.data?.data) return [];
-    return Object.keys(timeseriesResponse.data.data).sort((a, b) => {
-      const numA = parseInt(a);
-      const numB = parseInt(b);
-      return numA - numB;
-    });
-  }, [timeseriesResponse]);
-
-  // Selected QID data
-  const selectedQidData = useMemo(() => {
-    if (!selectedQid || !timeseriesResponse?.data?.data) return [];
-    const data = timeseriesResponse.data.data[selectedQid];
-    if (!Array.isArray(data)) return [];
-    return data.map((point: OutputParameterModel) => ({
-      time: point.calibrated_at || "",
-      value: point.value || 0,
-      unit: point.unit || "a.u.",
-    }));
-  }, [timeseriesResponse, selectedQid, selectedParameter]);
 
   // Convert data to CSV format
   const handleDownloadCSV = useCallback(() => {
@@ -560,7 +585,7 @@ export function TimeSeriesView() {
 
       {/* Data Table */}
       <div className="col-span-3 card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-4">
             <h2 className="text-2xl font-semibold">Data Table</h2>
             <button
@@ -586,46 +611,86 @@ export function TimeSeriesView() {
               Download CSV
             </button>
           </div>
-          <div className="w-64">
-            <QIDSelector
-              qids={qids}
-              selectedQid={selectedQid}
-              onQidSelect={setSelectedQid}
-              disabled={!plotData.length}
-            />
+          <div className="flex items-center gap-2">
+            <div className="form-control w-64">
+              <input
+                type="text"
+                placeholder="Filter by QID..."
+                className="input input-bordered input-sm"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              />
+            </div>
+            <div className="text-sm text-base-content/70">
+              {filter ? `Filtered ${filteredData.length} entries` : ""}
+            </div>
           </div>
         </div>
-        <div className="overflow-x-auto" style={{ minHeight: "300px" }}>
-          {selectedQid ? (
-            <table className="table table-compact table-zebra w-full border border-base-300 bg-base-100">
-              <thead>
-                <tr>
-                  <th className="text-left bg-base-200">Time</th>
-                  <th className="text-center bg-base-200">Value</th>
-                  <th className="text-center bg-base-200">Unit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedQidData.map((point, index) => (
+        <div className="overflow-x-auto" style={{ minHeight: "400px" }}>
+          <table className="table table-compact table-zebra w-full border border-base-300 bg-base-100">
+            <thead>
+              <tr>
+                <th className="text-left bg-base-200">QID</th>
+                <th className="text-left bg-base-200">Time</th>
+                <th className="text-center bg-base-200">Value</th>
+                <th className="text-center bg-base-200">Unit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredData
+                .slice(
+                  (currentPage - 1) * ROWS_PER_PAGE,
+                  currentPage * ROWS_PER_PAGE
+                )
+                .map((row, index) => (
                   <tr key={index}>
-                    <td className="text-left">{point.time}</td>
+                    <td className="text-left">{row.qid}</td>
+                    <td className="text-left">{row.time}</td>
                     <td className="text-center">
-                      {typeof point.value === "number"
-                        ? point.value.toFixed(4)
-                        : point.value}
+                      {typeof row.value === "number"
+                        ? row.value.toFixed(4)
+                        : row.value}
                     </td>
-                    <td className="text-center">{point.unit}</td>
+                    <td className="text-center">{row.unit}</td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="flex items-center justify-center h-full text-base-content/70">
-              <div className="text-center">
-                <p className="text-lg">Select a QID to view data</p>
-              </div>
+            </tbody>
+          </table>
+          <div className="flex justify-between items-center mt-4">
+            <div className="text-sm text-base-content/70">
+              Showing {Math.min(ROWS_PER_PAGE, filteredData.length)} of{" "}
+              {filteredData.length} entries
             </div>
-          )}
+            <div className="join">
+              <button
+                className="join-item btn btn-sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </button>
+              <button className="join-item btn btn-sm btn-disabled">
+                Page {currentPage} of{" "}
+                {Math.ceil(filteredData.length / ROWS_PER_PAGE)}
+              </button>
+              <button
+                className="join-item btn btn-sm"
+                onClick={() =>
+                  setCurrentPage((p) =>
+                    Math.min(
+                      Math.ceil(filteredData.length / ROWS_PER_PAGE),
+                      p + 1
+                    )
+                  )
+                }
+                disabled={
+                  currentPage === Math.ceil(filteredData.length / ROWS_PER_PAGE)
+                }
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
