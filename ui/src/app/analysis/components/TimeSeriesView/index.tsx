@@ -30,8 +30,23 @@ export function TimeSeriesView() {
   const [isEndAtLocked, setIsEndAtLocked] = useState(false);
   const [filter, setFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState<"time" | "qid">("time");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const REFRESH_INTERVAL = 30; // 30 seconds fixed
   const ROWS_PER_PAGE = 50;
+
+  // Handle sort
+  const handleSort = useCallback(
+    (field: "time" | "qid") => {
+      if (sortField === field) {
+        setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+      } else {
+        setSortField(field);
+        setSortDirection("desc");
+      }
+    },
+    [sortField]
+  );
 
   // Update current time every 30 seconds
   useEffect(() => {
@@ -145,10 +160,18 @@ export function TimeSeriesView() {
     });
   }, [timeseriesResponse]);
 
-  // Filtered data
+  // Filtered and sorted data
   const filteredData = useMemo(() => {
-    return tableData.filter((row) => row.qid.includes(filter));
-  }, [tableData, filter]);
+    const filtered = tableData.filter((row) => row.qid.includes(filter));
+    return filtered.sort((a, b) => {
+      const direction = sortDirection === "asc" ? 1 : -1;
+      if (sortField === "time") {
+        return direction * a.time.localeCompare(b.time);
+      } else {
+        return direction * (parseInt(a.qid) - parseInt(b.qid));
+      }
+    });
+  }, [tableData, filter, sortField, sortDirection]);
 
   // Prepare plot data
   const plotData = useMemo(() => {
@@ -630,8 +653,54 @@ export function TimeSeriesView() {
           <table className="table table-compact table-zebra w-full border border-base-300 bg-base-100">
             <thead>
               <tr>
-                <th className="text-left bg-base-200">QID</th>
-                <th className="text-left bg-base-200">Time</th>
+                <th
+                  className="text-left bg-base-200 cursor-pointer hover:bg-base-300"
+                  onClick={() => handleSort("qid")}
+                >
+                  <div className="flex items-center gap-1">
+                    QID
+                    {sortField === "qid" && (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`w-4 h-4 transition-transform ${
+                          sortDirection === "desc" ? "rotate-180" : ""
+                        }`}
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M18 15l-6-6-6 6" />
+                      </svg>
+                    )}
+                  </div>
+                </th>
+                <th
+                  className="text-left bg-base-200 cursor-pointer hover:bg-base-300"
+                  onClick={() => handleSort("time")}
+                >
+                  <div className="flex items-center gap-1">
+                    Time
+                    {sortField === "time" && (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`w-4 h-4 transition-transform ${
+                          sortDirection === "desc" ? "rotate-180" : ""
+                        }`}
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M18 15l-6-6-6 6" />
+                      </svg>
+                    )}
+                  </div>
+                </th>
                 <th className="text-center bg-base-200">Value</th>
                 <th className="text-center bg-base-200">Unit</th>
               </tr>
