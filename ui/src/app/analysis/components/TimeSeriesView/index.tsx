@@ -6,7 +6,6 @@ import { useFetchTimeseriesTaskResultByTagAndParameter } from "@/client/chip/chi
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TagSelector } from "@/app/components/TagSelector";
-import { QIDSelector } from "@/app/components/QIDSelector";
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { DateTimePicker } from "@/app/components/DateTimePicker";
 import dynamic from "next/dynamic";
