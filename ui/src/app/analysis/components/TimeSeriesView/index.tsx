@@ -260,6 +260,59 @@ export function TimeSeriesView() {
     }));
   }, [timeseriesResponse, selectedQid, selectedParameter]);
 
+  // Convert data to CSV format
+  const handleDownloadCSV = useCallback(() => {
+    if (!timeseriesResponse?.data?.data) return;
+
+    // Prepare CSV header
+    const headers = ["QID", "Time", "Value", "Unit"];
+    const rows: string[][] = [];
+
+    // Convert data to rows
+    Object.entries(timeseriesResponse.data.data).forEach(
+      ([qid, dataPoints]) => {
+        if (Array.isArray(dataPoints)) {
+          dataPoints.forEach((point: OutputParameterModel) => {
+            rows.push([
+              qid,
+              point.calibrated_at || "",
+              String(point.value || ""),
+              point.unit || "a.u.",
+            ]);
+          });
+        }
+      }
+    );
+
+    // Sort rows by QID and time
+    rows.sort((a, b) => {
+      const qidCompare = parseInt(a[0]) - parseInt(b[0]);
+      if (qidCompare !== 0) return qidCompare;
+      return a[1].localeCompare(b[1]);
+    });
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+    ].join("\n");
+
+    // Create and trigger download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute(
+      "download",
+      `timeseries_${selectedChip}_${selectedParameter}_${selectedTag}_${new Date()
+        .toISOString()
+        .slice(0, 19)
+        .replace(/[:-]/g, "")}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [timeseriesResponse, selectedChip, selectedParameter, selectedTag]);
+
   return (
     <div className="grid grid-cols-3 gap-8">
       {/* Parameter Selection Card */}
@@ -508,7 +561,31 @@ export function TimeSeriesView() {
       {/* Data Table */}
       <div className="col-span-3 card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-semibold">Data Table</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-semibold">Data Table</h2>
+            <button
+              className="btn btn-sm btn-outline gap-2"
+              onClick={handleDownloadCSV}
+              disabled={!timeseriesResponse?.data?.data}
+              title="Download all data as CSV"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Download CSV
+            </button>
+          </div>
           <div className="w-64">
             <QIDSelector
               qids={qids}
