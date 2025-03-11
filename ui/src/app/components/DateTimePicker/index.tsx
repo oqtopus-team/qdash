@@ -35,12 +35,18 @@ export function DateTimePicker({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setLocalValue(newValue);
-    // Convert local time to ISO string with timezone
+    // Convert local time to ISO string with JST timezone
     const date = new Date(newValue);
-    const isoString = new Date(
-      date.getTime() - date.getTimezoneOffset() * 60000
-    ).toISOString();
-    onChange(isoString);
+    // Format as YYYY-MM-DDTHH:mm:ss.SSSZ+09:00
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    const milliseconds = String(date.getMilliseconds()).padStart(3, "0");
+    const jstString = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}+09:00`;
+    onChange(jstString);
   };
 
   return (
