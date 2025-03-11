@@ -21,9 +21,21 @@ export function TimeSeriesView() {
   const [selectedChip, setSelectedChip] = useState<string>("");
   const [selectedParameter, setSelectedParameter] = useState<string>("t1");
   const [selectedTag, setSelectedTag] = useState<string>("daily");
-  const [endAt, setEndAt] = useState<string>(new Date().toISOString());
+  // Format date with JST timezone
+  const formatJSTDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    const milliseconds = String(date.getMilliseconds()).padStart(3, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}+09:00`;
+  };
+
+  const [endAt, setEndAt] = useState<string>(formatJSTDate(new Date()));
   const [startAt, setStartAt] = useState<string>(
-    new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    formatJSTDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
   );
   const [isStartAtLocked, setIsStartAtLocked] = useState(false);
   const [isEndAtLocked, setIsEndAtLocked] = useState(false);
@@ -51,11 +63,11 @@ export function TimeSeriesView() {
   useEffect(() => {
     const timer = setInterval(() => {
       if (!isEndAtLocked) {
-        setEndAt(new Date().toISOString());
+        setEndAt(formatJSTDate(new Date()));
       }
       if (!isStartAtLocked && !isEndAtLocked) {
         setStartAt(
-          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+          formatJSTDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
         );
       }
     }, REFRESH_INTERVAL * 1000);
@@ -91,14 +103,14 @@ export function TimeSeriesView() {
   // Toggle lock functions
   const toggleStartAtLock = useCallback(() => {
     if (isStartAtLocked) {
-      setStartAt(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+      setStartAt(formatJSTDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)));
     }
     setIsStartAtLocked(!isStartAtLocked);
   }, [isStartAtLocked]);
 
   const toggleEndAtLock = useCallback(() => {
     if (isEndAtLocked) {
-      setEndAt(new Date().toISOString());
+      setEndAt(formatJSTDate(new Date()));
     }
     setIsEndAtLocked(!isEndAtLocked);
   }, [isEndAtLocked]);
