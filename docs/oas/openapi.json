@@ -1027,6 +1027,24 @@
               "type": "string",
               "title": "Tag"
             }
+          },
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Start At"
+            }
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "End At"
+            }
           }
         ],
         "responses": {
@@ -1092,6 +1110,24 @@
             "schema": {
               "type": "string",
               "title": "Tag"
+            }
+          },
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Start At"
+            }
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "End At"
             }
           }
         ],

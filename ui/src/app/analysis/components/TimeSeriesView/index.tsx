@@ -3,11 +3,12 @@
 import { useFetchAllParameters } from "@/client/parameter/parameter";
 import { useListAllTag } from "@/client/tag/tag";
 import { useFetchTimeseriesTaskResultByTagAndParameter } from "@/client/chip/chip";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TagSelector } from "@/app/components/TagSelector";
 import { QIDSelector } from "@/app/components/QIDSelector";
 import { ChipSelector } from "@/app/components/ChipSelector";
+import { DateTimePicker } from "@/app/components/DateTimePicker";
 import dynamic from "next/dynamic";
 import { Layout } from "plotly.js";
 import { OutputParameterModel } from "@/schemas";
@@ -22,43 +23,104 @@ export function TimeSeriesView() {
   const [selectedParameter, setSelectedParameter] = useState<string>("t1");
   const [selectedTag, setSelectedTag] = useState<string>("daily");
   const [selectedQid, setSelectedQid] = useState<string>("");
-  const REFRESH_INTERVAL = 30; // 30秒固定
+  const [endAt, setEndAt] = useState<string>(new Date().toISOString());
+  const [startAt, setStartAt] = useState<string>(
+    new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  );
+  const [isStartAtLocked, setIsStartAtLocked] = useState(false);
+  const [isEndAtLocked, setIsEndAtLocked] = useState(false);
+  const REFRESH_INTERVAL = 30; // 30 seconds fixed
 
-  // パラメータとタグの取得
+  // Update current time every 30 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!isEndAtLocked) {
+        setEndAt(new Date().toISOString());
+      }
+      if (!isStartAtLocked && !isEndAtLocked) {
+        setStartAt(
+          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+        );
+      }
+    }, REFRESH_INTERVAL * 1000);
+    return () => clearInterval(timer);
+  }, [isStartAtLocked, isEndAtLocked]);
+
+  // Handle time range changes
+  const handleStartAtChange = useCallback(
+    (value: string) => {
+      setStartAt(value);
+      if (!isStartAtLocked) {
+        setIsStartAtLocked(true);
+      }
+    },
+    [isStartAtLocked]
+  );
+
+  const handleEndAtChange = useCallback(
+    (value: string) => {
+      setEndAt(value);
+      if (!isEndAtLocked) {
+        setIsEndAtLocked(true);
+      }
+    },
+    [isEndAtLocked]
+  );
+
+  // Toggle lock functions
+  const toggleStartAtLock = useCallback(() => {
+    if (isStartAtLocked) {
+      setStartAt(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+    }
+    setIsStartAtLocked(!isStartAtLocked);
+  }, [isStartAtLocked]);
+
+  const toggleEndAtLock = useCallback(() => {
+    if (isEndAtLocked) {
+      setEndAt(new Date().toISOString());
+    }
+    setIsEndAtLocked(!isEndAtLocked);
+  }, [isEndAtLocked]);
+
+  // Fetch parameters and tags
   const { data: parametersResponse, isLoading: isLoadingParameters } =
     useFetchAllParameters();
   const { data: tagsResponse, isLoading: isLoadingTags } = useListAllTag();
 
-  // 時系列データの取得
+  // Fetch time series data
   const { data: timeseriesResponse, isLoading: isLoadingTimeseries } =
     useFetchTimeseriesTaskResultByTagAndParameter(
       selectedChip,
       selectedParameter,
-      { tag: selectedTag },
+      {
+        tag: selectedTag,
+        start_at: startAt,
+        end_at: endAt,
+      },
       {
         query: {
           enabled: Boolean(selectedChip && selectedParameter && selectedTag),
           refetchInterval: REFRESH_INTERVAL * 1000,
         },
-      },
+      }
     );
 
-  // プロットデータの準備
+  // Prepare plot data
   const plotData = useMemo(() => {
     if (!timeseriesResponse?.data?.data) return [];
 
     try {
-      // QID毎のデータを整理
+      // Organize data by QID
       const qidData: { [key: string]: { x: string[]; y: number[] } } = {};
       const data = timeseriesResponse.data.data;
 
-      // データ構造の検証
+      // Validate data structure
       if (typeof data === "object" && data !== null) {
         Object.entries(data).forEach(([qid, dataPoints]) => {
           if (Array.isArray(dataPoints)) {
             qidData[qid] = {
               x: dataPoints.map(
-                (point: OutputParameterModel) => point.calibrated_at || "",
+                (point: OutputParameterModel) => point.calibrated_at || ""
               ),
               y: dataPoints.map((point: OutputParameterModel) => {
                 if (point.value && selectedParameter) {
@@ -77,14 +139,14 @@ export function TimeSeriesView() {
         });
       }
 
-      // QIDを数値順にソート
+      // Sort QIDs numerically
       const sortedQids = Object.keys(qidData).sort((a, b) => {
         const numA = parseInt(a);
         const numB = parseInt(b);
         return numA - numB;
       });
 
-      // Plotly用のトレースデータを作成
+      // Create trace data for Plotly
       return sortedQids.map((qid) => ({
         x: qidData[qid].x,
         y: qidData[qid].y,
@@ -186,7 +248,7 @@ export function TimeSeriesView() {
     });
   }, [timeseriesResponse]);
 
-  // 選択されたQIDのデータ
+  // Selected QID data
   const selectedQidData = useMemo(() => {
     if (!selectedQid || !timeseriesResponse?.data?.data) return [];
     const data = timeseriesResponse.data.data[selectedQid];
@@ -203,7 +265,7 @@ export function TimeSeriesView() {
       {/* Parameter Selection Card */}
       <div className="col-span-3 card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
         <div className="text-xs text-base-content/70 mb-2">
-          auto refresh every {REFRESH_INTERVAL} seconds
+          Auto refresh every {REFRESH_INTERVAL} seconds
         </div>
         <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
           <svg
@@ -240,6 +302,118 @@ export function TimeSeriesView() {
             disabled={isLoadingTags}
           />
         </div>
+        <div className="mt-4">
+          <span className="text-sm font-medium mb-2 block">Time Range</span>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <DateTimePicker
+                  label="From"
+                  value={startAt}
+                  onChange={handleStartAtChange}
+                  disabled={isLoadingTags}
+                />
+              </div>
+              <button
+                className={`btn btn-sm mt-8 gap-2 ${
+                  isStartAtLocked ? "btn-primary" : "btn-ghost"
+                }`}
+                onClick={toggleStartAtLock}
+                title={
+                  isStartAtLocked ? "Unlock start time" : "Lock start time"
+                }
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  {isStartAtLocked ? (
+                    <>
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </>
+                  ) : (
+                    <>
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                    </>
+                  )}
+                </svg>
+                {isStartAtLocked ? "Fixed" : "Auto"}
+              </button>
+            </div>
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <DateTimePicker
+                  label="To"
+                  value={endAt}
+                  onChange={handleEndAtChange}
+                  disabled={isLoadingTags}
+                />
+              </div>
+              <button
+                className={`btn btn-sm mt-8 gap-2 ${
+                  isEndAtLocked ? "btn-primary" : "btn-ghost"
+                }`}
+                onClick={toggleEndAtLock}
+                title={isEndAtLocked ? "Unlock end time" : "Lock end time"}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  {isEndAtLocked ? (
+                    <>
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </>
+                  ) : (
+                    <>
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                    </>
+                  )}
+                </svg>
+                {isEndAtLocked ? "Fixed" : "Auto"}
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-base-content/70 flex items-center gap-1">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12" y2="8" />
+            </svg>
+            {!isStartAtLocked && !isEndAtLocked
+              ? "Both times auto-update every 30 seconds"
+              : isStartAtLocked && isEndAtLocked
+              ? "Both times are fixed"
+              : isStartAtLocked
+              ? "Start time is fixed, end time auto-updates"
+              : "End time is fixed, start time auto-updates"}
+          </div>
+        </div>
       </div>
 
       {/* Plot Area */}
@@ -265,14 +439,14 @@ export function TimeSeriesView() {
           className="w-full bg-base-200/50 rounded-xl p-4"
           style={{ height: "550px" }}
         >
-          {/* ローディング状態の表示 */}
+          {/* Loading state */}
           {isLoadingTimeseries && (
             <div className="flex items-center justify-center h-full">
               <div className="loading loading-spinner loading-lg text-primary"></div>
             </div>
           )}
 
-          {/* エラー状態の表示 */}
+          {/* Error state */}
           {!isLoadingTimeseries &&
             selectedChip &&
             selectedParameter &&
@@ -283,7 +457,7 @@ export function TimeSeriesView() {
               </div>
             )}
 
-          {/* プロット表示エリア */}
+          {/* Plot area */}
           {plotData.length > 0 && (
             <Plot
               data={plotData}
@@ -304,7 +478,7 @@ export function TimeSeriesView() {
             />
           )}
 
-          {/* 未選択時の表示 */}
+          {/* Unselected state */}
           {!selectedChip || !selectedParameter || !selectedTag ? (
             <div className="flex items-center justify-center h-full text-base-content/70">
               <div className="text-center">
