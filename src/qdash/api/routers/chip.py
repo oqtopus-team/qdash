@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Annotated, Any
 
+import pendulum
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
@@ -518,6 +519,8 @@ def _fetch_timeseries_data(
     parameter: str,
     current_user: User,
     target_qid: str | None = None,
+    start_at: str | None = None,
+    end_at: str | None = None,
 ) -> TimeSeriesData:
     """Fetch timeseries data for all qids or a specific qid.
 
@@ -538,6 +541,9 @@ def _fetch_timeseries_data(
         The timeseries data
 
     """
+    if start_at is None or end_at is None:
+        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        start_at = pendulum.now(tz="Asia/Tokyo").subtract(days=7).to_iso8601_string()
     # Find all task results for the given tag and parameter
     task_results = (
         TaskResultHistoryDocument.find(
@@ -546,6 +552,7 @@ def _fetch_timeseries_data(
                 "chip_id": chip_id,
                 "tags": tag,
                 "output_parameter_names": parameter,
+                "start_at": {"$gte": start_at, "$lte": end_at},
             }
         )
         .sort([("start_at", ASCENDING)])
@@ -583,6 +590,8 @@ def fetch_timeseries_task_result_by_tag_and_parameter_and_qid(
     parameter: str,
     qid: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    start_at: str,
+    end_at: str,
 ) -> TimeSeriesData:
     """Fetch the timeseries task result by tag and parameter for a specific qid.
 
@@ -592,7 +601,7 @@ def fetch_timeseries_task_result_by_tag_and_parameter_and_qid(
 
     """
     logger.debug(f"Fetching timeseries task result for tag {tag}, parameter {parameter}, qid {qid}")
-    return _fetch_timeseries_data(chip_id, tag, parameter, current_user, qid)
+    return _fetch_timeseries_data(chip_id, tag, parameter, current_user, qid, start_at, end_at)
 
 
 @router.get(
@@ -606,6 +615,8 @@ def fetch_timeseries_task_result_by_tag_and_parameter(
     tag: str,
     parameter: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    start_at: str,
+    end_at: str,
 ) -> TimeSeriesData:
     """Fetch the timeseries task result by tag and parameter for all qids.
 
@@ -615,4 +626,6 @@ def fetch_timeseries_task_result_by_tag_and_parameter(
 
     """
     logger.debug(f"Fetching timeseries task result for tag {tag}, parameter {parameter}")
-    return _fetch_timeseries_data(chip_id, tag, parameter, current_user)
+    return _fetch_timeseries_data(
+        chip_id, tag, parameter, current_user, start_at=start_at, end_at=end_at
+    )

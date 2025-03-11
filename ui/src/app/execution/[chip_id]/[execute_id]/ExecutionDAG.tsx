@@ -160,7 +160,7 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
     const initialEdges: Edge[] = tasks
       .filter(
         (task): task is TaskNode & { upstream_id: string } =>
-          typeof task.upstream_id === "string" && task.upstream_id !== ""
+          typeof task.upstream_id === "string" && task.upstream_id !== "",
       )
       .map((task) => ({
         id: `${task.upstream_id}-${task.task_id}`,
@@ -353,10 +353,10 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
                   selectedTask.status === "running"
                     ? "text-info"
                     : selectedTask.status === "completed"
-                    ? "text-success"
-                    : selectedTask.status === "scheduled"
-                    ? "text-warning"
-                    : "text-error"
+                      ? "text-success"
+                      : selectedTask.status === "scheduled"
+                        ? "text-warning"
+                        : "text-error"
                 }`}
               >
                 {selectedTask.status}
