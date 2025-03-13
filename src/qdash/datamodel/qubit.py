@@ -42,5 +42,6 @@ class QubitModel(BaseModel):
 
     qid: str = Field(..., description="The qubit ID")
     status: str = Field("pending", description="The status of the qubit")
+    chip_id: str = Field(..., description="The chip ID")
     data: dict = Field(..., description="The data of the qubit")
     node_info: NodeInfoModel = Field(..., description="The node information")
