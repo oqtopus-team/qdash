@@ -55,14 +55,12 @@ class CheckRabi(BaseTask):
         label = qid_to_label(qid)
         result = run_result.raw_result
         self.output_parameters["rabi_amplitude"].value = result.rabi_params[label].amplitude
-        self.output_parameters["rabi_amplitude"].error = result.rabi_params[label].fit()[
-            "amplitude_err"
-        ]
+        self.output_parameters["rabi_amplitude"].error = result.data[label].fit()["amplitude_err"]
         self.output_parameters["rabi_frequency"].value = (
             result.rabi_params[label].frequency * 1000
         )  # convert to MHz
         self.output_parameters["rabi_frequency"].error = (
-            result.rabi_params[label].fit()["frequency_err"] * 1000
+            result.data[label].fit()["frequency_err"] * 1000
         )
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
