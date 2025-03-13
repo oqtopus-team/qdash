@@ -8,7 +8,6 @@ from qdash.workflow.tasks.base import (
     PreProcessResult,
     RunResult,
 )
-from qubex.analysis.visualization import plot
 from qubex.experiment import Experiment
 
 
@@ -33,16 +32,7 @@ class CheckPIPulse(BaseTask):
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         label = qid_to_label(qid)
         result = run_result.raw_result
-        figures = [
-            plot(
-                x=result.data[label].sweep_range,
-                y=result.data[label].normalized,
-                return_figure=True,
-                title=self.get_name(),
-                xlabel="Number of repetitions",
-                ylabel="Normalized signal",
-            )
-        ]
+        figures = [result.data[label].plot(normalize=True, return_figure=True)]
         return PostProcessResult(
             output_parameters=self.attach_execution_id(execution_id), figures=figures
         )

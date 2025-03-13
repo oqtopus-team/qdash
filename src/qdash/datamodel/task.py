@@ -78,6 +78,7 @@ class OutputParameterModel(BaseModel):
 
     value: float | int = 0
     value_type: str = "float"
+    error: float = 0
     unit: str = ""
     description: str = ""
     calibrated_at: str = Field(

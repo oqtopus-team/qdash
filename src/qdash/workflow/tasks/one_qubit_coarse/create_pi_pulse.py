@@ -48,6 +48,9 @@ class CreatePIPulse(BaseTask):
         self.output_parameters["pi_amplitude"].value = result.data[label].calib_value
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
+        r2 = result.data[label].r2
+        if self.r2_is_lower_than_threshold(r2):
+            raise ValueError(f"R^2 value of CreatePIPulse is below threshold: {r2}")
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:

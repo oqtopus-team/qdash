@@ -16,6 +16,7 @@ from qdash.workflow.calibration.task import (
     validate_task_name,
 )
 from qdash.workflow.calibration.util import (
+    coupling_qids_to_qubit_labels,
     qid_to_label,
     update_active_output_parameters,
     update_active_tasks,
@@ -77,7 +78,6 @@ def cal_flow(
     logger = get_run_logger()
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
-    labels = [qid_to_label(q) for q in qubits]
     task_names = validate_task_name(menu.tasks, username=menu.username)
     task_manager = TaskManager(
         username=menu.username, execution_id=execution_id, qids=qubits, calib_dir=calib_dir
@@ -88,20 +88,23 @@ def cal_flow(
         qubits=qubits,
         task_details=menu.task_details,
     )
-    task_manager.save()
 
+    task_manager.save()
+    if task_manager.has_only_qubit_or_global_tasks(task_names=task_names):
+        logger.info("Only qubit or global tasks are present")
+        labels = [qid_to_label(q) for q in qubits]
+    elif task_manager.has_only_coupling_or_global_tasks(task_names=task_names):
+        logger.info("Only coupling or global tasks are present")
+        labels = coupling_qids_to_qubit_labels(qids=qubits)
+    else:
+        logger.info(f"task names:{task_names}")
+        logger.error("this task is not supported")
+        raise ValueError("Invalid task names")  # noqa: EM101
     source_path = Path(f"/app/calib_data/{menu.username}/.calibration/64Q.json")
     destination_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
     destination_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(source_path, destination_path)
 
-    exp = Experiment(
-        chip_id="64Q",
-        qubits=labels,
-        config_dir="/home/shared/config",
-        calib_note_path=f"{calib_dir}/calib_note/{task_manager.id}.json",
-    )
-    exp.note.clear()
     parameters = update_active_output_parameters(username=menu.username)
     ParameterDocument.insert_parameters(parameters)
     tasks = update_active_tasks(username=menu.username)
@@ -113,6 +116,13 @@ def cal_flow(
     execution_manager.update_execution_status_to_running()
     initialize()
     ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
+    exp = Experiment(
+        chip_id="64Q",
+        qubits=labels,
+        config_dir="/home/shared/config",
+        calib_note_path=f"{calib_dir}/calib_note/{task_manager.id}.json",
+    )
+    exp.note.clear()
     for qid in qubits:
         task_manager = cal_sequence(
             menu=menu, exp=exp, task_manager=task_manager, task_names=task_names, qid=qid

@@ -37,10 +37,10 @@ from qdash.workflow.tasks.one_qubit_fine.check_drag_hpi_pulse import CheckDRAGHP
 from qdash.workflow.tasks.one_qubit_fine.check_drag_pi_pulse import CheckDRAGPIPulse
 from qdash.workflow.tasks.one_qubit_fine.create_drag_hpi_pulse import CreateDRAGHPIPulse
 from qdash.workflow.tasks.one_qubit_fine.create_drag_pi_pulse import CreateDRAGPIPulse
+from qdash.workflow.tasks.two_qubit.check_bell_state import CheckBellState
 from qdash.workflow.tasks.two_qubit.check_cross_resonance import CheckCrossResonance
-from qdash.workflow.tasks.two_qubit.create_fine_zx90 import CreateFineZX90
+from qdash.workflow.tasks.two_qubit.check_zx90 import CheckZX90
 from qdash.workflow.tasks.two_qubit.create_zx90 import CreateZX90
-from qdash.workflow.tasks.two_qubit.optimize_zx90 import OptimizeZX90
 
 __all__ = [
     "CheckNoise",
@@ -66,9 +66,9 @@ __all__ = [
     "CreateDRAGHPIPulse",
     "CreateDRAGPIPulse",
     "CheckCrossResonance",
-    "CreateFineZX90",
+    "CheckZX90",
     "CreateZX90",
-    "OptimizeZX90",
+    "CheckBellState",
     "RandomizedBenchmarking",
     "X90InterleavedRandomizedBenchmarking",
     "X180InterleavedRandomizedBenchmarking",
