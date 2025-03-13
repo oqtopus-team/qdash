@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 import { FaScrewdriverWrench } from "react-icons/fa6";
@@ -29,7 +30,18 @@ function Sidebar() {
       ></label>
       <aside className="bg-base-200 min-h-screen w-80">
         <ul className="menu p-4 py-0">
-          <div className="p-6"></div>
+          <div className="flex justify-center items-center p-4">
+            <Link href="/" className="flex items-center">
+              <Image
+                src="/oqtopus_logo.png"
+                alt="Oqtopus Logo"
+                width={100}
+                height={25}
+                className="object-contain"
+                priority
+              />
+            </Link>
+          </div>
           <li>
             <Link
               href="/chip"

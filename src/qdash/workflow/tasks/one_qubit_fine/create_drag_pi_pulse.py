@@ -52,9 +52,12 @@ class CreateDRAGPIPulse(BaseTask):
         label = qid_to_label(qid)
         result = run_result.raw_result
         self.output_parameters["drag_pi_beta"].value = result["beta"][label]
-        self.output_parameters["drag_pi_amplitude"].value = result["amplitude"][label]
+        self.output_parameters["drag_pi_amplitude"].value = result["amplitude"][label]["amplitude"]
         output_parameters = self.attach_execution_id(execution_id)
-        figures: list[go.Figure] = []
+        figures: list[go.Figure] = [result["amplitude"][label]["fig"]]
+        r2 = result["amplitude"][label]["r2"]
+        if self.r2_is_lower_than_threshold(r2):
+            raise ValueError(f"R^2 value of CreateDRAGPIPulse is below threshold: {r2}")
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:

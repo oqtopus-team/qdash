@@ -18,6 +18,7 @@ Attributes
 export interface OutputParameterModel {
   value?: OutputParameterModelValue;
   value_type?: string;
+  error?: number;
   unit?: string;
   description?: string;
   /** The time when the system information was created */

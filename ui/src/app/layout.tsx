@@ -7,7 +7,7 @@ export const metadata = {
   title: "QDash",
   description: "Quantum Dashboard",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/favicon.png",
   },
 };
 

@@ -1,6 +1,7 @@
 # from neodbmodel.task import TaskDocument
 from prefect import get_run_logger, task
 from qdash.datamodel.task import CouplingTaskModel, GlobalTaskModel, QubitTaskModel, TaskResultModel
+from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.qubit import QubitDocument
@@ -158,9 +159,16 @@ def execute_dynamic_task_by_qid(
             task_name=task_name, task_type=task_type, qid=qid
         )
         if output_parameters:
-            QubitDocument.update_calib_data(
-                qid=qid, chip_id=execution_manager.chip_id, output_parameters=output_parameters
-            )
+            if this_task.is_qubit_task():
+                QubitDocument.update_calib_data(
+                    qid=qid, chip_id=execution_manager.chip_id, output_parameters=output_parameters
+                )
+            elif this_task.is_coupling_task():
+                CouplingDocument.update_calib_data(
+                    qid=qid, chip_id=execution_manager.chip_id, output_parameters=output_parameters
+                )
+            else:
+                pass
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
 

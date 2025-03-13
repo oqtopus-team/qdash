@@ -2292,6 +2292,11 @@
             "title": "Value Type",
             "default": "float"
           },
+          "error": {
+            "type": "number",
+            "title": "Error",
+            "default": 0
+          },
           "unit": {
             "type": "string",
             "title": "Unit",

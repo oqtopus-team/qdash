@@ -5,6 +5,7 @@ import { useTheme } from "@/app/providers/theme-provider";
 import { SettingsCard } from "./components/SettingsCard";
 
 const themes = [
+  "oqtopus",
   "light",
   "dark",
   "cupcake",

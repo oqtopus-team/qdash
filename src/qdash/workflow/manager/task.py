@@ -54,6 +54,7 @@ class TaskManager(BaseModel):
             self.task_result.qubit_tasks[qid] = []
             self.task_result.coupling_tasks[qid] = []
             self.calib_data.qubit[qid] = {}
+            self.calib_data.coupling[qid] = {}
             self.calib_dir = calib_dir
 
     def _get_task_container(
@@ -416,3 +417,30 @@ class TaskManager(BaseModel):
         container = self._get_task_container(task_type, qid)
         task = self._find_task_in_container(container, task_name)
         return bool(task.status == TaskStatusModel.COMPLETED)
+
+    def _is_global_task(self, task_name: str) -> bool:
+        return any(task.name == task_name for task in self.task_result.global_tasks)
+
+    def _is_qubit_task(self, task_name: str) -> bool:
+        return any(
+            task_name in [task.name for task in tasks]
+            for tasks in self.task_result.qubit_tasks.values()
+        )
+
+    def _is_coupling_task(self, task_name: str) -> bool:
+        return any(
+            task_name in [task.name for task in tasks]
+            for tasks in self.task_result.coupling_tasks.values()
+        )
+
+    def has_only_qubit_or_global_tasks(self, task_names: list[str]) -> bool:
+        return all(
+            self._is_qubit_task(task_name) or self._is_global_task(task_name)
+            for task_name in task_names
+        )
+
+    def has_only_coupling_or_global_tasks(self, task_names: list[str]) -> bool:
+        return all(
+            self._is_coupling_task(task_name) or self._is_global_task(task_name)
+            for task_name in task_names
+        )

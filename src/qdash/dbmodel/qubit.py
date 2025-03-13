@@ -66,7 +66,9 @@ class QubitDocument(Document):
         chip_doc = ChipDocument.find_one({"chip_id": chip_id}).run()
         if chip_doc is None:
             raise ValueError(f"Chip {chip_id} not found")
-        qubit_model = QubitModel(qid=qid, data=qubit_doc.data, node_info=qubit_doc.node_info)
+        qubit_model = QubitModel(
+            qid=qid, chip_id=chip_id, data=qubit_doc.data, node_info=qubit_doc.node_info
+        )
         chip_doc.update_qubit(qid, qubit_model)
         return qubit_doc
 

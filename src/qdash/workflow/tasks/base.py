@@ -39,6 +39,7 @@ class BaseTask(ABC):
     task_type: Literal["global", "qubit", "coupling"]
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
+    r2_threshold: float = 0.6
     registry: ClassVar[dict] = {}
 
     def __init_subclass__(cls, **kwargs) -> None:  # noqa: ANN003
@@ -56,6 +57,10 @@ class BaseTask(ABC):
         """
         if params is not None:
             self._convert_and_set_parameters(params)
+
+    def r2_is_lower_than_threshold(self, r2: float) -> bool:
+        """Check if the R2 value is above the threshold."""
+        return r2 <= self.r2_threshold
 
     def _convert_value_to_type(self, value: Any, value_type: str) -> Any:
         """Convert value to the specified type.
