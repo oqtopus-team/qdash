@@ -145,6 +145,7 @@ export function TimeSeriesView() {
       qid: string;
       time: string;
       value: number | string;
+      error?: number;
       unit: string;
     }[] = [];
 
@@ -156,6 +157,7 @@ export function TimeSeriesView() {
               qid,
               time: point.calibrated_at || "",
               value: point.value || 0,
+              error: point.error,
               unit: point.unit || "a.u.",
             });
           });
@@ -190,7 +192,13 @@ export function TimeSeriesView() {
 
     try {
       // Organize data by QID
-      const qidData: { [key: string]: { x: string[]; y: number[] } } = {};
+      const qidData: {
+        [key: string]: {
+          x: string[];
+          y: number[];
+          error: number[];
+        };
+      } = {};
       const data = timeseriesResponse.data.data;
 
       // Validate data structure
@@ -213,6 +221,9 @@ export function TimeSeriesView() {
                 }
                 return 0;
               }),
+              error: dataPoints.map(
+                (point: OutputParameterModel) => point.error || 0
+              ),
             };
           }
         });
@@ -229,6 +240,11 @@ export function TimeSeriesView() {
       return sortedQids.map((qid) => ({
         x: qidData[qid].x,
         y: qidData[qid].y,
+        error_y: {
+          type: "data" as const,
+          array: qidData[qid].error as Plotly.Datum[],
+          visible: true,
+        },
         type: "scatter" as const,
         mode: "lines+markers" as const,
         name: `QID: ${qid}`,
@@ -242,8 +258,9 @@ export function TimeSeriesView() {
         },
         hovertemplate:
           "Time: %{x}<br>" +
-          "Value: %{y:.8f}<br>" +
-          "QID: " +
+          "Value: %{y:.8f}" +
+          (qidData[qid].error[0] ? "<br>Error: ±%{error_y.array:.8f}" : "") +
+          "<br>QID: " +
           qid +
           "<extra></extra>",
       }));
@@ -324,7 +341,7 @@ export function TimeSeriesView() {
     if (!timeseriesResponse?.data?.data) return;
 
     // Prepare CSV header
-    const headers = ["QID", "Time", "Value", "Unit"];
+    const headers = ["QID", "Time", "Value", "Error", "Unit"];
     const rows: string[][] = [];
 
     // Convert data to rows
@@ -336,6 +353,7 @@ export function TimeSeriesView() {
               qid,
               point.calibrated_at || "",
               String(point.value || ""),
+              String(point.error || ""),
               point.unit || "a.u.",
             ]);
           });
@@ -713,6 +731,7 @@ export function TimeSeriesView() {
                   </div>
                 </th>
                 <th className="text-center bg-base-200">Value</th>
+                <th className="text-center bg-base-200">Error</th>
                 <th className="text-center bg-base-200">Unit</th>
               </tr>
             </thead>
@@ -730,6 +749,11 @@ export function TimeSeriesView() {
                       {typeof row.value === "number"
                         ? row.value.toFixed(4)
                         : row.value}
+                    </td>
+                    <td className="text-center">
+                      {row.error !== undefined
+                        ? `±${row.error.toFixed(4)}`
+                        : "-"}
                     </td>
                     <td className="text-center">{row.unit}</td>
                   </tr>
