@@ -15,9 +15,6 @@ from qdash.workflow.tasks.box_setup.configure import Configure
 from qdash.workflow.tasks.box_setup.dump_box import DumpBox
 from qdash.workflow.tasks.box_setup.link_up import LinkUp
 from qdash.workflow.tasks.measurement.readout_classification import ReadoutClassification
-from qdash.workflow.tasks.one_qubit_coarse.check_effective_qubit_frequency import (
-    CheckEffectiveQubitFrequency,
-)
 from qdash.workflow.tasks.one_qubit_coarse.check_hpi_pulse import CheckHPIPulse
 from qdash.workflow.tasks.one_qubit_coarse.check_pi_pulse import CheckPIPulse
 from qdash.workflow.tasks.one_qubit_coarse.check_qubit_frequency import (
@@ -50,7 +47,6 @@ __all__ = [
     "DumpBox",
     "LinkUp",
     "ReadoutClassification",
-    "CheckEffectiveQubitFrequency",
     "CheckHPIPulse",
     "CheckPIPulse",
     "CheckQubitFrequency",
