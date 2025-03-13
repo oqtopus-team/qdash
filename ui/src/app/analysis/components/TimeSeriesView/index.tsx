@@ -341,7 +341,7 @@ export function TimeSeriesView() {
     if (!timeseriesResponse?.data?.data) return;
 
     // Prepare CSV header
-    const headers = ["QID", "Time", "Value", "Error", "Unit"];
+    const headers = ["QID", "Time", "Parameter", "Value", "Error", "Unit"];
     const rows: string[][] = [];
 
     // Convert data to rows
@@ -352,6 +352,7 @@ export function TimeSeriesView() {
             rows.push([
               qid,
               point.calibrated_at || "",
+              selectedParameter,
               String(point.value || ""),
               String(point.error || ""),
               point.unit || "a.u.",
