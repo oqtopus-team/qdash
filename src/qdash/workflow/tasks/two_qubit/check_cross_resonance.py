@@ -1,5 +1,7 @@
 from typing import ClassVar
 
+import numpy as np
+import plotly.graph_objects as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibration.util import qid_to_cr_label, qid_to_cr_pair
 from qdash.workflow.tasks.base import (
@@ -35,6 +37,25 @@ class CheckCrossResonance(BaseTask):
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
         return PreProcessResult(input_parameters=self.input_parameters)
 
+    def _plot_coeffs_history(self, coeffs_history: dict, qid: str) -> go.Figure:
+        fig = go.Figure()
+        for key, value in coeffs_history.items():
+            fig.add_trace(
+                go.Scatter(
+                    x=np.arange(1, len(value) + 1),
+                    y=value * 1e3,
+                    mode="lines+markers",
+                    name=f"{key}/2",
+                )
+            )
+        fig.update_layout(
+            title=f"CR Hamiltonian coefficients : {qid_to_cr_label(qid)}",
+            xaxis_title="Number of steps",
+            yaxis_title="Coefficient (MHz)",
+            xaxis={"tickmode": "array", "tickvals": np.arange(len(value))},
+        )
+        return fig
+
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         result = run_result.raw_result
         self.output_parameters["cr_amplitude"].value = result["cr_amplitude"]
@@ -42,7 +63,8 @@ class CheckCrossResonance(BaseTask):
         self.output_parameters["cancel_amplitude"].value = result["cancel_amplitude"]
         self.output_parameters["cancel_phase"].value = result["cancel_phase"]
         output_parameters = self.attach_execution_id(execution_id)
-        figures: list = []
+        fig = self._plot_coeffs_history(result["coeffs_history"], qid)
+        figures: list = [fig]
         raw_data: list = []
         return PostProcessResult(
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
@@ -50,7 +72,17 @@ class CheckCrossResonance(BaseTask):
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         control, target = qid_to_cr_pair(qid)
-        exp.obtain_cr_params(control, target)
-        result = exp.calib_note.get_cr_param(qid_to_cr_label(qid))
+        raw_result = exp.obtain_cr_params(control, target)
+        fit_result = exp.calib_note.get_cr_param(qid_to_cr_label(qid))
+        if fit_result is None:
+            error_message = "Fit result is None."
+            raise ValueError(error_message)
+        result = {
+            "cr_amplitude": fit_result["cr_amplitude"],
+            "cr_phase": fit_result["cr_phase"],
+            "cancel_amplitude": fit_result["cancel_amplitude"],
+            "cancel_phase": fit_result["cancel_phase"],
+            "coeffs_history": raw_result["coeffs_history"],
+        }
         exp.calib_note.save()
         return RunResult(raw_result=result)

@@ -42,7 +42,7 @@ class CreateZX90(BaseTask):
         self.output_parameters["cancel_amplitude"].value = result["cancel_amplitude"]
         self.output_parameters["cancel_phase"].value = result["cancel_phase"]
         output_parameters = self.attach_execution_id(execution_id)
-        figures: list = []
+        figures: list = [result["n1"], result["n3"], result["fig"]]
         raw_data: list = []
         return PostProcessResult(
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
@@ -50,7 +50,20 @@ class CreateZX90(BaseTask):
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         control, target = qid_to_cr_pair(qid)
-        exp.calibrate_zx90(control, target)
-        result = exp.calib_note.get_cr_param(qid_to_cr_label(qid))
+        raw_result = exp.calibrate_zx90(control, target)
+        fit_result = exp.calib_note.get_cr_param(qid_to_cr_label(qid))
+        if fit_result is None:
+            err_msg = f"CR parameters for {qid_to_cr_label(qid)} not found."
+            raise ValueError(err_msg)
+        result = {
+            "cr_amplitude": fit_result["cr_amplitude"],
+            "cr_phase": fit_result["cr_phase"],
+            "cancel_amplitude": fit_result["cancel_amplitude"],
+            "cancel_phase": fit_result["cancel_phase"],
+            "n1": raw_result["n1"]["fig"],
+            "n3": raw_result["n3"]["fig"],
+            "fig": raw_result["fig"],
+        }
+
         exp.calib_note.save()
         return RunResult(raw_result=result)
