@@ -3,8 +3,9 @@ from typing import ClassVar
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
-from qdash.datamodel.coupling import EdgeInfoModel
+from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.chip import ChipDocument
 
 
 class CouplingDocument(Document):
@@ -41,3 +42,43 @@ class CouplingDocument(Document):
         indexes: ClassVar = [
             IndexModel([("chip_id", ASCENDING), ("qid", ASCENDING), ("username")], unique=True)
         ]
+
+    @staticmethod
+    def merge_calib_data(existing: dict, new: dict) -> dict:
+        """Merge calibration data recursively."""
+        for key, value in new.items():
+            if key in existing and isinstance(existing[key], dict) and isinstance(value, dict):
+                existing[key] = CouplingDocument.merge_calib_data(existing[key], value)
+            else:
+                existing[key] = value
+        return existing
+
+    @classmethod
+    def update_calib_data(
+        cls, qid: str, chip_id: str, output_parameters: dict
+    ) -> "CouplingDocument":
+        """Update the CouplingDocument's calibration data with new values."""
+        coupling_doc = cls.find_one({"qid": qid, "chip_id": chip_id}).run()
+        if coupling_doc is None:
+            raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
+        coupling_doc.data = CouplingDocument.merge_calib_data(coupling_doc.data, output_parameters)
+        coupling_doc.system_info.update_time()
+        coupling_doc.save()
+        chip_doc = ChipDocument.find_one({"chip_id": chip_id}).run()
+        if chip_doc is None:
+            raise ValueError(f"Chip {chip_id} not found")
+        coupling_model = CouplingModel(
+            qid=qid, data=output_parameters, edge_info=coupling_doc.edge_info
+        )
+        chip_doc.update_coupling(qid, coupling_model)
+        return coupling_doc
+
+    @classmethod
+    def update_status(cls, qid: str, chip_id: str, status: str) -> "CouplingDocument":
+        """Update the CouplingDocument's status."""
+        coupling_doc = cls.find_one({"qid": qid, "chip_id": chip_id}).run()
+        if coupling_doc is None:
+            raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
+        coupling_doc.status = status
+        coupling_doc.save()
+        return coupling_doc

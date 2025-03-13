@@ -53,6 +53,14 @@ class ChipDocument(Document):
         self.save()
         return self
 
+    def update_coupling(self, qid: str, coupling_data: CouplingModel) -> "ChipDocument":
+        if qid not in self.couplings:
+            raise ValueError(f"Coupling {qid} not found in chip {self.chip_id}")
+        self.couplings[qid] = coupling_data
+        self.system_info.update_time()
+        self.save()
+        return self
+
     @classmethod
     def get_current_chip(cls, username: str) -> "ChipDocument":
         chip = cls.find_one({"username": username}).run()

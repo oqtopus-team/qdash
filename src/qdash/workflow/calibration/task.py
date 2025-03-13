@@ -164,7 +164,7 @@ def execute_dynamic_task_by_qid(
                     qid=qid, chip_id=execution_manager.chip_id, output_parameters=output_parameters
                 )
             elif this_task.is_coupling_task():
-                CouplingDocument.update_coupling_data(
+                CouplingDocument.update_calib_data(
                     qid=qid, chip_id=execution_manager.chip_id, output_parameters=output_parameters
                 )
             else:
