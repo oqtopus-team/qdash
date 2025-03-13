@@ -24,6 +24,7 @@ from qdash.workflow.tasks.one_qubit_coarse.check_qubit_frequency import (
     CheckQubitFrequency,
 )
 from qdash.workflow.tasks.one_qubit_coarse.check_rabi import CheckRabi
+from qdash.workflow.tasks.one_qubit_coarse.check_ramsey import CheckRamsey
 from qdash.workflow.tasks.one_qubit_coarse.check_readout_frequency import (
     CheckReadoutFrequency,
 )
@@ -74,4 +75,5 @@ __all__ = [
     "X180InterleavedRandomizedBenchmarking",
     "ZX90InterleavedRandomizedBenchmarking",
     "generate_task_instances",
+    "CheckRamsey",
 ]
