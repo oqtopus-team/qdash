@@ -31,6 +31,6 @@ class CouplingModel(BaseModel):
 
     qid: str = Field(..., description="The coupling ID")
     status: str = Field("pending", description="The status of the coupling")
-    chip_id: str = Field(..., description="The chip ID")
+    chip_id: str | None = Field(None, description="The chip ID")
     data: dict = Field(..., description="The data of the coupling")
     edge_info: EdgeInfoModel = Field(..., description="The edge information")
