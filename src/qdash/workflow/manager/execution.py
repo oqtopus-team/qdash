@@ -5,7 +5,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pendulum
-from filelock import FileLock
 from pydantic import BaseModel, Field
 from qdash.datamodel.execution import (
     CalibDataModel,
@@ -14,8 +13,13 @@ from qdash.datamodel.execution import (
     TaskResultModel,
 )
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+from qdash.dbmodel.initialize import initialize
 from qdash.workflow.manager.task import TaskManager
 from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
+
+initialize()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -66,16 +70,27 @@ class ExecutionManager(BaseModel):
         self.fridge_info = fridge_info
         self.chip_id = chip_id
         self.note = note
-        self._lock_file = Path(f"{self.calib_data_path}/execution_note.lock")
 
-    def _with_file_lock(self, func: Callable[["ExecutionManager"], None]) -> None:
-        """Filelock in the update method."""
-        lock = FileLock(str(self._lock_file))
-        with lock:
-            instance = ExecutionManager.load_from_file(self.calib_data_path)
+    def _with_db_transaction(self, func: Callable[["ExecutionManager"], None]) -> None:
+        """Execute the function within a MongoDB transaction."""
+        try:
+            # 最新の状態を取得
+            doc = ExecutionHistoryDocument.find_one({"execution_id": self.execution_id}).run()
+            if doc is None:
+                # 初回の場合は現在のインスタンスを使用
+                instance = self
+            else:
+                instance = ExecutionManager.model_validate(doc.model_dump())
+
+            # 関数を実行
             func(instance)
             instance.system_info.update_time()
-            instance._atomic_save()  # noqa: SLF001
+
+            # DBに保存
+            ExecutionHistoryDocument.upsert_document(instance.to_datamodel())
+        except Exception as e:
+            logger.error(f"DB transaction failed: {e}")
+            raise
 
     def update_status(self, new_status: ExecutionStatusModel) -> None:
         """Update the status of the execution."""
@@ -83,7 +98,7 @@ class ExecutionManager(BaseModel):
         def updater(instance: ExecutionManager) -> None:
             instance.status = new_status
 
-        self._with_file_lock(updater)
+        self._with_db_transaction(updater)
 
     def update_execution_status_to_running(self) -> "ExecutionManager":
         self.update_status(ExecutionStatusModel.RUNNING)
@@ -98,8 +113,13 @@ class ExecutionManager(BaseModel):
         return self
 
     def reload(self) -> "ExecutionManager":
-        """Reload the execution manager from the file and return self for chaining."""
-        return ExecutionManager.load_from_file(self.calib_data_path)
+        """Reload the execution manager from the database."""
+        doc = ExecutionHistoryDocument.find_one({"execution_id": self.execution_id}).run()
+        if doc is None:
+            # 初回の場合は現在のインスタンスを保存
+            ExecutionHistoryDocument.upsert_document(self.to_datamodel())
+            return self
+        return ExecutionManager.model_validate(doc.model_dump())
 
     def _merge_calib_notes(self, task_id: str) -> None:
         """Merge calibration notes from task with master note.
@@ -114,24 +134,49 @@ class ExecutionManager(BaseModel):
             It uses timestamp-based merging to ensure the most recent data is kept.
 
         """
-        note_path = f"{self.calib_data_path}/calib_note/{task_id}.json"
         try:
-            # Load master calib note
-            with Path(self.note["calib_note_path"]).open() as f:
-                calib_note = json.load(f)
+            # タスクのノートを読み込む
+            task_note_path = Path(f"{self.calib_data_path}/calib_note/{task_id}.json")
+            if not task_note_path.exists():
+                return  # Skip if task note doesn't exist
 
-            # Load and merge task note
-            with Path(note_path).open() as f:
-                task_note = json.load(f)
-                # Merge notes based on timestamp
-                merged_note = merge_notes_by_timestamp(calib_note, task_note)
+            task_note = json.loads(task_note_path.read_text())
 
-            # Save merged result back to master calib note
-            with Path(self.note["calib_note_path"]).open("w") as f:
-                json.dump(merged_note, f, indent=2)
+            # 最新のマスターノートを取得
+            master_docs = (
+                CalibrationNoteDocument.find({"task_id": "master"})
+                .sort([("timestamp", -1)])  # timestampで降順ソート
+                .limit(1)
+                .run()
+            )
 
-        except FileNotFoundError:
-            pass  # Skip if note file doesn't exist
+            if not master_docs:
+                # マスターノートが存在しない場合は新規作成
+                CalibrationNoteDocument.upsert_note(
+                    username=self.username,
+                    execution_id=self.execution_id,
+                    task_id="master",
+                    note=task_note,
+                )
+            else:
+                # マスターノートが存在する場合はマージして更新
+                master_doc = master_docs[0]
+                merged_note = merge_notes_by_timestamp(master_doc.note, task_note)
+                CalibrationNoteDocument.upsert_note(
+                    username=self.username,
+                    execution_id=self.execution_id,  # 最新のexecution_idで更新
+                    task_id="master",
+                    note=merged_note,
+                )
+
+            # タスクのノートもDBに保存
+            CalibrationNoteDocument.upsert_note(
+                username=self.username,
+                execution_id=self.execution_id,
+                task_id=task_id,
+                note=task_note,
+            )
+
         except Exception as e:
             logger.info(f"Error merging notes: {e}")  # Log error but continue execution
 
@@ -153,8 +198,8 @@ class ExecutionManager(BaseModel):
             # Merge calibration notes
             self._merge_calib_notes(task_manager.id)
 
-        self._with_file_lock(updater)
-        return ExecutionManager.load_from_file(self.calib_data_path)
+        self._with_db_transaction(updater)
+        return self.reload()
 
     def calculate_elapsed_time(self, start_at: str, end_at: str) -> str:
         try:
@@ -170,53 +215,41 @@ class ExecutionManager(BaseModel):
         def updater(instance: ExecutionManager) -> None:
             instance.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
 
-        self._with_file_lock(updater)
-        return ExecutionManager.load_from_file(self.calib_data_path)
+        self._with_db_transaction(updater)
+        return self.reload()
 
     def complete_execution(self) -> "ExecutionManager":
         """Complete the execution with success status."""
-        # 最新の状態を読み込む
-        instance = ExecutionManager.load_from_file(self.calib_data_path)
-        # 終了時刻を設定
-        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-        instance.end_at = end_at
-        instance.elapsed_time = instance.calculate_elapsed_time(instance.start_at, end_at)
-        # 完了状態を設定
-        instance.status = ExecutionStatusModel.COMPLETED
-        instance.save()
-        return instance
+
+        def updater(instance: ExecutionManager) -> None:
+            # 終了時刻を設定
+            end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+            instance.end_at = end_at
+            instance.elapsed_time = instance.calculate_elapsed_time(instance.start_at, end_at)
+            # 完了状態を設定
+            instance.status = ExecutionStatusModel.COMPLETED
+
+        self._with_db_transaction(updater)
+        return self.reload()
 
     def fail_execution(self) -> "ExecutionManager":
         """Complete the execution with failure status."""
-        # 最新の状態を読み込む
-        instance = ExecutionManager.load_from_file(self.calib_data_path)
-        # 終了時刻を設定
-        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-        instance.end_at = end_at
-        instance.elapsed_time = instance.calculate_elapsed_time(instance.start_at, end_at)
-        # 失敗状態を設定
-        instance.status = ExecutionStatusModel.FAILED
-        instance.save()
-        return instance
+
+        def updater(instance: ExecutionManager) -> None:
+            # 終了時刻を設定
+            end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+            instance.end_at = end_at
+            instance.elapsed_time = instance.calculate_elapsed_time(instance.start_at, end_at)
+            # 失敗状態を設定
+            instance.status = ExecutionStatusModel.FAILED
+
+        self._with_db_transaction(updater)
+        return self.reload()
 
     def save(self) -> "ExecutionManager":
-        self._atomic_save()
+        """Save the execution manager to the database."""
+        ExecutionHistoryDocument.upsert_document(self.to_datamodel())
         return self
-
-    def _atomic_save(self) -> None:
-        """Filelock in the save method."""
-        save_path = Path(f"{self.calib_data_path}/execution_note.json")
-        temp_path = save_path.with_suffix(".tmp")
-        with temp_path.open("w") as f:
-            f.write(json.dumps(self.model_dump(), indent=2))
-        temp_path.replace(save_path)
-
-    @classmethod
-    def load_from_file(cls, calib_data_path: str) -> "ExecutionManager":
-        save_path = Path(f"{calib_data_path}/execution_note.json")
-        if not save_path.exists():
-            raise FileNotFoundError(f"{save_path} does not exist.")
-        return cls.model_validate_json(save_path.read_text())
 
     def to_datamodel(self) -> ExecutionModel:
         return ExecutionModel(
