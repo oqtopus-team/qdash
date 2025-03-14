@@ -53,9 +53,19 @@ class TaskManager(BaseModel):
         for qid in qids:
             self.task_result.qubit_tasks[qid] = []
             self.task_result.coupling_tasks[qid] = []
-            self.calib_data.qubit[qid] = {}
-            self.calib_data.coupling[qid] = {}
+            if self._is_qubit_format(qid):
+                self.calib_data.qubit[qid] = {}
+            elif self._is_coupling_format(qid):
+                self.calib_data.coupling[qid] = {}
+            else:
+                raise ValueError(f"Unknown qubit format: {qid}")
             self.calib_dir = calib_dir
+
+    def _is_qubit_format(self, qid: str) -> bool:
+        return qid in self.task_result.qubit_tasks
+
+    def _is_coupling_format(self, qid: str) -> bool:
+        return qid in self.task_result.coupling_tasks
 
     def _get_task_container(
         self, task_type: str, qid: str = ""

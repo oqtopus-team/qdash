@@ -4,6 +4,7 @@ import pendulum
 from dotenv import load_dotenv
 from prefect import flow, get_run_logger, runtime
 from qdash.datamodel.menu import MenuModel as Menu
+from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
@@ -96,38 +97,40 @@ def main_flow(
     chip_id = ChipDocument.get_current_chip(username=menu.username).chip_id
     # with Path(".calibration/64Q.json").open() as f:
     #     chip_info = json.load(f)
-    calib_note_path = Path(f"/app/calib_data/{menu.username}/.calibration/64Q.json")
-    if not calib_note_path.exists():
-        calib_note_path.parent.mkdir(parents=True, exist_ok=True)
-        calib_note_path.touch()
-    execution_manager = ExecutionManager(
-        username=menu.username,
-        name=menu.name,
-        execution_id=execution_id,
-        calib_data_path=calib_dir,
-        tags=menu.tags,
-        fridge_info={"temperature": 0.0},
-        chip_id=chip_id,
-        note={
-            "qubex_version": get_package_version("qubex"),
-            "ui_url": ui_url,
-            "calib_note_path": str(calib_note_path),
-        },
-    ).save()
-    ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
-    execution_manager = execution_manager.start_execution().save()
-    ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
-    execution_manager = execution_manager.update_execution_status_to_running().save()
-    ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
+    # 初期のマスターノートをDBに作成
+    # current_time = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+    # CalibrationNoteDocument.upsert_note(
+    #     username=menu.username,
+    #     execution_id=execution_id,
+    #     task_id="master",
+    #     note={},  # 空のノートで初期化
+    #     created_at=current_time,
+    #     updated_at=current_time,
+    # )
+    # ExecutionManagerの初期化と実行開始
+    execution_manager = (
+        ExecutionManager(
+            username=menu.username,
+            name=menu.name,
+            execution_id=execution_id,
+            calib_data_path=calib_dir,
+            tags=menu.tags,
+            fridge_info={"temperature": 0.0},
+            chip_id=chip_id,
+            note={
+                "qubex_version": get_package_version("qubex"),
+                "ui_url": ui_url,
+            },
+        )
+        .save()
+        .start_execution()
+        .update_execution_status_to_running()
+    )
     try:
         success_map = qubex_one_qubit_cal_flow(menu, calib_dir, success_map, execution_id)
-        execution_manager = ExecutionManager.load_from_file(calib_dir).complete_execution()
-        # for note_name in list(execution_manager.task_results.keys()):
-        #     note_path = f"{calib_dir}/calib_note/{note_name}.json"
-        #     # merge the note
+        execution_manager = execution_manager.reload().complete_execution()
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")
-        execution_manager = ExecutionManager.load_from_file(calib_dir).fail_execution()
+        execution_manager = execution_manager.reload().fail_execution()
     finally:
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
         ExecutionLockDocument.unlock()

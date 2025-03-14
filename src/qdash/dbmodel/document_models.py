@@ -1,3 +1,4 @@
+from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
@@ -27,4 +28,5 @@ def document_models() -> list[str]:
         ExecutionCounterDocument,
         ExecutionLockDocument,
         TagDocument,
+        CalibrationNoteDocument,
     ]

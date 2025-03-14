@@ -1,12 +1,12 @@
 import asyncio
-import shutil
+import json
 from pathlib import Path
 
 from prefect import flow, get_run_logger
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
 from qdash.datamodel.menu import MenuModel as Menu
-from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.parameter import ParameterDocument
 from qdash.dbmodel.task import TaskDocument
@@ -100,27 +100,54 @@ def cal_flow(
         logger.info(f"task names:{task_names}")
         logger.error("this task is not supported")
         raise ValueError("Invalid task names")  # noqa: EM101
-    source_path = Path(f"/app/calib_data/{menu.username}/.calibration/64Q.json")
-    destination_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
-    destination_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(source_path, destination_path)
-
+    # パラメータと設定の更新
     parameters = update_active_output_parameters(username=menu.username)
     ParameterDocument.insert_parameters(parameters)
     tasks = update_active_tasks(username=menu.username)
     logger.info(f"updating tasks: {tasks}")
     TaskDocument.insert_tasks(tasks)
-    execution_manager = ExecutionManager.load_from_file(calib_dir).update_with_task_manager(
-        task_manager
+
+    # ExecutionManagerの初期化と更新
+
+    ExecutionManager(
+        username=menu.username,
+        execution_id=execution_id,
+        calib_data_path=calib_dir,
+    ).reload().update_with_task_manager(task_manager).update_execution_status_to_running()
+
+    # キャリブレーションノートの初期化とファイル出力
+    note_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
+    note_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # チップの最新のマスターノートを取得
+    master_doc = (
+        CalibrationNoteDocument.find({"task_id": "master"})
+        .sort([("timestamp", -1)])  # 更新時刻で降順ソート
+        .limit(1)
+        .run()
     )
-    execution_manager.update_execution_status_to_running()
+
+    if not master_doc:
+        # マスターノートが存在しない場合は新規作成
+        master_doc = CalibrationNoteDocument.upsert_note(
+            username=menu.username,
+            execution_id=execution_id,
+            task_id="master",
+            note={},  # 空のノートで初期化
+        )
+    else:
+        master_doc = master_doc[0]  # 最新のドキュメントを取得
+
+    # JSONファイルとして出力
+    note_path.write_text(json.dumps(master_doc.note, indent=2))
+
     initialize()
-    ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
+    # 実験の初期化
     exp = Experiment(
         chip_id="64Q",
         qubits=labels,
         config_dir="/home/shared/config",
-        calib_note_path=f"{calib_dir}/calib_note/{task_manager.id}.json",
+        calib_note_path=str(note_path),
     )
     exp.note.clear()
     for qid in qubits:
