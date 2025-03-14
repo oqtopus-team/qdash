@@ -11,16 +11,17 @@ services:
       - .:/workspace/qdash
       - /var/run/docker.sock:/var/run/docker.sock
       - /workspace/qdash/.venv
-      - /workspace/qdash/client/node_modules
+      - /workspace/qdash/ui/node_modules
+      - /home/shared/config:/home/shared/config
     environment:
-      - PYTHONPATH=/workspace:/workspace/qdash:/workspace/qdash/backend:/workspace/qdash/backend/qcflow:/workspace/dbmodel
+      - PYTHONPATH=/workspace:/workspace/src:/workspace/src/qdash/workflow:/workspace/src/qdash/dbmodel:/workspace/src/qdash/datamodel
     network_mode: host
 
     develop:
       watch:
         - action: sync
-          path: ./backend/server
-          target: /workspace/qdash/server
+          path: ./src/qdash/api
+          target: /workspace/qdash/api
     working_dir: /workspace/qdash
 # if following feature is enabled, this file should be moved to .devcontainer/compose.yaml
 # https://github.com/microsoft/vscode-remote-release/issues/4885

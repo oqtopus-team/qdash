@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libhdf5-dev \
     jq  \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -28,15 +29,11 @@ WORKDIR /workspace/qdash
 COPY ./.devcontainer/requirements.txt .
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 RUN uv pip install --system --no-cache -r requirements.txt
+RUN uv pip install --system --no-cache prefect==2.20.0
 
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-RUN apt-get install -y nodejs
+# Install bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:${PATH}"
 
-# COPY ./client/package*.json ./client/pnpm-lock.yaml ./
-# RUN npm install -g pnpm
-# RUN pnpm install
-COPY ./client/package*.json ./
-# pnpm をインストール
-#RUN npm install -g pnpm
-RUN npm install
-RUN npm install -g @go-task/cli
+COPY ./ui/package.json ./
+COPY ./ui/bun.lock ./

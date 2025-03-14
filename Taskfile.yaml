@@ -1,17 +1,21 @@
 version: 3
 
+env:
+  UV_LINK_MODE: copy
+
 tasks:
   default:
     desc: Display available tasks
     cmds:
       - task -l
+
   generate:
-    dir: client
+    dir: ui
     cmds:
       - curl http://localhost:5715/openapi.json | jq > ../docs/oas/openapi.json
-      - npx orval --config ./orval.config.cjs
-      - npx prettier . --write
-      - npx eslint . --fix
+      - bunx orval --config ./orval.config.cjs
+      - bunx prettier . --write
+      - bunx run fmt
     desc: Generate the client
 
   docs:
@@ -19,11 +23,15 @@ tasks:
     cmds:
       - npm run docs:dev
 
+  build:
+    dir: ui
+    cmds:
+      - bun run build
+
   build-docs:
     dir: docs
     cmds:
       - npm run docs:build
-      # - poetry run mkdocs serve
 
   fmt-client:
     dir: client
@@ -34,7 +42,7 @@ tasks:
 
   fmt:
     cmds:
-      - poetry run ruff format .
+      - ruff format .
       - npx prettier . --write
       - npx eslint . --fix
     desc: Format common code
@@ -44,32 +52,34 @@ tasks:
       - tbls doc -c .tbls.yml -f
     desc: Generate DB Schema Docs
 
-  export-server:
+  export-api:
     cmds:
-      - poetry export -f requirements.txt --output ./backend/server/requirements.txt --without-hashes --with=server,dev
+      - uv export --group api --no-hashes --no-emit-project --no-editable --format requirements-txt > ./src/qdash/api/requirements.txt
     desc: Export server requirements
 
-  export-qcflow:
+  export-workflow:
     cmds:
-      - poetry export -f requirements.txt --output ./backend/qcflow/requirements.txt --without-hashes --with=qcflow,dev
+      - uv export --group workflow --no-hashes --no-emit-project --no-editable --format requirements-txt > ./src/qdash/workflow/requirements.txt
     desc: Export qcflow requirements
+
+  export-dev:
+    cmds:
+      - uv export --all-groups --no-hashes --no-emit-project --no-editable --format requirements-txt > .devcontainer/requirements.txt
+    desc: Export all requirements
 
   export-all:
     cmds:
-      - poetry export -f requirements.txt --output ./.devcontainer/requirements.txt --without-hashes --with=server,qcflow,dev
+      - task export-api
+      - task export-workflow
+      - task export-dev
     desc: Export all requirements
 
-  build-server:
+  build-api:
     cmds:
-      - poetry export -f requirements.txt --output ./backend/server/requirements.txt --without-hashes --with=server,dev
-      - docker compose build --no-cache server
+      - task export-api
+      - docker compose build --no-cache api
 
-  build-qcflow:
+  build-workflow:
     cmds:
-      - poetry export -f requirements.txt --output qcflow.requirements.txt --without-hashes --with=qcflow,dev
-      - docker compose build --no-cache qcflow
-
-  requirements:
-    cmds:
-      - poetry export -f requirements.txt --output requirements.txt --without-hashes
-    desc: Generate requirements.txt
+      - task export-workflow
+      - docker compose build --no-cache workflow

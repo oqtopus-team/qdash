@@ -1,0 +1,22 @@
+FROM oven/bun:1
+
+WORKDIR /app
+
+# Copy source files
+COPY ./ui/package.json ./
+COPY ./ui/bun.lock ./
+COPY ./ui/.next ./.next
+
+# Copy public files
+COPY ./ui/public ./public
+
+# Install production dependencies only
+RUN bun install --production
+
+ENV HOST 0.0.0.0
+ENV PORT ${UI_PORT:-5714}
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV production
+
+# Start the application
+CMD ["bun", "run", "start"]

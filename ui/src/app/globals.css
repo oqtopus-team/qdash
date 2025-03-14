@@ -1,0 +1,62 @@
+@import "tailwindcss";
+@plugin "daisyui";
+@plugin "daisyui/theme" {
+  name: "oqtopus";
+  default: true; /* set as default */
+  prefersdark: false; /* set as default dark mode (prefers-color-scheme:dark) */
+  color-scheme: light; /* color of browser-provided UI */
+
+  /* ベース色 - より純粋な白を基調に */
+  --color-base-100: oklch(99% 0.005 0);
+  --color-base-200: oklch(97% 0.005 0);
+  --color-base-300: oklch(95% 0.005 0);
+  --color-base-content: oklch(15% 0.01 0);
+
+  /* プライマリカラー - ロゴの深い青を基調に */
+  --color-primary: oklch(45% 0.4 240);
+  --color-primary-content: oklch(99% 0.01 240);
+
+  /* セカンダリカラー - ロゴの赤を基調に */
+  --color-secondary: oklch(60% 0.35 30);
+  --color-secondary-content: oklch(99% 0.01 30);
+
+  /* アクセントカラー - 深い紫がかった青 */
+  --color-accent: oklch(50% 0.35 220);
+  --color-accent-content: oklch(99% 0.01 220);
+
+  /* ニュートラル - より純粋なグレー */
+  --color-neutral: oklch(85% 0.01 0);
+  --color-neutral-content: oklch(15% 0.01 0);
+
+  /* 情報色 - 深い青 */
+  --color-info: oklch(55% 0.3 220);
+  --color-info-content: oklch(15% 0.01 0);
+
+  /* 成功色 - 緑 */
+  --color-success: oklch(70% 0.3 140);
+  --color-success-content: oklch(15% 0.01 0);
+
+  /* 警告色 - 黄色 */
+  --color-warning: oklch(85% 0.3 80);
+  --color-warning-content: oklch(15% 0.01 0);
+
+  /* エラー色 - 赤 */
+  --color-error: oklch(70% 0.35 30);
+  --color-error-content: oklch(99% 0.01 0);
+
+  /* border radius */
+  --radius-selector: 1rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+
+  /* base sizes */
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+
+  /* border size */
+  --border: 1px;
+
+  /* effects */
+  --depth: 1;
+  --noise: 0;
+}

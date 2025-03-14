@@ -214,4 +214,10 @@ quel.json
 .pnpm-store/
 qpu_data/
 docs/.vitepress/cache/
-client/.vite/
+ui/.vite/
+
+src/qdash/workflow/images/*
+src/qdash/workflow/.system_note.json
+src/qdash/workflow/*.json
+src/qdash/workflow/.calibration/*.json
+src/qdash/workflow/.classifier/64Q/*

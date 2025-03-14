@@ -5,16 +5,13 @@ services:
     env_file:
       - .env
     ports:
-      - "27017:27017"
+      - "${MONGO_PORT:-27017}:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: example
-      MONGO_INIT_DATABASE: cloud
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INIT_DATABASE: qubex
     volumes:
       - ${MONGO_DATA_PATH}:/data/db
-    networks:
-      qdash:
-        ipv4_address: 172.22.0.2
 
   mongo-express:
     image: mongo-express
@@ -22,56 +19,49 @@ services:
     env_file:
       - .env
     ports:
-      - "8081:8081"
+      - "${MONGO_EXPRESS_PORT:-8081}:${MONGO_EXPRESS_PORT:-8081}"
     environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: root
-      ME_CONFIG_MONGODB_ADMINPASSWORD: example
-      ME_CONFIG_MONGODB_URL: mongodb://root:example@${MONGO_HOST}:27017/
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/
       ME_CONFIG_BASICAUTH: false
     depends_on:
       - mongo
-    networks:
-      qdash:
-        ipv4_address: 172.22.0.3
 
   postgres:
     image: postgres:14
     restart: always
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: prefect
-      POSTGRES_DB: prefect
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ${POSTGRES_DATA_PATH}:/var/lib/postgresql/data
-    networks:
-      qdash:
-        ipv4_address: 172.22.0.4
 
   prefect-server:
-    image: prefecthq/prefect:2-python3.10
+    image: prefecthq/prefect:2.20-python3.11
     restart: always
     env_file:
       - .env
     entrypoint: ["/bin/bash", "-c"]
     command: ["prefect server start --host 0.0.0.0"]
     ports:
-      - "4200:4200"
+      - "${PREFECT_PORT:-4200}:4200"
     environment:
-      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://postgres:prefect@${POSTGRES_HOST}:5432/prefect
+      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - PREFECT_EXPERIMENTAL_ENABLE_ENHANCED_CANCELLATION=True
-      - PREFECT_WORKER_WEBSERVER_HOST=0.0.0.0
       - PREFECT_WORKER_WEBSERVER_PORT=9090
     depends_on:
       - postgres
-    networks:
-      qdash:
-        ipv4_address: 172.22.0.5
-  qcflow:
+
+  workflow:
     build:
       context: .
-      dockerfile: ./backend/qcflow/Dockerfile
+      dockerfile: ./src/qdash/workflow/Dockerfile
     restart: always
     env_file:
       - .env
@@ -80,73 +70,73 @@ services:
       - prefect-server
       - mongo
     volumes:
-      - ./backend/qcflow:/app/qcflow
-      - ./backend/dbmodel:/app/dbmodel
+      - ./src/qdash/workflow:/app/qdash/workflow
+      - ./src/qdash/dbmodel:/app/qdash/dbmodel
+      - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./src/qdash/config.py:/app/qdash/config.py
       - ${CALIB_DATA_PATH}:/app/calib_data
-    working_dir: /app/qcflow
+      - /home/shared/config:/home/shared/config
+    working_dir: /app/qdash/workflow
     command: python deployment/${ENV}/main.py
     environment:
-      - BACKEND_URL=http://${QDASH_SERVER_HOST}:5715
-      - PREFECT_API_URL=http://${PREFECT_HOST}:4200/api
+      - BACKEND_URL=http://api:${API_PORT:-5715}
+      - PREFECT_API_URL=http://prefect-server:4200/api
       - PREFECT_EXPERIMENTAL_ENABLE_EXTRA_RUNNER_ENDPOINTS=True
       - PREFECT_EXPERIMENTAL_ENABLE_ENHANCED_CANCELLATION=True
       - PREFECT_RUNNER_SERVER_HOST=127.0.0.1
-      - PYTHONPATH=/app:/app/qcflow:/app/dbmodel
-    network_mode: host
+      - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
 
-  server:
+  api:
     build:
       context: .
-      dockerfile: ./backend/server/Dockerfile
+      dockerfile: ./src/qdash/api/Dockerfile
     restart: always
     privileged: true
     env_file:
       - .env
     ports:
-      - "5715:5715"
-    # expose:
-    #   - "80"
+      - "${API_PORT:-5715}:${API_PORT:-5715}"
     volumes:
-      - ./backend/server:/app/server
-      - ./backend/dbmodel:/app/dbmodel
+      - ./src/qdash/api:/app/qdash/api
+      - ./src/qdash/dbmodel:/app/qdash/dbmodel
+      - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./src/qdash/config.py:/app/qdash/config.py
       - ${CALIB_DATA_PATH}:/app/calib_data
       - ${QPU_DATA_PATH}:/app/qpu_data
-    working_dir: /app/server
-    command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind 0.0.0.0:5715 --log-level info
+    working_dir: /app/qdash/api
+    command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
     develop:
       watch:
         - action: sync
-          path: ./backend/server
-          target: /app/server
+          path: ./src/qdash/api
+          target: /app/api
     depends_on:
       - mongo
       - prefect-server
     environment:
-      - PYTHONPATH=/app:/app/dbmodel
+      - PYTHONPATH=/app:/app/qdash:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
       - CALIB_DATA_PATH=/app/calib_data
       - QPU_DATA_PATH=/app/qpu_data
-      - PREFECT_API_URL=http://${PREFECT_HOST}:4200/api
-    network_mode: host
+      - PREFECT_API_URL=http://prefect-server:4200/api
 
-  client:
+  ui:
     build:
       context: .
-      dockerfile: ./client/Dockerfile
-    volumes:
-      - ./client:/app
-      - /app/node_modules
+      dockerfile: ./ui/Dockerfile.prod
     restart: always
     env_file:
       - .env
     ports:
-      - "5714:5714"
+      - "${UI_PORT:-5714}:${UI_PORT:-5714}"
     depends_on:
-      - server
-    network_mode: host
-
-networks:
-  qdash:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.22.0.0/24
+      - api
+    command:
+      [
+        "bun",
+        "run",
+        "start",
+        "--hostname",
+        "0.0.0.0",
+        "--port",
+        "${UI_PORT:-5714}",
+      ]

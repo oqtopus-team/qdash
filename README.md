@@ -1,10 +1,12 @@
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 <div align="center">
+
+![qdash-logo](docs/oqtopus_logo.png)
 
 <h1> 📊 QDash </h1>
 
 </div>
-
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 QDash is a web application that provides a user-friendly interface to manage and monitor the execution of qubit calibration workflows.
 
