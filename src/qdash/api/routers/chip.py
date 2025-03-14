@@ -239,10 +239,11 @@ def flatten_tasks(task_results: dict) -> list[dict]:
     Returns
     -------
     list[dict]
-        Flattened list of tasks
+        Flattened list of tasks, sorted by completion time within qid groups
 
     """
-    flat_tasks = []
+    # グループごとのタスクを保持する辞書
+    grouped_tasks: dict[str, list[dict]] = {}
     logger.debug("Flattening task_results: %s", task_results)
 
     for key, result in task_results.items():
@@ -250,22 +251,49 @@ def flatten_tasks(task_results: dict) -> list[dict]:
             result = result.model_dump()  # noqa: PLW2901
         logger.debug("Processing key: %s, result: %s", key, result)
 
+        # グローバルタスクの処理
         if "global_tasks" in result:
             logger.debug("Found %d global_tasks in %s", len(result["global_tasks"]), key)
-            flat_tasks.extend(result["global_tasks"])
+            if "global" not in grouped_tasks:
+                grouped_tasks["global"] = []
+            grouped_tasks["global"].extend(result["global_tasks"])
 
+        # キュービットタスクの処理
         if "qubit_tasks" in result:
             for qid, tasks in result["qubit_tasks"].items():
                 logger.debug("Found %d qubit_tasks under qid %s", len(tasks), qid)
+                if qid not in grouped_tasks:
+                    grouped_tasks[qid] = []
                 for task in tasks:
                     if "qid" not in task or not task["qid"]:
                         task["qid"] = qid
-                    flat_tasks.append(task)
+                    grouped_tasks[qid].append(task)
 
+        # カップリングタスクの処理
         if "coupling_tasks" in result:
             for sub_key, tasks in result["coupling_tasks"].items():
                 logger.debug("Found %d coupling_tasks under key %s", len(tasks), sub_key)
-                flat_tasks.extend(tasks)
+                if "coupling" not in grouped_tasks:
+                    grouped_tasks["coupling"] = []
+                grouped_tasks["coupling"].extend(tasks)
+
+    # 各グループ内でstart_atによるソート
+    for group_tasks in grouped_tasks.values():
+        group_tasks.sort(key=lambda x: x.get("start_at", "") or "9999-12-31T23:59:59")
+
+    # グループ自体をstart_atの早い順にソート
+    def get_group_completion_time(group: list[dict]) -> str:
+        completed_tasks = [t for t in group if t.get("start_at")]
+        if not completed_tasks:
+            return "9999-12-31T23:59:59"
+        return max(t["start_at"] for t in completed_tasks)
+
+    sorted_groups = sorted(grouped_tasks.items(), key=lambda x: get_group_completion_time(x[1]))
+
+    # ソートされたグループを1つのリストに結合
+    flat_tasks = []
+    for _, tasks in sorted_groups:
+        flat_tasks.extend(tasks)
 
     logger.debug("Total flattened tasks: %d", len(flat_tasks))
     return flat_tasks
