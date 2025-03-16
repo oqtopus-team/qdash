@@ -11,8 +11,9 @@ tasks:
 
   generate:
     dir: ui
+    dotenv: [.env]
     cmds:
-      - curl http://localhost:5715/openapi.json | jq > ../docs/oas/openapi.json
+      - curl $NEXT_PUBLIC_API_URL/openapi.json | jq > ../docs/oas/openapi.json
       - bunx orval --config ./orval.config.cjs
       - bunx prettier . --write
       - bunx run fmt
