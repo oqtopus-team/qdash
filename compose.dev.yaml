@@ -6,7 +6,6 @@ services:
     env_file:
       - .env
     command: sleep infinity
-    container_name: qdash-devcontainer
     volumes:
       - .:/workspace/qdash
       - /var/run/docker.sock:/var/run/docker.sock
