@@ -35,7 +35,7 @@ export function TimeSeriesView() {
 
   const [endAt, setEndAt] = useState<string>(formatJSTDate(new Date()));
   const [startAt, setStartAt] = useState<string>(
-    formatJSTDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+    formatJSTDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)),
   );
   const [isStartAtLocked, setIsStartAtLocked] = useState(false);
   const [isEndAtLocked, setIsEndAtLocked] = useState(false);
@@ -56,7 +56,7 @@ export function TimeSeriesView() {
         setSortDirection("desc");
       }
     },
-    [sortField]
+    [sortField],
   );
 
   // Update current time every 30 seconds
@@ -67,7 +67,7 @@ export function TimeSeriesView() {
       }
       if (!isStartAtLocked && !isEndAtLocked) {
         setStartAt(
-          formatJSTDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+          formatJSTDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)),
         );
       }
     }, REFRESH_INTERVAL * 1000);
@@ -87,7 +87,7 @@ export function TimeSeriesView() {
         setIsStartAtLocked(true);
       }
     },
-    [isStartAtLocked]
+    [isStartAtLocked],
   );
 
   const handleEndAtChange = useCallback(
@@ -97,7 +97,7 @@ export function TimeSeriesView() {
         setIsEndAtLocked(true);
       }
     },
-    [isEndAtLocked]
+    [isEndAtLocked],
   );
 
   // Toggle lock functions
@@ -135,7 +135,7 @@ export function TimeSeriesView() {
           enabled: Boolean(selectedChip && selectedParameter && selectedTag),
           refetchInterval: REFRESH_INTERVAL * 1000,
         },
-      }
+      },
     );
 
   // Table data
@@ -162,7 +162,7 @@ export function TimeSeriesView() {
             });
           });
         }
-      }
+      },
     );
 
     // Sort by QID and time
@@ -207,7 +207,7 @@ export function TimeSeriesView() {
           if (Array.isArray(dataPoints)) {
             qidData[qid] = {
               x: dataPoints.map(
-                (point: OutputParameterModel) => point.calibrated_at || ""
+                (point: OutputParameterModel) => point.calibrated_at || "",
               ),
               y: dataPoints.map((point: OutputParameterModel) => {
                 if (point.value && selectedParameter) {
@@ -222,7 +222,7 @@ export function TimeSeriesView() {
                 return 0;
               }),
               error: dataPoints.map(
-                (point: OutputParameterModel) => point.error || 0
+                (point: OutputParameterModel) => point.error || 0,
               ),
             };
           }
@@ -359,7 +359,7 @@ export function TimeSeriesView() {
             ]);
           });
         }
-      }
+      },
     );
 
     // Sort rows by QID and time
@@ -384,7 +384,7 @@ export function TimeSeriesView() {
       `timeseries_${selectedChip}_${selectedParameter}_${selectedTag}_${new Date()
         .toISOString()
         .slice(0, 19)
-        .replace(/[:-]/g, "")}.csv`
+        .replace(/[:-]/g, "")}.csv`,
     );
     document.body.appendChild(link);
     link.click();
@@ -539,10 +539,10 @@ export function TimeSeriesView() {
             {!isStartAtLocked && !isEndAtLocked
               ? "Both times auto-update every 30 seconds"
               : isStartAtLocked && isEndAtLocked
-              ? "Both times are fixed"
-              : isStartAtLocked
-              ? "Start time is fixed, end time auto-updates"
-              : "End time is fixed, start time auto-updates"}
+                ? "Both times are fixed"
+                : isStartAtLocked
+                  ? "Start time is fixed, end time auto-updates"
+                  : "End time is fixed, start time auto-updates"}
           </div>
         </div>
       </div>
@@ -740,7 +740,7 @@ export function TimeSeriesView() {
               {filteredData
                 .slice(
                   (currentPage - 1) * ROWS_PER_PAGE,
-                  currentPage * ROWS_PER_PAGE
+                  currentPage * ROWS_PER_PAGE,
                 )
                 .map((row, index) => (
                   <tr key={index}>
@@ -784,8 +784,8 @@ export function TimeSeriesView() {
                   setCurrentPage((p) =>
                     Math.min(
                       Math.ceil(filteredData.length / ROWS_PER_PAGE),
-                      p + 1
-                    )
+                      p + 1,
+                    ),
                   )
                 }
                 disabled={
