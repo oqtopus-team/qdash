@@ -6,6 +6,9 @@ hero:
   name: "QDash"
   text: "Simplifies qubit calibration workflow management and monitoring."
   tagline: "A platform for managing calibration workflows."
+  image:
+    src: /oqtopus-symbol.png
+    alt: OQTOPUS
   actions:
     - theme: brand
       text: What is QDash?
