@@ -1,12 +1,8 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-<div align="center">
+![OQTOPUS](docs/oqtopus-logo.png)
 
-![qdash-logo](docs/oqtopus_logo.png)
-
-<h1> 📊 QDash </h1>
-
-</div>
+# QDash
 
 QDash is a web application that provides a user-friendly interface to manage and monitor the execution of qubit calibration workflows.
 
@@ -22,41 +18,6 @@ QDash is a web application that provides a user-friendly interface to manage and
 - **📊 Observations**: Access and analyze the observational data utilized in calibration processes, ensuring transparency and insight.
 
 - **⚙️ Settings**: Configure calibration parameters and adjust workflow settings to meet specific requirements seamlessly.
-
-## Quick Start
-
-### Initial Setup
-
-Run the following commands to create the necessary directories and environment files.
-
-```bash
-chmod +x scripts/create_directory.sh scripts/create_env.sh scripts/init.sh
-scripts/init.sh
-```
-
-### Start the Development Environment
-
-```bash
-docker compose up -d
-```
-
-### Initialize the Database
-
-```bash
- docker compose -f compose.dev.yaml up -d
-```
-
-```bash
-docker exec -it qdash-devcontainer /bin/bash -c "python init/setup.py init-all"
-```
-
-You can now access the application at [http://localhost:5714](http://localhost:5714).
-
-### Delete the Database
-
-```bash
-docker exec -it qdash-devcontainer /bin/bash -c "python init/setup.py teardown-all"
-```
 
 ## Documentation
 
