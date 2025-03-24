@@ -17,6 +17,7 @@ export default withMermaid(
 
     themeConfig: {
       // https://vitepress.dev/reference/default-theme-config
+      logo: "/oqtopus-symbol.png",
       nav: [
         { text: "Home", link: "/" },
         { text: "What is QDash", link: "/what-is-qdash" },
