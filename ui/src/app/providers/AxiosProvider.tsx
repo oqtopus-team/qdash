@@ -8,7 +8,7 @@ export default function AxiosProvider({
   children: React.ReactNode;
 }) {
   // Configure base URL
-  AXIOS_INSTANCE.defaults.baseURL = "http://localhost:5715";
+  AXIOS_INSTANCE.defaults.baseURL = process.env.NEXT_PUBLIC_API_URL;
 
   // Add request interceptor to handle auth
   AXIOS_INSTANCE.interceptors.request.use((config) => {
