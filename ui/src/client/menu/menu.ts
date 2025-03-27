@@ -20,9 +20,6 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import axios from "axios";
-import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-
 import type {
   CreateMenuRequest,
   CreateMenuResponse,
@@ -35,6 +32,11 @@ import type {
   UpdateMenuResponse,
 } from "../../schemas";
 
+import { customInstance } from "../../lib/custom-instance";
+import type { ErrorType, BodyType } from "../../lib/custom-instance";
+
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
 /**
  * Retrieve a list of menu items.
 
@@ -44,31 +46,35 @@ Returns
  * @summary Retrieve a list of menu items.
  */
 export const listMenu = (
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ListMenuResponse>> => {
-  return axios.get(`http://localhost:5715/api/menu`, options);
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ListMenuResponse>(
+    { url: `/api/menu`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getListMenuQueryKey = () => {
-  return [`http://localhost:5715/api/menu`] as const;
+  return [`/api/menu`] as const;
 };
 
 export const getListMenuQueryOptions = <
   TData = Awaited<ReturnType<typeof listMenu>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listMenu>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getListMenuQueryKey();
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listMenu>>> = ({
     signal,
-  }) => listMenu({ signal, ...axiosOptions });
+  }) => listMenu(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listMenu>>,
@@ -80,11 +86,11 @@ export const getListMenuQueryOptions = <
 export type ListMenuQueryResult = NonNullable<
   Awaited<ReturnType<typeof listMenu>>
 >;
-export type ListMenuQueryError = AxiosError<unknown>;
+export type ListMenuQueryError = ErrorType<unknown>;
 
 export function useListMenu<
   TData = Awaited<ReturnType<typeof listMenu>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options: {
   query: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listMenu>>, TError, TData>
@@ -97,13 +103,13 @@ export function useListMenu<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useListMenu<
   TData = Awaited<ReturnType<typeof listMenu>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listMenu>>, TError, TData>
@@ -116,16 +122,16 @@ export function useListMenu<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListMenu<
   TData = Awaited<ReturnType<typeof listMenu>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listMenu>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
  * @summary Retrieve a list of menu items.
@@ -133,12 +139,12 @@ export function useListMenu<
 
 export function useListMenu<
   TData = Awaited<ReturnType<typeof listMenu>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listMenu>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getListMenuQueryOptions(options);
 
@@ -165,49 +171,55 @@ Returns:
  * @summary Create a new menu item.
  */
 export const createMenu = (
-  createMenuRequest: CreateMenuRequest,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<CreateMenuResponse>> => {
-  return axios.post(
-    `http://localhost:5715/api/menu`,
-    createMenuRequest,
+  createMenuRequest: BodyType<CreateMenuRequest>,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<CreateMenuResponse>(
+    {
+      url: `/api/menu`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: createMenuRequest,
+      signal,
+    },
     options,
   );
 };
 
 export const getCreateMenuMutationOptions = <
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createMenu>>,
     TError,
-    { data: CreateMenuRequest },
+    { data: BodyType<CreateMenuRequest> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createMenu>>,
   TError,
-  { data: CreateMenuRequest },
+  { data: BodyType<CreateMenuRequest> },
   TContext
 > => {
   const mutationKey = ["createMenu"];
-  const { mutation: mutationOptions, axios: axiosOptions } = options
+  const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
       options.mutation.mutationKey
       ? options
       : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, axios: undefined };
+    : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof createMenu>>,
-    { data: CreateMenuRequest }
+    { data: BodyType<CreateMenuRequest> }
   > = (props) => {
     const { data } = props ?? {};
 
-    return createMenu(data, axiosOptions);
+    return createMenu(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -216,27 +228,27 @@ export const getCreateMenuMutationOptions = <
 export type CreateMenuMutationResult = NonNullable<
   Awaited<ReturnType<typeof createMenu>>
 >;
-export type CreateMenuMutationBody = CreateMenuRequest;
-export type CreateMenuMutationError = AxiosError<HTTPValidationError>;
+export type CreateMenuMutationBody = BodyType<CreateMenuRequest>;
+export type CreateMenuMutationError = ErrorType<HTTPValidationError>;
 
 /**
  * @summary Create a new menu item.
  */
 export const useCreateMenu = <
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createMenu>>,
     TError,
-    { data: CreateMenuRequest },
+    { data: BodyType<CreateMenuRequest> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof createMenu>>,
   TError,
-  { data: CreateMenuRequest },
+  { data: BodyType<CreateMenuRequest> },
   TContext
 > => {
   const mutationOptions = getCreateMenuMutationOptions(options);
@@ -252,31 +264,35 @@ Returns
  * @summary Retrieve a list of preset menu items.
  */
 export const listPreset = (
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ListMenuResponse>> => {
-  return axios.get(`http://localhost:5715/api/menu/preset`, options);
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ListMenuResponse>(
+    { url: `/api/menu/preset`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getListPresetQueryKey = () => {
-  return [`http://localhost:5715/api/menu/preset`] as const;
+  return [`/api/menu/preset`] as const;
 };
 
 export const getListPresetQueryOptions = <
   TData = Awaited<ReturnType<typeof listPreset>>,
-  TError = AxiosError<Detail>,
+  TError = ErrorType<Detail>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listPreset>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getListPresetQueryKey();
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listPreset>>> = ({
     signal,
-  }) => listPreset({ signal, ...axiosOptions });
+  }) => listPreset(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listPreset>>,
@@ -288,11 +304,11 @@ export const getListPresetQueryOptions = <
 export type ListPresetQueryResult = NonNullable<
   Awaited<ReturnType<typeof listPreset>>
 >;
-export type ListPresetQueryError = AxiosError<Detail>;
+export type ListPresetQueryError = ErrorType<Detail>;
 
 export function useListPreset<
   TData = Awaited<ReturnType<typeof listPreset>>,
-  TError = AxiosError<Detail>,
+  TError = ErrorType<Detail>,
 >(options: {
   query: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listPreset>>, TError, TData>
@@ -305,13 +321,13 @@ export function useListPreset<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useListPreset<
   TData = Awaited<ReturnType<typeof listPreset>>,
-  TError = AxiosError<Detail>,
+  TError = ErrorType<Detail>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listPreset>>, TError, TData>
@@ -324,16 +340,16 @@ export function useListPreset<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListPreset<
   TData = Awaited<ReturnType<typeof listPreset>>,
-  TError = AxiosError<Detail>,
+  TError = ErrorType<Detail>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listPreset>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
  * @summary Retrieve a list of preset menu items.
@@ -341,12 +357,12 @@ export function useListPreset<
 
 export function useListPreset<
   TData = Awaited<ReturnType<typeof listPreset>>,
-  TError = AxiosError<Detail>,
+  TError = ErrorType<Detail>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listPreset>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getListPresetQueryOptions(options);
 
@@ -379,34 +395,38 @@ Raises:
  */
 export const getMenuByName = (
   name: string,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<GetMenuResponse>> => {
-  return axios.get(`http://localhost:5715/api/menu/${name}`, options);
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<GetMenuResponse>(
+    { url: `/api/menu/${name}`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getGetMenuByNameQueryKey = (name: string) => {
-  return [`http://localhost:5715/api/menu/${name}`] as const;
+  return [`/api/menu/${name}`] as const;
 };
 
 export const getGetMenuByNameQueryOptions = <
   TData = Awaited<ReturnType<typeof getMenuByName>>,
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
 >(
   name: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getMenuByName>>, TError, TData>
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getGetMenuByNameQueryKey(name);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getMenuByName>>> = ({
     signal,
-  }) => getMenuByName(name, { signal, ...axiosOptions });
+  }) => getMenuByName(name, requestOptions, signal);
 
   return {
     queryKey,
@@ -423,11 +443,11 @@ export const getGetMenuByNameQueryOptions = <
 export type GetMenuByNameQueryResult = NonNullable<
   Awaited<ReturnType<typeof getMenuByName>>
 >;
-export type GetMenuByNameQueryError = AxiosError<Detail | HTTPValidationError>;
+export type GetMenuByNameQueryError = ErrorType<Detail | HTTPValidationError>;
 
 export function useGetMenuByName<
   TData = Awaited<ReturnType<typeof getMenuByName>>,
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
 >(
   name: string,
   options: {
@@ -442,14 +462,14 @@ export function useGetMenuByName<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useGetMenuByName<
   TData = Awaited<ReturnType<typeof getMenuByName>>,
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
 >(
   name: string,
   options?: {
@@ -464,19 +484,19 @@ export function useGetMenuByName<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetMenuByName<
   TData = Awaited<ReturnType<typeof getMenuByName>>,
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
 >(
   name: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getMenuByName>>, TError, TData>
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
@@ -485,14 +505,14 @@ export function useGetMenuByName<
 
 export function useGetMenuByName<
   TData = Awaited<ReturnType<typeof getMenuByName>>,
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
 >(
   name: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getMenuByName>>, TError, TData>
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getGetMenuByNameQueryOptions(name, options);
@@ -522,49 +542,53 @@ Returns:
  */
 export const updateMenu = (
   name: string,
-  updateMenuRequest: UpdateMenuRequest,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<UpdateMenuResponse>> => {
-  return axios.put(
-    `http://localhost:5715/api/menu/${name}`,
-    updateMenuRequest,
+  updateMenuRequest: BodyType<UpdateMenuRequest>,
+  options?: SecondParameter<typeof customInstance>,
+) => {
+  return customInstance<UpdateMenuResponse>(
+    {
+      url: `/api/menu/${name}`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: updateMenuRequest,
+    },
     options,
   );
 };
 
 export const getUpdateMenuMutationOptions = <
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateMenu>>,
     TError,
-    { name: string; data: UpdateMenuRequest },
+    { name: string; data: BodyType<UpdateMenuRequest> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateMenu>>,
   TError,
-  { name: string; data: UpdateMenuRequest },
+  { name: string; data: BodyType<UpdateMenuRequest> },
   TContext
 > => {
   const mutationKey = ["updateMenu"];
-  const { mutation: mutationOptions, axios: axiosOptions } = options
+  const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
       options.mutation.mutationKey
       ? options
       : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, axios: undefined };
+    : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof updateMenu>>,
-    { name: string; data: UpdateMenuRequest }
+    { name: string; data: BodyType<UpdateMenuRequest> }
   > = (props) => {
     const { name, data } = props ?? {};
 
-    return updateMenu(name, data, axiosOptions);
+    return updateMenu(name, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -573,27 +597,27 @@ export const getUpdateMenuMutationOptions = <
 export type UpdateMenuMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateMenu>>
 >;
-export type UpdateMenuMutationBody = UpdateMenuRequest;
-export type UpdateMenuMutationError = AxiosError<Detail | HTTPValidationError>;
+export type UpdateMenuMutationBody = BodyType<UpdateMenuRequest>;
+export type UpdateMenuMutationError = ErrorType<Detail | HTTPValidationError>;
 
 /**
  * @summary Update a menu with the given name.
  */
 export const useUpdateMenu = <
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateMenu>>,
     TError,
-    { name: string; data: UpdateMenuRequest },
+    { name: string; data: BodyType<UpdateMenuRequest> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof updateMenu>>,
   TError,
-  { name: string; data: UpdateMenuRequest },
+  { name: string; data: BodyType<UpdateMenuRequest> },
   TContext
 > => {
   const mutationOptions = getUpdateMenuMutationOptions(options);
@@ -615,13 +639,16 @@ Returns:
  */
 export const deleteMenu = (
   name: string,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<DeleteMenuResponse>> => {
-  return axios.delete(`http://localhost:5715/api/menu/${name}`, options);
+  options?: SecondParameter<typeof customInstance>,
+) => {
+  return customInstance<DeleteMenuResponse>(
+    { url: `/api/menu/${name}`, method: "DELETE" },
+    options,
+  );
 };
 
 export const getDeleteMenuMutationOptions = <
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -630,7 +657,7 @@ export const getDeleteMenuMutationOptions = <
     { name: string },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof deleteMenu>>,
   TError,
@@ -638,13 +665,13 @@ export const getDeleteMenuMutationOptions = <
   TContext
 > => {
   const mutationKey = ["deleteMenu"];
-  const { mutation: mutationOptions, axios: axiosOptions } = options
+  const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
       options.mutation.mutationKey
       ? options
       : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, axios: undefined };
+    : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof deleteMenu>>,
@@ -652,7 +679,7 @@ export const getDeleteMenuMutationOptions = <
   > = (props) => {
     const { name } = props ?? {};
 
-    return deleteMenu(name, axiosOptions);
+    return deleteMenu(name, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -662,13 +689,13 @@ export type DeleteMenuMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteMenu>>
 >;
 
-export type DeleteMenuMutationError = AxiosError<Detail | HTTPValidationError>;
+export type DeleteMenuMutationError = ErrorType<Detail | HTTPValidationError>;
 
 /**
  * @summary Delete a menu by its name.
  */
 export const useDeleteMenu = <
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -677,7 +704,7 @@ export const useDeleteMenu = <
     { name: string },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof deleteMenu>>,
   TError,
