@@ -8,7 +8,7 @@ from qdash.dbmodel.document_models import document_models
 
 mongo_ip = os.getenv("MONGO_HOST")
 mongo_port = os.getenv("MONGO_PORT")
-client: MongoClient = MongoClient(mongo_ip, mongo_port, username="root", password="example")  # noqa: S106
+client: MongoClient = MongoClient(mongo_ip, int(mongo_port), username="root", password="example")  # noqa: S106
 
 
 def initialize() -> None:
