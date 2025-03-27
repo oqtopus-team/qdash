@@ -5,7 +5,12 @@ module.exports = {
       mode: "tags-split",
       target: "./src/client",
       schemas: "./src/schemas",
-      baseUrl: process.env.NEXT_PUBLIC_API_URL,
+      override: {
+        mutator: {
+          path: "./src/lib/custom-instance.ts",
+          name: "customInstance",
+        },
+      },
       clean: true,
       mock: false,
       headers: {

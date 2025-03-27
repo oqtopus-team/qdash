@@ -17,41 +17,47 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import axios from "axios";
-import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-
 import type { Settings } from "../../schemas";
+
+import { customInstance } from "../../lib/custom-instance";
+import type { ErrorType } from "../../lib/custom-instance";
+
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
  * Get settings from the server
  * @summary Get settings
  */
 export const fetchConfig = (
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<Settings>> => {
-  return axios.get(`http://localhost:5715/api/settings`, options);
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<Settings>(
+    { url: `/api/settings`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getFetchConfigQueryKey = () => {
-  return [`http://localhost:5715/api/settings`] as const;
+  return [`/api/settings`] as const;
 };
 
 export const getFetchConfigQueryOptions = <
   TData = Awaited<ReturnType<typeof fetchConfig>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof fetchConfig>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getFetchConfigQueryKey();
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchConfig>>> = ({
     signal,
-  }) => fetchConfig({ signal, ...axiosOptions });
+  }) => fetchConfig(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof fetchConfig>>,
@@ -63,11 +69,11 @@ export const getFetchConfigQueryOptions = <
 export type FetchConfigQueryResult = NonNullable<
   Awaited<ReturnType<typeof fetchConfig>>
 >;
-export type FetchConfigQueryError = AxiosError<unknown>;
+export type FetchConfigQueryError = ErrorType<unknown>;
 
 export function useFetchConfig<
   TData = Awaited<ReturnType<typeof fetchConfig>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options: {
   query: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof fetchConfig>>, TError, TData>
@@ -80,13 +86,13 @@ export function useFetchConfig<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useFetchConfig<
   TData = Awaited<ReturnType<typeof fetchConfig>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof fetchConfig>>, TError, TData>
@@ -99,16 +105,16 @@ export function useFetchConfig<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useFetchConfig<
   TData = Awaited<ReturnType<typeof fetchConfig>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof fetchConfig>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
  * @summary Get settings
@@ -116,12 +122,12 @@ export function useFetchConfig<
 
 export function useFetchConfig<
   TData = Awaited<ReturnType<typeof fetchConfig>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof fetchConfig>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getFetchConfigQueryOptions(options);
 

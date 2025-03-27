@@ -17,10 +17,12 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import axios from "axios";
-import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-
 import type { ListTagResponse } from "../../schemas";
+
+import { customInstance } from "../../lib/custom-instance";
+import type { ErrorType } from "../../lib/custom-instance";
+
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
  * Fetch all tasks.
@@ -35,31 +37,35 @@ Returns:
  * @summary list all tag
  */
 export const listAllTag = (
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ListTagResponse>> => {
-  return axios.get(`http://localhost:5715/api/tag`, options);
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ListTagResponse>(
+    { url: `/api/tag`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getListAllTagQueryKey = () => {
-  return [`http://localhost:5715/api/tag`] as const;
+  return [`/api/tag`] as const;
 };
 
 export const getListAllTagQueryOptions = <
   TData = Awaited<ReturnType<typeof listAllTag>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listAllTag>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getListAllTagQueryKey();
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listAllTag>>> = ({
     signal,
-  }) => listAllTag({ signal, ...axiosOptions });
+  }) => listAllTag(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listAllTag>>,
@@ -71,11 +77,11 @@ export const getListAllTagQueryOptions = <
 export type ListAllTagQueryResult = NonNullable<
   Awaited<ReturnType<typeof listAllTag>>
 >;
-export type ListAllTagQueryError = AxiosError<unknown>;
+export type ListAllTagQueryError = ErrorType<unknown>;
 
 export function useListAllTag<
   TData = Awaited<ReturnType<typeof listAllTag>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options: {
   query: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listAllTag>>, TError, TData>
@@ -88,13 +94,13 @@ export function useListAllTag<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useListAllTag<
   TData = Awaited<ReturnType<typeof listAllTag>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listAllTag>>, TError, TData>
@@ -107,16 +113,16 @@ export function useListAllTag<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListAllTag<
   TData = Awaited<ReturnType<typeof listAllTag>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listAllTag>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
  * @summary list all tag
@@ -124,12 +130,12 @@ export function useListAllTag<
 
 export function useListAllTag<
   TData = Awaited<ReturnType<typeof listAllTag>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listAllTag>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getListAllTagQueryOptions(options);
 

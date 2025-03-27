@@ -5,19 +5,21 @@ import { useState } from "react";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./providers/theme-provider";
 import { ThemedToastContainer } from "./components/ThemedToastContainer";
-import "../lib/axios"; // Import axios configuration
+import AxiosProvider from "./providers/AxiosProvider";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <ThemeProvider>
-          {children}
-          <ThemedToastContainer />
-        </ThemeProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <AxiosProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <ThemeProvider>
+            {children}
+            <ThemedToastContainer />
+          </ThemeProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </AxiosProvider>
   );
 }
