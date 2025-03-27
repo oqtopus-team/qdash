@@ -20,9 +20,6 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import axios from "axios";
-import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-
 import type {
   ExecuteCalibRequest,
   ExecuteCalibResponse,
@@ -34,26 +31,32 @@ import type {
   ScheduleCronCalibResponse,
 } from "../../schemas";
 
+import { customInstance } from "../../lib/custom-instance";
+import type { ErrorType, BodyType } from "../../lib/custom-instance";
+
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
 /**
  * List all the cron schedules.
  * @summary Fetches all the cron schedules.
  */
 export const listCronSchedules = (
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ListCronScheduleResponse>> => {
-  return axios.get(
-    `http://localhost:5715/api/calibration/cron-schedule`,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ListCronScheduleResponse>(
+    { url: `/api/calibration/cron-schedule`, method: "GET", signal },
     options,
   );
 };
 
 export const getListCronSchedulesQueryKey = () => {
-  return [`http://localhost:5715/api/calibration/cron-schedule`] as const;
+  return [`/api/calibration/cron-schedule`] as const;
 };
 
 export const getListCronSchedulesQueryOptions = <
   TData = Awaited<ReturnType<typeof listCronSchedules>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -62,15 +65,15 @@ export const getListCronSchedulesQueryOptions = <
       TData
     >
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getListCronSchedulesQueryKey();
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listCronSchedules>>
-  > = ({ signal }) => listCronSchedules({ signal, ...axiosOptions });
+  > = ({ signal }) => listCronSchedules(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listCronSchedules>>,
@@ -82,11 +85,11 @@ export const getListCronSchedulesQueryOptions = <
 export type ListCronSchedulesQueryResult = NonNullable<
   Awaited<ReturnType<typeof listCronSchedules>>
 >;
-export type ListCronSchedulesQueryError = AxiosError<unknown>;
+export type ListCronSchedulesQueryError = ErrorType<unknown>;
 
 export function useListCronSchedules<
   TData = Awaited<ReturnType<typeof listCronSchedules>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options: {
   query: Partial<
     UseQueryOptions<
@@ -103,13 +106,13 @@ export function useListCronSchedules<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useListCronSchedules<
   TData = Awaited<ReturnType<typeof listCronSchedules>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -126,11 +129,11 @@ export function useListCronSchedules<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListCronSchedules<
   TData = Awaited<ReturnType<typeof listCronSchedules>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -139,7 +142,7 @@ export function useListCronSchedules<
       TData
     >
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
  * @summary Fetches all the cron schedules.
@@ -147,7 +150,7 @@ export function useListCronSchedules<
 
 export function useListCronSchedules<
   TData = Awaited<ReturnType<typeof listCronSchedules>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -156,7 +159,7 @@ export function useListCronSchedules<
       TData
     >
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getListCronSchedulesQueryOptions(options);
 
@@ -174,49 +177,55 @@ export function useListCronSchedules<
  * @summary Schedules a calibration with cron.
  */
 export const scheduleCronCalib = (
-  scheduleCronCalibRequest: ScheduleCronCalibRequest,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ScheduleCronCalibResponse>> => {
-  return axios.post(
-    `http://localhost:5715/api/calibration/cron-schedule`,
-    scheduleCronCalibRequest,
+  scheduleCronCalibRequest: BodyType<ScheduleCronCalibRequest>,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ScheduleCronCalibResponse>(
+    {
+      url: `/api/calibration/cron-schedule`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: scheduleCronCalibRequest,
+      signal,
+    },
     options,
   );
 };
 
 export const getScheduleCronCalibMutationOptions = <
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof scheduleCronCalib>>,
     TError,
-    { data: ScheduleCronCalibRequest },
+    { data: BodyType<ScheduleCronCalibRequest> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof scheduleCronCalib>>,
   TError,
-  { data: ScheduleCronCalibRequest },
+  { data: BodyType<ScheduleCronCalibRequest> },
   TContext
 > => {
   const mutationKey = ["scheduleCronCalib"];
-  const { mutation: mutationOptions, axios: axiosOptions } = options
+  const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
       options.mutation.mutationKey
       ? options
       : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, axios: undefined };
+    : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof scheduleCronCalib>>,
-    { data: ScheduleCronCalibRequest }
+    { data: BodyType<ScheduleCronCalibRequest> }
   > = (props) => {
     const { data } = props ?? {};
 
-    return scheduleCronCalib(data, axiosOptions);
+    return scheduleCronCalib(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -225,27 +234,27 @@ export const getScheduleCronCalibMutationOptions = <
 export type ScheduleCronCalibMutationResult = NonNullable<
   Awaited<ReturnType<typeof scheduleCronCalib>>
 >;
-export type ScheduleCronCalibMutationBody = ScheduleCronCalibRequest;
-export type ScheduleCronCalibMutationError = AxiosError<HTTPValidationError>;
+export type ScheduleCronCalibMutationBody = BodyType<ScheduleCronCalibRequest>;
+export type ScheduleCronCalibMutationError = ErrorType<HTTPValidationError>;
 
 /**
  * @summary Schedules a calibration with cron.
  */
 export const useScheduleCronCalib = <
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof scheduleCronCalib>>,
     TError,
-    { data: ScheduleCronCalibRequest },
+    { data: BodyType<ScheduleCronCalibRequest> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof scheduleCronCalib>>,
   TError,
-  { data: ScheduleCronCalibRequest },
+  { data: BodyType<ScheduleCronCalibRequest> },
   TContext
 > => {
   const mutationOptions = getScheduleCronCalibMutationOptions(options);
@@ -257,49 +266,55 @@ export const useScheduleCronCalib = <
  * @summary Executes a calibration by creating a flow run from a deployment.
  */
 export const executeCalib = (
-  executeCalibRequest: ExecuteCalibRequest,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ExecuteCalibResponse>> => {
-  return axios.post(
-    `http://localhost:5715/api/calibration`,
-    executeCalibRequest,
+  executeCalibRequest: BodyType<ExecuteCalibRequest>,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ExecuteCalibResponse>(
+    {
+      url: `/api/calibration`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: executeCalibRequest,
+      signal,
+    },
     options,
   );
 };
 
 export const getExecuteCalibMutationOptions = <
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof executeCalib>>,
     TError,
-    { data: ExecuteCalibRequest },
+    { data: BodyType<ExecuteCalibRequest> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof executeCalib>>,
   TError,
-  { data: ExecuteCalibRequest },
+  { data: BodyType<ExecuteCalibRequest> },
   TContext
 > => {
   const mutationKey = ["executeCalib"];
-  const { mutation: mutationOptions, axios: axiosOptions } = options
+  const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
       options.mutation.mutationKey
       ? options
       : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, axios: undefined };
+    : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof executeCalib>>,
-    { data: ExecuteCalibRequest }
+    { data: BodyType<ExecuteCalibRequest> }
   > = (props) => {
     const { data } = props ?? {};
 
-    return executeCalib(data, axiosOptions);
+    return executeCalib(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -308,27 +323,27 @@ export const getExecuteCalibMutationOptions = <
 export type ExecuteCalibMutationResult = NonNullable<
   Awaited<ReturnType<typeof executeCalib>>
 >;
-export type ExecuteCalibMutationBody = ExecuteCalibRequest;
-export type ExecuteCalibMutationError = AxiosError<HTTPValidationError>;
+export type ExecuteCalibMutationBody = BodyType<ExecuteCalibRequest>;
+export type ExecuteCalibMutationError = ErrorType<HTTPValidationError>;
 
 /**
  * @summary Executes a calibration by creating a flow run from a deployment.
  */
 export const useExecuteCalib = <
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof executeCalib>>,
     TError,
-    { data: ExecuteCalibRequest },
+    { data: BodyType<ExecuteCalibRequest> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof executeCalib>>,
   TError,
-  { data: ExecuteCalibRequest },
+  { data: BodyType<ExecuteCalibRequest> },
   TContext
 > => {
   const mutationOptions = getExecuteCalibMutationOptions(options);
@@ -339,18 +354,22 @@ export const useExecuteCalib = <
  * @summary Fetches all the calibration schedules.
  */
 export const fetchAllCalibSchedule = (
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ScheduleCalibResponse[]>> => {
-  return axios.get(`http://localhost:5715/api/calibration/schedule`, options);
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ScheduleCalibResponse[]>(
+    { url: `/api/calibration/schedule`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getFetchAllCalibScheduleQueryKey = () => {
-  return [`http://localhost:5715/api/calibration/schedule`] as const;
+  return [`/api/calibration/schedule`] as const;
 };
 
 export const getFetchAllCalibScheduleQueryOptions = <
   TData = Awaited<ReturnType<typeof fetchAllCalibSchedule>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -359,15 +378,15 @@ export const getFetchAllCalibScheduleQueryOptions = <
       TData
     >
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getFetchAllCalibScheduleQueryKey();
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof fetchAllCalibSchedule>>
-  > = ({ signal }) => fetchAllCalibSchedule({ signal, ...axiosOptions });
+  > = ({ signal }) => fetchAllCalibSchedule(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof fetchAllCalibSchedule>>,
@@ -379,11 +398,11 @@ export const getFetchAllCalibScheduleQueryOptions = <
 export type FetchAllCalibScheduleQueryResult = NonNullable<
   Awaited<ReturnType<typeof fetchAllCalibSchedule>>
 >;
-export type FetchAllCalibScheduleQueryError = AxiosError<unknown>;
+export type FetchAllCalibScheduleQueryError = ErrorType<unknown>;
 
 export function useFetchAllCalibSchedule<
   TData = Awaited<ReturnType<typeof fetchAllCalibSchedule>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options: {
   query: Partial<
     UseQueryOptions<
@@ -400,13 +419,13 @@ export function useFetchAllCalibSchedule<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useFetchAllCalibSchedule<
   TData = Awaited<ReturnType<typeof fetchAllCalibSchedule>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -423,11 +442,11 @@ export function useFetchAllCalibSchedule<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useFetchAllCalibSchedule<
   TData = Awaited<ReturnType<typeof fetchAllCalibSchedule>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -436,7 +455,7 @@ export function useFetchAllCalibSchedule<
       TData
     >
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
  * @summary Fetches all the calibration schedules.
@@ -444,7 +463,7 @@ export function useFetchAllCalibSchedule<
 
 export function useFetchAllCalibSchedule<
   TData = Awaited<ReturnType<typeof fetchAllCalibSchedule>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -453,7 +472,7 @@ export function useFetchAllCalibSchedule<
       TData
     >
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getFetchAllCalibScheduleQueryOptions(options);
 
@@ -471,49 +490,55 @@ export function useFetchAllCalibSchedule<
  * @summary Schedules a calibration.
  */
 export const scheduleCalib = (
-  scheduleCalibRequest: ScheduleCalibRequest,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ScheduleCalibResponse>> => {
-  return axios.post(
-    `http://localhost:5715/api/calibration/schedule`,
-    scheduleCalibRequest,
+  scheduleCalibRequest: BodyType<ScheduleCalibRequest>,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ScheduleCalibResponse>(
+    {
+      url: `/api/calibration/schedule`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: scheduleCalibRequest,
+      signal,
+    },
     options,
   );
 };
 
 export const getScheduleCalibMutationOptions = <
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof scheduleCalib>>,
     TError,
-    { data: ScheduleCalibRequest },
+    { data: BodyType<ScheduleCalibRequest> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof scheduleCalib>>,
   TError,
-  { data: ScheduleCalibRequest },
+  { data: BodyType<ScheduleCalibRequest> },
   TContext
 > => {
   const mutationKey = ["scheduleCalib"];
-  const { mutation: mutationOptions, axios: axiosOptions } = options
+  const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
       options.mutation.mutationKey
       ? options
       : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, axios: undefined };
+    : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof scheduleCalib>>,
-    { data: ScheduleCalibRequest }
+    { data: BodyType<ScheduleCalibRequest> }
   > = (props) => {
     const { data } = props ?? {};
 
-    return scheduleCalib(data, axiosOptions);
+    return scheduleCalib(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -522,27 +547,27 @@ export const getScheduleCalibMutationOptions = <
 export type ScheduleCalibMutationResult = NonNullable<
   Awaited<ReturnType<typeof scheduleCalib>>
 >;
-export type ScheduleCalibMutationBody = ScheduleCalibRequest;
-export type ScheduleCalibMutationError = AxiosError<HTTPValidationError>;
+export type ScheduleCalibMutationBody = BodyType<ScheduleCalibRequest>;
+export type ScheduleCalibMutationError = ErrorType<HTTPValidationError>;
 
 /**
  * @summary Schedules a calibration.
  */
 export const useScheduleCalib = <
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof scheduleCalib>>,
     TError,
-    { data: ScheduleCalibRequest },
+    { data: BodyType<ScheduleCalibRequest> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof scheduleCalib>>,
   TError,
-  { data: ScheduleCalibRequest },
+  { data: BodyType<ScheduleCalibRequest> },
   TContext
 > => {
   const mutationOptions = getScheduleCalibMutationOptions(options);
@@ -554,16 +579,16 @@ export const useScheduleCalib = <
  */
 export const deleteCalibSchedule = (
   flowRunId: string,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<unknown>> => {
-  return axios.delete(
-    `http://localhost:5715/api/calibration/schedule/${flowRunId}`,
+  options?: SecondParameter<typeof customInstance>,
+) => {
+  return customInstance<unknown>(
+    { url: `/api/calibration/schedule/${flowRunId}`, method: "DELETE" },
     options,
   );
 };
 
 export const getDeleteCalibScheduleMutationOptions = <
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -572,7 +597,7 @@ export const getDeleteCalibScheduleMutationOptions = <
     { flowRunId: string },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof deleteCalibSchedule>>,
   TError,
@@ -580,13 +605,13 @@ export const getDeleteCalibScheduleMutationOptions = <
   TContext
 > => {
   const mutationKey = ["deleteCalibSchedule"];
-  const { mutation: mutationOptions, axios: axiosOptions } = options
+  const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
       options.mutation.mutationKey
       ? options
       : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, axios: undefined };
+    : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof deleteCalibSchedule>>,
@@ -594,7 +619,7 @@ export const getDeleteCalibScheduleMutationOptions = <
   > = (props) => {
     const { flowRunId } = props ?? {};
 
-    return deleteCalibSchedule(flowRunId, axiosOptions);
+    return deleteCalibSchedule(flowRunId, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -604,13 +629,13 @@ export type DeleteCalibScheduleMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteCalibSchedule>>
 >;
 
-export type DeleteCalibScheduleMutationError = AxiosError<HTTPValidationError>;
+export type DeleteCalibScheduleMutationError = ErrorType<HTTPValidationError>;
 
 /**
  * @summary Deletes a calibration schedule.
  */
 export const useDeleteCalibSchedule = <
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -619,7 +644,7 @@ export const useDeleteCalibSchedule = <
     { flowRunId: string },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof deleteCalibSchedule>>,
   TError,

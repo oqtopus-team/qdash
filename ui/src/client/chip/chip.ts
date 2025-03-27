@@ -17,9 +17,6 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import axios from "axios";
-import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-
 import type {
   ChipResponse,
   ExecutionResponseDetail,
@@ -32,6 +29,11 @@ import type {
   MuxDetailResponse,
   TimeSeriesData,
 } from "../../schemas";
+
+import { customInstance } from "../../lib/custom-instance";
+import type { ErrorType } from "../../lib/custom-instance";
+
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
  * Fetch all chips.
@@ -48,31 +50,35 @@ list[ChipResponse]
  * @summary Fetch all chips
  */
 export const listChips = (
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ChipResponse[]>> => {
-  return axios.get(`http://localhost:5715/api/chip`, options);
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ChipResponse[]>(
+    { url: `/api/chip`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getListChipsQueryKey = () => {
-  return [`http://localhost:5715/api/chip`] as const;
+  return [`/api/chip`] as const;
 };
 
 export const getListChipsQueryOptions = <
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getListChipsQueryKey();
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listChips>>> = ({
     signal,
-  }) => listChips({ signal, ...axiosOptions });
+  }) => listChips(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listChips>>,
@@ -84,11 +90,11 @@ export const getListChipsQueryOptions = <
 export type ListChipsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listChips>>
 >;
-export type ListChipsQueryError = AxiosError<unknown>;
+export type ListChipsQueryError = ErrorType<unknown>;
 
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options: {
   query: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
@@ -101,13 +107,13 @@ export function useListChips<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
@@ -120,16 +126,16 @@ export function useListChips<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
  * @summary Fetch all chips
@@ -137,12 +143,12 @@ export function useListChips<
 
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getListChipsQueryOptions(options);
 
@@ -173,34 +179,38 @@ ChipResponse
  */
 export const fetchChip = (
   chipId: string,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ChipResponse>> => {
-  return axios.get(`http://localhost:5715/api/chip/${chipId}`, options);
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ChipResponse>(
+    { url: `/api/chip/${chipId}`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getFetchChipQueryKey = (chipId: string) => {
-  return [`http://localhost:5715/api/chip/${chipId}`] as const;
+  return [`/api/chip/${chipId}`] as const;
 };
 
 export const getFetchChipQueryOptions = <
   TData = Awaited<ReturnType<typeof fetchChip>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof fetchChip>>, TError, TData>
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getFetchChipQueryKey(chipId);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchChip>>> = ({
     signal,
-  }) => fetchChip(chipId, { signal, ...axiosOptions });
+  }) => fetchChip(chipId, requestOptions, signal);
 
   return {
     queryKey,
@@ -215,11 +225,11 @@ export const getFetchChipQueryOptions = <
 export type FetchChipQueryResult = NonNullable<
   Awaited<ReturnType<typeof fetchChip>>
 >;
-export type FetchChipQueryError = AxiosError<HTTPValidationError>;
+export type FetchChipQueryError = ErrorType<HTTPValidationError>;
 
 export function useFetchChip<
   TData = Awaited<ReturnType<typeof fetchChip>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options: {
@@ -234,14 +244,14 @@ export function useFetchChip<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useFetchChip<
   TData = Awaited<ReturnType<typeof fetchChip>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options?: {
@@ -256,19 +266,19 @@ export function useFetchChip<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useFetchChip<
   TData = Awaited<ReturnType<typeof fetchChip>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof fetchChip>>, TError, TData>
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
@@ -277,14 +287,14 @@ export function useFetchChip<
 
 export function useFetchChip<
   TData = Awaited<ReturnType<typeof fetchChip>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof fetchChip>>, TError, TData>
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getFetchChipQueryOptions(chipId, options);
@@ -316,21 +326,22 @@ list[ExecutionResponseSummary]
  */
 export const listExecutionsByChipId = (
   chipId: string,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ExecutionResponseSummary[]>> => {
-  return axios.get(
-    `http://localhost:5715/api/chip/${chipId}/execution`,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ExecutionResponseSummary[]>(
+    { url: `/api/chip/${chipId}/execution`, method: "GET", signal },
     options,
   );
 };
 
 export const getListExecutionsByChipIdQueryKey = (chipId: string) => {
-  return [`http://localhost:5715/api/chip/${chipId}/execution`] as const;
+  return [`/api/chip/${chipId}/execution`] as const;
 };
 
 export const getListExecutionsByChipIdQueryOptions = <
   TData = Awaited<ReturnType<typeof listExecutionsByChipId>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options?: {
@@ -341,18 +352,17 @@ export const getListExecutionsByChipIdQueryOptions = <
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
     queryOptions?.queryKey ?? getListExecutionsByChipIdQueryKey(chipId);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listExecutionsByChipId>>
-  > = ({ signal }) =>
-    listExecutionsByChipId(chipId, { signal, ...axiosOptions });
+  > = ({ signal }) => listExecutionsByChipId(chipId, requestOptions, signal);
 
   return {
     queryKey,
@@ -369,11 +379,11 @@ export const getListExecutionsByChipIdQueryOptions = <
 export type ListExecutionsByChipIdQueryResult = NonNullable<
   Awaited<ReturnType<typeof listExecutionsByChipId>>
 >;
-export type ListExecutionsByChipIdQueryError = AxiosError<HTTPValidationError>;
+export type ListExecutionsByChipIdQueryError = ErrorType<HTTPValidationError>;
 
 export function useListExecutionsByChipId<
   TData = Awaited<ReturnType<typeof listExecutionsByChipId>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options: {
@@ -392,14 +402,14 @@ export function useListExecutionsByChipId<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useListExecutionsByChipId<
   TData = Awaited<ReturnType<typeof listExecutionsByChipId>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options?: {
@@ -418,12 +428,12 @@ export function useListExecutionsByChipId<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListExecutionsByChipId<
   TData = Awaited<ReturnType<typeof listExecutionsByChipId>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options?: {
@@ -434,7 +444,7 @@ export function useListExecutionsByChipId<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
@@ -443,7 +453,7 @@ export function useListExecutionsByChipId<
 
 export function useListExecutionsByChipId<
   TData = Awaited<ReturnType<typeof listExecutionsByChipId>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options?: {
@@ -454,7 +464,7 @@ export function useListExecutionsByChipId<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getListExecutionsByChipIdQueryOptions(chipId, options);
@@ -489,10 +499,15 @@ ExecutionResponseDetail
 export const fetchExecutionByChipId = (
   chipId: string,
   executionId: string,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ExecutionResponseDetail>> => {
-  return axios.get(
-    `http://localhost:5715/api/chip/${chipId}/execution/${executionId}`,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ExecutionResponseDetail>(
+    {
+      url: `/api/chip/${chipId}/execution/${executionId}`,
+      method: "GET",
+      signal,
+    },
     options,
   );
 };
@@ -501,14 +516,12 @@ export const getFetchExecutionByChipIdQueryKey = (
   chipId: string,
   executionId: string,
 ) => {
-  return [
-    `http://localhost:5715/api/chip/${chipId}/execution/${executionId}`,
-  ] as const;
+  return [`/api/chip/${chipId}/execution/${executionId}`] as const;
 };
 
 export const getFetchExecutionByChipIdQueryOptions = <
   TData = Awaited<ReturnType<typeof fetchExecutionByChipId>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   executionId: string,
@@ -520,10 +533,10 @@ export const getFetchExecutionByChipIdQueryOptions = <
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
     queryOptions?.queryKey ??
@@ -532,7 +545,7 @@ export const getFetchExecutionByChipIdQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof fetchExecutionByChipId>>
   > = ({ signal }) =>
-    fetchExecutionByChipId(chipId, executionId, { signal, ...axiosOptions });
+    fetchExecutionByChipId(chipId, executionId, requestOptions, signal);
 
   return {
     queryKey,
@@ -549,11 +562,11 @@ export const getFetchExecutionByChipIdQueryOptions = <
 export type FetchExecutionByChipIdQueryResult = NonNullable<
   Awaited<ReturnType<typeof fetchExecutionByChipId>>
 >;
-export type FetchExecutionByChipIdQueryError = AxiosError<HTTPValidationError>;
+export type FetchExecutionByChipIdQueryError = ErrorType<HTTPValidationError>;
 
 export function useFetchExecutionByChipId<
   TData = Awaited<ReturnType<typeof fetchExecutionByChipId>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   executionId: string,
@@ -573,14 +586,14 @@ export function useFetchExecutionByChipId<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useFetchExecutionByChipId<
   TData = Awaited<ReturnType<typeof fetchExecutionByChipId>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   executionId: string,
@@ -600,12 +613,12 @@ export function useFetchExecutionByChipId<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useFetchExecutionByChipId<
   TData = Awaited<ReturnType<typeof fetchExecutionByChipId>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   executionId: string,
@@ -617,7 +630,7 @@ export function useFetchExecutionByChipId<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
@@ -626,7 +639,7 @@ export function useFetchExecutionByChipId<
 
 export function useFetchExecutionByChipId<
   TData = Awaited<ReturnType<typeof fetchExecutionByChipId>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   executionId: string,
@@ -638,7 +651,7 @@ export function useFetchExecutionByChipId<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getFetchExecutionByChipIdQueryOptions(
@@ -677,21 +690,22 @@ MuxDetailResponse
 export const fetchMuxDetails = (
   chipId: string,
   muxId: number,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<MuxDetailResponse>> => {
-  return axios.get(
-    `http://localhost:5715/api/chip/${chipId}/mux/${muxId}`,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<MuxDetailResponse>(
+    { url: `/api/chip/${chipId}/mux/${muxId}`, method: "GET", signal },
     options,
   );
 };
 
 export const getFetchMuxDetailsQueryKey = (chipId: string, muxId: number) => {
-  return [`http://localhost:5715/api/chip/${chipId}/mux/${muxId}`] as const;
+  return [`/api/chip/${chipId}/mux/${muxId}`] as const;
 };
 
 export const getFetchMuxDetailsQueryOptions = <
   TData = Awaited<ReturnType<typeof fetchMuxDetails>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   muxId: number,
@@ -703,17 +717,17 @@ export const getFetchMuxDetailsQueryOptions = <
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
     queryOptions?.queryKey ?? getFetchMuxDetailsQueryKey(chipId, muxId);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchMuxDetails>>> = ({
     signal,
-  }) => fetchMuxDetails(chipId, muxId, { signal, ...axiosOptions });
+  }) => fetchMuxDetails(chipId, muxId, requestOptions, signal);
 
   return {
     queryKey,
@@ -730,11 +744,11 @@ export const getFetchMuxDetailsQueryOptions = <
 export type FetchMuxDetailsQueryResult = NonNullable<
   Awaited<ReturnType<typeof fetchMuxDetails>>
 >;
-export type FetchMuxDetailsQueryError = AxiosError<HTTPValidationError>;
+export type FetchMuxDetailsQueryError = ErrorType<HTTPValidationError>;
 
 export function useFetchMuxDetails<
   TData = Awaited<ReturnType<typeof fetchMuxDetails>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   muxId: number,
@@ -754,14 +768,14 @@ export function useFetchMuxDetails<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useFetchMuxDetails<
   TData = Awaited<ReturnType<typeof fetchMuxDetails>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   muxId: number,
@@ -781,12 +795,12 @@ export function useFetchMuxDetails<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useFetchMuxDetails<
   TData = Awaited<ReturnType<typeof fetchMuxDetails>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   muxId: number,
@@ -798,7 +812,7 @@ export function useFetchMuxDetails<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
@@ -807,7 +821,7 @@ export function useFetchMuxDetails<
 
 export function useFetchMuxDetails<
   TData = Awaited<ReturnType<typeof fetchMuxDetails>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   muxId: number,
@@ -819,7 +833,7 @@ export function useFetchMuxDetails<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getFetchMuxDetailsQueryOptions(chipId, muxId, options);
@@ -851,34 +865,38 @@ ListMuxResponse
  */
 export const listMuxes = (
   chipId: string,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ListMuxResponse>> => {
-  return axios.get(`http://localhost:5715/api/chip/${chipId}/mux`, options);
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ListMuxResponse>(
+    { url: `/api/chip/${chipId}/mux`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getListMuxesQueryKey = (chipId: string) => {
-  return [`http://localhost:5715/api/chip/${chipId}/mux`] as const;
+  return [`/api/chip/${chipId}/mux`] as const;
 };
 
 export const getListMuxesQueryOptions = <
   TData = Awaited<ReturnType<typeof listMuxes>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listMuxes>>, TError, TData>
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getListMuxesQueryKey(chipId);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listMuxes>>> = ({
     signal,
-  }) => listMuxes(chipId, { signal, ...axiosOptions });
+  }) => listMuxes(chipId, requestOptions, signal);
 
   return {
     queryKey,
@@ -893,11 +911,11 @@ export const getListMuxesQueryOptions = <
 export type ListMuxesQueryResult = NonNullable<
   Awaited<ReturnType<typeof listMuxes>>
 >;
-export type ListMuxesQueryError = AxiosError<HTTPValidationError>;
+export type ListMuxesQueryError = ErrorType<HTTPValidationError>;
 
 export function useListMuxes<
   TData = Awaited<ReturnType<typeof listMuxes>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options: {
@@ -912,14 +930,14 @@ export function useListMuxes<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useListMuxes<
   TData = Awaited<ReturnType<typeof listMuxes>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options?: {
@@ -934,19 +952,19 @@ export function useListMuxes<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListMuxes<
   TData = Awaited<ReturnType<typeof listMuxes>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listMuxes>>, TError, TData>
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
@@ -955,14 +973,14 @@ export function useListMuxes<
 
 export function useListMuxes<
   TData = Awaited<ReturnType<typeof listMuxes>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listMuxes>>, TError, TData>
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getListMuxesQueryOptions(chipId, options);
@@ -983,10 +1001,11 @@ export function useListMuxes<
 export const fetchLatestTaskGroupedByChip = (
   chipId: string,
   taskName: string,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<LatestTaskGroupedByChipResponse>> => {
-  return axios.get(
-    `http://localhost:5715/api/chip/${chipId}/task/${taskName}`,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<LatestTaskGroupedByChipResponse>(
+    { url: `/api/chip/${chipId}/task/${taskName}`, method: "GET", signal },
     options,
   );
 };
@@ -995,12 +1014,12 @@ export const getFetchLatestTaskGroupedByChipQueryKey = (
   chipId: string,
   taskName: string,
 ) => {
-  return [`http://localhost:5715/api/chip/${chipId}/task/${taskName}`] as const;
+  return [`/api/chip/${chipId}/task/${taskName}`] as const;
 };
 
 export const getFetchLatestTaskGroupedByChipQueryOptions = <
   TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   taskName: string,
@@ -1012,10 +1031,10 @@ export const getFetchLatestTaskGroupedByChipQueryOptions = <
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
     queryOptions?.queryKey ??
@@ -1024,7 +1043,7 @@ export const getFetchLatestTaskGroupedByChipQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>
   > = ({ signal }) =>
-    fetchLatestTaskGroupedByChip(chipId, taskName, { signal, ...axiosOptions });
+    fetchLatestTaskGroupedByChip(chipId, taskName, requestOptions, signal);
 
   return {
     queryKey,
@@ -1042,11 +1061,11 @@ export type FetchLatestTaskGroupedByChipQueryResult = NonNullable<
   Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>
 >;
 export type FetchLatestTaskGroupedByChipQueryError =
-  AxiosError<HTTPValidationError>;
+  ErrorType<HTTPValidationError>;
 
 export function useFetchLatestTaskGroupedByChip<
   TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   taskName: string,
@@ -1066,14 +1085,14 @@ export function useFetchLatestTaskGroupedByChip<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useFetchLatestTaskGroupedByChip<
   TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   taskName: string,
@@ -1093,12 +1112,12 @@ export function useFetchLatestTaskGroupedByChip<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useFetchLatestTaskGroupedByChip<
   TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   taskName: string,
@@ -1110,7 +1129,7 @@ export function useFetchLatestTaskGroupedByChip<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
@@ -1119,7 +1138,7 @@ export function useFetchLatestTaskGroupedByChip<
 
 export function useFetchLatestTaskGroupedByChip<
   TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   taskName: string,
@@ -1131,7 +1150,7 @@ export function useFetchLatestTaskGroupedByChip<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getFetchLatestTaskGroupedByChipQueryOptions(
@@ -1162,14 +1181,17 @@ export const fetchTimeseriesTaskResultByTagAndParameterAndQid = (
   parameter: string,
   qid: string,
   params: FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<TimeSeriesData>> => {
-  return axios.get(
-    `http://localhost:5715/api/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<TimeSeriesData>(
     {
-      ...options,
-      params: { ...params, ...options?.params },
+      url: `/api/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
+      method: "GET",
+      params,
+      signal,
     },
+    options,
   );
 };
 
@@ -1180,7 +1202,7 @@ export const getFetchTimeseriesTaskResultByTagAndParameterAndQidQueryKey = (
   params: FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
 ) => {
   return [
-    `http://localhost:5715/api/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
+    `/api/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
     ...(params ? [params] : []),
   ] as const;
 };
@@ -1189,7 +1211,7 @@ export const getFetchTimeseriesTaskResultByTagAndParameterAndQidQueryOptions = <
   TData = Awaited<
     ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
   >,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   parameter: string,
@@ -1205,10 +1227,10 @@ export const getFetchTimeseriesTaskResultByTagAndParameterAndQidQueryOptions = <
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
     queryOptions?.queryKey ??
@@ -1227,7 +1249,8 @@ export const getFetchTimeseriesTaskResultByTagAndParameterAndQidQueryOptions = <
       parameter,
       qid,
       params,
-      { signal, ...axiosOptions },
+      requestOptions,
+      signal,
     );
 
   return {
@@ -1249,13 +1272,13 @@ export type FetchTimeseriesTaskResultByTagAndParameterAndQidQueryResult =
     Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>>
   >;
 export type FetchTimeseriesTaskResultByTagAndParameterAndQidQueryError =
-  AxiosError<HTTPValidationError>;
+  ErrorType<HTTPValidationError>;
 
 export function useFetchTimeseriesTaskResultByTagAndParameterAndQid<
   TData = Awaited<
     ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
   >,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   parameter: string,
@@ -1283,7 +1306,7 @@ export function useFetchTimeseriesTaskResultByTagAndParameterAndQid<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
@@ -1292,7 +1315,7 @@ export function useFetchTimeseriesTaskResultByTagAndParameterAndQid<
   TData = Awaited<
     ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
   >,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   parameter: string,
@@ -1320,14 +1343,14 @@ export function useFetchTimeseriesTaskResultByTagAndParameterAndQid<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useFetchTimeseriesTaskResultByTagAndParameterAndQid<
   TData = Awaited<
     ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
   >,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   parameter: string,
@@ -1343,7 +1366,7 @@ export function useFetchTimeseriesTaskResultByTagAndParameterAndQid<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
@@ -1354,7 +1377,7 @@ export function useFetchTimeseriesTaskResultByTagAndParameterAndQid<
   TData = Awaited<
     ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameterAndQid>
   >,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   parameter: string,
@@ -1370,7 +1393,7 @@ export function useFetchTimeseriesTaskResultByTagAndParameterAndQid<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions =
@@ -1403,14 +1426,17 @@ export const fetchTimeseriesTaskResultByTagAndParameter = (
   chipId: string,
   parameter: string,
   params: FetchTimeseriesTaskResultByTagAndParameterParams,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<TimeSeriesData>> => {
-  return axios.get(
-    `http://localhost:5715/api/chip/${chipId}/parameter/${parameter}`,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<TimeSeriesData>(
     {
-      ...options,
-      params: { ...params, ...options?.params },
+      url: `/api/chip/${chipId}/parameter/${parameter}`,
+      method: "GET",
+      params,
+      signal,
     },
+    options,
   );
 };
 
@@ -1420,7 +1446,7 @@ export const getFetchTimeseriesTaskResultByTagAndParameterQueryKey = (
   params: FetchTimeseriesTaskResultByTagAndParameterParams,
 ) => {
   return [
-    `http://localhost:5715/api/chip/${chipId}/parameter/${parameter}`,
+    `/api/chip/${chipId}/parameter/${parameter}`,
     ...(params ? [params] : []),
   ] as const;
 };
@@ -1429,7 +1455,7 @@ export const getFetchTimeseriesTaskResultByTagAndParameterQueryOptions = <
   TData = Awaited<
     ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>
   >,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   parameter: string,
@@ -1442,10 +1468,10 @@ export const getFetchTimeseriesTaskResultByTagAndParameterQueryOptions = <
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
     queryOptions?.queryKey ??
@@ -1458,10 +1484,13 @@ export const getFetchTimeseriesTaskResultByTagAndParameterQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>>
   > = ({ signal }) =>
-    fetchTimeseriesTaskResultByTagAndParameter(chipId, parameter, params, {
+    fetchTimeseriesTaskResultByTagAndParameter(
+      chipId,
+      parameter,
+      params,
+      requestOptions,
       signal,
-      ...axiosOptions,
-    });
+    );
 
   return {
     queryKey,
@@ -1479,13 +1508,13 @@ export type FetchTimeseriesTaskResultByTagAndParameterQueryResult = NonNullable<
   Awaited<ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>>
 >;
 export type FetchTimeseriesTaskResultByTagAndParameterQueryError =
-  AxiosError<HTTPValidationError>;
+  ErrorType<HTTPValidationError>;
 
 export function useFetchTimeseriesTaskResultByTagAndParameter<
   TData = Awaited<
     ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>
   >,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   parameter: string,
@@ -1508,7 +1537,7 @@ export function useFetchTimeseriesTaskResultByTagAndParameter<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
@@ -1517,7 +1546,7 @@ export function useFetchTimeseriesTaskResultByTagAndParameter<
   TData = Awaited<
     ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>
   >,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   parameter: string,
@@ -1540,14 +1569,14 @@ export function useFetchTimeseriesTaskResultByTagAndParameter<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useFetchTimeseriesTaskResultByTagAndParameter<
   TData = Awaited<
     ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>
   >,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   parameter: string,
@@ -1560,7 +1589,7 @@ export function useFetchTimeseriesTaskResultByTagAndParameter<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
@@ -1571,7 +1600,7 @@ export function useFetchTimeseriesTaskResultByTagAndParameter<
   TData = Awaited<
     ReturnType<typeof fetchTimeseriesTaskResultByTagAndParameter>
   >,
-  TError = AxiosError<HTTPValidationError>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
   parameter: string,
@@ -1584,7 +1613,7 @@ export function useFetchTimeseriesTaskResultByTagAndParameter<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions =

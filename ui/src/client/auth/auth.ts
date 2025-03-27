@@ -20,9 +20,6 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import axios from "axios";
-import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-
 import type {
   BodyAuthLoginForAccessToken,
   HTTPValidationError,
@@ -31,13 +28,19 @@ import type {
   UserCreate,
 } from "../../schemas";
 
+import { customInstance } from "../../lib/custom-instance";
+import type { ErrorType, BodyType } from "../../lib/custom-instance";
+
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
 /**
  * @summary Login For Access Token
  */
 export const authLoginForAccessToken = (
-  bodyAuthLoginForAccessToken: BodyAuthLoginForAccessToken,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<Token>> => {
+  bodyAuthLoginForAccessToken: BodyType<BodyAuthLoginForAccessToken>,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
   const formUrlEncoded = new URLSearchParams();
   formUrlEncoded.append("username", bodyAuthLoginForAccessToken.username);
   formUrlEncoded.append("password", bodyAuthLoginForAccessToken.password);
@@ -45,46 +48,51 @@ export const authLoginForAccessToken = (
     formUrlEncoded.append("grant_type", bodyAuthLoginForAccessToken.grant_type);
   }
 
-  return axios.post(
-    `http://localhost:5715/api/auth/token`,
-    formUrlEncoded,
+  return customInstance<Token>(
+    {
+      url: `/api/auth/token`,
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      data: formUrlEncoded,
+      signal,
+    },
     options,
   );
 };
 
 export const getAuthLoginForAccessTokenMutationOptions = <
-  TError = AxiosError<void | HTTPValidationError>,
+  TError = ErrorType<void | HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof authLoginForAccessToken>>,
     TError,
-    { data: BodyAuthLoginForAccessToken },
+    { data: BodyType<BodyAuthLoginForAccessToken> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof authLoginForAccessToken>>,
   TError,
-  { data: BodyAuthLoginForAccessToken },
+  { data: BodyType<BodyAuthLoginForAccessToken> },
   TContext
 > => {
   const mutationKey = ["authLoginForAccessToken"];
-  const { mutation: mutationOptions, axios: axiosOptions } = options
+  const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
       options.mutation.mutationKey
       ? options
       : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, axios: undefined };
+    : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof authLoginForAccessToken>>,
-    { data: BodyAuthLoginForAccessToken }
+    { data: BodyType<BodyAuthLoginForAccessToken> }
   > = (props) => {
     const { data } = props ?? {};
 
-    return authLoginForAccessToken(data, axiosOptions);
+    return authLoginForAccessToken(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -93,28 +101,29 @@ export const getAuthLoginForAccessTokenMutationOptions = <
 export type AuthLoginForAccessTokenMutationResult = NonNullable<
   Awaited<ReturnType<typeof authLoginForAccessToken>>
 >;
-export type AuthLoginForAccessTokenMutationBody = BodyAuthLoginForAccessToken;
+export type AuthLoginForAccessTokenMutationBody =
+  BodyType<BodyAuthLoginForAccessToken>;
 export type AuthLoginForAccessTokenMutationError =
-  AxiosError<void | HTTPValidationError>;
+  ErrorType<void | HTTPValidationError>;
 
 /**
  * @summary Login For Access Token
  */
 export const useAuthLoginForAccessToken = <
-  TError = AxiosError<void | HTTPValidationError>,
+  TError = ErrorType<void | HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof authLoginForAccessToken>>,
     TError,
-    { data: BodyAuthLoginForAccessToken },
+    { data: BodyType<BodyAuthLoginForAccessToken> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof authLoginForAccessToken>>,
   TError,
-  { data: BodyAuthLoginForAccessToken },
+  { data: BodyType<BodyAuthLoginForAccessToken> },
   TContext
 > => {
   const mutationOptions = getAuthLoginForAccessTokenMutationOptions(options);
@@ -125,49 +134,55 @@ export const useAuthLoginForAccessToken = <
  * @summary Register User
  */
 export const authRegisterUser = (
-  userCreate: UserCreate,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<User>> => {
-  return axios.post(
-    `http://localhost:5715/api/auth/register`,
-    userCreate,
+  userCreate: BodyType<UserCreate>,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<User>(
+    {
+      url: `/api/auth/register`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: userCreate,
+      signal,
+    },
     options,
   );
 };
 
 export const getAuthRegisterUserMutationOptions = <
-  TError = AxiosError<void | HTTPValidationError>,
+  TError = ErrorType<void | HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof authRegisterUser>>,
     TError,
-    { data: UserCreate },
+    { data: BodyType<UserCreate> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof authRegisterUser>>,
   TError,
-  { data: UserCreate },
+  { data: BodyType<UserCreate> },
   TContext
 > => {
   const mutationKey = ["authRegisterUser"];
-  const { mutation: mutationOptions, axios: axiosOptions } = options
+  const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
       options.mutation.mutationKey
       ? options
       : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, axios: undefined };
+    : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof authRegisterUser>>,
-    { data: UserCreate }
+    { data: BodyType<UserCreate> }
   > = (props) => {
     const { data } = props ?? {};
 
-    return authRegisterUser(data, axiosOptions);
+    return authRegisterUser(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -176,28 +191,28 @@ export const getAuthRegisterUserMutationOptions = <
 export type AuthRegisterUserMutationResult = NonNullable<
   Awaited<ReturnType<typeof authRegisterUser>>
 >;
-export type AuthRegisterUserMutationBody = UserCreate;
+export type AuthRegisterUserMutationBody = BodyType<UserCreate>;
 export type AuthRegisterUserMutationError =
-  AxiosError<void | HTTPValidationError>;
+  ErrorType<void | HTTPValidationError>;
 
 /**
  * @summary Register User
  */
 export const useAuthRegisterUser = <
-  TError = AxiosError<void | HTTPValidationError>,
+  TError = ErrorType<void | HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof authRegisterUser>>,
     TError,
-    { data: UserCreate },
+    { data: BodyType<UserCreate> },
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof authRegisterUser>>,
   TError,
-  { data: UserCreate },
+  { data: BodyType<UserCreate> },
   TContext
 > => {
   const mutationOptions = getAuthRegisterUserMutationOptions(options);
@@ -208,31 +223,35 @@ export const useAuthRegisterUser = <
  * @summary Read Users Me
  */
 export const authReadUsersMe = (
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<User>> => {
-  return axios.get(`http://localhost:5715/api/auth/me`, options);
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<User>(
+    { url: `/api/auth/me`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getAuthReadUsersMeQueryKey = () => {
-  return [`http://localhost:5715/api/auth/me`] as const;
+  return [`/api/auth/me`] as const;
 };
 
 export const getAuthReadUsersMeQueryOptions = <
   TData = Awaited<ReturnType<typeof authReadUsersMe>>,
-  TError = AxiosError<void>,
+  TError = ErrorType<void>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof authReadUsersMe>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getAuthReadUsersMeQueryKey();
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof authReadUsersMe>>> = ({
     signal,
-  }) => authReadUsersMe({ signal, ...axiosOptions });
+  }) => authReadUsersMe(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof authReadUsersMe>>,
@@ -244,11 +263,11 @@ export const getAuthReadUsersMeQueryOptions = <
 export type AuthReadUsersMeQueryResult = NonNullable<
   Awaited<ReturnType<typeof authReadUsersMe>>
 >;
-export type AuthReadUsersMeQueryError = AxiosError<void>;
+export type AuthReadUsersMeQueryError = ErrorType<void>;
 
 export function useAuthReadUsersMe<
   TData = Awaited<ReturnType<typeof authReadUsersMe>>,
-  TError = AxiosError<void>,
+  TError = ErrorType<void>,
 >(options: {
   query: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof authReadUsersMe>>, TError, TData>
@@ -261,13 +280,13 @@ export function useAuthReadUsersMe<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useAuthReadUsersMe<
   TData = Awaited<ReturnType<typeof authReadUsersMe>>,
-  TError = AxiosError<void>,
+  TError = ErrorType<void>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof authReadUsersMe>>, TError, TData>
@@ -280,16 +299,16 @@ export function useAuthReadUsersMe<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useAuthReadUsersMe<
   TData = Awaited<ReturnType<typeof authReadUsersMe>>,
-  TError = AxiosError<void>,
+  TError = ErrorType<void>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof authReadUsersMe>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
  * @summary Read Users Me
@@ -297,12 +316,12 @@ export function useAuthReadUsersMe<
 
 export function useAuthReadUsersMe<
   TData = Awaited<ReturnType<typeof authReadUsersMe>>,
-  TError = AxiosError<void>,
+  TError = ErrorType<void>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof authReadUsersMe>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getAuthReadUsersMeQueryOptions(options);
 
@@ -323,17 +342,17 @@ The client will remove the token from cookies.
  * @summary Logout
  */
 export const authLogout = (
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<unknown>> => {
-  return axios.post(
-    `http://localhost:5715/api/auth/logout`,
-    undefined,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<unknown>(
+    { url: `/api/auth/logout`, method: "POST", signal },
     options,
   );
 };
 
 export const getAuthLogoutMutationOptions = <
-  TError = AxiosError<void>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -342,7 +361,7 @@ export const getAuthLogoutMutationOptions = <
     void,
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof authLogout>>,
   TError,
@@ -350,19 +369,19 @@ export const getAuthLogoutMutationOptions = <
   TContext
 > => {
   const mutationKey = ["authLogout"];
-  const { mutation: mutationOptions, axios: axiosOptions } = options
+  const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
       options.mutation.mutationKey
       ? options
       : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, axios: undefined };
+    : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof authLogout>>,
     void
   > = () => {
-    return authLogout(axiosOptions);
+    return authLogout(requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -372,13 +391,13 @@ export type AuthLogoutMutationResult = NonNullable<
   Awaited<ReturnType<typeof authLogout>>
 >;
 
-export type AuthLogoutMutationError = AxiosError<void>;
+export type AuthLogoutMutationError = ErrorType<void>;
 
 /**
  * @summary Logout
  */
 export const useAuthLogout = <
-  TError = AxiosError<void>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -387,7 +406,7 @@ export const useAuthLogout = <
     void,
     TContext
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof authLogout>>,
   TError,

@@ -17,10 +17,12 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import axios from "axios";
-import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-
 import type { ListTaskResponse } from "../../schemas";
+
+import { customInstance } from "../../lib/custom-instance";
+import type { ErrorType } from "../../lib/custom-instance";
+
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
  * Fetch all tasks.
@@ -35,31 +37,35 @@ Returns:
  * @summary Fetch all tasks
  */
 export const fetchAllTasks = (
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ListTaskResponse>> => {
-  return axios.get(`http://localhost:5715/api/tasks`, options);
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ListTaskResponse>(
+    { url: `/api/tasks`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getFetchAllTasksQueryKey = () => {
-  return [`http://localhost:5715/api/tasks`] as const;
+  return [`/api/tasks`] as const;
 };
 
 export const getFetchAllTasksQueryOptions = <
   TData = Awaited<ReturnType<typeof fetchAllTasks>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof fetchAllTasks>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey = queryOptions?.queryKey ?? getFetchAllTasksQueryKey();
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchAllTasks>>> = ({
     signal,
-  }) => fetchAllTasks({ signal, ...axiosOptions });
+  }) => fetchAllTasks(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof fetchAllTasks>>,
@@ -71,11 +77,11 @@ export const getFetchAllTasksQueryOptions = <
 export type FetchAllTasksQueryResult = NonNullable<
   Awaited<ReturnType<typeof fetchAllTasks>>
 >;
-export type FetchAllTasksQueryError = AxiosError<unknown>;
+export type FetchAllTasksQueryError = ErrorType<unknown>;
 
 export function useFetchAllTasks<
   TData = Awaited<ReturnType<typeof fetchAllTasks>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options: {
   query: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof fetchAllTasks>>, TError, TData>
@@ -88,13 +94,13 @@ export function useFetchAllTasks<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useFetchAllTasks<
   TData = Awaited<ReturnType<typeof fetchAllTasks>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof fetchAllTasks>>, TError, TData>
@@ -107,16 +113,16 @@ export function useFetchAllTasks<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useFetchAllTasks<
   TData = Awaited<ReturnType<typeof fetchAllTasks>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof fetchAllTasks>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
  * @summary Fetch all tasks
@@ -124,12 +130,12 @@ export function useFetchAllTasks<
 
 export function useFetchAllTasks<
   TData = Awaited<ReturnType<typeof fetchAllTasks>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof fetchAllTasks>>, TError, TData>
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getFetchAllTasksQueryOptions(options);
 

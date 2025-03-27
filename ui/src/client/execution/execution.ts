@@ -17,9 +17,6 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import axios from "axios";
-import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-
 import type {
   Detail,
   ExecutionLockStatusResponse,
@@ -27,32 +24,35 @@ import type {
   HTTPValidationError,
 } from "../../schemas";
 
+import { customInstance } from "../../lib/custom-instance";
+import type { ErrorType } from "../../lib/custom-instance";
+
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
 /**
  * Fetch a calibration figure by its path.
  * @summary Fetches a calibration figure by its path
  */
 export const fetchFigureByPath = (
   params: FetchFigureByPathParams,
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<void>> => {
-  return axios.get(`http://localhost:5715/api/executions/figure`, {
-    ...options,
-    params: { ...params, ...options?.params },
-  });
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<void>(
+    { url: `/api/executions/figure`, method: "GET", params, signal },
+    options,
+  );
 };
 
 export const getFetchFigureByPathQueryKey = (
   params: FetchFigureByPathParams,
 ) => {
-  return [
-    `http://localhost:5715/api/executions/figure`,
-    ...(params ? [params] : []),
-  ] as const;
+  return [`/api/executions/figure`, ...(params ? [params] : [])] as const;
 };
 
 export const getFetchFigureByPathQueryOptions = <
   TData = Awaited<ReturnType<typeof fetchFigureByPath>>,
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
 >(
   params: FetchFigureByPathParams,
   options?: {
@@ -63,17 +63,17 @@ export const getFetchFigureByPathQueryOptions = <
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
     queryOptions?.queryKey ?? getFetchFigureByPathQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof fetchFigureByPath>>
-  > = ({ signal }) => fetchFigureByPath(params, { signal, ...axiosOptions });
+  > = ({ signal }) => fetchFigureByPath(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof fetchFigureByPath>>,
@@ -85,13 +85,13 @@ export const getFetchFigureByPathQueryOptions = <
 export type FetchFigureByPathQueryResult = NonNullable<
   Awaited<ReturnType<typeof fetchFigureByPath>>
 >;
-export type FetchFigureByPathQueryError = AxiosError<
+export type FetchFigureByPathQueryError = ErrorType<
   Detail | HTTPValidationError
 >;
 
 export function useFetchFigureByPath<
   TData = Awaited<ReturnType<typeof fetchFigureByPath>>,
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
 >(
   params: FetchFigureByPathParams,
   options: {
@@ -110,14 +110,14 @@ export function useFetchFigureByPath<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useFetchFigureByPath<
   TData = Awaited<ReturnType<typeof fetchFigureByPath>>,
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
 >(
   params: FetchFigureByPathParams,
   options?: {
@@ -136,12 +136,12 @@ export function useFetchFigureByPath<
         >,
         "initialData"
       >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useFetchFigureByPath<
   TData = Awaited<ReturnType<typeof fetchFigureByPath>>,
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
 >(
   params: FetchFigureByPathParams,
   options?: {
@@ -152,7 +152,7 @@ export function useFetchFigureByPath<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
@@ -161,7 +161,7 @@ export function useFetchFigureByPath<
 
 export function useFetchFigureByPath<
   TData = Awaited<ReturnType<typeof fetchFigureByPath>>,
-  TError = AxiosError<Detail | HTTPValidationError>,
+  TError = ErrorType<Detail | HTTPValidationError>,
 >(
   params: FetchFigureByPathParams,
   options?: {
@@ -172,7 +172,7 @@ export function useFetchFigureByPath<
         TData
       >
     >;
-    axios?: AxiosRequestConfig;
+    request?: SecondParameter<typeof customInstance>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getFetchFigureByPathQueryOptions(params, options);
@@ -191,18 +191,22 @@ export function useFetchFigureByPath<
  * @summary Fetches the status of a calibration.
  */
 export const fetchExecutionLockStatus = (
-  options?: AxiosRequestConfig,
-): Promise<AxiosResponse<ExecutionLockStatusResponse>> => {
-  return axios.get(`http://localhost:5715/api/executions/lock_status`, options);
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ExecutionLockStatusResponse>(
+    { url: `/api/executions/lock_status`, method: "GET", signal },
+    options,
+  );
 };
 
 export const getFetchExecutionLockStatusQueryKey = () => {
-  return [`http://localhost:5715/api/executions/lock_status`] as const;
+  return [`/api/executions/lock_status`] as const;
 };
 
 export const getFetchExecutionLockStatusQueryOptions = <
   TData = Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -211,16 +215,16 @@ export const getFetchExecutionLockStatusQueryOptions = <
       TData
     >
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }) => {
-  const { query: queryOptions, axios: axiosOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
     queryOptions?.queryKey ?? getFetchExecutionLockStatusQueryKey();
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof fetchExecutionLockStatus>>
-  > = ({ signal }) => fetchExecutionLockStatus({ signal, ...axiosOptions });
+  > = ({ signal }) => fetchExecutionLockStatus(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
@@ -232,11 +236,11 @@ export const getFetchExecutionLockStatusQueryOptions = <
 export type FetchExecutionLockStatusQueryResult = NonNullable<
   Awaited<ReturnType<typeof fetchExecutionLockStatus>>
 >;
-export type FetchExecutionLockStatusQueryError = AxiosError<unknown>;
+export type FetchExecutionLockStatusQueryError = ErrorType<unknown>;
 
 export function useFetchExecutionLockStatus<
   TData = Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options: {
   query: Partial<
     UseQueryOptions<
@@ -253,13 +257,13 @@ export function useFetchExecutionLockStatus<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
 export function useFetchExecutionLockStatus<
   TData = Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -276,11 +280,11 @@ export function useFetchExecutionLockStatus<
       >,
       "initialData"
     >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useFetchExecutionLockStatus<
   TData = Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -289,7 +293,7 @@ export function useFetchExecutionLockStatus<
       TData
     >
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
  * @summary Fetches the status of a calibration.
@@ -297,7 +301,7 @@ export function useFetchExecutionLockStatus<
 
 export function useFetchExecutionLockStatus<
   TData = Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
-  TError = AxiosError<unknown>,
+  TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -306,7 +310,7 @@ export function useFetchExecutionLockStatus<
       TData
     >
   >;
-  axios?: AxiosRequestConfig;
+  request?: SecondParameter<typeof customInstance>;
 }): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getFetchExecutionLockStatusQueryOptions(options);
 
