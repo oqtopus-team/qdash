@@ -106,6 +106,7 @@ workflow = [
     "pyyaml==6.0.1",
     "qubex[backend]",
     "filelock>=3.17.0",
+    "gitpython>=3.1.44",
 ]
 dev = [
     "ruff==0.5.5",
