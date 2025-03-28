@@ -21,11 +21,11 @@ export default function LoginPage() {
       await authLogin(userName, password);
       // replaceを使用してhistoryに残さない
       // Next.jsのルーターとwindow.location.hrefの両方を使用
-      router.replace("/");
-      window.location.href = "/";
+      router.replace("/execution");
+      window.location.href = "/execution";
     } catch (err) {
       setError(
-        "ログインに失敗しました。ユーザーIDとパスワードを確認してください。",
+        "ログインに失敗しました。ユーザーIDとパスワードを確認してください。"
       );
     }
   };
