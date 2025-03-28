@@ -2,21 +2,27 @@ FROM oven/bun:1
 
 WORKDIR /app
 
-# Copy source files
-COPY ./ui/package.json ./
-COPY ./ui/bun.lock ./
-COPY ./ui/.next ./.next
+# Build arguments
+ARG NEXT_PUBLIC_API_URL
 
-# Copy public files
-COPY ./ui/public ./public
+# Copy package files
+COPY ./ui/ ./
 
-# Install production dependencies only
-RUN bun install --production
 
-ENV HOST 0.0.0.0
-ENV PORT ${UI_PORT:-5714}
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV NODE_ENV production
+# Set build time environment variables
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
+# Install dependencies and build
+RUN bun install
+RUN rm -rf .next
+RUN bun run build
+
+# Set runtime environment variables
+ENV HOST=0.0.0.0
+ENV PORT=${UI_PORT:-5714}
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 # Start the application
 CMD ["bun", "run", "start"]
