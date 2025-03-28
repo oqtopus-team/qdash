@@ -1,8 +1,9 @@
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-
 ![OQTOPUS](docs/oqtopus-logo.png)
 
 # QDash
+
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![slack](https://img.shields.io/badge/slack-OQTOPUS-pink.svg?logo=slack&style=plastic")](https://oqtopus.slack.com/archives/C08KM5JPUEL)
 
 QDash is a web application that provides a user-friendly interface to manage and monitor the execution of qubit calibration workflows.
 
@@ -37,6 +38,10 @@ You can contact us by creating an issue in this repository,
 or you can contact us by email:
 
 - [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team[at]googlegroups.com)
+
+or you can join our Slack workspace:
+
+[![slack](https://img.shields.io/badge/slack-OQTOPUS-pink.svg?logo=slack&style=plastic")](https://oqtopus.slack.com/archives/C08KM5JPUEL)
 
 ## LICENSE
 
