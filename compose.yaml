@@ -65,7 +65,6 @@ services:
     restart: always
     env_file:
       - .env
-      - .slack.env
     depends_on:
       - prefect-server
       - mongo
@@ -75,7 +74,7 @@ services:
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/config.py:/app/qdash/config.py
       - ${CALIB_DATA_PATH}:/app/calib_data
-      - /home/shared/config:/home/shared/config
+      - ${CONFIG_PATH}:/app/config
     working_dir: /app/qdash/workflow
     command: python deployment/${ENV}/main.py
     environment:
