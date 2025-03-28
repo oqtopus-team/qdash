@@ -4,10 +4,8 @@ import pendulum
 from dotenv import load_dotenv
 from prefect import flow, get_run_logger, runtime
 from qdash.datamodel.menu import MenuModel as Menu
-from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
-from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.calibration.flow import qubex_one_qubit_cal_flow
@@ -95,19 +93,6 @@ def main_flow(
     create_directory_task.submit(latest_calib_dir).result()
     success_map = {flow_name: False for flow_name in calibration_flow_map}
     chip_id = ChipDocument.get_current_chip(username=menu.username).chip_id
-    # with Path(".calibration/64Q.json").open() as f:
-    #     chip_info = json.load(f)
-    # 初期のマスターノートをDBに作成
-    # current_time = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-    # CalibrationNoteDocument.upsert_note(
-    #     username=menu.username,
-    #     execution_id=execution_id,
-    #     task_id="master",
-    #     note={},  # 空のノートで初期化
-    #     created_at=current_time,
-    #     updated_at=current_time,
-    # )
-    # ExecutionManagerの初期化と実行開始
     execution_manager = (
         ExecutionManager(
             username=menu.username,

@@ -11,9 +11,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ログインページにいる場合、トークンがあればホームにリダイレクト
+  // ログインページにいる場合、トークンがあればexecutionにリダイレクト
   if (isLoginPage && token) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL("/execution", request.url));
   }
 
   // ログインページ以外でトークンがない場合、ログインページにリダイレクト
@@ -29,10 +29,12 @@ export const config = {
   matcher: [
     /*
      * 以下のパスに対してミドルウェアを適用:
+     * - / (ルートパス)
      * - /login
      * - /calibration, /chip, /execution, /experiment, /fridge, /setting
      * - /api/* (APIリクエストをスキップするため)
      */
+    "/",
     "/login",
     "/calibration/:path*",
     "/chip/:path*",
