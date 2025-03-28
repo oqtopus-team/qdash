@@ -146,7 +146,8 @@ def cal_flow(
     exp = Experiment(
         chip_id="64Q",
         qubits=labels,
-        config_dir="/home/shared/config",
+        config_dir="/app/config",
+        params_dir="/app/config",
         calib_note_path=str(note_path),
     )
     exp.note.clear()
