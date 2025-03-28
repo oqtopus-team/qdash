@@ -19,18 +19,16 @@ export default function LoginPage() {
 
     try {
       await authLogin(userName, password);
-      // replaceを使用してhistoryに残さない
-      // Next.jsのルーターとwindow.location.hrefの両方を使用
+      // Use replace to avoid leaving history
+      // Use both Next.js router and window.location.href
       router.replace("/execution");
       window.location.href = "/execution";
     } catch (err) {
-      setError(
-        "ログインに失敗しました。ユーザーIDとパスワードを確認してください。"
-      );
+      setError("Login failed. Please check your user ID and password.");
     }
   };
 
-  // コンポーネントマウント時にクエリパラメータをクリア
+  // Clear query parameters on component mount
   useEffect(() => {
     if (window.location.search) {
       window.history.replaceState({}, "", window.location.pathname);
@@ -95,7 +93,7 @@ export default function LoginPage() {
               type="submit"
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              ログイン
+              Sign In
             </button>
           </div>
 
@@ -104,7 +102,7 @@ export default function LoginPage() {
               href="/signup"
               className="font-medium text-indigo-600 hover:text-indigo-500"
             >
-              新規アカウントを作成
+              Create new account
             </Link>
           </div>
         </form>
