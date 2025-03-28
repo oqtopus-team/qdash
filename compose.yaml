@@ -131,3 +131,13 @@ services:
       - "${UI_PORT:-5714}:${UI_PORT:-5714}"
     depends_on:
       - api
+    command:
+      [
+        "bun",
+        "run",
+        "start",
+        "--hostname",
+        "0.0.0.0",
+        "--port",
+        "${UI_PORT:-5714}",
+      ]
