@@ -1,53 +1,44 @@
-# ruff: noqa
-import os
-from logging import getLogger
-
-from fastapi import APIRouter, HTTPException
-from prefect.client.orchestration import PrefectClient
-from prefect.client.schemas.objects import Deployment
-from prefect.client.schemas.schedules import construct_schedule
-from qdash.dbmodel.initialize import initialize
-from qdash.dbmodel.menu import MenuDocument
+from qdash.db.init.initialize import initialize
+from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+from qdash.dbmodel.chip import ChipDocument
+from qdash.workflow.calibration.util import qid_to_label
 
 initialize()
 
-router = APIRouter(prefix="/calibration")
-logger = getLogger("uvicorn.app")
-from qdash.config import get_settings
 
-
-async def main(menu_name: str, cron_str: str, env: str) -> None:
-    menu = MenuDocument.find_one({"name": menu_name}).run()
-    if menu is None:
-        raise HTTPException(status_code=404, detail="menu not found")
-    settings = get_settings()
-    client = PrefectClient(api=f"http://prefect-server:{settings.prefect_port}/api")
-    target_deployment = await client.read_deployment_by_name(f"cron-scheduler/{env}-scheduler")
-    cron = construct_schedule(cron=cron_str, timezone="Asia/Tokyo")
-    new_deployment = Deployment(
-        name="cron-scheduler",
-        flow_id=target_deployment.flow_id,
-        schedule=cron,
-        is_schedule_active=True,
-        path=target_deployment.path,
-        entrypoint=target_deployment.entrypoint,
-        version=target_deployment.version,
-        parameters={"menu_name": menu_name},
-    )
-    logger.info(f"flow id: {target_deployment.flow_id}")
-    _ = await client.update_deployment(
-        deployment=new_deployment,
-        schedule=cron,
-        is_schedule_active=True,
-    )
+def search_coupling_data_by_control_qid(cr_params, search_term):
+    filtered = {}
+    for key, value in cr_params.items():
+        # キーが '-' を含む場合は、左側を抽出
+        left_side = key.split("-")[0] if "-" in key else key
+        if left_side == search_term:
+            filtered[key] = value
+    return filtered
 
 
 if __name__ == "__main__":
-    import asyncio
+    # Example usage of the CalibrationNoteDocument
+    latest = (
+        CalibrationNoteDocument.find({"task_id": "master"})
+        .sort([("timestamp", -1)])  # 更新時刻で降順ソート
+        .limit(1)
+        .run()
+    )[0]
 
-    env = os.getenv("ENV", "oqtopus")
-    try:
-        asyncio.run(main("CheckRabi", "*/5 * * * *", env))
-        print("Successfully updated deployment")
-    except Exception as e:
-        print(f"Error updating deployment: {e}")
+    chip_docs = ChipDocument.find_one({"chip_id": "64Q", "username": latest.username}).run()
+    note = latest.note
+
+    cr_params = note["cr_params"]
+    drag_hpi_params = note["drag_hpi_params"]
+    drag_pi_params = note["drag_pi_params"]
+    search_term = "Q31"
+    print(drag_hpi_params["Q31"]["duration"])
+    print(drag_pi_params["Q31"])
+    print(chip_docs.qubits["31"].data["t2_echo"]["value"])
+    print(chip_docs.qubits["31"].node_info.position.x)
+    print(chip_docs.couplings["31-30"].data["zx90_gate_fidelity"])
+    # search_result = search_coupling_data_by_control_qid(cr_params, search_term)
+    # print(search_result)
+    # for cr_key, cr_value in search_result.items():
+    #     print(f"Key: {cr_key}, Value: {cr_value}")
+    #     print(cr_value["target"])

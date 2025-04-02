@@ -18,7 +18,7 @@
         "saoudrizwan.claude-dev"
       ],
       "settings": {
-        "python.defaultInterpreterPath": ".venv/bin/python"
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
       }
     }
   },

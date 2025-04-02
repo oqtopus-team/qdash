@@ -62,6 +62,8 @@ class TaskManager(BaseModel):
             self.calib_dir = calib_dir
 
     def _is_qubit_format(self, qid: str) -> bool:
+        if "-" in qid:
+            return False
         return qid in self.task_result.qubit_tasks
 
     def _is_coupling_format(self, qid: str) -> bool:
