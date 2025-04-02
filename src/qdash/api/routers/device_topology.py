@@ -151,6 +151,10 @@ def get_device_topology(
     drag_hpi_params = latest.note["drag_hpi_params"]
     drag_pi_params = latest.note["drag_pi_params"]
     chip_docs = ChipDocument.find_one({"chip_id": "64Q", "username": latest.username}).run()
+    # Sort physical qubit indices and create id mapping
+    sorted_physical_ids = sorted(physical_qubit_index_list)
+    id_mapping = {pid: idx for idx, pid in enumerate(sorted_physical_ids)}
+
     for qid in physical_qubit_index_list:
         x90_gate_fidelity = (chip_docs.qubits[qid].data.get("x90_gate_fidelity") or {"value": 0.5})[
             "value"
@@ -161,7 +165,7 @@ def get_device_topology(
         drag_pi_duration = drag_pi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
         qubits.append(
             Qubit(
-                id=int(qid),
+                id=id_mapping[qid],  # Map to new sequential id
                 physical_id=int(qid),
                 position=Position(
                     x=chip_docs.qubits[qid].node_info.position.x,
@@ -196,8 +200,8 @@ def get_device_topology(
             )["value"]
             couplings.append(
                 Coupling(
-                    control=int(control),
-                    target=int(target),
+                    control=id_mapping[control],  # Map to new sequential id
+                    target=id_mapping[target],  # Map to new sequential id
                     fidelity=zx90_gate_fidelity,
                     gate_duration=CouplingGateDuration(rzx90=cr_duration),
                 )
