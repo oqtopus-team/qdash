@@ -47,7 +47,7 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "zx90_gate_fidelity": OutputParameterModel(
-            unit="",
+            unit="a.u.",
             description="ZX90 gate fidelity",
         ),
     }

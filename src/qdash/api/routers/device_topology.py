@@ -1,9 +1,10 @@
+import logging
 import re
 from datetime import datetime, timezone
-from logging import getLogger
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from fastapi.logger import logger
 from pydantic import BaseModel
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
@@ -11,7 +12,12 @@ from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 
 router = APIRouter()
-logger = getLogger("uvicorn.app")
+gunicorn_logger = logging.getLogger("gunicorn.error")
+logger.handlers = gunicorn_logger.handlers
+if __name__ != "main":
+    logger.setLevel(gunicorn_logger.level)
+else:
+    logger.setLevel(logging.DEBUG)
 
 
 class Position(BaseModel):
@@ -81,7 +87,8 @@ class Device(BaseModel):
     calibrated_at: datetime
 
 
-def search_coupling_data_by_control_qid(cr_params, search_term):
+def search_coupling_data_by_control_qid(cr_params: dict, search_term: str) -> dict:
+    """Search for coupling data by control qubit id."""
     filtered = {}
     for key, value in cr_params.items():
         # キーが '-' を含む場合は、左側を抽出
@@ -99,29 +106,36 @@ def qid_to_label(qid: str) -> str:
     raise ValueError(error_message)
 
 
-def split_q_string(s):
-    """ "Q31-Q29" のような文字列を "31" と "29" に分解する関数です。
+def split_q_string(cr_label: str) -> tuple[str, str]:
+    """Split a string of the form "Q31-Q29" into two parts.
 
     Args:
     ----
-        s (str): "Q31-Q29" などの形式の文字列
+        cr_label (str): "Q31-Q29" string.
 
     Returns:
     -------
-        tuple: 分解された文字列 ("31", "29")
+        tuple: example ("31", "29") or ("4", "5") if the string is in the correct format.
+               Leading zeros are removed.
 
     Raises:
     ------
-        ValueError: 入力形式が正しくない場合に発生します。
+        ValueError: If the input string is not in the correct format.
 
     """
-    parts = s.split("-")
-    if len(parts) != 2:
-        raise ValueError("入力文字列の形式が正しくありません。")
+    parts = cr_label.split("-")
+    expected_parts_count = 2
+    error_message = "Invalid format. Expected 'Q31-Q29' or 'Q31-Q29'."
+    if len(parts) != expected_parts_count:
+        raise ValueError(error_message)
 
-    # 先頭の "Q" を除去
+    # Remove the leading 'Q' if present and convert to integer to remove leading zeros
     left = parts[0][1:] if parts[0].startswith("Q") else parts[0]
     right = parts[1][1:] if parts[1].startswith("Q") else parts[1]
+
+    # Convert to integer to remove leading zeros, then back to string
+    left = str(int(left))
+    right = str(int(right))
 
     return left, right
 
@@ -142,10 +156,7 @@ def get_device_topology(
     qubits = []
     couplings = []
     latest = (
-        CalibrationNoteDocument.find({"task_id": "master"})
-        .sort([("timestamp", -1)])  # 更新時刻で降順ソート
-        .limit(1)
-        .run()
+        CalibrationNoteDocument.find({"task_id": "master"}).sort([("timestamp", -1)]).limit(1).run()
     )[0]
     cr_params = latest.note["cr_params"]
     drag_hpi_params = latest.note["drag_hpi_params"]
@@ -154,6 +165,7 @@ def get_device_topology(
     # Sort physical qubit indices and create id mapping
     sorted_physical_ids = sorted(physical_qubit_index_list)
     id_mapping = {pid: idx for idx, pid in enumerate(sorted_physical_ids)}
+    logger.info(f"id_mapping: {id_mapping}")
 
     for qid in physical_qubit_index_list:
         x90_gate_fidelity = (chip_docs.qubits[qid].data.get("x90_gate_fidelity") or {"value": 0.5})[
@@ -163,6 +175,18 @@ def get_device_topology(
         t2 = (chip_docs.qubits[qid].data.get("t2_echo") or {"value": 100.0})["value"]
         drag_hpi_duration = drag_hpi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
         drag_pi_duration = drag_pi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
+        readout_fidelity_0 = (
+            chip_docs.qubits[qid].data.get("readout_fidelity_0") or {"value": 0.5}
+        )["value"]
+        readout_fidelity_1 = (
+            chip_docs.qubits[qid].data.get("readout_fidelity_1") or {"value": 0.5}
+        )["value"]
+        # Calculate readout assignment error
+        prob_meas1_prep0 = 1 - readout_fidelity_0
+        prob_meas0_prep1 = 1 - readout_fidelity_1
+        # Calculate readout assignment error
+        readout_assignment_error = 1 - (readout_fidelity_0 + readout_fidelity_1) / 2
+
         qubits.append(
             Qubit(
                 id=id_mapping[qid],  # Map to new sequential id
@@ -173,9 +197,9 @@ def get_device_topology(
                 ),
                 fidelity=x90_gate_fidelity,
                 meas_error=MeasError(
-                    prob_meas1_prep0=0.001,
-                    prob_meas0_prep1=0.001,
-                    readout_assignment_error=0.001,
+                    prob_meas1_prep0=prob_meas1_prep0,
+                    prob_meas0_prep1=prob_meas0_prep1,
+                    readout_assignment_error=readout_assignment_error,
                 ),
                 qubit_lifetime=QubitLifetime(
                     t1=t1,
@@ -198,14 +222,16 @@ def get_device_topology(
                 chip_docs.couplings[f"{control}-{target}"].data.get("zx90_gate_fidelity")
                 or {"value": 0.5}
             )["value"]
-            couplings.append(
-                Coupling(
-                    control=id_mapping[control],  # Map to new sequential id
-                    target=id_mapping[target],  # Map to new sequential id
-                    fidelity=zx90_gate_fidelity,
-                    gate_duration=CouplingGateDuration(rzx90=cr_duration),
+            # Only append if both control and target qubits exist in id_mapping
+            if control in id_mapping and target in id_mapping:
+                couplings.append(
+                    Coupling(
+                        control=id_mapping[control],  # Map to new sequential id
+                        target=id_mapping[target],  # Map to new sequential id
+                        fidelity=zx90_gate_fidelity,
+                        gate_duration=CouplingGateDuration(rzx90=cr_duration),
+                    )
                 )
-            )
     return Device(
         name="anemone",
         device_id="anemone",
@@ -213,580 +239,3 @@ def get_device_topology(
         couplings=couplings,
         calibrated_at=datetime.now(tz=timezone.utc),
     )
-
-
-# {
-#   "name": "qulacs",
-#   "device_id": "qiqb",
-#   "qubits": [
-#     {
-#       "id": 0,
-#       "physical_id": 0,
-#       "position": {
-#         "x": 0,
-#         "y": 0
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 1,
-#       "physical_id": 1,
-#       "position": {
-#         "x": 1,
-#         "y": 0
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 2,
-#       "physical_id": 2,
-#       "position": {
-#         "x": 0,
-#         "y": -1
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 3,
-#       "physical_id": 3,
-#       "position": {
-#         "x": 1,
-#         "y": -1
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 4,
-#       "physical_id": 4,
-#       "position": {
-#         "x": 2,
-#         "y": 0
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 5,
-#       "physical_id": 5,
-#       "position": {
-#         "x": 3,
-#         "y": 0
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 6,
-#       "physical_id": 6,
-#       "position": {
-#         "x": 2,
-#         "y": -1
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 7,
-#       "physical_id": 7,
-#       "position": {
-#         "x": 3,
-#         "y": -1
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 8,
-#       "physical_id": 8,
-#       "position": {
-#         "x": 4,
-#         "y": 0
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 9,
-#       "physical_id": 9,
-#       "position": {
-#         "x": 5,
-#         "y": 0
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 10,
-#       "physical_id": 10,
-#       "position": {
-#         "x": 4,
-#         "y": -1
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 11,
-#       "physical_id": 11,
-#       "position": {
-#         "x": 5,
-#         "y": -1
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 12,
-#       "physical_id": 12,
-#       "position": {
-#         "x": 6,
-#         "y": 0
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 13,
-#       "physical_id": 13,
-#       "position": {
-#         "x": 7,
-#         "y": 0
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 14,
-#       "physical_id": 14,
-#       "position": {
-#         "x": 6,
-#         "y": -1
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     },
-#     {
-#       "id": 15,
-#       "physical_id": 15,
-#       "position": {
-#         "x": 7,
-#         "y": -1
-#       },
-#       "fidelity": 0.999,
-#       "meas_error": {
-#         "prob_meas1_prep0": 0.001,
-#         "prob_meas0_prep1": 0.001,
-#         "readout_assignment_error": 0.001
-#       },
-#       "qubit_lifetime": {
-#         "t1": 100.0,
-#         "t2": 100.0
-#       },
-#       "gate_duration": {
-#         "rz": 20,
-#         "sx": 20,
-#         "x": 20
-#       }
-#     }
-#   ],
-#   "couplings": [
-#     {
-#       "control": 0,
-#       "target": 2,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 0,
-#       "target": 1,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 1,
-#       "target": 3,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 1,
-#       "target": 4,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 2,
-#       "target": 3,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 3,
-#       "target": 6,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 4,
-#       "target": 6,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 4,
-#       "target": 5,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 5,
-#       "target": 7,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 5,
-#       "target": 8,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 6,
-#       "target": 7,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 7,
-#       "target": 10,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 8,
-#       "target": 10,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 8,
-#       "target": 9,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 9,
-#       "target": 11,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 9,
-#       "target": 12,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 10,
-#       "target": 11,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 11,
-#       "target": 14,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 12,
-#       "target": 14,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 12,
-#       "target": 13,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 13,
-#       "target": 15,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     },
-#     {
-#       "control": 14,
-#       "target": 15,
-#       "fidelity": 0.99,
-#       "gate_duration": {
-#         "cx": 40,
-#         "rzx90": 40
-#       }
-#     }
-#   ],
-#   "calibrated_at": "2025-03-18 17:11:47.798353"
-# }
