@@ -1,10 +1,13 @@
-import logging
+import io
 import re
 from datetime import datetime, timezone
 from typing import Annotated
 
+import matplotlib.pyplot as plt
+import networkx as nx
 from fastapi import APIRouter, Depends
 from fastapi.logger import logger
+from fastapi.responses import Response
 from pydantic import BaseModel
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
@@ -12,12 +15,6 @@ from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 
 router = APIRouter()
-gunicorn_logger = logging.getLogger("gunicorn.error")
-logger.handlers = gunicorn_logger.handlers
-if __name__ != "main":
-    logger.setLevel(gunicorn_logger.level)
-else:
-    logger.setLevel(logging.DEBUG)
 
 
 class Position(BaseModel):
@@ -106,6 +103,15 @@ def qid_to_label(qid: str) -> str:
     raise ValueError(error_message)
 
 
+def normalize_coupling_key(control: str, target: str) -> str:
+    """Normalize coupling key by sorting the qubits.
+
+    This ensures that "0-1" and "1-0" are treated as the same coupling.
+    """
+    qubits = sorted([control, target])
+    return f"{qubits[0]}-{qubits[1]}"
+
+
 def split_q_string(cr_label: str) -> tuple[str, str]:
     """Split a string of the form "Q31-Q29" into two parts.
 
@@ -140,6 +146,15 @@ def split_q_string(cr_label: str) -> tuple[str, str]:
     return left, right
 
 
+class DeviceTopologyRequst(BaseModel):
+    """Request model for device topology."""
+
+    name: str = "anemone"
+    device_id: str = "anemone"
+    qubits: list[str] = ["0", "1", "2", "3", "4", "5"]
+    exclude_couplings: list[str] = []
+
+
 @router.post(
     "/device_topology",
     response_model=Device,
@@ -149,7 +164,7 @@ def split_q_string(cr_label: str) -> tuple[str, str]:
 )
 def get_device_topology(
     current_user: Annotated[User, Depends(get_current_active_user)],
-    physical_qubit_index_list: list[str] = ["0", "1", "2", "3", "4", "5"],
+    request: DeviceTopologyRequst,
 ) -> Device:
     """Get the device topology."""
     logger.info(f"current user: {current_user.username}")
@@ -163,11 +178,11 @@ def get_device_topology(
     drag_pi_params = latest.note["drag_pi_params"]
     chip_docs = ChipDocument.find_one({"chip_id": "64Q", "username": latest.username}).run()
     # Sort physical qubit indices and create id mapping
-    sorted_physical_ids = sorted(physical_qubit_index_list)
+    sorted_physical_ids = sorted(request.qubits)
     id_mapping = {pid: idx for idx, pid in enumerate(sorted_physical_ids)}
     logger.info(f"id_mapping: {id_mapping}")
 
-    for qid in physical_qubit_index_list:
+    for qid in request.qubits:
         x90_gate_fidelity = (chip_docs.qubits[qid].data.get("x90_gate_fidelity") or {"value": 0.5})[
             "value"
         ]
@@ -222,20 +237,145 @@ def get_device_topology(
                 chip_docs.couplings[f"{control}-{target}"].data.get("zx90_gate_fidelity")
                 or {"value": 0.5}
             )["value"]
-            # Only append if both control and target qubits exist in id_mapping
+            # Only append if both control and target qubits exist in id_mapping and coupling is not excluded
             if control in id_mapping and target in id_mapping:
-                couplings.append(
-                    Coupling(
-                        control=id_mapping[control],  # Map to new sequential id
-                        target=id_mapping[target],  # Map to new sequential id
-                        fidelity=zx90_gate_fidelity,
-                        gate_duration=CouplingGateDuration(rzx90=cr_duration),
+                # Normalize both the current coupling key and all excluded couplings
+                current_coupling = normalize_coupling_key(control, target)
+                excluded_couplings = {
+                    normalize_coupling_key(*coupling.split("-"))
+                    for coupling in request.exclude_couplings
+                }
+
+                if current_coupling not in excluded_couplings:
+                    couplings.append(
+                        Coupling(
+                            control=id_mapping[control],  # Map to new sequential id
+                            target=id_mapping[target],  # Map to new sequential id
+                            fidelity=zx90_gate_fidelity,
+                            gate_duration=CouplingGateDuration(rzx90=cr_duration),
+                        )
                     )
-                )
     return Device(
-        name="anemone",
-        device_id="anemone",
+        name=request.name,
+        device_id=request.device_id,
         qubits=qubits,
         couplings=couplings,
         calibrated_at=datetime.now(tz=timezone.utc),
     )
+
+
+def generate_device_plot(data: dict) -> bytes:
+    """Generate a plot of the quantum device and return it as bytes."""
+    # Create a new graph
+    G = nx.Graph()
+
+    # Add nodes (qubits) with their positions
+    pos = {}
+    for qubit in data["qubits"]:
+        G.add_node(qubit["id"], physical_id=qubit["physical_id"], fidelity=qubit["fidelity"])
+        pos[qubit["id"]] = (qubit["position"]["x"], qubit["position"]["y"])
+
+    # Add edges (couplings)
+    for coupling in data["couplings"]:
+        G.add_edge(
+            coupling["control"],
+            coupling["target"],
+            fidelity=coupling["fidelity"],
+            gate_duration=coupling["gate_duration"]["rzx90"],
+        )
+
+    # Set font parameters
+    plt.rcParams["font.size"] = 14
+    plt.rcParams["font.family"] = "sans-serif"
+
+    # Create the plot with a specific layout for colorbar
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    # Draw nodes
+    nx.draw_networkx_nodes(
+        G,
+        pos,
+        node_color=[G.nodes[node]["fidelity"] for node in G.nodes],
+        node_size=3000,
+        cmap="viridis",
+    )
+
+    # Draw edges
+    nx.draw_networkx_edges(G, pos, width=3)
+
+    # Add physical ID and fidelity labels in white
+    labels = {
+        node: f"Q{G.nodes[node]['physical_id']}\n{G.nodes[node]['fidelity']*100:.2f}%"
+        for node in G.nodes
+    }
+    nx.draw_networkx_labels(G, pos, labels, font_size=12, font_weight="bold", font_color="white")
+
+    # Add edge labels with adjusted position
+    edge_labels = nx.get_edge_attributes(G, "fidelity")
+    edge_labels = {k: f"F={v:.2f}" for k, v in edge_labels.items()}
+    nx.draw_networkx_edge_labels(G, pos, edge_labels, font_size=10, label_pos=0.3)
+
+    # Add a colorbar with adjusted position
+    sm = plt.cm.ScalarMappable(
+        cmap="viridis",
+        norm=plt.Normalize(
+            vmin=min(nx.get_node_attributes(G, "fidelity").values()),
+            vmax=max(nx.get_node_attributes(G, "fidelity").values()),
+        ),
+    )
+    cbar = plt.colorbar(sm, ax=ax, label="Qubit Fidelity (%)", fraction=0.046, pad=0.04)
+    cbar.ax.tick_params(labelsize=12)
+
+    ax.set_title(
+        f"Quantum Device: {data['name'].upper()}",
+        pad=20,
+        fontsize=16,
+        fontweight="bold",
+    )
+
+    # Adjust the plot limits with margins
+    x_coords = [coord[0] for coord in pos.values()]
+    y_coords = [coord[1] for coord in pos.values()]
+    x_min, x_max = min(x_coords), max(x_coords)
+    y_min, y_max = min(y_coords), max(y_coords)
+    margin = 50  # Add margin to prevent cutoff
+
+    ax.set_xlim(x_min - margin, x_max + margin)
+    ax.set_ylim(y_min - margin, y_max + margin)
+    ax.axis("off")  # Hide axes
+    plt.tight_layout()
+
+    # Save plot to bytes
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", bbox_inches="tight", dpi=300)
+    plt.close(fig)  # Close the figure to free memory
+    buf.seek(0)
+    return buf.getvalue()
+
+
+@router.post(
+    "/device_topology/plot",
+    response_class=Response,
+    summary="Get the device topology plot",
+    description="Get the device topology as a PNG image.",
+    operation_id="getDeviceTopologyPlot",
+)
+def get_device_topology_plot(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    device: Device,
+) -> Response:
+    """Get the device topology as a PNG image.
+
+    Args:
+    ----
+        current_user: Authenticated user
+        device: Device topology data
+
+    Returns:
+    -------
+        Response: PNG image of the device topology
+
+    """
+    logger.info(f"current user: {current_user.username}")
+    plot_bytes = generate_device_plot(device.model_dump())
+    return Response(content=plot_bytes, media_type="image/png")
