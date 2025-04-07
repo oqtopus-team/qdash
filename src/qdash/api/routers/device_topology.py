@@ -228,6 +228,17 @@ def get_device_topology(
             )
         )
 
+    # Adjust positions to make (min_x, min_y) the origin while maintaining relative positions
+    min_x = min(qubit.position.x for qubit in qubits)
+    min_y = min(qubit.position.y for qubit in qubits)
+
+    # Update positions
+    for qubit in qubits:
+        qubit.position.x -= min_x
+        qubit.position.y -= min_y
+
+    # Process couplings
+    for qid in request.qubits:
         search_result = search_coupling_data_by_control_qid(cr_params, qid_to_label(qid))
         for cr_key, cr_value in search_result.items():
             target = cr_value["target"]
