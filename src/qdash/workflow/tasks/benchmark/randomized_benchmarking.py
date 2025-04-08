@@ -46,7 +46,7 @@ class RandomizedBenchmarking(BaseTask):
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "average_gate_fidelity": OutputParameterModel(
-            unit="",
+            unit="a.u.",
             description="Average gate fidelity",
         ),
     }

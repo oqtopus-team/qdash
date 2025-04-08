@@ -47,7 +47,7 @@ class X180InterleavedRandomizedBenchmarking(BaseTask):
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "x180_gate_fidelity": OutputParameterModel(
-            unit="",
+            unit="a.u.",
             description="X180 gate fidelity",
         ),
     }

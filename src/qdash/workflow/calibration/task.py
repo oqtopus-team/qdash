@@ -1,9 +1,7 @@
 # from neodbmodel.task import TaskDocument
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
-import pendulum
 from prefect import get_run_logger, task
 from qdash.datamodel.task import CouplingTaskModel, GlobalTaskModel, QubitTaskModel, TaskResultModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
@@ -156,8 +154,6 @@ def execute_dynamic_task_by_qid(
                 )
                 task_manager.save()
 
-                # キャリブレーションノートの更新                # current_time = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-
                 # タスクのノートを取得または作成
                 calib_note = json.loads(exp.calib_note.__str__())
                 task_doc = CalibrationNoteDocument.find_one(
@@ -208,15 +204,24 @@ def execute_dynamic_task_by_qid(
         output_parameters = task_manager.get_output_parameter_by_task_name(
             task_name=task_name, task_type=task_type, qid=qid
         )
+        logger.info(f"output_parameters: {output_parameters}")
         if output_parameters:
             if this_task.is_qubit_task():
-                QubitDocument.update_calib_data(
-                    qid=qid, chip_id=execution_manager.chip_id, output_parameters=output_parameters
+                updated_docs = QubitDocument.update_calib_data(
+                    username=task_manager.username,
+                    qid=qid,
+                    chip_id=execution_manager.chip_id,
+                    output_parameters=output_parameters,
                 )
+                logger.info(f"QubitDocument updated for {updated_docs.model_dump()}")
             elif this_task.is_coupling_task():
                 CouplingDocument.update_calib_data(
-                    qid=qid, chip_id=execution_manager.chip_id, output_parameters=output_parameters
+                    username=task_manager.username,
+                    qid=qid,
+                    chip_id=execution_manager.chip_id,
+                    output_parameters=output_parameters,
                 )
+                logger.info(f"CouplingDocument updated for {qid}")
 
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")

@@ -29,6 +29,7 @@ from qdash.api.schemas.calibration import (
 )
 from qdash.api.schemas.exception import InternalSeverError
 from qdash.config import Settings, get_settings
+from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.menu import MenuDocument
@@ -73,6 +74,42 @@ def generate_execution_id() -> str:
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
     execution_index = ExecutionCounterDocument.get_next_index(date_str)
     return f"{date_str}-{execution_index:03d}"
+
+
+class CalibrationNoteResponse(BaseModel):
+    """CalibrationNote is a subclass of BaseModel."""
+
+    username: str
+    execution_id: str
+    task_id: str
+    note: dict
+    timestamp: str
+
+
+@router.get(
+    "/calibration/note",
+    response_model=CalibrationNoteResponse,
+    summary="Fetches all the cron schedules.",
+    operation_id="listCronSchedules",
+)
+def get_calibration_note(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> CalibrationNoteResponse:
+    """Get the calibration note."""
+    logger.info(f"current user: {current_user.username}")
+    latest = (
+        CalibrationNoteDocument.find({"task_id": "master"})
+        .sort([("timestamp", -1)])  # 更新時刻で降順ソート
+        .limit(1)
+        .run()
+    )[0]
+    return CalibrationNoteResponse(
+        username=latest.username,
+        execution_id=latest.execution_id,
+        task_id=latest.task_id,
+        note=latest.note,
+        timestamp=latest.timestamp,
+    )
 
 
 @router.get(

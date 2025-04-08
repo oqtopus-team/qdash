@@ -9,6 +9,7 @@ from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.calibration.flow import qubex_one_qubit_cal_flow
+from qdash.workflow.integration.config_downloader import update_config
 from qdash.workflow.manager.execution import ExecutionManager
 from qdash.workflow.utiltask.create_directory import (
     create_directory_task,
@@ -76,6 +77,7 @@ def main_flow(
         ui_url = ui_url.replace("127.0.0.1", "localhost").replace("prefect-server", "localhost")
     logger.info(f"Execution ID: {execution_id}")
     exectuion_is_locked = ExecutionLockDocument.get_lock_status()
+    commit_id = update_config()
     if exectuion_is_locked:
         logger.error("Calibration is already running.")
         error_message = "Calibration is already running."
@@ -105,6 +107,7 @@ def main_flow(
             note={
                 "qubex_version": get_package_version("qubex"),
                 "ui_url": ui_url,
+                "config_commit_id": commit_id,
             },
         )
         .save()

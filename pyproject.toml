@@ -94,7 +94,9 @@ api = [
     "passlib[bcrypt]==1.7.4",
     "pyyaml==6.0.1",
     "python-multipart==0.0.20",
-    "numpy>=1.26.0,<1.27.0"
+    "numpy>=1.26.0,<1.27.0",
+    "matplotlib>=3.8.0",
+    "networkx>=3.4.2",
 ]
 workflow = [
     "pymongo==4.8.0",
@@ -106,6 +108,7 @@ workflow = [
     "pyyaml==6.0.1",
     "qubex[backend]",
     "filelock>=3.17.0",
+    "gitpython>=3.1.44",
 ]
 dev = [
     "ruff==0.5.5",
