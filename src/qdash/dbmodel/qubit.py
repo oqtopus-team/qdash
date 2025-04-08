@@ -53,9 +53,11 @@ class QubitDocument(Document):
         return existing
 
     @classmethod
-    def update_calib_data(cls, qid: str, chip_id: str, output_parameters: dict) -> "QubitDocument":
+    def update_calib_data(
+        cls, username: str, qid: str, chip_id: str, output_parameters: dict
+    ) -> "QubitDocument":
         """Update the QubitDocument's calibration data with new values."""
-        qubit_doc = cls.find_one({"qid": qid, "chip_id": chip_id}).run()
+        qubit_doc = cls.find_one({"username": username, "qid": qid, "chip_id": chip_id}).run()
         if qubit_doc is None:
             raise ValueError(f"Qubit {qid} not found in chip {chip_id}")
         # Merge new calibration data into the existing data
@@ -63,7 +65,7 @@ class QubitDocument(Document):
         qubit_doc.system_info.update_time()
         qubit_doc.save()
         # Update the qubit in the chip document
-        chip_doc = ChipDocument.find_one({"chip_id": chip_id}).run()
+        chip_doc = ChipDocument.find_one({"username": username, "chip_id": chip_id}).run()
         if chip_doc is None:
             raise ValueError(f"Chip {chip_id} not found")
         qubit_model = QubitModel(

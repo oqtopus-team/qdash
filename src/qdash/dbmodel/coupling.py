@@ -55,20 +55,20 @@ class CouplingDocument(Document):
 
     @classmethod
     def update_calib_data(
-        cls, qid: str, chip_id: str, output_parameters: dict
+        cls, username: str, qid: str, chip_id: str, output_parameters: dict
     ) -> "CouplingDocument":
         """Update the CouplingDocument's calibration data with new values."""
-        coupling_doc = cls.find_one({"qid": qid, "chip_id": chip_id}).run()
+        coupling_doc = cls.find_one({"username": username, "qid": qid, "chip_id": chip_id}).run()
         if coupling_doc is None:
             raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
         coupling_doc.data = CouplingDocument.merge_calib_data(coupling_doc.data, output_parameters)
         coupling_doc.system_info.update_time()
         coupling_doc.save()
-        chip_doc = ChipDocument.find_one({"chip_id": chip_id}).run()
+        chip_doc = ChipDocument.find_one({"username": username, "chip_id": chip_id}).run()
         if chip_doc is None:
             raise ValueError(f"Chip {chip_id} not found")
         coupling_model = CouplingModel(
-            qid=qid, chip_id=chip_id, data=output_parameters, edge_info=coupling_doc.edge_info
+            qid=qid, chip_id=chip_id, data=coupling_doc.data, edge_info=coupling_doc.edge_info
         )
         chip_doc.update_coupling(qid, coupling_model)
         return coupling_doc

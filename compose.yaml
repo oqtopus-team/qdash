@@ -19,7 +19,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${MONGO_EXPRESS_PORT:-8081}:${MONGO_EXPRESS_PORT:-8081}"
+      - "${MONGO_EXPRESS_PORT:-8081}:8081"
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
@@ -102,6 +102,7 @@ services:
       - ./src/qdash/config.py:/app/qdash/config.py
       - ${CALIB_DATA_PATH}:/app/calib_data
       - ${QPU_DATA_PATH}:/app/qpu_data
+      - ${CONFIG_PATH}:/app/config
     working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
     develop:

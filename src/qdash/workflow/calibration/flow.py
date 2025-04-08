@@ -148,7 +148,7 @@ def cal_flow(
         qubits=labels,
         config_dir="/app/config",
         params_dir="/app/config",
-        calib_note_path=str(note_path),
+        calib_note_path=note_path,
     )
     exp.note.clear()
     for qid in qubits:

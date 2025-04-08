@@ -6,6 +6,7 @@ from qdash.api.routers import (
     auth,
     calibration,
     chip,
+    device_topology,
     execution,
     file,
     menu,
@@ -73,3 +74,4 @@ app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(task.router, prefix="/api", tags=["task"])
 app.include_router(parameter.router, prefix="/api", tags=["parameter"])
 app.include_router(tag.router, prefix="/api", tags=["tag"])
+app.include_router(device_topology.router, prefix="/api", tags=["device_topology"])

@@ -10,7 +10,6 @@ from git.exc import GitCommandError
 from prefect import flow, get_run_logger
 
 
-
 @flow(flow_run_name="Update Config")
 def update_config(target_dir: str | Path = "/app/config") -> str:
     """Update configuration files from the remote repository.
