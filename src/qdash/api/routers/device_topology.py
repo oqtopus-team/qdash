@@ -5,6 +5,7 @@ from typing import Annotated
 
 import matplotlib.pyplot as plt
 import networkx as nx
+import pendulum
 from fastapi import APIRouter, Depends
 from fastapi.logger import logger
 from fastapi.responses import Response
@@ -81,7 +82,7 @@ class Device(BaseModel):
     device_id: str
     qubits: list[Qubit]
     couplings: list[Coupling]
-    calibrated_at: datetime
+    calibrated_at: str
 
 
 def search_coupling_data_by_control_qid(cr_params: dict, search_term: str) -> dict:
@@ -207,8 +208,8 @@ def get_device_topology(
                 id=id_mapping[qid],  # Map to new sequential id
                 physical_id=int(qid),
                 position=Position(
-                    x=chip_docs.qubits[qid].node_info.position.x,
-                    y=chip_docs.qubits[qid].node_info.position.y,
+                    x=chip_docs.qubits[qid].node_info.position.x / 100,
+                    y=chip_docs.qubits[qid].node_info.position.y / 100,
                 ),
                 fidelity=x90_gate_fidelity,
                 meas_error=MeasError(
@@ -271,7 +272,7 @@ def get_device_topology(
         device_id=request.device_id,
         qubits=qubits,
         couplings=couplings,
-        calibrated_at=datetime.now(tz=timezone.utc),
+        calibrated_at=pendulum.parse(latest.timestamp).format("YYYY-MM-DD HH:mm:ss.SSSSSS"),  # type: ignore # noqa: PGH003
     )
 
 
@@ -284,7 +285,7 @@ def generate_device_plot(data: dict) -> bytes:
     pos = {}
     for qubit in data["qubits"]:
         G.add_node(qubit["id"], physical_id=qubit["physical_id"], fidelity=qubit["fidelity"])
-        pos[qubit["id"]] = (qubit["position"]["x"], qubit["position"]["y"])
+        pos[qubit["id"]] = (qubit["position"]["x"] * 100, qubit["position"]["y"] * 100)
 
     # Add edges (couplings)
     for coupling in data["couplings"]:
