@@ -2547,14 +2547,14 @@ workflow = [
     { name = "pymongo", specifier = "==4.8.0" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "pyyaml", specifier = "==6.0.1" },
-    { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?rev=v1.3.1" },
+    { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?rev=v1.3.2" },
     { name = "slack-sdk", specifier = "==3.31.0" },
 ]
 
 [[package]]
 name = "qubecalib"
-version = "3.1.7"
-source = { git = "https://github.com/qiqb-osaka/qube-calib.git?rev=3.1.7#36979ed4d419df777927d5fecaf6a5de8c313fb8" }
+version = "3.1.9"
+source = { git = "https://github.com/qiqb-osaka/qube-calib.git?rev=3.1.9#02088329c7e7fede064d745db4c16e2814e23efe" }
 dependencies = [
     { name = "e7awgsw" },
     { name = "jupyter" },
@@ -2568,8 +2568,8 @@ dependencies = [
 
 [[package]]
 name = "qubex"
-version = "1.3.1+6587937"
-source = { git = "https://github.com/amachino/qubex.git?rev=v1.3.1#65879371d5965e14855a81125874026d82851719" }
+version = "1.3.2+6e2fc21"
+source = { git = "https://github.com/amachino/qubex.git?rev=v1.3.2#6e2fc211c2697809a996d4201928d04caafb0c4a" }
 dependencies = [
     { name = "cma" },
     { name = "httpx" },
