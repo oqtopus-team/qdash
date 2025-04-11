@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     client_url: str
     prefect_api_url: str
     slack_bot_token: str
+    slack_channel_id: str
     postgres_data_path: str
     mongo_data_path: str
     calib_data_path: str
