@@ -146,6 +146,17 @@ class BaseTask(ABC):
 
         """
 
+    @abstractmethod
+    def batch_run(self, exp: Experiment, qids: list[str]) -> RunResult:
+        """Run the task for a batch of qubits.
+
+        Args:
+        ----
+            exp: Experiment object
+            qids: list of qubit ids
+
+        """
+
     def get_output_parameters(self) -> list[str]:
         """Return the output parameters of the task."""
         return list(self.output_parameters.keys())

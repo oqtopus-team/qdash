@@ -15,6 +15,33 @@
     "version": "0.0.1"
   },
   "paths": {
+    "/api/calibration/note": {
+      "get": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Fetches all the cron schedules.",
+        "description": "Get the calibration note.",
+        "operationId": "listCronSchedules",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationNoteResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
     "/api/calibration/cron-schedule": {
       "get": {
         "tags": [
@@ -1191,6 +1218,42 @@
         }
       }
     },
+    "/api/file/zip": {
+      "get": {
+        "tags": [
+          "file"
+        ],
+        "summary": "download file or directory as zip",
+        "description": "Download a file or directory as zip.",
+        "operationId": "downloadZipFile",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/token": {
       "post": {
         "tags": [
@@ -1432,6 +1495,93 @@
           }
         ]
       }
+    },
+    "/api/device_topology": {
+      "post": {
+        "tags": [
+          "device_topology"
+        ],
+        "summary": "Get the device topology",
+        "description": "Get the device topology.",
+        "operationId": "getDeviceTopology",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTopologyRequst"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Device"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/device_topology/plot": {
+      "post": {
+        "tags": [
+          "device_topology"
+        ],
+        "summary": "Get the device topology plot",
+        "description": "Get the device topology as a PNG image.",
+        "operationId": "getDeviceTopologyPlot",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Device"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1459,6 +1609,41 @@
         ],
         "title": "Body_auth-login_for_access_token"
       },
+      "CalibrationNoteResponse": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "note": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Note"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "execution_id",
+          "task_id",
+          "note",
+          "timestamp"
+        ],
+        "title": "CalibrationNoteResponse",
+        "description": "CalibrationNote is a subclass of BaseModel."
+      },
       "ChipResponse": {
         "properties": {
           "chip_id": {
@@ -1471,11 +1656,13 @@
             "default": 64
           },
           "qubits": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Qubits",
             "default": {}
           },
           "couplings": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Couplings",
             "default": {}
@@ -1492,6 +1679,48 @@
         ],
         "title": "ChipResponse",
         "description": "Chip is a Pydantic model that represents a chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    name (str): The name of the chip."
+      },
+      "Coupling": {
+        "properties": {
+          "control": {
+            "type": "integer",
+            "title": "Control"
+          },
+          "target": {
+            "type": "integer",
+            "title": "Target"
+          },
+          "fidelity": {
+            "type": "number",
+            "title": "Fidelity"
+          },
+          "gate_duration": {
+            "$ref": "#/components/schemas/CouplingGateDuration"
+          }
+        },
+        "type": "object",
+        "required": [
+          "control",
+          "target",
+          "fidelity",
+          "gate_duration"
+        ],
+        "title": "Coupling",
+        "description": "Coupling information."
+      },
+      "CouplingGateDuration": {
+        "properties": {
+          "rzx90": {
+            "type": "integer",
+            "title": "Rzx90"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rzx90"
+        ],
+        "title": "CouplingGateDuration",
+        "description": "Gate duration of the coupling."
       },
       "CreateMenuRequest": {
         "properties": {
@@ -1522,6 +1751,11 @@
             "title": "Notify Bool",
             "default": false
           },
+          "batch_mode": {
+            "type": "boolean",
+            "title": "Batch Mode",
+            "default": false
+          },
           "tasks": {
             "anyOf": [
               {
@@ -1539,6 +1773,7 @@
           "task_details": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -1572,6 +1807,7 @@
         "title": "CreateMenuRequest",
         "description": "CreateMenuRequest is a Pydantic model for creating a menu item.",
         "example": {
+          "batch_mode": false,
           "description": "This is a sample menu item.",
           "name": "CheckOneQubit",
           "notify_bool": false,
@@ -1641,6 +1877,86 @@
         "title": "Detail",
         "description": "A simple message response.\n\nArgs:\n----\n    BaseModel: The base class for Pydantic models.\n\nAttributes:\n----------\n    message (str): The message to return."
       },
+      "Device": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "device_id": {
+            "type": "string",
+            "title": "Device Id"
+          },
+          "qubits": {
+            "items": {
+              "$ref": "#/components/schemas/Qubit"
+            },
+            "type": "array",
+            "title": "Qubits"
+          },
+          "couplings": {
+            "items": {
+              "$ref": "#/components/schemas/Coupling"
+            },
+            "type": "array",
+            "title": "Couplings"
+          },
+          "calibrated_at": {
+            "type": "string",
+            "title": "Calibrated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "device_id",
+          "qubits",
+          "couplings",
+          "calibrated_at"
+        ],
+        "title": "Device",
+        "description": "Device information."
+      },
+      "DeviceTopologyRequst": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": "anemone"
+          },
+          "device_id": {
+            "type": "string",
+            "title": "Device Id",
+            "default": "anemone"
+          },
+          "qubits": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Qubits",
+            "default": [
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ]
+          },
+          "exclude_couplings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exclude Couplings",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "DeviceTopologyRequst",
+        "description": "Request model for device topology."
+      },
       "ExecuteCalibRequest": {
         "properties": {
           "name": {
@@ -1670,6 +1986,11 @@
             "title": "Notify Bool",
             "default": false
           },
+          "batch_mode": {
+            "type": "boolean",
+            "title": "Batch Mode",
+            "default": false
+          },
           "tasks": {
             "anyOf": [
               {
@@ -1687,6 +2008,7 @@
           "task_details": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -1844,6 +2166,7 @@
             "title": "Task"
           },
           "note": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Note"
           }
@@ -1895,6 +2218,7 @@
             "title": "Tags"
           },
           "note": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Note"
           }
@@ -1942,6 +2266,11 @@
             "title": "Notify Bool",
             "default": false
           },
+          "batch_mode": {
+            "type": "boolean",
+            "title": "Batch Mode",
+            "default": false
+          },
           "tasks": {
             "anyOf": [
               {
@@ -1959,6 +2288,7 @@
           "task_details": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -2169,6 +2499,30 @@
         "title": "ListTaskResponse",
         "description": "Response model for a list of tasks."
       },
+      "MeasError": {
+        "properties": {
+          "prob_meas1_prep0": {
+            "type": "number",
+            "title": "Prob Meas1 Prep0"
+          },
+          "prob_meas0_prep1": {
+            "type": "number",
+            "title": "Prob Meas0 Prep1"
+          },
+          "readout_assignment_error": {
+            "type": "number",
+            "title": "Readout Assignment Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prob_meas1_prep0",
+          "prob_meas0_prep1",
+          "readout_assignment_error"
+        ],
+        "title": "MeasError",
+        "description": "Measurement error of the qubit."
+      },
       "MenuModel": {
         "properties": {
           "name": {
@@ -2198,6 +2552,11 @@
             "title": "Notify Bool",
             "default": false
           },
+          "batch_mode": {
+            "type": "boolean",
+            "title": "Batch Mode",
+            "default": false
+          },
           "tasks": {
             "anyOf": [
               {
@@ -2215,6 +2574,7 @@
           "task_details": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -2354,6 +2714,108 @@
         ],
         "title": "ParameterModel",
         "description": "Data model for a parameter.\n\nAttributes\n----------\n    name (str): The name of the parameter.\n    unit (str): The unit of the parameter.\n    description (str): Detailed description of the parameter."
+      },
+      "Position": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "y"
+        ],
+        "title": "Position",
+        "description": "Position of the qubit on the device."
+      },
+      "Qubit": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "physical_id": {
+            "type": "integer",
+            "title": "Physical Id"
+          },
+          "position": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "fidelity": {
+            "type": "number",
+            "title": "Fidelity"
+          },
+          "meas_error": {
+            "$ref": "#/components/schemas/MeasError"
+          },
+          "qubit_lifetime": {
+            "$ref": "#/components/schemas/QubitLifetime"
+          },
+          "gate_duration": {
+            "$ref": "#/components/schemas/QubitGateDuration"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "physical_id",
+          "position",
+          "fidelity",
+          "meas_error",
+          "qubit_lifetime",
+          "gate_duration"
+        ],
+        "title": "Qubit",
+        "description": "Qubit information."
+      },
+      "QubitGateDuration": {
+        "properties": {
+          "rz": {
+            "type": "integer",
+            "title": "Rz"
+          },
+          "sx": {
+            "type": "integer",
+            "title": "Sx"
+          },
+          "x": {
+            "type": "integer",
+            "title": "X"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rz",
+          "sx",
+          "x"
+        ],
+        "title": "QubitGateDuration",
+        "description": "Gate duration of the qubit."
+      },
+      "QubitLifetime": {
+        "properties": {
+          "t1": {
+            "type": "number",
+            "title": "T1"
+          },
+          "t2": {
+            "type": "number",
+            "title": "T2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "t1",
+          "t2"
+        ],
+        "title": "QubitLifetime",
+        "description": "Qubit lifetime of the qubit."
       },
       "ScheduleCalibRequest": {
         "properties": {
@@ -2627,6 +3089,7 @@
           "input_parameters": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -2638,6 +3101,7 @@
           "output_parameters": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -2663,6 +3127,7 @@
           "note": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -2853,6 +3318,11 @@
             "title": "Notify Bool",
             "default": false
           },
+          "batch_mode": {
+            "type": "boolean",
+            "title": "Batch Mode",
+            "default": false
+          },
           "tasks": {
             "anyOf": [
               {
@@ -2870,6 +3340,7 @@
           "task_details": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {

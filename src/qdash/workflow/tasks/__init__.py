@@ -17,6 +17,7 @@ from qdash.workflow.tasks.box_setup.link_up import LinkUp
 from qdash.workflow.tasks.measurement.readout_classification import ReadoutClassification
 from qdash.workflow.tasks.one_qubit_coarse.check_hpi_pulse import CheckHPIPulse
 from qdash.workflow.tasks.one_qubit_coarse.check_pi_pulse import CheckPIPulse
+from qdash.workflow.tasks.one_qubit_coarse.check_qubit import CheckQubit
 from qdash.workflow.tasks.one_qubit_coarse.check_qubit_frequency import (
     CheckQubitFrequency,
 )
@@ -72,4 +73,5 @@ __all__ = [
     "ZX90InterleavedRandomizedBenchmarking",
     "generate_task_instances",
     "CheckRamsey",
+    "CheckQubit",
 ]

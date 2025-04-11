@@ -38,6 +38,7 @@ class CreateMenuRequest(MenuModel):
                 "username": "admin",
                 "description": "This is a sample menu item.",
                 "qids": [["28", "29"]],
+                "batch_mode": False,
                 "notify_bool": False,
                 "tasks": [
                     "CheckStatus",
@@ -105,6 +106,7 @@ def list_menu(current_user: Annotated[User, Depends(get_current_active_user)]) -
             username=menu.username,
             description=menu.description,
             qids=menu.qids,
+            batch_mode=menu.batch_mode,
             tasks=menu.tasks,
             notify_bool=menu.notify_bool,
             tags=menu.tags,
@@ -155,6 +157,7 @@ def create_menu(
         description=request.description,
         qids=request.qids,
         tasks=request.tasks,
+        batch_mode=request.batch_mode,
         notify_bool=request.notify_bool,
         tags=request.tags,
         task_details=task_details,
@@ -185,6 +188,7 @@ check_one_qubit_preset = MenuModel(
         "CheckT1",
         "CheckT2Echo",
     ],
+    batch_mode=False,
     tags=["debug"],
     task_details={},
 )
@@ -209,6 +213,7 @@ one_qubit_coarse_preset = MenuModel(
         "CheckT1",
         "CheckT2Echo",
     ],
+    batch_mode=False,
     tags=["debug"],
     task_details={},
 )
@@ -230,6 +235,7 @@ one_qubit_fine_preset = MenuModel(
         "X90InterleavedRandomizedBenchmarking",
         "X180InterleavedRandomizedBenchmarking",
     ],
+    batch_mode=False,
     tags=["debug"],
     task_details={},
 )
@@ -314,6 +320,7 @@ def get_menu_by_name(
         qids=menu.qids,
         tasks=menu.tasks,
         notify_bool=menu.notify_bool,
+        batch_mode=menu.batch_mode,
         tags=menu.tags,
         task_details=menu.task_details,
     )
@@ -351,6 +358,7 @@ def update_menu(
         existing_menu.qids = req.qids
         existing_menu.tasks = req.tasks
         existing_menu.notify_bool = req.notify_bool
+        existing_menu.batch_mode = req.batch_mode
         existing_menu.tags = req.tags
         existing_menu.task_details = req.task_details
         existing_menu.save()

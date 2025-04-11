@@ -47,6 +47,7 @@ export function ExecuteConfirmModal({
           tasks: menu.tasks,
           tags: menu.tags,
           task_details: menu.task_details,
+          batch_mode: menu.batch_mode,
         },
       },
       {

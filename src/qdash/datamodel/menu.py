@@ -25,6 +25,7 @@ class MenuModel(BaseModel):
     description: str
     qids: list[list[str]]
     notify_bool: bool = False
+    batch_mode: bool = False
     tasks: list[str] | None = Field(default=None)
     task_details: dict[str, Any] | None = Field(default=None)
     tags: list[str] | None = Field(default=None)
