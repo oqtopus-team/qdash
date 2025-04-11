@@ -31,3 +31,9 @@ class Configure(BaseTask):
         exp.state_manager.push(box_ids=exp.box_ids, confirm=False)
         exp.calib_note.save()
         return RunResult(raw_result=None)
+
+    def batch_run(self, exp: Experiment, qid: str) -> RunResult:
+        """Batch run is not implemented."""
+        raise NotImplementedError(
+            f"Batch run is not implemented for {self.name} task. Use run method instead."
+        )
