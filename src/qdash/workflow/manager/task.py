@@ -8,15 +8,18 @@ import pendulum
 import plotly.graph_objs as go
 from numpy import ndarray
 from pydantic import BaseModel, Field
+from qdash.config import get_settings
 from qdash.datamodel.task import (
     BaseTaskResultModel,
     CalibDataModel,
     CouplingTaskModel,
     GlobalTaskModel,
     QubitTaskModel,
+    SystemTaskModel,
     TaskResultModel,
     TaskStatusModel,
 )
+from qdash.workflow.utils.slack import SlackContents, Status
 
 
 class TaskManager(BaseModel):
@@ -71,8 +74,20 @@ class TaskManager(BaseModel):
 
     def _get_task_container(
         self, task_type: str, qid: str = ""
-    ) -> list[GlobalTaskModel] | list[QubitTaskModel] | list[CouplingTaskModel]:
-        container: list[GlobalTaskModel] | list[QubitTaskModel] | list[CouplingTaskModel]
+    ) -> (
+        list[GlobalTaskModel]
+        | list[QubitTaskModel]
+        | list[CouplingTaskModel]
+        | list[SystemTaskModel]
+    ):
+        container: (
+            list[GlobalTaskModel]
+            | list[QubitTaskModel]
+            | list[CouplingTaskModel]
+            | list[SystemTaskModel]
+        )
+        if task_type == "system":
+            return self.task_result.system_tasks
         if task_type == "global":
             return self.task_result.global_tasks
         if task_type == "qubit":
@@ -313,7 +328,13 @@ class TaskManager(BaseModel):
                 savepath = base_savepath.with_name(f"{base_savepath.stem}_{counter}.png")
                 counter += 1
             task.figure_path.append(str(savepath))
-            self._write_figure(savepath=str(savepath), fig=fig)
+            if task_name == "CheckSkew":
+                widhth = 1200
+                height = 1500
+            else:
+                widhth = 600
+                height = 300
+            self._write_figure(savepath=str(savepath), fig=fig, width=widhth, height=height)
 
     def save_figure(
         self,
@@ -445,6 +466,9 @@ class TaskManager(BaseModel):
             for tasks in self.task_result.coupling_tasks.values()
         )
 
+    def _is_system_task(self, task_name: str) -> bool:
+        return any(task.name == task_name for task in self.task_result.system_tasks)
+
     def has_only_qubit_or_global_tasks(self, task_names: list[str]) -> bool:
         return all(
             self._is_qubit_task(task_name) or self._is_global_task(task_name)
@@ -456,3 +480,6 @@ class TaskManager(BaseModel):
             self._is_coupling_task(task_name) or self._is_global_task(task_name)
             for task_name in task_names
         )
+
+    def has_only_system_tasks(self, task_names: list[str]) -> bool:
+        return all(self._is_system_task(task_name) for task_name in task_names)

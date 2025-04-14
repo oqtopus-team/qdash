@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 
 from prefect import get_run_logger, task
-from qdash.datamodel.task import CouplingTaskModel, GlobalTaskModel, QubitTaskModel, TaskResultModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
@@ -13,7 +12,6 @@ from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.workflow.manager.execution import ExecutionManager
 from qdash.workflow.manager.task import TaskManager
-from qdash.workflow.tasks.active_protocols import generate_task_instances
 from qdash.workflow.tasks.base import BaseTask
 from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
 from qubex.experiment import Experiment
@@ -27,46 +25,6 @@ def validate_task_name(task_names: list[str], username: str) -> list[str]:
         if task_name not in task_list:
             raise ValueError(f"Invalid task name: {task_name}")
     return task_names
-
-
-@task(name="build-workflow")
-def build_workflow(
-    task_manager: TaskManager, task_names: list[str], qubits: list[str], task_details: dict
-) -> TaskManager:
-    """Build workflow."""
-    task_result = TaskResultModel()
-    global_previous_task_id = ""
-    qubit_previous_task_id = {qubit: "" for qubit in qubits}
-    coupling_previous_task_id = {qubit: "" for qubit in qubits}
-    task_instances = generate_task_instances(task_names=task_names, task_details=task_details)
-    for name in task_names:
-        if name in task_instances:
-            this_task = task_instances[name]
-            if this_task.is_global_task():
-                task = GlobalTaskModel(name=name, upstream_id=global_previous_task_id)
-                task_result.global_tasks.append(task)
-                global_previous_task_id = task.task_id
-
-            elif this_task.is_qubit_task():
-                for qubit in qubits:
-                    task = QubitTaskModel(
-                        name=name, upstream_id=qubit_previous_task_id[qubit], qid=qubit
-                    )
-                    task_result.qubit_tasks.setdefault(qubit, []).append(task)
-                    qubit_previous_task_id[qubit] = task.task_id
-            elif this_task.is_coupling_task():
-                for qubit in qubits:
-                    task = CouplingTaskModel(
-                        name=name, upstream_id=coupling_previous_task_id[qubit], qid=qubit
-                    )
-                    task_result.coupling_tasks.setdefault(qubit, []).append(task)
-                    coupling_previous_task_id[qubit] = task.task_id
-            else:
-                raise ValueError(f"Task type {this_task.get_task_type()} not found.")
-        else:
-            raise ValueError(f"Task {name} not found.")
-    task_manager.task_result = task_result
-    return task_manager
 
 
 initialize()

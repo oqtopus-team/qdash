@@ -17,7 +17,7 @@ class PostProcessResult(BaseModel):
     """Result class."""
 
     output_parameters: dict[str, OutputParameterModel]
-    figures: list[go.Figure] = []
+    figures: list[go.Figure | go.FigureWidget] = []
     raw_data: list[Any] = []
 
     class Config:
@@ -36,7 +36,7 @@ class BaseTask(ABC):
     """Base class for the task."""
 
     name: str = ""
-    task_type: Literal["global", "qubit", "coupling"]
+    task_type: Literal["global", "qubit", "coupling", "system"]
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
     r2_threshold: float = 0.6
@@ -165,7 +165,7 @@ class BaseTask(ABC):
         """Return the name of the task."""
         return self.name
 
-    def get_task_type(self) -> Literal["global", "qubit", "coupling"]:
+    def get_task_type(self) -> Literal["global", "qubit", "coupling", "system"]:
         """Return the type of the task."""
         return self.task_type
 
@@ -180,6 +180,10 @@ class BaseTask(ABC):
     def is_coupling_task(self) -> bool:
         """Return True if the task is a coupling task."""
         return self.task_type == "coupling"
+
+    def is_system_task(self) -> bool:
+        """Return True if the task is a system task."""
+        return self.task_type == "system"
 
     def attach_execution_id(self, execution_id: str) -> dict[str, OutputParameterModel]:
         """Attach the execution id to the output parameters."""

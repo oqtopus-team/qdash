@@ -63,6 +63,10 @@ class InputParameterModel(BaseModel):
             return int(self.value)
         elif self.value_type == "float":
             return float(self.value)
+        elif self.value_type == "str":
+            return str(self.value)
+        elif self.value_type == "list":
+            return list(self.value)
         return self.value
 
 
@@ -108,26 +112,6 @@ class TaskStatusModel(str, Enum):
     FAILED = FAILED
     PENDING = PENDING
     SKIPPED = SKIPPED
-
-
-# class DataModel(BaseModel):
-#     """Data model.
-
-#     Attributes
-#     ----------
-#         qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.
-#         coupling (dict[str, dict[str, float | int]]): The calibration data for couplings.
-
-#     """
-
-#     value: float | int = 0
-#     unit: str = ""
-#     description: str = ""
-#     calibrated_at: str = Field(
-#         default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
-#         description="The time when the system information was created",
-#     )
-#     execution_id: str = ""
 
 
 class CalibDataModel(BaseModel):
@@ -259,6 +243,18 @@ class BaseTaskResultModel(BaseModel):
         return end_time.diff_for_humans(start_time, absolute=True)  # type: ignore #noqa: PGH003
 
 
+class SystemTaskModel(BaseTaskResultModel):
+    """System task result class.
+
+    Attributes
+    ----------
+        task_type (str): The type of the task. e.g. "system".
+
+    """
+
+    task_type: Literal["system"] = "system"
+
+
 class GlobalTaskModel(BaseTaskResultModel):
     """Global task result class.
 
@@ -310,6 +306,7 @@ class TaskResultModel(BaseModel):
 
     """
 
+    system_tasks: list[SystemTaskModel] = []
     global_tasks: list[GlobalTaskModel] = []
     qubit_tasks: dict[str, list[QubitTaskModel]] = {}
     coupling_tasks: dict[str, list[CouplingTaskModel]] = {}

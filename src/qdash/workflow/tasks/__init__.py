@@ -36,6 +36,7 @@ from qdash.workflow.tasks.one_qubit_fine.check_drag_hpi_pulse import CheckDRAGHP
 from qdash.workflow.tasks.one_qubit_fine.check_drag_pi_pulse import CheckDRAGPIPulse
 from qdash.workflow.tasks.one_qubit_fine.create_drag_hpi_pulse import CreateDRAGHPIPulse
 from qdash.workflow.tasks.one_qubit_fine.create_drag_pi_pulse import CreateDRAGPIPulse
+from qdash.workflow.tasks.system.check_skew import CheckSkew
 from qdash.workflow.tasks.two_qubit.check_bell_state import CheckBellState
 from qdash.workflow.tasks.two_qubit.check_cross_resonance import CheckCrossResonance
 from qdash.workflow.tasks.two_qubit.check_zx90 import CheckZX90
@@ -74,4 +75,5 @@ __all__ = [
     "generate_task_instances",
     "CheckRamsey",
     "CheckQubit",
+    "CheckSkew",
 ]

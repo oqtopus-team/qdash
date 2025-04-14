@@ -160,8 +160,7 @@ class SlackContents:
                     channel=self.channel,  # チャンネルID
                     file=self.path,  # ファイルパス
                     title=self.title,  # ファイルタイトル
-                    initial_comment=self.msg,  # ファイルの説明
-                    thread_ts=self.ts if self.ts != "" else message_ts,  # スレッドID
+                    thread_ts=self.ts,
                 )
                 logger.info("File upload successful")
             except Exception as e:
