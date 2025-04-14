@@ -81,11 +81,11 @@ def main_flow(
     if menu.notify_bool:
         slack = SlackContents(
             status=Status.RUNNING,
-            title="Calibration Started",
-            msg=f"http://127.0.0.1:{settings.ui_port}/execution/64Q/{execution_id}",
+            title=f"🏃‍♂️ RUNNING {menu.name}...",
+            msg="RUNNING",
             ts="",
             path="",
-            header=f"{menu.name} calibration...",
+            header=f"{menu.name}: http://127.0.0.1:{settings.ui_port}/execution/64Q/{execution_id}",
             channel=settings.slack_channel_id,
             token=settings.slack_bot_token,
         )
@@ -134,8 +134,38 @@ def main_flow(
         .start_execution()
         .update_execution_status_to_running()
     )
+    logger.info(f"tasks: {menu.tasks}")
+    if "CheckSkew" in menu.tasks:
+        logger.info("CheckSkew is in the tasks.")
+        success_map = qubex_one_qubit_cal_flow(
+            menu, calib_dir, success_map, execution_id, task_names=["CheckSkew"]
+        )
+        execution_manager = execution_manager.reload()
+        logger.info(f"execution manager: {execution_manager.task_results}")
+        data = execution_manager.task_results
+        model = list(data.values())[0]
+        logger.info(f"model: {model}")
+        for task in model.system_tasks:
+            if task.name == "CheckSkew":
+                fig_path = task.figure_path[0]
+                logger.info(f"fig_path: {fig_path}")
+                if menu.notify_bool:
+                    new = SlackContents(
+                        status=Status.SUCCESS,
+                        title=f"📈 {menu.name} Result",
+                        msg="SUCCESS",
+                        ts="",
+                        path=fig_path,
+                        channel=settings.slack_channel_id,
+                        token=settings.slack_bot_token,
+                    )
+                    new.send_slack()
+        menu.tasks.remove("CheckSkew")
     try:
-        success_map = qubex_one_qubit_cal_flow(menu, calib_dir, success_map, execution_id)
+        if len(menu.tasks) != 0:
+            success_map = qubex_one_qubit_cal_flow(
+                menu, calib_dir, success_map, execution_id, task_names=menu.tasks
+            )
         execution_manager = execution_manager.reload().complete_execution()
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")
@@ -159,23 +189,23 @@ def main_flow(
             .run()
         )[0]
         calib_note = latest.note
-        # save calib_note to calib_note_dir as json
         calib_note_path = f"{calib_note_dir}/{chip_id}.json"
         with Path(calib_note_path).open("w", encoding="utf-8") as f:
             json.dump(calib_note, f, indent=4, ensure_ascii=False)
         if menu.notify_bool:
             slack.update_contents(
                 status=Status.SUCCESS if success_map else Status.FAILURE,
-                title="Calibration Finished",
-                msg="Calibration finished.",
+                title="✅ Calibration finished.",
+                msg="SUCCESS",
                 ts=parent_ts,
                 broadcast=True,
             )
+            logger.info(f"exection manager: {execution_manager}")
             slack.send_slack()
             slack.update_contents(
                 status=Status.SUCCESS if success_map else Status.FAILURE,
-                title="CalibNote Snapshot",
-                msg="the calibration result is attached.",
+                title="📄 the calibration result is attached.",
+                msg="SUCCESS",
                 ts=parent_ts,
                 path=calib_note_path,
                 broadcast=False,

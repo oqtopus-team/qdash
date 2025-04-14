@@ -5,9 +5,8 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 import pendulum
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
-from qdash.api.lib.current_user import get_current_user_id
 from qdash.api.schemas.auth import User
 from qdash.datamodel.task import OutputParameterModel
 from qdash.dbmodel.chip import ChipDocument
@@ -257,6 +256,12 @@ def flatten_tasks(task_results: dict) -> list[dict]:
             if "global" not in grouped_tasks:
                 grouped_tasks["global"] = []
             grouped_tasks["global"].extend(result["global_tasks"])
+
+        if "system_tasks" in result:
+            logger.debug("Found %d system_tasks in %s", len(result["system_tasks"]), key)
+            if "system" not in grouped_tasks:
+                grouped_tasks["system"] = []
+            grouped_tasks["system"].extend(result["system_tasks"])
 
         # キュービットタスクの処理
         if "qubit_tasks" in result:

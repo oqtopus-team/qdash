@@ -6,12 +6,18 @@ from prefect import flow, get_run_logger
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
 from qdash.datamodel.menu import MenuModel as Menu
+from qdash.datamodel.task import (
+    CouplingTaskModel,
+    GlobalTaskModel,
+    QubitTaskModel,
+    SystemTaskModel,
+    TaskResultModel,
+)
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.parameter import ParameterDocument
 from qdash.dbmodel.task import TaskDocument
 from qdash.workflow.calibration.task import (
-    build_workflow,
     execute_dynamic_task_batch,
     execute_dynamic_task_by_qid,
     validate_task_name,
@@ -27,6 +33,47 @@ from qdash.workflow.manager.task import TaskManager
 from qdash.workflow.tasks.active_protocols import generate_task_instances
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
+
+
+@flow(name="build-workflow")
+def build_workflow(task_names: list[str], qubits: list[str], task_details: dict) -> TaskResultModel:
+    """Build workflow."""
+    task_result = TaskResultModel()
+    global_previous_task_id = ""
+    qubit_previous_task_id = {qubit: "" for qubit in qubits}
+    coupling_previous_task_id = {qubit: "" for qubit in qubits}
+    task_instances = generate_task_instances(task_names=task_names, task_details=task_details)
+    for name in task_names:
+        if name in task_instances:
+            this_task = task_instances[name]
+            if this_task.is_system_task():
+                # Skip system task
+                task = SystemTaskModel(name=name, upstream_id=global_previous_task_id)
+                task_result.system_tasks.append(task)
+                global_previous_task_id = task.task_id
+            elif this_task.is_global_task():
+                task = GlobalTaskModel(name=name, upstream_id=global_previous_task_id)
+                task_result.global_tasks.append(task)
+                global_previous_task_id = task.task_id
+            elif this_task.is_qubit_task():
+                for qubit in qubits:
+                    task = QubitTaskModel(
+                        name=name, upstream_id=qubit_previous_task_id[qubit], qid=qubit
+                    )
+                    task_result.qubit_tasks.setdefault(qubit, []).append(task)
+                    qubit_previous_task_id[qubit] = task.task_id
+            elif this_task.is_coupling_task():
+                for qubit in qubits:
+                    task = CouplingTaskModel(
+                        name=name, upstream_id=coupling_previous_task_id[qubit], qid=qubit
+                    )
+                    task_result.coupling_tasks.setdefault(qubit, []).append(task)
+                    coupling_previous_task_id[qubit] = task.task_id
+            else:
+                raise ValueError(f"Task type {this_task.get_task_type()} not found.")
+        else:
+            raise ValueError(f"Task {name} not found.")
+    return task_result
 
 
 @flow(flow_run_name="{qid}")
@@ -104,22 +151,25 @@ def cal_flow(
     successMap: dict[str, bool],
     execution_id: str,
     qubits: list[str],
+    task_names: list[str],
 ) -> dict[str, bool]:
     """Deployment to run calibration flow for a single qubit or a pair of qubits."""
     qids = qubits
     logger = get_run_logger()
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
-    task_names = validate_task_name(menu.tasks, username=menu.username)
+    task_names = validate_task_name(task_names=task_names, username=menu.username)
     task_manager = TaskManager(
         username=menu.username, execution_id=execution_id, qids=qids, calib_dir=calib_dir
     )
-    task_manager = build_workflow(
-        task_manager=task_manager,
+    task_result = build_workflow(
         task_names=task_names,
         qubits=qids,
         task_details=menu.task_details,
     )
+    task_manager.task_result = task_result
+
+    logger.info(f"workflow: {task_manager.task_result}")
 
     task_manager.save()
     if task_manager.has_only_qubit_or_global_tasks(task_names=task_names):
@@ -128,6 +178,10 @@ def cal_flow(
     elif task_manager.has_only_coupling_or_global_tasks(task_names=task_names):
         logger.info("Only coupling or global tasks are present")
         labels = coupling_qids_to_qubit_labels(qids=qids)
+    elif task_manager.has_only_system_tasks(task_names=task_names):
+        logger.info("Only system tasks are present")
+        labels = []
+        qids = ["system"]
     else:
         logger.info(f"task names:{task_names}")
         logger.error("this task is not supported")
@@ -199,6 +253,7 @@ def batch_cal_flow(
     successMap: dict[str, bool],
     execution_id: str,
     batch_qubits: list[list[str]],
+    task_names: list[str],
 ) -> dict[str, bool]:
     """Deployment to run calibration flow for a single qubit or a pair of qubits."""
     qids: list[str]
@@ -210,12 +265,12 @@ def batch_cal_flow(
     task_manager = TaskManager(
         username=menu.username, execution_id=execution_id, qids=qids, calib_dir=calib_dir
     )
-    task_manager = build_workflow(
-        task_manager=task_manager,
+    task_result = build_workflow(
         task_names=task_names,
         qubits=qids,
         task_details=menu.task_details,
     )
+    task_manager.task_result = task_result
 
     task_manager.save()
     if task_manager.has_only_qubit_or_global_tasks(task_names=task_names):
@@ -224,6 +279,10 @@ def batch_cal_flow(
     elif task_manager.has_only_coupling_or_global_tasks(task_names=task_names):
         logger.info("Only coupling or global tasks are present")
         labels = coupling_qids_to_qubit_labels(qids=qids)
+    elif task_manager.has_only_system_tasks(task_names=task_names):
+        logger.info("Only system tasks are present")
+        labels = []
+        qids = ["system"]
     else:
         logger.info(f"task names:{task_names}")
         logger.error("this task is not supported")
@@ -293,6 +352,7 @@ async def trigger_cal_flow(
     successMap: dict[str, bool],
     execution_id: str,
     qubits: list[list[str]],
+    task_names: list[str],
 ) -> None:
     """Trigger calibration flow for all qubits."""
     deployments = []
@@ -303,6 +363,7 @@ async def trigger_cal_flow(
             "successMap": successMap,
             "execution_id": execution_id,
             "batch_qubits": qubits,
+            "task_names": task_names,
         }
         deployments.append(
             run_deployment("batch-cal-flow/oqtopus-batch-cal-flow", parameters=parameters)
@@ -315,6 +376,7 @@ async def trigger_cal_flow(
                 "successMap": successMap,
                 "execution_id": execution_id,
                 "qubits": qubit,
+                "task_names": task_names,
             }
             deployments.append(run_deployment("cal-flow/oqtopus-cal-flow", parameters=parameters))
 
@@ -332,6 +394,7 @@ async def qubex_one_qubit_cal_flow(
     calib_dir: str,
     successMap: dict[str, bool],
     execution_id: str,
+    task_names: list[str],
 ) -> dict[str, bool]:
     """Flow to calibrate one qubit or a pair of qubits."""
     logger = get_run_logger()
@@ -340,5 +403,5 @@ async def qubex_one_qubit_cal_flow(
     plan = menu.qids
     logger.info(f"batch_mode: {menu.batch_mode}")
     logger.info(f"type:{type(menu.batch_mode)}")
-    await trigger_cal_flow(menu, calib_dir, successMap, execution_id, plan)
+    await trigger_cal_flow(menu, calib_dir, successMap, execution_id, plan, task_names=task_names)
     return successMap
