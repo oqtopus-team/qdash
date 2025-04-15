@@ -1,8 +1,9 @@
 import asyncio
 import json
 from pathlib import Path
+from typing import Any
 
-from prefect import flow, get_run_logger
+from prefect import flow, get_run_logger, task
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
 from qdash.datamodel.menu import BatchNode, ParallelNode, ScheduleNode, SerialNode
@@ -35,10 +36,36 @@ from qdash.workflow.tasks.active_protocols import generate_task_instances
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
 
+# Constants
+CHIP_ID = "64Q"
+CONFIG_DIR = "/app/config"
+PARAMS_DIR = "/app/config"
 
-@flow(name="build-workflow")
-def build_workflow(task_names: list[str], qubits: list[str], task_details: dict) -> TaskResultModel:
-    """Build workflow."""
+
+def build_workflow(
+    task_names: list[str], qubits: list[str], task_details: dict[str, Any]
+) -> TaskResultModel:
+    """Build a workflow model for task execution.
+
+    Constructs a TaskResultModel that represents the execution flow of tasks,
+    handling different types of tasks (system, global, qubit, coupling) and
+    maintaining their dependencies through upstream IDs.
+
+    Args:
+    ----
+        task_names: List of task names to be executed
+        qubits: List of qubit IDs involved in the workflow
+        task_details: Dictionary containing task-specific configuration details
+
+    Returns:
+    -------
+        TaskResultModel containing the structured workflow with task dependencies
+
+    Raises:
+    ------
+        ValueError: If a task name is not found or task type is invalid
+
+    """
     task_result = TaskResultModel()
     global_previous_task_id = ""
     qubit_previous_task_id = {qubit: "" for qubit in qubits}
@@ -85,7 +112,26 @@ def cal_serial(
     task_names: list[str],
     qid: str,
 ) -> TaskManager:
-    """Calibrate in sequence."""
+    """Execute calibration tasks sequentially for a single qubit.
+
+    Args:
+    ----
+        menu: Menu configuration containing task details
+        exp: Experiment instance for task execution
+        task_manager: Task manager instance to track execution state
+        task_names: List of task names to execute
+        qid: Target qubit ID
+
+    Returns:
+    -------
+        Updated TaskManager instance after task execution
+
+    Note:
+    ----
+        Tasks are executed one by one, checking completion status before execution.
+        Error handling ensures graceful failure and proper cleanup.
+
+    """
     logger = get_run_logger()
     try:
         task_instances = generate_task_instances(
@@ -121,7 +167,26 @@ def cal_batch(
     task_names: list[str],
     qids: list[str],
 ) -> TaskManager:
-    """Calibrate in sequence."""
+    """Execute calibration tasks in batch mode for multiple qubits.
+
+    Args:
+    ----
+        menu: Menu configuration containing task details
+        exp: Experiment instance for task execution
+        task_manager: Task manager instance to track execution state
+        task_names: List of task names to execute
+        qids: List of target qubit IDs
+
+    Returns:
+    -------
+        Updated TaskManager instance after task execution
+
+    Note:
+    ----
+        Tasks are executed in batch mode for all specified qubits simultaneously.
+        Error handling ensures graceful failure and proper cleanup.
+
+    """
     logger = get_run_logger()
     try:
         task_instances = generate_task_instances(
@@ -143,9 +208,117 @@ def cal_batch(
     return task_manager
 
 
-@flow(
-    flow_run_name="{qubits}",
-)
+@task
+def setup_calibration(
+    menu: Menu,
+    calib_dir: str,
+    execution_id: str,
+    qubits: list[str],
+    task_names: list[str],
+) -> tuple[TaskManager, Experiment]:
+    """Set up calibration environment and initialize required components.
+
+    Args:
+    ----
+        menu: Menu configuration
+        calib_dir: Calibration directory path
+        execution_id: Unique execution identifier
+        qubits: List of qubit IDs
+        task_names: List of task names to execute
+
+    Returns:
+    -------
+        Tuple containing:
+        - Initialized TaskManager
+        - Initialized Experiment
+        - List of qubit labels
+
+    """
+    logger = get_run_logger()
+    logger.info(f"Menu name: {menu.name}")
+    logger.info(f"Qubex version: {get_package_version('qubex')}")
+
+    # Initialize task manager and validate task names
+    validated_task_names = validate_task_name(task_names=task_names, username=menu.username)
+    task_manager = TaskManager(
+        username=menu.username, execution_id=execution_id, qids=qubits, calib_dir=calib_dir
+    )
+
+    # Build and save workflow
+    task_result = build_workflow(
+        task_names=validated_task_names,
+        qubits=qubits,
+        task_details=menu.task_details,
+    )
+    task_manager.task_result = task_result
+    logger.info(f"workflow: {task_manager.task_result}")
+    task_manager.save()
+
+    # Determine labels based on task types
+    labels: list[str] = []
+    if task_manager.has_only_qubit_or_global_tasks(task_names=validated_task_names):
+        logger.info("Only qubit or global tasks are present")
+        labels = [qid_to_label(q) for q in qubits]
+    elif task_manager.has_only_coupling_or_global_tasks(task_names=validated_task_names):
+        logger.info("Only coupling or global tasks are present")
+        labels = coupling_qids_to_qubit_labels(qids=qubits)
+    elif task_manager.has_only_system_tasks(task_names=validated_task_names):
+        logger.info("Only system tasks are present")
+        labels = []
+    else:
+        logger.info(f"task names:{validated_task_names}")
+        logger.error("this task is not supported")
+        raise ValueError("Invalid task names")
+
+    # Update parameters and tasks
+    parameters = update_active_output_parameters(username=menu.username)
+    ParameterDocument.insert_parameters(parameters)
+    tasks = update_active_tasks(username=menu.username)
+    logger.info(f"updating tasks: {tasks}")
+    TaskDocument.insert_tasks(tasks)
+
+    # Initialize ExecutionManager
+    ExecutionManager(
+        username=menu.username,
+        execution_id=execution_id,
+        calib_data_path=calib_dir,
+    ).reload().update_with_task_manager(task_manager).update_execution_status_to_running()
+
+    # Initialize calibration note
+    note_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
+    note_path.parent.mkdir(parents=True, exist_ok=True)
+
+    master_doc = (
+        CalibrationNoteDocument.find({"task_id": "master"}).sort([("timestamp", -1)]).limit(1).run()
+    )
+
+    if not master_doc:
+        master_doc = CalibrationNoteDocument.upsert_note(
+            username=menu.username,
+            execution_id=execution_id,
+            task_id="master",
+            note={},
+        )
+    else:
+        master_doc = master_doc[0]
+
+    note_path.write_text(json.dumps(master_doc.note, indent=2))
+
+    # Initialize experiment
+    initialize()
+    exp = Experiment(
+        chip_id=CHIP_ID,
+        qubits=labels,
+        config_dir=CONFIG_DIR,
+        params_dir=PARAMS_DIR,
+        calib_note_path=note_path,
+    )
+    exp.note.clear()
+
+    return task_manager, exp
+
+
+@flow(flow_run_name="{qubits}")
 def serial_cal_flow(
     menu: Menu,
     calib_dir: str,
@@ -154,100 +327,45 @@ def serial_cal_flow(
     qubits: list[str],
     task_names: list[str],
 ) -> dict[str, bool]:
-    """Deployment to run calibration flow for a single qubit or a pair of qubits."""
-    qids = qubits
-    logger = get_run_logger()
-    logger.info(f"Menu name: {menu.name}")
-    logger.info(f"Qubex version: {get_package_version('qubex')}")
-    task_names = validate_task_name(task_names=task_names, username=menu.username)
-    task_manager = TaskManager(
-        username=menu.username, execution_id=execution_id, qids=qids, calib_dir=calib_dir
-    )
-    task_result = build_workflow(
-        task_names=task_names,
-        qubits=qids,
-        task_details=menu.task_details,
-    )
-    task_manager.task_result = task_result
+    """Execute calibration tasks sequentially for a list of qubits.
 
-    logger.info(f"workflow: {task_manager.task_result}")
+    This flow initializes the calibration environment and executes tasks one by one
+    for each qubit in the provided list.
 
-    task_manager.save()
-    if task_manager.has_only_qubit_or_global_tasks(task_names=task_names):
-        logger.info("Only qubit or global tasks are present")
-        labels = [qid_to_label(q) for q in qids]
-    elif task_manager.has_only_coupling_or_global_tasks(task_names=task_names):
-        logger.info("Only coupling or global tasks are present")
-        labels = coupling_qids_to_qubit_labels(qids=qids)
-    elif task_manager.has_only_system_tasks(task_names=task_names):
-        logger.info("Only system tasks are present")
-        labels = []
-        qids = ["system"]
-    else:
-        logger.info(f"task names:{task_names}")
-        logger.error("this task is not supported")
-        raise ValueError("Invalid task names")  # noqa: EM101
-    # パラメータと設定の更新
-    parameters = update_active_output_parameters(username=menu.username)
-    ParameterDocument.insert_parameters(parameters)
-    tasks = update_active_tasks(username=menu.username)
-    logger.info(f"updating tasks: {tasks}")
-    TaskDocument.insert_tasks(tasks)
+    Args:
+    ----
+        menu: Menu configuration containing task details
+        calib_dir: Directory for calibration data
+        successMap: Dictionary tracking task execution success status
+        execution_id: Unique identifier for this execution
+        qubits: List of qubit IDs to calibrate
+        task_names: List of task names to execute
 
-    # ExecutionManagerの初期化と更新
+    Returns:
+    -------
+        Dictionary mapping task names to their execution success status
 
-    ExecutionManager(
-        username=menu.username,
+    """
+    task_manager, exp = setup_calibration(
+        menu=menu,
+        calib_dir=calib_dir,
         execution_id=execution_id,
-        calib_data_path=calib_dir,
-    ).reload().update_with_task_manager(task_manager).update_execution_status_to_running()
-
-    # キャリブレーションノートの初期化とファイル出力
-    note_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
-    note_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # チップの最新のマスターノートを取得
-    master_doc = (
-        CalibrationNoteDocument.find({"task_id": "master"})
-        .sort([("timestamp", -1)])  # 更新時刻で降順ソート
-        .limit(1)
-        .run()
+        qubits=qubits,
+        task_names=task_names,
     )
 
-    if not master_doc:
-        # マスターノートが存在しない場合は新規作成
-        master_doc = CalibrationNoteDocument.upsert_note(
-            username=menu.username,
-            execution_id=execution_id,
-            task_id="master",
-            note={},  # 空のノートで初期化
-        )
-    else:
-        master_doc = master_doc[0]  # 最新のドキュメントを取得
-
-    # JSONファイルとして出力
-    note_path.write_text(json.dumps(master_doc.note, indent=2))
-
-    initialize()
-    # 実験の初期化
-    exp = Experiment(
-        chip_id="64Q",
-        qubits=labels,
-        config_dir="/app/config",
-        params_dir="/app/config",
-        calib_note_path=note_path,
-    )
-    exp.note.clear()
-    for qid in qids:
+    for qid in qubits:
         task_manager = cal_serial(
-            menu=menu, exp=exp, task_manager=task_manager, task_names=task_names, qid=qid
+            menu=menu,
+            exp=exp,
+            task_manager=task_manager,
+            task_names=task_names,
+            qid=qid,
         )
     return successMap
 
 
-@flow(
-    flow_run_name="{qubits}",
-)
+@flow(flow_run_name="{qubits}")
 def batch_cal_flow(
     menu: Menu,
     calib_dir: str,
@@ -256,97 +374,44 @@ def batch_cal_flow(
     qubits: list[str],
     task_names: list[str],
 ) -> dict[str, bool]:
-    """Deployment to run calibration flow for a single qubit or a pair of qubits."""
-    qids = qubits
-    logger = get_run_logger()
-    logger.info(f"Menu name: {menu.name}")
-    logger.info(f"Qubex version: {get_package_version('qubex')}")
-    task_names = validate_task_name(task_names=task_names, username=menu.username)
-    task_manager = TaskManager(
-        username=menu.username, execution_id=execution_id, qids=qids, calib_dir=calib_dir
-    )
-    task_result = build_workflow(
-        task_names=task_names,
-        qubits=qids,
-        task_details=menu.task_details,
-    )
-    task_manager.task_result = task_result
+    """Execute calibration tasks in batch mode for a list of qubits.
 
-    logger.info(f"workflow: {task_manager.task_result}")
+    This flow initializes the calibration environment and executes tasks in batch mode
+    for all qubits simultaneously.
 
-    task_manager.save()
-    if task_manager.has_only_qubit_or_global_tasks(task_names=task_names):
-        logger.info("Only qubit or global tasks are present")
-        labels = [qid_to_label(q) for q in qids]
-    elif task_manager.has_only_coupling_or_global_tasks(task_names=task_names):
-        logger.info("Only coupling or global tasks are present")
-        labels = coupling_qids_to_qubit_labels(qids=qids)
-    elif task_manager.has_only_system_tasks(task_names=task_names):
-        logger.info("Only system tasks are present")
-        labels = []
-        qids = ["system"]
-    else:
-        logger.info(f"task names:{task_names}")
-        logger.error("this task is not supported")
-        raise ValueError("Invalid task names")  # noqa: EM101
-    # パラメータと設定の更新
-    parameters = update_active_output_parameters(username=menu.username)
-    ParameterDocument.insert_parameters(parameters)
-    tasks = update_active_tasks(username=menu.username)
-    logger.info(f"updating tasks: {tasks}")
-    TaskDocument.insert_tasks(tasks)
+    Args:
+    ----
+        menu: Menu configuration containing task details
+        calib_dir: Directory for calibration data
+        successMap: Dictionary tracking task execution success status
+        execution_id: Unique identifier for this execution
+        qubits: List of qubit IDs to calibrate
+        task_names: List of task names to execute
 
-    # ExecutionManagerの初期化と更新
+    Returns:
+    -------
+        Dictionary mapping task names to their execution success status
 
-    ExecutionManager(
-        username=menu.username,
+    """
+    task_manager, exp = setup_calibration(
+        menu=menu,
+        calib_dir=calib_dir,
         execution_id=execution_id,
-        calib_data_path=calib_dir,
-    ).reload().update_with_task_manager(task_manager).update_execution_status_to_running()
-
-    # キャリブレーションノートの初期化とファイル出力
-    note_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
-    note_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # チップの最新のマスターノートを取得
-    master_doc = (
-        CalibrationNoteDocument.find({"task_id": "master"})
-        .sort([("timestamp", -1)])  # 更新時刻で降順ソート
-        .limit(1)
-        .run()
+        qubits=qubits,
+        task_names=task_names,
     )
 
-    if not master_doc:
-        # マスターノートが存在しない場合は新規作成
-        master_doc = CalibrationNoteDocument.upsert_note(
-            username=menu.username,
-            execution_id=execution_id,
-            task_id="master",
-            note={},  # 空のノートで初期化
-        )
-    else:
-        master_doc = master_doc[0]  # 最新のドキュメントを取得
-
-    # JSONファイルとして出力
-    note_path.write_text(json.dumps(master_doc.note, indent=2))
-
-    initialize()
-    # 実験の初期化
-    exp = Experiment(
-        chip_id="64Q",
-        qubits=labels,
-        config_dir="/app/config",
-        params_dir="/app/config",
-        calib_note_path=note_path,
-    )
-    exp.note.clear()
     task_manager = cal_batch(
-        menu=menu, exp=exp, task_manager=task_manager, task_names=task_names, qids=qids
+        menu=menu,
+        exp=exp,
+        task_manager=task_manager,
+        task_names=task_names,
+        qids=qubits,
     )
     return successMap
 
 
-async def trigger_cal_flow(
+async def dispatch_calibration(
     menu: Menu,
     calib_dir: str,
     successMap: dict[str, bool],
@@ -354,7 +419,25 @@ async def trigger_cal_flow(
     schedule: ScheduleNode,
     task_names: list[str],
 ) -> None:
-    """Trigger calibration flow for all qubits."""
+    """Dispatch calibration flows based on the schedule configuration.
+
+    This function handles the orchestration of calibration flows according to the
+    provided schedule, supporting both serial and parallel execution patterns.
+
+    Args:
+    ----
+        menu: Menu configuration containing task details
+        calib_dir: Directory for calibration data
+        successMap: Dictionary tracking task execution success status
+        execution_id: Unique identifier for this execution
+        schedule: Node defining the execution schedule (Serial/Parallel/Batch)
+        task_names: List of task names to execute
+
+    Raises:
+    ------
+        TypeError: If the schedule type is not supported
+
+    """
     deployments = []
     if isinstance(schedule, SerialNode):
         for schedule_node in schedule.serial:
@@ -421,16 +504,34 @@ async def qubex_one_qubit_cal_flow(
     execution_id: str,
     task_names: list[str],
 ) -> dict[str, bool]:
-    """Flow to calibrate one qubit or a pair of qubits."""
+    """Execute one-qubit calibration tasks based on the provided menu.
+
+    This flow orchestrates the execution of calibration tasks according to the
+    provided menu's schedule configuration. It supports various execution patterns
+    including serial, parallel, and batch processing.
+
+    Args:
+    ----
+        menu: Menu configuration containing task details and schedule
+        calib_dir: Directory for calibration data
+        successMap: Dictionary tracking task execution success status
+        execution_id: Unique identifier for this execution
+        task_names: List of task names to execute
+
+    Returns:
+    -------
+        Dictionary mapping task names to their execution success status
+
+    """
     logger = get_run_logger()
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
     schedule = menu.schedule
     logger.info(f"schedule: {schedule}")
-    logger.info(f"seirial type:{isinstance(schedule,SerialNode)}")
+    logger.info(f"serial type:{isinstance(schedule,SerialNode)}")
     logger.info(f"parallel type:{isinstance(schedule,ParallelNode)}")
     logger.info(f"batch type:{isinstance(schedule,BatchNode)}")
-    await trigger_cal_flow(
+    await dispatch_calibration(
         menu, calib_dir, successMap, execution_id, schedule=schedule, task_names=task_names
     )
     return successMap
