@@ -21,9 +21,11 @@ class MenuDocument(Document):
     name: str
     username: str
     description: str
-    qids: list[list[str]]
+    schedule: dict[str, Any] | None = Field(
+        default=None,
+        description="The schedule of the menu. It can be a serial, parallel or batch node.",
+    )
     notify_bool: bool = False
-    batch_mode: bool = False
     tasks: list[str] | None = Field(default=None, exclude=True)
     tags: list[str] | None = Field(default=None)
     task_details: dict[str, Any] | None = Field(default=None)

@@ -5,6 +5,7 @@ from pathlib import Path
 from prefect import flow, get_run_logger
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
+from qdash.datamodel.menu import BatchNode, ParallelNode, ScheduleNode, SerialNode
 from qdash.datamodel.menu import MenuModel as Menu
 from qdash.datamodel.task import (
     CouplingTaskModel,
@@ -77,7 +78,7 @@ def build_workflow(task_names: list[str], qubits: list[str], task_details: dict)
 
 
 @flow(flow_run_name="{qid}")
-def cal_sequence(
+def cal_serial(
     menu: Menu,
     exp: Experiment,
     task_manager: TaskManager,
@@ -113,7 +114,7 @@ def cal_sequence(
 
 
 @flow(flow_run_name="{qids}")
-def cal_sequence_batch(
+def cal_batch(
     menu: Menu,
     exp: Experiment,
     task_manager: TaskManager,
@@ -145,7 +146,7 @@ def cal_sequence_batch(
 @flow(
     flow_run_name="{qubits}",
 )
-def cal_flow(
+def serial_cal_flow(
     menu: Menu,
     calib_dir: str,
     successMap: dict[str, bool],
@@ -238,30 +239,29 @@ def cal_flow(
     )
     exp.note.clear()
     for qid in qids:
-        task_manager = cal_sequence(
+        task_manager = cal_serial(
             menu=menu, exp=exp, task_manager=task_manager, task_names=task_names, qid=qid
         )
     return successMap
 
 
 @flow(
-    flow_run_name="{batch_qubits}",
+    flow_run_name="{qubits}",
 )
 def batch_cal_flow(
     menu: Menu,
     calib_dir: str,
     successMap: dict[str, bool],
     execution_id: str,
-    batch_qubits: list[list[str]],
+    qubits: list[str],
     task_names: list[str],
 ) -> dict[str, bool]:
     """Deployment to run calibration flow for a single qubit or a pair of qubits."""
-    qids: list[str]
-    qids = [q for sublist in batch_qubits for q in sublist]
+    qids = qubits
     logger = get_run_logger()
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
-    task_names = validate_task_name(menu.tasks, username=menu.username)
+    task_names = validate_task_name(task_names=task_names, username=menu.username)
     task_manager = TaskManager(
         username=menu.username, execution_id=execution_id, qids=qids, calib_dir=calib_dir
     )
@@ -271,6 +271,8 @@ def batch_cal_flow(
         task_details=menu.task_details,
     )
     task_manager.task_result = task_result
+
+    logger.info(f"workflow: {task_manager.task_result}")
 
     task_manager.save()
     if task_manager.has_only_qubit_or_global_tasks(task_names=task_names):
@@ -338,11 +340,9 @@ def batch_cal_flow(
         calib_note_path=note_path,
     )
     exp.note.clear()
-    logger.info("batch_mode is True")
-    for qubits in batch_qubits:
-        task_manager = cal_sequence_batch(
-            menu=menu, exp=exp, task_manager=task_manager, task_names=task_names, qids=qubits
-        )
+    task_manager = cal_batch(
+        menu=menu, exp=exp, task_manager=task_manager, task_names=task_names, qids=qids
+    )
     return successMap
 
 
@@ -351,34 +351,59 @@ async def trigger_cal_flow(
     calib_dir: str,
     successMap: dict[str, bool],
     execution_id: str,
-    qubits: list[list[str]],
+    schedule: ScheduleNode,
     task_names: list[str],
 ) -> None:
     """Trigger calibration flow for all qubits."""
     deployments = []
-    if menu.batch_mode:
-        parameters = {
-            "menu": menu.model_dump(),
-            "calib_dir": calib_dir,
-            "successMap": successMap,
-            "execution_id": execution_id,
-            "batch_qubits": qubits,
-            "task_names": task_names,
-        }
-        deployments.append(
-            run_deployment("batch-cal-flow/oqtopus-batch-cal-flow", parameters=parameters)
-        )
+    if isinstance(schedule, SerialNode):
+        for schedule_node in schedule.serial:
+            if isinstance(schedule_node, SerialNode):
+                serial_cal_flow(
+                    menu=menu,
+                    calib_dir=calib_dir,
+                    successMap=successMap,
+                    execution_id=execution_id,
+                    qubits=schedule_node.serial,
+                    task_names=task_names,
+                )
+            if isinstance(schedule_node, BatchNode):
+                batch_cal_flow(
+                    menu=menu,
+                    calib_dir=calib_dir,
+                    successMap=successMap,
+                    execution_id=execution_id,
+                    qubits=schedule_node.batch,
+                    task_names=task_names,
+                )
+    elif isinstance(schedule, ParallelNode):
+        for schedule_node in schedule.parallel:
+            if isinstance(schedule_node, SerialNode):
+                parameters = {
+                    "menu": menu.model_dump(),
+                    "calib_dir": calib_dir,
+                    "successMap": successMap,
+                    "execution_id": execution_id,
+                    "qubits": schedule_node.serial,
+                    "task_names": task_names,
+                }
+                deployments.append(
+                    run_deployment("serial-cal-flow/oqtopus-serial-cal-flow", parameters=parameters)
+                )
+            if isinstance(schedule_node, BatchNode):
+                parameters = {
+                    "menu": menu.model_dump(),
+                    "calib_dir": calib_dir,
+                    "successMap": successMap,
+                    "execution_id": execution_id,
+                    "qubits": schedule_node.batch,
+                    "task_names": task_names,
+                }
+                deployments.append(
+                    run_deployment("batch-cal-flow/oqtopus-batch-cal-flow", parameters=parameters)
+                )
     else:
-        for qubit in qubits:
-            parameters = {
-                "menu": menu.model_dump(),
-                "calib_dir": calib_dir,
-                "successMap": successMap,
-                "execution_id": execution_id,
-                "qubits": qubit,
-                "task_names": task_names,
-            }
-            deployments.append(run_deployment("cal-flow/oqtopus-cal-flow", parameters=parameters))
+        raise TypeError(f"Invalid schedule type: {type(schedule)}")
 
     await asyncio.gather(*deployments)
 
@@ -400,8 +425,85 @@ async def qubex_one_qubit_cal_flow(
     logger = get_run_logger()
     logger.info(f"Menu name: {menu.name}")
     logger.info(f"Qubex version: {get_package_version('qubex')}")
-    plan = menu.qids
-    logger.info(f"batch_mode: {menu.batch_mode}")
-    logger.info(f"type:{type(menu.batch_mode)}")
-    await trigger_cal_flow(menu, calib_dir, successMap, execution_id, plan, task_names=task_names)
+    schedule = menu.schedule
+    logger.info(f"schedule: {schedule}")
+    logger.info(f"seirial type:{isinstance(schedule,SerialNode)}")
+    logger.info(f"parallel type:{isinstance(schedule,ParallelNode)}")
+    logger.info(f"batch type:{isinstance(schedule,BatchNode)}")
+    await trigger_cal_flow(
+        menu, calib_dir, successMap, execution_id, schedule=schedule, task_names=task_names
+    )
     return successMap
+
+
+# ----------------------------------------
+# 1. Parallel of Serials
+# Run [0 → 1] and [4 → 5] in sequence, both in parallel (unsynchronized)
+# → 0→1 and 4→5 are run in serial blocks, and those blocks are run concurrently
+# ----------------------------------------
+# {
+#   "parallel": [
+#     { "serial": [0, 1] },
+#     { "serial": [4, 5] }
+#   ]
+# }
+
+# ----------------------------------------
+# 2. Parallel of Batches
+# Run [0, 1] and [4, 5] as separate batch jobs, both in parallel (unsynchronized)
+# → Two batch jobs executed concurrently
+# ----------------------------------------
+# {
+#   "parallel": [
+#     { "batch": [0, 1] },
+#     { "batch": [4, 5] }
+#   ]
+# }
+
+# ----------------------------------------
+# 3. Parallel of Serial and Batch
+# Run [0 → 1] in sequence and [4, 5] as a batch, both in parallel (unsynchronized)
+# → Heterogeneous blocks (serial and batch) run concurrently
+# ----------------------------------------
+# {
+#   "parallel": [
+#     { "serial": [0, 1] },
+#     { "batch": [4, 5] }
+#   ]
+# }
+
+# ----------------------------------------
+# 4. Serial of Serials
+# First run [0 → 1] in sequence, then run [4 → 5] in sequence
+# → Sequential execution of two serial blocks
+# ----------------------------------------
+# {
+#   "serial": [
+#     { "serial": [0, 1] },
+#     { "serial": [4, 5] }
+#   ]
+# }
+
+# ----------------------------------------
+# 5. Serial of Batches
+# First run [0, 1] as a batch, then run [4, 5] as a batch
+# → Sequential execution of two batch jobs
+# ----------------------------------------
+# {
+#   "serial": [
+#     { "batch": [0, 1] },
+#     { "batch": [4, 5] }
+#   ]
+# }
+
+# ----------------------------------------
+# 6. Serial of Serial and Batch
+# First run [0 → 1] in sequence, then run [4, 5] as a batch
+# → Run a serial block followed by a batch block
+# ----------------------------------------
+# {
+#   "serial": [
+#     { "serial": [0, 1] },
+#     { "batch": [4, 5] }
+#   ]
+# }

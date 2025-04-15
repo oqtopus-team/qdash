@@ -127,7 +127,6 @@ def main_flow(
                 "qubex_version": get_package_version("qubex"),
                 "ui_url": ui_url,
                 "config_commit_id": commit_id,
-                "batch_mode": menu.batch_mode,
             },
         )
         .save()

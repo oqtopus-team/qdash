@@ -105,8 +105,7 @@ def list_menu(current_user: Annotated[User, Depends(get_current_active_user)]) -
             name=menu.name,
             username=menu.username,
             description=menu.description,
-            qids=menu.qids,
-            batch_mode=menu.batch_mode,
+            schedule=menu.schedule,
             tasks=menu.tasks,
             notify_bool=menu.notify_bool,
             tags=menu.tags,
@@ -155,9 +154,8 @@ def create_menu(
         name=request.name,
         username=current_user.username,
         description=request.description,
-        qids=request.qids,
         tasks=request.tasks,
-        batch_mode=request.batch_mode,
+        schedule=request.schedule,
         notify_bool=request.notify_bool,
         tags=request.tags,
         task_details=task_details,
@@ -174,7 +172,7 @@ check_one_qubit_preset = MenuModel(
     name="CheckOneQubitShort",
     username="",
     description="check one qubit characteristics short",
-    qids=[["28", "29", "30", "31"]],
+    schedule={"parallel": [{"serial": ["28", "29"]}]},
     notify_bool=False,
     tasks=[
         "CheckStatus",
@@ -188,7 +186,6 @@ check_one_qubit_preset = MenuModel(
         "CheckT1",
         "CheckT2Echo",
     ],
-    batch_mode=False,
     tags=["debug"],
     task_details={},
 )
@@ -197,7 +194,7 @@ one_qubit_coarse_preset = MenuModel(
     name="OneQubitCoarse",
     username="",
     description="check one qubit characteristics coarse",
-    qids=[["28", "29", "30", "31"]],
+    schedule={"parallel": [{"serial": ["28", "29"]}]},
     notify_bool=False,
     tasks=[
         "DumpBox",
@@ -213,7 +210,6 @@ one_qubit_coarse_preset = MenuModel(
         "CheckT1",
         "CheckT2Echo",
     ],
-    batch_mode=False,
     tags=["debug"],
     task_details={},
 )
@@ -222,7 +218,6 @@ one_qubit_fine_preset = MenuModel(
     name="OneQubitFine",
     username="",
     description="check one qubit characteristics fine",
-    qids=[["28", "29", "30", "31"]],
     notify_bool=False,
     tasks=[
         "CheckEffectiveQubitFrequency",
@@ -235,7 +230,7 @@ one_qubit_fine_preset = MenuModel(
         "X90InterleavedRandomizedBenchmarking",
         "X180InterleavedRandomizedBenchmarking",
     ],
-    batch_mode=False,
+    schedule={"parallel": [{"serial": ["28", "29"]}]},
     tags=["debug"],
     task_details={},
 )
@@ -317,10 +312,9 @@ def get_menu_by_name(
         name=menu.name,
         username=menu.username,
         description=menu.description,
-        qids=menu.qids,
+        schedule=menu.schedule,
         tasks=menu.tasks,
         notify_bool=menu.notify_bool,
-        batch_mode=menu.batch_mode,
         tags=menu.tags,
         task_details=menu.task_details,
     )
@@ -355,10 +349,9 @@ def update_menu(
     if existing_menu:
         existing_menu.name = req.name
         existing_menu.description = req.description
-        existing_menu.qids = req.qids
+        existing_menu.schedule = req.schedule
         existing_menu.tasks = req.tasks
         existing_menu.notify_bool = req.notify_bool
-        existing_menu.batch_mode = req.batch_mode
         existing_menu.tags = req.tags
         existing_menu.task_details = req.task_details
         existing_menu.save()

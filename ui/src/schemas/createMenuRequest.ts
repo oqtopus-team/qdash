@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { CreateMenuRequestSchedule } from "./createMenuRequestSchedule";
 import type { CreateMenuRequestTasks } from "./createMenuRequestTasks";
 import type { CreateMenuRequestTaskDetails } from "./createMenuRequestTaskDetails";
 import type { CreateMenuRequestTags } from "./createMenuRequestTags";
@@ -16,9 +17,8 @@ export interface CreateMenuRequest {
   name: string;
   username: string;
   description: string;
-  qids: string[][];
+  schedule: CreateMenuRequestSchedule;
   notify_bool?: boolean;
-  batch_mode?: boolean;
   tasks?: CreateMenuRequestTasks;
   task_details?: CreateMenuRequestTaskDetails;
   tags?: CreateMenuRequestTags;

@@ -11,7 +11,7 @@ def init_menu(username: str) -> None:
         name="OneQubitCheck",
         username=username,
         description="description",
-        qids=[["28", "29", "30", "31"]],
+        schedule={"parallel": [{"serial": ["28", "29"]}]},
         tasks=["CheckStatus", "DumpBox", "CheckNoise", "CheckRabi"],
         task_details={
             "CheckStatus": {

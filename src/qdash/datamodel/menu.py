@@ -5,6 +5,32 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class SerialNode(BaseModel):
+    """Serial node model."""
+
+    serial: list[ScheduleNode | str]
+
+
+class ParallelNode(BaseModel):
+    """Parallel node model."""
+
+    parallel: list[ScheduleNode]
+
+
+class BatchNode(BaseModel):
+    """Batch node model."""
+
+    batch: list[str]
+
+
+ScheduleNode = SerialNode | ParallelNode | BatchNode
+
+
+SerialNode.model_rebuild()
+ParallelNode.model_rebuild()
+BatchNode.model_rebuild()
+
+
 class MenuModel(BaseModel):
     """Menu model.
 
@@ -23,9 +49,8 @@ class MenuModel(BaseModel):
     name: str
     username: str
     description: str
-    qids: list[list[str]]
+    schedule: ScheduleNode
     notify_bool: bool = False
-    batch_mode: bool = False
     tasks: list[str] | None = Field(default=None)
     task_details: dict[str, Any] | None = Field(default=None)
     tags: list[str] | None = Field(default=None)

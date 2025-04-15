@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { MenuModelSchedule } from "./menuModelSchedule";
 import type { MenuModelTasks } from "./menuModelTasks";
 import type { MenuModelTaskDetails } from "./menuModelTaskDetails";
 import type { MenuModelTags } from "./menuModelTags";
@@ -26,9 +27,8 @@ export interface MenuModel {
   name: string;
   username: string;
   description: string;
-  qids: string[][];
+  schedule: MenuModelSchedule;
   notify_bool?: boolean;
-  batch_mode?: boolean;
   tasks?: MenuModelTasks;
   task_details?: MenuModelTaskDetails;
   tags?: MenuModelTags;

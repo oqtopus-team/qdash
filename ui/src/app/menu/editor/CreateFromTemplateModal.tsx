@@ -2,15 +2,18 @@
 
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { BsPlus, BsTrash } from "react-icons/bs";
+import { BsPlus } from "react-icons/bs";
 import { useCreateMenu, useListPreset } from "@/client/menu/menu";
 import type { CreateMenuRequest } from "@/schemas";
+import type { CreateMenuRequestSchedule } from "@/schemas/createMenuRequestSchedule";
 
 const defaultFormData: CreateMenuRequest = {
   name: "",
   username: "",
   description: "",
-  qids: [[""]],
+  schedule: {
+    serial: [""],
+  } as CreateMenuRequestSchedule,
   notify_bool: false,
   tasks: [],
   tags: [],
@@ -29,49 +32,19 @@ export function CreateFromTemplateModal({
 
   const handleInputChange = (
     field: keyof CreateMenuRequest,
-    value: string | boolean | string[][] | string[],
+    value: string | boolean | string[] | CreateMenuRequestSchedule
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleQidsChange = (
-    groupIndex: number,
-    qubitIndex: number,
-    value: string,
-  ) => {
-    const newQids = [...formData.qids];
-    if (!newQids[groupIndex]) {
-      newQids[groupIndex] = [];
-    }
-    newQids[groupIndex][qubitIndex] = value;
-    handleInputChange("qids", newQids);
-  };
-
-  const addQubitGroup = () => {
-    handleInputChange("qids", [...formData.qids, [""]]);
-  };
-
-  const removeQubitGroup = (index: number) => {
-    const newQids = formData.qids.filter((_, i) => i !== index);
-    handleInputChange("qids", newQids);
-  };
-
-  const addQubitToGroup = (groupIndex: number) => {
-    const newQids = [...formData.qids];
-    newQids[groupIndex] = [...newQids[groupIndex], ""];
-    handleInputChange("qids", newQids);
-  };
-
-  const removeQubitFromGroup = (groupIndex: number, qubitIndex: number) => {
-    const newQids = [...formData.qids];
-    newQids[groupIndex] = newQids[groupIndex].filter(
-      (_, i) => i !== qubitIndex,
-    );
-    if (newQids[groupIndex].length === 0) {
-      removeQubitGroup(groupIndex);
-    } else {
-      handleInputChange("qids", newQids);
-    }
+  const handleScheduleChange = (value: string) => {
+    const tasks = value
+      .split(",")
+      .map((task) => task.trim())
+      .filter((task) => task !== "");
+    handleInputChange("schedule", {
+      serial: tasks,
+    } as CreateMenuRequestSchedule);
   };
 
   const handleTagsChange = (value: string) => {
@@ -103,7 +76,7 @@ export function CreateFromTemplateModal({
           console.error("Error creating template item:", error);
           toast.error("Error creating template item");
         },
-      },
+      }
     );
   };
 
@@ -141,7 +114,7 @@ export function CreateFromTemplateModal({
                   return;
                 }
                 const selectedPreset = presetData?.data.menus.find(
-                  (menu) => menu.name === e.target.value,
+                  (menu) => menu.name === e.target.value
                 );
                 if (selectedPreset) {
                   setFormData(selectedPreset);
@@ -205,77 +178,29 @@ export function CreateFromTemplateModal({
               </div>
             </div>
 
-            {/* Qubit Groups */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="label-text font-medium">Qubit Groups</label>
-                <button
-                  type="button"
-                  onClick={addQubitGroup}
-                  className="btn btn-sm btn-primary"
-                >
-                  Add Group
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {formData.qids.map((group, groupIndex) => (
-                  <div key={groupIndex} className="card bg-base-200 p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium">
-                        Group {groupIndex + 1}
-                      </span>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => addQubitToGroup(groupIndex)}
-                          className="btn btn-sm btn-ghost"
-                        >
-                          Add Qubit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeQubitGroup(groupIndex)}
-                          className="btn btn-sm btn-ghost text-error"
-                        >
-                          <BsTrash />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {group.map((qubit, qubitIndex) => (
-                        <div
-                          key={qubitIndex}
-                          className="flex items-center gap-2"
-                        >
-                          <input
-                            type="text"
-                            className="input input-bordered input-sm"
-                            value={qubit}
-                            onChange={(e) =>
-                              handleQidsChange(
-                                groupIndex,
-                                qubitIndex,
-                                e.target.value,
-                              )
-                            }
-                            placeholder={`Q${qubitIndex + 1}`}
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeQubitFromGroup(groupIndex, qubitIndex)
-                            }
-                            className="btn btn-sm btn-ghost text-error"
-                          >
-                            <BsTrash />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {/* Schedule */}
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">
+                  Schedule (comma-separated tasks)
+                </span>
+              </label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                value={
+                  "serial" in formData.schedule
+                    ? formData.schedule.serial.join(", ")
+                    : ""
+                }
+                onChange={(e) => handleScheduleChange(e.target.value)}
+                placeholder="task1, task2, task3"
+              />
+              <label className="label">
+                <span className="label-text-alt">
+                  Enter tasks to be executed in serial order
+                </span>
+              </label>
             </div>
 
             {/* Tasks */}

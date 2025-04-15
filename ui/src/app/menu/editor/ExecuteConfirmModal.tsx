@@ -5,6 +5,7 @@ import { BsPlus, BsLock } from "react-icons/bs";
 import { toast } from "react-toastify";
 import { GetMenuResponse } from "@/schemas";
 import { useExecuteCalib } from "@/client/calibration/calibration";
+import { ScheduleDisplay } from "@/app/calibration/components/CalibrationCronScheduleTable/ScheduleDisplay";
 import { useFetchExecutionLockStatus } from "@/client/execution/execution";
 import { useAuth } from "@/app/contexts/AuthContext";
 
@@ -31,7 +32,7 @@ export function ExecuteConfirmModal({
   const handleConfirmClick = () => {
     if (isLocked) {
       toast.error(
-        "実行がロックされています。他のキャリブレーションが完了するまでお待ちください。",
+        "実行がロックされています。他のキャリブレーションが完了するまでお待ちください。"
       );
       return;
     }
@@ -42,12 +43,11 @@ export function ExecuteConfirmModal({
           name: menu.name,
           username: user?.username ?? "default-user",
           description: menu.description,
-          qids: menu.qids,
+          schedule: menu.schedule,
           notify_bool: menu.notify_bool,
           tasks: menu.tasks,
           tags: menu.tags,
           task_details: menu.task_details,
-          batch_mode: menu.batch_mode,
         },
       },
       {
@@ -64,7 +64,7 @@ export function ExecuteConfirmModal({
               >
                 View Details →
               </a>
-            </div>,
+            </div>
           );
           onClose();
         },
@@ -72,7 +72,7 @@ export function ExecuteConfirmModal({
           console.error("Error executing calibration:", error);
           toast.error("Error executing calibration");
         },
-      },
+      }
     );
   };
 
@@ -113,13 +113,9 @@ export function ExecuteConfirmModal({
             </div>
 
             <div>
-              <h3 className="font-medium mb-2">Qubit IDs</h3>
+              <h3 className="font-medium mb-2">Schedule</h3>
               <div className="space-y-1">
-                {menu.qids.map((qidGroup, index) => (
-                  <p key={index} className="text-base-content/80">
-                    Group {index + 1}: {qidGroup.join(", ")}
-                  </p>
-                ))}
+                <ScheduleDisplay schedule={menu.schedule} />
               </div>
             </div>
 
