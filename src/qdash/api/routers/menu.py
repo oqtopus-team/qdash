@@ -140,15 +140,22 @@ def create_menu(
     task_details = {}
     for task_name in request.tasks:
         task_doc = TaskDocument.find_one({"name": task_name}).run()
-        task = TaskModel(
-            name=task_doc.name,
-            username=task_doc.username,
-            description=task_doc.description,
-            task_type=task_doc.task_type,
-            input_parameters=task_doc.input_parameters,
-            output_parameters=task_doc.output_parameters,
-        )
-        task_details[task_name] = task
+        if task_doc is None:
+            logger.error(f"Task not found: {task_name}")
+            raise InternalSeverError(detail=f"Task not found: {task_name}")
+        try:
+            task = TaskModel(
+                name=task_doc.name,
+                username=task_doc.username,
+                description=task_doc.description,
+                task_type=task_doc.task_type,
+                input_parameters=task_doc.input_parameters,
+                output_parameters=task_doc.output_parameters,
+            )
+            task_details[task_name] = task
+        except Exception as e:
+            logger.error(f"Failed to create task model for {task_name}: {e}")
+            raise InternalSeverError(detail=f"Failed to create task model for {task_name}: {e!s}")
 
     menu_doc = MenuDocument(
         name=request.name,

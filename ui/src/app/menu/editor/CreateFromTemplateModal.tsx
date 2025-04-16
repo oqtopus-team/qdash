@@ -6,6 +6,7 @@ import { BsPlus } from "react-icons/bs";
 import { useCreateMenu, useListPreset } from "@/client/menu/menu";
 import type { CreateMenuRequest } from "@/schemas";
 import type { CreateMenuRequestSchedule } from "@/schemas/createMenuRequestSchedule";
+import { ScheduleInput } from "./ScheduleInput";
 
 const defaultFormData: CreateMenuRequest = {
   name: "",
@@ -37,14 +38,8 @@ export function CreateFromTemplateModal({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleScheduleChange = (value: string) => {
-    const tasks = value
-      .split(",")
-      .map((task) => task.trim())
-      .filter((task) => task !== "");
-    handleInputChange("schedule", {
-      serial: tasks,
-    } as CreateMenuRequestSchedule);
+  const handleScheduleChange = (schedule: CreateMenuRequestSchedule) => {
+    handleInputChange("schedule", schedule);
   };
 
   const handleTagsChange = (value: string) => {
@@ -72,9 +67,11 @@ export function CreateFromTemplateModal({
           onSuccess();
           onClose();
         },
-        onError: (error) => {
+        onError: (error: any) => {
           console.error("Error creating template item:", error);
-          toast.error("Error creating template item");
+          const errorMessage =
+            error.response?.data?.detail || "Error creating template item";
+          toast.error(errorMessage);
         },
       }
     );
@@ -179,29 +176,10 @@ export function CreateFromTemplateModal({
             </div>
 
             {/* Schedule */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">
-                  Schedule (comma-separated tasks)
-                </span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered w-full"
-                value={
-                  "serial" in formData.schedule
-                    ? formData.schedule.serial.join(", ")
-                    : ""
-                }
-                onChange={(e) => handleScheduleChange(e.target.value)}
-                placeholder="task1, task2, task3"
-              />
-              <label className="label">
-                <span className="label-text-alt">
-                  Enter tasks to be executed in serial order
-                </span>
-              </label>
-            </div>
+            <ScheduleInput
+              value={formData.schedule}
+              onChange={handleScheduleChange}
+            />
 
             {/* Tasks */}
             <div className="form-control">
