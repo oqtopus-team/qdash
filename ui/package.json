@@ -65,6 +65,7 @@
     "reaflow": "^5.3.4",
     "reagraph": "^4.21.2",
     "recharts": "^2.13.3",
+    "sharp": "^0.34.1",
     "simplebar-react": "^3.3.0",
     "theme-change": "^2.5.0",
     "vis-data": "^7.1.9",

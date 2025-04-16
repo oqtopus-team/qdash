@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BsPlus } from "react-icons/bs";
 import type { MenuModel } from "@/schemas";
+import { ScheduleDisplay } from "@/app/calibration/components/CalibrationCronScheduleTable/ScheduleDisplay";
 
 export function ExecuteConfirmModal({
   selectedItem,
@@ -49,13 +50,9 @@ export function ExecuteConfirmModal({
           </div>
 
           <div>
-            <h3 className="font-medium mb-2">Qubit IDs</h3>
+            <h3 className="font-medium mb-2">Schedule</h3>
             <div className="space-y-1">
-              {menu.qids.map((qidGroup, index) => (
-                <p key={index} className="text-base-content/80">
-                  Group {index + 1}: {qidGroup.join(", ")}
-                </p>
-              ))}
+              <ScheduleDisplay schedule={menu.schedule} />
             </div>
           </div>
 

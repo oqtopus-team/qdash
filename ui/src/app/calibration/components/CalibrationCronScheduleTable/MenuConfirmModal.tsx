@@ -2,6 +2,7 @@
 
 import { BsPlus } from "react-icons/bs";
 import type { MenuModel } from "@/schemas";
+import { ScheduleDisplay } from "./ScheduleDisplay";
 
 interface MenuConfirmModalProps {
   menu: MenuModel;
@@ -44,13 +45,9 @@ export function MenuConfirmModal({
           </div>
 
           <div>
-            <h3 className="font-medium mb-2">Qubit IDs</h3>
+            <h3 className="font-medium mb-2">Schedule</h3>
             <div className="space-y-1">
-              {menu.qids.map((qidGroup, index) => (
-                <p key={index} className="text-base-content/80">
-                  Group {index + 1}: {qidGroup.join(", ")}
-                </p>
-              ))}
+              <ScheduleDisplay schedule={menu.schedule} />
             </div>
           </div>
 

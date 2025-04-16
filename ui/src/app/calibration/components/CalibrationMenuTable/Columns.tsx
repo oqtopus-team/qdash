@@ -4,6 +4,7 @@ import { createColumnHelper } from "@tanstack/react-table";
 import { FaTrash } from "react-icons/fa";
 import { FaRegCirclePlay } from "react-icons/fa6";
 import type { MenuModel } from "@/schemas";
+import { SchedulePreview } from "./SchedulePreview";
 
 const columnHelper = createColumnHelper<MenuModel>();
 
@@ -11,7 +12,7 @@ export const getColumns = (
   handleEditClick: (item: MenuModel) => void,
   handleDeleteClick: (item: MenuModel) => void,
   handleExecuteCalib: (item: MenuModel) => void,
-  isLocked: boolean,
+  isLocked: boolean
 ) => [
   columnHelper.accessor("name", {
     header: "Name",
@@ -29,16 +30,11 @@ export const getColumns = (
     header: "Description",
     cell: (info) => info.getValue(),
   }),
-  columnHelper.accessor("qids", {
-    header: "QIDs",
+  columnHelper.accessor("schedule", {
+    header: "Schedule",
     cell: (info) => (
       <div className="max-w-xs overflow-hidden">
-        <div className="text-sm text-base-content/70">
-          {info
-            .getValue()
-            .map((qids: string[]) => qids.join(", "))
-            .join(" | ")}
-        </div>
+        <SchedulePreview schedule={info.getValue()} />
       </div>
     ),
   }),

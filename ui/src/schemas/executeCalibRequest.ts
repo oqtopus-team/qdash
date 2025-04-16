@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ExecuteCalibRequestSchedule } from "./executeCalibRequestSchedule";
 import type { ExecuteCalibRequestTasks } from "./executeCalibRequestTasks";
 import type { ExecuteCalibRequestTaskDetails } from "./executeCalibRequestTaskDetails";
 import type { ExecuteCalibRequestTags } from "./executeCalibRequestTags";
@@ -16,9 +17,8 @@ export interface ExecuteCalibRequest {
   name: string;
   username: string;
   description: string;
-  qids: string[][];
+  schedule: ExecuteCalibRequestSchedule;
   notify_bool?: boolean;
-  batch_mode?: boolean;
   tasks?: ExecuteCalibRequestTasks;
   task_details?: ExecuteCalibRequestTaskDetails;
   tags?: ExecuteCalibRequestTags;

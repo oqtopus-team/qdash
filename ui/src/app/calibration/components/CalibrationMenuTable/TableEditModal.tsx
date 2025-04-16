@@ -14,10 +14,12 @@ import type { Menu } from "../../model";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { UpdateMenuRequest } from "@/schemas";
 
+import type { CreateMenuRequestSchedule } from "@/schemas/createMenuRequestSchedule";
+
 interface YamlData {
   name: string;
   description: string;
-  qids: string[][];
+  schedule: CreateMenuRequestSchedule;
   notify_bool: boolean;
   tasks?: string[];
   tags?: string[];
@@ -25,12 +27,11 @@ interface YamlData {
 
 // YAML 形式でデータを生成する関数
 function generateYamlWithCustomArrayFormat(data: Menu): string {
+  const scheduleYaml = yaml.dump({ schedule: data.schedule }, { indent: 2 });
   return `
 name: ${data.name}
 description: ${data.description}
-qids:
-${data.qids.map((seq) => `  - ${JSON.stringify(seq)}`).join("\n")}
-notify_bool: ${data.notify_bool}
+${scheduleYaml}notify_bool: ${data.notify_bool}
 ${
   data.tasks && data.tasks.length > 0
     ? `tasks:\n  - ${data.tasks.join("\n  - ")}`
@@ -56,7 +57,7 @@ export function TableEditModal({
   refetchMenu: () => Promise<UseQueryResult<any, any>>;
 }) {
   const [yamlText, setYamlText] = useState(
-    generateYamlWithCustomArrayFormat(selectedItem),
+    generateYamlWithCustomArrayFormat(selectedItem)
   );
   const [validationError, setValidationError] = useState("");
   const scheduleSettingChangedNotify = () => toast("schedule setting changed!");
@@ -87,7 +88,7 @@ export function TableEditModal({
         name: updatedItem.name,
         username: selectedItem.username, // Keep the original username
         description: updatedItem.description,
-        qids: updatedItem.qids,
+        schedule: updatedItem.schedule,
         notify_bool: updatedItem.notify_bool,
         tasks:
           updatedItem.tasks?.filter((item) => item !== null && item !== "") ??
@@ -101,7 +102,7 @@ export function TableEditModal({
         name: updatedItem.name,
         username: selectedItem.username, // Keep the original username
         description: updatedItem.description,
-        qids: updatedItem.qids,
+        schedule: updatedItem.schedule,
         notify_bool: updatedItem.notify_bool,
         tasks:
           updatedItem.tasks?.filter((item) => item !== null && item !== "") ??
@@ -120,7 +121,7 @@ export function TableEditModal({
             const updatedData = await refetchMenu();
             if (updatedData.data) {
               setTableData(
-                mapListMenuResponseToListMenu(updatedData.data.data),
+                mapListMenuResponseToListMenu(updatedData.data.data)
               );
               scheduleSettingChangedNotify();
             }
@@ -128,7 +129,7 @@ export function TableEditModal({
           onError: (error) => {
             console.error("Error updating menu:", error);
           },
-        },
+        }
       );
     } catch (error) {
       console.error("YAMLパースエラー:", error);

@@ -3,7 +3,7 @@ from prefect import serve
 
 from prefect.client.schemas.schedules import CronSchedule
 
-from qdash.workflow.calibration.flow import cal_flow
+from qdash.workflow.calibration.flow import serial_cal_flow
 from qdash.workflow.calibration.flow import batch_cal_flow
 from qdash.workflow.handler import main_flow
 
@@ -65,8 +65,8 @@ if __name__ == "__main__":
         is_schedule_active=False,
         parameters={"menu_name": "CheckRabi"},
     )
-    cal_flow_deploy = cal_flow.to_deployment(
-        name=f"{deployment_name}-cal-flow",
+    serial_cal_flow_deploy = serial_cal_flow.to_deployment(
+        name=f"{deployment_name}-serial-cal-flow",
         description="""This is a cal flow.
         """,
     )
@@ -81,7 +81,7 @@ if __name__ == "__main__":
         cron_scheduler_deploy_1,  # type: ignore
         cron_scheduler_deploy_2,  # type: ignore
         cron_scheduler_deploy_3,  # type: ignore
-        cal_flow_deploy,  # type: ignore
+        serial_cal_flow_deploy,  # type: ignore
         batch_cal_flow_deploy,  # type: ignore
         webserver=True,
         limit=50,
