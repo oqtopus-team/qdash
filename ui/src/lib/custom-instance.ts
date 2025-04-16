@@ -4,7 +4,7 @@ export const AXIOS_INSTANCE = Axios.create();
 
 export const customInstance = <T>(
   config: AxiosRequestConfig,
-  options?: AxiosRequestConfig,
+  options?: AxiosRequestConfig
 ): Promise<AxiosResponse<T>> => {
   const source = Axios.CancelToken.source();
   const promise = AXIOS_INSTANCE({

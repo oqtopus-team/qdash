@@ -1586,6 +1586,23 @@
   },
   "components": {
     "schemas": {
+      "BatchNode": {
+        "properties": {
+          "batch": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Batch"
+          }
+        },
+        "type": "object",
+        "required": [
+          "batch"
+        ],
+        "title": "BatchNode",
+        "description": "Batch node model."
+      },
       "Body_auth-login_for_access_token": {
         "properties": {
           "username": {
@@ -1736,24 +1753,23 @@
             "type": "string",
             "title": "Description"
           },
-          "qids": {
-            "items": {
-              "items": {
-                "type": "string"
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SerialNode"
               },
-              "type": "array"
-            },
-            "type": "array",
-            "title": "Qids"
+              {
+                "$ref": "#/components/schemas/ParallelNode"
+              },
+              {
+                "$ref": "#/components/schemas/BatchNode"
+              }
+            ],
+            "title": "Schedule"
           },
           "notify_bool": {
             "type": "boolean",
             "title": "Notify Bool",
-            "default": false
-          },
-          "batch_mode": {
-            "type": "boolean",
-            "title": "Batch Mode",
             "default": false
           },
           "tasks": {
@@ -1802,7 +1818,7 @@
           "name",
           "username",
           "description",
-          "qids"
+          "schedule"
         ],
         "title": "CreateMenuRequest",
         "description": "CreateMenuRequest is a Pydantic model for creating a menu item.",
@@ -1971,24 +1987,23 @@
             "type": "string",
             "title": "Description"
           },
-          "qids": {
-            "items": {
-              "items": {
-                "type": "string"
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SerialNode"
               },
-              "type": "array"
-            },
-            "type": "array",
-            "title": "Qids"
+              {
+                "$ref": "#/components/schemas/ParallelNode"
+              },
+              {
+                "$ref": "#/components/schemas/BatchNode"
+              }
+            ],
+            "title": "Schedule"
           },
           "notify_bool": {
             "type": "boolean",
             "title": "Notify Bool",
-            "default": false
-          },
-          "batch_mode": {
-            "type": "boolean",
-            "title": "Batch Mode",
             "default": false
           },
           "tasks": {
@@ -2037,7 +2052,7 @@
           "name",
           "username",
           "description",
-          "qids"
+          "schedule"
         ],
         "title": "ExecuteCalibRequest",
         "description": "ExecuteCalibRequest is a subclass of MenuModel.",
@@ -2251,24 +2266,23 @@
             "type": "string",
             "title": "Description"
           },
-          "qids": {
-            "items": {
-              "items": {
-                "type": "string"
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SerialNode"
               },
-              "type": "array"
-            },
-            "type": "array",
-            "title": "Qids"
+              {
+                "$ref": "#/components/schemas/ParallelNode"
+              },
+              {
+                "$ref": "#/components/schemas/BatchNode"
+              }
+            ],
+            "title": "Schedule"
           },
           "notify_bool": {
             "type": "boolean",
             "title": "Notify Bool",
-            "default": false
-          },
-          "batch_mode": {
-            "type": "boolean",
-            "title": "Batch Mode",
             "default": false
           },
           "tasks": {
@@ -2317,7 +2331,7 @@
           "name",
           "username",
           "description",
-          "qids"
+          "schedule"
         ],
         "title": "GetMenuResponse",
         "description": "GetMenuResponse is a Pydantic model for the get menu response."
@@ -2537,24 +2551,23 @@
             "type": "string",
             "title": "Description"
           },
-          "qids": {
-            "items": {
-              "items": {
-                "type": "string"
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SerialNode"
               },
-              "type": "array"
-            },
-            "type": "array",
-            "title": "Qids"
+              {
+                "$ref": "#/components/schemas/ParallelNode"
+              },
+              {
+                "$ref": "#/components/schemas/BatchNode"
+              }
+            ],
+            "title": "Schedule"
           },
           "notify_bool": {
             "type": "boolean",
             "title": "Notify Bool",
-            "default": false
-          },
-          "batch_mode": {
-            "type": "boolean",
-            "title": "Batch Mode",
             "default": false
           },
           "tasks": {
@@ -2603,7 +2616,7 @@
           "name",
           "username",
           "description",
-          "qids"
+          "schedule"
         ],
         "title": "MenuModel",
         "description": "Menu model.\n\nAttributes\n----------\n    name (str): The name of the menu.\n    username (str): The username of the user who created\n    description (str): Detailed description of the menu.\n    cal_plan (list[list[int]]): The calibration plan.\n    notify_bool (bool): The notification boolean.\n    tasks (list[str]): The tasks.\n    tags (list[str]): The tags."
@@ -2681,6 +2694,33 @@
         "type": "object",
         "title": "OutputParameterModel",
         "description": "Data model.\n\nAttributes\n----------\n    qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.\n    coupling (dict[str, dict[str, float | int]]): The calibration data for couplings."
+      },
+      "ParallelNode": {
+        "properties": {
+          "parallel": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SerialNode"
+                },
+                {
+                  "$ref": "#/components/schemas/ParallelNode"
+                },
+                {
+                  "$ref": "#/components/schemas/BatchNode"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Parallel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parallel"
+        ],
+        "title": "ParallelNode",
+        "description": "Parallel node model."
       },
       "ParameterModel": {
         "properties": {
@@ -2937,6 +2977,36 @@
         "title": "ScheduleCronCalibResponse",
         "description": "ScheduleCronCalibResponse is a subclass of BaseModel."
       },
+      "SerialNode": {
+        "properties": {
+          "serial": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SerialNode"
+                },
+                {
+                  "$ref": "#/components/schemas/ParallelNode"
+                },
+                {
+                  "$ref": "#/components/schemas/BatchNode"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Serial"
+          }
+        },
+        "type": "object",
+        "required": [
+          "serial"
+        ],
+        "title": "SerialNode",
+        "description": "Serial node model."
+      },
       "Settings": {
         "properties": {
           "env": {
@@ -2954,6 +3024,10 @@
           "slack_bot_token": {
             "type": "string",
             "title": "Slack Bot Token"
+          },
+          "slack_channel_id": {
+            "type": "string",
+            "title": "Slack Channel Id"
           },
           "postgres_data_path": {
             "type": "string",
@@ -3009,6 +3083,7 @@
           "client_url",
           "prefect_api_url",
           "slack_bot_token",
+          "slack_channel_id",
           "postgres_data_path",
           "mongo_data_path",
           "calib_data_path",
@@ -3303,24 +3378,23 @@
             "type": "string",
             "title": "Description"
           },
-          "qids": {
-            "items": {
-              "items": {
-                "type": "string"
+          "schedule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SerialNode"
               },
-              "type": "array"
-            },
-            "type": "array",
-            "title": "Qids"
+              {
+                "$ref": "#/components/schemas/ParallelNode"
+              },
+              {
+                "$ref": "#/components/schemas/BatchNode"
+              }
+            ],
+            "title": "Schedule"
           },
           "notify_bool": {
             "type": "boolean",
             "title": "Notify Bool",
-            "default": false
-          },
-          "batch_mode": {
-            "type": "boolean",
-            "title": "Batch Mode",
             "default": false
           },
           "tasks": {
@@ -3369,7 +3443,7 @@
           "name",
           "username",
           "description",
-          "qids"
+          "schedule"
         ],
         "title": "UpdateMenuRequest",
         "description": "UpdateMenuRequest is a Pydantic model for updating a menu item."

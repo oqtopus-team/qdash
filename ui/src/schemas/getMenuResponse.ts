@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { GetMenuResponseSchedule } from "./getMenuResponseSchedule";
 import type { GetMenuResponseTasks } from "./getMenuResponseTasks";
 import type { GetMenuResponseTaskDetails } from "./getMenuResponseTaskDetails";
 import type { GetMenuResponseTags } from "./getMenuResponseTags";
@@ -16,9 +17,8 @@ export interface GetMenuResponse {
   name: string;
   username: string;
   description: string;
-  qids: string[][];
+  schedule: GetMenuResponseSchedule;
   notify_bool?: boolean;
-  batch_mode?: boolean;
   tasks?: GetMenuResponseTasks;
   task_details?: GetMenuResponseTaskDetails;
   tags?: GetMenuResponseTags;

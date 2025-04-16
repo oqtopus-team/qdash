@@ -2,26 +2,27 @@ import type {
   ExecuteCalibRequest,
   ListMenuResponse,
   ScheduleCalibResponse,
+  CreateMenuRequestSchedule,
 } from "@/schemas";
 
 export type Menu = {
   name: string;
   username: string;
   description: string;
-  qids: string[][];
+  schedule: CreateMenuRequestSchedule;
   notify_bool: boolean;
   tasks?: string[];
   tags?: string[];
 };
 
 export const mapListMenuResponseToListMenu = (
-  response: ListMenuResponse,
+  response: ListMenuResponse
 ): Menu[] => {
   return response.menus.map((item) => ({
     name: item.name,
     username: item.username,
     description: item.description,
-    qids: item.qids,
+    schedule: item.schedule,
     notify_bool: item.notify_bool ?? false,
     tasks: item.tasks ?? [],
     tags: item.tags ?? [],
@@ -59,7 +60,7 @@ export type CalibrationSchedule = {
 };
 
 export const mapScheduleCalibResponsetoCalibSchedule = (
-  data: ScheduleCalibResponse[],
+  data: ScheduleCalibResponse[]
 ): CalibSchedule[] => {
   return data.map((item) => ({
     description: item.description,

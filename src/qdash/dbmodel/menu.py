@@ -2,6 +2,7 @@ from typing import Any
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
+from qdash.datamodel.menu import ScheduleNode
 from qdash.datamodel.system_info import SystemInfoModel
 
 
@@ -21,9 +22,10 @@ class MenuDocument(Document):
     name: str
     username: str
     description: str
-    qids: list[list[str]]
+    schedule: ScheduleNode = Field(
+        description="The schedule of the menu. It can be a serial, parallel or batch node.",
+    )
     notify_bool: bool = False
-    batch_mode: bool = False
     tasks: list[str] | None = Field(default=None, exclude=True)
     tags: list[str] | None = Field(default=None)
     task_details: dict[str, Any] | None = Field(default=None)
