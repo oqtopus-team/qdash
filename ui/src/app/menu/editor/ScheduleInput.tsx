@@ -1,9 +1,33 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { CreateMenuRequestSchedule } from "@/schemas/createMenuRequestSchedule";
+import type { SerialNode } from "@/schemas/serialNode";
+import type { ParallelNode } from "@/schemas/parallelNode";
+import type { BatchNode } from "@/schemas/batchNode";
 
 type Block = {
   type: "serial" | "batch";
   tasks: string;
+};
+
+const isSerialNode = (node: any): node is SerialNode =>
+  typeof node === "object" && "serial" in node;
+
+const isBatchNode = (node: any): node is BatchNode =>
+  typeof node === "object" && "batch" in node;
+
+const parseNode = (
+  node: SerialNode | ParallelNode | BatchNode | string
+): Block => {
+  if (typeof node === "string") {
+    return { type: "serial", tasks: node };
+  }
+  if (isSerialNode(node)) {
+    return { type: "serial", tasks: node.serial.join(", ") };
+  }
+  if (isBatchNode(node)) {
+    return { type: "batch", tasks: node.batch.join(", ") };
+  }
+  return { type: "serial", tasks: "" };
 };
 
 type ScheduleInputProps = {
@@ -11,31 +35,68 @@ type ScheduleInputProps = {
   onChange: (schedule: CreateMenuRequestSchedule) => void;
 };
 
-export function ScheduleInput({ onChange }: ScheduleInputProps) {
-  const [isParallel, setIsParallel] = useState(false);
-  const [blocks, setBlocks] = useState<Block[]>([
-    { type: "serial", tasks: "" },
-    { type: "serial", tasks: "" },
-  ]);
+export function ScheduleInput({ value, onChange }: ScheduleInputProps) {
+  const [isParallel, setIsParallel] = useState(() => "parallel" in value);
+  const [blocks, setBlocks] = useState<Block[]>(() => {
+    if ("parallel" in value) {
+      return value.parallel.map(parseNode);
+    } else if ("serial" in value) {
+      return value.serial.map(parseNode);
+    }
+    return [{ type: "serial", tasks: "" }];
+  });
 
-  const createSchedule = (blocks: Block[]): CreateMenuRequestSchedule => {
-    const validBlocks = blocks
-      .map((block) => ({
-        type: block.type,
-        tasks: block.tasks
-          .split(",")
-          .map((task) => task.trim())
-          .filter((task) => task !== ""),
-      }))
-      .filter((block) => block.tasks.length > 0);
+  // Memoize the value to detect changes
+  const valueKey = useMemo(() => {
+    if ("parallel" in value) {
+      return `parallel-${JSON.stringify(value.parallel)}`;
+    }
+    if ("serial" in value) {
+      return `serial-${JSON.stringify(value.serial)}`;
+    }
+    return "empty";
+  }, [value]);
 
-    if (validBlocks.length === 0) {
-      return { serial: [] };
+  // Update blocks when value changes
+  useEffect(() => {
+    const isParallelValue = "parallel" in value;
+    let nodes: (SerialNode | ParallelNode | BatchNode | string)[];
+
+    if (isParallelValue && "parallel" in value) {
+      nodes = value.parallel;
+    } else if ("serial" in value) {
+      nodes = value.serial;
+    } else {
+      nodes = [];
     }
 
-    const nodes = validBlocks.map((block) =>
-      block.type === "serial" ? { serial: block.tasks } : { batch: block.tasks }
-    );
+    setIsParallel(isParallelValue);
+    setBlocks(nodes.map(parseNode));
+  }, [valueKey]);
+
+  const createSchedule = (blocks: Block[]): CreateMenuRequestSchedule => {
+    const nodes = blocks
+      .filter((block) => block.tasks.trim() !== "")
+      .map((block) => {
+        const tasks = block.tasks
+          .split(",")
+          .map((task: string) => task.trim())
+          .filter((task: string) => task !== "");
+        return block.type === "serial" ? { serial: tasks } : { batch: tasks };
+      })
+      .filter((node): node is { serial: string[] } | { batch: string[] } => {
+        if ("serial" in node) {
+          return (node as { serial: string[] }).serial.length > 0;
+        }
+        if ("batch" in node) {
+          return (node as { batch: string[] }).batch.length > 0;
+        }
+        return false;
+      });
+
+    if (nodes.length === 0) {
+      return { serial: [{ serial: [] }] };
+    }
 
     return isParallel ? { parallel: nodes } : { serial: nodes };
   };

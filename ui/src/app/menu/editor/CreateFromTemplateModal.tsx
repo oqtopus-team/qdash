@@ -13,7 +13,7 @@ const defaultFormData: CreateMenuRequest = {
   username: "",
   description: "",
   schedule: {
-    serial: [""],
+    serial: [{ serial: [] }],
   } as CreateMenuRequestSchedule,
   notify_bool: false,
   tasks: [],
@@ -114,7 +114,16 @@ export function CreateFromTemplateModal({
                   (menu) => menu.name === e.target.value
                 );
                 if (selectedPreset) {
-                  setFormData(selectedPreset);
+                  // Convert schedule format if needed
+                  const schedule = selectedPreset.schedule || {
+                    serial: [{ serial: [] }],
+                  };
+                  const tasks = selectedPreset.tasks || [];
+                  setFormData({
+                    ...selectedPreset,
+                    schedule,
+                    tasks,
+                  });
                 }
               }}
             >
