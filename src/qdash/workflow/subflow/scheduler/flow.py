@@ -34,7 +34,7 @@ def cron_scheduler_flow(menu_name: str) -> None:
         name=menu.name,
         username=menu.username,
         description=menu.description,
-        qids=menu.qids,
+        schedule=menu.schedule,
         notify_bool=menu.notify_bool,
         tasks=menu.tasks,
         task_details=menu.task_details,
