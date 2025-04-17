@@ -35,11 +35,11 @@ if __name__ == "__main__":
         """,
         tags=["calibration"],
         schedule=CronSchedule(
-            cron="*/5 * * * *",
+            cron="0 4 * * *",
             timezone="Asia/Tokyo",
         ),
         is_schedule_active=False,
-        parameters={"menu_name": "CheckRabi"},
+        parameters={"menu_name": "DailyCheck(TypeA)"},
     )
     cron_scheduler_deploy_2 = cron_scheduler_flow.to_deployment(
         name=f"{deployment_name}-cron-scheduler-2",
@@ -47,11 +47,11 @@ if __name__ == "__main__":
         """,
         tags=["calibration"],
         schedule=CronSchedule(
-            cron="*/5 * * * *",
+            cron="20 4 * * *",
             timezone="Asia/Tokyo",
         ),
         is_schedule_active=False,
-        parameters={"menu_name": "CheckRabi"},
+        parameters={"menu_name": "DailyCheck(TypeB)"},
     )
     cron_scheduler_deploy_3 = cron_scheduler_flow.to_deployment(
         name=f"{deployment_name}-cron-scheduler-3",
@@ -59,11 +59,11 @@ if __name__ == "__main__":
         """,
         tags=["calibration"],
         schedule=CronSchedule(
-            cron="*/5 * * * *",
+            cron="15 5 * * *",
             timezone="Asia/Tokyo",
         ),
         is_schedule_active=False,
-        parameters={"menu_name": "CheckRabi"},
+        parameters={"menu_name": "CheckSkew"},
     )
     serial_cal_flow_deploy = serial_cal_flow.to_deployment(
         name=f"{deployment_name}-serial-cal-flow",
