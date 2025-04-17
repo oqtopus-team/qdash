@@ -258,12 +258,11 @@ async def schedule_calib(
         name=menu.name,
         username=menu.username,
         description=menu.description,
-        qids=menu.qids,
+        schedule=menu.schedule,
         notify_bool=menu.notify_bool,
         tasks=menu.tasks,
         task_details=menu.task_details,
         tags=menu.tags,
-        batch_mode=menu.batch_mode,
     )
 
     client = PrefectClient(api=settings.prefect_api_url)
