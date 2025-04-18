@@ -1,7 +1,12 @@
 "use client";
 
 import { useFetchExecutionByChipId } from "@/client/chip/chip";
-import { FaExternalLinkAlt, FaDownload } from "react-icons/fa";
+import {
+  FaExternalLinkAlt,
+  FaDownload,
+  FaCalendarAlt,
+  FaClock,
+} from "react-icons/fa";
 import JsonView from "react18-json-view";
 import { ExecutionResponseDetail } from "@/schemas";
 import ExecutionDAG from "./ExecutionDAG";
@@ -17,6 +22,25 @@ export default function ExecutionDetailClient({
   chip_id,
   execute_id,
 }: ExecutionDetailClientProps) {
+  const calculateDetailedDuration = (start: string, end: string) => {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const diff = endDate.getTime() - startDate.getTime();
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    const parts = [];
+    if (days > 0) parts.push(`${days} days`);
+    if (hours > 0) parts.push(`${hours} hours`);
+    if (minutes > 0) parts.push(`${minutes} minutes`);
+    if (seconds > 0) parts.push(`${seconds} seconds`);
+
+    return parts.join(", ");
+  };
+
   const {
     data: executionDetailData,
     isLoading: isDetailLoading,
@@ -109,6 +133,7 @@ export default function ExecutionDetailClient({
       status: task.status || "unknown",
       upstream_id: task.upstream_id || undefined,
       start_at: task.start_at || undefined,
+      end_at: task.end_at || undefined,
       elapsed_time: task.elapsed_time || undefined,
       figure_path: task.figure_path || undefined,
       input_parameters: task.input_parameters || undefined,
@@ -118,23 +143,49 @@ export default function ExecutionDetailClient({
   return (
     <div className="w-full px-4 py-6" style={{ width: "calc(100vw - 20rem)" }}>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">{execution.name}</h1>
-          <div className="flex space-x-4">
-            <a
-              href={`/execution/${execute_id}/experiment`}
-              className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold">{execution.name}</h1>
+            <div className="flex space-x-4">
+              <a
+                href={`/execution/${execute_id}/experiment`}
+                className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
+              >
+                <FaExternalLinkAlt className="mr-2" />
+                Go to Experiment
+              </a>
+              <a
+                href={(execution.note as { [key: string]: any })?.ui_url || "#"}
+                className="bg-accent text-accent-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
+              >
+                <FaExternalLinkAlt className="mr-2" />
+                Go to Flow
+              </a>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-6 text-sm bg-base-100/50 px-4 py-3 rounded-lg">
+            <div className="flex items-center text-base-content/70">
+              <FaCalendarAlt className="mr-2 text-info/70" />
+              <span className="font-medium mr-1">Start:</span>
+              <time>{new Date(execution.start_at).toLocaleString()}</time>
+            </div>
+            <div className="flex items-center text-base-content/70">
+              <FaCalendarAlt className="mr-2 text-info/70" />
+              <span className="font-medium mr-1">End:</span>
+              <time>{new Date(execution.end_at).toLocaleString()}</time>
+            </div>
+            <div
+              className="flex items-center text-base-content/70 tooltip tooltip-bottom"
+              data-tip={calculateDetailedDuration(
+                execution.start_at,
+                execution.end_at
+              )}
             >
-              <FaExternalLinkAlt className="mr-2" />
-              Go to Experiment
-            </a>
-            <a
-              href={(execution.note as { [key: string]: any })?.ui_url || "#"}
-              className="bg-accent text-accent-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
-            >
-              <FaExternalLinkAlt className="mr-2" />
-              Go to Flow
-            </a>
+              <FaClock className="mr-2 text-info/70" />
+              <span className="font-medium mr-1">Duration:</span>
+              <span>{execution.elapsed_time}</span>
+            </div>
           </div>
         </div>
 
@@ -162,20 +213,37 @@ export default function ExecutionDetailClient({
                           task.status === "running"
                             ? "text-info"
                             : task.status === "completed"
-                              ? "text-success"
-                              : task.status === "scheduled"
-                                ? "text-warning"
-                                : "text-error"
+                            ? "text-success"
+                            : task.status === "scheduled"
+                            ? "text-warning"
+                            : "text-error"
                         }`}
                       >
                         {task.status}
                       </span>
                     </div>
-                    <div className="text-sm text-base-content/60 mt-1">
-                      <p>
-                        Start at: {new Date(task.start_at).toLocaleString()}
-                      </p>
-                      <p>Elapsed time: {task.elapsed_time}</p>
+                    <div className="flex items-center gap-6 mt-2 text-sm">
+                      <div className="flex items-center text-base-content/70">
+                        <FaCalendarAlt className="mr-2 text-info/70" />
+                        <span className="font-medium mr-1">Start:</span>
+                        <time>{new Date(task.start_at).toLocaleString()}</time>
+                      </div>
+                      <div className="flex items-center text-base-content/70">
+                        <FaCalendarAlt className="mr-2 text-info/70" />
+                        <span className="font-medium mr-1">End:</span>
+                        <time>{new Date(task.end_at).toLocaleString()}</time>
+                      </div>
+                      <div
+                        className="flex items-center text-base-content/70 tooltip tooltip-bottom"
+                        data-tip={calculateDetailedDuration(
+                          task.start_at,
+                          task.end_at
+                        )}
+                      >
+                        <FaClock className="mr-2 text-info/70" />
+                        <span className="font-medium mr-1">Duration:</span>
+                        <span>{task.elapsed_time}</span>
+                      </div>
                     </div>
                   </summary>
 
@@ -213,7 +281,7 @@ export default function ExecutionDetailClient({
                                           const apiUrl =
                                             process.env.NEXT_PUBLIC_API_URL;
                                           link.href = `${apiUrl}/api/file/raw_data?path=${encodeURIComponent(
-                                            normalizedPath,
+                                            normalizedPath
                                           )}`;
                                           // Get just the filename for download
                                           const filename =
@@ -229,7 +297,7 @@ export default function ExecutionDetailClient({
                                         Download
                                       </button>
                                     </div>
-                                  ),
+                                  )
                                 )}
                               </div>
                             </div>
