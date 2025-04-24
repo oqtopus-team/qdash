@@ -32,6 +32,15 @@ class CheckCrossResonance(BaseTask):
         "cancel_phase": OutputParameterModel(
             unit="a.u.", value_type="float", description="Phase of the cancel pulse."
         ),
+        "cancel_beta": OutputParameterModel(
+            unit="a.u.", value_type="float", description="Beta of the cancel pulse."
+        ),
+        "rotary_amplitude": OutputParameterModel(
+            unit="a.u.", value_type="float", description="Amplitude of the rotary pulse."
+        ),
+        "zx_rotation_rate": OutputParameterModel(
+            unit="a.u.", value_type="float", description="ZX rotation rate."
+        ),
     }
 
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
@@ -62,6 +71,10 @@ class CheckCrossResonance(BaseTask):
         self.output_parameters["cr_phase"].value = result["cr_phase"]
         self.output_parameters["cancel_amplitude"].value = result["cancel_amplitude"]
         self.output_parameters["cancel_phase"].value = result["cancel_phase"]
+        self.output_parameters["cancel_beta"].value = result["cancel_beta"]
+        self.output_parameters["rotary_amplitude"].value = result["rotary_amplitude"]
+        self.output_parameters["zx_rotation_rate"].value = result["zx_rotation_rate"]
+
         output_parameters = self.attach_execution_id(execution_id)
         fig = self._plot_coeffs_history(result["coeffs_history"], qid)
         figures: list = [fig]
@@ -82,6 +95,9 @@ class CheckCrossResonance(BaseTask):
             "cr_phase": fit_result["cr_phase"],
             "cancel_amplitude": fit_result["cancel_amplitude"],
             "cancel_phase": fit_result["cancel_phase"],
+            "cancel_beta": fit_result["cancel_beta"],
+            "rotary_amplitude": fit_result["rotary_amplitude"],
+            "zx_rotation_rate": fit_result["zx_rotation_rate"],
             "coeffs_history": raw_result["coeffs_history"],
         }
         exp.calib_note.save()

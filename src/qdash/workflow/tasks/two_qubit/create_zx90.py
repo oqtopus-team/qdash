@@ -30,6 +30,15 @@ class CreateZX90(BaseTask):
         "cancel_phase": OutputParameterModel(
             unit="a.u.", value_type="float", description="Phase of the cancel pulse."
         ),
+        "cancel_beta": OutputParameterModel(
+            unit="a.u.", value_type="float", description="Beta of the cancel pulse."
+        ),
+        "rotary_amplitude": OutputParameterModel(
+            unit="a.u.", value_type="float", description="Amplitude of the rotary pulse."
+        ),
+        "zx_rotation_rate": OutputParameterModel(
+            unit="a.u.", value_type="float", description="ZX rotation rate."
+        ),
     }
 
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
@@ -41,6 +50,9 @@ class CreateZX90(BaseTask):
         self.output_parameters["cr_phase"].value = result["cr_phase"]
         self.output_parameters["cancel_amplitude"].value = result["cancel_amplitude"]
         self.output_parameters["cancel_phase"].value = result["cancel_phase"]
+        self.output_parameters["cancel_beta"].value = result["cancel_beta"]
+        self.output_parameters["rotary_amplitude"].value = result["rotary_amplitude"]
+        self.output_parameters["zx_rotation_rate"].value = result["zx_rotation_rate"]
         output_parameters = self.attach_execution_id(execution_id)
         figures: list = [result["n1"], result["n3"], result["fig"]]
         raw_data: list = []
@@ -60,6 +72,9 @@ class CreateZX90(BaseTask):
             "cr_phase": fit_result["cr_phase"],
             "cancel_amplitude": fit_result["cancel_amplitude"],
             "cancel_phase": fit_result["cancel_phase"],
+            "cancel_beta": fit_result["cancel_beta"],
+            "rotary_amplitude": fit_result["rotary_amplitude"],
+            "zx_rotation_rate": fit_result["zx_rotation_rate"],
             "n1": raw_result["n1"]["fig"],
             "n3": raw_result["n3"]["fig"],
             "fig": raw_result["fig"],
