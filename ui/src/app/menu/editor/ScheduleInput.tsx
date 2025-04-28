@@ -16,7 +16,7 @@ const isBatchNode = (node: any): node is BatchNode =>
   typeof node === "object" && "batch" in node;
 
 const parseNode = (
-  node: SerialNode | ParallelNode | BatchNode | string
+  node: SerialNode | ParallelNode | BatchNode | string,
 ): Block => {
   if (typeof node === "string") {
     return { type: "serial", tasks: node };
@@ -110,7 +110,7 @@ export function ScheduleInput({ value, onChange }: ScheduleInputProps) {
   const handleBlockChange = (
     index: number,
     field: keyof Block,
-    value: "serial" | "batch" | string
+    value: "serial" | "batch" | string,
   ) => {
     setBlocks((prev) => {
       const newBlocks = [...prev];
@@ -192,7 +192,7 @@ export function ScheduleInput({ value, onChange }: ScheduleInputProps) {
                     handleBlockChange(
                       index,
                       "type",
-                      e.target.value as "serial" | "batch"
+                      e.target.value as "serial" | "batch",
                     )
                   }
                 >

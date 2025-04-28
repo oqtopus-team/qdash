@@ -57,7 +57,7 @@ export function TableEditModal({
   refetchMenu: () => Promise<UseQueryResult<any, any>>;
 }) {
   const [yamlText, setYamlText] = useState(
-    generateYamlWithCustomArrayFormat(selectedItem)
+    generateYamlWithCustomArrayFormat(selectedItem),
   );
   const [validationError, setValidationError] = useState("");
   const scheduleSettingChangedNotify = () => toast("schedule setting changed!");
@@ -121,7 +121,7 @@ export function TableEditModal({
             const updatedData = await refetchMenu();
             if (updatedData.data) {
               setTableData(
-                mapListMenuResponseToListMenu(updatedData.data.data)
+                mapListMenuResponseToListMenu(updatedData.data.data),
               );
               scheduleSettingChangedNotify();
             }
@@ -129,7 +129,7 @@ export function TableEditModal({
           onError: (error) => {
             console.error("Error updating menu:", error);
           },
-        }
+        },
       );
     } catch (error) {
       console.error("YAMLパースエラー:", error);
