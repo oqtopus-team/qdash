@@ -32,7 +32,7 @@ export function ExecuteConfirmModal({
   const handleConfirmClick = () => {
     if (isLocked) {
       toast.error(
-        "実行がロックされています。他のキャリブレーションが完了するまでお待ちください。"
+        "実行がロックされています。他のキャリブレーションが完了するまでお待ちください。",
       );
       return;
     }
@@ -64,7 +64,7 @@ export function ExecuteConfirmModal({
               >
                 View Details →
               </a>
-            </div>
+            </div>,
           );
           onClose();
         },
@@ -72,7 +72,7 @@ export function ExecuteConfirmModal({
           console.error("Error executing calibration:", error);
           toast.error("Error executing calibration");
         },
-      }
+      },
     );
   };
 
