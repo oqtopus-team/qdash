@@ -101,6 +101,24 @@ def init_task_data(
 
 
 @app.command()
+def migrate_v1_0_16_to_v1_0_17(
+    username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
+    chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),
+) -> None:
+    """Migrate data from v1.0.16 to v1.0.17."""
+    try:
+        from qdash.dbmodel.migration import migrate_v1_0_16_to_v1_0_17
+
+        migrate_v1_0_16_to_v1_0_17(username=username, chip_id=chip_id)
+        typer.echo(
+            f"Data migration from v1.0.16 to v1.0.17 completed successfully (username: {username})"
+        )
+    except Exception as e:
+        typer.echo(f"Error during migration: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
 def init_all_data(
     username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
     chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),

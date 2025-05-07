@@ -15,6 +15,7 @@ class ExecuteCalibRequest(MenuModel):
                 {
                     "name": "CheckRabi",
                     "username": "admin",
+                    "chip_id": "chip1",
                     "description": "check one qubit characteristics short",
                     "qids": [["28"]],
                     "notify_bool": False,

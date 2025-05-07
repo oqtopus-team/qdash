@@ -122,7 +122,7 @@ def main_flow(
             calib_data_path=calib_dir,
             tags=menu.tags,
             fridge_info={"temperature": 0.0},
-            chip_id=chip_id,
+            chip_id=menu.chip_id,
             note={
                 "qubex_version": get_package_version("qubex"),
                 "ui_url": ui_url,

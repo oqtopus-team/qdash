@@ -15,6 +15,7 @@ import type { CreateMenuRequestTags } from "./createMenuRequestTags";
  */
 export interface CreateMenuRequest {
   name: string;
+  chip_id: string;
   username: string;
   description: string;
   schedule: CreateMenuRequestSchedule;
