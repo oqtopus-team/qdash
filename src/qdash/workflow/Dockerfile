@@ -1,4 +1,4 @@
-FROM prefecthq/prefect:2.20-python3.11 AS builder
+FROM prefecthq/prefect:2.20.18-python3.11 AS builder
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ RUN uv pip install --system --no-cache-dir -r requirements.txt
 RUN uv pip install --upgrade --system --no-cache-dir pydantic
 RUN uv pip install --upgrade --system --no-cache-dir pydantic-settings==2.3.4
 
-FROM prefecthq/prefect:2.20-python3.11
+FROM prefecthq/prefect:2.20.18-python3.11
 
 WORKDIR /app
 

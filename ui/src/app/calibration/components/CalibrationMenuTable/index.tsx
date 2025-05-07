@@ -32,7 +32,7 @@ export function CalibrationMenuTable() {
   const { user } = useAuth();
   const [tableData, setTableData] = useState<MenuModel[]>([]);
   const [selectedItem, setSelectedItem] = useState<MenuModel>(
-    INITIAL_SELECTED_ITEM
+    INITIAL_SELECTED_ITEM,
   );
   const [selectedMenuForPreview, setSelectedMenuForPreview] =
     useState<GetMenuResponse | null>(null);
@@ -51,7 +51,7 @@ export function CalibrationMenuTable() {
     const menuData = await refetchMenu();
     if (menuData.data) {
       const menuWithDetails = menuData.data.data.menus.find(
-        (menu: GetMenuResponse) => menu.name === item.name
+        (menu: GetMenuResponse) => menu.name === item.name,
       );
       if (menuWithDetails) {
         setSelectedMenuForPreview(menuWithDetails);
@@ -89,7 +89,7 @@ export function CalibrationMenuTable() {
     handleEditClick,
     handleDeleteClick,
     handleExecuteCalib,
-    false // isLocked
+    false, // isLocked
   );
 
   return (
@@ -120,7 +120,7 @@ export function CalibrationMenuTable() {
                   console.error("Error executing calibration:", error);
                   toast.error("Error executing calibration");
                 },
-              }
+              },
             );
           }}
           onCancel={() => setShowExecuteConfirmModal(false)}
@@ -142,7 +142,7 @@ export function CalibrationMenuTable() {
                   console.error("Error deleting menu:", error);
                   toast.error("Error deleting menu");
                 },
-              }
+              },
             );
           }}
           onCancel={() => setShowDeleteConfirmModal(false)}

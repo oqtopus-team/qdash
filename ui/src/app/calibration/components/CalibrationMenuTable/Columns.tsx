@@ -12,7 +12,7 @@ export const getColumns = (
   handleEditClick: (item: MenuModel) => void,
   handleDeleteClick: (item: MenuModel) => void,
   handleExecuteCalib: (item: MenuModel) => void,
-  isLocked: boolean
+  isLocked: boolean,
 ) => [
   columnHelper.accessor("name", {
     header: "Name",
