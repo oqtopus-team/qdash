@@ -75,11 +75,12 @@ def init_chip_data(
 @app.command()
 def init_menu_data(
     username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
+    chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),
 ) -> None:
     """Initialize menu data."""
     try:
         typer.echo(f"Initializing menu data for username: {username}")
-        init_menu(username=username)
+        init_menu(username=username, chip_id=chip_id)
         typer.echo(f"Menu data initialized successfully (username: {username})")
     except Exception as e:
         typer.echo(f"Error initializing menu data: {e}", err=True)
@@ -115,6 +116,22 @@ def migrate_v1_0_16_to_v1_0_17(
         )
     except Exception as e:
         typer.echo(f"Error during migration: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
+def add_new_chip(
+    username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
+    chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),
+) -> None:
+    """Add new chip."""
+    try:
+        from qdash.cli.add import add_new_chip
+
+        add_new_chip(username=username, chip_id=chip_id)
+        typer.echo(f"New chip added successfully (username: {username})")
+    except Exception as e:
+        typer.echo(f"Error adding new chip: {e}", err=True)
         raise typer.Exit(1)
 
 

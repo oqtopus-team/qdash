@@ -9,7 +9,12 @@ RUN apt-get update \
     libhdf5-dev \
     tzdata \
     curl \
+    libcairo2-dev \
+    cmake \
     wget \
+    libgirepository1.0-dev \
+    gobject-introspection \
+    gir1.2-gtk-3.0 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
