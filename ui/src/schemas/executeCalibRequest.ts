@@ -15,6 +15,7 @@ import type { ExecuteCalibRequestTags } from "./executeCalibRequestTags";
  */
 export interface ExecuteCalibRequest {
   name: string;
+  chip_id: string;
   username: string;
   description: string;
   schedule: ExecuteCalibRequestSchedule;

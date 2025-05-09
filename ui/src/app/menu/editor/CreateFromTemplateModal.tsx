@@ -10,6 +10,7 @@ import { ScheduleInput } from "./ScheduleInput";
 
 const defaultFormData: CreateMenuRequest = {
   name: "",
+  chip_id: "",
   username: "",
   description: "",
   schedule: {
@@ -33,7 +34,7 @@ export function CreateFromTemplateModal({
 
   const handleInputChange = (
     field: keyof CreateMenuRequest,
-    value: string | boolean | string[] | CreateMenuRequestSchedule,
+    value: string | boolean | string[] | CreateMenuRequestSchedule
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -73,7 +74,7 @@ export function CreateFromTemplateModal({
             error.response?.data?.detail || "Error creating template item";
           toast.error(errorMessage);
         },
-      },
+      }
     );
   };
 
@@ -111,7 +112,7 @@ export function CreateFromTemplateModal({
                   return;
                 }
                 const selectedPreset = presetData?.data.menus.find(
-                  (menu) => menu.name === e.target.value,
+                  (menu) => menu.name === e.target.value
                 );
                 if (selectedPreset) {
                   // Convert schedule format if needed
@@ -151,6 +152,19 @@ export function CreateFromTemplateModal({
                   value={formData.name}
                   onChange={(e) => handleInputChange("name", e.target.value)}
                   placeholder="Enter menu name"
+                />
+              </div>
+
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Chip ID</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered w-full"
+                  value={formData.chip_id}
+                  onChange={(e) => handleInputChange("chip_id", e.target.value)}
+                  placeholder="Enter chip ID"
                 />
               </div>
 
@@ -242,7 +256,7 @@ export function CreateFromTemplateModal({
           <button
             className="btn btn-primary"
             onClick={handleSaveClick}
-            disabled={!formData.name || !formData.username}
+            disabled={!formData.name || !formData.username || !formData.chip_id}
           >
             Create
           </button>

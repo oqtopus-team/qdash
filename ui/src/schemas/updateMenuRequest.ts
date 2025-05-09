@@ -15,6 +15,7 @@ import type { UpdateMenuRequestTags } from "./updateMenuRequestTags";
  */
 export interface UpdateMenuRequest {
   name: string;
+  chip_id: string;
   username: string;
   description: string;
   schedule: UpdateMenuRequestSchedule;

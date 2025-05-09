@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import yaml from "js-yaml"; // YAML を解析するためのライブラリ
 
 import { mapListMenuResponseToListMenu } from "../../model";
+import { ChipSelector } from "@/app/components/ChipSelector";
 
 import type { Menu } from "../../model";
 import type { UseQueryResult } from "@tanstack/react-query";
@@ -22,6 +23,7 @@ export function NewItemModal({
 }) {
   const createMutation = useCreateMenu();
   const [fileData, setFileData] = useState<any>(null);
+  const [selectedChipId, setSelectedChipId] = useState<string>("");
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) {
@@ -48,7 +50,14 @@ export function NewItemModal({
   };
 
   const handleSubmit = async () => {
+    if (!selectedChipId) {
+      toast.error("Please select a chip");
+      return;
+    }
+
     if (fileData) {
+      // Add chip_id to the file data
+      fileData.chip_id = selectedChipId;
       createMutation.mutate(
         { data: fileData },
         {
@@ -65,7 +74,7 @@ export function NewItemModal({
             console.error("Error uploading file", error);
             toast.error("Error uploading file");
           },
-        },
+        }
       );
     }
   };
@@ -75,6 +84,12 @@ export function NewItemModal({
       <dialog id="newItem" className="modal">
         <div className="modal-box">
           <h3 className="font-bold text-lg my-4">Upload YAML File</h3>
+          <div className="mb-4">
+            <ChipSelector
+              selectedChip={selectedChipId}
+              onChipSelect={setSelectedChipId}
+            />
+          </div>
           <input
             type="file"
             className="file-input file-input-bordered file-input-secondary w-full max-w-xs"

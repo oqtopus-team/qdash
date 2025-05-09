@@ -4,13 +4,14 @@ from qdash.db.init.initialize import initialize
 from qdash.dbmodel.menu import MenuDocument
 
 
-def init_menu(username: str) -> None:
+def init_menu(username: str, chip_id: str) -> None:
     """Initialize menu document."""
     initialize()
     MenuDocument(
         name="OneQubitCheck",
         username=username,
         description="description",
+        chip_id=chip_id,
         schedule={"parallel": [{"serial": ["28", "29"]}]},
         tasks=["CheckStatus", "DumpBox", "CheckNoise", "CheckRabi"],
         task_details={

@@ -47,6 +47,7 @@ class MenuModel(BaseModel):
     """
 
     name: str
+    chip_id: str
     username: str
     description: str
     schedule: ScheduleNode

@@ -15,6 +15,7 @@ import type { GetMenuResponseTags } from "./getMenuResponseTags";
  */
 export interface GetMenuResponse {
   name: string;
+  chip_id: string;
   username: string;
   description: string;
   schedule: GetMenuResponseSchedule;

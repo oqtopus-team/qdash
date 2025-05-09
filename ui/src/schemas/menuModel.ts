@@ -25,6 +25,7 @@ Attributes
  */
 export interface MenuModel {
   name: string;
+  chip_id: string;
   username: string;
   description: string;
   schedule: MenuModelSchedule;

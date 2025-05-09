@@ -103,6 +103,7 @@ def list_menu(current_user: Annotated[User, Depends(get_current_active_user)]) -
     for menu in menus:
         menu_item = MenuModel(
             name=menu.name,
+            chip_id=menu.chip_id,
             username=menu.username,
             description=menu.description,
             schedule=menu.schedule,
@@ -159,6 +160,7 @@ def create_menu(
 
     menu_doc = MenuDocument(
         name=request.name,
+        chip_id=request.chip_id,
         username=current_user.username,
         description=request.description,
         tasks=request.tasks,
@@ -177,6 +179,7 @@ def create_menu(
 
 check_one_qubit_preset = MenuModel(
     name="CheckOneQubitShort",
+    chip_id="",
     username="",
     description="check one qubit characteristics short",
     schedule={"parallel": [{"serial": ["28", "29"]}]},
@@ -199,6 +202,7 @@ check_one_qubit_preset = MenuModel(
 
 one_qubit_coarse_preset = MenuModel(
     name="OneQubitCoarse",
+    chip_id="",
     username="",
     description="check one qubit characteristics coarse",
     schedule={"parallel": [{"serial": ["28", "29"]}]},
@@ -223,6 +227,7 @@ one_qubit_coarse_preset = MenuModel(
 
 one_qubit_fine_preset = MenuModel(
     name="OneQubitFine",
+    chip_id="",
     username="",
     description="check one qubit characteristics fine",
     notify_bool=False,
@@ -317,6 +322,7 @@ def get_menu_by_name(
         return NotFoundErrorResponse(detail=f"menu not found: {name}")
     return GetMenuResponse(
         name=menu.name,
+        chip_id=menu.chip_id,
         username=menu.username,
         description=menu.description,
         schedule=menu.schedule,
@@ -355,6 +361,7 @@ def update_menu(
     existing_menu = MenuDocument.find_one({"name": name, "username": current_user.username}).run()
     if existing_menu:
         existing_menu.name = req.name
+        existing_menu.chip_id = req.chip_id
         existing_menu.description = req.description
         existing_menu.schedule = req.schedule
         existing_menu.tasks = req.tasks
