@@ -256,6 +256,7 @@ async def schedule_calib(
     # Convert MenuDocument to ExecuteCalibRequest
     menu_request = ExecuteCalibRequest(
         name=menu.name,
+        chip_id=menu.chip_id,
         username=menu.username,
         description=menu.description,
         schedule=menu.schedule,

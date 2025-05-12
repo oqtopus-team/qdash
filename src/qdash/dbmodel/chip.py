@@ -3,7 +3,7 @@ from typing import ClassVar
 import pendulum
 from bunnet import Document
 from pydantic import ConfigDict, Field
-from pymongo import ASCENDING, IndexModel
+from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
@@ -63,7 +63,7 @@ class ChipDocument(Document):
 
     @classmethod
     def get_current_chip(cls, username: str) -> "ChipDocument":
-        chip = cls.find_one({"username": username}).run()
+        chip = cls.find_one({"username": username}, sort=[("installed_at", DESCENDING)]).run()
         if chip is None:
             raise ValueError(f"Chip not found for user {username}")
         return chip
