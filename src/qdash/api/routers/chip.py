@@ -363,7 +363,9 @@ class ListMuxResponse(BaseModel):
     muxes: dict[int, MuxDetailResponse]
 
 
-def _build_mux_detail(mux_id: int, tasks: list, current_user: User) -> MuxDetailResponse:
+def _build_mux_detail(
+    mux_id: int, tasks: list, current_user: User, chip_id: str
+) -> MuxDetailResponse:
     qids = [str(mux_id * 4 + i) for i in range(4)]
     detail: dict[str, dict[str, Task]] = {}
     for qid in qids:
@@ -371,7 +373,12 @@ def _build_mux_detail(mux_id: int, tasks: list, current_user: User) -> MuxDetail
         for task in tasks:
             logger.debug("Task: %s", task)
             result = TaskResultHistoryDocument.find_one(
-                {"name": task.name, "username": current_user.username, "qid": qid},
+                {
+                    "name": task.name,
+                    "username": current_user.username,
+                    "qid": qid,
+                    "chip_id": chip_id,
+                },
                 sort=[("end_at", DESCENDING)],
             ).run()
             if result is None:
@@ -429,7 +436,7 @@ def fetch_mux_detail(
     logger.debug(f"Fetching mux details for chip {chip_id}, user: {current_user.username}")
     tasks = TaskDocument.find({"username": current_user.username}).run()
     logger.debug("Tasks: %s", tasks)
-    return _build_mux_detail(mux_id, tasks, current_user)
+    return _build_mux_detail(mux_id, tasks, current_user, chip_id=chip_id)
 
 
 @router.get(
@@ -466,7 +473,7 @@ def list_muxes(
         raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
     mux_num = int(chip.size // 4)
     for mux_id in range(mux_num):
-        muxes[mux_id] = _build_mux_detail(mux_id, tasks, current_user)
+        muxes[mux_id] = _build_mux_detail(mux_id, tasks, current_user, chip_id=chip_id)
     return ListMuxResponse(muxes=muxes)
 
 
@@ -496,7 +503,7 @@ def fetch_latest_task_grouped_by_chip(
     results = {}
     for qid in qids:
         result = TaskResultHistoryDocument.find_one(
-            {"name": task_name, "username": current_user.username, "qid": qid},
+            {"name": task_name, "username": current_user.username, "qid": qid, "chip_id": chip_id},
             sort=[("end_at", DESCENDING)],
         ).run()
         if result is not None:

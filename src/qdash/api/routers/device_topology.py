@@ -177,7 +177,8 @@ def get_device_topology(
     cr_params = latest.note["cr_params"]
     drag_hpi_params = latest.note["drag_hpi_params"]
     drag_pi_params = latest.note["drag_pi_params"]
-    chip_docs = ChipDocument.find_one({"chip_id": "64Q", "username": latest.username}).run()
+    # chip_docs = ChipDocument.find_one({"chip_id": chip_id, "username": latest.username}).run()
+    chip_docs = ChipDocument.get_current_chip(username=latest.username)
     # Sort physical qubit indices and create id mapping
     sorted_physical_ids = sorted(request.qubits)
     id_mapping = {pid: idx for idx, pid in enumerate(sorted_physical_ids)}

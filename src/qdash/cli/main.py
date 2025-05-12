@@ -136,6 +136,22 @@ def add_new_chip(
 
 
 @app.command()
+def rename_all_menu_with_chip_id(
+    username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
+    chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),
+) -> None:
+    """Rename menu with chip ID."""
+    try:
+        from qdash.cli.add import rename_all_menu_with_chip_id
+
+        rename_all_menu_with_chip_id(username=username, chip_id=chip_id)
+        typer.echo(f"Menu renamed with chip ID successfully (username: {username})")
+    except Exception as e:
+        typer.echo(f"Error renaming menu with chip ID: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
 def init_all_data(
     username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
     chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),
