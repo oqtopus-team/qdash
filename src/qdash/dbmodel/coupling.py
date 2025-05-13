@@ -6,6 +6,7 @@ from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.coupling_history import CouplingHistoryDocument
 
 
 class CouplingDocument(Document):
@@ -71,6 +72,8 @@ class CouplingDocument(Document):
             qid=qid, chip_id=chip_id, data=coupling_doc.data, edge_info=coupling_doc.edge_info
         )
         chip_doc.update_coupling(qid, coupling_model)
+        # Update the coupling in the history document
+        CouplingHistoryDocument.create_history(coupling_model)
         return coupling_doc
 
     @classmethod
