@@ -57,9 +57,6 @@ class CreateDRAGHPIPulse(BaseTask):
         self.output_parameters["drag_hpi_amplitude"].value = result["amplitude"][label]["amplitude"]
         output_parameters = self.attach_execution_id(execution_id)
         figures: list[go.Figure] = [result["amplitude"][label]["fig"]]
-        r2 = result["amplitude"][label]["r2"]
-        if self.r2_is_lower_than_threshold(r2):
-            raise ValueError(f"R^2 value of CreateDRAGHPIPulse is below threshold: {r2}")
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
@@ -73,7 +70,8 @@ class CreateDRAGHPIPulse(BaseTask):
             interval=self.input_parameters["interval"].get_value(),
         )
         exp.calib_note.save()
-        return RunResult(raw_result=result)
+        r2 = result["amplitude"][qid_to_label(qid)]["r2"]
+        return RunResult(raw_result=result, r2={qid: r2})
 
     def batch_run(self, exp: Experiment, qid: str) -> RunResult:
         """Batch run is not implemented."""

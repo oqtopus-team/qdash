@@ -65,9 +65,6 @@ class CheckRabi(BaseTask):
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
         raw_data = [result.data[label].data]
-        r2 = result.rabi_params[label].r2
-        if self.r2_is_lower_than_threshold(r2):
-            raise ValueError(f"R^2 value of Rabi oscillation is too low: {r2}")
         return PostProcessResult(
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
         )
@@ -82,7 +79,8 @@ class CheckRabi(BaseTask):
             targets=label,
         )
         exp.calib_note.save()
-        return RunResult(raw_result=result)
+        r2 = result.rabi_params[label].r2 if result.rabi_params else None
+        return RunResult(raw_result=result, r2={qid: r2})
 
     def batch_run(self, exp: Experiment, qid: str) -> RunResult:
         """Batch run is not implemented."""
