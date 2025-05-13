@@ -6,6 +6,7 @@ from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.qubit import NodeInfoModel, QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.qubit_history import QubitHistoryDocument
 
 
 class QubitDocument(Document):
@@ -72,6 +73,8 @@ class QubitDocument(Document):
             qid=qid, chip_id=chip_id, data=qubit_doc.data, node_info=qubit_doc.node_info
         )
         chip_doc.update_qubit(qid, qubit_model)
+        # Update History
+        QubitHistoryDocument.create_history(qubit_doc)
         return qubit_doc
 
     @classmethod
