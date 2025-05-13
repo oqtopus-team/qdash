@@ -52,9 +52,6 @@ class CheckT2Echo(BaseTask):
         self.output_parameters["t2_echo"].error = result.data[label].t2_err * 0.001  # convert to μs
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
-        r2 = result.data[label].r2
-        if self.r2_is_lower_than_threshold(r2):
-            raise ValueError(f"R^2 value of CheckT2Echo is below threshold: {r2}")
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
@@ -66,8 +63,9 @@ class CheckT2Echo(BaseTask):
             interval=self.input_parameters["interval"].get_value(),
             save_image=False,
         )
+        r2 = result.data[qid_to_label(qid)].r2
         exp.calib_note.save()
-        return RunResult(raw_result=result)
+        return RunResult(raw_result=result, r2={qid: r2})
 
     def batch_run(self, exp: Experiment, qid: str) -> RunResult:
         """Batch run is not implemented."""

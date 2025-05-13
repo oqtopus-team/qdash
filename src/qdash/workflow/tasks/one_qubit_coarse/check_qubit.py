@@ -82,7 +82,8 @@ class CheckQubit(BaseTask):
             targets=[label],
         )
         exp.calib_note.save()
-        return RunResult(raw_result=result)
+        r2 = result.rabi_params[label].r2 if result.rabi_params else None
+        return RunResult(raw_result=result, r2={qid: r2})
 
     def batch_run(self, exp: Experiment, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits."""

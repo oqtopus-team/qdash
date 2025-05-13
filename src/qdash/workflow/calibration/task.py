@@ -111,7 +111,9 @@ def execute_dynamic_task_by_qid(
                     qid=qid,
                 )
                 task_manager.save()
-
+                # for record tha failed result, error handling do this step
+                if run_result.has_r2() and run_result.r2[qid] < this_task.r2_threshold:
+                    raise ValueError(f"{this_task.name} R² value too low: {run_result.r2[qid]:.4f}")  # noqa: TRY301
                 # タスクのノートを取得または作成
                 calib_note = json.loads(exp.calib_note.__str__())
                 task_doc = CalibrationNoteDocument.find_one(
