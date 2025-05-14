@@ -30,6 +30,11 @@ class RunResult(BaseModel):
     """Result class."""
 
     raw_result: Any
+    r2: dict[str, float] | None = None
+
+    def has_r2(self) -> bool:
+        """Check if the result has R2 value."""
+        return self.r2 is not None
 
 
 class BaseTask(ABC):
@@ -156,6 +161,11 @@ class BaseTask(ABC):
             qids: list of qubit ids
 
         """
+
+    def is_valid(self, r2: float) -> None:
+        """Diagnose the task. This method is called to check the task status."""
+        if self.r2_is_lower_than_threshold(r2):
+            raise ValueError(f"R^2 value of {self.name} is too low: {r2}")
 
     def get_output_parameters(self) -> list[str]:
         """Return the output parameters of the task."""

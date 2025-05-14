@@ -18,6 +18,7 @@ import { Table } from "@/app/components/Table";
 // Initial selected item
 const INITIAL_SELECTED_ITEM: MenuModel = {
   name: "default-menu",
+  chip_id: "default-chip",
   username: "default-user",
   description: "Default calibration menu",
   schedule: { parallel: [{ serial: ["28", "29"] }] },

@@ -10,6 +10,7 @@ import { ScheduleInput } from "./ScheduleInput";
 
 const defaultFormData: CreateMenuRequest = {
   name: "",
+  chip_id: "",
   username: "",
   description: "",
   schedule: {
@@ -156,6 +157,19 @@ export function CreateFromTemplateModal({
 
               <div className="form-control">
                 <label className="label">
+                  <span className="label-text">Chip ID</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered w-full"
+                  value={formData.chip_id}
+                  onChange={(e) => handleInputChange("chip_id", e.target.value)}
+                  placeholder="Enter chip ID"
+                />
+              </div>
+
+              <div className="form-control">
+                <label className="label">
                   <span className="label-text">Username</span>
                 </label>
                 <input
@@ -242,7 +256,7 @@ export function CreateFromTemplateModal({
           <button
             className="btn btn-primary"
             onClick={handleSaveClick}
-            disabled={!formData.name || !formData.username}
+            disabled={!formData.name || !formData.username || !formData.chip_id}
           >
             Create
           </button>

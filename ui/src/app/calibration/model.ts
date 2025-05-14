@@ -7,6 +7,7 @@ import type {
 
 export type Menu = {
   name: string;
+  chip_id: string;
   username: string;
   description: string;
   schedule: CreateMenuRequestSchedule;
@@ -20,6 +21,7 @@ export const mapListMenuResponseToListMenu = (
 ): Menu[] => {
   return response.menus.map((item) => ({
     name: item.name,
+    chip_id: item.chip_id,
     username: item.username,
     description: item.description,
     schedule: item.schedule,

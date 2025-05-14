@@ -18,6 +18,7 @@ import type { CreateMenuRequestSchedule } from "@/schemas/createMenuRequestSched
 
 interface YamlData {
   name: string;
+  chip_id: string;
   description: string;
   schedule: CreateMenuRequestSchedule;
   notify_bool: boolean;
@@ -30,6 +31,7 @@ function generateYamlWithCustomArrayFormat(data: Menu): string {
   const scheduleYaml = yaml.dump({ schedule: data.schedule }, { indent: 2 });
   return `
 name: ${data.name}
+chip_id: ${data.chip_id}
 description: ${data.description}
 ${scheduleYaml}notify_bool: ${data.notify_bool}
 ${
@@ -86,6 +88,7 @@ export function TableEditModal({
 
       const formattedItem: UpdateMenuRequest = {
         name: updatedItem.name,
+        chip_id: updatedItem.chip_id,
         username: selectedItem.username, // Keep the original username
         description: updatedItem.description,
         schedule: updatedItem.schedule,
@@ -100,6 +103,7 @@ export function TableEditModal({
 
       const menuItem: Menu = {
         name: updatedItem.name,
+        chip_id: updatedItem.chip_id,
         username: selectedItem.username, // Keep the original username
         description: updatedItem.description,
         schedule: updatedItem.schedule,

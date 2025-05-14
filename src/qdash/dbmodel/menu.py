@@ -22,6 +22,7 @@ class MenuDocument(Document):
     name: str
     username: str
     description: str
+    chip_id: str | None = Field(default=None)
     schedule: ScheduleNode = Field(
         description="The schedule of the menu. It can be a serial, parallel or batch node.",
     )

@@ -41,6 +41,7 @@ export function ExecuteConfirmModal({
       {
         data: {
           name: menu.name,
+          chip_id: menu.chip_id,
           username: user?.username ?? "default-user",
           description: menu.description,
           schedule: menu.schedule,
@@ -105,6 +106,11 @@ export function ExecuteConfirmModal({
             <div>
               <h3 className="font-medium mb-2">Name</h3>
               <p className="text-base-content/80">{menu.name}</p>
+            </div>
+
+            <div>
+              <h3 className="font-medium mb-2">Chip ID</h3>
+              <p className="text-base-content/80">{menu.chip_id}</p>
             </div>
 
             <div>

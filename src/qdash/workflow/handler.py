@@ -8,6 +8,7 @@ from qdash.config import get_settings
 from qdash.datamodel.menu import MenuModel as Menu
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.initialize import initialize
@@ -122,7 +123,7 @@ def main_flow(
             calib_data_path=calib_dir,
             tags=menu.tags,
             fridge_info={"temperature": 0.0},
-            chip_id=chip_id,
+            chip_id=menu.chip_id,
             note={
                 "qubex_version": get_package_version("qubex"),
                 "ui_url": ui_url,
@@ -166,6 +167,9 @@ def main_flow(
                 menu, calib_dir, success_map, execution_id, task_names=menu.tasks
             )
         execution_manager = execution_manager.reload().complete_execution()
+        # Update ChipDocument and ChipHistoryDocument
+        chip_doc = ChipDocument.get_current_chip(username=menu.username)
+        ChipHistoryDocument.create_history(chip_doc)
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")
         execution_manager = execution_manager.reload().fail_execution()
