@@ -66,7 +66,7 @@ class TaskDocument(Document):
         inserted_documents = []
         for task in tasks:
             logger.debug(f"Inserting task: {task}")
-            doc = cls.find_one(cls.name == task.name).run()
+            doc = cls.find_one(cls.name == task.name, cls.username == task.username).run()
             if doc is None:
                 logger.debug(f"Task {task.name} not found. Inserting new task.")
                 doc = cls.from_task_model(task)
