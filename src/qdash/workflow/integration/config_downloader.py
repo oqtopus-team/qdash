@@ -33,7 +33,7 @@ def update_config(target_dir: str | Path = "/app/config") -> str:
         # Get authentication details from environment
         github_user = os.getenv("GITHUB_USER")
         github_token = os.getenv("GITHUB_TOKEN")
-        repo_url = os.getenv("CONFIG_REPO_URL", "https://github.com/qiqb-osaka/config.git")
+        repo_url = os.getenv("CONFIG_REPO_URL")
 
         if not all([github_user, github_token]):
             raise RuntimeError("Missing required environment variables: GITHUB_USER, GITHUB_TOKEN")

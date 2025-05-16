@@ -47,7 +47,7 @@ if __name__ == "__main__":
         """,
         tags=["calibration"],
         schedule=CronSchedule(
-            cron="20 4 * * *",
+            cron="35 4 * * *",
             timezone="Asia/Tokyo",
         ),
         is_schedule_active=False,

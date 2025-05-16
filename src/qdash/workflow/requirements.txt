@@ -451,9 +451,9 @@ pyzmq==26.2.1
     #   jupyter-server
 qctrl-visualizer==8.0.2
     # via qubex
-qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@542c30bfb268f7f2df0f7a072460eea13d381629
+qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@5855b39f606b92dedde911904f0c0e13c3161baf
     # via qubex
-qubex @ git+https://github.com/amachino/qubex.git@44ff2d7bcdb84fbfbc92310b42cefe14a461bb1d
+qubex @ git+https://github.com/amachino/qubex.git@24874863506bf30968620c2b81ee126e0634c33a
 quel-clock-master @ git+https://github.com/quel-inc/quelware.git@de4dd6caf967b025b7d529e41a1d6e8c3029cc66#subdirectory=quel_clock_master
     # via
     #   qubecalib
