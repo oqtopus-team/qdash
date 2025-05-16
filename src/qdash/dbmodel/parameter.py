@@ -55,10 +55,12 @@ class ParameterDocument(Document):
         )
 
     @classmethod
-    def insert_parameters(cls, parameters: list[ParameterModel]) -> list["ParameterDocument"]:
+    def insert_parameters(
+        cls, parameters: list[ParameterModel], username: str
+    ) -> list["ParameterDocument"]:
         inserted_documents = []
         for param in parameters:
-            doc = cls.find_one(cls.name == param.name).run()
+            doc = cls.find_one(cls.name == param.name, cls.username == username).run()
             if doc is None:
                 doc = cls.from_parameter_model(param)
                 doc.save()

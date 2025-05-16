@@ -272,7 +272,7 @@ def setup_calibration(
 
     # Update parameters and tasks
     parameters = update_active_output_parameters(username=menu.username)
-    ParameterDocument.insert_parameters(parameters)
+    ParameterDocument.insert_parameters(parameters, username=menu.username)
     tasks = update_active_tasks(username=menu.username)
     logger.info(f"updating tasks: {tasks}")
     TaskDocument.insert_tasks(tasks)
