@@ -8,6 +8,8 @@ from qdash.db.init import (
     init_qubit_document,
     init_task_document,
 )
+from qdash.db.init.initialize import initialize
+from qdash.dbmodel.parameter import ParameterDocument
 
 app = typer.Typer(
     name="qdash",
@@ -148,6 +150,23 @@ def rename_all_menu_with_chip_id(
         typer.echo(f"Menu renamed with chip ID successfully (username: {username})")
     except Exception as e:
         typer.echo(f"Error renaming menu with chip ID: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
+def update_active_output_parameters(
+    username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
+) -> None:
+    """Update active output parameters."""
+    try:
+        from qdash.cli.add import update_active_output_parameters
+
+        params = update_active_output_parameters(username=username)
+        initialize()
+        ParameterDocument.insert_parameters(params, username=username)
+        typer.echo(f"Active output parameters updated successfully (username: {username})")
+    except Exception as e:
+        typer.echo(f"Error updating active output parameters: {e}", err=True)
         raise typer.Exit(1)
 
 

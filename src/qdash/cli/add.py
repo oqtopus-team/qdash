@@ -1,11 +1,13 @@
 import logging
 
+from qdash.datamodel.parameter import ParameterModel
 from qdash.db.init.chip import generate_coupling_data, generate_qubit_data
 from qdash.db.init.coupling import bi_direction, generate_coupling
 from qdash.db.init.initialize import initialize
 from qdash.db.init.qubit import generate_dummy_data, qubit_lattice
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.menu import MenuDocument
+from qdash.workflow.tasks.base import BaseTask
 
 logging.basicConfig(level=logging.INFO)
 
@@ -85,3 +87,46 @@ def rename_all_menu_with_chip_id(
     except Exception as e:
         logging.error(f"Error renaming menu with chip ID: {e}")
         raise
+
+
+def convert_output_parameters(username: str, outputs: dict[str, any]) -> dict[str, dict]:  # type: ignore # noqa: PGH003
+    """Convert the output parameters to the Parameter class."""
+    converted = {}
+    for param_name, output in outputs.items():
+        param = ParameterModel(
+            username=username, name=param_name, unit=output.unit, description=output.description
+        )  # type: ignore # noqa: PGH003
+        converted[param_name] = param.model_dump()
+    return converted
+
+
+def update_active_output_parameters(username: str) -> list[ParameterModel]:
+    """Update the active output parameters in the input file.
+
+    Args:
+    ----
+        username (str): The username for the initialization.
+
+    """
+    all_outputs = {name: cls.output_parameters for name, cls in BaseTask.registry.items()}
+    converted_outputs = {
+        task_name: convert_output_parameters(username=username, outputs=outputs)
+        for task_name, outputs in all_outputs.items()
+    }
+
+    unique_parameter_names = {
+        param_name for outputs in converted_outputs.values() for param_name in outputs
+    }
+    return [
+        ParameterModel(
+            username=username,
+            name=name,
+            unit=converted_outputs[
+                next(task for task in converted_outputs if name in converted_outputs[task])
+            ][name]["unit"],
+            description=converted_outputs[
+                next(task for task in converted_outputs if name in converted_outputs[task])
+            ][name]["description"],
+        )
+        for name in unique_parameter_names
+    ]
