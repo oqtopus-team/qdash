@@ -86,7 +86,7 @@ def main_flow(
             msg="RUNNING",
             ts="",
             path="",
-            header=f"{menu.name}: http://127.0.0.1:{settings.ui_port}/execution/64Q/{execution_id}",
+            header=f"{menu.name}: http://localhost:{settings.ui_port}/execution/64Q/{execution_id}",
             channel=settings.slack_channel_id,
             token=settings.slack_bot_token,
         )

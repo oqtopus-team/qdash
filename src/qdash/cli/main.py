@@ -170,7 +170,7 @@ def init_all_data(
         init_chip_document(username=username, chip_id=chip_id)
         typer.echo("Chip data initialized")
 
-        init_menu(username=username)
+        init_menu(username=username, chip_id=chip_id)
         typer.echo("Menu data initialized")
 
         init_task_document(username=username)
