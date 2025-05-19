@@ -81,7 +81,6 @@ class QubitHistoryDocument(Document):
                 chip_id=qubit.chip_id,
                 data=qubit.data,
                 node_info=qubit.node_info,
-                system_info=qubit.system_info,
             )
         history.save()
         return history

@@ -80,7 +80,6 @@ class CouplingHistoryDocument(Document):
                 chip_id=coupling.chip_id,
                 data=coupling.data,
                 edge_info=coupling.edge_info,
-                system_info=coupling.system_info,
             )
         history.save()
         return history
