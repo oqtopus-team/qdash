@@ -69,7 +69,11 @@ class CouplingDocument(Document):
         if chip_doc is None:
             raise ValueError(f"Chip {chip_id} not found")
         coupling_model = CouplingModel(
-            qid=qid, chip_id=chip_id, data=coupling_doc.data, edge_info=coupling_doc.edge_info
+            qid=qid,
+            chip_id=chip_id,
+            data=coupling_doc.data,
+            edge_info=coupling_doc.edge_info,
+            username=username,
         )
         chip_doc.update_coupling(qid, coupling_model)
         # Update the coupling in the history document

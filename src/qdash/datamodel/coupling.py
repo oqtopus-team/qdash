@@ -29,6 +29,9 @@ class CouplingModel(BaseModel):
 
     """
 
+    username: str | None = Field(
+        None, description="The username of the user who created the coupling"
+    )
     qid: str = Field(..., description="The coupling ID")
     status: str = Field("pending", description="The status of the coupling")
     chip_id: str | None = Field(None, description="The chip ID")
