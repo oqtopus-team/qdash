@@ -40,6 +40,7 @@ class QubitModel(BaseModel):
 
     """
 
+    username: None | str = Field(None, description="The username of the user who created the qubit")
     qid: str = Field(..., description="The qubit ID")
     status: str = Field("pending", description="The status of the qubit")
     chip_id: str | None = Field(None, description="The chip ID")
