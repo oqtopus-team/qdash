@@ -80,6 +80,10 @@ class CouplingHistoryDocument(Document):
                 chip_id=coupling.chip_id,
                 data=coupling.data,
                 edge_info=coupling.edge_info,
+                system_info=SystemInfoModel(
+                    created_at=pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+                    updated_at=pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+                ),
             )
         history.save()
         return history

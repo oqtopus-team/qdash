@@ -81,6 +81,10 @@ class QubitHistoryDocument(Document):
                 chip_id=qubit.chip_id,
                 data=qubit.data,
                 node_info=qubit.node_info,
+                system_info=SystemInfoModel(
+                    created_at=pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+                    updated_at=pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+                ),
             )
         history.save()
         return history
