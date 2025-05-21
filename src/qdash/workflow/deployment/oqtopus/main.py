@@ -6,6 +6,7 @@ from prefect.client.schemas.schedules import CronSchedule
 from qdash.workflow.calibration.flow import serial_cal_flow
 from qdash.workflow.calibration.flow import batch_cal_flow
 from qdash.workflow.handler import main_flow
+from qdash.workflow.subflow.chip_info.flow import update_props
 
 from qdash.workflow.subflow.scheduler.flow import cron_scheduler_flow
 
@@ -99,6 +100,18 @@ if __name__ == "__main__":
         description="""This is a batch cal flow.
         """,
     )
+    update_props_deploy = update_props.to_deployment(
+        name=f"{deployment_name}-update-props",
+        description="""This is a props update flow.
+        """,
+        tags=["system"],
+        schedule=CronSchedule(
+            cron="0 12 * * *",
+            timezone="Asia/Tokyo",
+        ),
+        parameters={"username": "admin"},
+        is_schedule_active=True,
+    )
 
     _ = serve(
         main_deploy,  # type: ignore
@@ -109,6 +122,7 @@ if __name__ == "__main__":
         cron_scheduler_deploy_5,  # type: ignore
         serial_cal_flow_deploy,  # type: ignore
         batch_cal_flow_deploy,  # type: ignore
+        update_props_deploy,  # type: ignore
         webserver=True,
         limit=50,
     )
