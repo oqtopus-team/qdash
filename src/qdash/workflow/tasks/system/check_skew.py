@@ -20,7 +20,7 @@ class CheckSkew(BaseTask):
         "muxes": InputParameterModel(
             unit="a.u.",
             value_type="list",
-            value=[0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+            value=[0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
             description="List of muxes to check skew",
         ),
     }
@@ -37,20 +37,20 @@ class CheckSkew(BaseTask):
         )
 
     def run(self, exp: Experiment, qid: str) -> RunResult:  # noqa: ARG002
-        qc = exp.tool.get_qubecalib()
         exp = Experiment(
             chip_id="64Q",
             muxes=self.input_parameters["muxes"].get_value(),
             config_dir="/app/config",
             params_dir="/app/config",
         )
+        qc = exp.tool.get_qubecalib()
         qc.sysdb.load_box_yaml("/app/config/box.yaml")
         setting = SkewSetting.from_yaml("/app/config/skew.yaml")
-        boxes = [*list(exp.boxes), setting.monitor_box_name]
+        boxes = [list(exp.boxes), setting.monitor_box_name]
         system = qc.sysdb.create_quel1system(*boxes)
+        system.initialize()
         system.resync(*boxes)
         skew = Skew.create(setting=setting, system=system, sysdb=qc.sysdb)
-
         skew.measure()
         skew.estimate()
         fig = skew.plot()

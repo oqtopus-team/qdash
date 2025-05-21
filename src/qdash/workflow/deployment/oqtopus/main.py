@@ -47,7 +47,7 @@ if __name__ == "__main__":
         """,
         tags=["calibration"],
         schedule=CronSchedule(
-            cron="35 4 * * *",
+            cron="40 4 * * *",
             timezone="Asia/Tokyo",
         ),
         is_schedule_active=False,
@@ -59,7 +59,31 @@ if __name__ == "__main__":
         """,
         tags=["calibration"],
         schedule=CronSchedule(
-            cron="15 5 * * *",
+            cron="40 6 * * *",
+            timezone="Asia/Tokyo",
+        ),
+        is_schedule_active=False,
+        parameters={"menu_name": "DailyTwoQubit"},
+    )
+    cron_scheduler_deploy_4 = cron_scheduler_flow.to_deployment(
+        name=f"{deployment_name}-cron-scheduler-4",
+        description="""This is a scheduler.
+        """,
+        tags=["calibration"],
+        schedule=CronSchedule(
+            cron="30 7 * * *",
+            timezone="Asia/Tokyo",
+        ),
+        is_schedule_active=False,
+        parameters={"menu_name": "CheckSkew"},
+    )
+    cron_scheduler_deploy_5 = cron_scheduler_flow.to_deployment(
+        name=f"{deployment_name}-cron-scheduler-5",
+        description="""This is a scheduler.
+        """,
+        tags=["calibration"],
+        schedule=CronSchedule(
+            cron="30 8 * * *",
             timezone="Asia/Tokyo",
         ),
         is_schedule_active=False,
@@ -81,6 +105,8 @@ if __name__ == "__main__":
         cron_scheduler_deploy_1,  # type: ignore
         cron_scheduler_deploy_2,  # type: ignore
         cron_scheduler_deploy_3,  # type: ignore
+        cron_scheduler_deploy_4,  # type: ignore
+        cron_scheduler_deploy_5,  # type: ignore
         serial_cal_flow_deploy,  # type: ignore
         batch_cal_flow_deploy,  # type: ignore
         webserver=True,
