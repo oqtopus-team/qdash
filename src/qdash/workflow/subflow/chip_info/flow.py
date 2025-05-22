@@ -1,12 +1,17 @@
 import math
 from typing import Any, Protocol, TypeAlias, cast
 
+import pendulum
 from prefect import flow
 from pydantic import BaseModel, Field
 from qdash.config import get_settings
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
+from qdash.workflow.subflow.chip_info.task import generate_chip_info_report
 from qdash.workflow.utils.slack import SlackContents, Status
+from qdash.workflow.utiltask.create_directory import (
+    create_directory_task,
+)
 
 # Import YAML module
 from ruamel import yaml
@@ -290,7 +295,10 @@ def update_props(username: str = "admin") -> None:
 
     settings = get_settings()
     # Write to YAML file
-    props_save_path = f"/app/calib_data/{username}/.calibration/props.yaml"
+    date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
+    chip_info_dir = f"/app/calib_data/{username}/{date_str}/chip_info"
+    create_directory_task.submit(chip_info_dir).result()
+    props_save_path = f"{chip_info_dir}/props.yaml"
     write_yaml(merged_props, filename=props_save_path)
     slack = SlackContents(
         status=Status.SUCCESS,
@@ -298,7 +306,19 @@ def update_props(username: str = "admin") -> None:
         msg="props.yaml updated successfully.",
         ts="",
         path=props_save_path,
-        header=f"file: /app/calib_data/{username}/.calibration/props.yaml",
+        header=f"file: {props_save_path}",
+        channel=settings.slack_channel_id,
+        token=settings.slack_bot_token,
+    )
+    slack.send_slack()
+    generate_chip_info_report(chip_info_dir=chip_info_dir)
+    slack = SlackContents(
+        status=Status.SUCCESS,
+        title="chip_info_report.pdf",
+        msg="chip_info_report.pdf updated successfully.",
+        ts="",
+        path=f"{chip_info_dir}/chip_info_report.pdf",
+        header=f"file: {chip_info_dir}/chip_info_report.pdf",
         channel=settings.slack_channel_id,
         token=settings.slack_bot_token,
     )
