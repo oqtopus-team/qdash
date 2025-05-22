@@ -44,6 +44,10 @@ class CheckRabi(BaseTask):
         "rabi_frequency": OutputParameterModel(
             unit="MHz", description="Rabi oscillation frequency"
         ),
+        "rabi_phase": OutputParameterModel(unit="a.u.", description="Rabi oscillation phase"),
+        "rabi_offset": OutputParameterModel(unit="a.u.", description="Rabi oscillation offset"),
+        "rabi_angle": OutputParameterModel(unit="degree", description="Rabi angle (in degree)"),
+        "rabi_noise": OutputParameterModel(unit="a.u.", description="Rabi oscillation noise"),
     }
 
     def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
@@ -62,6 +66,12 @@ class CheckRabi(BaseTask):
         self.output_parameters["rabi_frequency"].error = (
             result.data[label].fit()["frequency_err"] * 1000
         )
+        self.output_parameters["rabi_phase"].value = result.rabi_params[label].phase
+        self.output_parameters["rabi_phase"].error = result.data[label].fit()["phase_err"]
+        self.output_parameters["rabi_offset"].value = result.rabi_params[label].offset
+        self.output_parameters["rabi_offset"].error = result.data[label].fit()["offset_err"]
+        self.output_parameters["rabi_angle"].value = result.rabi_params[label].angle
+        self.output_parameters["rabi_noise"].value = result.rabi_params[label].noise
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
         raw_data = [result.data[label].data]
