@@ -109,6 +109,7 @@ workflow = [
     "qubex[backend]",
     "filelock>=3.17.0",
     "gitpython>=3.1.44",
+    "reportlab>=4.4.1",
 ]
 dev = [
     "ruff==0.5.5",

@@ -54,6 +54,8 @@ cffi==1.17.1
     #   argon2-cffi-bindings
     #   cryptography
     #   pyzmq
+chardet==5.2.0
+    # via reportlab
 charset-normalizer==3.4.1
     # via requests
 chex==0.1.89
@@ -368,7 +370,9 @@ passlib==1.7.4
 pexpect==4.9.0 ; sys_platform != 'emscripten' and sys_platform != 'win32'
     # via ipython
 pillow==11.1.0
-    # via matplotlib
+    # via
+    #   matplotlib
+    #   reportlab
 pip==24.0
     # via qubex
 platformdirs==4.3.6
@@ -501,6 +505,7 @@ referencing==0.36.2
     #   jsonschema
     #   jsonschema-specifications
     #   jupyter-events
+reportlab==4.4.1
 requests==2.32.3
     # via
     #   jupyterlab-server

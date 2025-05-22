@@ -7,6 +7,9 @@ from qdash.workflow.calibration.flow import serial_cal_flow
 from qdash.workflow.calibration.flow import batch_cal_flow
 from qdash.workflow.handler import main_flow
 
+# from qdash.workflow.subflow.chip_info.update_props_pr import update_props_pr
+from qdash.workflow.subflow.chip_info.flow import update_props
+
 from qdash.workflow.subflow.scheduler.flow import cron_scheduler_flow
 
 deployment_name = "oqtopus"
@@ -47,7 +50,7 @@ if __name__ == "__main__":
         """,
         tags=["calibration"],
         schedule=CronSchedule(
-            cron="35 4 * * *",
+            cron="40 4 * * *",
             timezone="Asia/Tokyo",
         ),
         is_schedule_active=False,
@@ -59,7 +62,31 @@ if __name__ == "__main__":
         """,
         tags=["calibration"],
         schedule=CronSchedule(
-            cron="15 5 * * *",
+            cron="40 6 * * *",
+            timezone="Asia/Tokyo",
+        ),
+        is_schedule_active=False,
+        parameters={"menu_name": "DailyTwoQubit"},
+    )
+    cron_scheduler_deploy_4 = cron_scheduler_flow.to_deployment(
+        name=f"{deployment_name}-cron-scheduler-4",
+        description="""This is a scheduler.
+        """,
+        tags=["calibration"],
+        schedule=CronSchedule(
+            cron="30 7 * * *",
+            timezone="Asia/Tokyo",
+        ),
+        is_schedule_active=False,
+        parameters={"menu_name": "CheckSkew"},
+    )
+    cron_scheduler_deploy_5 = cron_scheduler_flow.to_deployment(
+        name=f"{deployment_name}-cron-scheduler-5",
+        description="""This is a scheduler.
+        """,
+        tags=["calibration"],
+        schedule=CronSchedule(
+            cron="30 8 * * *",
             timezone="Asia/Tokyo",
         ),
         is_schedule_active=False,
@@ -75,14 +102,29 @@ if __name__ == "__main__":
         description="""This is a batch cal flow.
         """,
     )
+    update_props_deploy = update_props.to_deployment(
+        name=f"{deployment_name}-update-props",
+        description="""This is a props update flow.
+        """,
+        tags=["system"],
+        schedule=CronSchedule(
+            cron="0 12 * * *",
+            timezone="Asia/Tokyo",
+        ),
+        parameters={"username": "admin"},
+        is_schedule_active=True,
+    )
 
     _ = serve(
         main_deploy,  # type: ignore
         cron_scheduler_deploy_1,  # type: ignore
         cron_scheduler_deploy_2,  # type: ignore
         cron_scheduler_deploy_3,  # type: ignore
+        cron_scheduler_deploy_4,  # type: ignore
+        cron_scheduler_deploy_5,  # type: ignore
         serial_cal_flow_deploy,  # type: ignore
         batch_cal_flow_deploy,  # type: ignore
+        update_props_deploy,  # type: ignore
         webserver=True,
         limit=50,
     )
