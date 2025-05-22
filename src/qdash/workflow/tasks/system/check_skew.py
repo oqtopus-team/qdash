@@ -46,7 +46,7 @@ class CheckSkew(BaseTask):
         qc = exp.tool.get_qubecalib()
         qc.sysdb.load_box_yaml("/app/config/box.yaml")
         setting = SkewSetting.from_yaml("/app/config/skew.yaml")
-        boxes = [list(exp.boxes), setting.monitor_box_name]
+        boxes = [*list(exp.boxes), setting.monitor_box_name]
         system = qc.sysdb.create_quel1system(*boxes)
         system.initialize()
         system.resync(*boxes)
