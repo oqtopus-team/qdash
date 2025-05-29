@@ -92,6 +92,130 @@ class CustomLatticeGraph(LatticeGraph):
 
         return fig
 
+    def create_graph_figure(
+        self,
+        *,
+        directed: bool = True,
+        title: str = "Graph Data",
+        node_values: dict | None = None,
+        node_texts: dict | None = None,
+        node_hovertexts: dict | None = None,
+        node_color: str | None = None,
+        node_linecolor: str | None = None,
+        node_textcolor: str | None = None,
+        edge_values: dict | None = None,
+        edge_texts: dict | None = None,
+        edge_hovertexts: dict | None = None,
+        edge_color: str | None = None,
+        edge_textcolor: str | None = None,
+        node_overlay: bool = False,
+        edge_overlay: bool = False,
+        node_overlay_values: dict | None = None,
+        node_overlay_texts: dict | None = None,
+        node_overlay_hovertexts: dict | None = None,
+        node_overlay_color: str | None = None,
+        node_overlay_linecolor: str | None = None,
+        node_overlay_textcolor: str | None = None,
+        edge_overlay_values: dict | None = None,
+        edge_overlay_texts: dict | None = None,
+        edge_overlay_hovertexts: dict | None = None,
+        edge_overlay_color: str | None = None,
+        edge_overlay_textcolor: str | None = None,
+        colorscale: str = "Viridis",
+    ):
+        width = 3 * NODE_SIZE * self.n_qubit_cols
+        height = 3 * NODE_SIZE * self.n_qubit_rows
+
+        layout = go.Layout(
+            title=title,
+            width=width,
+            height=height,
+            margin=dict(b=30, l=30, r=30, t=60),
+            xaxis=dict(
+                ticks="",
+                # showline=False,
+                showgrid=False,
+                zeroline=False,
+                showticklabels=False,
+                constrain="domain",
+            ),
+            yaxis=dict(
+                ticks="",
+                autorange="reversed",
+                # showline=False,
+                showgrid=False,
+                zeroline=False,
+                showticklabels=False,
+            ),
+            plot_bgcolor="white",
+            showlegend=False,
+            hovermode="closest",
+            hoverlabel=dict(
+                bgcolor="white",
+                bordercolor="black",
+                font=dict(
+                    family="monospace",
+                    size=TEXT_SIZE,
+                    color="black",
+                ),
+            ),
+        )
+
+        data = []
+
+        mux_node_trace = self._create_mux_node_trace()
+        data.append(mux_node_trace)
+
+        qubit_edge_trace = self._create_qubit_edge_traces(
+            directed=directed,
+            values=edge_values,
+            texts=edge_texts,
+            hovertexts=edge_hovertexts,
+            color=edge_color,
+            textcolor=edge_textcolor,
+            colorscale=colorscale,
+        )
+        data += qubit_edge_trace
+
+        if edge_overlay:
+            qubit_edge_overlay_trace = self._create_qubit_edge_traces(
+                directed=directed,
+                values=edge_overlay_values,
+                texts=edge_overlay_texts,
+                hovertexts=edge_overlay_hovertexts,
+                color=edge_overlay_color,
+                textcolor=edge_overlay_textcolor,
+                colorscale=colorscale,
+            )
+            data += qubit_edge_overlay_trace
+
+        qubit_node_trace = self._create_qubit_node_traces(
+            values=node_values,
+            texts=node_texts,
+            hovertexts=node_hovertexts,
+            color=node_color,
+            linecolor=node_linecolor,
+            textcolor=node_textcolor,
+        )
+        data += qubit_node_trace
+
+        if node_overlay:
+            qubit_node_overlay_trace = self._create_qubit_node_traces(
+                values=node_overlay_values,
+                texts=node_overlay_texts,
+                hovertexts=node_overlay_hovertexts,
+                color=node_overlay_color,
+                linecolor=node_overlay_linecolor,
+                textcolor=node_overlay_textcolor,
+            )
+            data += qubit_node_overlay_trace
+
+        fig = go.Figure(
+            data=data,
+            layout=layout,
+        )
+        return fig
+
 
 def replace_none_with_nan(obj: dict | list | ScalarFloat | None | float | int | str):
     if isinstance(obj, dict):
@@ -395,6 +519,54 @@ def generate_chip_info_report(
             ],
         )
         fig.write_image(file=f"{chip_info_dir}/x180_gate_fidelity.png")
+
+    def create_undirected_data(
+        data: dict[str, float],
+        method: Literal["avg", "max", "min"],
+    ) -> dict[str, float]:
+        result = {}
+        for key, value in data.items():
+            if value is None or math.isnan(value):
+                continue
+            pair = key.split("-")
+            inv_key = f"{pair[1]}-{pair[0]}"
+            if (
+                inv_key in result
+                and result[inv_key] is not None
+                and not math.isnan(result[inv_key])
+            ):
+                if method == "avg":
+                    result[inv_key] = (result[inv_key] + value) / 2
+                elif method == "max":
+                    result[inv_key] = max(result[inv_key], value)
+                elif method == "min":
+                    result[inv_key] = min(result[inv_key], value)
+                else:
+                    raise ValueError(f"Unknown method: {method}")
+            else:
+                result[key] = float(value)
+        return result
+
+    if "zx90_gate_fidelity" in info_type:
+        values = props["zx90_gate_fidelity"]
+        values = create_undirected_data(
+            data=values,
+            method="max",
+        )
+        fig = graph.create_graph_figure(
+            directed=False,
+            title="ZX90 gate fidelity (%)",
+            edge_values={key: value for key, value in values.items()},
+            edge_texts={
+                key: f"{value * 1e2:.1f}" if not math.isnan(value) else None
+                for key, value in values.items()
+            },
+            edge_hovertexts={
+                key: f"{key}: {value:.2%}" if not math.isnan(value) else "N/A"
+                for key, value in values.items()
+            },
+        )
+        fig.write_image(file=f"{chip_info_dir}/zx90_gate_fidelity.png")
 
     generate_rich_pdf_report(
         [
