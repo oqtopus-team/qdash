@@ -44,7 +44,7 @@ class BaseTask(ABC):
     task_type: Literal["global", "qubit", "coupling", "system"]
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
-    r2_threshold: float = 0.6
+    r2_threshold: float = 0.9
     registry: ClassVar[dict] = {}
 
     def __init_subclass__(cls, **kwargs) -> None:  # noqa: ANN003
