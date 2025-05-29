@@ -1,3 +1,4 @@
+import math
 import uuid
 from copy import deepcopy
 from enum import Enum
@@ -5,7 +6,7 @@ from typing import Any, Literal
 
 import numpy as np
 import pendulum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from qdash.datamodel.system_info import SystemInfoModel
 
 SCHDULED = "scheduled"
@@ -90,6 +91,14 @@ class OutputParameterModel(BaseModel):
         description="The time when the system information was created",
     )
     execution_id: str = ""
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def replace_nan_with_zero(cls, v: float) -> float:
+        """Replace NaN values with zero."""
+        if isinstance(v, float) and math.isnan(v):
+            return 0
+        return v
 
 
 class TaskStatusModel(str, Enum):
