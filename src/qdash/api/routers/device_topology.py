@@ -180,7 +180,7 @@ def get_device_topology(
     # chip_docs = ChipDocument.find_one({"chip_id": chip_id, "username": latest.username}).run()
     chip_docs = ChipDocument.get_current_chip(username=latest.username)
     # Sort physical qubit indices and create id mapping
-    sorted_physical_ids = sorted(request.qubits)
+    sorted_physical_ids = sorted(request.qubits, key=lambda x: int(x))
     id_mapping = {pid: idx for idx, pid in enumerate(sorted_physical_ids)}
     logger.info(f"id_mapping: {id_mapping}")
 
@@ -209,8 +209,8 @@ def get_device_topology(
                 id=id_mapping[qid],  # Map to new sequential id
                 physical_id=int(qid),
                 position=Position(
-                    x=chip_docs.qubits[qid].node_info.position.x / 100,
-                    y=chip_docs.qubits[qid].node_info.position.y / 100,
+                    x=chip_docs.qubits[qid].node_info.position.x / 30,
+                    y=chip_docs.qubits[qid].node_info.position.y / 30,
                 ),
                 fidelity=x90_gate_fidelity,
                 meas_error=MeasError(
@@ -273,7 +273,7 @@ def get_device_topology(
         device_id=request.device_id,
         qubits=qubits,
         couplings=couplings,
-        calibrated_at=pendulum.parse(latest.timestamp).format("YYYY-MM-DD HH:mm:ss.SSSSSS"),  # type: ignore # noqa: PGH003
+        calibrated_at=latest.timestamp,  # type: ignore # noqa: PGH003
     )
 
 
