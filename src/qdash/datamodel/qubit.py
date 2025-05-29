@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+import math
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class PositionModel(BaseModel):
@@ -46,3 +48,21 @@ class QubitModel(BaseModel):
     chip_id: str | None = Field(None, description="The chip ID")
     data: dict = Field(..., description="The data of the qubit")
     node_info: NodeInfoModel = Field(..., description="The node information")
+
+    @field_validator("data", mode="before")
+    @classmethod
+    def sanitize_data(cls, v: object) -> dict:
+        def replace_nan(obj: object) -> object:
+            if isinstance(obj, float) and math.isnan(obj):
+                return 0
+            if isinstance(obj, dict):
+                return {k: replace_nan(val) for k, val in obj.items()}
+            if isinstance(obj, list):
+                return [replace_nan(val) for val in obj]
+            return obj
+
+        cleaned = replace_nan(v)
+        if not isinstance(cleaned, dict):
+            msg = "data must be a dictionary"
+            raise TypeError(msg)
+        return cleaned
