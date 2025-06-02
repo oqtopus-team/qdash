@@ -154,6 +154,11 @@ class DeviceTopologyRequst(BaseModel):
     device_id: str = "anemone"
     qubits: list[str] = ["0", "1", "2", "3", "4", "5"]
     exclude_couplings: list[str] = []
+    condition: dict = {
+        "coupling_fidelity": {"min": 0.7, "max": 1.0},
+        "qubit_fidelity": {"min": 0.7, "max": 1.0},
+        "only_maximum_connected": True,
+    }
 
 
 @router.post(
@@ -268,11 +273,71 @@ def get_device_topology(
                             gate_duration=CouplingGateDuration(rzx90=cr_duration),
                         )
                     )
+    # Filter couplings based on fidelity threshold
+    # filtered_couplings = [
+    #     coupling for coupling in couplings if coupling.fidelity >= 0.7 and coupling.fidelity < 1.0
+    # ]
+    # First filter qubits based on fidelity
+    filtered_qubits = [
+        qubit
+        for qubit in qubits
+        if (
+            request.condition["qubit_fidelity"]["min"]
+            <= qubit.fidelity
+            <= request.condition["qubit_fidelity"]["max"]
+        )
+    ]
+
+    # Get set of qubit IDs that passed the fidelity filter
+    valid_qubit_ids = {qubit.id for qubit in filtered_qubits}
+
+    # Filter couplings based on both coupling fidelity and connected qubit fidelity
+    filtered_couplings = [
+        coupling
+        for coupling in couplings
+        if (
+            request.condition["coupling_fidelity"]["min"]
+            <= coupling.fidelity
+            <= request.condition["coupling_fidelity"]["max"]
+            and coupling.control in valid_qubit_ids
+            and coupling.target in valid_qubit_ids
+        )
+    ]
+
+    if request.condition["only_maximum_connected"]:
+        # Create a graph to find the largest connected component
+        G = nx.Graph()
+        for coupling in filtered_couplings:
+            G.add_edge(coupling.control, coupling.target)
+
+        if G.edges:  # Only find largest component if there are any edges
+            # Find the largest connected component
+            largest_component = max(nx.connected_components(G), key=len)
+
+            # Filter qubits and couplings to keep only those in the largest component
+            filtered_qubits = [qubit for qubit in filtered_qubits if qubit.id in largest_component]
+            filtered_couplings = [
+                coupling
+                for coupling in filtered_couplings
+                if coupling.control in largest_component and coupling.target in largest_component
+            ]
+    # Create new sequential IDs starting from 0
+    new_id_mapping = {qubit.id: i for i, qubit in enumerate(filtered_qubits)}
+
+    # Update qubit IDs
+    for qubit in filtered_qubits:
+        qubit.id = new_id_mapping[qubit.id]
+
+    # Update coupling IDs to match new qubit IDs
+    for coupling in filtered_couplings:
+        coupling.control = new_id_mapping[coupling.control]
+        coupling.target = new_id_mapping[coupling.target]
+
     return Device(
         name=request.name,
         device_id=request.device_id,
-        qubits=qubits,
-        couplings=couplings,
+        qubits=filtered_qubits,
+        couplings=filtered_couplings,
         calibrated_at=latest.timestamp,  # type: ignore # noqa: PGH003
     )
 
@@ -302,7 +367,7 @@ def generate_device_plot(data: dict) -> bytes:
     plt.rcParams["font.family"] = "sans-serif"
 
     # Create the plot with a specific layout for colorbar
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(15, 15))
 
     # Draw nodes
     nx.draw_networkx_nodes(
@@ -329,6 +394,18 @@ def generate_device_plot(data: dict) -> bytes:
     nx.draw_networkx_edge_labels(G, pos, edge_labels, font_size=10, label_pos=0.3)
 
     # Add a colorbar with adjusted position
+    qubit_number = len(G.nodes)
+    copuling_number = len(G.edges)
+    logger.info(f"Qubit number: {qubit_number}, Coupling number: {copuling_number}")
+    # ax.text(
+    #     0.5,
+    #     0.99,
+    #     f"Qubit: {qubit_number}, Coupling: {copuling_number}",
+    #     transform=ax.transAxes,
+    #     ha="center",
+    #     fontsize=12,
+    #     fontweight="bold",
+    # )
     sm = plt.cm.ScalarMappable(
         cmap="viridis",
         norm=plt.Normalize(
@@ -340,7 +417,7 @@ def generate_device_plot(data: dict) -> bytes:
     cbar.ax.tick_params(labelsize=12)
 
     ax.set_title(
-        f"Quantum Device: {data['name'].upper()}",
+        f"Quantum Device: {data['name'].upper()}, qubit: {qubit_number}, coupling: {copuling_number}",
         pad=20,
         fontsize=16,
         fontweight="bold",
