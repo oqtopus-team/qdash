@@ -49,6 +49,7 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
         "zx90_gate_fidelity": OutputParameterModel(
             unit="a.u.",
             description="ZX90 gate fidelity",
+            value_type="float",
         ),
     }
 
