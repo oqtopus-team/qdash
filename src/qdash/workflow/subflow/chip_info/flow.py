@@ -91,6 +91,7 @@ class CouplingProperties(BaseModel):
     static_zz_interaction: float | None = None
     qubit_qubit_coupling_strength: float | None = None
     zx90_gate_fidelity: float | None = None
+    bell_state_fidelity: float | None = None
 
 
 class ChipProperties(BaseModel):
@@ -137,6 +138,8 @@ def _process_coupling_data(coupling_data: dict) -> CouplingProperties:
             coupling_props.static_zz_interaction = v
         elif key == "qubit_qubit_coupling_strength":
             coupling_props.qubit_qubit_coupling_strength = v
+        elif key == "bell_state_fidelity":
+            coupling_props.bell_state_fidelity = v
     return coupling_props
 
 
@@ -194,13 +197,22 @@ def merge_properties(base_props: CommentedMap, chip_props: ChipProperties) -> Co
 
     # Helper function to update a property if it differs
     def update_if_different(section: str, key: str, value: float | str | bool | None) -> None:
-        if value is not None and key in base_props["64Q"][section]:
-            old_value = base_props["64Q"][section][key]
-            if old_value != value:
-                if section not in updated_values:
-                    updated_values[section] = {}
-                updated_values[section][key] = (old_value, value)
-                base_props["64Q"][section][key] = format_number(value)
+        if value is None:
+            return
+
+        # セクションが存在しない場合は作成
+        if section not in base_props["64Q"]:
+            base_props["64Q"][section] = CommentedMap()
+            updated_values[section] = {}
+
+        section_map = base_props["64Q"][section]
+
+        old_value = section_map.get(key)
+        if old_value != value:
+            if section not in updated_values:
+                updated_values[section] = {}
+            updated_values[section][key] = (old_value, value)
+            section_map[key] = format_number(value)
 
     # Update qubit properties
     for qid, qubit in chip_props.qubits.items():
@@ -251,6 +263,7 @@ def write_yaml(data: CommentedMap | ChipProperties, filename: str = "chip_proper
             "x90_gate_fidelity",
             "x180_gate_fidelity",
             "zx90_gate_fidelity",
+            "bell_state_fidelity",
         ]
         for section in sections:
             output_dict["64Q"][section] = CommentedMap()

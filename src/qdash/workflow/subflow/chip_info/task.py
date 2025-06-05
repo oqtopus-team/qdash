@@ -326,6 +326,7 @@ def generate_chip_info_report(
         "average_readout_fidelity",
         "x90_gate_fidelity",
         "zx90_gate_fidelity",
+        "bell_state_fidelity",
     )
     graph = CustomLatticeGraph(64)
     if "resonator_frequency" in info_type:
@@ -567,6 +568,26 @@ def generate_chip_info_report(
             },
         )
         fig.write_image(file=f"{chip_info_dir}/zx90_gate_fidelity.png")
+    if "bell_state_fidelity" in info_type:
+        values = props["bell_state_fidelity"]
+        values = create_undirected_data(
+            data=values,
+            method="max",
+        )
+        fig = graph.create_graph_figure(
+            directed=False,
+            title="Bell state fidelity (%)",
+            edge_values={key: value for key, value in values.items()},
+            edge_texts={
+                key: f"{value * 1e2:.1f}" if not math.isnan(value) else None
+                for key, value in values.items()
+            },
+            edge_hovertexts={
+                key: f"{key}: {value:.2%}" if not math.isnan(value) else "N/A"
+                for key, value in values.items()
+            },
+        )
+        fig.write_image(file=f"{chip_info_dir}/bell_state_fidelity.png")
 
     generate_rich_pdf_report(
         [
@@ -577,6 +598,7 @@ def generate_chip_info_report(
             f"{chip_info_dir}/average_readout_fidelity.png",
             f"{chip_info_dir}/x90_gate_fidelity.png",
             f"{chip_info_dir}/zx90_gate_fidelity.png",
+            f"{chip_info_dir}/bell_state_fidelity.png",
         ],
         pdf_path=f"{chip_info_dir}/chip_info_report.pdf",
     )

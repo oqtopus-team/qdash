@@ -1,3 +1,5 @@
+import json
+
 from qdash.datamodel.qubit import QubitModel
 from qdash.db.init import initialize
 from qdash.dbmodel.chip import ChipDocument
@@ -127,9 +129,9 @@ if __name__ == "__main__":
     two_qubit_list = get_two_qubit_pair_list(chip_doc)
 
     bare_freq = extract_bare_frequency(chip_doc.qubits)
-    print(two_qubit_list)
-    print(len(two_qubit_list), "couplings found.")
-    print(bare_freq)
+    # print(two_qubit_list)
+    # print(len(two_qubit_list), "couplings found.")
+    # print(bare_freq)
 
     # Get CR pairs where first qubit frequency is lower than second qubit frequency
     cr_pairs = cr_pair_list(two_qubit_list, bare_freq)
@@ -140,14 +142,31 @@ if __name__ == "__main__":
     # Filter CR pairs by mux groups
     mux_groups = [[0, 1, 4, 5], [2, 3, 6, 7], [8, 9, 12, 13], [10, 11, 14, 15]]
     # mux_groups = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9]]
+    internal_schedule = {"parallel": []}
     for mux_group in mux_groups:
         filtered_pairs = filter_cr_pairs_by_mux(cr_pairs, mux_group)
         print("\nCR pairs where both qubits belong to mux numbers", mux_group, ":")
         print(filtered_pairs)
         print(len(filtered_pairs), "filtered pairs found.")
+        internal_schedule["parallel"].append({"serial": filtered_pairs})
 
+    external_schedule = {"parallel": []}
     # Get CR pairs that don't belong to any mux group
     other_pairs = get_other_cr_pairs(cr_pairs, mux_groups)
-    print("\nCR pairs that don't belong to any mux group:")
-    print(other_pairs)
-    print(len(other_pairs), "other pairs found.")
+    print("\n" + "=" * 40)
+    print("🧩 CR pairs that don't belong to any mux group")
+    print("=" * 40)
+    print(f"Count: {len(other_pairs)}")
+    print("Pairs:", other_pairs)
+
+    external_schedule["parallel"].append({"serial": other_pairs})
+
+    print("\n" + "=" * 40)
+    print("📦 Internal Schedule")
+    print("=" * 40)
+    print(json.dumps(internal_schedule, indent=2))
+
+    print("\n" + "=" * 40)
+    print("🌐 External Schedule")
+    print("=" * 40)
+    print(json.dumps(external_schedule, indent=2))
