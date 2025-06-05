@@ -135,7 +135,7 @@ if __name__ == "__main__":
             },
         },
         schedule=CronSchedule(
-            cron="18 14 * * *",
+            cron="5 9 * * *",
             timezone="Asia/Tokyo",
         ),
         is_schedule_active=True,
