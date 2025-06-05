@@ -66,3 +66,10 @@ class QubitModel(BaseModel):
             msg = "data must be a dictionary"
             raise TypeError(msg)
         return cleaned
+
+    def get_bare_frequency(self) -> float | None:
+        """Get the bare frequency of the qubit."""
+        v = self.data.get("bare_frequency")
+        if v is None:
+            return None
+        return float(v.get("value", 0.0))
