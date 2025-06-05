@@ -27,6 +27,10 @@ class QubitDocument(Document):
     status: str = Field("pending", description="The status of the qubit")
     chip_id: str = Field(..., description="The chip ID")
     data: dict = Field(..., description="The data of the qubit")
+    best_data: dict = Field(
+        default_factory=dict,
+        description="The best calibration results, focusing on fidelity metrics",
+    )
     node_info: NodeInfoModel = Field(..., description="The node information")
 
     system_info: SystemInfoModel = Field(..., description="The system information")
@@ -53,6 +57,30 @@ class QubitDocument(Document):
                 existing[key] = value
         return existing
 
+    @staticmethod
+    def update_best_data(current_best: dict, new_data: dict) -> dict:
+        """Update best_data with new calibration results if they are better.
+
+        Only updates fidelity-related metrics when the new values are higher
+        (better fidelity = higher value).
+        """
+        fidelity_metrics = [
+            "average_readout_fidelity",
+            "readout_fidelity_0",
+            "readout_fidelity_1",
+            "x90_gate_fidelity",
+            "x180_gate_fidelity",
+        ]
+
+        for metric in fidelity_metrics:
+            if metric in new_data:
+                new_value = new_data[metric].get("value", 0.0)
+                # Initialize if metric doesn't exist in best_data
+                if metric not in current_best or new_value > current_best[metric].get("value", 0.0):
+                    current_best[metric] = new_data[metric].copy()
+
+        return current_best
+
     @classmethod
     def update_calib_data(
         cls, username: str, qid: str, chip_id: str, output_parameters: dict
@@ -63,6 +91,8 @@ class QubitDocument(Document):
             raise ValueError(f"Qubit {qid} not found in chip {chip_id}")
         # Merge new calibration data into the existing data
         qubit_doc.data = QubitDocument.merge_calib_data(qubit_doc.data, output_parameters)
+        # Update best_data if new results are better
+        qubit_doc.best_data = QubitDocument.update_best_data(qubit_doc.best_data, output_parameters)
         qubit_doc.system_info.update_time()
         qubit_doc.save()
         # Update the qubit in the chip document
@@ -73,6 +103,7 @@ class QubitDocument(Document):
             qid=qid,
             chip_id=chip_id,
             data=qubit_doc.data,
+            best_data=qubit_doc.best_data,
             node_info=qubit_doc.node_info,
             username=username,
         )

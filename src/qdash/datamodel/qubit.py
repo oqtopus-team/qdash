@@ -47,6 +47,10 @@ class QubitModel(BaseModel):
     status: str = Field("pending", description="The status of the qubit")
     chip_id: str | None = Field(None, description="The chip ID")
     data: dict = Field(..., description="The data of the qubit")
+    best_data: dict = Field(
+        default_factory=dict,
+        description="The best calibration results, focusing on fidelity metrics",
+    )
     node_info: NodeInfoModel = Field(..., description="The node information")
 
     @field_validator("data", mode="before")

@@ -34,6 +34,7 @@ def generate_qubit_data(num_qubits: int, pos: dict, chip_id: str) -> dict:
                 ),
             ),
             data={},
+            best_data={},
         )
     return qubits
 
