@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar
 
 import pendulum
 from fastapi import APIRouter, Depends
@@ -291,7 +291,7 @@ def flatten_tasks(task_results: dict) -> list[dict]:
         completed_tasks = [t for t in group if t.get("start_at")]
         if not completed_tasks:
             return "9999-12-31T23:59:59"
-        return max(t["start_at"] for t in completed_tasks)
+        return max(str(t["start_at"]) for t in completed_tasks)
 
     sorted_groups = sorted(grouped_tasks.items(), key=lambda x: get_group_completion_time(x[1]))
 
@@ -364,28 +364,23 @@ class ListMuxResponse(BaseModel):
 
 
 def _build_mux_detail(
-    mux_id: int, tasks: list, current_user: User, chip_id: str
+    mux_id: int,
+    tasks: list,
+    current_user: User,
+    chip_id: str,
+    task_results: dict[str, dict[str, TaskResultHistoryDocument]],
 ) -> MuxDetailResponse:
     qids = [str(mux_id * 4 + i) for i in range(4)]
     detail: dict[str, dict[str, Task]] = {}
+
     for qid in qids:
-        detail[qid] = {}  # qidごとの辞書を初期化
+        detail[qid] = {}
+        qid_results = task_results.get(qid, {})
+
         for task in tasks:
-            logger.debug("Task: %s", task)
-            result = TaskResultHistoryDocument.find_one(
-                {
-                    "name": task.name,
-                    "username": current_user.username,
-                    "qid": qid,
-                    "chip_id": chip_id,
-                },
-                sort=[("end_at", DESCENDING)],
-            ).run()
+            result = qid_results.get(task.name)
             if result is None:
-                task_result = Task(
-                    name=task.name,
-                )
-                detail[qid][task.name] = task_result
+                task_result = Task(name=task.name)
             else:
                 task_result = Task(
                     task_id=result.task_id,
@@ -403,7 +398,8 @@ def _build_mux_detail(
                     elapsed_time=result.elapsed_time,
                     task_type=result.task_type,
                 )
-                detail[qid][task.name] = task_result
+            detail[qid][task.name] = task_result
+
     return MuxDetailResponse(mux_id=mux_id, detail=detail)
 
 
@@ -434,9 +430,40 @@ def fetch_mux_detail(
 
     """
     logger.debug(f"Fetching mux details for chip {chip_id}, user: {current_user.username}")
+
+    # Get all tasks
     tasks = TaskDocument.find({"username": current_user.username}).run()
+    task_names = [task.name for task in tasks]
     logger.debug("Tasks: %s", tasks)
-    return _build_mux_detail(mux_id, tasks, current_user, chip_id=chip_id)
+
+    # Calculate qids for this mux
+    qids = [str(mux_id * 4 + i) for i in range(4)]
+
+    # Fetch all task results in one query
+    all_results = (
+        TaskResultHistoryDocument.find(
+            {
+                "username": current_user.username,
+                "chip_id": chip_id,
+                "qid": {"$in": qids},
+                "name": {"$in": task_names},
+            }
+        )
+        .sort([("end_at", DESCENDING)])
+        .run()
+    )
+
+    # Organize results by qid and task name
+    task_results: dict[str, dict[str, TaskResultHistoryDocument]] = {}
+    for result in all_results:
+        if result.qid not in task_results:
+            task_results[result.qid] = {}
+        if result.name not in task_results[result.qid]:
+            task_results[result.qid][result.name] = result
+
+    return _build_mux_detail(
+        mux_id, tasks, current_user, chip_id=chip_id, task_results=task_results
+    )
 
 
 @router.get(
@@ -464,16 +491,48 @@ def list_muxes(
         Multiplexdetails
 
     """
-    logger.debug(f"Fetching muxes for chip {chip_id}, user: {current_user.username}")
+    # Get all tasks
     tasks = TaskDocument.find({"username": current_user.username}).run()
-    logger.debug("Tasks: %s", tasks)
-    muxes: dict[int, MuxDetailResponse] = {}
+    task_names = [task.name for task in tasks]
+
+    # Get chip info
     chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+
+    # Calculate mux number
     mux_num = int(chip.size // 4)
+    qids = [str(i) for i in range(chip.size)]
+
+    # Fetch all task results in one query
+    all_results = (
+        TaskResultHistoryDocument.find(
+            {
+                "username": current_user.username,
+                "chip_id": chip_id,
+                "qid": {"$in": qids},
+                "name": {"$in": task_names},
+            }
+        )
+        .sort([("end_at", DESCENDING)])
+        .run()
+    )
+
+    # Organize results by qid and task name
+    task_results: dict[str, dict[str, TaskResultHistoryDocument]] = {}
+    for result in all_results:
+        if result.qid not in task_results:
+            task_results[result.qid] = {}
+        if result.name not in task_results[result.qid]:
+            task_results[result.qid][result.name] = result
+
+    # Build mux details
+    muxes: dict[int, MuxDetailResponse] = {}
     for mux_id in range(mux_num):
-        muxes[mux_id] = _build_mux_detail(mux_id, tasks, current_user, chip_id=chip_id)
+        muxes[mux_id] = _build_mux_detail(
+            mux_id, tasks, current_user, chip_id=chip_id, task_results=task_results
+        )
+
     return ListMuxResponse(muxes=muxes)
 
 
@@ -496,16 +555,39 @@ def fetch_latest_task_grouped_by_chip(
 ) -> LatestTaskGroupedByChipResponse:
     """Fetch the multiplexers."""
     logger.debug(f"Fetching muxes for chip {chip_id}, user: {current_user.username}")
+
+    # Get chip info
     chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+
+    # Get qids
     qids = [str(qid) for qid in range(chip.size)]
+
+    # Fetch all task results in one query
+    all_results = (
+        TaskResultHistoryDocument.find(
+            {
+                "username": current_user.username,
+                "chip_id": chip_id,
+                "name": task_name,
+                "qid": {"$in": qids},
+            }
+        )
+        .sort([("end_at", DESCENDING)])
+        .run()
+    )
+
+    # Organize results by qid
+    task_results: dict[str, TaskResultHistoryDocument] = {}
+    for result in all_results:
+        if result.qid not in task_results:
+            task_results[result.qid] = result
+
+    # Build response
     results = {}
     for qid in qids:
-        result = TaskResultHistoryDocument.find_one(
-            {"name": task_name, "username": current_user.username, "qid": qid, "chip_id": chip_id},
-            sort=[("end_at", DESCENDING)],
-        ).run()
+        result = task_results.get(qid)
         if result is not None:
             task_result = Task(
                 task_id=result.task_id,
@@ -526,6 +608,7 @@ def fetch_latest_task_grouped_by_chip(
         else:
             task_result = Task(name=task_name)
         results[qid] = task_result
+
     return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
 
 
@@ -535,14 +618,6 @@ class TimeSeriesProjection(BaseModel):
     qid: str
     output_parameters: dict[str, Any]
     start_at: str
-
-    class Settings:
-        projection = {
-            "qid": 1,
-            "output_parameters": 1,
-            "start_at": 1,
-            "_id": 0,
-        }
 
 
 class TimeSeriesData(BaseModel):
@@ -613,7 +688,11 @@ def _fetch_timeseries_data(
         if qid not in timeseries_by_qid:
             timeseries_by_qid[qid] = []
 
-        timeseries_by_qid[qid].append(task_result.output_parameters[parameter])
+        param_data = task_result.output_parameters[parameter]
+        if isinstance(param_data, dict):
+            timeseries_by_qid[qid].append(OutputParameterModel(**param_data))
+        else:
+            timeseries_by_qid[qid].append(param_data)
 
     return TimeSeriesData(data=timeseries_by_qid)
 
