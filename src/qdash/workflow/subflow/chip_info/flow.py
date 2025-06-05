@@ -3,6 +3,7 @@ from typing import Any, Protocol, TypeAlias, cast
 
 import pendulum
 from prefect import flow
+from prefect.logging import get_run_logger
 from pydantic import BaseModel, Field
 from qdash.config import get_settings
 from qdash.dbmodel.chip import ChipDocument
@@ -101,37 +102,66 @@ class ChipProperties(BaseModel):
     couplings: dict[str, CouplingProperties] = Field(default_factory=dict)
 
 
-def _process_qubit_data(qubit_data: dict) -> QubitProperties:
+def _process_qubit_data(qubit_data: dict, within_24hrs: bool = False) -> QubitProperties:
     """Process a single qubit's data dict into QubitProperties."""
     qubit_props = QubitProperties()
     if not qubit_data:
         return qubit_props
+
+    now = pendulum.now(tz="Asia/Tokyo")
+    cutoff = now.subtract(hours=24)
+
     for key, value in qubit_data.items():
-        v = value.get("value")
+        calibrated_at = value.get("calibrated_at")
+        is_recent = True
+        if within_24hrs and calibrated_at:
+            try:
+                calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
+                is_recent = calibrated_at_dt >= cutoff
+            except Exception:
+                is_recent = False  # 日付フォーマットが不正なら無効とみなす
+
+        v = value.get("value") if is_recent else None
+
         if key == "bare_frequency":
             qubit_props.qubit_frequency = v
         elif key == "t1":
-            qubit_props.t1 = v * 1e3 if v is not None else None  # Convert to ns
+            qubit_props.t1 = v * 1e3 if v is not None else None  # us → ns
         elif key == "t2_echo":
-            qubit_props.t2_echo = v * 1e3 if v is not None else None  # Convert to ns
+            qubit_props.t2_echo = v * 1e3 if v is not None else None
         elif key == "t2_star":
-            qubit_props.t2_star = v * 1e3 if v is not None else None  # Convert to ns
+            qubit_props.t2_star = v * 1e3 if v is not None else None
         elif key == "average_readout_fidelity":
             qubit_props.average_readout_fidelity = v
         elif key == "x90_gate_fidelity":
             qubit_props.x90_gate_fidelity = v
         elif key == "x180_gate_fidelity":
             qubit_props.x180_gate_fidelity = v
+
     return qubit_props
 
 
-def _process_coupling_data(coupling_data: dict) -> CouplingProperties:
+def _process_coupling_data(coupling_data: dict, within_24hrs: bool = False) -> CouplingProperties:
     """Process a single coupling's data dict into CouplingProperties."""
     coupling_props = CouplingProperties()
     if not coupling_data:
         return coupling_props
+
+    now = pendulum.now(tz="Asia/Tokyo")
+    cutoff = now.subtract(hours=24)
+
     for key, value in coupling_data.items():
-        v = value.get("value")
+        calibrated_at = value.get("calibrated_at")
+        is_recent = True
+        if within_24hrs and calibrated_at:
+            try:
+                calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
+                is_recent = calibrated_at_dt >= cutoff
+            except Exception:
+                is_recent = False
+
+        v = value.get("value") if is_recent else None
+
         if key == "zx90_gate_fidelity":
             coupling_props.zx90_gate_fidelity = v
         elif key == "static_zz_interaction":
@@ -140,10 +170,11 @@ def _process_coupling_data(coupling_data: dict) -> CouplingProperties:
             coupling_props.qubit_qubit_coupling_strength = v
         elif key == "bell_state_fidelity":
             coupling_props.bell_state_fidelity = v
+
     return coupling_props
 
 
-def get_chip_properties(chip: ChipDocument) -> ChipProperties:
+def get_chip_properties(chip: ChipDocument, within_24hrs: bool = False) -> ChipProperties:
     """Get the properties of a chip as a dictionary."""
     chip_props = ChipProperties()
 
@@ -155,7 +186,7 @@ def get_chip_properties(chip: ChipDocument) -> ChipProperties:
     # Process qubits
     for qid, qubit in chip.qubits.items():
         qid_str = f"Q{int(qid):02d}"
-        chip_props.qubits[qid_str] = _process_qubit_data(qubit.data)
+        chip_props.qubits[qid_str] = _process_qubit_data(qubit.data, within_24hrs=within_24hrs)
 
     # Process couplings
     for coupling_id, coupling in chip.couplings.items():
@@ -163,7 +194,9 @@ def get_chip_properties(chip: ChipDocument) -> ChipProperties:
         source_str = f"Q{int(source):02d}"
         target_str = f"Q{int(target):02d}"
         coupling_key = f"{source_str}-{target_str}"
-        chip_props.couplings[coupling_key] = _process_coupling_data(coupling.data)
+        chip_props.couplings[coupling_key] = _process_coupling_data(
+            coupling.data, within_24hrs=within_24hrs
+        )
 
     return chip_props
 
@@ -237,6 +270,30 @@ def merge_properties(base_props: CommentedMap, chip_props: ChipProperties) -> Co
     return base_props
 
 
+def create_comment_map_from_chip_properties(chip_props: ChipProperties) -> CommentedMap:
+    """Create a new CommentedMap structure from ChipProperties without merging."""
+    props_map = CommentedMap()
+    props_map["64Q"] = CommentedMap()
+
+    # Qubit properties
+    for qid, qubit in chip_props.qubits.items():
+        qubit_dict = {k: v for k, v in qubit.model_dump().items() if v is not None}
+        for field, value in qubit_dict.items():
+            if field not in props_map["64Q"]:
+                props_map["64Q"][field] = CommentedMap()
+            props_map["64Q"][field][qid] = format_number(value)
+
+    # Coupling properties
+    for coupling_id, coupling in chip_props.couplings.items():
+        coupling_dict = {k: v for k, v in coupling.model_dump().items() if v is not None}
+        for field, value in coupling_dict.items():
+            if field not in props_map["64Q"]:
+                props_map["64Q"][field] = CommentedMap()
+            props_map["64Q"][field][coupling_id] = format_number(value)
+
+    return props_map
+
+
 def write_yaml(data: CommentedMap | ChipProperties, filename: str = "chip_properties.yaml") -> None:
     """Write chip properties to a YAML file in the required format."""
     if isinstance(data, ChipProperties):
@@ -294,25 +351,33 @@ def update_props(username: str = "admin") -> None:
     """Update chip properties."""
     # Initialize database connection
     initialize()
+    logger = get_run_logger()
     # Get current chip
     chip = ChipDocument.get_current_chip(username=username)
 
-    # Convert properties
-    chip_props = get_chip_properties(chip)
-
-    # Read base properties
+    # ==== 1. これまでの実績を加味したプロパティ ====
+    chip_props_all = get_chip_properties(chip, within_24hrs=False)
     base_props = read_base_properties(filename="/app/config/props.yaml")
+    merged_props_all = merge_properties(base_props, chip_props_all)
 
-    # Merge properties
-    merged_props = merge_properties(base_props, chip_props)
+    # ==== 2. 24時間以内の最新プロパティ　====
+    chip_props_24hrs = get_chip_properties(chip, within_24hrs=True)
+    chip_props_24hrs_all = create_comment_map_from_chip_properties(chip_props_24hrs)
+    # base_props とのマージは行わない
 
+    # ==== 保存処理 ====
     settings = get_settings()
-    # Write to YAML file
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
     chip_info_dir = f"/app/calib_data/{username}/{date_str}/chip_info"
     create_directory_task.submit(chip_info_dir).result()
+
+    # 書き出し
     props_save_path = f"{chip_info_dir}/props.yaml"
-    write_yaml(merged_props, filename=props_save_path)
+    write_yaml(merged_props_all, filename=props_save_path)  # 全データ込み
+    chip_props_24hrs_save_path = f"{chip_info_dir}/props_24hrs.yaml"
+    logger.info(f"props.yaml saved to {props_save_path}")
+    logger.info(f"props_24hrs.yaml saved to {chip_props_24hrs_save_path}")
+    write_yaml(chip_props_24hrs_all, filename=chip_props_24hrs_save_path)
     slack = SlackContents(
         status=Status.SUCCESS,
         title="props.yaml",

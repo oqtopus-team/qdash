@@ -309,15 +309,76 @@ def generate_rich_pdf_report(image_paths: list[str], pdf_path: str = "rich_repor
     print(f"Saved rich report: {pdf_path}")
 
 
-@task
-def generate_chip_info_report(
-    chip_info_dir: str = "",
-) -> None:
-    """Generate a report for chip information."""
-    props_path = f"{chip_info_dir}/props.yaml"
-    props = read_base_properties(
-        filename=props_path,
-    )["64Q"]
+def create_undirected_data(
+    data: dict[str, float],
+    method: Literal["avg", "max", "min"],
+) -> dict[str, float]:
+    """Create undirected data by combining bidirectional values.
+
+    Args:
+    ----
+        data: Dictionary of directed data with format {"qubit1-qubit2": value}
+        method: Method to combine values ("avg", "max", or "min")
+
+    Returns:
+    -------
+        Dictionary of undirected data
+
+    """
+    result: dict[str, float] = {}
+    for key, value in data.items():
+        if value is None or math.isnan(value):
+            continue
+        pair = key.split("-")
+        inv_key = f"{pair[1]}-{pair[0]}"
+        if inv_key in result and result[inv_key] is not None and not math.isnan(result[inv_key]):
+            if method == "avg":
+                result[inv_key] = (result[inv_key] + value) / 2
+            elif method == "max":
+                result[inv_key] = max(result[inv_key], value)
+            elif method == "min":
+                result[inv_key] = min(result[inv_key], value)
+            else:
+                raise ValueError(f"Unknown method: {method}")
+        else:
+            result[key] = float(value)
+    return result
+
+
+def pad_qubit_data(data: dict[str, float], n_qubits: int = 64) -> dict[str, float]:
+    """Pad missing qubit data with NaN values.
+
+    Args:
+    ----
+        data: Dictionary of qubit data with format {"Q00": value, "Q01": value, ...}
+        n_qubits: Total number of qubits to pad to
+
+    Returns:
+    -------
+        Dictionary with all qubits from Q00 to Q{n_qubits-1}, with NaN for missing values
+
+    """
+    result: dict[str, float] = {}
+    for i in range(n_qubits):
+        qubit = f"Q{i:02d}"  # Use zero-padded format Q00, Q01, etc.
+        result[qubit] = data.get(qubit, math.nan)
+    return result
+
+
+def generate_figures(props: dict, chip_info_dir: str, suffix: str = "") -> list[str]:
+    """Generate figures for chip information.
+
+    Args:
+    ----
+        props: Properties dictionary containing chip data
+        chip_info_dir: Directory to save figures
+        suffix: Suffix to append to filenames (e.g. "_24hrs")
+
+    Returns:
+    -------
+        List of generated figure paths
+
+    """
     info_type = (
         "qubit_frequency",
         "qubit_anharmonicity",
@@ -328,11 +389,14 @@ def generate_chip_info_report(
         "zx90_gate_fidelity",
         "bell_state_fidelity",
     )
+
+    generated_files = []
     graph = CustomLatticeGraph(64)
-    if "resonator_frequency" in info_type:
-        values = props["resonator_frequency"]
+
+    if "resonator_frequency" in info_type and "resonator_frequency" in props:
+        values = pad_qubit_data(props["resonator_frequency"])
         fig = graph.create_lattice_figure(
-            title="Resonator frequency (GHz)",
+            title=f"Resonator frequency (GHz){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value:.3f}<br>GHz" if not math.isnan(value) else "N/A"
@@ -343,12 +407,14 @@ def generate_chip_info_report(
                 for qubit, value in values.items()
             ],
         )
-        fig.write_image(file=f"{chip_info_dir}/resonator_frequency.png")
+        path = f"{chip_info_dir}/resonator_frequency{suffix}.png"
+        fig.write_image(file=path)
+        generated_files.append(path)
 
-    if "qubit_frequency" in info_type:
-        values = props["qubit_frequency"]
+    if "qubit_frequency" in info_type and "qubit_frequency" in props:
+        values = pad_qubit_data(props["qubit_frequency"])
         fig = graph.create_lattice_figure(
-            title="Qubit frequency (GHz)",
+            title=f"Qubit frequency (GHz){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value:.3f}<br>GHz" if not math.isnan(value) else "N/A"
@@ -359,12 +425,14 @@ def generate_chip_info_report(
                 for qubit, value in values.items()
             ],
         )
-        fig.write_image(file=f"{chip_info_dir}/qubit_frequency.png")
+        path = f"{chip_info_dir}/qubit_frequency{suffix}.png"
+        fig.write_image(file=path)
+        generated_files.append(path)
 
-    if "qubit_anharmonicity" in info_type:
-        values = props["anharmonicity"]
+    if "qubit_anharmonicity" in info_type and "anharmonicity" in props:
+        values = pad_qubit_data(props["anharmonicity"])
         fig = graph.create_lattice_figure(
-            title="Qubit anharmonicity (MHz)",
+            title=f"Qubit anharmonicity (MHz){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value * 1e3:.1f}<br>MHz" if not math.isnan(value) else "N/A"
@@ -375,44 +443,14 @@ def generate_chip_info_report(
                 for qubit, value in values.items()
             ],
         )
-        fig.write_image(file=f"{chip_info_dir}/qubit_anharmonicity.png")
+        path = f"{chip_info_dir}/qubit_anharmonicity{suffix}.png"
+        fig.write_image(file=path)
+        generated_files.append(path)
 
-    if "external_loss_rate" in info_type:
-        values = props["external_loss_rate"]
+    if "t1" in info_type and "t1" in props:
+        values = pad_qubit_data(props["t1"])
         fig = graph.create_lattice_figure(
-            title="External loss rate (MHz)",
-            values=list(values.values()),
-            texts=[
-                f"{qubit}<br>{value * 1e3:.2f}<br>MHz" if not math.isnan(value) else "N/A"
-                for qubit, value in values.items()
-            ],
-            hovertexts=[
-                f"{qubit}: {value * 1e3:.3f} MHz" if not math.isnan(value) else f"{qubit}: N/A"
-                for qubit, value in values.items()
-            ],
-        )
-        fig.write_image(file=f"{chip_info_dir}/external_loss_rate.png")
-
-    if "internal_loss_rate" in info_type:
-        values = props["internal_loss_rate"]
-        fig = graph.create_lattice_figure(
-            title="Internal loss rate (MHz)",
-            values=list(values.values()),
-            texts=[
-                f"{qubit}<br>{value * 1e3:.2f}<br>MHz" if not math.isnan(value) else "N/A"
-                for qubit, value in values.items()
-            ],
-            hovertexts=[
-                f"{qubit}: {value * 1e3:.3f} MHz" if not math.isnan(value) else f"{qubit}: N/A"
-                for qubit, value in values.items()
-            ],
-        )
-        fig.write_image(file=f"{chip_info_dir}/internal_loss_rate.png")
-
-    if "t1" in info_type:
-        values = props["t1"]
-        fig = graph.create_lattice_figure(
-            title="T1 (μs)",
+            title=f"T1 (μs){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value * 1e-3:.2f}<br>μs" if not math.isnan(value) else "N/A"
@@ -423,12 +461,14 @@ def generate_chip_info_report(
                 for qubit, value in values.items()
             ],
         )
-        fig.write_image(file=f"{chip_info_dir}/t1.png")
+        path = f"{chip_info_dir}/t1{suffix}.png"
+        fig.write_image(file=path)
+        generated_files.append(path)
 
-    if "t2_star" in info_type:
-        values = props["t2_star"]
+    if "t2_echo" in info_type and "t2_echo" in props:
+        values = pad_qubit_data(props["t2_echo"])
         fig = graph.create_lattice_figure(
-            title="T2* (μs)",
+            title=f"T2 echo (μs){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value * 1e-3:.2f}<br>μs" if not math.isnan(value) else "N/A"
@@ -439,28 +479,14 @@ def generate_chip_info_report(
                 for qubit, value in values.items()
             ],
         )
-        fig.write_image(file=f"{chip_info_dir}/t2_star.png")
+        path = f"{chip_info_dir}/t2_echo{suffix}.png"
+        fig.write_image(file=path)
+        generated_files.append(path)
 
-    if "t2_echo" in info_type:
-        values = props["t2_echo"]
+    if "average_readout_fidelity" in info_type and "average_readout_fidelity" in props:
+        values = pad_qubit_data(props["average_readout_fidelity"])
         fig = graph.create_lattice_figure(
-            title="T2 echo (μs)",
-            values=list(values.values()),
-            texts=[
-                f"{qubit}<br>{value * 1e-3:.2f}<br>μs" if not math.isnan(value) else "N/A"
-                for qubit, value in values.items()
-            ],
-            hovertexts=[
-                f"{qubit}: {value * 1e-3:.3f} μs" if not math.isnan(value) else f"{qubit}: N/A"
-                for qubit, value in values.items()
-            ],
-        )
-        fig.write_image(file=f"{chip_info_dir}/t2_echo.png")
-
-    if "average_readout_fidelity" in info_type:
-        values = props["average_readout_fidelity"]
-        fig = graph.create_lattice_figure(
-            title="Average readout fidelity (%)",
+            title=f"Average readout fidelity (%){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value:.2%}" if not math.isnan(value) else "N/A"
@@ -471,12 +497,14 @@ def generate_chip_info_report(
                 for qubit, value in values.items()
             ],
         )
-        fig.write_image(file=f"{chip_info_dir}/average_readout_fidelity.png")
+        path = f"{chip_info_dir}/average_readout_fidelity{suffix}.png"
+        fig.write_image(file=path)
+        generated_files.append(path)
 
-    if "average_gate_fidelity" in info_type:
-        values = props["average_gate_fidelity"]
+    if "x90_gate_fidelity" in info_type and "x90_gate_fidelity" in props:
+        values = pad_qubit_data(props["x90_gate_fidelity"])
         fig = graph.create_lattice_figure(
-            title="Average gate fidelity (%)",
+            title=f"X90 gate fidelity (%){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value:.2%}" if not math.isnan(value) else "N/A"
@@ -487,68 +515,11 @@ def generate_chip_info_report(
                 for qubit, value in values.items()
             ],
         )
-        fig.write_image(file=f"{chip_info_dir}/average_gate_fidelity.png")
+        path = f"{chip_info_dir}/x90_gate_fidelity{suffix}.png"
+        fig.write_image(file=path)
+        generated_files.append(path)
 
-    if "x90_gate_fidelity" in info_type:
-        values = props["x90_gate_fidelity"]
-        fig = graph.create_lattice_figure(
-            title="X90 gate fidelity (%)",
-            values=list(values.values()),
-            texts=[
-                f"{qubit}<br>{value:.2%}" if not math.isnan(value) else "N/A"
-                for qubit, value in values.items()
-            ],
-            hovertexts=[
-                f"{qubit}: {value:.2%}" if not math.isnan(value) else f"{qubit}: N/A"
-                for qubit, value in values.items()
-            ],
-        )
-        fig.write_image(file=f"{chip_info_dir}/x90_gate_fidelity.png")
-
-    if "x180_gate_fidelity" in info_type:
-        values = props["x180_gate_fidelity"]
-        fig = graph.create_lattice_figure(
-            title="X180 gate fidelity (%)",
-            values=list(values.values()),
-            texts=[
-                f"{qubit}<br>{value:.2%}" if not math.isnan(value) else "N/A"
-                for qubit, value in values.items()
-            ],
-            hovertexts=[
-                f"{qubit}: {value:.2%}" if not math.isnan(value) else "N/A"
-                for qubit, value in values.items()
-            ],
-        )
-        fig.write_image(file=f"{chip_info_dir}/x180_gate_fidelity.png")
-
-    def create_undirected_data(
-        data: dict[str, float],
-        method: Literal["avg", "max", "min"],
-    ) -> dict[str, float]:
-        result = {}
-        for key, value in data.items():
-            if value is None or math.isnan(value):
-                continue
-            pair = key.split("-")
-            inv_key = f"{pair[1]}-{pair[0]}"
-            if (
-                inv_key in result
-                and result[inv_key] is not None
-                and not math.isnan(result[inv_key])
-            ):
-                if method == "avg":
-                    result[inv_key] = (result[inv_key] + value) / 2
-                elif method == "max":
-                    result[inv_key] = max(result[inv_key], value)
-                elif method == "min":
-                    result[inv_key] = min(result[inv_key], value)
-                else:
-                    raise ValueError(f"Unknown method: {method}")
-            else:
-                result[key] = float(value)
-        return result
-
-    if "zx90_gate_fidelity" in info_type:
+    if "zx90_gate_fidelity" in info_type and "zx90_gate_fidelity" in props:
         values = props["zx90_gate_fidelity"]
         values = create_undirected_data(
             data=values,
@@ -556,7 +527,7 @@ def generate_chip_info_report(
         )
         fig = graph.create_graph_figure(
             directed=False,
-            title="ZX90 gate fidelity (%)",
+            title=f"ZX90 gate fidelity (%){' (24hrs)' if suffix else ''}",
             edge_values={key: value for key, value in values.items()},
             edge_texts={
                 key: f"{value * 1e2:.1f}" if not math.isnan(value) else None
@@ -567,8 +538,11 @@ def generate_chip_info_report(
                 for key, value in values.items()
             },
         )
-        fig.write_image(file=f"{chip_info_dir}/zx90_gate_fidelity.png")
-    if "bell_state_fidelity" in info_type:
+        path = f"{chip_info_dir}/zx90_gate_fidelity{suffix}.png"
+        fig.write_image(file=path)
+        generated_files.append(path)
+
+    if "bell_state_fidelity" in info_type and "bell_state_fidelity" in props:
         values = props["bell_state_fidelity"]
         values = create_undirected_data(
             data=values,
@@ -576,7 +550,7 @@ def generate_chip_info_report(
         )
         fig = graph.create_graph_figure(
             directed=False,
-            title="Bell state fidelity (%)",
+            title=f"Bell state fidelity (%){' (24hrs)' if suffix else ''}",
             edge_values={key: value for key, value in values.items()},
             edge_texts={
                 key: f"{value * 1e2:.1f}" if not math.isnan(value) else None
@@ -587,18 +561,39 @@ def generate_chip_info_report(
                 for key, value in values.items()
             },
         )
-        fig.write_image(file=f"{chip_info_dir}/bell_state_fidelity.png")
+        path = f"{chip_info_dir}/bell_state_fidelity{suffix}.png"
+        fig.write_image(file=path)
+        generated_files.append(path)
 
-    generate_rich_pdf_report(
-        [
-            f"{chip_info_dir}/qubit_frequency.png",
-            f"{chip_info_dir}/qubit_anharmonicity.png",
-            f"{chip_info_dir}/t1.png",
-            f"{chip_info_dir}/t2_echo.png",
-            f"{chip_info_dir}/average_readout_fidelity.png",
-            f"{chip_info_dir}/x90_gate_fidelity.png",
-            f"{chip_info_dir}/zx90_gate_fidelity.png",
-            f"{chip_info_dir}/bell_state_fidelity.png",
-        ],
-        pdf_path=f"{chip_info_dir}/chip_info_report.pdf",
-    )
+    return generated_files
+
+
+@task
+def generate_chip_info_report(
+    chip_info_dir: str = "",
+) -> None:
+    """Generate a report for chip information."""
+    # Read regular properties
+    props_path = f"{chip_info_dir}/props.yaml"
+    props = read_base_properties(filename=props_path)["64Q"]
+
+    # Generate regular figures
+    regular_files = generate_figures(props, chip_info_dir)
+
+    # Read and generate 24hr properties if available
+    props_path_24hrs = f"{chip_info_dir}/props_24hrs.yaml"
+    if Path(props_path_24hrs).exists():
+        props_24hrs = read_base_properties(filename=props_path_24hrs)["64Q"]
+        hrs24_files = generate_figures(props_24hrs, chip_info_dir, "_24hrs")
+
+        # Generate combined report
+        generate_rich_pdf_report(
+            regular_files + hrs24_files,
+            pdf_path=f"{chip_info_dir}/chip_info_report.pdf",
+        )
+    else:
+        # Generate report with just regular files
+        generate_rich_pdf_report(
+            regular_files,
+            pdf_path=f"{chip_info_dir}/chip_info_report.pdf",
+        )

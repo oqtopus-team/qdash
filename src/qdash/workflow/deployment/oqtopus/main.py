@@ -108,7 +108,7 @@ if __name__ == "__main__":
         """,
         tags=["system"],
         schedule=CronSchedule(
-            cron="0 12 * * *",
+            cron="0 9 * * *",
             timezone="Asia/Tokyo",
         ),
         parameters={"username": "admin"},
