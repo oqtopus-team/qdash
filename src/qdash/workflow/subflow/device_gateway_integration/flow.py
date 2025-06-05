@@ -35,10 +35,10 @@ def device_gateway_integration_flow(
     topology_figure_file = save_path / "device_topology.png"
     slack = SlackContents(
         status=Status.SUCCESS,
-        title="🧑‍💻For Cloud Operator",
+        title="🧑‍💻 For Cloud Operator",
         msg="Check the device topology request and response files.",
         ts="",
-        path=str(request_file),
+        path="",
         header="For Cloud Operator",
         channel=settings.slack_channel_id,
         token=settings.slack_bot_token,
