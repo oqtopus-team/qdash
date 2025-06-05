@@ -190,18 +190,18 @@ def get_device_topology(
     logger.info(f"id_mapping: {id_mapping}")
 
     for qid in request.qubits:
-        x90_gate_fidelity = (chip_docs.qubits[qid].data.get("x90_gate_fidelity") or {"value": 0.5})[
-            "value"
-        ]
+        x90_gate_fidelity = (
+            chip_docs.qubits[qid].data.get("x90_gate_fidelity") or {"value": 0.25}
+        )["value"]
         t1 = (chip_docs.qubits[qid].data.get("t1") or {"value": 100.0})["value"]
         t2 = (chip_docs.qubits[qid].data.get("t2_echo") or {"value": 100.0})["value"]
         drag_hpi_duration = drag_hpi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
         drag_pi_duration = drag_pi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
         readout_fidelity_0 = (
-            chip_docs.qubits[qid].data.get("readout_fidelity_0") or {"value": 0.5}
+            chip_docs.qubits[qid].data.get("readout_fidelity_0") or {"value": 0.25}
         )["value"]
         readout_fidelity_1 = (
-            chip_docs.qubits[qid].data.get("readout_fidelity_1") or {"value": 0.5}
+            chip_docs.qubits[qid].data.get("readout_fidelity_1") or {"value": 0.25}
         )["value"]
         # Calculate readout assignment error
         prob_meas1_prep0 = 1 - readout_fidelity_0
@@ -252,8 +252,9 @@ def get_device_topology(
             control, target = split_q_string(cr_key)
             cr_duration = cr_value.get("duration", 20)
             zx90_gate_fidelity = (
-                chip_docs.couplings[f"{control}-{target}"].data.get("zx90_gate_fidelity")
-                or {"value": 0.5}
+                # chip_docs.couplings[f"{control}-{target}"].data.get("zx90_gate_fidelity") # TODO(orangekame3): Use zx90_gate_fidelity if available
+                chip_docs.couplings[f"{control}-{target}"].data.get("bell_state_fidelity")
+                or {"value": 0.25}
             )["value"]
             # Only append if both control and target qubits exist in id_mapping and coupling is not excluded
             if control in id_mapping and target in id_mapping:

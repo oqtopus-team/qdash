@@ -11,6 +11,7 @@ from qdash.workflow.handler import main_flow
 from qdash.workflow.subflow.chip_info.flow import update_props
 
 from qdash.workflow.subflow.scheduler.flow import cron_scheduler_flow
+from qdash.workflow.subflow.device_gateway_integration.flow import device_gateway_integration_flow
 
 deployment_name = "oqtopus"
 
@@ -114,6 +115,31 @@ if __name__ == "__main__":
         parameters={"username": "admin"},
         is_schedule_active=True,
     )
+    device_gateway_integration_deploy = device_gateway_integration_flow.to_deployment(
+        name=f"{deployment_name}-device-gateway-integration",
+        description="""This is a flow to integrate the device gateway with the system.
+        """,
+        tags=["system"],
+        parameters={
+            "username": "admin",
+            "request": {
+                "name": "anemone",
+                "device_id": "anemone",
+                "qubits": [],
+                "exclude_couplings": [],
+                "condition": {
+                    "coupling_fidelity": {"min": 0.7, "max": 1.0},
+                    "qubit_fidelity": {"min": 0.9, "max": 1.0},
+                    "only_maximum_connected": True,
+                },
+            },
+        },
+        schedule=CronSchedule(
+            cron="18 14 * * *",
+            timezone="Asia/Tokyo",
+        ),
+        is_schedule_active=True,
+    )
 
     _ = serve(
         main_deploy,  # type: ignore
@@ -125,6 +151,7 @@ if __name__ == "__main__":
         serial_cal_flow_deploy,  # type: ignore
         batch_cal_flow_deploy,  # type: ignore
         update_props_deploy,  # type: ignore
+        device_gateway_integration_deploy,  # type: ignore
         webserver=True,
         limit=50,
     )
