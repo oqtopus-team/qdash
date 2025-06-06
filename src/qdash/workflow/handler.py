@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import pendulum
@@ -97,7 +98,7 @@ def main_flow(
         ui_url = ui_url.replace("127.0.0.1", "localhost").replace("prefect-server", "localhost")
     logger.info(f"Execution ID: {execution_id}")
     exectuion_is_locked = ExecutionLockDocument.get_lock_status()
-    commit_id = update_config()
+    commit_id = "local" if os.getenv("CONFIG_REPO_URL") == "" else update_config()
     if exectuion_is_locked:
         logger.error("Calibration is already running.")
         error_message = "Calibration is already running."
