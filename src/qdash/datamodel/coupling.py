@@ -36,4 +36,8 @@ class CouplingModel(BaseModel):
     status: str = Field("pending", description="The status of the coupling")
     chip_id: str | None = Field(None, description="The chip ID")
     data: dict = Field(..., description="The data of the coupling")
+    best_data: dict = Field(
+        default_factory=dict,
+        description="The best calibration results, focusing on fidelity metrics",
+    )
     edge_info: EdgeInfoModel = Field(..., description="The edge information")

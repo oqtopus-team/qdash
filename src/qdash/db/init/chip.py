@@ -34,6 +34,7 @@ def generate_qubit_data(num_qubits: int, pos: dict, chip_id: str) -> dict:
                 ),
             ),
             data={},
+            best_data={},
         )
     return qubits
 
@@ -58,6 +59,7 @@ def generate_coupling_data(edges: list[tuple[int, int]], chip_id: str) -> dict:
             status="pending",
             chip_id=chip_id,
             data={},
+            best_data={},
             edge_info=EdgeInfoModel(size=4, fill="", source=f"{edge[0]}", target=f"{edge[1]}"),
         )
     return coupling
