@@ -32,6 +32,7 @@ def generate_coupling(edges: list, username: str, chip_id: str) -> list:
             status="pending",
             chip_id=chip_id,
             data={},
+            best_data={},
             edge_info=EdgeInfoModel(size=4, fill="", source=f"{edge[0]}", target=f"{edge[1]}"),
             system_info={},
         )

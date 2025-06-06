@@ -28,6 +28,10 @@ class CouplingHistoryDocument(Document):
     status: str = Field(..., description="The status of the coupling")
     chip_id: str = Field(..., description="The chip ID")
     data: dict = Field(..., description="The data of the coupling")
+    best_data: dict = Field(
+        default_factory=dict,
+        description="The best calibration results, focusing on fidelity metrics",
+    )
     edge_info: EdgeInfoModel = Field(..., description="The edge information")
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
@@ -70,6 +74,7 @@ class CouplingHistoryDocument(Document):
         if existing_history:
             history = existing_history
             history.data = coupling.data
+            history.best_data = coupling.best_data
             history.status = coupling.status
             history.edge_info = coupling.edge_info
         else:
@@ -79,6 +84,7 @@ class CouplingHistoryDocument(Document):
                 status=coupling.status,
                 chip_id=coupling.chip_id,
                 data=coupling.data,
+                best_data=coupling.best_data,
                 edge_info=coupling.edge_info,
                 system_info=SystemInfoModel(
                     created_at=pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),

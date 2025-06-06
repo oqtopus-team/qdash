@@ -201,6 +201,33 @@ def get_chip_properties(chip: ChipDocument, within_24hrs: bool = False) -> ChipP
     return chip_props
 
 
+def get_best_chip_properties(chip: ChipDocument, within_24hrs: bool = False) -> ChipProperties:
+    """Get the best properties of a chip as a dictionary."""
+    chip_props = ChipProperties()
+
+    # Initialize qubits
+    for i in range(64):  # 64 qubits (00-63)
+        qid_str = f"Q{i:02d}"
+        chip_props.qubits[qid_str] = QubitProperties()
+
+    # Process qubits
+    for qid, qubit in chip.qubits.items():
+        qid_str = f"Q{int(qid):02d}"
+        chip_props.qubits[qid_str] = _process_qubit_data(qubit.best_data, within_24hrs=within_24hrs)
+
+    # Process couplings
+    for coupling_id, coupling in chip.couplings.items():
+        source, target = coupling_id.split("-")
+        source_str = f"Q{int(source):02d}"
+        target_str = f"Q{int(target):02d}"
+        coupling_key = f"{source_str}-{target_str}"
+        chip_props.couplings[coupling_key] = _process_coupling_data(
+            coupling.best_data, within_24hrs=within_24hrs
+        )
+
+    return chip_props
+
+
 def read_base_properties(filename: str = "props.yaml") -> CommentedMap:
     """Read the base properties from props.yaml."""
     from pathlib import Path
@@ -365,6 +392,31 @@ def update_props(username: str = "admin") -> None:
     chip_props_24hrs_all = create_comment_map_from_chip_properties(chip_props_24hrs)
     # base_props とのマージは行わない
 
+    # ==== 3. ベストプロパティ ====
+    chip_props_best = get_best_chip_properties(chip, within_24hrs=True)
+    chip_props_best_all = create_comment_map_from_chip_properties(chip_props_best)
+
+    value_sci_notation_threshold = 1e3
+
+    def create_report_text(comment_map: CommentedMap) -> str:
+        """Generate a summary text of best chip properties for Slack."""
+        lines = []
+        for section, values in comment_map["64Q"].items():
+            lines.append(f"*{section}*")
+            for key, value in values.items():
+                if isinstance(value, float):
+                    value_str = (
+                        f"{value:.2e}" if abs(value) >= value_sci_notation_threshold else str(value)
+                    )
+                else:
+                    value_str = str(value)
+                lines.append(f"・{key}: {value_str}")
+            lines.append("")
+        return "\n".join(lines)
+
+    # Example usage to avoid unused function warning
+    # logger.info(create_report_text(chip_props_best_all))
+
     # ==== 保存処理 ====
     settings = get_settings()
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
@@ -381,10 +433,10 @@ def update_props(username: str = "admin") -> None:
     slack = SlackContents(
         status=Status.SUCCESS,
         title="🧪 For Experiment User",
-        msg="Check the reported chip properties.",
+        msg=f"{create_report_text(chip_props_best_all)}\n\n",
         ts="",
         path="",
-        header="For Experiment User",
+        header="Check the latest chip properties.",
         channel=settings.slack_channel_id,
         token=settings.slack_bot_token,
     )
