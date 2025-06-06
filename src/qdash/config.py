@@ -4,6 +4,8 @@ from pydantic_settings import BaseSettings  # , SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Settings for the QDash application."""
+
     env: str
     client_url: str
     prefect_api_url: str
@@ -23,5 +25,6 @@ class Settings(BaseSettings):
 
 
 @lru_cache
-def get_settings():
-    return Settings()  # type: ignore
+def get_settings() -> Settings:
+    """Get the application settings."""
+    return Settings()

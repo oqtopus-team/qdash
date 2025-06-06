@@ -70,6 +70,9 @@ class QubitDocument(Document):
             "readout_fidelity_1",
             "x90_gate_fidelity",
             "x180_gate_fidelity",
+            "t1",
+            "t2_echo",
+            "t2_star",
         ]
 
         for metric in fidelity_metrics:

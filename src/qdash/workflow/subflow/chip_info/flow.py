@@ -7,6 +7,7 @@ from prefect.logging import get_run_logger
 from pydantic import BaseModel, Field
 from qdash.config import get_settings
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.subflow.chip_info.task import generate_chip_info_report
 from qdash.workflow.utils.slack import SlackContents, Status
@@ -392,27 +393,105 @@ def update_props(username: str = "admin") -> None:
     chip_props_24hrs_all = create_comment_map_from_chip_properties(chip_props_24hrs)
     # base_props とのマージは行わない
 
-    # ==== 3. ベストプロパティ ====
+    # ==== 3. ベストプロパティと昨日のデータの比較 ====
     chip_props_best = get_best_chip_properties(chip, within_24hrs=True)
     chip_props_best_all = create_comment_map_from_chip_properties(chip_props_best)
 
+    # Get yesterday's data
+    yesterday_history = ChipHistoryDocument.get_yesterday_history(chip.chip_id, username)
     value_sci_notation_threshold = 1e3
 
-    def create_report_text(comment_map: CommentedMap) -> str:
-        """Generate a summary text of best chip properties for Slack."""
-        lines = []
-        for section, values in comment_map["64Q"].items():
-            lines.append(f"*{section}*")
-            for key, value in values.items():
-                if isinstance(value, float):
-                    value_str = (
-                        f"{value:.2e}" if abs(value) >= value_sci_notation_threshold else str(value)
+    def format_value(value: float | None) -> str:
+        """Format value for display."""
+        if value is None:
+            return "N/A"
+        return f"{value:.2e}" if abs(value) >= value_sci_notation_threshold else f"{value:.3f}"
+
+    def calculate_improvement(new_val: float | None, old_val: float | None) -> str:
+        """Calculate improvement percentage."""
+        if new_val is None or old_val is None or old_val == 0:
+            return ""
+        change = ((new_val - old_val) / abs(old_val)) * 100
+        return f" ({change:+.1f}%)"
+
+    def create_best_updates_text() -> str:
+        """Generate a text showing best data updates from today."""
+        lines = ["*🏆 Today's Best Data Updates*\n"]
+
+        # Check qubit properties
+        for qid, best_qubit in chip_props_best.qubits.items():
+            best_dict = best_qubit.model_dump()
+
+            updates = []
+            for field, best_value in best_dict.items():
+                if best_value is None:
+                    continue
+
+                # Get the value from yesterday for comparison
+                yesterday_value = None
+                if yesterday_history and qid in yesterday_history.qubits:
+                    yesterday_data = yesterday_history.qubits[qid].data
+                    if field == "t1":
+                        yesterday_value = yesterday_data.get("t1", {}).get("value")
+                        if yesterday_value:
+                            yesterday_value *= 1e3  # Convert to ns
+                    elif field == "t2_echo":
+                        yesterday_value = yesterday_data.get("t2_echo", {}).get("value")
+                        if yesterday_value:
+                            yesterday_value *= 1e3  # Convert to ns
+                    elif field == "t2_star":
+                        yesterday_value = yesterday_data.get("t2_star", {}).get("value")
+                        if yesterday_value:
+                            yesterday_value *= 1e3  # Convert to ns
+                    elif field in [
+                        "x90_gate_fidelity",
+                        "x180_gate_fidelity",
+                        "average_readout_fidelity",
+                    ]:
+                        yesterday_value = yesterday_data.get(field, {}).get("value")
+
+                # Only show if this is a new best value
+                if yesterday_value is None:
+                    updates.append(f"・{field}: New best! {format_value(best_value)}")
+                elif best_value > yesterday_value:  # Assuming higher values are better
+                    improvement = calculate_improvement(best_value, yesterday_value)
+                    updates.append(
+                        f"・{field}: New best! {format_value(yesterday_value)} → {format_value(best_value)}{improvement}"
                     )
-                else:
-                    value_str = str(value)
-                lines.append(f"・{key}: {value_str}")
-            lines.append("")
-        return "\n".join(lines)
+
+            if updates:
+                lines.append(f"\n*{qid}*")
+                lines.extend(updates)
+
+        # Check coupling properties
+        for coupling_id, best_coupling in chip_props_best.couplings.items():
+            best_dict = best_coupling.model_dump()
+
+            updates = []
+            for field, best_value in best_dict.items():
+                if best_value is None:
+                    continue
+
+                # Get the value from yesterday for comparison
+                yesterday_value = None
+                if yesterday_history and coupling_id in yesterday_history.couplings:
+                    yesterday_data = yesterday_history.couplings[coupling_id].data
+                    yesterday_value = yesterday_data.get(field, {}).get("value")
+
+                # Only show if this is a new best value
+                if yesterday_value is None:
+                    updates.append(f"・{field}: New best! {format_value(best_value)}")
+                elif best_value > yesterday_value:  # Assuming higher values are better
+                    improvement = calculate_improvement(best_value, yesterday_value)
+                    updates.append(
+                        f"・{field}: New best! {format_value(yesterday_value)} → {format_value(best_value)}{improvement}"
+                    )
+
+            if updates:
+                lines.append(f"\n*{coupling_id}*")
+                lines.extend(updates)
+
+        return "\n".join(lines) if len(lines) > 1 else "*No best data updates today*\n"
 
     # Example usage to avoid unused function warning
     # logger.info(create_report_text(chip_props_best_all))
@@ -430,13 +509,16 @@ def update_props(username: str = "admin") -> None:
     logger.info(f"props.yaml saved to {props_save_path}")
     logger.info(f"props_24hrs.yaml saved to {chip_props_24hrs_save_path}")
     write_yaml(chip_props_24hrs_all, filename=chip_props_24hrs_save_path)
+    # Send best updates report
+    updates_text = create_best_updates_text()
+
     slack = SlackContents(
         status=Status.SUCCESS,
-        title="🧪 For Experiment User",
-        msg=f"{create_report_text(chip_props_best_all)}\n\n",
+        title="🏆 Best Data Updates",
+        msg=updates_text,
         ts="",
         path="",
-        header="Check the latest chip properties.",
+        header="Today's best data updates",
         channel=settings.slack_channel_id,
         token=settings.slack_bot_token,
     )
@@ -464,23 +546,4 @@ def update_props(username: str = "admin") -> None:
         token=settings.slack_bot_token,
     )
     slack.send_slack()
-
-
-# if __name__ == "__main__":
-#     # Initialize database connection
-#     initialize()
-
-#     # Get current chip
-#     chip = ChipDocument.get_current_chip(username="orangekame3")
-
-#     # Convert properties
-#     chip_props = get_chip_properties(chip)
-
-#     # Read base properties
-#     base_props = read_base_properties()
-
-#     # Merge properties
-#     merged_props = merge_properties(base_props, chip_props)
-
-#     # Write to YAML file
-#     write_yaml(merged_props)
+    logger.info("Chip properties updated successfully.")
