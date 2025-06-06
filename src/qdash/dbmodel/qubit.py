@@ -74,10 +74,23 @@ class QubitDocument(Document):
 
         for metric in fidelity_metrics:
             if metric in new_data:
-                new_value = new_data[metric].get("value", 0.0)
-                # Initialize if metric doesn't exist in best_data
-                if metric not in current_best or new_value > current_best[metric].get("value", 0.0):
-                    current_best[metric] = new_data[metric].copy()
+                new_param = new_data[metric]
+                new_value = new_param.value if hasattr(new_param, "value") else 0.0
+                # Initialize if metric doesn't exist in best_data or new value is better
+                current_value = (
+                    current_best[metric].get("value", 0.0) if metric in current_best else 0.0
+                )
+                if metric not in current_best or new_value > current_value:
+                    # Convert OutputParameterModel to dict for storage
+                    current_best[metric] = {
+                        "value": new_param.value,
+                        "value_type": new_param.value_type,
+                        "error": new_param.error,
+                        "unit": new_param.unit,
+                        "description": new_param.description,
+                        "calibrated_at": new_param.calibrated_at,
+                        "execution_id": new_param.execution_id,
+                    }
 
         return current_best
 
