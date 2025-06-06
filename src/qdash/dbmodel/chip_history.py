@@ -53,6 +53,32 @@ class ChipHistoryDocument(Document):
         ]
 
     @classmethod
+    def get_yesterday_history(cls, chip_id: str, username: str) -> "ChipHistoryDocument | None":
+        """Get yesterday's history record for a chip.
+
+        Parameters
+        ----------
+        chip_id : str
+            The chip ID
+        username : str
+            The username of the user who created the chip
+
+        Returns
+        -------
+        ChipHistoryDocument | None
+            Yesterday's history record if it exists, None otherwise
+
+        """
+        yesterday = pendulum.now(tz="Asia/Tokyo").subtract(days=1).format("YYYY-MM-DD")
+        return cls.find_one(
+            {
+                "chip_id": chip_id,
+                "username": username,
+                "recorded_date": yesterday,
+            }
+        ).run()
+
+    @classmethod
     def create_history(cls, chip_doc: ChipDocument) -> "ChipHistoryDocument":
         """Create a history record from a ChipDocument."""
         today = pendulum.now(tz="Asia/Tokyo").format("YYYY-MM-DD")
