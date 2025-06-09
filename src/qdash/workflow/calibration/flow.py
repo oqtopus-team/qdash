@@ -208,35 +208,6 @@ def cal_batch(
     return task_manager
 
 
-def cal_parallel(
-    menu: Menu,
-    exp: Experiment,
-    task_manager: TaskManager,
-    task_names: list[str],
-    qids: list[str],
-) -> TaskManager:
-    """Execute calibration tasks in parallel for multiple qubits.
-
-    This function is a placeholder for parallel execution logic. It initializes the
-    calibration environment and prepares for parallel task execution.
-
-    Args:
-    ----
-        menu: Menu configuration containing task details
-        exp: Experiment instance for task execution
-        task_manager: Task manager instance to track execution state
-        task_names: List of task names to execute
-        qids: List of target qubit IDs
-
-    Returns:
-    -------
-        Updated TaskManager instance after task execution
-
-    """
-    # Placeholder for parallel execution logic
-    return task_manager
-
-
 @task
 def setup_calibration(
     menu: Menu,
