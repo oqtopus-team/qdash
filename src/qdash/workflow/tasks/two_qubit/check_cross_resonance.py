@@ -2,6 +2,7 @@ from typing import ClassVar
 
 import numpy as np
 import plotly.graph_objects as go
+import timeout_decorator
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibration.util import qid_to_cr_label, qid_to_cr_pair
 from qdash.workflow.tasks.base import (
@@ -83,6 +84,7 @@ class CheckCrossResonance(BaseTask):
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
         )
 
+    @timeout_decorator.timeout(60 * 30, use_signals=False)
     def run(self, exp: Experiment, qid: str) -> RunResult:
         control, target = qid_to_cr_pair(qid)
         raw_result = exp.obtain_cr_params(control, target)
