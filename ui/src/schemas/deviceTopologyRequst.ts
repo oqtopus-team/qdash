@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { DeviceTopologyRequstCondition } from "./deviceTopologyRequstCondition";
 
 /**
  * Request model for device topology.
@@ -14,4 +15,5 @@ export interface DeviceTopologyRequst {
   device_id?: string;
   qubits?: string[];
   exclude_couplings?: string[];
+  condition?: DeviceTopologyRequstCondition;
 }

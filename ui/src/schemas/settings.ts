@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * Settings for the QDash application.
+ */
 export interface Settings {
   env: string;
   client_url: string;

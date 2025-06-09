@@ -67,7 +67,7 @@ def execute_dynamic_task_by_qid(
 
         # ExecutionManagerの更新
         execution_manager = execution_manager.update_with_task_manager(task_manager)
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
+        # ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
 
         # タスクの前処理
         preprocess_result = this_task.preprocess(exp=exp, qid=qid)
@@ -80,9 +80,9 @@ def execute_dynamic_task_by_qid(
             )
             task_manager.save()
             execution_manager = execution_manager.update_with_task_manager(task_manager)
-            ExecutionHistoryDocument.upsert_document(
-                execution_model=execution_manager.to_datamodel()
-            )
+            # ExecutionHistoryDocument.upsert_document(
+            #     execution_model=execution_manager.to_datamodel()
+            # )
 
         # タスクの実行
         run_result = this_task.run(exp=exp, qid=qid)
@@ -158,7 +158,7 @@ def execute_dynamic_task_by_qid(
             task=executed_task, execution_model=execution_manager.to_datamodel()
         )
         execution_manager = execution_manager.update_with_task_manager(task_manager)
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
+        # ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
 
         # キャリブレーションデータの更新
         output_parameters = task_manager.get_output_parameter_by_task_name(
@@ -192,13 +192,13 @@ def execute_dynamic_task_by_qid(
         )
         task_manager.save()
         execution_manager = execution_manager.update_with_task_manager(task_manager)
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
+        # ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
 
         # 未実行タスクのスキップ処理
         task_manager.update_not_executed_tasks_to_skipped(task_type=task_type, qid=qid)
         task_manager.save()
         execution_manager = execution_manager.update_with_task_manager(task_manager)
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
+        # ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
 
         raise RuntimeError(f"Task {task_name} failed: {e}")
 
@@ -208,7 +208,7 @@ def execute_dynamic_task_by_qid(
         task_manager.end_task(task_name, task_type, qid)
         task_manager.save()
         execution_manager = execution_manager.update_with_task_manager(task_manager)
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
+        # ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
 
         # 最終状態の保存
         executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)

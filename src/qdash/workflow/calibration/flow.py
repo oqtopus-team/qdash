@@ -438,7 +438,6 @@ async def dispatch_calibration(
         TypeError: If the schedule type is not supported
 
     """
-    deployments = []
     if isinstance(schedule, SerialNode):
         for schedule_node in schedule.serial:
             if isinstance(schedule_node, SerialNode):
@@ -459,7 +458,25 @@ async def dispatch_calibration(
                     qubits=schedule_node.batch,
                     task_names=task_names,
                 )
+            if isinstance(schedule_node, ParallelNode):
+                parallel_deployments = []
+                for qid in schedule_node.parallel:
+                    parameters = {
+                        "menu": menu.model_dump(),
+                        "calib_dir": calib_dir,
+                        "successMap": successMap,
+                        "execution_id": execution_id,
+                        "qubits": [qid],
+                        "task_names": task_names,
+                    }
+                    parallel_deployments.append(
+                        run_deployment(
+                            "serial-cal-flow/oqtopus-serial-cal-flow", parameters=parameters
+                        )
+                    )
+                await asyncio.gather(*parallel_deployments)
     elif isinstance(schedule, ParallelNode):
+        deployments = []
         for schedule_node in schedule.parallel:
             if isinstance(schedule_node, SerialNode):
                 parameters = {
@@ -485,10 +502,9 @@ async def dispatch_calibration(
                 deployments.append(
                     run_deployment("batch-cal-flow/oqtopus-batch-cal-flow", parameters=parameters)
                 )
+        await asyncio.gather(*deployments)
     else:
         raise TypeError(f"Invalid schedule type: {type(schedule)}")
-
-    await asyncio.gather(*deployments)
 
 
 @flow(
