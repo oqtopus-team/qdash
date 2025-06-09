@@ -63,6 +63,7 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
+        """Run the X90 interleaved randomized benchmarking task with timeout."""
         label = qid_to_label(qid)
         result = exp.interleaved_randomized_benchmarking(
             target=label,

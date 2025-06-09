@@ -74,7 +74,7 @@ export function NewItemModal({
             console.error("Error uploading file", error);
             toast.error("Error uploading file");
           },
-        }
+        },
       );
     }
   };

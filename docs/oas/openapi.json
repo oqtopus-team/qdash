@@ -1972,6 +1972,22 @@
             "type": "array",
             "title": "Exclude Couplings",
             "default": []
+          },
+          "condition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Condition",
+            "default": {
+              "coupling_fidelity": {
+                "max": 1,
+                "min": 0.7
+              },
+              "qubit_fidelity": {
+                "max": 1,
+                "min": 0.7
+              },
+              "only_maximum_connected": true
+            }
           }
         },
         "type": "object",
@@ -2729,6 +2745,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/BatchNode"
+                },
+                {
+                  "type": "string"
                 }
               ]
             },
@@ -3110,7 +3129,8 @@
           "calib_data_path",
           "qpu_data_path"
         ],
-        "title": "Settings"
+        "title": "Settings",
+        "description": "Settings for the QDash application."
       },
       "Tag": {
         "properties": {

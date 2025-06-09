@@ -1,5 +1,8 @@
+import itertools
 import json
+from collections import defaultdict
 
+import networkx as nx
 from qdash.datamodel.qubit import QubitModel
 from qdash.db.init import initialize
 from qdash.dbmodel.chip import ChipDocument
@@ -129,9 +132,9 @@ if __name__ == "__main__":
     two_qubit_list = get_two_qubit_pair_list(chip_doc)
 
     bare_freq = extract_bare_frequency(chip_doc.qubits)
-    # print(two_qubit_list)
-    # print(len(two_qubit_list), "couplings found.")
-    # print(bare_freq)
+    print(two_qubit_list)
+    print(len(two_qubit_list), "couplings found.")
+    print(bare_freq)
 
     # Get CR pairs where first qubit frequency is lower than second qubit frequency
     cr_pairs = cr_pair_list(two_qubit_list, bare_freq)
@@ -140,7 +143,8 @@ if __name__ == "__main__":
     print(len(cr_pairs), "CR pairs found.")
 
     # Filter CR pairs by mux groups
-    mux_groups = [[0, 1, 4, 5], [2, 3, 6, 7], [8, 9, 12, 13], [10, 11, 14, 15]]
+    # mux_groups = [[0, 1, 4, 5], [2, 3, 6, 7], [8, 9, 12, 13], [10, 11, 14, 15]]
+    mux_groups = [[0, 1, 10, 11, 14, 15], [2, 3, 6, 7], [4, 5, 8, 9, 12, 13]]
     # mux_groups = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9]]
     internal_schedule = {"parallel": []}
     for mux_group in mux_groups:
