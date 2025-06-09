@@ -185,11 +185,16 @@ class ExecutionManager(BaseModel):
             # Update task results
             updated.task_results[task_manager.id] = task_manager.task_result
 
-            # Update calibration data
+            # Merge calibration data instead of overwriting
             for qid in task_manager.calib_data.qubit:
-                updated.calib_data.qubit[qid] = task_manager.calib_data.qubit[qid]
+                if qid not in updated.calib_data.qubit:
+                    updated.calib_data.qubit[qid] = {}
+                updated.calib_data.qubit[qid].update(task_manager.calib_data.qubit[qid])
+
             for qid in task_manager.calib_data.coupling:
-                updated.calib_data.coupling[qid] = task_manager.calib_data.coupling[qid]
+                if qid not in updated.calib_data.coupling:
+                    updated.calib_data.coupling[qid] = {}
+                updated.calib_data.coupling[qid].update(task_manager.calib_data.coupling[qid])
 
             # Update controller info
             for _id in task_manager.controller_info:

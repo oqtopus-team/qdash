@@ -82,12 +82,13 @@ class ExecutionHistoryDocument(Document):
             doc = cls.from_execution_model(execution_model)
             doc.save()
             return doc
+
+        # Update basic fields
         doc.username = execution_model.username
         doc.name = execution_model.name
         doc.calib_data_path = execution_model.calib_data_path
         doc.note = execution_model.note
         doc.status = execution_model.status
-        doc.task_results = execution_model.task_results
         doc.tags = execution_model.tags
         doc.controller_info = execution_model.controller_info
         doc.fridge_info = execution_model.fridge_info
@@ -95,9 +96,31 @@ class ExecutionHistoryDocument(Document):
         doc.start_at = execution_model.start_at
         doc.end_at = execution_model.end_at
         doc.elapsed_time = execution_model.elapsed_time
-        doc.calib_data = execution_model.calib_data.model_dump()
         doc.message = execution_model.message
         doc.system_info = execution_model.system_info.model_dump()
+
+        # Merge task_results
+        for task_id, task_result in execution_model.task_results.items():
+            doc.task_results[task_id] = task_result
+
+        # Merge calib_data
+        calib_data = execution_model.calib_data.model_dump()
+        if "qubit" in calib_data:
+            if "qubit" not in doc.calib_data:
+                doc.calib_data["qubit"] = {}
+            for qid, data in calib_data["qubit"].items():
+                if qid not in doc.calib_data["qubit"]:
+                    doc.calib_data["qubit"][qid] = {}
+                doc.calib_data["qubit"][qid].update(data)
+
+        if "coupling" in calib_data:
+            if "coupling" not in doc.calib_data:
+                doc.calib_data["coupling"] = {}
+            for qid, data in calib_data["coupling"].items():
+                if qid not in doc.calib_data["coupling"]:
+                    doc.calib_data["coupling"][qid] = {}
+                doc.calib_data["coupling"][qid].update(data)
+
         doc.save()
         return doc
 
