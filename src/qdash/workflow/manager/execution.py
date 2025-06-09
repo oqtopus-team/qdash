@@ -73,21 +73,137 @@ class ExecutionManager(BaseModel):
 
     def _with_db_transaction(self, func: Callable[["ExecutionManager"], None]) -> None:
         """Execute the function within a MongoDB transaction."""
+        import os
+
+        from pymongo import MongoClient, ReturnDocument
+
         try:
-            # 最新の状態を取得
-            doc = ExecutionHistoryDocument.find_one({"execution_id": self.execution_id}).run()
-            if doc is None:
-                # 初回の場合は現在のインスタンスを使用
-                instance = self
-            else:
-                instance = ExecutionManager.model_validate(doc.model_dump())
+            client: MongoClient = MongoClient(
+                "mongo",  # Docker service name
+                port=27017,  # Docker internal port
+                username=os.getenv("MONGO_INITDB_ROOT_USERNAME"),
+                password=os.getenv("MONGO_INITDB_ROOT_PASSWORD"),
+            )
+            # Get collection
+            collection = client.qubex[ExecutionHistoryDocument.Settings.name]
 
-            # 関数を実行
-            func(instance)
-            instance.system_info.update_time()
+            # Define array_filters for nested updates
+            array_filters = []
 
-            # DBに保存
-            ExecutionHistoryDocument.upsert_document(instance.to_datamodel())
+            # First, ensure the document exists with initial structure
+            collection.update_one(
+                {"execution_id": self.execution_id},
+                {
+                    "$setOnInsert": {
+                        "username": self.username,
+                        "name": self.name,
+                        "execution_id": self.execution_id,
+                        "calib_data_path": self.calib_data_path,
+                        "note": {},
+                        "status": ExecutionStatusModel.SCHEDULED,
+                        "task_results": {},
+                        "tags": [],
+                        "controller_info": {},
+                        "fridge_info": {},
+                        "chip_id": "",
+                        "start_at": "",
+                        "end_at": "",
+                        "elapsed_time": "",
+                        "calib_data": {"qubit": {}, "coupling": {}},
+                        "message": "",
+                        "system_info": {},
+                    }
+                },
+                upsert=True,
+            )
+
+            # Get latest document and apply updates
+            while True:
+                try:
+                    # Get current state
+                    doc = collection.find_one({"execution_id": self.execution_id})
+                    if doc is None:
+                        instance = self
+                    else:
+                        instance = ExecutionManager.model_validate(doc)
+
+                    # Execute update function
+                    func(instance)
+                    instance.system_info.update_time()
+
+                    # Convert to dict
+                    update_data = instance.to_datamodel().model_dump()
+
+                    # Prepare update operations
+                    update_ops = {
+                        "$set": {
+                            "username": update_data["username"],
+                            "name": update_data["name"],
+                            "calib_data_path": update_data["calib_data_path"],
+                            "note": update_data["note"],
+                            "status": update_data["status"],
+                            "tags": update_data["tags"],
+                            "chip_id": update_data["chip_id"],
+                            "start_at": update_data["start_at"],
+                            "end_at": update_data["end_at"],
+                            "elapsed_time": update_data["elapsed_time"],
+                            "message": update_data["message"],
+                            "system_info": update_data["system_info"],
+                        }
+                    }
+
+                    # Merge task_results
+                    if update_data["task_results"]:
+                        for k, v in update_data["task_results"].items():
+                            update_ops["$set"][f"task_results.{k}"] = v
+
+                    # Merge controller_info
+                    if update_data["controller_info"]:
+                        for k, v in update_data["controller_info"].items():
+                            update_ops["$set"][f"controller_info.{k}"] = v
+
+                    # Merge fridge_info
+                    if update_data["fridge_info"]:
+                        for k, v in update_data["fridge_info"].items():
+                            update_ops["$set"][f"fridge_info.{k}"] = v
+
+                    # Merge calibration data
+                    if update_data["calib_data"].get("qubit"):
+                        for qid, data in update_data["calib_data"]["qubit"].items():
+                            update_ops["$set"][f"calib_data.qubit.{qid}"] = data
+
+                    if update_data["calib_data"].get("coupling"):
+                        for qid, data in update_data["calib_data"]["coupling"].items():
+                            update_ops["$set"][f"calib_data.coupling.{qid}"] = data
+
+                    # Try to update with optimistic locking
+                    result = collection.find_one_and_update(
+                        {
+                            "execution_id": self.execution_id,
+                            "$or": [
+                                {"_version": {"$exists": False}},
+                                {"_version": doc.get("_version", 0) if doc else 0},
+                            ],
+                        },
+                        {
+                            **update_ops,
+                            "$inc": {"_version": 1},
+                        },
+                        return_document=ReturnDocument.AFTER,
+                    )
+
+                    if result is not None:
+                        # Update successful
+                        break
+
+                    # If update failed, retry with latest document
+                    logger.info("Retrying update due to concurrent modification")
+                    continue
+
+                except Exception as e:
+                    logger.error(f"Error during update retry: {e}")
+                    raise
+
         except Exception as e:
             logger.error(f"DB transaction failed: {e}")
             raise
