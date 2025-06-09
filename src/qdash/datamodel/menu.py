@@ -14,7 +14,7 @@ class SerialNode(BaseModel):
 class ParallelNode(BaseModel):
     """Parallel node model."""
 
-    parallel: list[ScheduleNode]
+    parallel: list[ScheduleNode | str]
 
 
 class BatchNode(BaseModel):

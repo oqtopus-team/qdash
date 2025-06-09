@@ -34,7 +34,7 @@ export function CreateFromTemplateModal({
 
   const handleInputChange = (
     field: keyof CreateMenuRequest,
-    value: string | boolean | string[] | CreateMenuRequestSchedule
+    value: string | boolean | string[] | CreateMenuRequestSchedule,
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -74,7 +74,7 @@ export function CreateFromTemplateModal({
             error.response?.data?.detail || "Error creating template item";
           toast.error(errorMessage);
         },
-      }
+      },
     );
   };
 
@@ -112,7 +112,7 @@ export function CreateFromTemplateModal({
                   return;
                 }
                 const selectedPreset = presetData?.data.menus.find(
-                  (menu) => menu.name === e.target.value
+                  (menu) => menu.name === e.target.value,
                 );
                 if (selectedPreset) {
                   // Convert schedule format if needed

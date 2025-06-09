@@ -17,7 +17,7 @@ export type Menu = {
 };
 
 export const mapListMenuResponseToListMenu = (
-  response: ListMenuResponse
+  response: ListMenuResponse,
 ): Menu[] => {
   return response.menus.map((item) => ({
     name: item.name,
@@ -62,7 +62,7 @@ export type CalibrationSchedule = {
 };
 
 export const mapScheduleCalibResponsetoCalibSchedule = (
-  data: ScheduleCalibResponse[]
+  data: ScheduleCalibResponse[],
 ): CalibSchedule[] => {
   return data.map((item) => ({
     description: item.description,

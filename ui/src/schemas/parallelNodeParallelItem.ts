@@ -9,4 +9,8 @@ import type { SerialNode } from "./serialNode";
 import type { ParallelNode } from "./parallelNode";
 import type { BatchNode } from "./batchNode";
 
-export type ParallelNodeParallelItem = SerialNode | ParallelNode | BatchNode;
+export type ParallelNodeParallelItem =
+  | SerialNode
+  | ParallelNode
+  | BatchNode
+  | string;

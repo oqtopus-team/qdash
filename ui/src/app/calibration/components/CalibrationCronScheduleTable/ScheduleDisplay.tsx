@@ -36,7 +36,13 @@ export function ScheduleDisplay({ schedule }: ScheduleDisplayProps) {
         </p>
         <div className="space-y-2">
           {schedule.parallel.map((node, index) => (
-            <ScheduleDisplay key={index} schedule={node} />
+            <div key={index}>
+              {typeof node === "string" ? (
+                <p className="text-base-content/80">{node}</p>
+              ) : (
+                <ScheduleDisplay schedule={node} />
+              )}
+            </div>
           ))}
         </div>
       </div>
