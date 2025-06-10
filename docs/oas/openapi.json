@@ -162,6 +162,7 @@
           "calibration"
         ],
         "summary": "Fetches all the calibration schedules.",
+        "description": "Fetch all the calibration schedules.",
         "operationId": "fetch_all_calib_schedule",
         "responses": {
           "200": {
@@ -178,12 +179,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       },
       "post": {
         "tags": [
@@ -237,12 +233,8 @@
           "calibration"
         ],
         "summary": "Deletes a calibration schedule.",
+        "description": "Delete a calibration schedule.",
         "operationId": "delete_calib_schedule",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "flow_run_id",
