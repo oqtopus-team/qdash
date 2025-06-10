@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar
+from typing import TYPE_CHECKING, Annotated, Any
 
 import pendulum
 from fastapi import APIRouter, Depends
@@ -10,6 +10,8 @@ from qdash.api.lib.auth import get_current_active_user, get_optional_current_use
 from qdash.api.schemas.auth import User
 from qdash.datamodel.task import OutputParameterModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.chip_history import ChipHistoryDocument
+from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -145,6 +147,50 @@ def list_chips(
         )
         for chip in chips
     ]
+
+
+class ChipDatesResponse(BaseModel):
+    """Response model for chip dates."""
+
+    data: list[str]
+
+
+@router.get(
+    "/chip/{chip_id}/dates",
+    response_model=ChipDatesResponse,
+    summary="Fetch available dates for a chip",
+    operation_id="fetchChipDates",
+)
+def fetch_chip_dates(
+    chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]
+) -> ChipDatesResponse:
+    """Fetch available dates for a chip from execution counter.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    current_user : User
+        Current authenticated user
+
+    Returns
+    -------
+    list[str]
+        List of available dates in ISO format
+
+    """
+    logger.debug(f"Fetching dates for chip {chip_id}, user: {current_user.username}")
+    counter_list = ExecutionCounterDocument.find(
+        {"chip_id": chip_id, "username": current_user.username}
+    ).run()
+    if not counter_list:
+        raise ValueError(
+            f"No execution counter found for chip {chip_id} and user {current_user.username}"
+        )
+    # Extract unique dates from the counter
+    dates = [counter.date for counter in counter_list]
+    # Return dates in a format matching the API schema
+    return ChipDatesResponse(data=dates)
 
 
 @router.get(
@@ -541,6 +587,108 @@ class LatestTaskGroupedByChipResponse(BaseModel):
 
     task_name: str
     result: dict[str, Task]
+
+
+@router.get(
+    "/chip/{chip_id}/task/{task_name}/history/{recorded_date}",
+    summary="Fetch historical task results",
+    operation_id="fetchHistoricalTaskGroupedByChip",
+    response_model=LatestTaskGroupedByChipResponse,
+    response_model_exclude_none=True,
+)
+def fetch_historical_task_grouped_by_chip(
+    chip_id: str,
+    task_name: str,
+    recorded_date: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> LatestTaskGroupedByChipResponse:
+    """Fetch historical task results for a specific date.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    task_name : str
+        Name of the task to fetch
+    recorded_date : str
+        Date to fetch history for (ISO format YYYY-MM-DD)
+    current_user : User
+        Current authenticated user
+
+    Returns
+    -------
+    LatestTaskGroupedByChipResponse
+        Historical task results for all qubits on the specified date
+
+    """
+    logger.debug(
+        f"Fetching historical task results for chip {chip_id}, task {task_name}, date {recorded_date}"
+    )
+
+    # Get chip info
+    chip = ChipHistoryDocument.find_one(
+        {"chip_id": chip_id, "username": current_user.username, "recorded_date": recorded_date}
+    ).run()
+    if chip is None:
+        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+
+    # Get qids
+    qids = [str(qid) for qid in range(chip.size)]
+
+    parsed_date = pendulum.from_format(recorded_date, "YYYYMMDD", tz="Asia/Tokyo")
+
+    # Format to 'YYYY-MM-DD'
+    formatted_date = parsed_date.to_date_string()
+    all_results = (
+        TaskResultHistoryDocument.find(
+            {
+                "username": current_user.username,
+                "chip_id": chip_id,
+                "name": task_name,
+                "qid": {"$in": qids},
+                # Filter tasks executed on the same date in JST
+                "start_at": {
+                    "$gte": f"{formatted_date}T00:00:00+09:00",
+                    "$lt": f"{formatted_date}T23:59:59+09:00",
+                },
+            }
+        )
+        .sort([("end_at", DESCENDING)])
+        .run()
+    )
+
+    # Organize results by qid
+    task_results: dict[str, TaskResultHistoryDocument] = {}
+    for result in all_results:
+        if result.qid not in task_results:
+            task_results[result.qid] = result
+
+    # Build response
+    results = {}
+    for qid in qids:
+        result = task_results.get(qid)
+        if result is not None:
+            task_result = Task(
+                task_id=result.task_id,
+                name=result.name,
+                status=result.status,
+                message=result.message,
+                input_parameters=result.input_parameters,
+                output_parameters=result.output_parameters,
+                output_parameter_names=result.output_parameter_names,
+                note=result.note,
+                figure_path=result.figure_path,
+                raw_data_path=result.raw_data_path,
+                start_at=result.start_at,
+                end_at=result.end_at,
+                elapsed_time=result.elapsed_time,
+                task_type=result.task_type,
+            )
+        else:
+            task_result = Task(name=task_name)
+        results[qid] = task_result
+
+    return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
 
 
 @router.get(

@@ -10,6 +10,7 @@ export * from "./batchNode";
 export * from "./bodyAuthLoginForAccessToken";
 export * from "./calibrationNoteResponse";
 export * from "./calibrationNoteResponseNote";
+export * from "./chipDatesResponse";
 export * from "./chipResponse";
 export * from "./chipResponseCouplings";
 export * from "./chipResponseQubits";

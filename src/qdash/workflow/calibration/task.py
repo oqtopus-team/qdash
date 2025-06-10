@@ -4,6 +4,8 @@ from pathlib import Path
 
 from prefect import get_run_logger, task
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.initialize import initialize
@@ -215,6 +217,8 @@ def execute_dynamic_task_by_qid(
         TaskResultHistoryDocument.upsert_document(
             task=executed_task, execution_model=execution_manager.to_datamodel()
         )
+        chip_doc = ChipDocument.get_current_chip(username=task_manager.username)
+        ChipHistoryDocument.create_history(chip_doc)
 
     return task_manager
 
