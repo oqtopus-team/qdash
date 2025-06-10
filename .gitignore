@@ -222,3 +222,4 @@ src/qdash/workflow/*.json
 src/qdash/workflow/.calibration/*.json
 src/qdash/workflow/.classifier/64Q/*
 config
+src/tools/schedule/*

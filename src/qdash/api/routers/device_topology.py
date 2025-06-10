@@ -104,6 +104,29 @@ def qid_to_label(qid: str) -> str:
     raise ValueError(error_message)
 
 
+def is_within_24h(calibrated_at: str | None) -> bool:
+    """Check if the calibrated timestamp is within 24 hours.
+
+    Args:
+    ----
+        calibrated_at: Timestamp string to check
+
+    Returns:
+    -------
+        bool: True if within 24 hours, False otherwise
+
+    """
+    if not calibrated_at:
+        return False
+    try:
+        now = pendulum.now(tz="Asia/Tokyo")
+        cutoff = now.subtract(hours=24)
+        calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
+        return calibrated_at_dt >= cutoff
+    except Exception:
+        return False
+
+
 def normalize_coupling_key(control: str, target: str) -> str:
     """Normalize coupling key by sorting the qubits.
 
@@ -190,19 +213,27 @@ def get_device_topology(
     logger.info(f"id_mapping: {id_mapping}")
 
     for qid in request.qubits:
+        # Get qubit data with timestamp checks
+        x90_data = chip_docs.qubits[qid].data.get("x90_gate_fidelity", {})
+        t1_data = chip_docs.qubits[qid].data.get("t1", {})
+        t2_data = chip_docs.qubits[qid].data.get("t2_echo", {})
+        readout_0_data = chip_docs.qubits[qid].data.get("readout_fidelity_0", {})
+        readout_1_data = chip_docs.qubits[qid].data.get("readout_fidelity_1", {})
+
+        # Check timestamps and get values
         x90_gate_fidelity = (
-            chip_docs.qubits[qid].data.get("x90_gate_fidelity") or {"value": 0.25}
-        )["value"]
-        t1 = (chip_docs.qubits[qid].data.get("t1") or {"value": 100.0})["value"]
-        t2 = (chip_docs.qubits[qid].data.get("t2_echo") or {"value": 100.0})["value"]
+            x90_data["value"] if is_within_24h(x90_data.get("calibrated_at")) else 0.25
+        )
+        t1 = t1_data["value"] if is_within_24h(t1_data.get("calibrated_at")) else 100.0
+        t2 = t2_data["value"] if is_within_24h(t2_data.get("calibrated_at")) else 100.0
         drag_hpi_duration = drag_hpi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
         drag_pi_duration = drag_pi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
         readout_fidelity_0 = (
-            chip_docs.qubits[qid].data.get("readout_fidelity_0") or {"value": 0.25}
-        )["value"]
+            readout_0_data["value"] if is_within_24h(readout_0_data.get("calibrated_at")) else 0.25
+        )
         readout_fidelity_1 = (
-            chip_docs.qubits[qid].data.get("readout_fidelity_1") or {"value": 0.25}
-        )["value"]
+            readout_1_data["value"] if is_within_24h(readout_1_data.get("calibrated_at")) else 0.25
+        )
         # Calculate readout assignment error
         prob_meas1_prep0 = 1 - readout_fidelity_0
         prob_meas0_prep1 = 1 - readout_fidelity_1
@@ -251,11 +282,15 @@ def get_device_topology(
             target = cr_value["target"]
             control, target = split_q_string(cr_key)
             cr_duration = cr_value.get("duration", 20)
+            # Get coupling fidelity data with timestamp check
+            coupling_data = chip_docs.couplings[f"{control}-{target}"].data.get(
+                "bell_state_fidelity", {}
+            )
             zx90_gate_fidelity = (
-                # chip_docs.couplings[f"{control}-{target}"].data.get("zx90_gate_fidelity") # TODO(orangekame3): Use zx90_gate_fidelity if available
-                chip_docs.couplings[f"{control}-{target}"].data.get("bell_state_fidelity")
-                or {"value": 0.25}
-            )["value"]
+                coupling_data["value"]
+                if is_within_24h(coupling_data.get("calibrated_at"))
+                else 0.25
+            )
             # Only append if both control and target qubits exist in id_mapping and coupling is not excluded
             if control in id_mapping and target in id_mapping:
                 # Normalize both the current coupling key and all excluded couplings
