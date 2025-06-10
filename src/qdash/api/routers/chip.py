@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar
+from typing import TYPE_CHECKING, Annotated, Any
 
 import pendulum
 from fastapi import APIRouter, Depends
@@ -180,29 +180,18 @@ def fetch_chip_dates(
 
     """
     logger.debug(f"Fetching dates for chip {chip_id}, user: {current_user.username}")
-
-    # Get dates from task results for this chip and user
-    executions = (
-        TaskResultHistoryDocument.find(
-            {
-                "username": current_user.username,
-                "chip_id": chip_id,
-                "status": "completed",  # Only include completed tasks
-            }
+    counter = ExecutionCounterDocument.find(
+        {"chip_id": chip_id, "username": current_user.username}
+    ).run()
+    if not counter:
+        raise ValueError(
+            f"No execution counter found for chip {chip_id} and user {current_user.username}"
         )
-        .sort([("end_at", DESCENDING)])
-        .run()
-    )
-
-    # Log execution counter results
-    logger.debug(f"Found {len(executions)} task result records")
-
-    # Extract unique dates from end_at timestamps
+    # Extract unique dates from the counter
     dates = sorted(
-        set(e.end_at.split("T")[0] for e in executions if e.end_at and e.status == "completed"),
-        reverse=True,
+        [date for date in counter.dates if date],
+        key=lambda x: pendulum.parse(x),
     )
-    logger.debug(f"Returning {len(dates)} unique dates: {dates}")
     # Return dates in a format matching the API schema
     return ChipDatesResponse(data=dates)
 
