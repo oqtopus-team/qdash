@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Task } from "@/schemas";
 import {
   useFetchLatestTaskGroupedByChip,
   useFetchHistoricalTaskGroupedByChip,
 } from "@/client/chip/chip";
-import { TaskFigure } from "@/app/components/TaskFigure";
+import { Task } from "@/schemas";
+import { TaskFigure } from "./TaskFigure";
+import { useState } from "react";
 
 interface TaskResultGridProps {
   chipId: string;
@@ -20,10 +20,6 @@ interface SelectedTaskInfo {
   task: Task;
 }
 
-// Grid configuration
-const GRID_SIZE = 8;
-const MUX_SIZE = 2; // 2x2 blocks for each mux
-
 export function TaskResultGrid({
   chipId,
   selectedTask,
@@ -32,16 +28,54 @@ export function TaskResultGrid({
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
 
-  // Fetch task results
+  // Use appropriate hook based on selectedDate
   const {
-    data: taskResponse,
-    isLoading: isLoadingTask,
-    isError: isTaskError,
-  } = selectedDate === "latest"
-    ? useFetchLatestTaskGroupedByChip(chipId, selectedTask)
-    : useFetchHistoricalTaskGroupedByChip(chipId, selectedTask, selectedDate);
+    data: latestData,
+    isLoading: isLoadingLatest,
+    isError: isLatestError,
+  } = useFetchLatestTaskGroupedByChip(chipId, selectedTask, {
+    query: {
+      enabled: selectedDate === "latest",
+    },
+  });
 
-  if (isLoadingTask) {
+  const {
+    data: historicalData,
+    isLoading: isLoadingHistorical,
+    isError: isHistoricalError,
+  } = useFetchHistoricalTaskGroupedByChip(chipId, selectedTask, selectedDate, {
+    query: {
+      enabled: selectedDate !== "latest",
+    },
+  });
+
+  const isLoading = isLoadingLatest || isLoadingHistorical;
+  const isError = isLatestError || isHistoricalError;
+  const responseData =
+    selectedDate === "latest" ? latestData?.data : historicalData?.data;
+
+  // Format relative time
+  const formatRelativeTime = (date: Date): string => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return "just now";
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400)
+      return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    return date.toLocaleString();
+  };
+
+  // Get figure path from task
+  const getFigurePath = (task: Task): string | null => {
+    if (!task.figure_path) return null;
+    if (Array.isArray(task.figure_path)) {
+      return task.figure_path[0] || null;
+    }
+    return task.figure_path;
+  };
+
+  if (isLoading) {
     return (
       <div className="w-full flex justify-center py-12">
         <span className="loading loading-spinner loading-lg"></span>
@@ -49,7 +83,7 @@ export function TaskResultGrid({
     );
   }
 
-  if (isTaskError) {
+  if (isError) {
     return (
       <div className="alert alert-error">
         <svg
@@ -65,120 +99,87 @@ export function TaskResultGrid({
             d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        <span>Failed to load task data</span>
+        <span>Failed to load task results</span>
       </div>
     );
   }
 
-  // Create a mapping of QID to grid position
-  const gridPositions: { [key: string]: { row: number; col: number } } = {};
-  if (taskResponse?.data?.result) {
-    Object.keys(taskResponse.data.result).forEach((qid) => {
-      const qidNum = parseInt(qid);
-      const muxIndex = Math.floor(qidNum / 4); // Which mux block (0, 1, 2, ...)
-      const muxRow = Math.floor(muxIndex / (GRID_SIZE / MUX_SIZE)); // Row of mux blocks
-      const muxCol = muxIndex % (GRID_SIZE / MUX_SIZE); // Column of mux blocks
-      const localIndex = qidNum % 4; // Position within mux (0-3)
-      const localRow = Math.floor(localIndex / 2); // Row within mux (0-1)
-      const localCol = localIndex % 2; // Column within mux (0-1)
-
-      gridPositions[qid] = {
-        row: muxRow * MUX_SIZE + localRow,
-        col: muxCol * MUX_SIZE + localCol,
-      };
-    });
+  if (!responseData) {
+    return (
+      <div className="alert alert-info">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          className="stroke-current shrink-0 w-6 h-6"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+        <span>No task results available</span>
+      </div>
+    );
   }
 
-  // Get task result for a specific QID
-  const getTaskResult = (qid: string): Task | null => {
-    if (!taskResponse?.data?.result?.[qid]) return null;
-    return taskResponse.data.result[qid];
-  };
-
-  // Get figure path from task
-  const getFigurePath = (task: Task): string | null => {
-    if (!task.figure_path) return null;
-    if (Array.isArray(task.figure_path)) {
-      return task.figure_path[0] || null;
-    }
-    return task.figure_path;
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Grid Display */}
-      <div className="grid grid-cols-8 gap-2 p-4 bg-base-200/50 rounded-xl">
-        {Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, index) => {
-          const row = Math.floor(index / GRID_SIZE);
-          const col = index % GRID_SIZE;
-          const qid = Object.keys(gridPositions).find(
-            (key) =>
-              gridPositions[key].row === row && gridPositions[key].col === col
-          );
+    <>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        {Object.entries(responseData.result).map(
+          ([qid, task]: [string, Task]) => {
+            const figurePath = getFigurePath(task);
 
-          if (!qid) {
             return (
-              <div
-                key={index}
-                className="aspect-square bg-base-300/50 rounded-lg"
-              />
-            );
-          }
-
-          const task = getTaskResult(qid);
-          if (!task) {
-            return (
-              <div
-                key={index}
-                className="aspect-square bg-base-300 rounded-lg flex items-center justify-center"
+              <button
+                key={qid}
+                onClick={() => {
+                  if (figurePath) {
+                    setSelectedTaskInfo({
+                      path: figurePath,
+                      qid,
+                      task,
+                    });
+                  }
+                }}
+                className="card bg-base-100 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow relative"
               >
-                <div className="text-sm font-medium text-base-content/50">
-                  {qid}
+                <div className="card-body p-2">
+                  <div className="text-sm font-medium mb-2">
+                    <div className="flex justify-between items-center mb-1">
+                      <span>QID: {qid}</span>
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          task.status === "completed"
+                            ? "bg-success"
+                            : task.status === "failed"
+                            ? "bg-error"
+                            : "bg-warning"
+                        }`}
+                      />
+                    </div>
+                    {task.end_at && (
+                      <div className="text-xs text-base-content/60">
+                        Updated: {formatRelativeTime(new Date(task.end_at))}
+                      </div>
+                    )}
+                  </div>
+                  {task.figure_path && (
+                    <div className="relative h-48 rounded-lg overflow-hidden">
+                      <TaskFigure
+                        path={task.figure_path}
+                        qid={qid}
+                        className="w-full h-48 object-contain"
+                      />
+                    </div>
+                  )}
                 </div>
-              </div>
+              </button>
             );
           }
-
-          const figurePath = getFigurePath(task);
-
-          return (
-            <button
-              key={index}
-              onClick={() => {
-                if (figurePath) {
-                  setSelectedTaskInfo({
-                    path: figurePath,
-                    qid,
-                    task,
-                  });
-                }
-              }}
-              className="aspect-square bg-base-100 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow relative"
-            >
-              {task.figure_path && (
-                <div className="absolute inset-0">
-                  <TaskFigure
-                    path={task.figure_path}
-                    qid={qid}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              )}
-              <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
-                {qid}
-              </div>
-              <div
-                className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
-                  task.status === "completed"
-                    ? "bg-success"
-                    : task.status === "failed"
-                    ? "bg-error"
-                    : "bg-warning"
-                }`}
-              />
-            </button>
-          );
-        })}
+        )}
       </div>
 
       {/* Task Result Modal */}
@@ -262,6 +263,6 @@ export function TaskResultGrid({
           </form>
         </dialog>
       )}
-    </div>
+    </>
   );
 }

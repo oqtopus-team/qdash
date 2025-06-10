@@ -331,201 +331,6 @@ export function useFetchChipDates<
 }
 
 /**
- * Fetch historical chip data for a specific date.
-
-Parameters
-----------
-chip_id : str
-    ID of the chip to fetch
-recorded_date : str
-    Date to fetch history for (ISO format)
-current_user : User
-    Current authenticated user
-
-Returns
--------
-ChipResponse
-    Historical chip information
- * @summary Fetch historical chip data
- */
-export const fetchChipHistory = (
-  chipId: string,
-  recordedDate: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
-) => {
-  return customInstance<ChipResponse>(
-    {
-      url: `/api/chip/${chipId}/history/${recordedDate}`,
-      method: "GET",
-      signal,
-    },
-    options,
-  );
-};
-
-export const getFetchChipHistoryQueryKey = (
-  chipId: string,
-  recordedDate: string,
-) => {
-  return [`/api/chip/${chipId}/history/${recordedDate}`] as const;
-};
-
-export const getFetchChipHistoryQueryOptions = <
-  TData = Awaited<ReturnType<typeof fetchChipHistory>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  chipId: string,
-  recordedDate: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof fetchChipHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getFetchChipHistoryQueryKey(chipId, recordedDate);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof fetchChipHistory>>
-  > = ({ signal }) =>
-    fetchChipHistory(chipId, recordedDate, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!(chipId && recordedDate),
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof fetchChipHistory>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
-
-export type FetchChipHistoryQueryResult = NonNullable<
-  Awaited<ReturnType<typeof fetchChipHistory>>
->;
-export type FetchChipHistoryQueryError = ErrorType<HTTPValidationError>;
-
-export function useFetchChipHistory<
-  TData = Awaited<ReturnType<typeof fetchChipHistory>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  chipId: string,
-  recordedDate: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof fetchChipHistory>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchChipHistory>>,
-          TError,
-          Awaited<ReturnType<typeof fetchChipHistory>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useFetchChipHistory<
-  TData = Awaited<ReturnType<typeof fetchChipHistory>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  chipId: string,
-  recordedDate: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof fetchChipHistory>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchChipHistory>>,
-          TError,
-          Awaited<ReturnType<typeof fetchChipHistory>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useFetchChipHistory<
-  TData = Awaited<ReturnType<typeof fetchChipHistory>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  chipId: string,
-  recordedDate: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof fetchChipHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-/**
- * @summary Fetch historical chip data
- */
-
-export function useFetchChipHistory<
-  TData = Awaited<ReturnType<typeof fetchChipHistory>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  chipId: string,
-  recordedDate: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof fetchChipHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getFetchChipHistoryQueryOptions(
-    chipId,
-    recordedDate,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
  * Fetch a chip by its ID.
 
 Parameters
@@ -1385,6 +1190,22 @@ export function useListMuxes<
 
 /**
  * Fetch historical task results for a specific date.
+
+Parameters
+----------
+chip_id : str
+    ID of the chip
+task_name : str
+    Name of the task to fetch
+recorded_date : str
+    Date to fetch history for (ISO format YYYY-MM-DD)
+current_user : User
+    Current authenticated user
+
+Returns
+-------
+LatestTaskGroupedByChipResponse
+    Historical task results for all qubits on the specified date
  * @summary Fetch historical task results
  */
 export const fetchHistoricalTaskGroupedByChip = (

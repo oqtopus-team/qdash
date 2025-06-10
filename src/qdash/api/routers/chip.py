@@ -194,63 +194,6 @@ def fetch_chip_dates(
 
 
 @router.get(
-    "/chip/{chip_id}/history/{recorded_date}",
-    response_model=ChipResponse,
-    summary="Fetch historical chip data",
-    operation_id="fetchChipHistory",
-)
-def fetch_chip_history(
-    chip_id: str,
-    recorded_date: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-) -> ChipResponse:
-    """Fetch historical chip data for a specific date.
-
-    Parameters
-    ----------
-    chip_id : str
-        ID of the chip to fetch
-    recorded_date : str
-        Date to fetch history for (ISO format)
-    current_user : User
-        Current authenticated user
-
-    Returns
-    -------
-    ChipResponse
-        Historical chip information
-
-    """
-    logger.debug(
-        f"Fetching chip history for {chip_id} at {recorded_date}, user: {current_user.username}"
-    )
-
-    # Convert YYYY-MM-DD to YYYYMMDD
-    date_parts = recorded_date.split("-")
-    formatted_date = "".join(date_parts)
-
-    chip_history = ChipHistoryDocument.find_one(
-        {"chip_id": chip_id, "username": current_user.username, "date": formatted_date}
-    ).run()
-
-    if not chip_history:
-        # If not found with formatted date, try with original format
-        chip_history = ChipHistoryDocument.find_one(
-            {"chip_id": chip_id, "username": current_user.username, "recorded_date": recorded_date}
-        ).run()
-        if not chip_history:
-            raise ValueError(f"No history found for chip {chip_id} at {recorded_date}")
-
-    return ChipResponse(
-        chip_id=chip_history.chip_id,
-        size=chip_history.size,
-        qubits=chip_history.qubits,
-        couplings=chip_history.couplings,
-        installed_at=chip_history.installed_at,
-    )
-
-
-@router.get(
     "/chip/{chip_id}", response_model=ChipResponse, summary="Fetch a chip", operation_id="fetchChip"
 )
 def fetch_chip(
@@ -659,22 +602,38 @@ def fetch_historical_task_grouped_by_chip(
     recorded_date: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> LatestTaskGroupedByChipResponse:
-    """Fetch historical task results for a specific date."""
+    """Fetch historical task results for a specific date.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    task_name : str
+        Name of the task to fetch
+    recorded_date : str
+        Date to fetch history for (ISO format YYYY-MM-DD)
+    current_user : User
+        Current authenticated user
+
+    Returns
+    -------
+    LatestTaskGroupedByChipResponse
+        Historical task results for all qubits on the specified date
+
+    """
     logger.debug(
         f"Fetching historical task results for chip {chip_id}, task {task_name}, date {recorded_date}"
     )
 
     # Get chip info
-    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    chip = ChipHistoryDocument.find_one(
+        {"chip_id": chip_id, "username": current_user.username, "recorded_date": recorded_date}
+    ).run()
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
 
     # Get qids
     qids = [str(qid) for qid in range(chip.size)]
-
-    # Convert YYYY-MM-DD to YYYYMMDD
-    date_parts = recorded_date.split("-")
-    formatted_date = "".join(date_parts)
 
     # Fetch historical task results
     all_results = (
@@ -683,8 +642,7 @@ def fetch_historical_task_grouped_by_chip(
                 "username": current_user.username,
                 "chip_id": chip_id,
                 "name": task_name,
-                "qid": {"$in": qids},
-                "end_at": {"$regex": f"^{recorded_date}"},  # Match tasks from this date
+                "qid": {"$in": qids},  # Use formatted date for exact match
             }
         )
         .sort([("end_at", DESCENDING)])
