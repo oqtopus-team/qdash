@@ -10,6 +10,7 @@ from qdash.api.lib.auth import get_current_active_user, get_optional_current_use
 from qdash.api.schemas.auth import User
 from qdash.datamodel.task import OutputParameterModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -145,6 +146,54 @@ def list_chips(
         )
         for chip in chips
     ]
+
+
+@router.get(
+    "/chip/{chip_id}/history/{recorded_date}",
+    response_model=ChipResponse,
+    summary="Fetch historical chip data",
+    operation_id="fetchChipHistory",
+)
+def fetch_chip_history(
+    chip_id: str,
+    recorded_date: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> ChipResponse:
+    """Fetch historical chip data for a specific date.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip to fetch
+    recorded_date : str
+        Date to fetch history for (ISO format)
+    current_user : User
+        Current authenticated user
+
+    Returns
+    -------
+    ChipResponse
+        Historical chip information
+
+    """
+    logger.debug(
+        f"Fetching chip history for {chip_id} at {recorded_date}, user: {current_user.username}"
+    )
+
+    chip_history = ChipHistoryDocument.find_one(
+        {"chip_id": chip_id, "username": current_user.username, "recorded_date": recorded_date}
+    ).run()
+
+    if not chip_history:
+        raise ValueError(f"No history found for chip {chip_id} at {recorded_date}")
+
+    return ChipResponse(
+        chip_id=chip_history.chip_id,
+        size=chip_history.size,
+        qubits=chip_history.qubits,
+        couplings=chip_history.couplings,
+        installed_at=chip_history.installed_at,
+    )
 
 
 @router.get(
@@ -541,6 +590,81 @@ class LatestTaskGroupedByChipResponse(BaseModel):
 
     task_name: str
     result: dict[str, Task]
+
+
+@router.get(
+    "/chip/{chip_id}/task/{task_name}/history/{recorded_date}",
+    summary="Fetch historical task results",
+    operation_id="fetchHistoricalTaskGroupedByChip",
+    response_model=LatestTaskGroupedByChipResponse,
+    response_model_exclude_none=True,
+)
+def fetch_historical_task_grouped_by_chip(
+    chip_id: str,
+    task_name: str,
+    recorded_date: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> LatestTaskGroupedByChipResponse:
+    """Fetch historical task results for a specific date."""
+    logger.debug(
+        f"Fetching historical task results for chip {chip_id}, task {task_name}, date {recorded_date}"
+    )
+
+    # Get chip info
+    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    if chip is None:
+        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+
+    # Get qids
+    qids = [str(qid) for qid in range(chip.size)]
+
+    # Fetch historical task results
+    all_results = (
+        TaskResultHistoryDocument.find(
+            {
+                "username": current_user.username,
+                "chip_id": chip_id,
+                "name": task_name,
+                "qid": {"$in": qids},
+                "end_at": {"$lte": recorded_date},
+            }
+        )
+        .sort([("end_at", DESCENDING)])
+        .run()
+    )
+
+    # Organize results by qid
+    task_results: dict[str, TaskResultHistoryDocument] = {}
+    for result in all_results:
+        if result.qid not in task_results:
+            task_results[result.qid] = result
+
+    # Build response
+    results = {}
+    for qid in qids:
+        result = task_results.get(qid)
+        if result is not None:
+            task_result = Task(
+                task_id=result.task_id,
+                name=result.name,
+                status=result.status,
+                message=result.message,
+                input_parameters=result.input_parameters,
+                output_parameters=result.output_parameters,
+                output_parameter_names=result.output_parameter_names,
+                note=result.note,
+                figure_path=result.figure_path,
+                raw_data_path=result.raw_data_path,
+                start_at=result.start_at,
+                end_at=result.end_at,
+                elapsed_time=result.elapsed_time,
+                task_type=result.task_type,
+            )
+        else:
+            task_result = Task(name=task_name)
+        results[qid] = task_result
+
+    return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
 
 
 @router.get(

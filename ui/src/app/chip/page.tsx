@@ -8,6 +8,7 @@ import { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
 import { TaskResultGrid } from "./components/TaskResultGrid";
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { TaskSelector } from "@/app/components/TaskSelector";
+import { DateSelector } from "@/app/components/DateSelector";
 import { TaskFigure } from "@/app/components/TaskFigure";
 type ViewMode = "chip" | "mux";
 
@@ -19,6 +20,7 @@ interface SelectedTaskInfo {
 
 export default function ChipPage() {
   const [selectedChip, setSelectedChip] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>("latest");
   const [viewMode, setViewMode] = useState<ViewMode>("chip");
   const [expandedMuxes, setExpandedMuxes] = useState<{
     [key: string]: boolean;
@@ -164,6 +166,12 @@ export default function ChipPage() {
               onChipSelect={setSelectedChip}
             />
 
+            <DateSelector
+              selectedDate={selectedDate}
+              onDateSelect={setSelectedDate}
+              disabled={!selectedChip}
+            />
+
             <TaskSelector
               tasks={qubitTasks}
               selectedTask={selectedTask}
@@ -214,7 +222,11 @@ export default function ChipPage() {
               <span>Select a chip to view data</span>
             </div>
           ) : viewMode === "chip" ? (
-            <TaskResultGrid chipId={selectedChip} selectedTask={selectedTask} />
+            <TaskResultGrid
+              chipId={selectedChip}
+              selectedTask={selectedTask}
+              selectedDate={selectedDate}
+            />
           ) : (
             <div className="space-y-4">
               {Object.entries(muxData.data.muxes).map(([muxId, muxDetail]) => {
