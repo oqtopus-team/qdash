@@ -38,16 +38,21 @@ dotenv_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path)
 
 
-def generate_execution_id() -> str:
+def generate_execution_id(username: str, chip_id: str) -> str:
     """Generate a unique execution ID based on the current date and an execution index. e.g. 20220101-001.
 
-    Returns
+    Args:
+    ----
+        username: The username to generate the execution ID for
+        chip_id: The chip ID to generate the execution ID for
+
+    Returns:
     -------
         str: The generated execution ID.
 
     """
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
-    execution_index = ExecutionCounterDocument.get_next_index(date_str)
+    execution_index = ExecutionCounterDocument.get_next_index(date_str, username, chip_id)
     return f"{date_str}-{execution_index:03d}"
 
 
@@ -79,7 +84,7 @@ def main_flow(
     logger.info(f"notify_bool: {menu.notify_bool}")
 
     if execution_id is None:
-        execution_id = generate_execution_id()
+        execution_id = generate_execution_id(menu.username, menu.chip_id)
     if menu.notify_bool:
         slack = SlackContents(
             status=Status.RUNNING,
