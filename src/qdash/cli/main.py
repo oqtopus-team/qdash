@@ -187,6 +187,19 @@ def update_active_output_parameters(
 
 
 @app.command()
+def migrate_dates() -> None:
+    """Migrate recorded_date format in history collections."""
+    try:
+        from qdash.dbmodel.migration import migrate_history_dates
+
+        migrate_history_dates()
+        typer.echo("History date migration completed successfully")
+    except Exception as e:
+        typer.echo(f"Error during history date migration: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
 def init_all_data(
     username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
     chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),

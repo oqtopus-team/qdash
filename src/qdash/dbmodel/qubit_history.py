@@ -19,7 +19,7 @@ class QubitHistoryDocument(Document):
         status (str): The status of the qubit.
         node_info (NodeInfoModel): The node information.
         system_info (SystemInfo): The system information.
-        recorded_date (str): The date when this history record was created (YYYY-MM-DD).
+        recorded_date (str): The date when this history record was created (YYYYMMDD).
 
     """
 
@@ -35,7 +35,7 @@ class QubitHistoryDocument(Document):
     node_info: NodeInfoModel = Field(..., description="The node information")
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").format("YYYY-MM-DD"),
+        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD"),
         description="The date when this history record was created",
     )
 
@@ -62,7 +62,7 @@ class QubitHistoryDocument(Document):
     @classmethod
     def create_history(cls, qubit: QubitModel) -> "QubitHistoryDocument":
         """Create a history record from a QubitDocument."""
-        today = pendulum.now(tz="Asia/Tokyo").format("YYYY-MM-DD")
+        today = pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD")
         existing_history = cls.find_one(
             {
                 "chip_id": qubit.chip_id,
