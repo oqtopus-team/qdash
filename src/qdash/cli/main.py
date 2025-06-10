@@ -122,6 +122,22 @@ def migrate_v1_0_16_to_v1_0_17(
 
 
 @app.command()
+def migrate_execution_counter_v1(
+    username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
+    chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),
+) -> None:
+    """Migrate execution counter documents to include username and chip_id fields."""
+    try:
+        from qdash.dbmodel.migration import migrate_execution_counter_v1
+
+        migrate_execution_counter_v1(username=username, chip_id=chip_id)
+        typer.echo(f"Execution counter migration completed successfully (username: {username})")
+    except Exception as e:
+        typer.echo(f"Error during execution counter migration: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
 def add_new_chip(
     username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
     chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),
@@ -167,6 +183,19 @@ def update_active_output_parameters(
         typer.echo(f"Active output parameters updated successfully (username: {username})")
     except Exception as e:
         typer.echo(f"Error updating active output parameters: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
+def migrate_dates() -> None:
+    """Migrate recorded_date format in history collections."""
+    try:
+        from qdash.dbmodel.migration import migrate_history_dates
+
+        migrate_history_dates()
+        typer.echo("History date migration completed successfully")
+    except Exception as e:
+        typer.echo(f"Error during history date migration: {e}", err=True)
         raise typer.Exit(1)
 
 

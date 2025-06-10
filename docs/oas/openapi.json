@@ -162,6 +162,7 @@
           "calibration"
         ],
         "summary": "Fetches all the calibration schedules.",
+        "description": "Fetch all the calibration schedules.",
         "operationId": "fetch_all_calib_schedule",
         "responses": {
           "200": {
@@ -178,12 +179,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       },
       "post": {
         "tags": [
@@ -237,12 +233,8 @@
           "calibration"
         ],
         "summary": "Deletes a calibration schedule.",
+        "description": "Delete a calibration schedule.",
         "operationId": "delete_calib_schedule",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "flow_run_id",
@@ -686,6 +678,54 @@
         ]
       }
     },
+    "/api/chip/{chip_id}/dates": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Fetch available dates for a chip",
+        "description": "Fetch available dates for a chip from execution counter.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nlist[str]\n    List of available dates in ISO format",
+        "operationId": "fetchChipDates",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipDatesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chip/{chip_id}": {
       "get": {
         "tags": [
@@ -931,6 +971,72 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ListMuxResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chip/{chip_id}/task/{task_name}/history/{recorded_date}": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Fetch historical task results",
+        "description": "Fetch historical task results for a specific date.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ntask_name : str\n    Name of the task to fetch\nrecorded_date : str\n    Date to fetch history for (ISO format YYYY-MM-DD)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskGroupedByChipResponse\n    Historical task results for all qubits on the specified date",
+        "operationId": "fetchHistoricalTaskGroupedByChip",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          },
+          {
+            "name": "recorded_date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Recorded Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestTaskGroupedByChipResponse"
                 }
               }
             }
@@ -1660,6 +1766,23 @@
         ],
         "title": "CalibrationNoteResponse",
         "description": "CalibrationNote is a subclass of BaseModel."
+      },
+      "ChipDatesResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ChipDatesResponse",
+        "description": "Response model for chip dates."
       },
       "ChipResponse": {
         "properties": {

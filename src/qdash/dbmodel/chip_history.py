@@ -21,7 +21,7 @@ class ChipHistoryDocument(Document):
         couplings (dict): The couplings of the chip.
         installed_at (str): The time when the system information was created.
         system_info (SystemInfo): The system information.
-        recorded_date (str): The date when this history record was created (YYYY-MM-DD).
+        recorded_date (str): The date when this history record was created (YYYYMMDD).
 
     """
 
@@ -33,7 +33,7 @@ class ChipHistoryDocument(Document):
     installed_at: str = Field(..., description="The time when the system information was created")
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").format("YYYY-MM-DD"),
+        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD"),
         description="The date when this history record was created",
     )
 
@@ -69,7 +69,7 @@ class ChipHistoryDocument(Document):
             Yesterday's history record if it exists, None otherwise
 
         """
-        yesterday = pendulum.now(tz="Asia/Tokyo").subtract(days=1).format("YYYY-MM-DD")
+        yesterday = pendulum.now(tz="Asia/Tokyo").subtract(days=1).format("YYYYMMDD")
         return cls.find_one(
             {
                 "chip_id": chip_id,
@@ -81,7 +81,7 @@ class ChipHistoryDocument(Document):
     @classmethod
     def create_history(cls, chip_doc: ChipDocument) -> "ChipHistoryDocument":
         """Create a history record from a ChipDocument."""
-        today = pendulum.now(tz="Asia/Tokyo").format("YYYY-MM-DD")
+        today = pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD")
         existing_history = cls.find_one(
             {
                 "chip_id": chip_doc.chip_id,

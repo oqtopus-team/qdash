@@ -371,6 +371,7 @@ export const useExecuteCalib = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
+ * Fetch all the calibration schedules.
  * @summary Fetches all the calibration schedules.
  */
 export const fetchAllCalibSchedule = (
@@ -611,6 +612,7 @@ export const useScheduleCalib = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
+ * Delete a calibration schedule.
  * @summary Deletes a calibration schedule.
  */
 export const deleteCalibSchedule = (
