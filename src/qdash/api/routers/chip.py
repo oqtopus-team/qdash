@@ -635,14 +635,22 @@ def fetch_historical_task_grouped_by_chip(
     # Get qids
     qids = [str(qid) for qid in range(chip.size)]
 
-    # Fetch historical task results
+    parsed_date = pendulum.from_format(recorded_date, "YYYYMMDD", tz="Asia/Tokyo")
+
+    # Format to 'YYYY-MM-DD'
+    formatted_date = parsed_date.to_date_string()
     all_results = (
         TaskResultHistoryDocument.find(
             {
                 "username": current_user.username,
                 "chip_id": chip_id,
                 "name": task_name,
-                "qid": {"$in": qids},  # Use formatted date for exact match
+                "qid": {"$in": qids},
+                # Filter tasks executed on the same date in JST
+                "start_at": {
+                    "$gte": f"{formatted_date}T00:00:00+09:00",
+                    "$lt": f"{formatted_date}T23:59:59+09:00",
+                },
             }
         )
         .sort([("end_at", DESCENDING)])
