@@ -57,17 +57,22 @@ def migrate_execution_counter_v1(
     """
     try:
         initialize()
-        # Find all execution counter documents
-        counters = ExecutionCounterDocument.find_all().run()
-        for counter in counters:
-            logging.info(f"Updating execution counter for date: {counter.date}")
-            # Add the new fields
-            counter.username = username
-            counter.chip_id = chip_id
-            counter.save()
-            logging.info(
-                f"Updated execution counter: {counter.date} with username: {username}, chip_id: {chip_id}"
-            )
+        # Get the MongoDB collection directly
+        collection = ExecutionCounterDocument.get_motor_collection()
+        # Update all documents to add the new fields
+        result = collection.update_many(
+            filter={},  # Match all documents
+            update={
+                "$set": {
+                    "username": username,
+                    "chip_id": chip_id,
+                }
+            },
+        )
+        logging.info(
+            f"Updated {result.modified_count} execution counter documents with "
+            f"username: {username}, chip_id: {chip_id}"
+        )
         logging.info("Execution counter migration completed successfully")
     except Exception as e:
         logging.error(f"Error during execution counter migration: {e}")

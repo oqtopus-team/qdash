@@ -180,18 +180,15 @@ def fetch_chip_dates(
 
     """
     logger.debug(f"Fetching dates for chip {chip_id}, user: {current_user.username}")
-    counter = ExecutionCounterDocument.find(
+    counter_list = ExecutionCounterDocument.find(
         {"chip_id": chip_id, "username": current_user.username}
     ).run()
-    if not counter:
+    if not counter_list:
         raise ValueError(
             f"No execution counter found for chip {chip_id} and user {current_user.username}"
         )
     # Extract unique dates from the counter
-    dates = sorted(
-        [date for date in counter.dates if date],
-        key=lambda x: pendulum.parse(x),
-    )
+    dates = [counter.date for counter in counter_list]
     # Return dates in a format matching the API schema
     return ChipDatesResponse(data=dates)
 
