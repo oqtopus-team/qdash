@@ -1,6 +1,5 @@
 from typing import ClassVar
 
-import timeout_decorator
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibration.util import qid_to_cr_pair
 from qdash.workflow.tasks.base import (
@@ -41,7 +40,6 @@ class CheckZX90(BaseTask):
             output_parameters=self.attach_execution_id(execution_id), figures=figures
         )
 
-    @timeout_decorator.timeout(60 * 30, use_signals=False)
     def run(self, exp: Experiment, qid: str) -> RunResult:
         cr_control, cr_target = qid_to_cr_pair(qid)
         zx90_pulse = exp.zx90(cr_control, cr_target)
