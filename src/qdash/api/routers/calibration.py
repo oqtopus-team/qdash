@@ -5,7 +5,7 @@ from typing import Annotated
 
 import dateutil.tz
 import pendulum
-from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi import APIRouter, Depends, HTTPException
 from prefect.client.orchestration import PrefectClient
 from prefect.client.schemas.filters import (
     FlowFilter,
@@ -19,7 +19,7 @@ from prefect.client.schemas.objects import Deployment
 from prefect.client.schemas.schedules import construct_schedule
 from prefect.states import Scheduled
 from pydantic import BaseModel
-from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
+from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.calibration import (
     ExecuteCalibRequest,
@@ -141,7 +141,7 @@ async def list_cron_schedules(
             ScheduleCronCalibResponse(
                 scheduler_name=scheduler_name,
                 menu_name=target_deployment.parameters["menu_name"],
-                cron=target_deployment.schedule.cron,  # type: ignore
+                cron=target_deployment.schedule.cron,
                 active=target_deployment.is_schedule_active,
             )
         )
@@ -311,22 +311,22 @@ async def schedule_calib(
     operation_id="fetch_all_calib_schedule",
 )
 async def fetch_all_calib_schedule(
-    settings: Annotated[Settings, Depends] = Depends(get_settings),
-    current_user: User | None = Depends(get_optional_current_user),
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> list[ScheduleCalibResponse]:
+    """Fetch all the calibration schedules."""
     client = PrefectClient(api=settings.prefect_api_url)
     env = settings.env
     target_deployment = await client.read_deployment_by_name(f"main/{env}-main")
     flow_id = target_deployment.flow_id
-    flowFilterId = FlowFilterId()
-    flowFilterId.any_ = [flow_id]
+    flow_filter_id = FlowFilterId()
+    flow_filter_id.any_ = [flow_id]
     state = FlowRunFilterStateType()
     state.any_ = [StateType.SCHEDULED]
     flow_run_filter_state = FlowRunFilterState(type=state, name=None)
 
     try:
         flows = await client.read_flow_runs(
-            flow_filter=FlowFilter(id=flowFilterId),
+            flow_filter=FlowFilter(id=flow_filter_id),
             flow_run_filter=FlowRunFilter(state=flow_run_filter_state),
         )
     except Exception as e:
@@ -350,8 +350,7 @@ async def fetch_all_calib_schedule(
                     flow_run_id=str(flow.id),
                 )
             )
-    calib_schedules = sorted(calib_schedules, key=lambda x: x.scheduled_time)
-    return calib_schedules
+    return sorted(calib_schedules, key=lambda x: x.scheduled_time)
 
 
 @router.delete(
@@ -361,13 +360,13 @@ async def fetch_all_calib_schedule(
 )
 async def delete_calib_schedule(
     flow_run_id: str,
-    settings: Annotated[Settings, Depends] = Depends(get_settings),
-    current_user: User = Security(get_current_active_user),
-):
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> None:
+    """Delete a calibration schedule."""
     client = PrefectClient(api=settings.prefect_api_url)
-    id = uuid.UUID(flow_run_id)
+    _id = uuid.UUID(flow_run_id)
     try:
-        await client.delete_flow_run(flow_run_id=id)
+        await client.delete_flow_run(flow_run_id=_id)
     except Exception as e:
         logger.warning(e)
         raise InternalSeverError(f"Failed to delete calibration schedule {e!s}")
