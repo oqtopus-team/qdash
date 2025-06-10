@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Task } from "@/schemas";
 import {
   useFetchChip,
@@ -22,6 +22,10 @@ interface SelectedTaskInfo {
   task: Task;
 }
 
+// Grid configuration
+const GRID_SIZE = 8;
+const MUX_SIZE = 2; // 2x2 blocks for each mux
+
 export function TaskResultGrid({
   chipId,
   selectedTask,
@@ -30,44 +34,70 @@ export function TaskResultGrid({
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
 
-  // For SAMPLE chip, create an 8x8 grid
-  const gridSize = 8;
-  const muxSize = 2; // 2x2 blocks for each mux
-
   // Fetch chip data and task results
-  const { data: chipResponse } =
-    selectedDate === "latest"
-      ? useFetchChip(chipId)
-      : useFetchChipHistory(chipId, selectedDate);
+  const {
+    data: chipResponse,
+    isLoading: isLoadingChip,
+    isError: isChipError,
+  } = selectedDate === "latest"
+    ? useFetchChip(chipId)
+    : useFetchChipHistory(chipId, selectedDate);
 
-  const { data: taskResponse } =
-    selectedDate === "latest"
-      ? useFetchLatestTaskGroupedByChip(chipId, selectedTask)
-      : useFetchHistoricalTaskGroupedByChip(chipId, selectedTask, selectedDate);
+  const {
+    data: taskResponse,
+    isLoading: isLoadingTask,
+    isError: isTaskError,
+  } = selectedDate === "latest"
+    ? useFetchLatestTaskGroupedByChip(chipId, selectedTask)
+    : useFetchHistoricalTaskGroupedByChip(chipId, selectedTask, selectedDate);
+
+  if (isLoadingChip || isLoadingTask) {
+    return (
+      <div className="w-full flex justify-center py-12">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
+  }
+
+  if (isChipError || isTaskError) {
+    return (
+      <div className="alert alert-error">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="stroke-current shrink-0 h-6 w-6"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+        <span>Failed to load {isChipError ? "chip" : "task"} data</span>
+      </div>
+    );
+  }
 
   // Create a mapping of QID to grid position
-  const gridPositions = useMemo(() => {
-    const positions: { [key: string]: { row: number; col: number } } = {};
-    if (!chipResponse?.data?.qubits) return positions;
-
-    // Calculate positions based on mux layout
+  const gridPositions: { [key: string]: { row: number; col: number } } = {};
+  if (chipResponse?.data?.qubits) {
     Object.keys(chipResponse.data.qubits).forEach((qid) => {
       const qidNum = parseInt(qid);
       const muxIndex = Math.floor(qidNum / 4); // Which mux block (0, 1, 2, ...)
-      const muxRow = Math.floor(muxIndex / (gridSize / muxSize)); // Row of mux blocks
-      const muxCol = muxIndex % (gridSize / muxSize); // Column of mux blocks
+      const muxRow = Math.floor(muxIndex / (GRID_SIZE / MUX_SIZE)); // Row of mux blocks
+      const muxCol = muxIndex % (GRID_SIZE / MUX_SIZE); // Column of mux blocks
       const localIndex = qidNum % 4; // Position within mux (0-3)
       const localRow = Math.floor(localIndex / 2); // Row within mux (0-1)
       const localCol = localIndex % 2; // Column within mux (0-1)
 
-      positions[qid] = {
-        row: muxRow * muxSize + localRow,
-        col: muxCol * muxSize + localCol,
+      gridPositions[qid] = {
+        row: muxRow * MUX_SIZE + localRow,
+        col: muxCol * MUX_SIZE + localCol,
       };
     });
-
-    return positions;
-  }, [chipResponse]);
+  }
 
   // Get task result for a specific QID
   const getTaskResult = (qid: string): Task | null => {
@@ -88,12 +118,12 @@ export function TaskResultGrid({
     <div className="space-y-6">
       {/* Grid Display */}
       <div className="grid grid-cols-8 gap-2 p-4 bg-base-200/50 rounded-xl">
-        {Array.from({ length: gridSize * gridSize }).map((_, index) => {
-          const row = Math.floor(index / gridSize);
-          const col = index % gridSize;
+        {Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, index) => {
+          const row = Math.floor(index / GRID_SIZE);
+          const col = index % GRID_SIZE;
           const qid = Object.keys(gridPositions).find(
             (key) =>
-              gridPositions[key].row === row && gridPositions[key].col === col
+              gridPositions[key].row === row && gridPositions[key].col === col,
           );
 
           if (!qid) {
@@ -152,8 +182,8 @@ export function TaskResultGrid({
                   task.status === "completed"
                     ? "bg-success"
                     : task.status === "failed"
-                    ? "bg-error"
-                    : "bg-warning"
+                      ? "bg-error"
+                      : "bg-warning"
                 }`}
               />
             </button>
@@ -192,8 +222,8 @@ export function TaskResultGrid({
                       selectedTaskInfo.task.status === "completed"
                         ? "badge-success"
                         : selectedTaskInfo.task.status === "failed"
-                        ? "badge-error"
-                        : "badge-warning"
+                          ? "badge-error"
+                          : "badge-warning"
                     }`}
                   >
                     {selectedTaskInfo.task.status}
@@ -204,7 +234,7 @@ export function TaskResultGrid({
                     <h4 className="font-medium mb-2">Parameters</h4>
                     <div className="space-y-2">
                       {Object.entries(
-                        selectedTaskInfo.task.output_parameters
+                        selectedTaskInfo.task.output_parameters,
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&

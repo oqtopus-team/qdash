@@ -19,6 +19,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  ChipDatesResponse,
   ChipResponse,
   ExecutionResponseDetail,
   ExecutionResponseSummary,
@@ -164,6 +165,160 @@ export function useListChips<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getListChipsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Fetch available dates for a chip from execution counter.
+
+Parameters
+----------
+chip_id : str
+    ID of the chip
+current_user : User
+    Current authenticated user
+
+Returns
+-------
+list[str]
+    List of available dates in ISO format
+ * @summary Fetch available dates for a chip
+ */
+export const fetchChipDates = (
+  chipId: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ChipDatesResponse>(
+    { url: `/api/chip/${chipId}/dates`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getFetchChipDatesQueryKey = (chipId: string) => {
+  return [`/api/chip/${chipId}/dates`] as const;
+};
+
+export const getFetchChipDatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof fetchChipDates>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof fetchChipDates>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getFetchChipDatesQueryKey(chipId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchChipDates>>> = ({
+    signal,
+  }) => fetchChipDates(chipId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!chipId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof fetchChipDates>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type FetchChipDatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof fetchChipDates>>
+>;
+export type FetchChipDatesQueryError = ErrorType<HTTPValidationError>;
+
+export function useFetchChipDates<
+  TData = Awaited<ReturnType<typeof fetchChipDates>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof fetchChipDates>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof fetchChipDates>>,
+          TError,
+          Awaited<ReturnType<typeof fetchChipDates>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useFetchChipDates<
+  TData = Awaited<ReturnType<typeof fetchChipDates>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof fetchChipDates>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof fetchChipDates>>,
+          TError,
+          Awaited<ReturnType<typeof fetchChipDates>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useFetchChipDates<
+  TData = Awaited<ReturnType<typeof fetchChipDates>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof fetchChipDates>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Fetch available dates for a chip
+ */
+
+export function useFetchChipDates<
+  TData = Awaited<ReturnType<typeof fetchChipDates>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof fetchChipDates>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getFetchChipDatesQueryOptions(chipId, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

@@ -11,6 +11,7 @@ from qdash.api.schemas.auth import User
 from qdash.datamodel.task import OutputParameterModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
+from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -148,6 +149,64 @@ def list_chips(
     ]
 
 
+class ChipDatesResponse(BaseModel):
+    """Response model for chip dates."""
+
+    data: list[str]
+
+
+@router.get(
+    "/chip/{chip_id}/dates",
+    response_model=ChipDatesResponse,
+    summary="Fetch available dates for a chip",
+    operation_id="fetchChipDates",
+)
+def fetch_chip_dates(
+    chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]
+) -> ChipDatesResponse:
+    """Fetch available dates for a chip from execution counter.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    current_user : User
+        Current authenticated user
+
+    Returns
+    -------
+    list[str]
+        List of available dates in ISO format
+
+    """
+    logger.debug(f"Fetching dates for chip {chip_id}, user: {current_user.username}")
+
+    # Get dates from task results for this chip and user
+    executions = (
+        TaskResultHistoryDocument.find(
+            {
+                "username": current_user.username,
+                "chip_id": chip_id,
+                "status": "completed",  # Only include completed tasks
+            }
+        )
+        .sort([("end_at", DESCENDING)])
+        .run()
+    )
+
+    # Log execution counter results
+    logger.debug(f"Found {len(executions)} task result records")
+
+    # Extract unique dates from end_at timestamps
+    dates = sorted(
+        set(e.end_at.split("T")[0] for e in executions if e.end_at and e.status == "completed"),
+        reverse=True,
+    )
+    logger.debug(f"Returning {len(dates)} unique dates: {dates}")
+    # Return dates in a format matching the API schema
+    return ChipDatesResponse(data=dates)
+
+
 @router.get(
     "/chip/{chip_id}/history/{recorded_date}",
     response_model=ChipResponse,
@@ -180,12 +239,21 @@ def fetch_chip_history(
         f"Fetching chip history for {chip_id} at {recorded_date}, user: {current_user.username}"
     )
 
+    # Convert YYYY-MM-DD to YYYYMMDD
+    date_parts = recorded_date.split("-")
+    formatted_date = "".join(date_parts)
+
     chip_history = ChipHistoryDocument.find_one(
-        {"chip_id": chip_id, "username": current_user.username, "recorded_date": recorded_date}
+        {"chip_id": chip_id, "username": current_user.username, "date": formatted_date}
     ).run()
 
     if not chip_history:
-        raise ValueError(f"No history found for chip {chip_id} at {recorded_date}")
+        # If not found with formatted date, try with original format
+        chip_history = ChipHistoryDocument.find_one(
+            {"chip_id": chip_id, "username": current_user.username, "recorded_date": recorded_date}
+        ).run()
+        if not chip_history:
+            raise ValueError(f"No history found for chip {chip_id} at {recorded_date}")
 
     return ChipResponse(
         chip_id=chip_history.chip_id,
@@ -618,6 +686,10 @@ def fetch_historical_task_grouped_by_chip(
     # Get qids
     qids = [str(qid) for qid in range(chip.size)]
 
+    # Convert YYYY-MM-DD to YYYYMMDD
+    date_parts = recorded_date.split("-")
+    formatted_date = "".join(date_parts)
+
     # Fetch historical task results
     all_results = (
         TaskResultHistoryDocument.find(
@@ -626,7 +698,7 @@ def fetch_historical_task_grouped_by_chip(
                 "chip_id": chip_id,
                 "name": task_name,
                 "qid": {"$in": qids},
-                "end_at": {"$lte": recorded_date},
+                "end_at": {"$regex": f"^{recorded_date}"},  # Match tasks from this date
             }
         )
         .sort([("end_at", DESCENDING)])

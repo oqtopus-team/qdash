@@ -686,6 +686,54 @@
         ]
       }
     },
+    "/api/chip/{chip_id}/dates": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Fetch available dates for a chip",
+        "description": "Fetch available dates for a chip from execution counter.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nlist[str]\n    List of available dates in ISO format",
+        "operationId": "fetchChipDates",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipDatesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chip/{chip_id}/history/{recorded_date}": {
       "get": {
         "tags": [
@@ -1783,6 +1831,23 @@
         ],
         "title": "CalibrationNoteResponse",
         "description": "CalibrationNote is a subclass of BaseModel."
+      },
+      "ChipDatesResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ChipDatesResponse",
+        "description": "Response model for chip dates."
       },
       "ChipResponse": {
         "properties": {

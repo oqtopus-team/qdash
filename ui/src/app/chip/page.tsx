@@ -167,6 +167,7 @@ export default function ChipPage() {
             />
 
             <DateSelector
+              chipId={selectedChip}
               selectedDate={selectedDate}
               onDateSelect={setSelectedDate}
               disabled={!selectedChip}
