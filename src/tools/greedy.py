@@ -133,7 +133,10 @@ def build_qubit_to_mux_map(yaml_mux_list: list[dict]) -> dict[str, int]:
 
 
 def group_cr_pairs_by_conflict(
-    cr_pairs: list[str], qid_to_mux: dict[str, int], mux_conflict_map: dict[int, set[int]]
+    cr_pairs: list[str],
+    qid_to_mux: dict[str, int],
+    mux_conflict_map: dict[int, set[int]],
+    max_parallel_ops: int = None,
 ) -> list[list[str]]:
     G = nx.Graph()
     G.add_nodes_from(cr_pairs)
@@ -158,12 +161,26 @@ def group_cr_pairs_by_conflict(
             G.add_edge(a, b)
 
     coloring = nx.coloring.greedy_color(G, strategy="DSATUR")
-    ## Save Graph image
 
+    # Group pairs by color
     color_groups = defaultdict(list)
     for pair, color in coloring.items():
         color_groups[color].append(pair)
-    return [color_groups[c] for c in sorted(color_groups)]
+
+    # Convert to list of groups
+    groups = [color_groups[c] for c in sorted(color_groups)]
+
+    # If max_parallel_ops is specified, split groups that exceed the limit
+    if max_parallel_ops is not None:
+        new_groups = []
+        for group in groups:
+            # Split group into chunks of max_parallel_ops size
+            for i in range(0, len(group), max_parallel_ops):
+                chunk = group[i : i + max_parallel_ops]
+                new_groups.append(chunk)
+        return new_groups
+
+    return groups
 
 
 def convert_to_serial_parallel(grouped: list[list[str]]) -> dict:
@@ -190,7 +207,8 @@ def visualize_combined_schedule(
 
     plt.figure(figsize=(10, 8))
     node_colors = [
-        plt.cm.tab20(qid_to_mux[qid] % 20) if qid in qid_to_mux else "gray" for qid in G.nodes
+        plt.cm.get_cmap("tab20")(qid_to_mux[qid] % 20) if qid in qid_to_mux else "gray"
+        for qid in G.nodes
     ]
 
     nx.draw(
@@ -210,7 +228,7 @@ def visualize_combined_schedule(
     plt.legend(handles=step_handles, bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.title("Combined CR Schedule with Step Labels")
     plt.axis("off")
-    plt.savefig("combined_schedule.png", dpi=300, bbox_inches="tight")
+    plt.savefig("schedule/combined_schedule.png", dpi=300, bbox_inches="tight")
 
 
 def visualize_each_step(
@@ -226,18 +244,23 @@ def visualize_each_step(
             G.add_node(qid)
 
         node_colors = [
-            plt.cm.tab20(qid_to_mux[qid] % 20) if qid in qid_to_mux else "gray" for qid in G.nodes
+            plt.cm.get_cmap("tab20")(qid_to_mux[qid] % 20) if qid in qid_to_mux else "gray"
+            for qid in G.nodes
         ]
 
         plt.figure(figsize=(8, 6))
         nx.draw(G, pos=lattice_pos, node_color=node_colors, node_size=500, with_labels=True)
         plt.title(f"Internal Schedule Step {i + 1}")
         plt.axis("off")
-        plt.savefig(f"schedule_step_{i + 1}.png", dpi=300, bbox_inches="tight")
+        plt.savefig(f"schedule/schedule_step_{i + 1}.png", dpi=300, bbox_inches="tight")
 
 
 if __name__ == "__main__":
     initialize()
+    # Maximum number of parallel operations allowed
+    MAX_PARALLEL_OPS = 3  # Can be adjusted as needed
+
+    # create schedule directory
     chip_doc = ChipDocument.get_current_chip("admin")
     two_qubit_list = get_two_qubit_pair_list(chip_doc)
     bare_freq = extract_bare_frequency(chip_doc.qubits)
@@ -248,7 +271,7 @@ if __name__ == "__main__":
     mux_conflict_map = build_mux_conflict_map(yaml_data["64Q"])
     qid_to_mux = build_qubit_to_mux_map(yaml_data["64Q"])
 
-    grouped = group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, mux_conflict_map)
+    grouped = group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, mux_conflict_map, MAX_PARALLEL_OPS)
 
     internal_pairs = set(itertools.chain.from_iterable(grouped))
     external_pairs = [pair for pair in cr_pairs if pair not in internal_pairs]
