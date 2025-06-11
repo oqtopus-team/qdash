@@ -633,7 +633,7 @@ def fetch_historical_qubit_task_grouped_by_chip(
         raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
 
     # Get qids
-    qids = [str(qid) for qid in range(chip.size)]
+    qids = list(chip.qubits.keys())
 
     parsed_date = pendulum.from_format(recorded_date, "YYYYMMDD", tz="Asia/Tokyo")
 
@@ -710,7 +710,178 @@ def fetch_latest_qubit_task_grouped_by_chip(
         raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
 
     # Get qids
-    qids = [str(qid) for qid in range(chip.size)]
+    qids = list(chip.qubits.keys())
+
+    # Fetch all task results in one query
+    all_results = (
+        TaskResultHistoryDocument.find(
+            {
+                "username": current_user.username,
+                "chip_id": chip_id,
+                "name": task_name,
+                "qid": {"$in": qids},
+            }
+        )
+        .sort([("end_at", DESCENDING)])
+        .run()
+    )
+
+    # Organize results by qid
+    task_results: dict[str, TaskResultHistoryDocument] = {}
+    for result in all_results:
+        if result.qid not in task_results:
+            task_results[result.qid] = result
+
+    # Build response
+    results = {}
+    for qid in qids:
+        result = task_results.get(qid)
+        if result is not None:
+            task_result = Task(
+                task_id=result.task_id,
+                name=result.name,
+                status=result.status,
+                message=result.message,
+                input_parameters=result.input_parameters,
+                output_parameters=result.output_parameters,
+                output_parameter_names=result.output_parameter_names,
+                note=result.note,
+                figure_path=result.figure_path,
+                raw_data_path=result.raw_data_path,
+                start_at=result.start_at,
+                end_at=result.end_at,
+                elapsed_time=result.elapsed_time,
+                task_type=result.task_type,
+            )
+        else:
+            task_result = Task(name=task_name)
+        results[qid] = task_result
+
+    return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+
+
+@router.get(
+    "/chip/{chip_id}/task/coupling/{task_name}/history/{recorded_date}",
+    summary="Fetch historical task results",
+    operation_id="fetchHistoricalCoupingTaskGroupedByChip",
+    response_model=LatestTaskGroupedByChipResponse,
+    response_model_exclude_none=True,
+)
+def fetch_historical_coupling_task_grouped_by_chip(
+    chip_id: str,
+    task_name: str,
+    recorded_date: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> LatestTaskGroupedByChipResponse:
+    """Fetch historical task results for a specific date.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    task_name : str
+        Name of the task to fetch
+    recorded_date : str
+        Date to fetch history for (ISO format YYYY-MM-DD)
+    current_user : User
+        Current authenticated user
+
+    Returns
+    -------
+    LatestTaskGroupedByChipResponse
+        Historical task results for all qubits on the specified date
+
+    """
+    logger.debug(
+        f"Fetching historical task results for chip {chip_id}, task {task_name}, date {recorded_date}"
+    )
+
+    # Get chip info
+    chip = ChipHistoryDocument.find_one(
+        {"chip_id": chip_id, "username": current_user.username, "recorded_date": recorded_date}
+    ).run()
+    if chip is None:
+        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+
+    # Get qids
+    qids = list(chip.couplings.keys())
+
+    parsed_date = pendulum.from_format(recorded_date, "YYYYMMDD", tz="Asia/Tokyo")
+
+    # Format to 'YYYY-MM-DD'
+    formatted_date = parsed_date.to_date_string()
+    all_results = (
+        TaskResultHistoryDocument.find(
+            {
+                "username": current_user.username,
+                "chip_id": chip_id,
+                "name": task_name,
+                "qid": {"$in": qids},
+                # Filter tasks executed on the same date in JST
+                "start_at": {
+                    "$gte": f"{formatted_date}T00:00:00+09:00",
+                    "$lt": f"{formatted_date}T23:59:59+09:00",
+                },
+            }
+        )
+        .sort([("end_at", DESCENDING)])
+        .run()
+    )
+
+    # Organize results by qid
+    task_results: dict[str, TaskResultHistoryDocument] = {}
+    for result in all_results:
+        if result.qid not in task_results:
+            task_results[result.qid] = result
+
+    # Build response
+    results = {}
+    for qid in qids:
+        result = task_results.get(qid)
+        if result is not None:
+            task_result = Task(
+                task_id=result.task_id,
+                name=result.name,
+                status=result.status,
+                message=result.message,
+                input_parameters=result.input_parameters,
+                output_parameters=result.output_parameters,
+                output_parameter_names=result.output_parameter_names,
+                note=result.note,
+                figure_path=result.figure_path,
+                raw_data_path=result.raw_data_path,
+                start_at=result.start_at,
+                end_at=result.end_at,
+                elapsed_time=result.elapsed_time,
+                task_type=result.task_type,
+            )
+        else:
+            task_result = Task(name=task_name)
+        results[qid] = task_result
+
+    return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+
+
+@router.get(
+    "/chip/{chip_id}/task/coupling/{task_name}",
+    summary="Fetch the multiplexers",
+    operation_id="fetchLatestCouplingTaskGroupedByChip",
+    response_model=LatestTaskGroupedByChipResponse,
+    response_model_exclude_none=True,
+)
+def fetch_latest_coupling_task_grouped_by_chip(
+    chip_id: str, task_name: str, current_user: Annotated[User, Depends(get_current_active_user)]
+) -> LatestTaskGroupedByChipResponse:
+    """Fetch the multiplexers."""
+    logger.debug(f"Fetching muxes for chip {chip_id}, user: {current_user.username}")
+
+    # Get chip info
+    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    if chip is None:
+        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+
+    # Get qids
+    qids = list(chip.couplings.keys())
 
     # Fetch all task results in one query
     all_results = (
