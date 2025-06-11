@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useListMuxes } from "@/client/chip/chip";
 import { useFetchAllTasks } from "@/client/task/task";
-import { BsGrid, BsListUl } from "react-icons/bs";
+import { BsGrid, BsListUl, BsLink } from "react-icons/bs";
 import { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
 import { TaskResultGrid } from "./components/TaskResultGrid";
+import { CouplingGrid } from "./components/CouplingGrid";
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { TaskSelector } from "@/app/components/TaskSelector";
 import { DateSelector } from "@/app/components/DateSelector";
 import { TaskFigure } from "@/app/components/TaskFigure";
-type ViewMode = "chip" | "mux";
+type ViewMode = "chip" | "mux" | "coupling";
 
 interface SelectedTaskInfo {
   path: string;
@@ -30,6 +31,20 @@ export default function ChipPage() {
   const [selectedTask, setSelectedTask] = useState<string>("CheckRabi");
 
   const { data: tasks } = useFetchAllTasks();
+
+  // Update selected task when view mode changes
+  useEffect(() => {
+    if (tasks?.data?.tasks) {
+      const availableTasks = tasks.data.tasks.filter((task: TaskResponse) =>
+        viewMode === "coupling"
+          ? task.task_type === "coupling"
+          : task.task_type === "qubit",
+      );
+      if (availableTasks.length > 0) {
+        setSelectedTask(availableTasks[0].name);
+      }
+    }
+  }, [viewMode, tasks?.data?.tasks]);
   const {
     data: muxData,
     isLoading: isLoadingMux,
@@ -119,15 +134,18 @@ export default function ChipPage() {
     }));
   };
 
-  // Get qubit tasks
-  const qubitTasks =
-    tasks?.data?.tasks?.filter(
-      (task: TaskResponse) => task.task_type === "qubit",
-    ) || [];
+  // Get tasks based on view mode
+  const filteredTasks =
+    tasks?.data?.tasks?.filter((task: TaskResponse) => {
+      if (viewMode === "coupling") {
+        return task.task_type === "coupling";
+      }
+      return task.task_type === "qubit";
+    }) || [];
 
-  // Set first qubit task as default if none selected and qubit tasks available
-  if (selectedTask === "" && qubitTasks.length > 0) {
-    setSelectedTask(qubitTasks[0].name);
+  // Set first task as default if none selected and tasks available
+  if (selectedTask === "" && filteredTasks.length > 0) {
+    setSelectedTask(filteredTasks[0].name);
   }
 
   return (
@@ -156,6 +174,15 @@ export default function ChipPage() {
                 <BsListUl className="text-lg" />
                 <span className="ml-2">MUX View</span>
               </button>
+              <button
+                className={`join-item btn btn-sm ${
+                  viewMode === "coupling" ? "btn-active" : ""
+                }`}
+                onClick={() => setViewMode("coupling")}
+              >
+                <BsLink className="text-lg" />
+                <span className="ml-2">2Q View</span>
+              </button>
             </div>
           </div>
 
@@ -174,10 +201,10 @@ export default function ChipPage() {
             />
 
             <TaskSelector
-              tasks={qubitTasks}
+              tasks={filteredTasks}
               selectedTask={selectedTask}
               onTaskSelect={setSelectedTask}
-              disabled={viewMode !== "chip"}
+              disabled={viewMode === "mux"}
             />
           </div>
         </div>
@@ -224,6 +251,12 @@ export default function ChipPage() {
             </div>
           ) : viewMode === "chip" ? (
             <TaskResultGrid
+              chipId={selectedChip}
+              selectedTask={selectedTask}
+              selectedDate={selectedDate}
+            />
+          ) : viewMode === "coupling" ? (
+            <CouplingGrid
               chipId={selectedChip}
               selectedTask={selectedTask}
               selectedDate={selectedDate}
@@ -362,7 +395,8 @@ export default function ChipPage() {
           <div className="modal-box max-w-4xl bg-base-100">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg">
-                Result for QID {selectedTaskInfo.qid}
+                Result for {viewMode === "coupling" ? "Coupling" : "QID"}{" "}
+                {selectedTaskInfo.qid}
               </h3>
               <button
                 onClick={() => setSelectedTaskInfo(null)}

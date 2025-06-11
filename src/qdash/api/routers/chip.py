@@ -763,7 +763,7 @@ def fetch_latest_qubit_task_grouped_by_chip(
 @router.get(
     "/chip/{chip_id}/task/coupling/{task_name}/history/{recorded_date}",
     summary="Fetch historical task results",
-    operation_id="fetchHistoricalCoupingTaskGroupedByChip",
+    operation_id="fetchHistoricalCouplingTaskGroupedByChip",
     response_model=LatestTaskGroupedByChipResponse,
     response_model_exclude_none=True,
 )

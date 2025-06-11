@@ -1118,7 +1118,7 @@
         ],
         "summary": "Fetch historical task results",
         "description": "Fetch historical task results for a specific date.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ntask_name : str\n    Name of the task to fetch\nrecorded_date : str\n    Date to fetch history for (ISO format YYYY-MM-DD)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskGroupedByChipResponse\n    Historical task results for all qubits on the specified date",
-        "operationId": "fetchHistoricalCoupingTaskGroupedByChip",
+        "operationId": "fetchHistoricalCouplingTaskGroupedByChip",
         "security": [
           {
             "APIKeyHeader": []
