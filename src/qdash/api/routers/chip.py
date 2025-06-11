@@ -592,11 +592,11 @@ class LatestTaskGroupedByChipResponse(BaseModel):
 @router.get(
     "/chip/{chip_id}/task/qubit/{task_name}/history/{recorded_date}",
     summary="Fetch historical task results",
-    operation_id="fetchHistoricalTaskGroupedByChip",
+    operation_id="fetchHistoricalQubitTaskGroupedByChip",
     response_model=LatestTaskGroupedByChipResponse,
     response_model_exclude_none=True,
 )
-def fetch_historical_task_grouped_by_chip(
+def fetch_historical_qubit_task_grouped_by_chip(
     chip_id: str,
     task_name: str,
     recorded_date: str,
@@ -694,11 +694,11 @@ def fetch_historical_task_grouped_by_chip(
 @router.get(
     "/chip/{chip_id}/task/qubit/{task_name}",
     summary="Fetch the multiplexers",
-    operation_id="fetchLatestTaskGroupedByChip",
+    operation_id="fetchLatestQubitTaskGroupedByChip",
     response_model=LatestTaskGroupedByChipResponse,
     response_model_exclude_none=True,
 )
-def fetch_latest_task_grouped_by_chip(
+def fetch_latest_qubit_task_grouped_by_chip(
     chip_id: str, task_name: str, current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> LatestTaskGroupedByChipResponse:
     """Fetch the multiplexers."""
