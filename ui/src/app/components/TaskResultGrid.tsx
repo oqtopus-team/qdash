@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  useFetchLatestTaskGroupedByChip,
-  useFetchHistoricalTaskGroupedByChip,
+  useFetchLatestQubitTaskGroupedByChip,
+  useFetchHistoricalQubitTaskGroupedByChip,
 } from "@/client/chip/chip";
 import { Task } from "@/schemas";
 import { TaskFigure } from "./TaskFigure";
@@ -33,7 +33,7 @@ export function TaskResultGrid({
     data: latestData,
     isLoading: isLoadingLatest,
     isError: isLatestError,
-  } = useFetchLatestTaskGroupedByChip(chipId, selectedTask, {
+  } = useFetchLatestQubitTaskGroupedByChip(chipId, selectedTask, {
     query: {
       enabled: selectedDate === "latest",
     },
@@ -43,11 +43,16 @@ export function TaskResultGrid({
     data: historicalData,
     isLoading: isLoadingHistorical,
     isError: isHistoricalError,
-  } = useFetchHistoricalTaskGroupedByChip(chipId, selectedTask, selectedDate, {
-    query: {
-      enabled: selectedDate !== "latest",
+  } = useFetchHistoricalQubitTaskGroupedByChip(
+    chipId,
+    selectedTask,
+    selectedDate,
+    {
+      query: {
+        enabled: selectedDate !== "latest",
+      },
     },
-  });
+  );
 
   const isLoading = isLoadingLatest || isLoadingHistorical;
   const isError = isLatestError || isHistoricalError;
@@ -155,8 +160,8 @@ export function TaskResultGrid({
                           task.status === "completed"
                             ? "bg-success"
                             : task.status === "failed"
-                            ? "bg-error"
-                            : "bg-warning"
+                              ? "bg-error"
+                              : "bg-warning"
                         }`}
                       />
                     </div>
@@ -178,7 +183,7 @@ export function TaskResultGrid({
                 </div>
               </button>
             );
-          }
+          },
         )}
       </div>
 
@@ -213,8 +218,8 @@ export function TaskResultGrid({
                       selectedTaskInfo.task.status === "completed"
                         ? "badge-success"
                         : selectedTaskInfo.task.status === "failed"
-                        ? "badge-error"
-                        : "badge-warning"
+                          ? "badge-error"
+                          : "badge-warning"
                     }`}
                   >
                     {selectedTaskInfo.task.status}
@@ -225,7 +230,7 @@ export function TaskResultGrid({
                     <h4 className="font-medium mb-2">Parameters</h4>
                     <div className="space-y-2">
                       {Object.entries(
-                        selectedTaskInfo.task.output_parameters
+                        selectedTaskInfo.task.output_parameters,
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&

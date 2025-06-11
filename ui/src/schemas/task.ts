@@ -40,4 +40,5 @@ export interface Task {
   end_at?: TaskEndAt;
   elapsed_time?: TaskElapsedTime;
   task_type?: TaskTaskType;
+  default_view?: boolean;
 }
