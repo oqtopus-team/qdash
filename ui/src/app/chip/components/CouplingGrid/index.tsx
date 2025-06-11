@@ -78,7 +78,7 @@ export function CouplingGrid({
     : useFetchHistoricalCouplingTaskGroupedByChip(
         chipId,
         selectedTask,
-        selectedDate
+        selectedDate,
       );
 
   const getFigurePath = (task: Task): string | null => {
@@ -109,7 +109,7 @@ export function CouplingGrid({
         couplingId,
       } as ExtendedTask);
       normalizedResultMap[normKey].sort(
-        (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0)
+        (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0),
       );
     }
   }
@@ -194,8 +194,8 @@ export function CouplingGrid({
                     task.status === "completed"
                       ? "bg-success"
                       : task.status === "failed"
-                      ? "bg-error"
-                      : "bg-warning"
+                        ? "bg-error"
+                        : "bg-warning"
                   }`}
                 />
               </button>
@@ -227,7 +227,8 @@ export function CouplingGrid({
                       .figure_path || ""
                   }
                   qid={String(
-                    selectedTaskInfo.taskList[selectedTaskInfo.index].couplingId
+                    selectedTaskInfo.taskList[selectedTaskInfo.index]
+                      .couplingId,
                   )}
                   className="w-full h-full object-contain"
                 />
@@ -243,7 +244,7 @@ export function CouplingGrid({
                               ...prev,
                               index: (prev.index + 1) % prev.taskList.length,
                             }
-                          : null
+                          : null,
                       )
                     }
                   >
@@ -263,9 +264,9 @@ export function CouplingGrid({
                         .status === "completed"
                         ? "badge-success"
                         : selectedTaskInfo.taskList[selectedTaskInfo.index]
-                            .status === "failed"
-                        ? "badge-error"
-                        : "badge-warning"
+                              .status === "failed"
+                          ? "badge-error"
+                          : "badge-warning"
                     }`}
                   >
                     {selectedTaskInfo.taskList[selectedTaskInfo.index].status}
@@ -278,7 +279,7 @@ export function CouplingGrid({
                     <div className="space-y-2">
                       {Object.entries(
                         selectedTaskInfo.taskList[selectedTaskInfo.index]
-                          .output_parameters || {}
+                          .output_parameters || {},
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&

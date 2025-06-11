@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useListMuxes } from "@/client/chip/chip";
 import { useFetchAllTasks } from "@/client/task/task";
-import { BsGrid, BsListUl, BsLink } from "react-icons/bs";
+import { BsGrid, BsListUl, BsLink, BsGrid1X2 } from "react-icons/bs";
 import { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
 import { TaskResultGrid } from "./components/TaskResultGrid";
 import { CouplingGrid } from "./components/CouplingGrid";
@@ -11,7 +11,7 @@ import { ChipSelector } from "@/app/components/ChipSelector";
 import { TaskSelector } from "@/app/components/TaskSelector";
 import { DateSelector } from "@/app/components/DateSelector";
 import { TaskFigure } from "@/app/components/TaskFigure";
-type ViewMode = "chip" | "mux" | "coupling";
+type ViewMode = "1q" | "2q" | "mux";
 
 interface SelectedTaskInfo {
   path: string;
@@ -22,7 +22,7 @@ interface SelectedTaskInfo {
 export default function ChipPage() {
   const [selectedChip, setSelectedChip] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>("latest");
-  const [viewMode, setViewMode] = useState<ViewMode>("chip");
+  const [viewMode, setViewMode] = useState<ViewMode>("1q");
   const [expandedMuxes, setExpandedMuxes] = useState<{
     [key: string]: boolean;
   }>({});
@@ -32,9 +32,9 @@ export default function ChipPage() {
 
   const { data: tasks } = useFetchAllTasks();
 
-  // Update selected task when view mode changes to coupling
+  // Update selected task when view mode changes to 2q
   useEffect(() => {
-    if (viewMode === "coupling" && tasks?.data?.tasks) {
+    if (viewMode === "2q" && tasks?.data?.tasks) {
       const availableTasks = tasks.data.tasks.filter(
         (task: TaskResponse) => task.task_type === "coupling"
       );
@@ -140,7 +140,7 @@ export default function ChipPage() {
   // Get tasks based on view mode
   const filteredTasks =
     tasks?.data?.tasks?.filter((task: TaskResponse) => {
-      if (viewMode === "coupling") {
+      if (viewMode === "2q") {
         return task.task_type === "coupling";
       }
       return task.task_type === "qubit";
@@ -156,12 +156,21 @@ export default function ChipPage() {
             <div className="join rounded-lg overflow-hidden">
               <button
                 className={`join-item btn btn-sm ${
-                  viewMode === "chip" ? "btn-active" : ""
+                  viewMode === "1q" ? "btn-active" : ""
                 }`}
-                onClick={() => setViewMode("chip")}
+                onClick={() => setViewMode("1q")}
               >
                 <BsGrid className="text-lg" />
-                <span className="ml-2">Chip View</span>
+                <span className="ml-2">1Q View</span>
+              </button>
+              <button
+                className={`join-item btn btn-sm ${
+                  viewMode === "2q" ? "btn-active" : ""
+                }`}
+                onClick={() => setViewMode("2q")}
+              >
+                <BsGrid className="text-lg" />
+                <span className="ml-2">2Q View</span>
               </button>
               <button
                 className={`join-item btn btn-sm ${
@@ -171,15 +180,6 @@ export default function ChipPage() {
               >
                 <BsListUl className="text-lg" />
                 <span className="ml-2">MUX View</span>
-              </button>
-              <button
-                className={`join-item btn btn-sm ${
-                  viewMode === "coupling" ? "btn-active" : ""
-                }`}
-                onClick={() => setViewMode("coupling")}
-              >
-                <BsLink className="text-lg" />
-                <span className="ml-2">2Q View</span>
               </button>
             </div>
           </div>
@@ -247,13 +247,13 @@ export default function ChipPage() {
               </svg>
               <span>Select a chip to view data</span>
             </div>
-          ) : viewMode === "chip" ? (
+          ) : viewMode === "1q" ? (
             <TaskResultGrid
               chipId={selectedChip}
               selectedTask={selectedTask}
               selectedDate={selectedDate}
             />
-          ) : viewMode === "coupling" ? (
+          ) : viewMode === "2q" ? (
             <CouplingGrid
               chipId={selectedChip}
               selectedTask={selectedTask}
@@ -393,7 +393,7 @@ export default function ChipPage() {
           <div className="modal-box max-w-4xl bg-base-100">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg">
-                Result for {viewMode === "coupling" ? "Coupling" : "QID"}{" "}
+                Result for {viewMode === "2q" ? "Coupling" : "QID"}{" "}
                 {selectedTaskInfo.qid}
               </h3>
               <button
