@@ -47,7 +47,7 @@ export function DateSelector({
     if (dateStr === "latest") return "Latest";
     return `${dateStr.slice(0, 4)}/${dateStr.slice(4, 6)}/${dateStr.slice(
       6,
-      8
+      8,
     )}`;
   };
 

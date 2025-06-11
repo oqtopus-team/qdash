@@ -1208,7 +1208,7 @@ LatestTaskGroupedByChipResponse
     Historical task results for all qubits on the specified date
  * @summary Fetch historical task results
  */
-export const fetchHistoricalTaskGroupedByChip = (
+export const fetchHistoricalQubitTaskGroupedByChip = (
   chipId: string,
   taskName: string,
   recordedDate: string,
@@ -1217,7 +1217,7 @@ export const fetchHistoricalTaskGroupedByChip = (
 ) => {
   return customInstance<LatestTaskGroupedByChipResponse>(
     {
-      url: `/api/chip/${chipId}/task/${taskName}/history/${recordedDate}`,
+      url: `/api/chip/${chipId}/task/qubit/${taskName}/history/${recordedDate}`,
       method: "GET",
       signal,
     },
@@ -1225,18 +1225,18 @@ export const fetchHistoricalTaskGroupedByChip = (
   );
 };
 
-export const getFetchHistoricalTaskGroupedByChipQueryKey = (
+export const getFetchHistoricalQubitTaskGroupedByChipQueryKey = (
   chipId: string,
   taskName: string,
   recordedDate: string,
 ) => {
   return [
-    `/api/chip/${chipId}/task/${taskName}/history/${recordedDate}`,
+    `/api/chip/${chipId}/task/qubit/${taskName}/history/${recordedDate}`,
   ] as const;
 };
 
-export const getFetchHistoricalTaskGroupedByChipQueryOptions = <
-  TData = Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+export const getFetchHistoricalQubitTaskGroupedByChipQueryOptions = <
+  TData = Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
@@ -1245,7 +1245,7 @@ export const getFetchHistoricalTaskGroupedByChipQueryOptions = <
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+        Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
         TError,
         TData
       >
@@ -1257,12 +1257,16 @@ export const getFetchHistoricalTaskGroupedByChipQueryOptions = <
 
   const queryKey =
     queryOptions?.queryKey ??
-    getFetchHistoricalTaskGroupedByChipQueryKey(chipId, taskName, recordedDate);
+    getFetchHistoricalQubitTaskGroupedByChipQueryKey(
+      chipId,
+      taskName,
+      recordedDate,
+    );
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>
+    Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>
   > = ({ signal }) =>
-    fetchHistoricalTaskGroupedByChip(
+    fetchHistoricalQubitTaskGroupedByChip(
       chipId,
       taskName,
       recordedDate,
@@ -1276,20 +1280,20 @@ export const getFetchHistoricalTaskGroupedByChipQueryOptions = <
     enabled: !!(chipId && taskName && recordedDate),
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+    Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type FetchHistoricalTaskGroupedByChipQueryResult = NonNullable<
-  Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>
+export type FetchHistoricalQubitTaskGroupedByChipQueryResult = NonNullable<
+  Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>
 >;
-export type FetchHistoricalTaskGroupedByChipQueryError =
+export type FetchHistoricalQubitTaskGroupedByChipQueryError =
   ErrorType<HTTPValidationError>;
 
-export function useFetchHistoricalTaskGroupedByChip<
-  TData = Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+export function useFetchHistoricalQubitTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
@@ -1298,16 +1302,16 @@ export function useFetchHistoricalTaskGroupedByChip<
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+        Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+          Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
           TError,
-          Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>
+          Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>
         >,
         "initialData"
       >;
@@ -1317,8 +1321,8 @@ export function useFetchHistoricalTaskGroupedByChip<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useFetchHistoricalTaskGroupedByChip<
-  TData = Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+export function useFetchHistoricalQubitTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
@@ -1327,16 +1331,16 @@ export function useFetchHistoricalTaskGroupedByChip<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+        Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+          Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
           TError,
-          Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>
+          Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>
         >,
         "initialData"
       >;
@@ -1344,8 +1348,8 @@ export function useFetchHistoricalTaskGroupedByChip<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useFetchHistoricalTaskGroupedByChip<
-  TData = Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+export function useFetchHistoricalQubitTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
@@ -1354,7 +1358,7 @@ export function useFetchHistoricalTaskGroupedByChip<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+        Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
         TError,
         TData
       >
@@ -1367,8 +1371,8 @@ export function useFetchHistoricalTaskGroupedByChip<
  * @summary Fetch historical task results
  */
 
-export function useFetchHistoricalTaskGroupedByChip<
-  TData = Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+export function useFetchHistoricalQubitTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
@@ -1377,7 +1381,7 @@ export function useFetchHistoricalTaskGroupedByChip<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchHistoricalTaskGroupedByChip>>,
+        Awaited<ReturnType<typeof fetchHistoricalQubitTaskGroupedByChip>>,
         TError,
         TData
       >
@@ -1386,7 +1390,7 @@ export function useFetchHistoricalTaskGroupedByChip<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getFetchHistoricalTaskGroupedByChipQueryOptions(
+  const queryOptions = getFetchHistoricalQubitTaskGroupedByChipQueryOptions(
     chipId,
     taskName,
     recordedDate,
@@ -1407,27 +1411,31 @@ export function useFetchHistoricalTaskGroupedByChip<
  * Fetch the multiplexers.
  * @summary Fetch the multiplexers
  */
-export const fetchLatestTaskGroupedByChip = (
+export const fetchLatestQubitTaskGroupedByChip = (
   chipId: string,
   taskName: string,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<LatestTaskGroupedByChipResponse>(
-    { url: `/api/chip/${chipId}/task/${taskName}`, method: "GET", signal },
+    {
+      url: `/api/chip/${chipId}/task/qubit/${taskName}`,
+      method: "GET",
+      signal,
+    },
     options,
   );
 };
 
-export const getFetchLatestTaskGroupedByChipQueryKey = (
+export const getFetchLatestQubitTaskGroupedByChipQueryKey = (
   chipId: string,
   taskName: string,
 ) => {
-  return [`/api/chip/${chipId}/task/${taskName}`] as const;
+  return [`/api/chip/${chipId}/task/qubit/${taskName}`] as const;
 };
 
-export const getFetchLatestTaskGroupedByChipQueryOptions = <
-  TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+export const getFetchLatestQubitTaskGroupedByChipQueryOptions = <
+  TData = Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
@@ -1435,7 +1443,7 @@ export const getFetchLatestTaskGroupedByChipQueryOptions = <
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+        Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
         TError,
         TData
       >
@@ -1447,12 +1455,12 @@ export const getFetchLatestTaskGroupedByChipQueryOptions = <
 
   const queryKey =
     queryOptions?.queryKey ??
-    getFetchLatestTaskGroupedByChipQueryKey(chipId, taskName);
+    getFetchLatestQubitTaskGroupedByChipQueryKey(chipId, taskName);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>
+    Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>
   > = ({ signal }) =>
-    fetchLatestTaskGroupedByChip(chipId, taskName, requestOptions, signal);
+    fetchLatestQubitTaskGroupedByChip(chipId, taskName, requestOptions, signal);
 
   return {
     queryKey,
@@ -1460,20 +1468,20 @@ export const getFetchLatestTaskGroupedByChipQueryOptions = <
     enabled: !!(chipId && taskName),
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+    Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type FetchLatestTaskGroupedByChipQueryResult = NonNullable<
-  Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>
+export type FetchLatestQubitTaskGroupedByChipQueryResult = NonNullable<
+  Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>
 >;
-export type FetchLatestTaskGroupedByChipQueryError =
+export type FetchLatestQubitTaskGroupedByChipQueryError =
   ErrorType<HTTPValidationError>;
 
-export function useFetchLatestTaskGroupedByChip<
-  TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+export function useFetchLatestQubitTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
@@ -1481,16 +1489,16 @@ export function useFetchLatestTaskGroupedByChip<
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+        Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+          Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
           TError,
-          Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>
+          Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>
         >,
         "initialData"
       >;
@@ -1500,8 +1508,8 @@ export function useFetchLatestTaskGroupedByChip<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useFetchLatestTaskGroupedByChip<
-  TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+export function useFetchLatestQubitTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
@@ -1509,16 +1517,16 @@ export function useFetchLatestTaskGroupedByChip<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+        Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+          Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
           TError,
-          Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>
+          Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>
         >,
         "initialData"
       >;
@@ -1526,8 +1534,8 @@ export function useFetchLatestTaskGroupedByChip<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useFetchLatestTaskGroupedByChip<
-  TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+export function useFetchLatestQubitTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
@@ -1535,7 +1543,7 @@ export function useFetchLatestTaskGroupedByChip<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+        Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
         TError,
         TData
       >
@@ -1548,8 +1556,8 @@ export function useFetchLatestTaskGroupedByChip<
  * @summary Fetch the multiplexers
  */
 
-export function useFetchLatestTaskGroupedByChip<
-  TData = Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+export function useFetchLatestQubitTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
@@ -1557,7 +1565,7 @@ export function useFetchLatestTaskGroupedByChip<
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchLatestTaskGroupedByChip>>,
+        Awaited<ReturnType<typeof fetchLatestQubitTaskGroupedByChip>>,
         TError,
         TData
       >
@@ -1566,7 +1574,414 @@ export function useFetchLatestTaskGroupedByChip<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getFetchLatestTaskGroupedByChipQueryOptions(
+  const queryOptions = getFetchLatestQubitTaskGroupedByChipQueryOptions(
+    chipId,
+    taskName,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Fetch historical task results for a specific date.
+
+Parameters
+----------
+chip_id : str
+    ID of the chip
+task_name : str
+    Name of the task to fetch
+recorded_date : str
+    Date to fetch history for (ISO format YYYY-MM-DD)
+current_user : User
+    Current authenticated user
+
+Returns
+-------
+LatestTaskGroupedByChipResponse
+    Historical task results for all qubits on the specified date
+ * @summary Fetch historical task results
+ */
+export const fetchHistoricalCouplingTaskGroupedByChip = (
+  chipId: string,
+  taskName: string,
+  recordedDate: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<LatestTaskGroupedByChipResponse>(
+    {
+      url: `/api/chip/${chipId}/task/coupling/${taskName}/history/${recordedDate}`,
+      method: "GET",
+      signal,
+    },
+    options,
+  );
+};
+
+export const getFetchHistoricalCouplingTaskGroupedByChipQueryKey = (
+  chipId: string,
+  taskName: string,
+  recordedDate: string,
+) => {
+  return [
+    `/api/chip/${chipId}/task/coupling/${taskName}/history/${recordedDate}`,
+  ] as const;
+};
+
+export const getFetchHistoricalCouplingTaskGroupedByChipQueryOptions = <
+  TData = Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  recordedDate: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getFetchHistoricalCouplingTaskGroupedByChipQueryKey(
+      chipId,
+      taskName,
+      recordedDate,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>
+  > = ({ signal }) =>
+    fetchHistoricalCouplingTaskGroupedByChip(
+      chipId,
+      taskName,
+      recordedDate,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(chipId && taskName && recordedDate),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type FetchHistoricalCouplingTaskGroupedByChipQueryResult = NonNullable<
+  Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>
+>;
+export type FetchHistoricalCouplingTaskGroupedByChipQueryError =
+  ErrorType<HTTPValidationError>;
+
+export function useFetchHistoricalCouplingTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  recordedDate: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+          TError,
+          Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useFetchHistoricalCouplingTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  recordedDate: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+          TError,
+          Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useFetchHistoricalCouplingTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  recordedDate: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Fetch historical task results
+ */
+
+export function useFetchHistoricalCouplingTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  recordedDate: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchHistoricalCouplingTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getFetchHistoricalCouplingTaskGroupedByChipQueryOptions(
+    chipId,
+    taskName,
+    recordedDate,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Fetch the multiplexers.
+ * @summary Fetch the multiplexers
+ */
+export const fetchLatestCouplingTaskGroupedByChip = (
+  chipId: string,
+  taskName: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<LatestTaskGroupedByChipResponse>(
+    {
+      url: `/api/chip/${chipId}/task/coupling/${taskName}`,
+      method: "GET",
+      signal,
+    },
+    options,
+  );
+};
+
+export const getFetchLatestCouplingTaskGroupedByChipQueryKey = (
+  chipId: string,
+  taskName: string,
+) => {
+  return [`/api/chip/${chipId}/task/coupling/${taskName}`] as const;
+};
+
+export const getFetchLatestCouplingTaskGroupedByChipQueryOptions = <
+  TData = Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getFetchLatestCouplingTaskGroupedByChipQueryKey(chipId, taskName);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>
+  > = ({ signal }) =>
+    fetchLatestCouplingTaskGroupedByChip(
+      chipId,
+      taskName,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(chipId && taskName),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type FetchLatestCouplingTaskGroupedByChipQueryResult = NonNullable<
+  Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>
+>;
+export type FetchLatestCouplingTaskGroupedByChipQueryError =
+  ErrorType<HTTPValidationError>;
+
+export function useFetchLatestCouplingTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+          TError,
+          Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useFetchLatestCouplingTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+          TError,
+          Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useFetchLatestCouplingTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Fetch the multiplexers
+ */
+
+export function useFetchLatestCouplingTaskGroupedByChip<
+  TData = Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchLatestCouplingTaskGroupedByChip>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getFetchLatestCouplingTaskGroupedByChipQueryOptions(
     chipId,
     taskName,
     options,
