@@ -17,11 +17,11 @@ interface CouplingGridProps {
 interface SelectedTaskInfo {
   path: string;
   couplingId: string;
-  task: Task;
+  taskList: Task[];
+  index: number;
 }
 
 const GRID_SIZE = 8;
-
 const MUX_SIZE = 2;
 
 const getCouplingPosition = (qid1: number, qid2: number) => {
@@ -94,6 +94,19 @@ export function CouplingGrid({
     return <div className="alert alert-error">Failed to load task data</div>;
   }
 
+  const normalizedResultMap: Record<string, Task[]> = {};
+  if (taskResponse?.data?.result) {
+    for (const [couplingId, task] of Object.entries(taskResponse.data.result)) {
+      const [a, b] = couplingId.split("-").map(Number);
+      const normKey = a < b ? `${a}-${b}` : `${b}-${a}`;
+      if (!(normKey in normalizedResultMap)) normalizedResultMap[normKey] = [];
+      normalizedResultMap[normKey].push({ ...task, couplingId });
+      normalizedResultMap[normKey].sort(
+        (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0)
+      );
+    }
+  }
+
   return (
     <div className="space-y-6 px-4">
       <div className="w-full overflow-x-auto">
@@ -128,65 +141,59 @@ export function CouplingGrid({
             );
           })}
 
-          {taskResponse?.data?.result &&
-            Object.entries(taskResponse.data.result).map(
-              ([couplingId, task]) => {
-                const [qid1, qid2] = couplingId.split("-").map(Number);
-                const { row1, col1, row2, col2 } = getCouplingPosition(
-                  qid1,
-                  qid2
-                );
-                const centerX =
-                  ((col1 + col2) / 2) * (cellSize + 8) + cellSize / 2;
-                const centerY =
-                  ((row1 + row2) / 2) * (cellSize + 8) + cellSize / 2;
-                const figurePath = getFigurePath(task);
+          {Object.entries(normalizedResultMap).map(([normKey, taskList]) => {
+            const [qid1, qid2] = normKey.split("-").map(Number);
+            const task = taskList[0];
+            const figurePath = getFigurePath(task);
+            const { row1, col1, row2, col2 } = getCouplingPosition(qid1, qid2);
+            const centerX = ((col1 + col2) / 2) * (cellSize + 8) + cellSize / 2;
+            const centerY = ((row1 + row2) / 2) * (cellSize + 8) + cellSize / 2;
 
-                return (
-                  <button
-                    key={couplingId}
-                    onClick={() => {
-                      if (figurePath) {
-                        setSelectedTaskInfo({
-                          path: figurePath,
-                          couplingId,
-                          task,
-                        });
-                      }
-                    }}
-                    style={{
-                      position: "absolute",
-                      top: centerY,
-                      left: centerX,
-                      width: cellSize * 0.6,
-                      height: cellSize * 0.6,
-                      transform: "translate(-50%, -50%)",
-                    }}
-                    className="bg-base-100 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-                  >
-                    {figurePath && (
-                      <TaskFigure
-                        path={figurePath}
-                        qid={couplingId}
-                        className="w-full h-full object-contain"
-                      />
-                    )}
-                    <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
-                      {couplingId}
-                    </div>
-                    <div
-                      className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
-                        task.status === "completed"
-                          ? "bg-success"
-                          : task.status === "failed"
-                          ? "bg-error"
-                          : "bg-warning"
-                      }`}
-                    />
-                  </button>
-                );
-              }
-            )}
+            return (
+              <button
+                key={normKey}
+                onClick={() => {
+                  if (figurePath) {
+                    setSelectedTaskInfo({
+                      path: figurePath,
+                      couplingId: normKey,
+                      taskList,
+                      index: 0,
+                    });
+                  }
+                }}
+                style={{
+                  position: "absolute",
+                  top: centerY,
+                  left: centerX,
+                  width: cellSize * 0.6,
+                  height: cellSize * 0.6,
+                  transform: "translate(-50%, -50%)",
+                }}
+                className="bg-base-100 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+              >
+                {figurePath && (
+                  <TaskFigure
+                    path={figurePath}
+                    qid={task.couplingId}
+                    className="w-full h-full object-contain"
+                  />
+                )}
+                <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
+                  {task.couplingId}
+                </div>
+                <div
+                  className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
+                    task.status === "completed"
+                      ? "bg-success"
+                      : task.status === "failed"
+                      ? "bg-error"
+                      : "bg-warning"
+                  }`}
+                />
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -195,7 +202,8 @@ export function CouplingGrid({
           <div className="modal-box max-w-4xl bg-base-100">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg">
-                Result for Coupling {selectedTaskInfo.couplingId}
+                Result for Coupling{" "}
+                {selectedTaskInfo.taskList[selectedTaskInfo.index].couplingId}
               </h3>
               <button
                 onClick={() => setSelectedTaskInfo(null)}
@@ -207,32 +215,63 @@ export function CouplingGrid({
             <div className="grid grid-cols-2 gap-8">
               <div className="aspect-square bg-base-200/50 rounded-xl p-4">
                 <TaskFigure
-                  path={selectedTaskInfo.path}
-                  qid={selectedTaskInfo.couplingId}
+                  path={
+                    selectedTaskInfo.taskList[selectedTaskInfo.index]
+                      .figure_path
+                  }
+                  qid={
+                    selectedTaskInfo.taskList[selectedTaskInfo.index].couplingId
+                  }
                   className="w-full h-full object-contain"
                 />
               </div>
               <div className="space-y-6">
+                {selectedTaskInfo.taskList.length > 1 && (
+                  <button
+                    className="btn btn-sm"
+                    onClick={() =>
+                      setSelectedTaskInfo((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              index: (prev.index + 1) % prev.taskList.length,
+                            }
+                          : null
+                      )
+                    }
+                  >
+                    Toggle Direction (
+                    {
+                      selectedTaskInfo.taskList[selectedTaskInfo.index]
+                        .couplingId
+                    }
+                    )
+                  </button>
+                )}
                 <div className="card bg-base-200 p-4 rounded-xl">
                   <h4 className="font-medium mb-2">Status</h4>
                   <div
                     className={`badge ${
-                      selectedTaskInfo.task.status === "completed"
+                      selectedTaskInfo.taskList[selectedTaskInfo.index]
+                        .status === "completed"
                         ? "badge-success"
-                        : selectedTaskInfo.task.status === "failed"
+                        : selectedTaskInfo.taskList[selectedTaskInfo.index]
+                            .status === "failed"
                         ? "badge-error"
                         : "badge-warning"
                     }`}
                   >
-                    {selectedTaskInfo.task.status}
+                    {selectedTaskInfo.taskList[selectedTaskInfo.index].status}
                   </div>
                 </div>
-                {selectedTaskInfo.task.output_parameters && (
+                {selectedTaskInfo.taskList[selectedTaskInfo.index]
+                  .output_parameters && (
                   <div className="card bg-base-200 p-4 rounded-xl">
                     <h4 className="font-medium mb-2">Parameters</h4>
                     <div className="space-y-2">
                       {Object.entries(
-                        selectedTaskInfo.task.output_parameters
+                        selectedTaskInfo.taskList[selectedTaskInfo.index]
+                          .output_parameters
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&
@@ -256,10 +295,15 @@ export function CouplingGrid({
                     </div>
                   </div>
                 )}
-                {selectedTaskInfo.task.message && (
+                {selectedTaskInfo.taskList[selectedTaskInfo.index].message && (
                   <div className="card bg-base-200 p-4 rounded-xl">
                     <h4 className="font-medium mb-2">Message</h4>
-                    <p className="text-sm">{selectedTaskInfo.task.message}</p>
+                    <p className="text-sm">
+                      {
+                        selectedTaskInfo.taskList[selectedTaskInfo.index]
+                          .message
+                      }
+                    </p>
                   </div>
                 )}
               </div>

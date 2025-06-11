@@ -69,6 +69,7 @@ class Task(BaseModel):
     end_at: str | None = None
     elapsed_time: str | None = None
     task_type: str | None = None
+    default_view: bool = True
 
     @field_validator("name", mode="before")
     def modify_name(cls, v: str, info: FieldValidationInfo) -> str:  # noqa: N805
@@ -856,7 +857,7 @@ def fetch_historical_coupling_task_grouped_by_chip(
                 task_type=result.task_type,
             )
         else:
-            task_result = Task(name=task_name)
+            task_result = Task(name=task_name, default_view=False)
         results[qid] = task_result
 
     return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
@@ -925,7 +926,7 @@ def fetch_latest_coupling_task_grouped_by_chip(
                 task_type=result.task_type,
             )
         else:
-            task_result = Task(name=task_name)
+            task_result = Task(name=task_name, default_view=False)
         results[qid] = task_result
 
     return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)

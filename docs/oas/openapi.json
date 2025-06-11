@@ -3569,6 +3569,11 @@
               }
             ],
             "title": "Task Type"
+          },
+          "default_view": {
+            "type": "boolean",
+            "title": "Default View",
+            "default": true
           }
         },
         "type": "object",
