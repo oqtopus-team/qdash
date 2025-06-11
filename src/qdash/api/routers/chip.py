@@ -209,8 +209,8 @@ def fetch_chip(
     ----------
     chip_id : str
         ID of the chip to fetch
-    current_user_id : str
-        Current user ID from authentication
+    current_user : User
+        Current authenticated user
 
     Returns
     -------
@@ -371,8 +371,8 @@ def fetch_execution_by_chip_id(
         ID of the chip
     execution_id : str
         ID of the execution to fetch
-    current_user_id : str
-        Current user ID from authentication
+    current_user : User
+        Current authenticated user
 
     Returns
     -------
@@ -416,8 +416,6 @@ class ListMuxResponse(BaseModel):
 def _build_mux_detail(
     mux_id: int,
     tasks: list,
-    current_user: User,
-    chip_id: str,
     task_results: dict[str, dict[str, TaskResultHistoryDocument]],
 ) -> MuxDetailResponse:
     qids = [str(mux_id * 4 + i) for i in range(4)]
@@ -511,9 +509,7 @@ def fetch_mux_detail(
         if result.name not in task_results[result.qid]:
             task_results[result.qid][result.name] = result
 
-    return _build_mux_detail(
-        mux_id, tasks, current_user, chip_id=chip_id, task_results=task_results
-    )
+    return _build_mux_detail(mux_id, tasks, task_results=task_results)
 
 
 @router.get(
@@ -579,9 +575,7 @@ def list_muxes(
     # Build mux details
     muxes: dict[int, MuxDetailResponse] = {}
     for mux_id in range(mux_num):
-        muxes[mux_id] = _build_mux_detail(
-            mux_id, tasks, current_user, chip_id=chip_id, task_results=task_results
-        )
+        muxes[mux_id] = _build_mux_detail(mux_id, tasks, task_results=task_results)
 
     return ListMuxResponse(muxes=muxes)
 
@@ -638,14 +632,10 @@ def fetch_historical_qubit_task_grouped_by_chip(
 
     # Get qids
     qids = list(chip.qubits.keys())
-    fidelity_map = {
-        k: v.data.get("x90_gate_fidelity", {}).get("value", 0.0) > QUBIT_FIDELITY_THRESHOLD
-        for k, v in chip.qubits.items()
-    }
     parsed_date = pendulum.from_format(recorded_date, "YYYYMMDD", tz="Asia/Tokyo")
 
-    # Format to 'YYYY-MM-DD'
-    formatted_date = parsed_date.to_date_string()
+    start_time = parsed_date.start_of("day")
+    end_time = parsed_date.end_of("day")
     all_results = (
         TaskResultHistoryDocument.find(
             {
@@ -655,15 +645,30 @@ def fetch_historical_qubit_task_grouped_by_chip(
                 "qid": {"$in": qids},
                 # Filter tasks executed on the same date in JST
                 "start_at": {
-                    "$gte": f"{formatted_date}T00:00:00+09:00",
-                    "$lt": f"{formatted_date}T23:59:59+09:00",
+                    "$gte": start_time.to_iso8601_string(),
+                    "$lt": end_time.to_iso8601_string(),
                 },
             }
         )
         .sort([("end_at", DESCENDING)])
         .run()
     )
+    fidelity_map = {}
+    for k, v in chip.couplings.items():
+        fidelity_data = v.data.get("x90_gate_fidelity", {})
+        value = fidelity_data.get("value", 0.0)
+        calibrated_at_str = fidelity_data.get("calibrated_at")
 
+        try:
+            calibrated_at = pendulum.parse(calibrated_at_str)
+        except Exception:
+            calibrated_at = None
+
+        fidelity_map[k] = (
+            value > QUBIT_FIDELITY_THRESHOLD
+            and calibrated_at is not None
+            and start_time <= calibrated_at <= end_time
+        )
     # Organize results by qid
     task_results: dict[str, TaskResultHistoryDocument] = {}
     for result in all_results:
@@ -817,14 +822,12 @@ def fetch_historical_coupling_task_grouped_by_chip(
 
     # Get qids
     qids = list(chip.couplings.keys())
-    fidelity_map = {
-        k: v.data.get("bell_state_fidelity", {}).get("value", 0.0) > COUPLING_FIDELITY_THRESHOLD
-        for k, v in chip.couplings.items()
-    }
+
     parsed_date = pendulum.from_format(recorded_date, "YYYYMMDD", tz="Asia/Tokyo")
 
-    # Format to 'YYYY-MM-DD'
-    formatted_date = parsed_date.to_date_string()
+    start_time = parsed_date.start_of("day")
+    end_time = parsed_date.end_of("day")
+
     all_results = (
         TaskResultHistoryDocument.find(
             {
@@ -832,10 +835,9 @@ def fetch_historical_coupling_task_grouped_by_chip(
                 "chip_id": chip_id,
                 "name": task_name,
                 "qid": {"$in": qids},
-                # Filter tasks executed on the same date in JST
                 "start_at": {
-                    "$gte": f"{formatted_date}T00:00:00+09:00",
-                    "$lt": f"{formatted_date}T23:59:59+09:00",
+                    "$gte": start_time.to_iso8601_string(),
+                    "$lt": end_time.to_iso8601_string(),
                 },
             }
         )
@@ -843,6 +845,22 @@ def fetch_historical_coupling_task_grouped_by_chip(
         .run()
     )
 
+    fidelity_map = {}
+    for k, v in chip.couplings.items():
+        fidelity_data = v.data.get("bell_state_fidelity", {})
+        value = fidelity_data.get("value", 0.0)
+        calibrated_at_str = fidelity_data.get("calibrated_at")
+
+        try:
+            calibrated_at = pendulum.parse(calibrated_at_str)
+        except Exception:
+            calibrated_at = None
+
+        fidelity_map[k] = (
+            value > COUPLING_FIDELITY_THRESHOLD
+            and calibrated_at is not None
+            and start_time <= calibrated_at <= end_time
+        )
     # Organize results by qid
     task_results: dict[str, TaskResultHistoryDocument] = {}
     for result in all_results:
@@ -981,6 +999,12 @@ def _fetch_timeseries_data(
 
     Parameters
     ----------
+    chip_id : str
+        The ID of the chip to fetch data for
+    start_at : str | None
+        The start time in ISO format (optional, defaults to 7 days ago)
+    end_at : str | None
+        The end time in ISO format (optional, defaults to now)
     tag : str
         The tag to filter by
     parameter : str
