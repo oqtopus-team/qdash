@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useListMuxes } from "@/client/chip/chip";
 import { useFetchAllTasks } from "@/client/task/task";
-import { BsGrid, BsListUl, BsLink, BsGrid1X2 } from "react-icons/bs";
+import { BsGrid, BsListUl } from "react-icons/bs";
 import { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
 import { TaskResultGrid } from "./components/TaskResultGrid";
 import { CouplingGrid } from "./components/CouplingGrid";
@@ -32,7 +32,7 @@ export default function ChipPage() {
 
   const { data: tasks } = useFetchAllTasks();
 
-  // Update selected task when view mode changes to 2q
+  // Update selected task when view mode changes
   useEffect(() => {
     if (viewMode === "2q" && tasks?.data?.tasks) {
       const availableTasks = tasks.data.tasks.filter(
@@ -46,6 +46,8 @@ export default function ChipPage() {
       } else if (availableTasks.length > 0) {
         setSelectedTask(availableTasks[0].name);
       }
+    } else if (viewMode === "1q") {
+      setSelectedTask("CheckRabi");
     }
   }, [viewMode, tasks?.data?.tasks]);
   const {
