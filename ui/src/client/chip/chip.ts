@@ -1217,7 +1217,7 @@ export const fetchHistoricalTaskGroupedByChip = (
 ) => {
   return customInstance<LatestTaskGroupedByChipResponse>(
     {
-      url: `/api/chip/${chipId}/task/${taskName}/history/${recordedDate}`,
+      url: `/api/chip/${chipId}/task/qubit/${taskName}/history/${recordedDate}`,
       method: "GET",
       signal,
     },
@@ -1231,7 +1231,7 @@ export const getFetchHistoricalTaskGroupedByChipQueryKey = (
   recordedDate: string,
 ) => {
   return [
-    `/api/chip/${chipId}/task/${taskName}/history/${recordedDate}`,
+    `/api/chip/${chipId}/task/qubit/${taskName}/history/${recordedDate}`,
   ] as const;
 };
 
@@ -1414,7 +1414,11 @@ export const fetchLatestTaskGroupedByChip = (
   signal?: AbortSignal,
 ) => {
   return customInstance<LatestTaskGroupedByChipResponse>(
-    { url: `/api/chip/${chipId}/task/${taskName}`, method: "GET", signal },
+    {
+      url: `/api/chip/${chipId}/task/qubit/${taskName}`,
+      method: "GET",
+      signal,
+    },
     options,
   );
 };
@@ -1423,7 +1427,7 @@ export const getFetchLatestTaskGroupedByChipQueryKey = (
   chipId: string,
   taskName: string,
 ) => {
-  return [`/api/chip/${chipId}/task/${taskName}`] as const;
+  return [`/api/chip/${chipId}/task/qubit/${taskName}`] as const;
 };
 
 export const getFetchLatestTaskGroupedByChipQueryOptions = <

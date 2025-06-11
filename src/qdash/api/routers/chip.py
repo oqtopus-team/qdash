@@ -590,7 +590,7 @@ class LatestTaskGroupedByChipResponse(BaseModel):
 
 
 @router.get(
-    "/chip/{chip_id}/task/{task_name}/history/{recorded_date}",
+    "/chip/{chip_id}/task/qubit/{task_name}/history/{recorded_date}",
     summary="Fetch historical task results",
     operation_id="fetchHistoricalTaskGroupedByChip",
     response_model=LatestTaskGroupedByChipResponse,
@@ -692,7 +692,7 @@ def fetch_historical_task_grouped_by_chip(
 
 
 @router.get(
-    "/chip/{chip_id}/task/{task_name}",
+    "/chip/{chip_id}/task/qubit/{task_name}",
     summary="Fetch the multiplexers",
     operation_id="fetchLatestTaskGroupedByChip",
     response_model=LatestTaskGroupedByChipResponse,

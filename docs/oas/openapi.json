@@ -988,7 +988,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/{task_name}/history/{recorded_date}": {
+    "/api/chip/{chip_id}/task/qubit/{task_name}/history/{recorded_date}": {
       "get": {
         "tags": [
           "chip"
@@ -1054,7 +1054,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/{task_name}": {
+    "/api/chip/{chip_id}/task/qubit/{task_name}": {
       "get": {
         "tags": [
           "chip"
