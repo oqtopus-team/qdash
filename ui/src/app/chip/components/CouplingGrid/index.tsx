@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { Task } from "@/schemas";
+
+interface ExtendedTask extends Task {
+  couplingId: string;
+}
 import {
   useFetchLatestCouplingTaskGroupedByChip,
   useFetchHistoricalCouplingTaskGroupedByChip,
@@ -17,7 +21,7 @@ interface CouplingGridProps {
 interface SelectedTaskInfo {
   path: string;
   couplingId: string;
-  taskList: Task[];
+  taskList: ExtendedTask[];
   index: number;
 }
 
@@ -94,13 +98,16 @@ export function CouplingGrid({
     return <div className="alert alert-error">Failed to load task data</div>;
   }
 
-  const normalizedResultMap: Record<string, Task[]> = {};
+  const normalizedResultMap: Record<string, ExtendedTask[]> = {};
   if (taskResponse?.data?.result) {
     for (const [couplingId, task] of Object.entries(taskResponse.data.result)) {
       const [a, b] = couplingId.split("-").map(Number);
       const normKey = a < b ? `${a}-${b}` : `${b}-${a}`;
       if (!(normKey in normalizedResultMap)) normalizedResultMap[normKey] = [];
-      normalizedResultMap[normKey].push({ ...task, couplingId });
+      normalizedResultMap[normKey].push({
+        ...task,
+        couplingId,
+      } as ExtendedTask);
       normalizedResultMap[normKey].sort(
         (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0)
       );
@@ -174,8 +181,8 @@ export function CouplingGrid({
               >
                 {figurePath && (
                   <TaskFigure
-                    path={figurePath}
-                    qid={task.couplingId}
+                    path={figurePath || ""}
+                    qid={String(task.couplingId)}
                     className="w-full h-full object-contain"
                   />
                 )}
@@ -217,11 +224,11 @@ export function CouplingGrid({
                 <TaskFigure
                   path={
                     selectedTaskInfo.taskList[selectedTaskInfo.index]
-                      .figure_path
+                      .figure_path || ""
                   }
-                  qid={
+                  qid={String(
                     selectedTaskInfo.taskList[selectedTaskInfo.index].couplingId
-                  }
+                  )}
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -271,7 +278,7 @@ export function CouplingGrid({
                     <div className="space-y-2">
                       {Object.entries(
                         selectedTaskInfo.taskList[selectedTaskInfo.index]
-                          .output_parameters
+                          .output_parameters || {}
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&
