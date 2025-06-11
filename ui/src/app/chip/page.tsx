@@ -36,10 +36,10 @@ export default function ChipPage() {
   useEffect(() => {
     if (viewMode === "2q" && tasks?.data?.tasks) {
       const availableTasks = tasks.data.tasks.filter(
-        (task: TaskResponse) => task.task_type === "coupling"
+        (task: TaskResponse) => task.task_type === "coupling",
       );
       const checkBellState = availableTasks.find(
-        (task: TaskResponse) => task.name === "CheckBellState"
+        (task: TaskResponse) => task.name === "CheckBellState",
       );
       if (checkBellState) {
         setSelectedTask("CheckBellState");
@@ -80,7 +80,7 @@ export default function ChipPage() {
             taskGroups[taskName] = {};
           }
           taskGroups[taskName][qid] = task;
-        }
+        },
       );
     });
 
@@ -89,7 +89,7 @@ export default function ChipPage() {
 
   // Get latest update time info from tasks
   const getLatestUpdateInfo = (
-    detail: MuxDetailResponseDetail
+    detail: MuxDetailResponseDetail,
   ): { time: Date; isRecent: boolean } => {
     let latestTime = new Date(0);
 
@@ -347,8 +347,8 @@ export default function ChipPage() {
                                                   task.status === "completed"
                                                     ? "bg-success"
                                                     : task.status === "failed"
-                                                    ? "bg-error"
-                                                    : "bg-warning"
+                                                      ? "bg-error"
+                                                      : "bg-warning"
                                                 }`}
                                               />
                                             </div>
@@ -356,7 +356,7 @@ export default function ChipPage() {
                                               <div className="text-xs text-base-content/60">
                                                 Updated:{" "}
                                                 {formatRelativeTime(
-                                                  new Date(task.end_at)
+                                                  new Date(task.end_at),
                                                 )}
                                               </div>
                                             )}
@@ -376,7 +376,7 @@ export default function ChipPage() {
                                   })}
                                 </div>
                               </div>
-                            )
+                            ),
                           )}
                         </div>
                       </div>
@@ -421,8 +421,8 @@ export default function ChipPage() {
                       selectedTaskInfo.task.status === "completed"
                         ? "badge-success"
                         : selectedTaskInfo.task.status === "failed"
-                        ? "badge-error"
-                        : "badge-warning"
+                          ? "badge-error"
+                          : "badge-warning"
                     }`}
                   >
                     {selectedTaskInfo.task.status}
@@ -433,7 +433,7 @@ export default function ChipPage() {
                     <h4 className="font-medium mb-2">Parameters</h4>
                     <div className="space-y-2">
                       {Object.entries(
-                        selectedTaskInfo.task.output_parameters
+                        selectedTaskInfo.task.output_parameters,
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&
