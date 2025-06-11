@@ -337,8 +337,8 @@ Parameters
 ----------
 chip_id : str
     ID of the chip to fetch
-current_user_id : str
-    Current user ID from authentication
+current_user : User
+    Current authenticated user
 
 Returns
 -------
@@ -666,8 +666,8 @@ chip_id : str
     ID of the chip
 execution_id : str
     ID of the execution to fetch
-current_user_id : str
-    Current user ID from authentication
+current_user : User
+    Current authenticated user
 
 Returns
 -------
