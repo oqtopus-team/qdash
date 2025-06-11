@@ -157,7 +157,11 @@ export function TaskResultGrid({
                   });
                 }
               }}
-              className="aspect-square bg-base-100 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow relative"
+              className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow relative ${
+                task.over_threshold === true
+                  ? "border-2 border-primary animate-pulse-light"
+                  : ""
+              }`}
             >
               {task.figure_path && (
                 <div className="absolute inset-0">
@@ -188,7 +192,13 @@ export function TaskResultGrid({
       {/* Task Result Modal */}
       {selectedTaskInfo && (
         <dialog className="modal modal-open">
-          <div className="modal-box max-w-4xl bg-base-100">
+          <div
+            className={`modal-box max-w-4xl p-6 rounded-2xl shadow-xl transition-all duration-300 bg-base-100 ${
+              selectedTaskInfo.task.over_threshold === true
+                ? "border-2 border-primary animate-pulse-light"
+                : ""
+            }`}
+          >
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg">
                 Result for QID {selectedTaskInfo.qid}

@@ -177,7 +177,11 @@ export function CouplingGrid({
                   height: cellSize * 0.6,
                   transform: "translate(-50%, -50%)",
                 }}
-                className="bg-base-100 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+                className={`rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow ${
+                  task.over_threshold === true
+                    ? "border-2 border-primary animate-pulse-light"
+                    : ""
+                }`}
               >
                 {figurePath && (
                   <TaskFigure
@@ -206,7 +210,14 @@ export function CouplingGrid({
 
       {selectedTaskInfo && (
         <dialog className="modal modal-open">
-          <div className="modal-box max-w-4xl bg-base-100">
+          <div
+            className={`modal-box w-full max-w-5xl p-6 rounded-2xl shadow-xl transition-all duration-300 ${
+              selectedTaskInfo.taskList[selectedTaskInfo.index]
+                .over_threshold === true
+                ? "border-2 border-primary animate-pulse-light"
+                : "bg-base-100"
+            }`}
+          >
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg">
                 Result for Coupling{" "}

@@ -3574,6 +3574,11 @@
             "type": "boolean",
             "title": "Default View",
             "default": true
+          },
+          "over_threshold": {
+            "type": "boolean",
+            "title": "Over Threshold",
+            "default": false
           }
         },
         "type": "object",

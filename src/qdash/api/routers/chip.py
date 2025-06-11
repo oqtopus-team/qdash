@@ -25,6 +25,8 @@ router = APIRouter()
 # ロガーの設定
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+QUBIT_FIDELITY_THRESHOLD = 0.99
+COUPLING_FIDELITY_THRESHOLD = 0.90
 
 
 class ExecutionResponseSummary(BaseModel):
@@ -70,6 +72,7 @@ class Task(BaseModel):
     elapsed_time: str | None = None
     task_type: str | None = None
     default_view: bool = True
+    over_threshold: bool = False
 
     @field_validator("name", mode="before")
     def modify_name(cls, v: str, info: FieldValidationInfo) -> str:  # noqa: N805
@@ -635,7 +638,10 @@ def fetch_historical_qubit_task_grouped_by_chip(
 
     # Get qids
     qids = list(chip.qubits.keys())
-
+    fidelity_map = {
+        k: v.data.get("x90_gate_fidelity", {}).get("value", 0.0) > QUBIT_FIDELITY_THRESHOLD
+        for k, v in chip.qubits.items()
+    }
     parsed_date = pendulum.from_format(recorded_date, "YYYYMMDD", tz="Asia/Tokyo")
 
     # Format to 'YYYY-MM-DD'
@@ -684,6 +690,7 @@ def fetch_historical_qubit_task_grouped_by_chip(
                 end_at=result.end_at,
                 elapsed_time=result.elapsed_time,
                 task_type=result.task_type,
+                over_threshold=fidelity_map.get(qid, False),
             )
         else:
             task_result = Task(name=task_name)
@@ -712,7 +719,10 @@ def fetch_latest_qubit_task_grouped_by_chip(
 
     # Get qids
     qids = list(chip.qubits.keys())
-
+    fidelity_map = {
+        k: v.data.get("x90_gate_fidelity", {}).get("value", 0.0) > QUBIT_FIDELITY_THRESHOLD
+        for k, v in chip.qubits.items()
+    }
     # Fetch all task results in one query
     all_results = (
         TaskResultHistoryDocument.find(
@@ -753,6 +763,7 @@ def fetch_latest_qubit_task_grouped_by_chip(
                 end_at=result.end_at,
                 elapsed_time=result.elapsed_time,
                 task_type=result.task_type,
+                over_threshold=fidelity_map.get(qid, False),
             )
         else:
             task_result = Task(name=task_name)
@@ -806,7 +817,10 @@ def fetch_historical_coupling_task_grouped_by_chip(
 
     # Get qids
     qids = list(chip.couplings.keys())
-
+    fidelity_map = {
+        k: v.data.get("bell_state_fidelity", {}).get("value", 0.0) > COUPLING_FIDELITY_THRESHOLD
+        for k, v in chip.couplings.items()
+    }
     parsed_date = pendulum.from_format(recorded_date, "YYYYMMDD", tz="Asia/Tokyo")
 
     # Format to 'YYYY-MM-DD'
@@ -855,6 +869,7 @@ def fetch_historical_coupling_task_grouped_by_chip(
                 end_at=result.end_at,
                 elapsed_time=result.elapsed_time,
                 task_type=result.task_type,
+                over_threshold=fidelity_map.get(qid, False),
             )
         else:
             task_result = Task(name=task_name, default_view=False)
@@ -883,6 +898,10 @@ def fetch_latest_coupling_task_grouped_by_chip(
 
     # Get qids
     qids = list(chip.couplings.keys())
+    fidelity_map = {
+        k: v.data.get("bell_state_fidelity", {}).get("value", 0.0) > COUPLING_FIDELITY_THRESHOLD
+        for k, v in chip.couplings.items()
+    }
 
     # Fetch all task results in one query
     all_results = (
@@ -924,6 +943,7 @@ def fetch_latest_coupling_task_grouped_by_chip(
                 end_at=result.end_at,
                 elapsed_time=result.elapsed_time,
                 task_type=result.task_type,
+                over_threshold=fidelity_map.get(qid, False),
             )
         else:
             task_result = Task(name=task_name, default_view=False)
