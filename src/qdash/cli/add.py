@@ -15,6 +15,8 @@ logging.basicConfig(level=logging.INFO)
 
 CHIP_SIZE_64 = 64
 CHIP_SIZE_144 = 144
+CHIP_SIZE_256 = 256
+CHIP_SIZE_1024 = 1024
 
 
 def add_new_chip(
@@ -38,14 +40,18 @@ def add_new_chip(
         # Initialize chip data
         initialize()
 
-        if size not in [CHIP_SIZE_64, CHIP_SIZE_144]:
-            msg = "Size must be either CHIP_SIZE_64 or CHIP_SIZE_144."
+        if size not in [CHIP_SIZE_64, CHIP_SIZE_144, CHIP_SIZE_256, CHIP_SIZE_1024]:
+            msg = "Size must be either CHIP_SIZE_64 or CHIP_SIZE_144 or CHIP_SIZE_256."
             raise ValueError(msg)  # noqa: TRY301
         # Removed unused variable 'd'
         if size == CHIP_SIZE_64:
             d = 4
         elif size == CHIP_SIZE_144:
             d = 6
+        elif size == CHIP_SIZE_256:
+            d = 8
+        elif size == CHIP_SIZE_1024:
+            d = 16
         _, edges, pos = qubit_lattice(size, d)
         nodes, edges, pos = qubit_lattice(size, d)
         qubits = generate_qubit_data(size, pos, chip_id)

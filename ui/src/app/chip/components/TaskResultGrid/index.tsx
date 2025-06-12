@@ -12,6 +12,7 @@ interface TaskResultGridProps {
   chipId: string;
   selectedTask: string;
   selectedDate: string;
+  gridSize: number;
 }
 
 interface SelectedTaskInfo {
@@ -20,14 +21,13 @@ interface SelectedTaskInfo {
   task: Task;
 }
 
-// Grid configuration
-const GRID_SIZE = 8;
 const MUX_SIZE = 2; // 2x2 blocks for each mux
 
 export function TaskResultGrid({
   chipId,
   selectedTask,
   selectedDate,
+  gridSize,
 }: TaskResultGridProps) {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
@@ -42,7 +42,7 @@ export function TaskResultGrid({
     : useFetchHistoricalQubitTaskGroupedByChip(
         chipId,
         selectedTask,
-        selectedDate,
+        selectedDate
       );
 
   if (isLoadingTask) {
@@ -80,8 +80,8 @@ export function TaskResultGrid({
     Object.keys(taskResponse.data.result).forEach((qid) => {
       const qidNum = parseInt(qid);
       const muxIndex = Math.floor(qidNum / 4); // Which mux block (0, 1, 2, ...)
-      const muxRow = Math.floor(muxIndex / (GRID_SIZE / MUX_SIZE)); // Row of mux blocks
-      const muxCol = muxIndex % (GRID_SIZE / MUX_SIZE); // Column of mux blocks
+      const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE)); // Row of mux blocks
+      const muxCol = muxIndex % (gridSize / MUX_SIZE); // Column of mux blocks
       const localIndex = qidNum % 4; // Position within mux (0-3)
       const localRow = Math.floor(localIndex / 2); // Row within mux (0-1)
       const localCol = localIndex % 2; // Column within mux (0-1)
@@ -111,13 +111,16 @@ export function TaskResultGrid({
   return (
     <div className="space-y-6">
       {/* Grid Display */}
-      <div className="grid grid-cols-8 gap-2 p-4 bg-base-200/50 rounded-xl">
-        {Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, index) => {
-          const row = Math.floor(index / GRID_SIZE);
-          const col = index % GRID_SIZE;
+      <div
+        className={`grid gap-2 p-4 bg-base-200/50 rounded-xl`}
+        style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}
+      >
+        {Array.from({ length: gridSize * gridSize }).map((_, index) => {
+          const row = Math.floor(index / gridSize);
+          const col = index % gridSize;
           const qid = Object.keys(gridPositions).find(
             (key) =>
-              gridPositions[key].row === row && gridPositions[key].col === col,
+              gridPositions[key].row === row && gridPositions[key].col === col
           );
 
           if (!qid) {
@@ -180,8 +183,8 @@ export function TaskResultGrid({
                   task.status === "completed"
                     ? "bg-success"
                     : task.status === "failed"
-                      ? "bg-error"
-                      : "bg-warning"
+                    ? "bg-error"
+                    : "bg-warning"
                 }`}
               />
             </button>
@@ -226,8 +229,8 @@ export function TaskResultGrid({
                       selectedTaskInfo.task.status === "completed"
                         ? "badge-success"
                         : selectedTaskInfo.task.status === "failed"
-                          ? "badge-error"
-                          : "badge-warning"
+                        ? "badge-error"
+                        : "badge-warning"
                     }`}
                   >
                     {selectedTaskInfo.task.status}
@@ -238,7 +241,7 @@ export function TaskResultGrid({
                     <h4 className="font-medium mb-2">Parameters</h4>
                     <div className="space-y-2">
                       {Object.entries(
-                        selectedTaskInfo.task.output_parameters,
+                        selectedTaskInfo.task.output_parameters
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&
