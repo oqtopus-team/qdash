@@ -8,7 +8,6 @@ import pendulum
 import plotly.graph_objs as go
 from numpy import ndarray
 from pydantic import BaseModel, Field
-from qdash.config import get_settings
 from qdash.datamodel.task import (
     BaseTaskResultModel,
     CalibDataModel,
@@ -19,7 +18,6 @@ from qdash.datamodel.task import (
     TaskResultModel,
     TaskStatusModel,
 )
-from qdash.workflow.utils.slack import SlackContents, Status
 
 
 class TaskManager(BaseModel):
@@ -313,28 +311,73 @@ class TaskManager(BaseModel):
         qid: str = "",
     ) -> None:
         container = self._get_task_container(task_type, qid)
-
         task = self._find_task_in_container(container, task_name)
         if task is None:
             raise ValueError(f"Task '{task_name}' not found.")
+
         savedir_path = Path(self.calib_dir) / "fig" if savedir == "" else Path(savedir)
         savedir_path.mkdir(parents=True, exist_ok=True)
 
+        # Ensure both fields exist
+        if not hasattr(task, "figure_path"):
+            task.figure_path = []
+        if not hasattr(task, "figure_json_path"):
+            task.json_figure_path = []
+
         for i, fig in enumerate(figures):
-            base_savepath = savedir_path / f"{qid}_{task_name}_{i}"
-            savepath = base_savepath.with_suffix(".png")
-            counter = 1
-            while savepath.exists():
-                savepath = base_savepath.with_name(f"{base_savepath.stem}_{counter}.png")
-                counter += 1
-            task.figure_path.append(str(savepath))
-            if task_name == "CheckSkew":
-                widhth = 1200
-                height = 1500
-            else:
-                widhth = 600
-                height = 300
-            self._write_figure(savepath=str(savepath), fig=fig, width=widhth, height=height)
+            base_name = f"{qid}_{task_name}_{i}"
+            base_path = savedir_path / base_name
+
+            # Determine dimensions
+            width, height = (1200, 1500) if task_name == "CheckSkew" else (600, 300)
+
+            # JSON path
+            json_path = base_path.with_suffix(".json")
+            json_path = self._resolve_conflict(json_path)
+            task.json_figure_path.append(str(json_path))
+            self._write_figure_json(fig, savepath=json_path, width=width, height=height)
+
+            # PNG path
+            png_path = base_path.with_suffix(".png")
+            png_path = self._resolve_conflict(png_path)
+            task.figure_path.append(str(png_path))
+            self._write_figure_image(fig, savepath=png_path, width=width, height=height)
+
+    def _write_figure_json(
+        self,
+        fig: go.Figure,
+        savepath: Path,
+        width: int = 600,
+        height: int = 300,
+    ) -> None:
+        fig.update_layout(width=width, height=height)
+        fig.write_json(str(savepath), pretty=True)
+
+    def _write_figure_image(
+        self,
+        fig: go.Figure,
+        savepath: Path,
+        width: int = 600,
+        height: int = 300,
+        scale: int = 3,
+        file_format: Literal["png", "svg", "jpeg", "webp"] = "png",
+    ) -> None:
+        fig.write_image(
+            str(savepath),
+            format=file_format,
+            width=width,
+            height=height,
+            scale=scale,
+        )
+
+    def _resolve_conflict(self, path: Path) -> Path:
+        """Ensure unique path by appending index if needed."""
+        counter = 1
+        new_path = path
+        while new_path.exists():
+            new_path = path.with_name(f"{path.stem}_{counter}{path.suffix}")
+            counter += 1
+        return new_path
 
     def save_figure(
         self,
@@ -419,12 +462,17 @@ class TaskManager(BaseModel):
         """
         if savepath == "":
             savepath = str(Path(self.calib_dir) / "fig" / f"{name}.{file_format}")
-        fig.write_image(
+        # fig.write_image(
+        #     savepath,
+        #     format=file_format,
+        #     width=width,
+        #     height=height,
+        #     scale=scale,
+        # )
+        fig.update_layout(width=width, height=height)
+        fig.write_json(
             savepath,
-            format=file_format,
-            width=width,
-            height=height,
-            scale=scale,
+            pretty=True,
         )
 
     def put_controller_info(self, box_info: dict) -> None:
