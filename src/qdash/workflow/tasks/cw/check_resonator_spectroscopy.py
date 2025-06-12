@@ -19,13 +19,13 @@ class CheckResonatorSpectroscopy(BaseTask):
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "frequency_range": InputParameterModel(
             unit="GHz",
-            value_type="arange",
+            value_type="np.arange",
             value=(9.75, 10.75, 0.002),
             description="Frequency range for resonator spectroscopy",
         ),
         "power_range": InputParameterModel(
             unit="dB",
-            value_type="arange",
+            value_type="np.arange",
             value=(-60, 5, 5),
             description="Power range for resonator spectroscopy",
         ),
@@ -63,3 +63,20 @@ class CheckResonatorSpectroscopy(BaseTask):
 
     def batch_run(self, exp: Experiment, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits."""
+        labels = [qid_to_label(qid) for qid in qids]
+        read_box = exp.experiment_system.get_readout_box_for_qubit(labels[0])
+        import numpy as np
+        from qubex.backend import BoxType
+
+        if read_box.type == BoxType.QUEL1SE_R8:
+            frequency_range = np.arange(5.75, 6.75, 0.002)
+        else:
+            frequency_range = self.input_parameters["frequency_range"].get_value()
+        result = exp.resonator_spectroscopy(
+            labels[0],
+            frequency_range=frequency_range,
+            power_range=self.input_parameters["power_range"].get_value(),
+            shots=1024,
+        )
+        exp.calib_note.save()
+        return RunResult(raw_result=result)

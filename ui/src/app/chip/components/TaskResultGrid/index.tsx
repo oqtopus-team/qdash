@@ -7,6 +7,12 @@ import {
   useFetchHistoricalQubitTaskGroupedByChip,
 } from "@/client/chip/chip";
 import { TaskFigure } from "@/app/components/TaskFigure";
+import dynamic from "next/dynamic";
+
+const PlotlyRenderer = dynamic(
+  () => import("@/app/components/PlotlyRenderer").then((mod) => mod.default),
+  { ssr: false }
+);
 
 interface TaskResultGridProps {
   chipId: string;
@@ -21,7 +27,7 @@ interface SelectedTaskInfo {
   task: Task;
 }
 
-const MUX_SIZE = 2; // 2x2 blocks for each mux
+const MUX_SIZE = 2;
 
 export function TaskResultGrid({
   chipId,
@@ -31,8 +37,8 @@ export function TaskResultGrid({
 }: TaskResultGridProps) {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
+  const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
 
-  // Fetch task results
   const {
     data: taskResponse,
     isLoading: isLoadingTask,
@@ -45,47 +51,25 @@ export function TaskResultGrid({
         selectedDate
       );
 
-  if (isLoadingTask) {
+  if (isLoadingTask)
     return (
       <div className="w-full flex justify-center py-12">
         <span className="loading loading-spinner loading-lg"></span>
       </div>
     );
-  }
+  if (isTaskError)
+    return <div className="alert alert-error">Failed to load task data</div>;
 
-  if (isTaskError) {
-    return (
-      <div className="alert alert-error">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="stroke-current shrink-0 h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        <span>Failed to load task data</span>
-      </div>
-    );
-  }
-
-  // Create a mapping of QID to grid position
   const gridPositions: { [key: string]: { row: number; col: number } } = {};
   if (taskResponse?.data?.result) {
     Object.keys(taskResponse.data.result).forEach((qid) => {
       const qidNum = parseInt(qid);
-      const muxIndex = Math.floor(qidNum / 4); // Which mux block (0, 1, 2, ...)
-      const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE)); // Row of mux blocks
-      const muxCol = muxIndex % (gridSize / MUX_SIZE); // Column of mux blocks
-      const localIndex = qidNum % 4; // Position within mux (0-3)
-      const localRow = Math.floor(localIndex / 2); // Row within mux (0-1)
-      const localCol = localIndex % 2; // Column within mux (0-1)
-
+      const muxIndex = Math.floor(qidNum / 4);
+      const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE));
+      const muxCol = muxIndex % (gridSize / MUX_SIZE);
+      const localIndex = qidNum % 4;
+      const localRow = Math.floor(localIndex / 2);
+      const localCol = localIndex % 2;
       gridPositions[qid] = {
         row: muxRow * MUX_SIZE + localRow,
         col: muxCol * MUX_SIZE + localCol,
@@ -93,24 +77,18 @@ export function TaskResultGrid({
     });
   }
 
-  // Get task result for a specific QID
-  const getTaskResult = (qid: string): Task | null => {
-    if (!taskResponse?.data?.result?.[qid]) return null;
-    return taskResponse.data.result[qid];
-  };
+  const getTaskResult = (qid: string): Task | null =>
+    taskResponse?.data?.result?.[qid] || null;
 
-  // Get figure path from task
   const getFigurePath = (task: Task): string | null => {
     if (!task.figure_path) return null;
-    if (Array.isArray(task.figure_path)) {
-      return task.figure_path[0] || null;
-    }
-    return task.figure_path;
+    return Array.isArray(task.figure_path)
+      ? task.figure_path[0] || null
+      : task.figure_path;
   };
 
   return (
     <div className="space-y-6">
-      {/* Grid Display */}
       <div
         className={`grid gap-2 p-4 bg-base-200/50 rounded-xl`}
         style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}
@@ -122,18 +100,16 @@ export function TaskResultGrid({
             (key) =>
               gridPositions[key].row === row && gridPositions[key].col === col
           );
-
-          if (!qid) {
+          if (!qid)
             return (
               <div
                 key={index}
                 className="aspect-square bg-base-300/50 rounded-lg"
               />
             );
-          }
 
           const task = getTaskResult(qid);
-          if (!task) {
+          if (!task)
             return (
               <div
                 key={index}
@@ -144,24 +120,19 @@ export function TaskResultGrid({
                 </div>
               </div>
             );
-          }
 
           const figurePath = getFigurePath(task);
-
           return (
             <button
               key={index}
               onClick={() => {
                 if (figurePath) {
-                  setSelectedTaskInfo({
-                    path: figurePath,
-                    qid,
-                    task,
-                  });
+                  setSelectedTaskInfo({ path: figurePath, qid, task });
+                  setViewMode("static");
                 }
               }}
               className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow relative ${
-                task.over_threshold === true
+                task.over_threshold
                   ? "border-2 border-primary animate-pulse-light"
                   : ""
               }`}
@@ -192,16 +163,9 @@ export function TaskResultGrid({
         })}
       </div>
 
-      {/* Task Result Modal */}
       {selectedTaskInfo && (
         <dialog className="modal modal-open">
-          <div
-            className={`modal-box max-w-4xl p-6 rounded-2xl shadow-xl transition-all duration-300 bg-base-100 ${
-              selectedTaskInfo.task.over_threshold === true
-                ? "border-2 border-primary animate-pulse-light"
-                : ""
-            }`}
-          >
+          <div className="modal-box max-w-6xl p-6 rounded-2xl shadow-xl bg-base-100">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg">
                 Result for QID {selectedTaskInfo.qid}
@@ -213,65 +177,107 @@ export function TaskResultGrid({
                 ✕
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-8">
-              <div className="aspect-square bg-base-200/50 rounded-xl p-4">
-                <TaskFigure
-                  path={selectedTaskInfo.path}
-                  qid={selectedTaskInfo.qid}
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <div className="space-y-6">
-                <div className="card bg-base-200 p-4 rounded-xl">
-                  <h4 className="font-medium mb-2">Status</h4>
-                  <div
-                    className={`badge ${
-                      selectedTaskInfo.task.status === "completed"
-                        ? "badge-success"
-                        : selectedTaskInfo.task.status === "failed"
-                        ? "badge-error"
-                        : "badge-warning"
-                    }`}
-                  >
-                    {selectedTaskInfo.task.status}
-                  </div>
+
+            {viewMode === "static" && (
+              <div className="grid grid-cols-2 gap-8">
+                <div className="aspect-square bg-base-200/50 rounded-xl p-4">
+                  <TaskFigure
+                    path={selectedTaskInfo.path}
+                    qid={selectedTaskInfo.qid}
+                    className="w-full h-full object-contain"
+                  />
+                  {selectedTaskInfo.task.json_figure_path && (
+                    <button
+                      className="btn btn-sm mt-4"
+                      onClick={() => setViewMode("interactive")}
+                    >
+                      Interactive View
+                    </button>
+                  )}
                 </div>
-                {selectedTaskInfo.task.output_parameters && (
+                <div className="space-y-6">
                   <div className="card bg-base-200 p-4 rounded-xl">
-                    <h4 className="font-medium mb-2">Parameters</h4>
-                    <div className="space-y-2">
-                      {Object.entries(
-                        selectedTaskInfo.task.output_parameters
-                      ).map(([key, value]) => {
-                        const paramValue = (
-                          typeof value === "object" &&
-                          value !== null &&
-                          "value" in value
-                            ? value
-                            : { value }
-                        ) as { value: number | string; unit?: string };
-                        return (
-                          <div key={key} className="flex justify-between">
-                            <span className="font-medium">{key}:</span>
-                            <span>
-                              {typeof paramValue.value === "number"
-                                ? paramValue.value.toFixed(4)
-                                : String(paramValue.value)}
-                              {paramValue.unit ? ` ${paramValue.unit}` : ""}
-                            </span>
-                          </div>
-                        );
-                      })}
+                    <h4 className="font-medium mb-2">Status</h4>
+                    <div
+                      className={`badge ${
+                        selectedTaskInfo.task.status === "completed"
+                          ? "badge-success"
+                          : selectedTaskInfo.task.status === "failed"
+                          ? "badge-error"
+                          : "badge-warning"
+                      }`}
+                    >
+                      {selectedTaskInfo.task.status}
                     </div>
                   </div>
-                )}
-                {selectedTaskInfo.task.message && (
-                  <div className="card bg-base-200 p-4 rounded-xl">
-                    <h4 className="font-medium mb-2">Message</h4>
-                    <p className="text-sm">{selectedTaskInfo.task.message}</p>
-                  </div>
-                )}
+                  {selectedTaskInfo.task.output_parameters && (
+                    <div className="card bg-base-200 p-4 rounded-xl">
+                      <h4 className="font-medium mb-2">Parameters</h4>
+                      <div className="space-y-2">
+                        {Object.entries(
+                          selectedTaskInfo.task.output_parameters
+                        ).map(([key, value]) => {
+                          const paramValue = (
+                            typeof value === "object" &&
+                            value !== null &&
+                            "value" in value
+                              ? value
+                              : { value }
+                          ) as { value: number | string; unit?: string };
+                          return (
+                            <div key={key} className="flex justify-between">
+                              <span className="font-medium">{key}:</span>
+                              <span>
+                                {typeof paramValue.value === "number"
+                                  ? paramValue.value.toFixed(4)
+                                  : String(paramValue.value)}
+                                {paramValue.unit ? ` ${paramValue.unit}` : ""}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {selectedTaskInfo.task.message && (
+                    <div className="card bg-base-200 p-4 rounded-xl">
+                      <h4 className="font-medium mb-2">Message</h4>
+                      <p className="text-sm">{selectedTaskInfo.task.message}</p>
+                    </div>
+                  )}
+                </div>
               </div>
+            )}
+
+            {viewMode === "interactive" &&
+              selectedTaskInfo.task.json_figure_path && (
+                <div className="w-full h-[70vh] flex justify-center items-center">
+                  <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
+                    <div className="w-full h-full flex justify-center items-center">
+                      <div className="w-fit h-fit m-auto">
+                        <PlotlyRenderer
+                          className="w-full h-full"
+                          fullPath={`${
+                            process.env.NEXT_PUBLIC_API_URL
+                          }/api/executions/figure?path=${encodeURIComponent(
+                            selectedTaskInfo.task.json_figure_path[0]
+                          )}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            <div className="mt-6 flex justify-end gap-2">
+              {viewMode === "interactive" && (
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setViewMode("static")}
+                >
+                  Back to Summary
+                </button>
+              )}
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">

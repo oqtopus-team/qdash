@@ -8,6 +8,7 @@ from qdash.db.init.initialize import initialize
 from qdash.db.init.qubit import generate_dummy_data, qubit_lattice
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.menu import MenuDocument
+from qdash.dbmodel.task import TaskDocument
 from qdash.workflow.tasks.base import BaseTask
 
 logging.basicConfig(level=logging.INFO)

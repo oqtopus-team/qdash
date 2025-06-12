@@ -95,6 +95,7 @@ export * from "./taskEndAt";
 export * from "./taskFigurePath";
 export * from "./taskInputParameters";
 export * from "./taskInputParametersAnyOf";
+export * from "./taskJsonFigurePath";
 export * from "./taskMessage";
 export * from "./taskNote";
 export * from "./taskNoteAnyOf";

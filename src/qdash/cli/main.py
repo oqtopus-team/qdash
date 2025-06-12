@@ -201,6 +201,19 @@ def migrate_dates() -> None:
 
 
 @app.command()
+def update_active_tasks(
+    username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
+) -> None:
+    """Update active tasks."""
+    try:
+        init_task_document(username=username)
+        typer.echo(f"Active tasks updated successfully (username: {username})")
+    except Exception as e:
+        typer.echo(f"Error updating active tasks: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
 def init_all_data(
     username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
     chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),

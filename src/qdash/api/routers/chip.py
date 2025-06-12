@@ -66,6 +66,7 @@ class Task(BaseModel):
     output_parameter_names: list[str] | None = None
     note: dict[str, Any] | None = None
     figure_path: list[str] | None = None
+    json_figure_path: list[str] | None = None
     raw_data_path: list[str] | None = None
     start_at: str | None = None
     end_at: str | None = None
@@ -440,6 +441,7 @@ def _build_mux_detail(
                     output_parameter_names=result.output_parameter_names,
                     note=result.note,
                     figure_path=result.figure_path,
+                    json_figure_path=result.json_figure_path,
                     raw_data_path=result.raw_data_path,
                     start_at=result.start_at,
                     end_at=result.end_at,
@@ -690,6 +692,7 @@ def fetch_historical_qubit_task_grouped_by_chip(
                 output_parameter_names=result.output_parameter_names,
                 note=result.note,
                 figure_path=result.figure_path,
+                json_figure_path=result.json_figure_path,
                 raw_data_path=result.raw_data_path,
                 start_at=result.start_at,
                 end_at=result.end_at,
@@ -763,6 +766,7 @@ def fetch_latest_qubit_task_grouped_by_chip(
                 output_parameter_names=result.output_parameter_names,
                 note=result.note,
                 figure_path=result.figure_path,
+                json_figure_path=result.json_figure_path,
                 raw_data_path=result.raw_data_path,
                 start_at=result.start_at,
                 end_at=result.end_at,
@@ -882,6 +886,7 @@ def fetch_historical_coupling_task_grouped_by_chip(
                 output_parameter_names=result.output_parameter_names,
                 note=result.note,
                 figure_path=result.figure_path,
+                json_figure_path=result.json_figure_path,
                 raw_data_path=result.raw_data_path,
                 start_at=result.start_at,
                 end_at=result.end_at,
@@ -956,6 +961,7 @@ def fetch_latest_coupling_task_grouped_by_chip(
                 output_parameter_names=result.output_parameter_names,
                 note=result.note,
                 figure_path=result.figure_path,
+                json_figure_path=result.json_figure_path,
                 raw_data_path=result.raw_data_path,
                 start_at=result.start_at,
                 end_at=result.end_at,
