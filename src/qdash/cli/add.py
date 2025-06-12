@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 from qdash.datamodel.parameter import ParameterModel
 from qdash.db.init.chip import generate_coupling_data, generate_qubit_data
@@ -12,9 +13,16 @@ from qdash.workflow.tasks.base import BaseTask
 logging.basicConfig(level=logging.INFO)
 
 
+CHIP_SIZE_64 = 64
+CHIP_SIZE_144 = 144
+CHIP_SIZE_256 = 256
+CHIP_SIZE_1024 = 1024
+
+
 def add_new_chip(
     username: str = "admin",
     chip_id: str = "64Q",
+    size: int = CHIP_SIZE_64,
 ) -> None:
     """Add a new chip to the database.
 
@@ -25,32 +33,45 @@ def add_new_chip(
     ----
         username (str): The username for the initialization.
         chip_id (str): The chip ID for the initialization.
+        size (int): The size of the chip, either CHIP_SIZE_64 or CHIP_SIZE_144.
 
     """
     try:
         # Initialize chip data
         initialize()
-        num_qubits = 64
-        _, edges, pos = qubit_lattice(64, 4)
-        nodes, edges, pos = qubit_lattice(64, 4)
-        qubits = generate_qubit_data(num_qubits, pos, chip_id)
+
+        if size not in [CHIP_SIZE_64, CHIP_SIZE_144, CHIP_SIZE_256, CHIP_SIZE_1024]:
+            msg = "Size must be either CHIP_SIZE_64 or CHIP_SIZE_144 or CHIP_SIZE_256."
+            raise ValueError(msg)  # noqa: TRY301
+        # Removed unused variable 'd'
+        if size == CHIP_SIZE_64:
+            d = 4
+        elif size == CHIP_SIZE_144:
+            d = 6
+        elif size == CHIP_SIZE_256:
+            d = 8
+        elif size == CHIP_SIZE_1024:
+            d = 16
+        _, edges, pos = qubit_lattice(size, d)
+        nodes, edges, pos = qubit_lattice(size, d)
+        qubits = generate_qubit_data(size, pos, chip_id)
         couplings = generate_coupling_data(edges, chip_id)
         chip = ChipDocument(
             username=username,
             chip_id=chip_id,
-            size=64,
+            size=size,
             qubits=qubits,
             couplings=couplings,
             system_info={},
         )
         chip.save()
         ## Initialize qubit data
-        nodes, edges, pos = qubit_lattice(64, 4)
-        dummy_data = generate_dummy_data(num_qubits, pos, username=username, chip_id=chip_id)
+        nodes, edges, pos = qubit_lattice(size, d)
+        dummy_data = generate_dummy_data(size, pos, username=username, chip_id=chip_id)
         for data in dummy_data:
             data.insert()
         ## Initialize coupling data
-        _, edges, _ = qubit_lattice(n=64, d=4)
+        _, edges, _ = qubit_lattice(size, d)
         edges = bi_direction(edges)
         couplings = generate_coupling(edges, username=username, chip_id=chip_id)
         for c in couplings:
@@ -94,7 +115,10 @@ def convert_output_parameters(username: str, outputs: dict[str, any]) -> dict[st
     converted = {}
     for param_name, output in outputs.items():
         param = ParameterModel(
-            username=username, name=param_name, unit=output.unit, description=output.description
+            username=username,
+            name=param_name,
+            unit=cast(ParameterModel, output).unit,
+            description=cast(ParameterModel, output).description,
         )  # type: ignore # noqa: PGH003
         converted[param_name] = param.model_dump()
     return converted

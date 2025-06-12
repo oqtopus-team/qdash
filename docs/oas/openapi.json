@@ -732,7 +732,7 @@
           "chip"
         ],
         "summary": "Fetch a chip",
-        "description": "Fetch a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user_id : str\n    Current user ID from authentication\n\nReturns\n-------\nChipResponse\n    Chip information",
+        "description": "Fetch a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Chip information",
         "operationId": "fetchChip",
         "security": [
           {
@@ -832,7 +832,7 @@
           "chip"
         ],
         "summary": "Fetch an execution by its ID",
-        "description": "Return the execution detail by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nexecution_id : str\n    ID of the execution to fetch\ncurrent_user_id : str\n    Current user ID from authentication\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
+        "description": "Return the execution detail by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nexecution_id : str\n    ID of the execution to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
         "operationId": "fetchExecutionByChipId",
         "security": [
           {

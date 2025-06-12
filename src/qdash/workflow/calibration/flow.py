@@ -16,6 +16,7 @@ from qdash.datamodel.task import (
     TaskResultModel,
 )
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.parameter import ParameterDocument
 from qdash.dbmodel.task import TaskDocument
@@ -37,9 +38,11 @@ from qubex.experiment import Experiment
 from qubex.version import get_package_version
 
 # Constants
-CHIP_ID = "64Q"
 CONFIG_DIR = "/app/config"
 PARAMS_DIR = "/app/config"
+CHIP_SIZE_64 = 64
+CHIP_SIZE_144 = 144
+CHIP_SIZE_256 = 256
 
 
 def build_workflow(
@@ -303,11 +306,25 @@ def setup_calibration(
         master_doc = master_doc[0]
 
     note_path.write_text(json.dumps(master_doc.note, indent=2))
+    chip = ChipDocument.get_current_chip(username=menu.username)
+    if chip is None:
+        msg = "No current chip found. Please select a chip before running calibration."
+        raise ValueError(msg)
 
+    if chip.size == CHIP_SIZE_64:
+        chip_id = f"{CHIP_SIZE_64!s}Q"
+    elif chip.size == CHIP_SIZE_144:
+        chip_id = f"{CHIP_SIZE_144!s}Q"
+    elif chip.size == CHIP_SIZE_256:
+        chip_id = f"{CHIP_SIZE_256!s}Q"
+    else:
+        raise ValueError(
+            f"Unsupported chip size: {chip.size}. Supported sizes are {CHIP_SIZE_64}, {CHIP_SIZE_144}, and {CHIP_SIZE_256}."
+        )
     # Initialize experiment
     initialize()
     exp = Experiment(
-        chip_id=CHIP_ID,
+        chip_id=chip_id,
         qubits=labels,
         config_dir=CONFIG_DIR,
         params_dir=PARAMS_DIR,

@@ -2,10 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Task } from "@/schemas";
-
-interface ExtendedTask extends Task {
-  couplingId: string;
-}
 import {
   useFetchLatestCouplingTaskGroupedByChip,
   useFetchHistoricalCouplingTaskGroupedByChip,
@@ -16,6 +12,11 @@ interface CouplingGridProps {
   chipId: string;
   selectedTask: string;
   selectedDate: string;
+  gridSize: number;
+}
+
+interface ExtendedTask extends Task {
+  couplingId: string;
 }
 
 interface SelectedTaskInfo {
@@ -25,16 +26,15 @@ interface SelectedTaskInfo {
   index: number;
 }
 
-const GRID_SIZE = 8;
 const MUX_SIZE = 2;
 
-const getCouplingPosition = (qid1: number, qid2: number) => {
+const getCouplingPosition = (qid1: number, qid2: number, gridSize: number) => {
   const muxIndex1 = Math.floor(qid1 / 4);
   const muxIndex2 = Math.floor(qid2 / 4);
-  const muxRow1 = Math.floor(muxIndex1 / (GRID_SIZE / MUX_SIZE));
-  const muxCol1 = muxIndex1 % (GRID_SIZE / MUX_SIZE);
-  const muxRow2 = Math.floor(muxIndex2 / (GRID_SIZE / MUX_SIZE));
-  const muxCol2 = muxIndex2 % (GRID_SIZE / MUX_SIZE);
+  const muxRow1 = Math.floor(muxIndex1 / (gridSize / MUX_SIZE));
+  const muxCol1 = muxIndex1 % (gridSize / MUX_SIZE);
+  const muxRow2 = Math.floor(muxIndex2 / (gridSize / MUX_SIZE));
+  const muxCol2 = muxIndex2 % (gridSize / MUX_SIZE);
   const localIndex1 = qid1 % 4;
   const localIndex2 = qid2 % 4;
   const localRow1 = Math.floor(localIndex1 / 2);
@@ -54,6 +54,7 @@ export function CouplingGrid({
   chipId,
   selectedTask,
   selectedDate,
+  gridSize,
 }: CouplingGridProps) {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
@@ -62,12 +63,12 @@ export function CouplingGrid({
   useEffect(() => {
     const updateSize = () => {
       const vw = window.innerWidth;
-      setCellSize(Math.max(Math.floor((vw * 0.75) / GRID_SIZE - 12), 40));
+      setCellSize(Math.max(Math.floor((vw * 0.75) / gridSize - 12), 30));
     };
     updateSize();
     window.addEventListener("resize", updateSize);
     return () => window.removeEventListener("resize", updateSize);
-  }, []);
+  }, [gridSize]);
 
   const {
     data: taskResponse,
@@ -78,7 +79,7 @@ export function CouplingGrid({
     : useFetchHistoricalCouplingTaskGroupedByChip(
         chipId,
         selectedTask,
-        selectedDate,
+        selectedDate
       );
 
   const getFigurePath = (task: Task): string | null => {
@@ -94,6 +95,7 @@ export function CouplingGrid({
       </div>
     );
   }
+
   if (isTaskError) {
     return <div className="alert alert-error">Failed to load task data</div>;
   }
@@ -109,10 +111,18 @@ export function CouplingGrid({
         couplingId,
       } as ExtendedTask);
       normalizedResultMap[normKey].sort(
-        (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0),
+        (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0)
       );
     }
   }
+
+  const maxQid = Math.max(
+    ...Object.keys(normalizedResultMap).flatMap((key) =>
+      key.split("-").map(Number)
+    )
+  );
+
+  const totalQubits = maxQid + 1;
 
   return (
     <div className="space-y-6 px-4">
@@ -120,22 +130,21 @@ export function CouplingGrid({
         <div
           className="relative inline-block"
           style={{
-            width: GRID_SIZE * (cellSize + 8),
-            height: GRID_SIZE * (cellSize + 8),
+            width: gridSize * (cellSize + 8),
+            height: gridSize * (cellSize + 8),
           }}
         >
-          {Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, index) => {
-            const muxIndex = Math.floor(index / 4);
-            const muxRow = Math.floor(muxIndex / (GRID_SIZE / MUX_SIZE));
-            const muxCol = muxIndex % (GRID_SIZE / MUX_SIZE);
-            const localIndex = index % 4;
+          {Array.from({ length: totalQubits }).map((_, qid) => {
+            const muxIndex = Math.floor(qid / 4);
+            const localIndex = qid % 4;
+            const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE));
+            const muxCol = muxIndex % (gridSize / MUX_SIZE);
             const localRow = Math.floor(localIndex / 2);
             const localCol = localIndex % 2;
             const row = muxRow * MUX_SIZE + localRow;
             const col = muxCol * MUX_SIZE + localCol;
             const x = col * (cellSize + 8);
             const y = row * (cellSize + 8);
-            const qid = muxIndex * 4 + localIndex;
 
             return (
               <div
@@ -152,7 +161,11 @@ export function CouplingGrid({
             const [qid1, qid2] = normKey.split("-").map(Number);
             const task = taskList[0];
             const figurePath = getFigurePath(task);
-            const { row1, col1, row2, col2 } = getCouplingPosition(qid1, qid2);
+            const { row1, col1, row2, col2 } = getCouplingPosition(
+              qid1,
+              qid2,
+              gridSize
+            );
             const centerX = ((col1 + col2) / 2) * (cellSize + 8) + cellSize / 2;
             const centerY = ((row1 + row2) / 2) * (cellSize + 8) + cellSize / 2;
 
@@ -185,7 +198,7 @@ export function CouplingGrid({
               >
                 {figurePath && (
                   <TaskFigure
-                    path={figurePath || ""}
+                    path={figurePath}
                     qid={String(task.couplingId)}
                     className="w-full h-full object-contain"
                   />
@@ -198,8 +211,8 @@ export function CouplingGrid({
                     task.status === "completed"
                       ? "bg-success"
                       : task.status === "failed"
-                        ? "bg-error"
-                        : "bg-warning"
+                      ? "bg-error"
+                      : "bg-warning"
                   }`}
                 />
               </button>
@@ -238,8 +251,7 @@ export function CouplingGrid({
                       .figure_path || ""
                   }
                   qid={String(
-                    selectedTaskInfo.taskList[selectedTaskInfo.index]
-                      .couplingId,
+                    selectedTaskInfo.taskList[selectedTaskInfo.index].couplingId
                   )}
                   className="w-full h-full object-contain"
                 />
@@ -255,7 +267,7 @@ export function CouplingGrid({
                               ...prev,
                               index: (prev.index + 1) % prev.taskList.length,
                             }
-                          : null,
+                          : null
                       )
                     }
                   >
@@ -275,9 +287,9 @@ export function CouplingGrid({
                         .status === "completed"
                         ? "badge-success"
                         : selectedTaskInfo.taskList[selectedTaskInfo.index]
-                              .status === "failed"
-                          ? "badge-error"
-                          : "badge-warning"
+                            .status === "failed"
+                        ? "badge-error"
+                        : "badge-warning"
                     }`}
                   >
                     {selectedTaskInfo.taskList[selectedTaskInfo.index].status}
@@ -290,7 +302,7 @@ export function CouplingGrid({
                     <div className="space-y-2">
                       {Object.entries(
                         selectedTaskInfo.taskList[selectedTaskInfo.index]
-                          .output_parameters || {},
+                          .output_parameters || {}
                       ).map(([key, value]) => {
                         const paramValue = (
                           typeof value === "object" &&
