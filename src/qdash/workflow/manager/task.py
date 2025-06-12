@@ -469,7 +469,7 @@ class TaskManager(BaseModel):
         #     height=height,
         #     scale=scale,
         # )
-        fig.update_layout(width=width, height=height)
+        # fig.update_layout(width=width, height=height)
         fig.write_json(
             savepath,
             pretty=True,

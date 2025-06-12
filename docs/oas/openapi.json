@@ -3512,6 +3512,20 @@
             ],
             "title": "Figure Path"
           },
+          "json_figure_path": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Figure Path"
+          },
           "raw_data_path": {
             "anyOf": [
               {

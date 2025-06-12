@@ -14,6 +14,7 @@ import type { TaskOutputParameters } from "./taskOutputParameters";
 import type { TaskOutputParameterNames } from "./taskOutputParameterNames";
 import type { TaskNote } from "./taskNote";
 import type { TaskFigurePath } from "./taskFigurePath";
+import type { TaskJsonFigurePath } from "./taskJsonFigurePath";
 import type { TaskRawDataPath } from "./taskRawDataPath";
 import type { TaskStartAt } from "./taskStartAt";
 import type { TaskEndAt } from "./taskEndAt";
@@ -35,6 +36,7 @@ export interface Task {
   output_parameter_names?: TaskOutputParameterNames;
   note?: TaskNote;
   figure_path?: TaskFigurePath;
+  json_figure_path?: TaskJsonFigurePath;
   raw_data_path?: TaskRawDataPath;
   start_at?: TaskStartAt;
   end_at?: TaskEndAt;
