@@ -30,13 +30,14 @@ export default function PlotlyRenderer({
   if (!figure) return <div>Loading...</div>;
 
   return (
-    <Plot
-      data={figure.data}
-      layout={{ ...figure.layout, autosize: true }}
-      config={{ displayModeBar: true, responsive: true }}
-      useResizeHandler
-      className={className}
-      style={{ width: "100%", height: "100%" }}
-    />
+    <div className={className}>
+      <Plot
+        data={figure.data}
+        layout={{ ...figure.layout, autosize: true }}
+        config={{ displayModeBar: true, responsive: true }}
+        useResizeHandler
+        style={{ width: "100%", height: "100%" }}
+      />
+    </div>
   );
 }

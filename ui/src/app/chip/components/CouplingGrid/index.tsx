@@ -21,6 +21,11 @@ interface CouplingGridProps {
   gridSize: number;
 }
 
+interface ParameterValue {
+  value: unknown;
+  unit?: string;
+}
+
 interface ExtendedTask extends Task {
   couplingId: string;
 }
@@ -290,13 +295,13 @@ export function CouplingGrid({
                       <div className="space-y-2">
                         {Object.entries(
                           selectedTaskInfo.taskList[selectedTaskInfo.index]
-                            .output_parameters
+                            ?.output_parameters || {}
                         ).map(([key, value]) => {
-                          const paramValue =
+                          const paramValue: ParameterValue =
                             typeof value === "object" &&
                             value !== null &&
                             "value" in value
-                              ? value
+                              ? (value as ParameterValue)
                               : { value };
                           return (
                             <div key={key} className="flex justify-between">
