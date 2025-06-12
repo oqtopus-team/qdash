@@ -332,17 +332,34 @@ export function CouplingGrid({
             ) : (
               // Interactive View
               <div className="w-full h-[70vh] flex justify-center items-center">
-                <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow">
-                  <PlotlyRenderer
-                    fullPath={`${
-                      process.env.NEXT_PUBLIC_API_URL
-                    }/api/executions/figure?path=${encodeURIComponent(
-                      selectedTaskInfo.taskList[selectedTaskInfo.index]
-                        .json_figure_path?.[0] || ""
-                    )}`}
-                  />
+                <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
+                  <div className="w-full h-full flex justify-center items-center">
+                    <div className="w-fit h-fit m-auto">
+                      <PlotlyRenderer
+                        className="w-full h-full"
+                        fullPath={`${
+                          process.env.NEXT_PUBLIC_API_URL
+                        }/api/executions/figure?path=${encodeURIComponent(
+                          selectedTaskInfo.taskList[selectedTaskInfo.index]
+                            .json_figure_path?.[0] || ""
+                        )}`}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
+              // <div className="w-full h-[70vh] flex justify-center items-center">
+              //   <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow">
+              //     <PlotlyRenderer
+              //       fullPath={`${
+              //         process.env.NEXT_PUBLIC_API_URL
+              //       }/api/executions/figure?path=${encodeURIComponent(
+              //         selectedTaskInfo.taskList[selectedTaskInfo.index]
+              //           .json_figure_path?.[0] || ""
+              //       )}`}
+              //     />
+              //   </div>
+              // </div>
             )}
 
             <div className="mt-6 flex justify-end gap-2">
