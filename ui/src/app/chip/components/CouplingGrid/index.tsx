@@ -135,29 +135,27 @@ export function CouplingGrid({
           }}
         >
           {/* Qubit labels */}
-          {Array.from({ length: chipId.includes("Q") ? 112 : 64 }).map(
-            (_, qid) => {
-              const muxIndex = Math.floor(qid / 4);
-              const localIndex = qid % 4;
-              const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE));
-              const muxCol = muxIndex % (gridSize / MUX_SIZE);
-              const localRow = Math.floor(localIndex / 2);
-              const localCol = localIndex % 2;
-              const row = muxRow * MUX_SIZE + localRow;
-              const col = muxCol * MUX_SIZE + localCol;
-              const x = col * (cellSize + 8);
-              const y = row * (cellSize + 8);
-              return (
-                <div
-                  key={qid}
-                  className="absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30"
-                  style={{ top: y, left: x, width: cellSize, height: cellSize }}
-                >
-                  {qid}
-                </div>
-              );
-            }
-          )}
+          {Array.from({ length: gridSize === 8 ? 64 : 144 }).map((_, qid) => {
+            const muxIndex = Math.floor(qid / 4);
+            const localIndex = qid % 4;
+            const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE));
+            const muxCol = muxIndex % (gridSize / MUX_SIZE);
+            const localRow = Math.floor(localIndex / 2);
+            const localCol = localIndex % 2;
+            const row = muxRow * MUX_SIZE + localRow;
+            const col = muxCol * MUX_SIZE + localCol;
+            const x = col * (cellSize + 8);
+            const y = row * (cellSize + 8);
+            return (
+              <div
+                key={qid}
+                className="absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30"
+                style={{ top: y, left: x, width: cellSize, height: cellSize }}
+              >
+                {qid}
+              </div>
+            );
+          })}
 
           {/* Coupling buttons */}
           {Object.entries(normalizedResultMap).map(([normKey, taskList]) => {
