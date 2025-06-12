@@ -141,12 +141,13 @@ def migrate_execution_counter_v1(
 def add_new_chip(
     username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
     chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),
+    size: int = typer.Option(64, "--size", "-s", help="Size of the chip (e.g., 64, 144)"),
 ) -> None:
     """Add new chip."""
     try:
         from qdash.cli.add import add_new_chip
 
-        add_new_chip(username=username, chip_id=chip_id)
+        add_new_chip(username=username, chip_id=chip_id, size=size)
         typer.echo(f"New chip added successfully (username: {username})")
     except Exception as e:
         typer.echo(f"Error adding new chip: {e}", err=True)
