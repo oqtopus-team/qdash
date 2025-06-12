@@ -441,9 +441,8 @@ class TaskManager(BaseModel):
         self,
         fig: go.Figure,
         file_format: Literal["png", "svg", "jpeg", "webp"] = "png",
-        width: int = 600,
-        height: int = 300,
-        scale: int = 3,
+        width: int = 800,
+        height: int = 400,
         name: str = "",
         savepath: str = "",
     ) -> None:
@@ -469,7 +468,7 @@ class TaskManager(BaseModel):
         #     height=height,
         #     scale=scale,
         # )
-        # fig.update_layout(width=width, height=height)
+        fig.update_layout(width=width, height=height)
         fig.write_json(
             savepath,
             pretty=True,
