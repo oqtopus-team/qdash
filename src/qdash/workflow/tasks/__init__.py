@@ -14,6 +14,8 @@ from qdash.workflow.tasks.box_setup.check_status import CheckStatus
 from qdash.workflow.tasks.box_setup.configure import Configure
 from qdash.workflow.tasks.box_setup.dump_box import DumpBox
 from qdash.workflow.tasks.box_setup.link_up import LinkUp
+from qdash.workflow.tasks.cw.check_readout_amplitude import CheckReadoutAmplitude
+from qdash.workflow.tasks.cw.check_resonator_spectroscopy import CheckResonatorSpectroscopy
 from qdash.workflow.tasks.measurement.readout_classification import ReadoutClassification
 from qdash.workflow.tasks.one_qubit_coarse.check_hpi_pulse import CheckHPIPulse
 from qdash.workflow.tasks.one_qubit_coarse.check_pi_pulse import CheckPIPulse
@@ -78,4 +80,6 @@ __all__ = [
     "CheckQubit",
     "CheckSkew",
     "CheckBellStateTomography",
+    "CheckReadoutAmplitude",
+    "CheckResonatorSpectroscopy",
 ]

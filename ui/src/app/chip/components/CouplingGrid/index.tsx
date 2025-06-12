@@ -2,17 +2,28 @@
 
 import { useState, useEffect } from "react";
 import { Task } from "@/schemas";
+import dynamic from "next/dynamic";
+import { TaskFigure } from "@/app/components/TaskFigure";
 import {
   useFetchLatestCouplingTaskGroupedByChip,
   useFetchHistoricalCouplingTaskGroupedByChip,
 } from "@/client/chip/chip";
-import { TaskFigure } from "@/app/components/TaskFigure";
+
+const PlotlyRenderer = dynamic(
+  () => import("@/app/components/PlotlyRenderer").then((mod) => mod.default),
+  { ssr: false }
+);
 
 interface CouplingGridProps {
   chipId: string;
   selectedTask: string;
   selectedDate: string;
   gridSize: number;
+}
+
+interface ParameterValue {
+  value: unknown;
+  unit?: string;
 }
 
 interface ExtendedTask extends Task {
@@ -58,8 +69,9 @@ export function CouplingGrid({
 }: CouplingGridProps) {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
-  const [cellSize, setCellSize] = useState(60);
+  const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
 
+  const [cellSize, setCellSize] = useState(60);
   useEffect(() => {
     const updateSize = () => {
       const vw = window.innerWidth;
@@ -72,8 +84,8 @@ export function CouplingGrid({
 
   const {
     data: taskResponse,
-    isLoading: isLoadingTask,
-    isError: isTaskError,
+    isLoading,
+    isError,
   } = selectedDate === "latest"
     ? useFetchLatestCouplingTaskGroupedByChip(chipId, selectedTask)
     : useFetchHistoricalCouplingTaskGroupedByChip(
@@ -82,30 +94,12 @@ export function CouplingGrid({
         selectedDate
       );
 
-  const getFigurePath = (task: Task): string | null => {
-    if (!task.figure_path) return null;
-    if (Array.isArray(task.figure_path)) return task.figure_path[0] || null;
-    return task.figure_path;
-  };
-
-  if (isLoadingTask) {
-    return (
-      <div className="w-full flex justify-center py-12">
-        <span className="loading loading-spinner loading-lg"></span>
-      </div>
-    );
-  }
-
-  if (isTaskError) {
-    return <div className="alert alert-error">Failed to load task data</div>;
-  }
-
   const normalizedResultMap: Record<string, ExtendedTask[]> = {};
   if (taskResponse?.data?.result) {
     for (const [couplingId, task] of Object.entries(taskResponse.data.result)) {
       const [a, b] = couplingId.split("-").map(Number);
       const normKey = a < b ? `${a}-${b}` : `${b}-${a}`;
-      if (!(normKey in normalizedResultMap)) normalizedResultMap[normKey] = [];
+      if (!normalizedResultMap[normKey]) normalizedResultMap[normKey] = [];
       normalizedResultMap[normKey].push({
         ...task,
         couplingId,
@@ -116,16 +110,22 @@ export function CouplingGrid({
     }
   }
 
-  const maxQid = Math.max(
-    ...Object.keys(normalizedResultMap).flatMap((key) =>
-      key.split("-").map(Number)
-    )
-  );
+  const getFigurePath = (task: Task): string | null =>
+    Array.isArray(task.figure_path)
+      ? task.figure_path[0] || null
+      : task.figure_path || null;
 
-  const totalQubits = maxQid + 1;
+  if (isLoading)
+    return (
+      <div className="w-full flex justify-center py-12">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
+  if (isError) return <div className="alert alert-error">Failed to load</div>;
 
   return (
     <div className="space-y-6 px-4">
+      {/* Grid */}
       <div className="w-full overflow-x-auto">
         <div
           className="relative inline-block"
@@ -134,29 +134,32 @@ export function CouplingGrid({
             height: gridSize * (cellSize + 8),
           }}
         >
-          {Array.from({ length: totalQubits }).map((_, qid) => {
-            const muxIndex = Math.floor(qid / 4);
-            const localIndex = qid % 4;
-            const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE));
-            const muxCol = muxIndex % (gridSize / MUX_SIZE);
-            const localRow = Math.floor(localIndex / 2);
-            const localCol = localIndex % 2;
-            const row = muxRow * MUX_SIZE + localRow;
-            const col = muxCol * MUX_SIZE + localCol;
-            const x = col * (cellSize + 8);
-            const y = row * (cellSize + 8);
+          {/* Qubit labels */}
+          {Array.from({ length: chipId.includes("Q") ? 112 : 64 }).map(
+            (_, qid) => {
+              const muxIndex = Math.floor(qid / 4);
+              const localIndex = qid % 4;
+              const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE));
+              const muxCol = muxIndex % (gridSize / MUX_SIZE);
+              const localRow = Math.floor(localIndex / 2);
+              const localCol = localIndex % 2;
+              const row = muxRow * MUX_SIZE + localRow;
+              const col = muxCol * MUX_SIZE + localCol;
+              const x = col * (cellSize + 8);
+              const y = row * (cellSize + 8);
+              return (
+                <div
+                  key={qid}
+                  className="absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30"
+                  style={{ top: y, left: x, width: cellSize, height: cellSize }}
+                >
+                  {qid}
+                </div>
+              );
+            }
+          )}
 
-            return (
-              <div
-                key={qid}
-                className="absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30"
-                style={{ top: y, left: x, width: cellSize, height: cellSize }}
-              >
-                {qid}
-              </div>
-            );
-          })}
-
+          {/* Coupling buttons */}
           {Object.entries(normalizedResultMap).map(([normKey, taskList]) => {
             const [qid1, qid2] = normKey.split("-").map(Number);
             const task = taskList[0];
@@ -168,7 +171,6 @@ export function CouplingGrid({
             );
             const centerX = ((col1 + col2) / 2) * (cellSize + 8) + cellSize / 2;
             const centerY = ((row1 + row2) / 2) * (cellSize + 8) + cellSize / 2;
-
             return (
               <button
                 key={normKey}
@@ -180,6 +182,7 @@ export function CouplingGrid({
                       taskList,
                       index: 0,
                     });
+                    setViewMode("static");
                   }
                 }}
                 style={{
@@ -191,7 +194,7 @@ export function CouplingGrid({
                   transform: "translate(-50%, -50%)",
                 }}
                 className={`rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow ${
-                  task.over_threshold === true
+                  task.over_threshold
                     ? "border-2 border-primary animate-pulse-light"
                     : ""
                 }`}
@@ -203,37 +206,19 @@ export function CouplingGrid({
                     className="w-full h-full object-contain"
                   />
                 )}
-                <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
-                  {task.couplingId}
-                </div>
-                <div
-                  className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
-                    task.status === "completed"
-                      ? "bg-success"
-                      : task.status === "failed"
-                      ? "bg-error"
-                      : "bg-warning"
-                  }`}
-                />
               </button>
             );
           })}
         </div>
       </div>
 
+      {/* Modal */}
       {selectedTaskInfo && (
         <dialog className="modal modal-open">
-          <div
-            className={`modal-box w-full max-w-5xl p-6 rounded-2xl shadow-xl transition-all duration-300 ${
-              selectedTaskInfo.taskList[selectedTaskInfo.index]
-                .over_threshold === true
-                ? "border-2 border-primary animate-pulse-light"
-                : "bg-base-100"
-            }`}
-          >
+          <div className="modal-box max-w-6xl p-6 rounded-2xl shadow-xl bg-base-100">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg">
-                Result for Coupling{" "}
+                Coupling{" "}
                 {selectedTaskInfo.taskList[selectedTaskInfo.index].couplingId}
               </h3>
               <button
@@ -243,101 +228,142 @@ export function CouplingGrid({
                 ✕
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-8">
-              <div className="aspect-square bg-base-200/50 rounded-xl p-4">
-                <TaskFigure
-                  path={
-                    selectedTaskInfo.taskList[selectedTaskInfo.index]
-                      .figure_path || ""
-                  }
-                  qid={String(
-                    selectedTaskInfo.taskList[selectedTaskInfo.index].couplingId
-                  )}
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <div className="space-y-6">
-                {selectedTaskInfo.taskList.length > 1 && (
-                  <button
-                    className="btn btn-sm"
-                    onClick={() =>
-                      setSelectedTaskInfo((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              index: (prev.index + 1) % prev.taskList.length,
-                            }
-                          : null
-                      )
-                    }
-                  >
-                    Toggle Direction (
-                    {
+
+            {viewMode === "static" ? (
+              <div className="grid grid-cols-2 gap-8">
+                <div className="aspect-square bg-base-200/50 rounded-xl p-4">
+                  <TaskFigure
+                    path={selectedTaskInfo.path}
+                    qid={String(
                       selectedTaskInfo.taskList[selectedTaskInfo.index]
                         .couplingId
-                    }
-                    )
-                  </button>
-                )}
-                <div className="card bg-base-200 p-4 rounded-xl">
-                  <h4 className="font-medium mb-2">Status</h4>
-                  <div
-                    className={`badge ${
-                      selectedTaskInfo.taskList[selectedTaskInfo.index]
-                        .status === "completed"
-                        ? "badge-success"
-                        : selectedTaskInfo.taskList[selectedTaskInfo.index]
-                            .status === "failed"
-                        ? "badge-error"
-                        : "badge-warning"
-                    }`}
-                  >
-                    {selectedTaskInfo.taskList[selectedTaskInfo.index].status}
-                  </div>
+                    )}
+                    className="w-full h-full object-contain"
+                  />
+                  {selectedTaskInfo.taskList[selectedTaskInfo.index]
+                    .json_figure_path && (
+                    <button
+                      className="btn btn-sm mt-4"
+                      onClick={() => setViewMode("interactive")}
+                    >
+                      Interactive View
+                    </button>
+                  )}
                 </div>
-                {selectedTaskInfo.taskList[selectedTaskInfo.index]
-                  .output_parameters && (
+                <div className="space-y-6">
+                  {/* Toggle Button */}
+                  {selectedTaskInfo.taskList.length > 1 && (
+                    <button
+                      className="btn btn-sm"
+                      onClick={() =>
+                        setSelectedTaskInfo((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                index: (prev.index + 1) % prev.taskList.length,
+                              }
+                            : null
+                        )
+                      }
+                    >
+                      Toggle Direction
+                    </button>
+                  )}
+                  {/* Status */}
                   <div className="card bg-base-200 p-4 rounded-xl">
-                    <h4 className="font-medium mb-2">Parameters</h4>
-                    <div className="space-y-2">
-                      {Object.entries(
+                    <h4 className="font-medium mb-2">Status</h4>
+                    <div
+                      className={`badge ${
                         selectedTaskInfo.taskList[selectedTaskInfo.index]
-                          .output_parameters || {}
-                      ).map(([key, value]) => {
-                        const paramValue = (
-                          typeof value === "object" &&
-                          value !== null &&
-                          "value" in value
-                            ? value
-                            : { value }
-                        ) as { value: number | string; unit?: string };
-                        return (
-                          <div key={key} className="flex justify-between">
-                            <span className="font-medium">{key}:</span>
-                            <span>
-                              {typeof paramValue.value === "number"
-                                ? paramValue.value.toFixed(4)
-                                : String(paramValue.value)}
-                              {paramValue.unit ? ` ${paramValue.unit}` : ""}
-                            </span>
-                          </div>
-                        );
-                      })}
+                          .status === "completed"
+                          ? "badge-success"
+                          : selectedTaskInfo.taskList[selectedTaskInfo.index]
+                              .status === "failed"
+                          ? "badge-error"
+                          : "badge-warning"
+                      }`}
+                    >
+                      {selectedTaskInfo.taskList[selectedTaskInfo.index].status}
                     </div>
                   </div>
-                )}
-                {selectedTaskInfo.taskList[selectedTaskInfo.index].message && (
-                  <div className="card bg-base-200 p-4 rounded-xl">
-                    <h4 className="font-medium mb-2">Message</h4>
-                    <p className="text-sm">
-                      {
-                        selectedTaskInfo.taskList[selectedTaskInfo.index]
-                          .message
-                      }
-                    </p>
-                  </div>
-                )}
+
+                  {/* Params */}
+                  {selectedTaskInfo.taskList[selectedTaskInfo.index]
+                    .output_parameters && (
+                    <div className="card bg-base-200 p-4 rounded-xl">
+                      <h4 className="font-medium mb-2">Parameters</h4>
+                      <div className="space-y-2">
+                        {Object.entries(
+                          selectedTaskInfo.taskList[selectedTaskInfo.index]
+                            ?.output_parameters || {}
+                        ).map(([key, value]) => {
+                          const paramValue: ParameterValue =
+                            typeof value === "object" &&
+                            value !== null &&
+                            "value" in value
+                              ? (value as ParameterValue)
+                              : { value };
+                          return (
+                            <div key={key} className="flex justify-between">
+                              <span className="font-medium">{key}:</span>
+                              <span>
+                                {typeof paramValue.value === "number"
+                                  ? paramValue.value.toFixed(4)
+                                  : String(paramValue.value)}
+                                {paramValue.unit ? ` ${paramValue.unit}` : ""}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Message */}
+                  {selectedTaskInfo.taskList[selectedTaskInfo.index]
+                    .message && (
+                    <div className="card bg-base-200 p-4 rounded-xl">
+                      <h4 className="font-medium mb-2">Message</h4>
+                      <p className="text-sm">
+                        {
+                          selectedTaskInfo.taskList[selectedTaskInfo.index]
+                            .message
+                        }
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
+            ) : (
+              // Interactive View
+              <div className="w-full h-[70vh] flex justify-center items-center">
+                <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
+                  <div className="w-full h-full flex justify-center items-center">
+                    <div className="w-fit h-fit m-auto">
+                      <PlotlyRenderer
+                        className="w-full h-full"
+                        fullPath={`${
+                          process.env.NEXT_PUBLIC_API_URL
+                        }/api/executions/figure?path=${encodeURIComponent(
+                          selectedTaskInfo.taskList[selectedTaskInfo.index]
+                            .json_figure_path?.[0] || ""
+                        )}`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-2">
+              {viewMode === "interactive" && (
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setViewMode("static")}
+                >
+                  Back to Summary
+                </button>
+              )}
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">

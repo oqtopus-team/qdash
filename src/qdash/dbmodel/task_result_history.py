@@ -40,6 +40,7 @@ class TaskResultHistoryDocument(Document):
     output_parameter_names: list[str] = Field(..., description="The output parameter names")
     note: dict = Field(..., description="The note")
     figure_path: list[str] = Field(..., description="The path to the figure")
+    json_figure_path: list[str] = Field([], description="The path to the JSON figure")
     raw_data_path: list[str] = Field([], description="The path to the raw data")
     start_at: str = Field(..., description="The time when the execution started")
     end_at: str = Field(..., description="The time when the execution ended")
@@ -78,6 +79,7 @@ class TaskResultHistoryDocument(Document):
             output_parameter_names=task.output_parameter_names,
             note=task.note,
             figure_path=task.figure_path,
+            json_figure_path=task.json_figure_path,
             raw_data_path=task.raw_data_path,
             start_at=task.start_at,
             end_at=task.end_at,
@@ -109,6 +111,7 @@ class TaskResultHistoryDocument(Document):
         doc.output_parameter_names = task.output_parameter_names
         doc.note = task.note
         doc.figure_path = task.figure_path
+        doc.json_figure_path = task.json_figure_path
         doc.raw_data_path = task.raw_data_path
         doc.start_at = task.start_at
         doc.end_at = task.end_at
