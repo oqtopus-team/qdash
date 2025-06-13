@@ -130,7 +130,7 @@ export function TaskResultGrid({
                   : ""
               }`}
             >
-              {task.figure_path && (
+              {task.figure_path && figurePath && (
                 <div className="absolute inset-0">
                   <TaskFigure
                     path={figurePath}
@@ -184,11 +184,13 @@ export function TaskResultGrid({
                 return (
                   <div className="grid grid-cols-2 gap-8">
                     <div className="aspect-square bg-base-200/50 rounded-xl p-4">
-                      <TaskFigure
-                        path={currentFigure}
-                        qid={selectedTaskInfo.qid}
-                        className="w-full h-full object-contain"
-                      />
+                      {currentFigure && (
+                        <TaskFigure
+                          path={currentFigure}
+                          qid={selectedTaskInfo.qid}
+                          className="w-full h-full object-contain"
+                        />
+                      )}
                       {figures.length > 1 && (
                         <div className="flex justify-center mt-2 gap-2">
                           <button

@@ -332,36 +332,39 @@ export function CouplingGrid({
                       {selectedTaskInfo.taskList[selectedTaskInfo.index].status}
                     </div>
                   </div>
-                  {selectedTaskInfo.taskList[selectedTaskInfo.index]
-                    .output_parameters && (
-                    <div className="card bg-base-200 p-4 rounded-xl">
-                      <h4 className="font-medium mb-2">Parameters</h4>
-                      <div className="space-y-2">
-                        {Object.entries(
-                          selectedTaskInfo.taskList[selectedTaskInfo.index]
-                            .output_parameters
-                        ).map(([key, value]) => {
-                          const paramValue: ParameterValue =
-                            typeof value === "object" &&
-                            value !== null &&
-                            "value" in value
-                              ? (value as ParameterValue)
-                              : { value };
-                          return (
-                            <div key={key} className="flex justify-between">
-                              <span className="font-medium">{key}:</span>
-                              <span>
-                                {typeof paramValue.value === "number"
-                                  ? paramValue.value.toFixed(4)
-                                  : String(paramValue.value)}
-                                {paramValue.unit ? ` ${paramValue.unit}` : ""}
-                              </span>
-                            </div>
-                          );
-                        })}
+                  {(() => {
+                    const outputParams =
+                      selectedTaskInfo.taskList[selectedTaskInfo.index]
+                        .output_parameters;
+                    if (!outputParams) return null;
+
+                    return (
+                      <div className="card bg-base-200 p-4 rounded-xl">
+                        <h4 className="font-medium mb-2">Parameters</h4>
+                        <div className="space-y-2">
+                          {Object.entries(outputParams).map(([key, value]) => {
+                            const paramValue: ParameterValue =
+                              typeof value === "object" &&
+                              value !== null &&
+                              "value" in value
+                                ? (value as ParameterValue)
+                                : { value };
+                            return (
+                              <div key={key} className="flex justify-between">
+                                <span className="font-medium">{key}:</span>
+                                <span>
+                                  {typeof paramValue.value === "number"
+                                    ? paramValue.value.toFixed(4)
+                                    : String(paramValue.value)}
+                                  {paramValue.unit ? ` ${paramValue.unit}` : ""}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                   {selectedTaskInfo.taskList[selectedTaskInfo.index]
                     .message && (
                     <div className="card bg-base-200 p-4 rounded-xl">
