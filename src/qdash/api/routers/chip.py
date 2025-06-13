@@ -26,7 +26,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 QUBIT_FIDELITY_THRESHOLD = 0.99
-COUPLING_FIDELITY_THRESHOLD = 0.90
+COUPLING_FIDELITY_THRESHOLD = 0.75
 
 
 class ExecutionResponseSummary(BaseModel):
