@@ -1,6 +1,5 @@
 import io
 import re
-from datetime import datetime, timezone
 from typing import Annotated
 
 import matplotlib.pyplot as plt
@@ -9,7 +8,7 @@ import pendulum
 from fastapi import APIRouter, Depends
 from fastapi.logger import logger
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
@@ -122,9 +121,36 @@ def is_within_24h(calibrated_at: str | None) -> bool:
         now = pendulum.now(tz="Asia/Tokyo")
         cutoff = now.subtract(hours=24)
         calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
-        return calibrated_at_dt >= cutoff
+        return bool(calibrated_at_dt >= cutoff)
     except Exception:
         return False
+
+
+def get_value_within_24h_fallback(
+    data: dict,
+    use_24h: bool,
+    fallback: float,
+) -> float:
+    """Get calibrated value based on whether it was calibrated within 24h.
+
+    If `use_24h` is True:
+        - If data is within 24h: return value
+        - Else: return fallback (strict mode)
+
+    If `use_24h` is False:
+        - If value exists: return value (regardless of age)
+        - Else: return fallback
+    """
+    value = data.get("value")
+    calibrated_at = data.get("calibrated_at")
+
+    if value is None:
+        return fallback
+
+    if use_24h:
+        return value if is_within_24h(calibrated_at) else fallback
+
+    return value
 
 
 def normalize_coupling_key(control: str, target: str) -> str:
@@ -170,18 +196,38 @@ def split_q_string(cr_label: str) -> tuple[str, str]:
     return left, right
 
 
-class DeviceTopologyRequst(BaseModel):
+class FidelityCondition(BaseModel):
+    """Condition for fidelity filtering."""
+
+    min: float
+    max: float
+    is_within_24h: bool = True  # 追加
+
+
+class Condition(BaseModel):
+    """Condition for filtering device topology."""
+
+    coupling_fidelity: FidelityCondition
+    qubit_fidelity: FidelityCondition
+    readout_fidelity: FidelityCondition
+    only_maximum_connected: bool = True
+
+
+class DeviceTopologyRequest(BaseModel):
     """Request model for device topology."""
 
     name: str = "anemone"
     device_id: str = "anemone"
     qubits: list[str] = ["0", "1", "2", "3", "4", "5"]
     exclude_couplings: list[str] = []
-    condition: dict = {
-        "coupling_fidelity": {"min": 0.7, "max": 1.0},
-        "qubit_fidelity": {"min": 0.7, "max": 1.0},
-        "only_maximum_connected": True,
-    }
+    condition: Condition = Field(
+        default_factory=lambda: Condition(
+            coupling_fidelity=FidelityCondition(min=0.0, max=1.0, is_within_24h=True),
+            qubit_fidelity=FidelityCondition(min=0.0, max=1.0, is_within_24h=True),
+            readout_fidelity=FidelityCondition(min=0.0, max=1.0, is_within_24h=True),
+            only_maximum_connected=True,
+        )
+    )
 
 
 @router.post(
@@ -193,7 +239,7 @@ class DeviceTopologyRequst(BaseModel):
 )
 def get_device_topology(
     current_user: Annotated[User, Depends(get_current_active_user)],
-    request: DeviceTopologyRequst,
+    request: DeviceTopologyRequest,
 ) -> Device:
     """Get the device topology."""
     logger.info(f"current user: {current_user.username}")
@@ -220,26 +266,37 @@ def get_device_topology(
         readout_0_data = chip_docs.qubits[qid].data.get("readout_fidelity_0", {})
         readout_1_data = chip_docs.qubits[qid].data.get("readout_fidelity_1", {})
 
-        # Check timestamps and get values
-        x90_gate_fidelity = (
-            x90_data["value"] if is_within_24h(x90_data.get("calibrated_at")) else 0.25
+        x90_gate_fidelity = get_value_within_24h_fallback(
+            x90_data, request.condition.qubit_fidelity.is_within_24h, fallback=0.25
         )
-        t1 = t1_data["value"] if is_within_24h(t1_data.get("calibrated_at")) else 100.0
-        t2 = t2_data["value"] if is_within_24h(t2_data.get("calibrated_at")) else 100.0
+        # t1 = t1_data["value"] if is_within_24h(t1_data.get("calibrated_at")) else 100.0
+        t1 = get_value_within_24h_fallback(
+            t1_data, request.condition.qubit_fidelity.is_within_24h, fallback=100.0
+        )
+        # t2 = t2_data["value"] if is_within_24h(t2_data.get("calibrated_at")) else 100.0
+        t2 = get_value_within_24h_fallback(
+            t2_data, request.condition.qubit_fidelity.is_within_24h, fallback=100.0
+        )
         drag_hpi_duration = drag_hpi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
         drag_pi_duration = drag_pi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
-        readout_fidelity_0 = (
-            readout_0_data["value"] if is_within_24h(readout_0_data.get("calibrated_at")) else 0.25
+        # readout_fidelity_0 = (
+        #     readout_0_data["value"] if is_within_24h(readout_0_data.get("calibrated_at")) else 0.25
+        # )
+        readout_fidelity_0 = get_value_within_24h_fallback(
+            readout_0_data, request.condition.qubit_fidelity.is_within_24h, fallback=0.25
         )
-        readout_fidelity_1 = (
-            readout_1_data["value"] if is_within_24h(readout_1_data.get("calibrated_at")) else 0.25
+        # readout_fidelity_1 = (
+        #     readout_1_data["value"] if is_within_24h(readout_1_data.get("calibrated_at")) else 0.25
+        # )
+        readout_fidelity_1 = get_value_within_24h_fallback(
+            readout_1_data, request.condition.qubit_fidelity.is_within_24h, fallback=0.25
         )
         # Calculate readout assignment error
         prob_meas1_prep0 = 1 - readout_fidelity_0
         prob_meas0_prep1 = 1 - readout_fidelity_1
         # Calculate readout assignment error
-        readout_assignment_error = 1 - (readout_fidelity_0 + readout_fidelity_1) / 2
-
+        readout_fidelity = (readout_fidelity_0 + readout_fidelity_1) / 2
+        readout_assignment_error = 1 - readout_fidelity
         qubits.append(
             Qubit(
                 id=id_mapping[qid],  # Map to new sequential id
@@ -286,10 +343,15 @@ def get_device_topology(
             coupling_data = chip_docs.couplings[f"{control}-{target}"].data.get(
                 "bell_state_fidelity", {}
             )
-            zx90_gate_fidelity = (
-                coupling_data["value"]
-                if is_within_24h(coupling_data.get("calibrated_at"))
-                else 0.25
+            # zx90_gate_fidelity = (
+            #     coupling_data["value"]
+            #     if is_within_24h(coupling_data.get("calibrated_at"))
+            #     else 0.25
+            # )
+            zx90_gate_fidelity = get_value_within_24h_fallback(
+                coupling_data,
+                request.condition.coupling_fidelity.is_within_24h,
+                fallback=0.25,
             )
             # Only append if both control and target qubits exist in id_mapping and coupling is not excluded
             if control in id_mapping and target in id_mapping:
@@ -318,12 +380,21 @@ def get_device_topology(
         qubit
         for qubit in qubits
         if (
-            request.condition["qubit_fidelity"]["min"]
+            request.condition.qubit_fidelity.min
             <= qubit.fidelity
-            <= request.condition["qubit_fidelity"]["max"]
+            <= request.condition.qubit_fidelity.max
         )
     ]
 
+    filtered_qubits = [
+        qubit
+        for qubit in filtered_qubits
+        if (
+            request.condition.readout_fidelity.min
+            <= 1 - qubit.meas_error.readout_assignment_error
+            <= request.condition.readout_fidelity.max
+        )
+    ]
     # Get set of qubit IDs that passed the fidelity filter
     valid_qubit_ids = {qubit.id for qubit in filtered_qubits}
 
@@ -332,23 +403,23 @@ def get_device_topology(
         coupling
         for coupling in couplings
         if (
-            request.condition["coupling_fidelity"]["min"]
+            request.condition.coupling_fidelity.min
             <= coupling.fidelity
-            <= request.condition["coupling_fidelity"]["max"]
+            <= request.condition.coupling_fidelity.max
             and coupling.control in valid_qubit_ids
             and coupling.target in valid_qubit_ids
         )
     ]
 
-    if request.condition["only_maximum_connected"]:
+    if request.condition.only_maximum_connected:
         # Create a graph to find the largest connected component
-        G = nx.Graph()
+        g = nx.Graph()
         for coupling in filtered_couplings:
-            G.add_edge(coupling.control, coupling.target)
+            g.add_edge(coupling.control, coupling.target)
 
-        if G.edges:  # Only find largest component if there are any edges
+        if g.edges:  # Only find largest component if there are any edges
             # Find the largest connected component
-            largest_component = max(nx.connected_components(G), key=len)
+            largest_component = max(nx.connected_components(g), key=len)
 
             # Filter qubits and couplings to keep only those in the largest component
             filtered_qubits = [qubit for qubit in filtered_qubits if qubit.id in largest_component]
@@ -381,17 +452,17 @@ def get_device_topology(
 def generate_device_plot(data: dict) -> bytes:
     """Generate a plot of the quantum device and return it as bytes."""
     # Create a new graph
-    G = nx.Graph()
+    g = nx.Graph()
 
     # Add nodes (qubits) with their positions
     pos = {}
     for qubit in data["qubits"]:
-        G.add_node(qubit["id"], physical_id=qubit["physical_id"], fidelity=qubit["fidelity"])
+        g.add_node(qubit["id"], physical_id=qubit["physical_id"], fidelity=qubit["fidelity"])
         pos[qubit["id"]] = (qubit["position"]["x"] * 100, qubit["position"]["y"] * 100)
 
     # Add edges (couplings)
     for coupling in data["couplings"]:
-        G.add_edge(
+        g.add_edge(
             coupling["control"],
             coupling["target"],
             fidelity=coupling["fidelity"],
@@ -407,31 +478,31 @@ def generate_device_plot(data: dict) -> bytes:
 
     # Draw nodes
     nx.draw_networkx_nodes(
-        G,
+        g,
         pos,
-        node_color=[G.nodes[node]["fidelity"] for node in G.nodes],
+        node_color=[g.nodes[node]["fidelity"] for node in g.nodes],
         node_size=3000,
         cmap="viridis",
     )
 
     # Draw edges
-    nx.draw_networkx_edges(G, pos, width=3)
+    nx.draw_networkx_edges(g, pos, width=3)
 
     # Add physical ID and fidelity labels in white
     labels = {
-        node: f"Q{G.nodes[node]['physical_id']}\n{G.nodes[node]['fidelity']*100:.2f}%"
-        for node in G.nodes
+        node: f"Q{g.nodes[node]['physical_id']}\n{g.nodes[node]['fidelity']*100:.2f}%"
+        for node in g.nodes
     }
-    nx.draw_networkx_labels(G, pos, labels, font_size=12, font_weight="bold", font_color="white")
+    nx.draw_networkx_labels(g, pos, labels, font_size=12, font_weight="bold", font_color="white")
 
     # Add edge labels with adjusted position
-    edge_labels = nx.get_edge_attributes(G, "fidelity")
+    edge_labels = nx.get_edge_attributes(g, "fidelity")
     edge_labels = {k: f"F={v:.2f}" for k, v in edge_labels.items()}
-    nx.draw_networkx_edge_labels(G, pos, edge_labels, font_size=10, label_pos=0.3)
+    nx.draw_networkx_edge_labels(g, pos, edge_labels, font_size=10, label_pos=0.3)
 
     # Add a colorbar with adjusted position
-    qubit_number = len(G.nodes)
-    copuling_number = len(G.edges)
+    qubit_number = len(g.nodes)
+    copuling_number = len(g.edges)
     logger.info(f"Qubit number: {qubit_number}, Coupling number: {copuling_number}")
     # ax.text(
     #     0.5,
@@ -445,8 +516,8 @@ def generate_device_plot(data: dict) -> bytes:
     sm = plt.cm.ScalarMappable(
         cmap="viridis",
         norm=plt.Normalize(
-            vmin=min(nx.get_node_attributes(G, "fidelity").values()),
-            vmax=max(nx.get_node_attributes(G, "fidelity").values()),
+            vmin=min(nx.get_node_attributes(g, "fidelity").values()),
+            vmax=max(nx.get_node_attributes(g, "fidelity").values()),
         ),
     )
     cbar = plt.colorbar(sm, ax=ax, label="Qubit Fidelity (%)", fraction=0.046, pad=0.04)
