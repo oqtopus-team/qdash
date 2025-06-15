@@ -32,19 +32,25 @@ class CheckReflectionCoefficient(BaseTask):
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         """Process the results of the task."""
+        label = qid_to_label(qid)
         result = run_result.raw_result
-        figures = [result["fig_phase"], result["fig_phase_diff"]]
+        figures = [result[label]["fig"]]
         output_parameters = self.attach_execution_id(execution_id)
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         """Run the task."""
         label = qid_to_label(qid)
-        result = exp.measure_reflection_coefficient(
-            target=label, frequency_range=self.input_parameters["frequency_range"].get_value()
-        )
+        result = exp.measure_reflection_coefficient(target=label)
         exp.calib_note.save()
         return RunResult(raw_result=result)
 
     def batch_run(self, exp: Experiment, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits."""
+        labels = [qid_to_label(qid) for qid in qids]
+        results = {}
+        for label in labels:
+            result = exp.measure_reflection_coefficient(target=label)
+            results[label] = result
+        exp.calib_note.save()
+        return RunResult(raw_result=results)
