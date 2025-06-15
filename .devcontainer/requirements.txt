@@ -459,6 +459,8 @@ pyparsing==3.2.1
     # via
     #   matplotlib
     #   pylabrad
+pyserial==3.5
+    # via qubex
 pytest==8.3.2
     # via
     #   pytest-cov
@@ -507,7 +509,7 @@ qctrl-visualizer==8.0.2
     # via qubex
 qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@9e81ed65b933d48a9110d31c48b42b9876158b20
     # via qubex
-qubex @ git+https://github.com/amachino/qubex.git@851e47997f245daa5e918a542d3a6677a013b4c1
+qubex @ git+https://github.com/amachino/qubex.git@c1bbf272c09118d88b20c2e829dea3c8b011d8ea
 quel-clock-master @ git+https://github.com/quel-inc/quelware.git@de4dd6caf967b025b7d529e41a1d6e8c3029cc66#subdirectory=quel_clock_master
     # via
     #   qubecalib

@@ -304,24 +304,78 @@ export function TaskResultGrid({
               })()}
 
             {viewMode === "interactive" &&
-              selectedTaskInfo.task.json_figure_path && (
-                <div className="w-full h-[70vh] flex justify-center items-center">
-                  <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
-                    <div className="w-full h-full flex justify-center items-center">
-                      <div className="w-fit h-fit m-auto">
-                        <PlotlyRenderer
-                          className="w-full h-full"
-                          fullPath={`${
-                            process.env.NEXT_PUBLIC_API_URL
-                          }/api/executions/figure?path=${encodeURIComponent(
-                            selectedTaskInfo.task.json_figure_path[0]
-                          )}`}
-                        />
+              selectedTaskInfo.task.json_figure_path &&
+              (() => {
+                const figures = Array.isArray(
+                  selectedTaskInfo.task.json_figure_path
+                )
+                  ? selectedTaskInfo.task.json_figure_path
+                  : [selectedTaskInfo.task.json_figure_path];
+                const currentSubIndex = selectedTaskInfo.subIndex ?? 0;
+                const currentFigure = figures[currentSubIndex];
+
+                return (
+                  <div className="w-full h-[70vh] flex flex-col justify-center items-center space-y-4">
+                    <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
+                      <div className="w-full h-full flex justify-center items-center">
+                        <div className="w-fit h-fit m-auto">
+                          <PlotlyRenderer
+                            className="w-full h-full"
+                            fullPath={`${
+                              process.env.NEXT_PUBLIC_API_URL
+                            }/api/executions/figure?path=${encodeURIComponent(
+                              currentFigure
+                            )}`}
+                          />
+                        </div>
                       </div>
                     </div>
+                    {figures.length > 1 && (
+                      <div className="flex justify-center gap-2">
+                        <button
+                          className="btn btn-xs"
+                          onClick={() =>
+                            setSelectedTaskInfo((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    subIndex:
+                                      ((prev.subIndex ?? 0) -
+                                        1 +
+                                        figures.length) %
+                                      figures.length,
+                                  }
+                                : null
+                            )
+                          }
+                        >
+                          ◀
+                        </button>
+                        <span className="text-sm">
+                          {currentSubIndex + 1} / {figures.length}
+                        </span>
+                        <button
+                          className="btn btn-xs"
+                          onClick={() =>
+                            setSelectedTaskInfo((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    subIndex:
+                                      ((prev.subIndex ?? 0) + 1) %
+                                      figures.length,
+                                  }
+                                : null
+                            )
+                          }
+                        >
+                          ▶
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
             <div className="mt-6 flex justify-end gap-2">
               {viewMode === "interactive" && (

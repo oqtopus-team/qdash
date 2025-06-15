@@ -400,14 +400,82 @@ export function CouplingGrid({
             )}
 
             <div className="mt-6 flex justify-end gap-2">
-              {viewMode === "interactive" && (
-                <button
-                  className="btn btn-sm"
-                  onClick={() => setViewMode("static")}
-                >
-                  Back to Summary
-                </button>
-              )}
+              {viewMode === "interactive" &&
+                (() => {
+                  const selectedTask =
+                    selectedTaskInfo.taskList[selectedTaskInfo.index];
+                  const path = selectedTask.json_figure_path;
+                  const figures = Array.isArray(path)
+                    ? path
+                    : path
+                    ? [path]
+                    : [];
+                  const currentSubIndex = selectedTaskInfo.subIndex ?? 0;
+                  const currentFigure = figures[currentSubIndex];
+
+                  return (
+                    <div className="w-full h-[70vh] flex flex-col justify-center items-center space-y-4">
+                      <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
+                        <div className="w-full h-full flex justify-center items-center">
+                          <div className="w-fit h-fit m-auto">
+                            <PlotlyRenderer
+                              className="w-full h-full"
+                              fullPath={`${
+                                process.env.NEXT_PUBLIC_API_URL
+                              }/api/executions/figure?path=${encodeURIComponent(
+                                currentFigure || ""
+                              )}`}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {figures.length > 1 && (
+                        <div className="flex justify-center gap-2">
+                          <button
+                            className="btn btn-xs"
+                            onClick={() =>
+                              setSelectedTaskInfo((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      subIndex:
+                                        ((prev.subIndex ?? 0) -
+                                          1 +
+                                          figures.length) %
+                                        figures.length,
+                                    }
+                                  : null
+                              )
+                            }
+                          >
+                            ◀
+                          </button>
+                          <span className="text-sm">
+                            {currentSubIndex + 1} / {figures.length}
+                          </span>
+                          <button
+                            className="btn btn-xs"
+                            onClick={() =>
+                              setSelectedTaskInfo((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      subIndex:
+                                        ((prev.subIndex ?? 0) + 1) %
+                                        figures.length,
+                                    }
+                                  : null
+                              )
+                            }
+                          >
+                            ▶
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">

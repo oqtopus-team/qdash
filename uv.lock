@@ -2370,6 +2370,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyserial"
+version = "3.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/7d/ae3f0a63f41e4d2f6cb66a5b57197850f919f59e558159a4dd3a818f5082/pyserial-3.5.tar.gz", hash = "sha256:3c77e014170dfffbd816e6ffc205e9842efb10be9f58ec16d3e8675b4925cddb", size = 159125, upload-time = "2020-11-23T03:59:15.045Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/bc/587a445451b253b285629263eb51c2d8e9bcea4fc97826266d186f96f558/pyserial-3.5-py2.py3-none-any.whl", hash = "sha256:c4451db6ba391ca6ca299fb3ec7bae67a5c55dde170964c7a14ceefec02f2cf0", size = 90585, upload-time = "2020-11-23T03:59:13.41Z" },
+]
+
+[[package]]
 name = "pytest"
 version = "8.3.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2697,7 +2706,7 @@ workflow = [
     { name = "pymongo", specifier = "==4.8.0" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "pyyaml", specifier = "==6.0.1" },
-    { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?tag=v1.3.7" },
+    { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?rev=fix%2Fscan_res_freqs" },
     { name = "reportlab", specifier = ">=4.4.1" },
     { name = "slack-sdk", specifier = "==3.31.0" },
     { name = "timeout-decorator", specifier = ">=0.5.0" },
@@ -2725,8 +2734,8 @@ dependencies = [
 
 [[package]]
 name = "qubex"
-version = "1.3.7+851e479"
-source = { git = "https://github.com/amachino/qubex.git?tag=v1.3.7#851e47997f245daa5e918a542d3a6677a013b4c1" }
+version = "1.3.8rc1+c1bbf27"
+source = { git = "https://github.com/amachino/qubex.git?rev=fix%2Fscan_res_freqs#c1bbf272c09118d88b20c2e829dea3c8b011d8ea" }
 dependencies = [
     { name = "cma" },
     { name = "cvxopt" },
@@ -2743,6 +2752,7 @@ dependencies = [
     { name = "pip" },
     { name = "plotly" },
     { name = "pydantic" },
+    { name = "pyserial" },
     { name = "pyyaml" },
     { name = "qctrl-visualizer" },
     { name = "qutip" },
