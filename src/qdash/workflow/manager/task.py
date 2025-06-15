@@ -335,7 +335,7 @@ class TaskManager(BaseModel):
             json_path = base_path.with_suffix(".json")
             json_path = self._resolve_conflict(json_path)
             task.json_figure_path.append(str(json_path))
-            self._write_figure_json(fig, savepath=json_path, width=width, height=height)
+            self._write_figure_json(fig, savepath=json_path, width=1000, height=500)
 
             # PNG path
             png_path = base_path.with_suffix(".png")
@@ -347,8 +347,8 @@ class TaskManager(BaseModel):
         self,
         fig: go.Figure,
         savepath: Path,
-        width: int = 600,
-        height: int = 300,
+        width: int = 1000,
+        height: int = 500,
     ) -> None:
         fig.update_layout(width=width, height=height)
         fig.write_json(str(savepath), pretty=True)
@@ -441,8 +441,8 @@ class TaskManager(BaseModel):
         self,
         fig: go.Figure,
         file_format: Literal["png", "svg", "jpeg", "webp"] = "png",
-        width: int = 800,
-        height: int = 400,
+        width: int = 600,
+        height: int = 300,
         name: str = "",
         savepath: str = "",
     ) -> None:
