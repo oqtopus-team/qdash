@@ -2667,7 +2667,6 @@ workflow = [
     { name = "qubex", extra = ["backend"] },
     { name = "reportlab" },
     { name = "slack-sdk" },
-    { name = "timeout-decorator" },
 ]
 
 [package.metadata]
@@ -2709,7 +2708,6 @@ workflow = [
     { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?rev=fix%2Fscan_res_freqs" },
     { name = "reportlab", specifier = ">=4.4.1" },
     { name = "slack-sdk", specifier = "==3.31.0" },
-    { name = "timeout-decorator", specifier = ">=0.5.0" },
 ]
 
 [[package]]
@@ -2734,8 +2732,8 @@ dependencies = [
 
 [[package]]
 name = "qubex"
-version = "1.3.8rc1+c1bbf27"
-source = { git = "https://github.com/amachino/qubex.git?rev=fix%2Fscan_res_freqs#c1bbf272c09118d88b20c2e829dea3c8b011d8ea" }
+version = "1.3.8rc1+d92e68c"
+source = { git = "https://github.com/amachino/qubex.git?rev=fix%2Fscan_res_freqs#d92e68c305075230d26bad33b9206a4cf348d826" }
 dependencies = [
     { name = "cma" },
     { name = "cvxopt" },
@@ -3243,12 +3241,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/bd/55/b5148dcbf72f5cde2
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4b/2c/ffbf7a134b9ab11a67b0cf0726453cedd9c5043a4fe7a35d1cefa9a1bcfb/threadpoolctl-3.5.0-py3-none-any.whl", hash = "sha256:56c1e26c150397e58c4926da8eeee87533b1e32bef131bd4bf6a2f45f3185467", size = 18414, upload-time = "2024-04-29T13:50:14.014Z" },
 ]
-
-[[package]]
-name = "timeout-decorator"
-version = "0.5.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/80/f8/0802dd14c58b5d3d72bb9caa4315535f58787a1dc50b81bbbcaaa15451be/timeout-decorator-0.5.0.tar.gz", hash = "sha256:6a2f2f58db1c5b24a2cc79de6345760377ad8bdc13813f5265f6c3e63d16b3d7", size = 4754, upload-time = "2020-11-15T00:53:06.506Z" }
 
 [[package]]
 name = "tinycss2"

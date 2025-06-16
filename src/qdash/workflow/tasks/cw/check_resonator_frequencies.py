@@ -78,7 +78,7 @@ class CheckResonatorFrequencies(BaseTask):
             labels[0],
             frequency_range=frequency_range,
             shots=1024,
-            optimize=False,
+            filter="savgol",
         )
         exp.calib_note.save()
         return RunResult(raw_result=result)
