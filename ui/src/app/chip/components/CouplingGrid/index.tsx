@@ -35,6 +35,7 @@ interface SelectedTaskInfo {
   couplingId: string;
   taskList: ExtendedTask[];
   index: number;
+  subIndex?: number;
 }
 
 const MUX_SIZE = 2;
@@ -70,8 +71,8 @@ export function CouplingGrid({
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
-
   const [cellSize, setCellSize] = useState(60);
+
   useEffect(() => {
     const updateSize = () => {
       const vw = window.innerWidth;
@@ -110,11 +111,6 @@ export function CouplingGrid({
     }
   }
 
-  const getFigurePath = (task: Task): string | null =>
-    Array.isArray(task.figure_path)
-      ? task.figure_path[0] || null
-      : task.figure_path || null;
-
   if (isLoading)
     return (
       <div className="w-full flex justify-center py-12">
@@ -125,7 +121,6 @@ export function CouplingGrid({
 
   return (
     <div className="space-y-6 px-4">
-      {/* Grid */}
       <div className="w-full overflow-x-auto">
         <div
           className="relative inline-block"
@@ -134,7 +129,6 @@ export function CouplingGrid({
             height: gridSize * (cellSize + 8),
           }}
         >
-          {/* Qubit labels */}
           {Array.from({ length: gridSize === 8 ? 64 : 144 }).map((_, qid) => {
             const muxIndex = Math.floor(qid / 4);
             const localIndex = qid % 4;
@@ -157,11 +151,12 @@ export function CouplingGrid({
             );
           })}
 
-          {/* Coupling buttons */}
           {Object.entries(normalizedResultMap).map(([normKey, taskList]) => {
             const [qid1, qid2] = normKey.split("-").map(Number);
             const task = taskList[0];
-            const figurePath = getFigurePath(task);
+            const figurePath = Array.isArray(task.figure_path)
+              ? task.figure_path[0]
+              : task.figure_path || null;
             const { row1, col1, row2, col2 } = getCouplingPosition(
               qid1,
               qid2,
@@ -179,6 +174,7 @@ export function CouplingGrid({
                       couplingId: normKey,
                       taskList,
                       index: 0,
+                      subIndex: 0,
                     });
                     setViewMode("static");
                   }
@@ -210,7 +206,6 @@ export function CouplingGrid({
         </div>
       </div>
 
-      {/* Modal */}
       {selectedTaskInfo && (
         <dialog className="modal modal-open">
           <div className="modal-box max-w-6xl p-6 rounded-2xl shadow-xl bg-base-100">
@@ -230,26 +225,79 @@ export function CouplingGrid({
             {viewMode === "static" ? (
               <div className="grid grid-cols-2 gap-8">
                 <div className="aspect-square bg-base-200/50 rounded-xl p-4">
-                  <TaskFigure
-                    path={selectedTaskInfo.path}
-                    qid={String(
-                      selectedTaskInfo.taskList[selectedTaskInfo.index]
-                        .couplingId
-                    )}
-                    className="w-full h-full object-contain"
-                  />
-                  {selectedTaskInfo.taskList[selectedTaskInfo.index]
-                    .json_figure_path && (
-                    <button
-                      className="btn btn-sm mt-4"
-                      onClick={() => setViewMode("interactive")}
-                    >
-                      Interactive View
-                    </button>
-                  )}
+                  {(() => {
+                    const selectedTask =
+                      selectedTaskInfo.taskList[selectedTaskInfo.index];
+                    const figures = Array.isArray(selectedTask.figure_path)
+                      ? selectedTask.figure_path
+                      : selectedTask.figure_path
+                      ? [selectedTask.figure_path]
+                      : [];
+                    const currentSubIndex = selectedTaskInfo.subIndex ?? 0;
+                    const currentFigure = figures[currentSubIndex];
+                    return (
+                      <>
+                        <TaskFigure
+                          path={currentFigure}
+                          qid={String(selectedTask.couplingId)}
+                          className="w-full h-full object-contain"
+                        />
+                        {figures.length > 1 && (
+                          <div className="flex justify-center mt-2 gap-2">
+                            <button
+                              className="btn btn-xs"
+                              onClick={() =>
+                                setSelectedTaskInfo((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        subIndex:
+                                          ((prev.subIndex ?? 0) -
+                                            1 +
+                                            figures.length) %
+                                          figures.length,
+                                      }
+                                    : null
+                                )
+                              }
+                            >
+                              ◀
+                            </button>
+                            <span className="text-sm">
+                              {currentSubIndex + 1} / {figures.length}
+                            </span>
+                            <button
+                              className="btn btn-xs"
+                              onClick={() =>
+                                setSelectedTaskInfo((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        subIndex:
+                                          ((prev.subIndex ?? 0) + 1) %
+                                          figures.length,
+                                      }
+                                    : null
+                                )
+                              }
+                            >
+                              ▶
+                            </button>
+                          </div>
+                        )}
+                        {selectedTask.json_figure_path && (
+                          <button
+                            className="btn btn-sm mt-4"
+                            onClick={() => setViewMode("interactive")}
+                          >
+                            Interactive View
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="space-y-6">
-                  {/* Toggle Button */}
                   {selectedTaskInfo.taskList.length > 1 && (
                     <button
                       className="btn btn-sm"
@@ -259,6 +307,7 @@ export function CouplingGrid({
                             ? {
                                 ...prev,
                                 index: (prev.index + 1) % prev.taskList.length,
+                                subIndex: 0,
                               }
                             : null
                         )
@@ -267,7 +316,6 @@ export function CouplingGrid({
                       Toggle Direction
                     </button>
                   )}
-                  {/* Status */}
                   <div className="card bg-base-200 p-4 rounded-xl">
                     <h4 className="font-medium mb-2">Status</h4>
                     <div
@@ -284,40 +332,39 @@ export function CouplingGrid({
                       {selectedTaskInfo.taskList[selectedTaskInfo.index].status}
                     </div>
                   </div>
+                  {(() => {
+                    const outputParams =
+                      selectedTaskInfo.taskList[selectedTaskInfo.index]
+                        .output_parameters;
+                    if (!outputParams) return null;
 
-                  {/* Params */}
-                  {selectedTaskInfo.taskList[selectedTaskInfo.index]
-                    .output_parameters && (
-                    <div className="card bg-base-200 p-4 rounded-xl">
-                      <h4 className="font-medium mb-2">Parameters</h4>
-                      <div className="space-y-2">
-                        {Object.entries(
-                          selectedTaskInfo.taskList[selectedTaskInfo.index]
-                            ?.output_parameters || {}
-                        ).map(([key, value]) => {
-                          const paramValue: ParameterValue =
-                            typeof value === "object" &&
-                            value !== null &&
-                            "value" in value
-                              ? (value as ParameterValue)
-                              : { value };
-                          return (
-                            <div key={key} className="flex justify-between">
-                              <span className="font-medium">{key}:</span>
-                              <span>
-                                {typeof paramValue.value === "number"
-                                  ? paramValue.value.toFixed(4)
-                                  : String(paramValue.value)}
-                                {paramValue.unit ? ` ${paramValue.unit}` : ""}
-                              </span>
-                            </div>
-                          );
-                        })}
+                    return (
+                      <div className="card bg-base-200 p-4 rounded-xl">
+                        <h4 className="font-medium mb-2">Parameters</h4>
+                        <div className="space-y-2">
+                          {Object.entries(outputParams).map(([key, value]) => {
+                            const paramValue: ParameterValue =
+                              typeof value === "object" &&
+                              value !== null &&
+                              "value" in value
+                                ? (value as ParameterValue)
+                                : { value };
+                            return (
+                              <div key={key} className="flex justify-between">
+                                <span className="font-medium">{key}:</span>
+                                <span>
+                                  {typeof paramValue.value === "number"
+                                    ? paramValue.value.toFixed(4)
+                                    : String(paramValue.value)}
+                                  {paramValue.unit ? ` ${paramValue.unit}` : ""}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Message */}
+                    );
+                  })()}
                   {selectedTaskInfo.taskList[selectedTaskInfo.index]
                     .message && (
                     <div className="card bg-base-200 p-4 rounded-xl">
@@ -333,7 +380,6 @@ export function CouplingGrid({
                 </div>
               </div>
             ) : (
-              // Interactive View
               <div className="w-full h-[70vh] flex justify-center items-center">
                 <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
                   <div className="w-full h-full flex justify-center items-center">
@@ -354,14 +400,82 @@ export function CouplingGrid({
             )}
 
             <div className="mt-6 flex justify-end gap-2">
-              {viewMode === "interactive" && (
-                <button
-                  className="btn btn-sm"
-                  onClick={() => setViewMode("static")}
-                >
-                  Back to Summary
-                </button>
-              )}
+              {viewMode === "interactive" &&
+                (() => {
+                  const selectedTask =
+                    selectedTaskInfo.taskList[selectedTaskInfo.index];
+                  const path = selectedTask.json_figure_path;
+                  const figures = Array.isArray(path)
+                    ? path
+                    : path
+                    ? [path]
+                    : [];
+                  const currentSubIndex = selectedTaskInfo.subIndex ?? 0;
+                  const currentFigure = figures[currentSubIndex];
+
+                  return (
+                    <div className="w-full h-[70vh] flex flex-col justify-center items-center space-y-4">
+                      <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
+                        <div className="w-full h-full flex justify-center items-center">
+                          <div className="w-fit h-fit m-auto">
+                            <PlotlyRenderer
+                              className="w-full h-full"
+                              fullPath={`${
+                                process.env.NEXT_PUBLIC_API_URL
+                              }/api/executions/figure?path=${encodeURIComponent(
+                                currentFigure || ""
+                              )}`}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {figures.length > 1 && (
+                        <div className="flex justify-center gap-2">
+                          <button
+                            className="btn btn-xs"
+                            onClick={() =>
+                              setSelectedTaskInfo((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      subIndex:
+                                        ((prev.subIndex ?? 0) -
+                                          1 +
+                                          figures.length) %
+                                        figures.length,
+                                    }
+                                  : null
+                              )
+                            }
+                          >
+                            ◀
+                          </button>
+                          <span className="text-sm">
+                            {currentSubIndex + 1} / {figures.length}
+                          </span>
+                          <button
+                            className="btn btn-xs"
+                            onClick={() =>
+                              setSelectedTaskInfo((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      subIndex:
+                                        ((prev.subIndex ?? 0) + 1) %
+                                        figures.length,
+                                    }
+                                  : null
+                              )
+                            }
+                          >
+                            ▶
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">

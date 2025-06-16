@@ -16,6 +16,7 @@ class CreateZX90(BaseTask):
 
     name: str = "CreateZX90"
     task_type: str = "coupling"
+    timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "cr_amplitude": OutputParameterModel(
