@@ -32,7 +32,7 @@ def validate_task_name(task_names: list[str], username: str) -> list[str]:
 initialize()
 
 
-@task(name="execute-dynamic-task", task_run_name="{task_instance.name}")
+@task(name="execute-dynamic-task")
 def execute_dynamic_task_by_qid(
     exp: Experiment,
     task_manager: TaskManager,

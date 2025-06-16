@@ -149,14 +149,17 @@ def cal_serial(
                     logger.info(f"Task {task_name} is already completed")
                     continue
                 logger.info(f"Starting task: {task_name}")
-                task_manager = execute_dynamic_task_by_qid(
+                task_instance = task_instances[task_name]
+                task_manager = execute_dynamic_task_by_qid.with_options(
+                    timeout_seconds=task_instance.timeout, task_run_name=task_instance.name
+                )(
                     exp=exp,
                     task_manager=task_manager,
-                    task_instance=task_instances[task_name],
+                    task_instance=task_instance,
                     qid=qid,
                 )
     except Exception as e:
-        logger.error(f"Failed to execute task: {e}")
+        logger.error(f"Failed to execute {task_instance.name}: {e}, id: {task_manager.id}")
     finally:
         logger.info("Ending all processes")
     return task_manager

@@ -45,6 +45,7 @@ class BaseTask(ABC):
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
     r2_threshold: float = 0.7
+    timeout = 60 * 60  # Default timeout of 1 hour
     registry: ClassVar[dict] = {}
 
     def __init_subclass__(cls, **kwargs) -> None:  # noqa: ANN003
