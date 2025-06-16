@@ -122,4 +122,4 @@ dev = [
 ]
 
 [tool.uv.sources]
-qubex = { git = "https://github.com/amachino/qubex.git", rev = "fix/scan_res_freqs" }
+qubex = { git = "https://github.com/amachino/qubex.git", rev = "develop" }

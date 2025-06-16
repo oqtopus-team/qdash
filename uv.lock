@@ -2705,7 +2705,7 @@ workflow = [
     { name = "pymongo", specifier = "==4.8.0" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "pyyaml", specifier = "==6.0.1" },
-    { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?rev=fix%2Fscan_res_freqs" },
+    { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?rev=develop" },
     { name = "reportlab", specifier = ">=4.4.1" },
     { name = "slack-sdk", specifier = "==3.31.0" },
 ]
@@ -2732,8 +2732,8 @@ dependencies = [
 
 [[package]]
 name = "qubex"
-version = "1.3.8rc1+d92e68c"
-source = { git = "https://github.com/amachino/qubex.git?rev=fix%2Fscan_res_freqs#d92e68c305075230d26bad33b9206a4cf348d826" }
+version = "1.3.8rc1+6e409f8"
+source = { git = "https://github.com/amachino/qubex.git?rev=develop#6e409f839bb5dbe36fd56320fa378e46ee1fd801" }
 dependencies = [
     { name = "cma" },
     { name = "cvxopt" },
