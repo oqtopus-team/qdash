@@ -19,6 +19,7 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
 
     name: str = "ZX90InterleavedRandomizedBenchmarking"
     task_type: str = "coupling"
+    timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "n_cliffords_range": InputParameterModel(
             unit="a.u.",
