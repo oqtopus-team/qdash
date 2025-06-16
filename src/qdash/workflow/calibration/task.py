@@ -7,7 +7,6 @@ from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.coupling import CouplingDocument
-from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task import TaskDocument
@@ -32,13 +31,14 @@ def validate_task_name(task_names: list[str], username: str) -> list[str]:
 initialize()
 
 
-@task(name="execute-dynamic-task", task_run_name="{task_instance.name}")
+@task(name="execute-dynamic-task")
 def execute_dynamic_task_by_qid(
     exp: Experiment,
+    execution_manager: ExecutionManager,
     task_manager: TaskManager,
     task_instance: BaseTask,
     qid: str,
-) -> TaskManager:
+) -> tuple[ExecutionManager, TaskManager]:
     """Execute dynamic task."""
     logger = get_run_logger()
     task_manager.diagnose()
@@ -47,15 +47,8 @@ def execute_dynamic_task_by_qid(
         task_name = this_task.get_name()
         task_type = this_task.get_task_type()
         execution_id = task_manager.execution_id
-        # ExecutionManagerの取得と更新
-        execution_manager = ExecutionManager(
-            username=task_manager.username,
-            execution_id=task_manager.execution_id,
-            calib_data_path=task_manager.calib_dir,
-        ).reload()
         logger.info(f"execution manager: {execution_manager.model_dump(mode='json')}")
         logger.info(f"Starting task: {task_name}, execution_id: {task_manager.execution_id}")
-
         # タスクの開始
         task_manager.start_task(task_name, task_type, qid)
         logger.info(f"task manager: {task_manager.model_dump(mode='json')}")
@@ -69,8 +62,6 @@ def execute_dynamic_task_by_qid(
 
         # ExecutionManagerの更新
         execution_manager = execution_manager.update_with_task_manager(task_manager)
-        # ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
-
         # タスクの前処理
         preprocess_result = this_task.preprocess(exp=exp, qid=qid)
         if preprocess_result is not None:
@@ -82,9 +73,6 @@ def execute_dynamic_task_by_qid(
             )
             task_manager.save()
             execution_manager = execution_manager.update_with_task_manager(task_manager)
-            # ExecutionHistoryDocument.upsert_document(
-            #     execution_model=execution_manager.to_datamodel()
-            # )
 
         # タスクの実行
         run_result = this_task.run(exp=exp, qid=qid)
@@ -160,7 +148,6 @@ def execute_dynamic_task_by_qid(
             task=executed_task, execution_model=execution_manager.to_datamodel()
         )
         execution_manager = execution_manager.update_with_task_manager(task_manager)
-        # ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
 
         # キャリブレーションデータの更新
         output_parameters = task_manager.get_output_parameter_by_task_name(
@@ -187,21 +174,6 @@ def execute_dynamic_task_by_qid(
 
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
-
-        # エラー時の処理
-        task_manager.update_task_status_to_failed(
-            task_name=task_name, message=f"{task_name} failed", task_type=task_type, qid=qid
-        )
-        task_manager.save()
-        execution_manager = execution_manager.update_with_task_manager(task_manager)
-        # ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
-
-        # 未実行タスクのスキップ処理
-        task_manager.update_not_executed_tasks_to_skipped(task_type=task_type, qid=qid)
-        task_manager.save()
-        execution_manager = execution_manager.update_with_task_manager(task_manager)
-        # ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
-
         raise RuntimeError(f"Task {task_name} failed: {e}")
 
     finally:
@@ -210,8 +182,6 @@ def execute_dynamic_task_by_qid(
         task_manager.end_task(task_name, task_type, qid)
         task_manager.save()
         execution_manager = execution_manager.update_with_task_manager(task_manager)
-        # ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
-
         # 最終状態の保存
         executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
         TaskResultHistoryDocument.upsert_document(
@@ -220,16 +190,17 @@ def execute_dynamic_task_by_qid(
         chip_doc = ChipDocument.get_current_chip(username=task_manager.username)
         ChipHistoryDocument.create_history(chip_doc)
 
-    return task_manager
+    return execution_manager, task_manager
 
 
-@task(name="execute-dynamic-task-batch", task_run_name="{task_instance.name}")
+@task(name="execute-dynamic-task-batch")
 def execute_dynamic_task_batch(
     exp: Experiment,
+    execution_manager: ExecutionManager,
     task_manager: TaskManager,
     task_instance: BaseTask,
     qids: list[str],
-) -> TaskManager:
+) -> tuple[ExecutionManager, TaskManager]:
     """Execute dynamic task."""
     logger = get_run_logger()
     task_manager.diagnose()
@@ -238,26 +209,14 @@ def execute_dynamic_task_batch(
         task_name = this_task.get_name()
         task_type = this_task.get_task_type()
         execution_id = task_manager.execution_id
-        # ExecutionManagerの取得と更新
-        execution_manager = ExecutionManager(
-            username=task_manager.username,
-            execution_id=task_manager.execution_id,
-            calib_data_path=task_manager.calib_dir,
-        ).reload()
         logger.info(f"execution manager: {execution_manager.model_dump(mode='json')}")
         logger.info(f"Starting task: {task_name}, execution_id: {task_manager.execution_id}")
 
-        # タスクの開始
-        for qid in qids:
-            task_manager.start_task(task_name, task_type, qid)
-        logger.info(f"task manager: {task_manager.model_dump(mode='json')}")
-        logger.info(f"Running task: {task_name}, id: {task_manager.id}")
-
         # タスク実行状態の保存
         for qid in qids:
-            task_manager.update_task_status_to_running(
-                task_name=task_name, message=f"{task_name} is running", task_type=task_type, qid=qid
-            )
+            logger.info(f"task manager: {task_manager.model_dump(mode='json')}")
+            logger.info(f"Running task: {task_name}, id: {task_manager.id}")
+            task_manager.start_task(task_name, task_type, qid)
             executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
             TaskResultHistoryDocument.upsert_document(
                 task=executed_task, execution_model=execution_manager.to_datamodel()
@@ -265,8 +224,6 @@ def execute_dynamic_task_batch(
 
         # ExecutionManagerの更新
         execution_manager = execution_manager.update_with_task_manager(task_manager)
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
-
         # タスクの前処理
         for qid in qids:
             preprocess_result = this_task.preprocess(exp=exp, qid=qid)
@@ -279,7 +236,6 @@ def execute_dynamic_task_batch(
                 )
                 task_manager.save()
         execution_manager = execution_manager.update_with_task_manager(task_manager)
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
 
         # タスクの実行
         run_result = this_task.batch_run(exp=exp, qids=qids)
@@ -309,6 +265,10 @@ def execute_dynamic_task_batch(
                         qid=qid,
                     )
                     task_manager.save()
+                    if run_result.has_r2() and run_result.r2[qid] < this_task.r2_threshold:
+                        raise ValueError(  # noqa: TRY301
+                            f"{this_task.name} R² value too low: {run_result.r2[qid]:.4f}"
+                        )
 
                     # タスクのノートを取得または作成
                     calib_note = json.loads(exp.calib_note.__str__())
@@ -358,7 +318,6 @@ def execute_dynamic_task_batch(
                 task=executed_task, execution_model=execution_manager.to_datamodel()
             )
         execution_manager = execution_manager.update_with_task_manager(task_manager)
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
 
         for qid in qids:
             # キャリブレーションデータの更新
@@ -386,22 +345,6 @@ def execute_dynamic_task_batch(
 
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
-        for qid in qids:
-            # エラー時の処理
-            task_manager.update_task_status_to_failed(
-                task_name=task_name, message=f"{task_name} failed", task_type=task_type, qid=qid
-            )
-            task_manager.save()
-        execution_manager = execution_manager.update_with_task_manager(task_manager)
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
-
-        for qid in qids:
-            # 未実行タスクのスキップ処理
-            task_manager.update_not_executed_tasks_to_skipped(task_type=task_type, qid=qid)
-            task_manager.save()
-        execution_manager = execution_manager.update_with_task_manager(task_manager)
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
-
         raise RuntimeError(f"Task {task_name} failed: {e}")
 
     finally:
@@ -410,8 +353,7 @@ def execute_dynamic_task_batch(
         for qid in qids:
             task_manager.end_task(task_name, task_type, qid)
             task_manager.save()
-        execution_manager = execution_manager.update_with_task_manager(task_manager)
-        ExecutionHistoryDocument.upsert_document(execution_model=execution_manager.to_datamodel())
+            execution_manager = execution_manager.update_with_task_manager(task_manager)
 
         # 最終状態の保存
         for qid in qids:
@@ -419,4 +361,6 @@ def execute_dynamic_task_batch(
             TaskResultHistoryDocument.upsert_document(
                 task=executed_task, execution_model=execution_manager.to_datamodel()
             )
-    return task_manager
+        chip_doc = ChipDocument.get_current_chip(username=task_manager.username)
+        ChipHistoryDocument.create_history(chip_doc)
+    return execution_manager, task_manager
