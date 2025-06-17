@@ -34,7 +34,7 @@ class CheckQubitSpectroscopy(BaseTask):
     def run(self, exp: Experiment, qid: str) -> RunResult:
         """Run the task."""
         label = qid_to_label(qid)
-        result = exp.scan_qubit_frequencies(label)
+        result = exp.qubit_spectroscopy(label)
         exp.calib_note.save()
         return RunResult(raw_result=result)
 
