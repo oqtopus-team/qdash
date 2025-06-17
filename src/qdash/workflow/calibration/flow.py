@@ -230,7 +230,7 @@ def cal_batch(
                     execution_id=task_manager.execution_id,
                     calib_data_path=task_manager.calib_dir,
                 ).reload()
-                task_manager = execute_dynamic_task_batch.with_options(
+                execution_manager, task_manager = execute_dynamic_task_batch.with_options(
                     timeout_seconds=task_instance.timeout, task_run_name=task_instance.name
                 )(
                     exp=exp,

@@ -11,21 +11,15 @@ from qdash.workflow.tasks.base import (
 from qubex.experiment import Experiment
 
 
-class CheckReflectionCoefficient(BaseTask):
-    """Task to check the reflection coefficient of a resonator."""
+class CheckQubitFrequencies(BaseTask):
+    """Task to check the qubit frequencies."""
 
-    name: str = "CheckReflectionCoefficient"
+    name: str = "CheckQubitFrequencies"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "fine_resonator_frequency": OutputParameterModel(
-            unit="GHz", description="Fine resonator frequency"
-        ),
-        "kappa_external": OutputParameterModel(
-            unit="MHz", description="External coupling rate (kappa_external)"
-        ),
-        "kappa_internal": OutputParameterModel(
-            unit="MHz", description="Internal coupling rate (kappa_internal)"
+        "coarse_qubit_frequency": OutputParameterModel(
+            unit="GHz", description="Coarse qubit frequency"
         ),
     }
 
@@ -38,17 +32,17 @@ class CheckReflectionCoefficient(BaseTask):
         label = qid_to_label(qid)
         result = run_result.raw_result
         figures = [result[label]["fig"]]
-        self.output_parameters["fine_resonator_frequency"].value = result[label]["f_r"]
-        self.output_parameters["kappa_external"].value = result[label]["kappa_ex"] * 1e3
-        self.output_parameters["kappa_internal"].value = result[label]["kappa_in"] * 1e3
+        coarse_qubit_frequency = 0
+        if result[label]["frequency_guess"]["f_ge"] is not None:
+            coarse_qubit_frequency = result[label]["frequency_guess"]["f_ge"]
+        self.output_parameters["coarse_qubit_frequency"].value = coarse_qubit_frequency
         output_parameters = self.attach_execution_id(execution_id)
-
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, exp: Experiment, qid: str) -> RunResult:
         """Run the task."""
         label = qid_to_label(qid)
-        result = exp.measure_reflection_coefficient(target=label)
+        result = exp.scan_qubit_frequencies(label)
         exp.calib_note.save()
         return RunResult(raw_result=result)
 
@@ -57,7 +51,7 @@ class CheckReflectionCoefficient(BaseTask):
         labels = [qid_to_label(qid) for qid in qids]
         results = {}
         for label in labels:
-            result = exp.measure_reflection_coefficient(target=label)
+            result = exp.scan_qubit_frequencies(label)
             results[label] = result
         exp.calib_note.save()
         return RunResult(raw_result=results)
