@@ -18,6 +18,7 @@ class CheckBellStateTomography(BaseTask):
 
     name: str = "CheckBellStateTomography"
     task_type: str = "coupling"
+    timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "bell_state_fidelity": OutputParameterModel(

@@ -22,9 +22,9 @@ interface TaskResultGridProps {
 }
 
 interface SelectedTaskInfo {
-  path: string;
   qid: string;
   task: Task;
+  subIndex?: number;
 }
 
 const MUX_SIZE = 2;
@@ -80,13 +80,6 @@ export function TaskResultGrid({
   const getTaskResult = (qid: string): Task | null =>
     taskResponse?.data?.result?.[qid] || null;
 
-  const getFigurePath = (task: Task): string | null => {
-    if (!task.figure_path) return null;
-    return Array.isArray(task.figure_path)
-      ? task.figure_path[0] || null
-      : task.figure_path;
-  };
-
   return (
     <div className="space-y-6">
       <div
@@ -121,15 +114,15 @@ export function TaskResultGrid({
               </div>
             );
 
-          const figurePath = getFigurePath(task);
+          const figurePath = Array.isArray(task.figure_path)
+            ? task.figure_path[0]
+            : task.figure_path || null;
           return (
             <button
               key={index}
               onClick={() => {
-                if (figurePath) {
-                  setSelectedTaskInfo({ path: figurePath, qid, task });
-                  setViewMode("static");
-                }
+                if (figurePath) setSelectedTaskInfo({ qid, task, subIndex: 0 });
+                setViewMode("static");
               }}
               className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow relative ${
                 task.over_threshold
@@ -137,10 +130,10 @@ export function TaskResultGrid({
                   : ""
               }`}
             >
-              {task.figure_path && (
+              {task.figure_path && figurePath && (
                 <div className="absolute inset-0">
                   <TaskFigure
-                    path={task.figure_path}
+                    path={figurePath}
                     qid={qid}
                     className="w-full h-full object-contain"
                   />
@@ -178,96 +171,211 @@ export function TaskResultGrid({
               </button>
             </div>
 
-            {viewMode === "static" && (
-              <div className="grid grid-cols-2 gap-8">
-                <div className="aspect-square bg-base-200/50 rounded-xl p-4">
-                  <TaskFigure
-                    path={selectedTaskInfo.path}
-                    qid={selectedTaskInfo.qid}
-                    className="w-full h-full object-contain"
-                  />
-                  {selectedTaskInfo.task.json_figure_path && (
-                    <button
-                      className="btn btn-sm mt-4"
-                      onClick={() => setViewMode("interactive")}
-                    >
-                      Interactive View
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-6">
-                  <div className="card bg-base-200 p-4 rounded-xl">
-                    <h4 className="font-medium mb-2">Status</h4>
-                    <div
-                      className={`badge ${
-                        selectedTaskInfo.task.status === "completed"
-                          ? "badge-success"
-                          : selectedTaskInfo.task.status === "failed"
-                          ? "badge-error"
-                          : "badge-warning"
-                      }`}
-                    >
-                      {selectedTaskInfo.task.status}
+            {viewMode === "static" &&
+              (() => {
+                const task = selectedTaskInfo.task;
+                const figures = Array.isArray(task.figure_path)
+                  ? task.figure_path
+                  : task.figure_path
+                  ? [task.figure_path]
+                  : [];
+                const currentSubIndex = selectedTaskInfo.subIndex ?? 0;
+                const currentFigure = figures[currentSubIndex];
+                return (
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="aspect-square bg-base-200/50 rounded-xl p-4">
+                      {currentFigure && (
+                        <TaskFigure
+                          path={currentFigure}
+                          qid={selectedTaskInfo.qid}
+                          className="w-full h-full object-contain"
+                        />
+                      )}
+                      {figures.length > 1 && (
+                        <div className="flex justify-center mt-2 gap-2">
+                          <button
+                            className="btn btn-xs"
+                            onClick={() =>
+                              setSelectedTaskInfo((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      subIndex:
+                                        ((prev.subIndex ?? 0) -
+                                          1 +
+                                          figures.length) %
+                                        figures.length,
+                                    }
+                                  : null
+                              )
+                            }
+                          >
+                            ◀
+                          </button>
+                          <span className="text-sm">
+                            {currentSubIndex + 1} / {figures.length}
+                          </span>
+                          <button
+                            className="btn btn-xs"
+                            onClick={() =>
+                              setSelectedTaskInfo((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      subIndex:
+                                        ((prev.subIndex ?? 0) + 1) %
+                                        figures.length,
+                                    }
+                                  : null
+                              )
+                            }
+                          >
+                            ▶
+                          </button>
+                        </div>
+                      )}
+                      {task.json_figure_path && (
+                        <button
+                          className="btn btn-sm mt-4"
+                          onClick={() => setViewMode("interactive")}
+                        >
+                          Interactive View
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-6">
+                      <div className="card bg-base-200 p-4 rounded-xl">
+                        <h4 className="font-medium mb-2">Status</h4>
+                        <div
+                          className={`badge ${
+                            task.status === "completed"
+                              ? "badge-success"
+                              : task.status === "failed"
+                              ? "badge-error"
+                              : "badge-warning"
+                          }`}
+                        >
+                          {task.status}
+                        </div>
+                      </div>
+                      {task.output_parameters && (
+                        <div className="card bg-base-200 p-4 rounded-xl">
+                          <h4 className="font-medium mb-2">Parameters</h4>
+                          <div className="space-y-2">
+                            {Object.entries(task.output_parameters).map(
+                              ([key, value]) => {
+                                const paramValue = (
+                                  typeof value === "object" &&
+                                  value !== null &&
+                                  "value" in value
+                                    ? value
+                                    : { value }
+                                ) as { value: number | string; unit?: string };
+                                return (
+                                  <div
+                                    key={key}
+                                    className="flex justify-between"
+                                  >
+                                    <span className="font-medium">{key}:</span>
+                                    <span>
+                                      {typeof paramValue.value === "number"
+                                        ? paramValue.value.toFixed(4)
+                                        : String(paramValue.value)}
+                                      {paramValue.unit
+                                        ? ` ${paramValue.unit}`
+                                        : ""}
+                                    </span>
+                                  </div>
+                                );
+                              }
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {task.message && (
+                        <div className="card bg-base-200 p-4 rounded-xl">
+                          <h4 className="font-medium mb-2">Message</h4>
+                          <p className="text-sm">{task.message}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  {selectedTaskInfo.task.output_parameters && (
-                    <div className="card bg-base-200 p-4 rounded-xl">
-                      <h4 className="font-medium mb-2">Parameters</h4>
-                      <div className="space-y-2">
-                        {Object.entries(
-                          selectedTaskInfo.task.output_parameters
-                        ).map(([key, value]) => {
-                          const paramValue = (
-                            typeof value === "object" &&
-                            value !== null &&
-                            "value" in value
-                              ? value
-                              : { value }
-                          ) as { value: number | string; unit?: string };
-                          return (
-                            <div key={key} className="flex justify-between">
-                              <span className="font-medium">{key}:</span>
-                              <span>
-                                {typeof paramValue.value === "number"
-                                  ? paramValue.value.toFixed(4)
-                                  : String(paramValue.value)}
-                                {paramValue.unit ? ` ${paramValue.unit}` : ""}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  {selectedTaskInfo.task.message && (
-                    <div className="card bg-base-200 p-4 rounded-xl">
-                      <h4 className="font-medium mb-2">Message</h4>
-                      <p className="text-sm">{selectedTaskInfo.task.message}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+                );
+              })()}
 
             {viewMode === "interactive" &&
-              selectedTaskInfo.task.json_figure_path && (
-                <div className="w-full h-[70vh] flex justify-center items-center">
-                  <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
-                    <div className="w-full h-full flex justify-center items-center">
-                      <div className="w-fit h-fit m-auto">
-                        <PlotlyRenderer
-                          className="w-full h-full"
-                          fullPath={`${
-                            process.env.NEXT_PUBLIC_API_URL
-                          }/api/executions/figure?path=${encodeURIComponent(
-                            selectedTaskInfo.task.json_figure_path[0]
-                          )}`}
-                        />
+              selectedTaskInfo.task.json_figure_path &&
+              (() => {
+                const figures = Array.isArray(
+                  selectedTaskInfo.task.json_figure_path
+                )
+                  ? selectedTaskInfo.task.json_figure_path
+                  : [selectedTaskInfo.task.json_figure_path];
+                const currentSubIndex = selectedTaskInfo.subIndex ?? 0;
+                const currentFigure = figures[currentSubIndex];
+
+                return (
+                  <div className="w-full h-[70vh] flex flex-col justify-center items-center space-y-4">
+                    <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
+                      <div className="w-full h-full flex justify-center items-center">
+                        <div className="w-fit h-fit m-auto">
+                          <PlotlyRenderer
+                            className="w-full h-full"
+                            fullPath={`${
+                              process.env.NEXT_PUBLIC_API_URL
+                            }/api/executions/figure?path=${encodeURIComponent(
+                              currentFigure
+                            )}`}
+                          />
+                        </div>
                       </div>
                     </div>
+                    {figures.length > 1 && (
+                      <div className="flex justify-center gap-2">
+                        <button
+                          className="btn btn-xs"
+                          onClick={() =>
+                            setSelectedTaskInfo((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    subIndex:
+                                      ((prev.subIndex ?? 0) -
+                                        1 +
+                                        figures.length) %
+                                      figures.length,
+                                  }
+                                : null
+                            )
+                          }
+                        >
+                          ◀
+                        </button>
+                        <span className="text-sm">
+                          {currentSubIndex + 1} / {figures.length}
+                        </span>
+                        <button
+                          className="btn btn-xs"
+                          onClick={() =>
+                            setSelectedTaskInfo((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    subIndex:
+                                      ((prev.subIndex ?? 0) + 1) %
+                                      figures.length,
+                                  }
+                                : null
+                            )
+                          }
+                        >
+                          ▶
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
             <div className="mt-6 flex justify-end gap-2">
               {viewMode === "interactive" && (

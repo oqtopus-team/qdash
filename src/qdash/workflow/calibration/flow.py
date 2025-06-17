@@ -20,6 +20,7 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.parameter import ParameterDocument
 from qdash.dbmodel.task import TaskDocument
+from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.workflow.calibration.task import (
     execute_dynamic_task_batch,
     execute_dynamic_task_by_qid,
@@ -149,14 +150,38 @@ def cal_serial(
                     logger.info(f"Task {task_name} is already completed")
                     continue
                 logger.info(f"Starting task: {task_name}")
-                task_manager = execute_dynamic_task_by_qid(
+                task_instance = task_instances[task_name]
+                execution_manager = ExecutionManager(
+                    username=task_manager.username,
+                    execution_id=task_manager.execution_id,
+                    calib_data_path=task_manager.calib_dir,
+                ).reload()
+                execution_manager, task_manager = execute_dynamic_task_by_qid.with_options(
+                    timeout_seconds=task_instance.timeout, task_run_name=task_instance.name
+                )(
                     exp=exp,
+                    execution_manager=execution_manager,
                     task_manager=task_manager,
-                    task_instance=task_instances[task_name],
+                    task_instance=task_instance,
                     qid=qid,
                 )
     except Exception as e:
-        logger.error(f"Failed to execute task: {e}")
+        logger.error(f"Failed to execute {task_instance.name}: {e}, id: {task_manager.id}")
+        # エラー時の処理
+        task_manager.update_task_status_to_failed(
+            task_name=task_name, message=f"{task_name} failed", task_type=task_type, qid=qid
+        )
+        task_manager.save()
+        # Update task result history
+        executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
+        TaskResultHistoryDocument.upsert_document(
+            task=executed_task, execution_model=execution_manager.to_datamodel()
+        )
+        execution_manager = execution_manager.update_with_task_manager(task_manager)
+        # 未実行タスクのスキップ処理
+        task_manager.update_not_executed_tasks_to_skipped(task_type=task_type, qid=qid)
+        task_manager.save()
+        execution_manager = execution_manager.update_with_task_manager(task_manager)
     finally:
         logger.info("Ending all processes")
     return task_manager
@@ -197,15 +222,40 @@ def cal_batch(
         )
         for task_name in task_names:
             if task_name in task_instances:
+                task_type = task_instances[task_name].get_task_type()
                 logger.info(f"Starting task: {task_name}")
-                task_manager = execute_dynamic_task_batch(
+                task_instance = task_instances[task_name]
+                execution_manager = ExecutionManager(
+                    username=task_manager.username,
+                    execution_id=task_manager.execution_id,
+                    calib_data_path=task_manager.calib_dir,
+                ).reload()
+                execution_manager, task_manager = execute_dynamic_task_batch.with_options(
+                    timeout_seconds=task_instance.timeout, task_run_name=task_instance.name
+                )(
                     exp=exp,
+                    execution_manager=execution_manager,
                     task_manager=task_manager,
-                    task_instance=task_instances[task_name],
+                    task_instance=task_instance,
                     qids=qids,
                 )
     except Exception as e:
         logger.error(f"Failed to execute task: {e}")
+        for qid in qids:
+            task_manager.update_task_status_to_failed(
+                task_name=task_name, message=f"{task_name} failed", task_type=task_type, qid=qid
+            )
+            task_manager.save()
+            # Update task result history
+            executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
+            TaskResultHistoryDocument.upsert_document(
+                task=executed_task, execution_model=execution_manager.to_datamodel()
+            )
+            execution_manager = execution_manager.update_with_task_manager(task_manager)
+            # 未実行タスクのスキップ処理
+            task_manager.update_not_executed_tasks_to_skipped(task_type=task_type, qid=qid)
+            task_manager.save()
+            execution_manager = execution_manager.update_with_task_manager(task_manager)
     finally:
         logger.info("Ending all processes")
     return task_manager
