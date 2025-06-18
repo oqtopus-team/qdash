@@ -128,8 +128,9 @@ if __name__ == "__main__":
                 "qubits": [],
                 "exclude_couplings": [],
                 "condition": {
-                    "coupling_fidelity": {"min": 0.7, "max": 1.0},
-                    "qubit_fidelity": {"min": 0.9, "max": 1.0},
+                    "coupling_fidelity": {"min": 0.7, "max": 1.0, "is_within_24h": True},
+                    "qubit_fidelity": {"min": 0.9, "max": 1.0, "is_within_24h": False},
+                    "readout_fidelity": {"min": 0.5, "max": 1.0, "is_within_24h": True},
                     "only_maximum_connected": True,
                 },
             },
