@@ -157,7 +157,9 @@ def cal_serial(
                     calib_data_path=task_manager.calib_dir,
                 ).reload()
                 execution_manager, task_manager = execute_dynamic_task_by_qid.with_options(
-                    timeout_seconds=task_instance.timeout, task_run_name=task_instance.name
+                    timeout_seconds=task_instance.timeout,
+                    task_run_name=task_instance.name,
+                    log_prints=True,
                 )(
                     exp=exp,
                     execution_manager=execution_manager,
