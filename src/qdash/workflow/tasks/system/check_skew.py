@@ -1,5 +1,7 @@
-from typing import ClassVar
+from pathlib import Path
+from typing import Any, ClassVar
 
+import yaml
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -36,7 +38,14 @@ class CheckSkew(BaseTask):
             output_parameters=self.attach_execution_id(execution_id), figures=figures
         )
 
+    def load(self, filename: str) -> Any:
+        with (Path.cwd() / Path(filename)).open() as file:
+            return yaml.safe_load(file)
+
     def run(self, exp: Experiment, qid: str) -> RunResult:  # noqa: ARG002
+        config = self.load("/app/config/skew.yaml")
+        for k, v in config["box_setting"].items():
+            print(f"Box {k} setting: {v}")
         exp = Experiment(
             chip_id="64Q",
             muxes=self.input_parameters["muxes"].get_value(),
@@ -53,6 +62,8 @@ class CheckSkew(BaseTask):
         skew = Skew.create(setting=setting, system=system, sysdb=qc.sysdb)
         skew.measure()
         skew.estimate()
+        for v, k in skew._estimated.items():
+            print(f"Estimated skew for {v[0]}: {k.idx:.3f} ns")
         fig = skew.plot()
         result = {
             "fig": fig,
