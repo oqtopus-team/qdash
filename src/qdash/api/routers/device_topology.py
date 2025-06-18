@@ -201,7 +201,7 @@ class FidelityCondition(BaseModel):
 
     min: float
     max: float
-    is_within_24h: bool = True  # 追加
+    is_within_24h: bool = True
 
 
 class Condition(BaseModel):

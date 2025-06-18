@@ -20,44 +20,36 @@ logging.info(f"Using QDash API base URL: {API_URL}")
 
 
 class FidelityCondition(BaseModel):
-    """Model for fidelity conditions with min and max values."""
+    """Condition for fidelity filtering."""
 
     min: float
     max: float
+    is_within_24h: bool = True
 
 
-class TopologyCondition(BaseModel):
-    """Model for device topology conditions."""
+class Condition(BaseModel):
+    """Condition for filtering device topology."""
 
-    coupling_fidelity: FidelityCondition = Field(
-        FidelityCondition(min=0.7, max=1.0),
-        description="Conditions for coupling fidelity",
-    )
-    qubit_fidelity: FidelityCondition = Field(
-        FidelityCondition(min=0.9, max=1.0),
-        description="Conditions for qubit fidelity",
-    )
-    only_maximum_connected: bool = Field(
-        default=True, description="If True, only include maximum connected qubits in the topology"
-    )
+    coupling_fidelity: FidelityCondition
+    qubit_fidelity: FidelityCondition
+    readout_fidelity: FidelityCondition
+    only_maximum_connected: bool = True
 
 
 class DeviceTopologyRequest(BaseModel):
-    """Model for device topology request data."""
+    """Request model for device topology."""
 
-    name: str = Field("anemone", description="The name of the device topology request")
-    device_id: str = Field("anemone", description="The ID of the device")
-    qubits: list[str] = Field([], description="List of qubit IDs to include in the topology")
-    exclude_couplings: list[str] = Field(
-        [], description="List of coupling IDs to exclude from the topology"
-    )
-    condition: TopologyCondition = Field(
-        default_factory=lambda: TopologyCondition(
-            coupling_fidelity=FidelityCondition(min=0.7, max=1.0),
-            qubit_fidelity=FidelityCondition(min=0.9, max=1.0),
+    name: str = "anemone"
+    device_id: str = "anemone"
+    qubits: list[str] = []
+    exclude_couplings: list[str] = []
+    condition: Condition = Field(
+        default_factory=lambda: Condition(
+            coupling_fidelity=FidelityCondition(min=0.7, max=1.0, is_within_24h=True),
+            qubit_fidelity=FidelityCondition(min=0.9, max=1.0, is_within_24h=False),
+            readout_fidelity=FidelityCondition(min=0.5, max=1.0, is_within_24h=True),
             only_maximum_connected=True,
-        ),
-        description="Conditions for the device topology",
+        )
     )
 
 
