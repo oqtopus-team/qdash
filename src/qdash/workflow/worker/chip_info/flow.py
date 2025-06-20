@@ -9,11 +9,11 @@ from qdash.config import get_settings
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.initialize import initialize
-from qdash.workflow.subflow.chip_info.task import generate_chip_info_report
 from qdash.workflow.utils.slack import SlackContents, Status
 from qdash.workflow.utiltask.create_directory import (
     create_directory_task,
 )
+from qdash.workflow.worker.chip_info.task import generate_chip_info_report
 
 # Import YAML module
 from ruamel import yaml

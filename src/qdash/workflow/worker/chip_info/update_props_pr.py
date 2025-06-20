@@ -14,13 +14,13 @@ from prefect.logging import get_run_logger
 from qdash.config import get_settings
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
-from qdash.workflow.subflow.chip_info.flow import (
+from qdash.workflow.utils.slack import SlackContents, Status
+from qdash.workflow.worker.chip_info.flow import (
     get_chip_properties,
     merge_properties,
     read_base_properties,
     write_yaml,
 )
-from qdash.workflow.utils.slack import SlackContents, Status
 
 
 @flow(name="update-props-pr", log_prints=True)
