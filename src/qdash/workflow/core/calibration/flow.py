@@ -34,13 +34,13 @@ from qdash.workflow.core.calibration.util import (
     update_active_output_parameters,
     update_active_tasks,
 )
+from qdash.workflow.core.session.base import BaseSession
+from qdash.workflow.core.session.qubex import QubexSession
+
+# from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.qubex.active_protocols import generate_task_instances
-from qubex.experiment import Experiment
 from qubex.version import get_package_version
 
-# Constants
-CONFIG_DIR = "/app/config"
-PARAMS_DIR = "/app/config"
 CHIP_SIZE_64 = 64
 CHIP_SIZE_144 = 144
 CHIP_SIZE_256 = 256
@@ -111,7 +111,7 @@ def build_workflow(
 @flow(flow_run_name="{qid}")
 def cal_serial(
     menu: Menu,
-    exp: Experiment,
+    session: BaseSession,
     task_manager: TaskManager,
     task_names: list[str],
     qid: str,
@@ -161,7 +161,7 @@ def cal_serial(
                     task_run_name=task_instance.name,
                     log_prints=True,
                 )(
-                    exp=exp,
+                    session=session,
                     execution_manager=execution_manager,
                     task_manager=task_manager,
                     task_instance=task_instance,
@@ -192,7 +192,7 @@ def cal_serial(
 @flow(flow_run_name="{qids}")
 def cal_batch(
     menu: Menu,
-    exp: Experiment,
+    session: BaseSession,
     task_manager: TaskManager,
     task_names: list[str],
     qids: list[str],
@@ -235,7 +235,7 @@ def cal_batch(
                 execution_manager, task_manager = execute_dynamic_task_batch.with_options(
                     timeout_seconds=task_instance.timeout, task_run_name=task_instance.name
                 )(
-                    exp=exp,
+                    session=session,
                     execution_manager=execution_manager,
                     task_manager=task_manager,
                     task_instance=task_instance,
@@ -270,7 +270,7 @@ def setup_calibration(
     execution_id: str,
     qubits: list[str],
     task_names: list[str],
-) -> tuple[TaskManager, Experiment]:
+) -> tuple[TaskManager, BaseSession]:
     """Set up calibration environment and initialize required components.
 
     Args:
@@ -375,16 +375,19 @@ def setup_calibration(
         )
     # Initialize experiment
     initialize()
-    exp = Experiment(
-        chip_id=chip_id,
-        qubits=labels,
-        config_dir=CONFIG_DIR,
-        params_dir=PARAMS_DIR,
-        calib_note_path=note_path,
+    # exp = Experiment(
+    #     chip_id=chip_id,
+    #     qubits=labels,
+    #     config_dir=CONFIG_DIR,
+    #     params_dir=PARAMS_DIR,
+    #     calib_note_path=note_path,
+    # )
+    session = QubexSession(
+        config={"chip_id": chip_id, "qubits": labels, "calib_note_path": note_path}
     )
-    exp.note.clear()
+    session.connect()
 
-    return task_manager, exp
+    return task_manager, session
 
 
 @flow(flow_run_name="{qubits}")
@@ -415,7 +418,7 @@ def serial_cal_flow(
         Dictionary mapping task names to their execution success status
 
     """
-    task_manager, exp = setup_calibration(
+    task_manager, session = setup_calibration(
         menu=menu,
         calib_dir=calib_dir,
         execution_id=execution_id,
@@ -426,7 +429,7 @@ def serial_cal_flow(
     for qid in qubits:
         task_manager = cal_serial(
             menu=menu,
-            exp=exp,
+            session=session,
             task_manager=task_manager,
             task_names=task_names,
             qid=qid,
@@ -462,7 +465,7 @@ def batch_cal_flow(
         Dictionary mapping task names to their execution success status
 
     """
-    task_manager, exp = setup_calibration(
+    task_manager, session = setup_calibration(
         menu=menu,
         calib_dir=calib_dir,
         execution_id=execution_id,
@@ -472,7 +475,7 @@ def batch_cal_flow(
 
     task_manager = cal_batch(
         menu=menu,
-        exp=exp,
+        session=session,
         task_manager=task_manager,
         task_names=task_names,
         qids=qubits,

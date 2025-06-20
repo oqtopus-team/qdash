@@ -3,6 +3,7 @@ from typing import Any, ClassVar
 
 import yaml
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
     PostProcessResult,
@@ -10,7 +11,6 @@ from qdash.workflow.tasks.base import (
     RunResult,
 )
 from qubecalib.instrument.quel.quel1.tool.skew import Skew, SkewSetting
-from qubex.experiment import Experiment
 
 
 class CheckSkew(BaseTask):
@@ -28,7 +28,7 @@ class CheckSkew(BaseTask):
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 
-    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
+    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
         return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
@@ -42,16 +42,13 @@ class CheckSkew(BaseTask):
         with (Path.cwd() / Path(filename)).open() as file:
             return yaml.safe_load(file)
 
-    def run(self, exp: Experiment, qid: str) -> RunResult:  # noqa: ARG002
+    def run(self, session: QubexSession, qid: str) -> RunResult:  # noqa: ARG002
         config = self.load("/app/config/skew.yaml")
         for k, v in config["box_setting"].items():
             print(f"Box {k} setting: {v}")
-        exp = Experiment(
-            chip_id="64Q",
-            muxes=self.input_parameters["muxes"].get_value(),
-            config_dir="/app/config",
-            params_dir="/app/config",
-        )
+        session = QubexSession(config=config)
+        exp = session.get_session()
+
         qc = exp.tool.get_qubecalib()
         qc.sysdb.load_box_yaml("/app/config/box.yaml")
         setting = SkewSetting.from_yaml("/app/config/skew.yaml")
@@ -70,7 +67,7 @@ class CheckSkew(BaseTask):
         }
         return RunResult(raw_result=result)
 
-    def batch_run(self, exp: Experiment, qid: str) -> RunResult:
+    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
         raise NotImplementedError(
             f"Batch run is not implemented for {self.name} task. Use run method instead."

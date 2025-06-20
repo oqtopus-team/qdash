@@ -4,7 +4,7 @@ from typing import Any, ClassVar, Literal
 import plotly.graph_objs as go
 from pydantic import BaseModel
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qubex.experiment import Experiment
+from qdash.workflow.core.session.base import BaseSession
 
 
 class PreProcessResult(BaseModel):
@@ -119,12 +119,12 @@ class BaseTask(ABC):
                         self.input_parameters[name].value = converted_value
 
     @abstractmethod
-    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
+    def preprocess(self, session: BaseSession, qid: str) -> PreProcessResult:
         """Preprocess the task. This method is called before the task is executed.
 
         Args:
         ----
-            exp: Experiment object
+            session: Session object
             qid: qubit id
 
         """
@@ -142,23 +142,23 @@ class BaseTask(ABC):
         """
 
     @abstractmethod
-    def run(self, exp: Experiment, qid: str) -> RunResult:
+    def run(self, session: BaseSession, qid: str) -> RunResult:
         """Run the task.
 
         Args:
         ----
-            exp: Experiment object
+            session: Session object
             qid: qubit id
 
         """
 
     @abstractmethod
-    def batch_run(self, exp: Experiment, qids: list[str]) -> RunResult:
+    def batch_run(self, session: BaseSession, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits.
 
         Args:
         ----
-            exp: Experiment object
+            session: Session object
             qids: list of qubit ids
 
         """

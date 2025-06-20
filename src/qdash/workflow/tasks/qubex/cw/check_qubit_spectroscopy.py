@@ -2,13 +2,13 @@ from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.calibration.util import qid_to_label
+from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
-from qubex.experiment import Experiment
 
 
 class CheckQubitSpectroscopy(BaseTask):
@@ -19,7 +19,7 @@ class CheckQubitSpectroscopy(BaseTask):
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 
-    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
+    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
         """Preprocess the task."""
         return PreProcessResult(input_parameters=self.input_parameters)
 
@@ -31,17 +31,19 @@ class CheckQubitSpectroscopy(BaseTask):
         output_parameters = self.attach_execution_id(execution_id)
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
-    def run(self, exp: Experiment, qid: str) -> RunResult:
+    def run(self, session: QubexSession, qid: str) -> RunResult:
         """Run the task."""
         label = qid_to_label(qid)
+        exp = session.get_session()
         result = exp.qubit_spectroscopy(label)
         exp.calib_note.save()
         return RunResult(raw_result=result)
 
-    def batch_run(self, exp: Experiment, qids: list[str]) -> RunResult:
+    def batch_run(self, session: QubexSession, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits."""
         labels = [qid_to_label(qid) for qid in qids]
         results = {}
+        exp = session.get_session()
         for label in labels:
             result = exp.qubit_spectroscopy(label)
             results[label] = result
