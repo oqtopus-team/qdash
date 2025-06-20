@@ -285,7 +285,6 @@ class ExecutionManager(BaseModel):
                     note=merged_note,
                 )
 
-            # タスクのノートもDBに保存
             CalibrationNoteDocument.upsert_note(
                 username=self.username,
                 execution_id=self.execution_id,
