@@ -3,7 +3,7 @@ from typing import ClassVar
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.util import qid_to_label
+from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.tasks.base import (
     BaseTask,
     PostProcessResult,

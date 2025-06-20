@@ -21,14 +21,14 @@ from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.parameter import ParameterDocument
 from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-from qdash.workflow.core.calibration_task import (
+from qdash.workflow.core.calibration.execution_manager import ExecutionManager
+from qdash.workflow.core.calibration.task import (
     execute_dynamic_task_batch,
     execute_dynamic_task_by_qid,
     validate_task_name,
 )
-from qdash.workflow.core.execution_manager import ExecutionManager
-from qdash.workflow.core.task_manager import TaskManager
-from qdash.workflow.core.util import (
+from qdash.workflow.core.calibration.task_manager import TaskManager
+from qdash.workflow.core.calibration.util import (
     coupling_qids_to_qubit_labels,
     qid_to_label,
     update_active_output_parameters,
