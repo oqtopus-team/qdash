@@ -11,8 +11,8 @@ from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-from qdash.workflow.manager.execution import ExecutionManager
-from qdash.workflow.manager.task import TaskManager
+from qdash.workflow.core.execution_manager import ExecutionManager
+from qdash.workflow.core.task_manager import TaskManager
 from qdash.workflow.tasks.base import BaseTask
 from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
 from qubex.experiment import Experiment

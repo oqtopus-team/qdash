@@ -16,7 +16,7 @@ from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.initialize import initialize
-from qdash.workflow.manager.task import TaskManager
+from qdash.workflow.core.task_manager import TaskManager
 from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
 
 initialize()
