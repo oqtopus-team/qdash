@@ -461,13 +461,6 @@ class TaskManager(BaseModel):
         """
         if savepath == "":
             savepath = str(Path(self.calib_dir) / "fig" / f"{name}.{file_format}")
-        # fig.write_image(
-        #     savepath,
-        #     format=file_format,
-        #     width=width,
-        #     height=height,
-        #     scale=scale,
-        # )
         fig.update_layout(width=width, height=height)
         fig.write_json(
             savepath,
