@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.calibration.util import qid_to_cr_pair
+from qdash.workflow.core.util import qid_to_cr_pair
 from qdash.workflow.tasks.base import (
     BaseTask,
     PostProcessResult,
