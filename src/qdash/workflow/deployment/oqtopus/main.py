@@ -3,8 +3,8 @@ from prefect import serve
 
 from prefect.client.schemas.schedules import CronSchedule
 
-from qdash.workflow.core.calibration_flow import serial_cal_flow
-from qdash.workflow.core.calibration_flow import batch_cal_flow
+from qdash.workflow.core.calibration.flow import serial_cal_flow
+from qdash.workflow.core.calibration.flow import batch_cal_flow
 from qdash.workflow.entrypoints.handler import main_flow
 
 # from qdash.workflow.subflow.chip_info.update_props_pr import update_props_pr
