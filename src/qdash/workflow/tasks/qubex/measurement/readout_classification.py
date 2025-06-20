@@ -4,13 +4,13 @@ if TYPE_CHECKING:
     import plotly.graph_objs as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.calibration.util import qid_to_label
+from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
-from qubex.experiment import Experiment
 
 
 class ReadoutClassification(BaseTask):
@@ -34,7 +34,7 @@ class ReadoutClassification(BaseTask):
         ),
     }
 
-    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
+    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
         """Preprocess the task."""
         return PreProcessResult(input_parameters=self.input_parameters)
 
@@ -51,13 +51,14 @@ class ReadoutClassification(BaseTask):
         figures: list[go.Figure] = []
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
-    def run(self, exp: Experiment, qid: str) -> RunResult:
+    def run(self, session: QubexSession, qid: str) -> RunResult:
+        exp = session.get_session()
         label = qid_to_label(qid)
         result = exp.build_classifier(targets=label)
         exp.calib_note.save()
         return RunResult(raw_result=result)
 
-    def batch_run(self, exp: Experiment, qid: str) -> RunResult:
+    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
         raise NotImplementedError(
             f"Batch run is not implemented for {self.name} task. Use run method instead."

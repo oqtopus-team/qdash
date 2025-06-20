@@ -2,6 +2,7 @@ from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.calibration.util import qid_to_label
+from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
     PostProcessResult,
@@ -9,7 +10,6 @@ from qdash.workflow.tasks.base import (
     RunResult,
 )
 from qubex.clifford import Clifford
-from qubex.experiment import Experiment
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement import DEFAULT_INTERVAL
 
@@ -53,7 +53,7 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
         ),
     }
 
-    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
+    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
         return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:  # noqa: ARG002
@@ -63,9 +63,10 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
         figures = [result["fig"]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
-    def run(self, exp: Experiment, qid: str) -> RunResult:
+    def run(self, session: QubexSession, qid: str) -> RunResult:
         """Run the X90 interleaved randomized benchmarking task with timeout."""
         label = qid_to_label(qid)
+        exp = session.get_session()
         result = exp.interleaved_randomized_benchmarking(
             target=label,
             interleaved_waveform=exp.drag_hpi_pulse[label],
@@ -80,7 +81,7 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
         exp.calib_note.save()
         return RunResult(raw_result=result)
 
-    def batch_run(self, exp: Experiment, qid: str) -> RunResult:
+    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
         raise NotImplementedError(
             f"Batch run is not implemented for {self.name} task. Use run method instead."

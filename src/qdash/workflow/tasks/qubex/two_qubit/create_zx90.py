@@ -2,13 +2,13 @@ from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.calibration.util import qid_to_cr_label, qid_to_cr_pair
+from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
-from qubex.experiment import Experiment
 
 
 class CreateZX90(BaseTask):
@@ -42,7 +42,7 @@ class CreateZX90(BaseTask):
         ),
     }
 
-    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
+    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
         return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
@@ -61,8 +61,9 @@ class CreateZX90(BaseTask):
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
         )
 
-    def run(self, exp: Experiment, qid: str) -> RunResult:
+    def run(self, session: QubexSession, qid: str) -> RunResult:
         control, target = qid_to_cr_pair(qid)
+        exp = session.get_session()
         raw_result = exp.calibrate_zx90(control, target)
         fit_result = exp.calib_note.get_cr_param(qid_to_cr_label(qid))
         if fit_result is None:
@@ -84,7 +85,7 @@ class CreateZX90(BaseTask):
         exp.calib_note.save()
         return RunResult(raw_result=result)
 
-    def batch_run(self, exp: Experiment, qid: str) -> RunResult:
+    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
         raise NotImplementedError(
             f"Batch run is not implemented for {self.name} task. Use run method instead."

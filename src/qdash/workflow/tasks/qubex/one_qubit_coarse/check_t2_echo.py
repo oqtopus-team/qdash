@@ -3,13 +3,13 @@ from typing import ClassVar
 import numpy as np
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.calibration.util import qid_to_label
+from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
-from qubex.experiment import Experiment
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 
@@ -42,7 +42,7 @@ class CheckT2Echo(BaseTask):
         "t2_echo": OutputParameterModel(unit="μs", description="T2 echo time"),
     }
 
-    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
+    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
         return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
@@ -54,8 +54,9 @@ class CheckT2Echo(BaseTask):
         figures = [result.data[label].fit()["fig"]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
-    def run(self, exp: Experiment, qid: str) -> RunResult:
+    def run(self, session: QubexSession, qid: str) -> RunResult:
         labels = [qid_to_label(qid)]
+        exp = session.get_session()
         result = exp.t2_experiment(
             labels,
             time_range=self.input_parameters["time_range"].get_value(),
@@ -67,7 +68,7 @@ class CheckT2Echo(BaseTask):
         exp.calib_note.save()
         return RunResult(raw_result=result, r2={qid: r2})
 
-    def batch_run(self, exp: Experiment, qid: str) -> RunResult:
+    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
         raise NotImplementedError(
             f"Batch run is not implemented for {self.name} task. Use run method instead."

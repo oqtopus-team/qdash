@@ -3,13 +3,13 @@ from typing import Any, ClassVar
 import plotly.graph_objects as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.calibration.util import qid_to_label
+from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
-from qubex.experiment import Experiment
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 
@@ -52,7 +52,7 @@ class CheckRamsey(BaseTask):
         "t2_star": OutputParameterModel(unit="μs", description="T2* time"),
     }
 
-    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:  # noqa: ARG002
+    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
         """Preprocess the task."""
         return PreProcessResult(input_parameters=self.input_parameters)
 
@@ -135,9 +135,10 @@ class CheckRamsey(BaseTask):
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
         )
 
-    def run(self, exp: Experiment, qid: str) -> RunResult:
+    def run(self, session: QubexSession, qid: str) -> RunResult:
         """Run the task."""
         label = qid_to_label(qid)
+        exp = session.get_session()
         result_x = exp.ramsey_experiment(
             time_range=self.input_parameters["time_range"].get_value(),
             shots=self.input_parameters["shots"].get_value(),
@@ -161,7 +162,7 @@ class CheckRamsey(BaseTask):
         r2 = result_x.data[label].r2 if result_x.data else None
         return RunResult(raw_result=result, r2={qid: r2})
 
-    def batch_run(self, exp: Experiment, qid: str) -> RunResult:
+    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
         raise NotImplementedError(
             f"Batch run is not implemented for {self.name} task. Use run method instead."

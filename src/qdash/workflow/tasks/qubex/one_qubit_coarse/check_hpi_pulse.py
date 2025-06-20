@@ -2,14 +2,13 @@ from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.calibration.util import qid_to_label
+from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
-from qubex.analysis.visualization import plot
-from qubex.experiment import Experiment
 
 
 class CheckHPIPulse(BaseTask):
@@ -27,7 +26,7 @@ class CheckHPIPulse(BaseTask):
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 
-    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
+    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
         return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
@@ -38,8 +37,9 @@ class CheckHPIPulse(BaseTask):
             output_parameters=self.attach_execution_id(execution_id), figures=figures
         )
 
-    def run(self, exp: Experiment, qid: str) -> RunResult:
+    def run(self, session: QubexSession, qid: str) -> RunResult:
         labels = [qid_to_label(qid)]
+        exp = session.get_session()
         hpi_pulse = {qubit: exp.hpi_pulse[qubit] for qubit in labels}
         result = exp.repeat_sequence(
             sequence=hpi_pulse,
@@ -48,7 +48,7 @@ class CheckHPIPulse(BaseTask):
         exp.calib_note.save()
         return RunResult(raw_result=result)
 
-    def batch_run(self, exp: Experiment, qid: str) -> RunResult:
+    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
         raise NotImplementedError(
             f"Batch run is not implemented for {self.name} task. Use run method instead."

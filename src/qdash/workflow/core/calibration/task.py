@@ -13,9 +13,9 @@ from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.workflow.core.calibration.execution_manager import ExecutionManager
 from qdash.workflow.core.calibration.task_manager import TaskManager
+from qdash.workflow.core.session.base import BaseSession
 from qdash.workflow.tasks.base import BaseTask
 from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
-from qubex.experiment import Experiment
 
 
 def validate_task_name(task_names: list[str], username: str) -> list[str]:
@@ -33,7 +33,7 @@ initialize()
 
 @task(name="execute-dynamic-task")
 def execute_dynamic_task_by_qid(
-    exp: Experiment,
+    session: BaseSession,
     execution_manager: ExecutionManager,
     task_manager: TaskManager,
     task_instance: BaseTask,
@@ -63,7 +63,7 @@ def execute_dynamic_task_by_qid(
         # ExecutionManagerの更新
         execution_manager = execution_manager.update_with_task_manager(task_manager)
         # タスクの前処理
-        preprocess_result = this_task.preprocess(exp=exp, qid=qid)
+        preprocess_result = this_task.preprocess(session=session, qid=qid)
         if preprocess_result is not None:
             task_manager.put_input_parameters(
                 task_name=task_name,
@@ -75,7 +75,7 @@ def execute_dynamic_task_by_qid(
             execution_manager = execution_manager.update_with_task_manager(task_manager)
 
         # タスクの実行
-        run_result = this_task.run(exp=exp, qid=qid)
+        run_result = this_task.run(session=session, qid=qid)
         if run_result is not None:
             postprocess_result = this_task.postprocess(
                 execution_id=execution_id, run_result=run_result, qid=qid
@@ -104,8 +104,8 @@ def execute_dynamic_task_by_qid(
                 # for record tha failed result, error handling do this step
                 if run_result.has_r2() and run_result.r2[qid] < this_task.r2_threshold:
                     raise ValueError(f"{this_task.name} R² value too low: {run_result.r2[qid]:.4f}")  # noqa: TRY301
-                # タスクのノートを取得または作成
-                calib_note = json.loads(exp.calib_note.__str__())
+                # # タスクのノートを取得または作成
+                calib_note = json.loads(session.get_note())
                 task_doc = CalibrationNoteDocument.find_one(
                     {
                         "execution_id": execution_id,
@@ -195,7 +195,7 @@ def execute_dynamic_task_by_qid(
 
 @task(name="execute-dynamic-task-batch")
 def execute_dynamic_task_batch(
-    exp: Experiment,
+    session: BaseSession,
     execution_manager: ExecutionManager,
     task_manager: TaskManager,
     task_instance: BaseTask,
@@ -226,7 +226,7 @@ def execute_dynamic_task_batch(
         execution_manager = execution_manager.update_with_task_manager(task_manager)
         # タスクの前処理
         for qid in qids:
-            preprocess_result = this_task.preprocess(exp=exp, qid=qid)
+            preprocess_result = this_task.preprocess(session=session, qid=qid)
             if preprocess_result is not None:
                 task_manager.put_input_parameters(
                     task_name=task_name,
@@ -238,7 +238,7 @@ def execute_dynamic_task_batch(
         execution_manager = execution_manager.update_with_task_manager(task_manager)
 
         # タスクの実行
-        run_result = this_task.batch_run(exp=exp, qids=qids)
+        run_result = this_task.batch_run(session=session, qids=qids)
         if run_result is not None:
             for qid in qids:
                 postprocess_result = this_task.postprocess(
@@ -270,8 +270,8 @@ def execute_dynamic_task_batch(
                             f"{this_task.name} R² value too low: {run_result.r2[qid]:.4f}"
                         )
 
-                    # タスクのノートを取得または作成
-                    calib_note = json.loads(exp.calib_note.__str__())
+                    # # タスクのノートを取得または作成
+                    calib_note = json.loads(session.get_note())
                     task_doc = CalibrationNoteDocument.find_one(
                         {
                             "execution_id": execution_id,
