@@ -34,7 +34,7 @@ from qdash.workflow.core.util import (
     update_active_output_parameters,
     update_active_tasks,
 )
-from qdash.workflow.tasks.active_protocols import generate_task_instances
+from qdash.workflow.tasks.qubex.active_protocols import generate_task_instances
 from qubex.experiment import Experiment
 from qubex.version import get_package_version
 
