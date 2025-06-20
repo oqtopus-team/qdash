@@ -35,9 +35,7 @@ from qdash.workflow.core.calibration.util import (
     update_active_tasks,
 )
 from qdash.workflow.core.session.base import BaseSession
-from qdash.workflow.core.session.qubex import QubexSession
-
-# from qdash.workflow.core.session.qubex import QubexSession
+from qdash.workflow.core.session.factory import get_session
 from qdash.workflow.tasks.qubex.active_protocols import generate_task_instances
 from qubex.version import get_package_version
 
@@ -375,16 +373,10 @@ def setup_calibration(
         )
     # Initialize experiment
     initialize()
-    # exp = Experiment(
-    #     chip_id=chip_id,
-    #     qubits=labels,
-    #     config_dir=CONFIG_DIR,
-    #     params_dir=PARAMS_DIR,
-    #     calib_note_path=note_path,
-    # )
-    session = QubexSession(
+    session = get_session(
         config={"chip_id": chip_id, "qubits": labels, "calib_note_path": note_path}
     )
+
     session.connect()
 
     return task_manager, session
