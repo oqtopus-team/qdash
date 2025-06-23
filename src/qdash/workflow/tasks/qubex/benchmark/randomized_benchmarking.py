@@ -17,6 +17,7 @@ class RandomizedBenchmarking(BaseTask):
     """Task to perform randomized benchmarking."""
 
     name: str = "RandomizedBenchmarking"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "n_cliffords_range": InputParameterModel(

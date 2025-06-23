@@ -16,6 +16,7 @@ class CheckQubit(BaseTask):
     """Task to check the Qubit Rabi oscillation breifly."""
 
     name: str = "CheckQubit"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "time_range": InputParameterModel(

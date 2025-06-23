@@ -22,6 +22,7 @@ class TaskDocument(Document):
 
     username: str = Field(..., description="The username of the user who created the task")
     name: str = Field(..., description="The name of the task")
+    backend: str | None = Field(None, description="The backend of the task")
     description: str = Field(..., description="Detailed description of the task")
     task_type: str = Field(..., description="The type of the task")
     input_parameters: dict | None = Field(None, description="The input parameters")
@@ -55,6 +56,7 @@ class TaskDocument(Document):
         return cls(
             username=model.username,
             name=model.name,
+            backend=model.backend,
             task_type=model.task_type,
             description=model.description,
             input_parameters=model.input_parameters,
@@ -75,6 +77,7 @@ class TaskDocument(Document):
             else:
                 logger.debug(f"Task {task.name} found. Updating task.")
                 doc.username = task.username
+                doc.backend = task.backend
                 doc.task_type = task.task_type
                 doc.description = task.description
                 doc.input_parameters = task.input_parameters

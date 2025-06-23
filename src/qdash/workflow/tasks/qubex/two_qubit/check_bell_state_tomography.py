@@ -17,6 +17,7 @@ class CheckBellStateTomography(BaseTask):
     """Task to check the bell state tomography."""
 
     name: str = "CheckBellStateTomography"
+    backend: str = "qubex"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}

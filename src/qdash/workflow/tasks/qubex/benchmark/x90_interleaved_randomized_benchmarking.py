@@ -18,6 +18,7 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
     """Task to perform X90 interleaved randomized benchmarking."""
 
     name: str = "X90InterleavedRandomizedBenchmarking"
+    backend: str = "qubex"
     task_type: str = "qubit"
     timeout: int = 60 * 1  # Default timeout of 1 hour
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {

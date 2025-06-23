@@ -15,6 +15,7 @@ class CheckPIPulse(BaseTask):
     """Task to check the PI pulse."""
 
     name: str = "CheckPIPulse"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "repetitions": InputParameterModel(

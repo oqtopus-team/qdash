@@ -18,6 +18,7 @@ class CheckReadoutFrequency(BaseTask):
     """Task to check the readout frequency."""
 
     name: str = "CheckReadoutFrequency"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "detuning_range": InputParameterModel(

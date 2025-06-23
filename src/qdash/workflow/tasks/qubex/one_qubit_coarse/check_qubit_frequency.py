@@ -18,6 +18,7 @@ class CheckQubitFrequency(BaseTask):
     """Task to check the qubit frequency."""
 
     name: str = "CheckQubitFrequency"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "detuning_range": InputParameterModel(

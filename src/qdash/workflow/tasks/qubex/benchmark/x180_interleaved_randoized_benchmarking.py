@@ -18,6 +18,7 @@ class X180InterleavedRandomizedBenchmarking(BaseTask):
     """Task to perform X180 interleaved randomized benchmarking."""
 
     name: str = "X180InterleavedRandomizedBenchmarking"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "n_cliffords_range": InputParameterModel(

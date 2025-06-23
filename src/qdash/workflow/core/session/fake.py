@@ -6,6 +6,8 @@ from qdash.workflow.core.session.base import BaseSession
 class FakeSession(BaseSession):
     """Session management for Qubex experiments."""
 
+    name: str = "fake"
+
     def __init__(self, config: dict) -> None:
         """Initialize the Fake session with a configuration dictionary."""
         self._config = config
@@ -16,17 +18,20 @@ class FakeSession(BaseSession):
             self._session = object()
 
     def get_session(self) -> object | None:
-        if self._exp is None:
+        if self._session is None:
             self.connect()
-        if self._exp is None:
+        if self._session is None:
             msg = "Experiment instance is not initialized. Please call connect() first."
             raise RuntimeError(msg)
-        return self._exp or None
+        return self._session or None
 
     def get_note(self) -> str:
         """Get the calibration note from the experiment."""
+        import json
+
         exp = self.get_session()
         if exp is None:
             msg = "Experiment instance is not initialized. Please call connect() first."
             raise RuntimeError(msg)
-        return "Fake calibration note for testing purposes."
+        # fake json string
+        return json.dumps({"note": "This is a fake calibration note."})

@@ -19,6 +19,7 @@ class CreateDRAGPIPulse(BaseTask):
     """Task to create the DRAG pi pulse."""
 
     name: str = "CreateDRAGPIPulse"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "pi_length": InputParameterModel(

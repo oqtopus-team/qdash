@@ -15,6 +15,7 @@ class CreateZX90(BaseTask):
     """Task to create ZX90 gate."""
 
     name: str = "CreateZX90"
+    backend: str = "qubex"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}

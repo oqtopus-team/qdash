@@ -15,6 +15,7 @@ class CheckQubitFrequencies(BaseTask):
     """Task to check the qubit frequencies."""
 
     name: str = "CheckQubitFrequencies"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {

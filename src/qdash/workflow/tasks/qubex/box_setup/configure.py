@@ -14,6 +14,7 @@ class Configure(BaseTask):
     """Task to configure the box."""
 
     name: str = "Configure"
+    backend: str = "qubex"
     task_type: str = "global"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}

@@ -11,7 +11,7 @@ import dynamic from "next/dynamic";
 
 const PlotlyRenderer = dynamic(
   () => import("@/app/components/PlotlyRenderer").then((mod) => mod.default),
-  { ssr: false }
+  { ssr: false },
 );
 
 interface TaskResultGridProps {
@@ -48,7 +48,7 @@ export function TaskResultGrid({
     : useFetchHistoricalQubitTaskGroupedByChip(
         chipId,
         selectedTask,
-        selectedDate
+        selectedDate,
       );
 
   if (isLoadingTask)
@@ -91,7 +91,7 @@ export function TaskResultGrid({
           const col = index % gridSize;
           const qid = Object.keys(gridPositions).find(
             (key) =>
-              gridPositions[key].row === row && gridPositions[key].col === col
+              gridPositions[key].row === row && gridPositions[key].col === col,
           );
           if (!qid)
             return (
@@ -147,8 +147,8 @@ export function TaskResultGrid({
                   task.status === "completed"
                     ? "bg-success"
                     : task.status === "failed"
-                    ? "bg-error"
-                    : "bg-warning"
+                      ? "bg-error"
+                      : "bg-warning"
                 }`}
               />
             </button>
@@ -177,8 +177,8 @@ export function TaskResultGrid({
                 const figures = Array.isArray(task.figure_path)
                   ? task.figure_path
                   : task.figure_path
-                  ? [task.figure_path]
-                  : [];
+                    ? [task.figure_path]
+                    : [];
                 const currentSubIndex = selectedTaskInfo.subIndex ?? 0;
                 const currentFigure = figures[currentSubIndex];
                 return (
@@ -206,7 +206,7 @@ export function TaskResultGrid({
                                           figures.length) %
                                         figures.length,
                                     }
-                                  : null
+                                  : null,
                               )
                             }
                           >
@@ -226,7 +226,7 @@ export function TaskResultGrid({
                                         ((prev.subIndex ?? 0) + 1) %
                                         figures.length,
                                     }
-                                  : null
+                                  : null,
                               )
                             }
                           >
@@ -251,8 +251,8 @@ export function TaskResultGrid({
                             task.status === "completed"
                               ? "badge-success"
                               : task.status === "failed"
-                              ? "badge-error"
-                              : "badge-warning"
+                                ? "badge-error"
+                                : "badge-warning"
                           }`}
                         >
                           {task.status}
@@ -287,7 +287,7 @@ export function TaskResultGrid({
                                     </span>
                                   </div>
                                 );
-                              }
+                              },
                             )}
                           </div>
                         </div>
@@ -307,7 +307,7 @@ export function TaskResultGrid({
               selectedTaskInfo.task.json_figure_path &&
               (() => {
                 const figures = Array.isArray(
-                  selectedTaskInfo.task.json_figure_path
+                  selectedTaskInfo.task.json_figure_path,
                 )
                   ? selectedTaskInfo.task.json_figure_path
                   : [selectedTaskInfo.task.json_figure_path];
@@ -324,7 +324,7 @@ export function TaskResultGrid({
                             fullPath={`${
                               process.env.NEXT_PUBLIC_API_URL
                             }/api/executions/figure?path=${encodeURIComponent(
-                              currentFigure
+                              currentFigure,
                             )}`}
                           />
                         </div>
@@ -345,7 +345,7 @@ export function TaskResultGrid({
                                         figures.length) %
                                       figures.length,
                                   }
-                                : null
+                                : null,
                             )
                           }
                         >
@@ -365,7 +365,7 @@ export function TaskResultGrid({
                                       ((prev.subIndex ?? 0) + 1) %
                                       figures.length,
                                   }
-                                : null
+                                : null,
                             )
                           }
                         >

@@ -13,6 +13,8 @@ CHIP_SIZE_256 = 256
 class QubexSession(BaseSession):
     """Session management for Qubex experiments."""
 
+    name: str = "qubex"
+
     from qubex import Experiment
 
     def __init__(self, config: dict) -> None:

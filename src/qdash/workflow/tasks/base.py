@@ -46,12 +46,16 @@ class BaseTask(ABC):
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
     r2_threshold: float = 0.7
     timeout = 60 * 60  # Default timeout of 1 hour
-    registry: ClassVar[dict] = {}
+    backend = "qubex"
+    registry: ClassVar[dict[str, dict[str, type["BaseTask"]]]] = {}
 
-    def __init_subclass__(cls, **kwargs) -> None:  # noqa: ANN003
-        """Register the task class."""
+    def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
-        BaseTask.registry[cls.__name__] = cls
+        backend = getattr(cls, "backend", None)
+        if backend is None:
+            raise ValueError(f"{cls.__name__} に backend を定義してください")
+        task_name = getattr(cls, "name", cls.__name__)
+        BaseTask.registry.setdefault(backend, {})[task_name] = cls
 
     def __init__(self, params: dict[str, Any] | None = None) -> None:
         """Initialize task with parameters.
