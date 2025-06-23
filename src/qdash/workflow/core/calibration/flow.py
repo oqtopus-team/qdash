@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from typing import Any
 
 from prefect import flow, get_run_logger, task
@@ -328,8 +329,11 @@ def setup_calibration(
     ).reload().update_with_task_manager(task_manager).update_execution_status_to_running()
 
     # Initialize experiment
+    note_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
     initialize()
-    session = get_session(config={"username": menu.username, "qubits": labels})
+    session = get_session(
+        config={"username": menu.username, "qubits": labels, "note_path": note_path}
+    )
     session.connect()
     # Update parameters and tasks
     parameters = update_active_output_parameters(username=menu.username, backend=session.name)

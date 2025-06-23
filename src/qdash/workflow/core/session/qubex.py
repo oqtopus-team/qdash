@@ -5,6 +5,7 @@ from typing import Any
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.workflow.core.session.base import BaseSession
+from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
 
 # Constants
 CONFIG_DIR = "/app/config"
@@ -53,7 +54,7 @@ class QubexSession(BaseSession):
                 qubits=self._config.get("qubits", []),
                 config_dir=self._config.get("config_dir", CONFIG_DIR),
                 params_dir=self._config.get("params_dir", PARAMS_DIR),
-                calib_note_path=self._config.get("calib_note_path", "/app/calib_note.json"),
+                calib_note_path=self._config.get("note_path", "/app/calib_note.json"),
             )
 
     def get_session(self) -> Experiment | None:
@@ -97,3 +98,40 @@ class QubexSession(BaseSession):
         else:
             master_doc = master_doc[0]
         note_path.write_text(json.dumps(master_doc.note, indent=2))
+
+    def update_note(
+        self, username: str, calib_dir: str, execution_id: str, task_manager_id: str
+    ) -> None:
+        """Update the calibration note in the experiment."""
+        calib_note = json.loads(self.get_note())
+        task_doc = CalibrationNoteDocument.find_one(
+            {
+                "execution_id": execution_id,
+                "task_id": task_manager_id,
+                "username": username,
+            }
+        ).run()
+
+        if task_doc is None:
+            # タスクノートが存在しない場合は新規作成
+            task_doc = CalibrationNoteDocument.upsert_note(
+                username=username,
+                execution_id=execution_id,
+                task_id=task_manager_id,
+                note=calib_note,
+            )
+        else:
+            # タスクノートが存在する場合はマージ
+            merged_note = merge_notes_by_timestamp(task_doc.note, calib_note)
+            task_doc = CalibrationNoteDocument.upsert_note(
+                username=username,
+                execution_id=execution_id,
+                task_id=task_manager_id,
+                note=merged_note,
+            )
+
+        # JSONファイルとして出力
+        note_dir = Path(f"{calib_dir}/calib_note")
+        note_dir.mkdir(parents=True, exist_ok=True)
+        note_path = note_dir / f"{task_manager_id}.json"
+        note_path.write_text(json.dumps(task_doc.note, indent=2))
