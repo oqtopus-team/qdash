@@ -14,7 +14,7 @@ from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.core.calibration.execution_manager import ExecutionManager
-from qdash.workflow.core.calibration.flow import qubex_one_qubit_cal_flow
+from qdash.workflow.core.calibration.flow import dispatch_cal_flow
 from qdash.workflow.utils.slack import SlackContents, Status
 from qdash.workflow.utiltask.create_directory import (
     create_directory_task,
@@ -28,7 +28,7 @@ class CalibrationRunningError(Exception):
 
 
 calibration_flow_map = {
-    "qubex-one-qubit-cal-flow": qubex_one_qubit_cal_flow,
+    "dispatch-cal-flow": dispatch_cal_flow,
 }
 
 
@@ -143,7 +143,7 @@ def main_flow(
     logger.info(f"tasks: {menu.tasks}")
     if "CheckSkew" in menu.tasks:
         logger.info("CheckSkew is in the tasks.")
-        success_map = qubex_one_qubit_cal_flow(
+        success_map = dispatch_cal_flow(
             menu, calib_dir, success_map, execution_id, task_names=["CheckSkew"]
         )
         execution_manager = execution_manager.reload()
@@ -169,7 +169,7 @@ def main_flow(
         menu.tasks.remove("CheckSkew")
     try:
         if len(menu.tasks) != 0:
-            success_map = qubex_one_qubit_cal_flow(
+            success_map = dispatch_cal_flow(
                 menu, calib_dir, success_map, execution_id, task_names=menu.tasks
             )
         execution_manager = execution_manager.reload().complete_execution()

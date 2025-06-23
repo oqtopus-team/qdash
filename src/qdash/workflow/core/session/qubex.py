@@ -1,5 +1,9 @@
+import json
+from pathlib import Path
 from typing import Any
 
+from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+from qdash.dbmodel.chip import ChipDocument
 from qdash.workflow.core.session.base import BaseSession
 
 # Constants
@@ -8,6 +12,7 @@ PARAMS_DIR = "/app/config"
 CHIP_SIZE_64 = 64
 CHIP_SIZE_144 = 144
 CHIP_SIZE_256 = 256
+CHIP_SIZE_1024 = 1024
 
 
 class QubexSession(BaseSession):
@@ -24,10 +29,27 @@ class QubexSession(BaseSession):
 
     def connect(self) -> None:
         if self._exp is None:
+            chip = ChipDocument.get_current_chip(username=self._config.get("username", "admin"))
+            if chip is None:
+                msg = "No current chip found. Please select a chip before running calibration."
+                raise ValueError(msg)
             from qubex import Experiment
 
+            if chip.size == CHIP_SIZE_64:
+                chip_id = f"{CHIP_SIZE_64!s}Q"
+            elif chip.size == CHIP_SIZE_144:
+                chip_id = f"{CHIP_SIZE_144!s}Q"
+            elif chip.size == CHIP_SIZE_256:
+                chip_id = f"{CHIP_SIZE_256!s}Q"
+            elif chip.size == CHIP_SIZE_1024:
+                chip_id = f"{CHIP_SIZE_1024!s}Q"
+            else:
+                raise ValueError(
+                    f"Unsupported chip size: {chip.size}. Supported sizes are {CHIP_SIZE_64}, {CHIP_SIZE_144}, and {CHIP_SIZE_256}."
+                )
+
             self._exp = Experiment(
-                chip_id=self._config.get("chip_id", "64Q"),
+                chip_id=self._config.get("chip_id", chip_id),
                 qubits=self._config.get("qubits", []),
                 config_dir=self._config.get("config_dir", CONFIG_DIR),
                 params_dir=self._config.get("params_dir", PARAMS_DIR),
@@ -49,3 +71,29 @@ class QubexSession(BaseSession):
             msg = "Experiment instance is not initialized. Please call connect() first."
             raise RuntimeError(msg)
         return str(exp.calib_note)
+
+    def save_note(
+        self, username: str, calib_dir: str, execution_id: str, task_manager_id: str
+    ) -> None:
+        """Save the calibration note to the experiment."""
+        # Initialize calibration note
+        note_path = Path(f"{calib_dir}/calib_note/{task_manager_id}.json")
+        note_path.parent.mkdir(parents=True, exist_ok=True)
+
+        master_doc = (
+            CalibrationNoteDocument.find({"task_id": "master"})
+            .sort([("timestamp", -1)])
+            .limit(1)
+            .run()
+        )
+
+        if not master_doc:
+            master_doc = CalibrationNoteDocument.upsert_note(
+                username=username,
+                execution_id=execution_id,
+                task_id="master",
+                note={},
+            )
+        else:
+            master_doc = master_doc[0]
+        note_path.write_text(json.dumps(master_doc.note, indent=2))

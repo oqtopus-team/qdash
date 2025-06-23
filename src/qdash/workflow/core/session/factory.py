@@ -1,5 +1,3 @@
-# core/session/factory.py
-
 from qdash.config import get_settings
 from qdash.workflow.core.session.base import BaseSession
 

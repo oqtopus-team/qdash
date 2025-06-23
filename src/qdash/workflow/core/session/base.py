@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Any
 
 
 class BaseSession(ABC):
@@ -12,10 +11,8 @@ class BaseSession(ABC):
 
     """Connect to the session."""
 
-    def get_name(self) -> str:
-        """Get the name of the session."""
-        return self.name
-
-    def get_session(self) -> Any:
+    @abstractmethod
+    def get_session(self) -> object:
         """Get the session object."""
-        raise NotImplementedError("This method should be implemented by subclasses.")
+        msg = "This method should be implemented by subclasses."
+        raise NotImplementedError(msg)

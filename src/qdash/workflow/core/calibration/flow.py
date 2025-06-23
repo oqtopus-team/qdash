@@ -1,6 +1,4 @@
 import asyncio
-import json
-from pathlib import Path
 from typing import Any
 
 from prefect import flow, get_run_logger, task
@@ -16,8 +14,6 @@ from qdash.datamodel.task import (
     SystemTaskModel,
     TaskResultModel,
 )
-from qdash.dbmodel.calibration_note import CalibrationNoteDocument
-from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.parameter import ParameterDocument
 from qdash.dbmodel.task import TaskDocument
@@ -39,11 +35,6 @@ from qdash.workflow.core.session.base import BaseSession
 from qdash.workflow.core.session.factory import get_session
 from qdash.workflow.tasks.active_protocols import generate_task_instances
 from qubex.version import get_package_version
-
-CHIP_SIZE_64 = 64
-CHIP_SIZE_144 = 144
-CHIP_SIZE_256 = 256
-CHIP_SIZE_1024 = 1024
 
 
 def build_workflow(
@@ -124,7 +115,7 @@ def cal_serial(
     Args:
     ----
         menu: Menu configuration containing task details
-        exp: Experiment instance for task execution
+        session: BaseSession instance for task execution
         task_manager: Task manager instance to track execution state
         task_names: List of task names to execute
         qid: Target qubit ID
@@ -205,7 +196,7 @@ def cal_batch(
     Args:
     ----
         menu: Menu configuration containing task details
-        exp: Experiment instance for task execution
+        session: BaseSession instance for task execution
         task_manager: Task manager instance to track execution state
         task_names: List of task names to execute
         qids: List of target qubit IDs
@@ -325,7 +316,9 @@ def setup_calibration(
         labels = []
     else:
         logger.info(f"task names:{validated_task_names}")
-        logger.error("this task is not supported")        raise ValueError("Invalid task names")
+        logger.error("this task is not supported")
+        error_message = "Invalid task names"
+        raise ValueError(error_message)
 
     # Initialize ExecutionManager
     ExecutionManager(
@@ -334,31 +327,9 @@ def setup_calibration(
         calib_data_path=calib_dir,
     ).reload().update_with_task_manager(task_manager).update_execution_status_to_running()
 
-
-
-
-    chip = ChipDocument.get_current_chip(username=menu.username)
-    if chip is None:
-        msg = "No current chip found. Please select a chip before running calibration."
-        raise ValueError(msg)
-
-    if chip.size == CHIP_SIZE_64:
-        chip_id = f"{CHIP_SIZE_64!s}Q"
-    elif chip.size == CHIP_SIZE_144:
-        chip_id = f"{CHIP_SIZE_144!s}Q"
-    elif chip.size == CHIP_SIZE_256:
-        chip_id = f"{CHIP_SIZE_256!s}Q"
-    elif chip.size == CHIP_SIZE_1024:
-        chip_id = f"{CHIP_SIZE_1024!s}Q"
-    else:
-        raise ValueError(
-            f"Unsupported chip size: {chip.size}. Supported sizes are {CHIP_SIZE_64}, {CHIP_SIZE_144}, and {CHIP_SIZE_256}."
-        )
     # Initialize experiment
     initialize()
-    session = get_session(
-        config={"chip_id": chip_id, "qubits": labels, "calib_note_path": note_path}
-    )
+    session = get_session(config={"username": menu.username, "qubits": labels})
     session.connect()
     # Update parameters and tasks
     parameters = update_active_output_parameters(username=menu.username, backend=session.name)
@@ -368,24 +339,12 @@ def setup_calibration(
     TaskDocument.insert_tasks(tasks)
 
     if session.name == "qubex":
-        # Initialize calibration note
-        note_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
-        note_path.parent.mkdir(parents=True, exist_ok=True)
-
-        master_doc = (
-            CalibrationNoteDocument.find({"task_id": "master"}).sort([("timestamp", -1)]).limit(1).run()
+        session.save_note(
+            username=menu.username,
+            calib_dir=calib_dir,
+            execution_id=execution_id,
+            task_manager_id=task_manager.id,
         )
-
-        if not master_doc:
-            master_doc = CalibrationNoteDocument.upsert_note(
-                username=menu.username,
-                execution_id=execution_id,
-                task_id="master",
-                note={},
-            )
-        else:
-            master_doc = master_doc[0]
-        note_path.write_text(json.dumps(master_doc.note, indent=2))
 
     return task_manager, session
 
@@ -483,7 +442,7 @@ def batch_cal_flow(
     return successMap
 
 
-async def dispatch_calibration(
+async def dispatch(
     menu: Menu,
     calib_dir: str,
     successMap: dict[str, bool],
@@ -580,12 +539,12 @@ async def dispatch_calibration(
 
 
 @flow(
-    name="qubex-one-qubit-cal-flow",
+    name="dispatch-cal-flow",
     task_runner=SequentialTaskRunner(),
     log_prints=True,
     flow_run_name="{execution_id}",
 )
-async def qubex_one_qubit_cal_flow(
+async def dispatch_cal_flow(
     menu: Menu,
     calib_dir: str,
     successMap: dict[str, bool],
@@ -619,7 +578,7 @@ async def qubex_one_qubit_cal_flow(
     logger.info(f"serial type:{isinstance(schedule,SerialNode)}")
     logger.info(f"parallel type:{isinstance(schedule,ParallelNode)}")
     logger.info(f"batch type:{isinstance(schedule,BatchNode)}")
-    await dispatch_calibration(
+    await dispatch(
         menu, calib_dir, successMap, execution_id, schedule=schedule, task_names=task_names
     )
     return successMap
