@@ -15,6 +15,7 @@ class CheckHPIPulse(BaseTask):
     """Task to check the HPI pulse."""
 
     name: str = "CheckHPIPulse"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "repetitions": InputParameterModel(

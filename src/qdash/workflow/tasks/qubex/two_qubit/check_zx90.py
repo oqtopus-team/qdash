@@ -15,6 +15,7 @@ class CheckZX90(BaseTask):
     """Task to check ZX90 pulse."""
 
     name: str = "CheckZX90"
+    backend: str = "qubex"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {

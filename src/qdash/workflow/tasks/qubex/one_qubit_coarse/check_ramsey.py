@@ -17,6 +17,7 @@ class CheckRamsey(BaseTask):
     """Task to check the Rabi oscillation."""
 
     name: str = "CheckRamsey"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "detuning": InputParameterModel(

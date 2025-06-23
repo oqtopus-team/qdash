@@ -6,6 +6,7 @@ from typing import Any
 from prefect import flow, get_run_logger, task
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
+from qdash.config import get_settings
 from qdash.datamodel.menu import BatchNode, ParallelNode, ScheduleNode, SerialNode
 from qdash.datamodel.menu import MenuModel as Menu
 from qdash.datamodel.task import (
@@ -36,12 +37,13 @@ from qdash.workflow.core.calibration.util import (
 )
 from qdash.workflow.core.session.base import BaseSession
 from qdash.workflow.core.session.factory import get_session
-from qdash.workflow.tasks.qubex.active_protocols import generate_task_instances
+from qdash.workflow.tasks.active_protocols import generate_task_instances
 from qubex.version import get_package_version
 
 CHIP_SIZE_64 = 64
 CHIP_SIZE_144 = 144
 CHIP_SIZE_256 = 256
+CHIP_SIZE_1024 = 1024
 
 
 def build_workflow(
@@ -69,10 +71,13 @@ def build_workflow(
 
     """
     task_result = TaskResultModel()
+    settings = get_settings()
     global_previous_task_id = ""
     qubit_previous_task_id = {qubit: "" for qubit in qubits}
     coupling_previous_task_id = {qubit: "" for qubit in qubits}
-    task_instances = generate_task_instances(task_names=task_names, task_details=task_details)
+    task_instances = generate_task_instances(
+        task_names=task_names, task_details=task_details, backend=settings.backend
+    )
     for name in task_names:
         if name in task_instances:
             this_task = task_instances[name]
@@ -137,7 +142,7 @@ def cal_serial(
     logger = get_run_logger()
     try:
         task_instances = generate_task_instances(
-            task_names=task_names, task_details=menu.task_details
+            task_names=task_names, task_details=menu.task_details, backend=session.name
         )
         for task_name in task_names:
             if task_name in task_instances:
@@ -320,15 +325,7 @@ def setup_calibration(
         labels = []
     else:
         logger.info(f"task names:{validated_task_names}")
-        logger.error("this task is not supported")
-        raise ValueError("Invalid task names")
-
-    # Update parameters and tasks
-    parameters = update_active_output_parameters(username=menu.username)
-    ParameterDocument.insert_parameters(parameters, username=menu.username)
-    tasks = update_active_tasks(username=menu.username)
-    logger.info(f"updating tasks: {tasks}")
-    TaskDocument.insert_tasks(tasks)
+        logger.error("this task is not supported")        raise ValueError("Invalid task names")
 
     # Initialize ExecutionManager
     ExecutionManager(
@@ -337,25 +334,9 @@ def setup_calibration(
         calib_data_path=calib_dir,
     ).reload().update_with_task_manager(task_manager).update_execution_status_to_running()
 
-    # Initialize calibration note
-    note_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
-    note_path.parent.mkdir(parents=True, exist_ok=True)
 
-    master_doc = (
-        CalibrationNoteDocument.find({"task_id": "master"}).sort([("timestamp", -1)]).limit(1).run()
-    )
 
-    if not master_doc:
-        master_doc = CalibrationNoteDocument.upsert_note(
-            username=menu.username,
-            execution_id=execution_id,
-            task_id="master",
-            note={},
-        )
-    else:
-        master_doc = master_doc[0]
 
-    note_path.write_text(json.dumps(master_doc.note, indent=2))
     chip = ChipDocument.get_current_chip(username=menu.username)
     if chip is None:
         msg = "No current chip found. Please select a chip before running calibration."
@@ -367,6 +348,8 @@ def setup_calibration(
         chip_id = f"{CHIP_SIZE_144!s}Q"
     elif chip.size == CHIP_SIZE_256:
         chip_id = f"{CHIP_SIZE_256!s}Q"
+    elif chip.size == CHIP_SIZE_1024:
+        chip_id = f"{CHIP_SIZE_1024!s}Q"
     else:
         raise ValueError(
             f"Unsupported chip size: {chip.size}. Supported sizes are {CHIP_SIZE_64}, {CHIP_SIZE_144}, and {CHIP_SIZE_256}."
@@ -376,8 +359,33 @@ def setup_calibration(
     session = get_session(
         config={"chip_id": chip_id, "qubits": labels, "calib_note_path": note_path}
     )
-
     session.connect()
+    # Update parameters and tasks
+    parameters = update_active_output_parameters(username=menu.username, backend=session.name)
+    ParameterDocument.insert_parameters(parameters, username=menu.username)
+    tasks = update_active_tasks(username=menu.username, backend=session.name)
+    logger.info(f"updating tasks: {tasks}")
+    TaskDocument.insert_tasks(tasks)
+
+    if session.name == "qubex":
+        # Initialize calibration note
+        note_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
+        note_path.parent.mkdir(parents=True, exist_ok=True)
+
+        master_doc = (
+            CalibrationNoteDocument.find({"task_id": "master"}).sort([("timestamp", -1)]).limit(1).run()
+        )
+
+        if not master_doc:
+            master_doc = CalibrationNoteDocument.upsert_note(
+                username=menu.username,
+                execution_id=execution_id,
+                task_id="master",
+                note={},
+            )
+        else:
+            master_doc = master_doc[0]
+        note_path.write_text(json.dumps(master_doc.note, indent=2))
 
     return task_manager, session
 

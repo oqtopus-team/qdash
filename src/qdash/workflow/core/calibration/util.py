@@ -91,7 +91,7 @@ def convert_output_parameters(username: str, outputs: dict[str, any]) -> dict[st
 
 
 @task
-def update_active_output_parameters(username: str) -> list[ParameterModel]:
+def update_active_output_parameters(username: str, backend: str) -> list[ParameterModel]:
     """Update the active output parameters in the input file.
 
     Args:
@@ -99,7 +99,8 @@ def update_active_output_parameters(username: str) -> list[ParameterModel]:
         file_path: The path to the input file.
 
     """
-    all_outputs = {name: cls.output_parameters for name, cls in BaseTask.registry.items()}
+    task_cls = BaseTask.registry.get(backend)
+    all_outputs = {cls.name: cls.output_parameters for cls in task_cls.values()}
     converted_outputs = {
         task_name: convert_output_parameters(username=username, outputs=outputs)
         for task_name, outputs in all_outputs.items()
@@ -124,8 +125,9 @@ def update_active_output_parameters(username: str) -> list[ParameterModel]:
 
 
 @task
-def update_active_tasks(username: str) -> list[TaskModel]:
+def update_active_tasks(username: str, backend: str) -> list[TaskModel]:
     """Update the active tasks in the registry and return a list of TaskModel instances."""
+    task_cls = BaseTask.registry.get(backend)
     return [
         TaskModel(
             username=username,
@@ -139,5 +141,5 @@ def update_active_tasks(username: str) -> list[TaskModel]:
                 name: param.model_dump() for name, param in cls.output_parameters.items()
             },
         )
-        for cls in BaseTask.registry.values()
+        for cls in task_cls.values()
     ]

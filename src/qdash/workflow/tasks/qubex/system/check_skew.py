@@ -17,6 +17,7 @@ class CheckSkew(BaseTask):
     """Task to check skew the boxies."""
 
     name: str = "CheckSkew"
+    backend: str = "qubex"
     task_type: str = "system"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "muxes": InputParameterModel(

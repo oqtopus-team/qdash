@@ -203,11 +203,13 @@ def migrate_dates() -> None:
 @app.command()
 def update_active_tasks(
     username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
+    backend: str = typer.Option("qubex", "--backend", "-b", help="Backend for task initialization"),
 ) -> None:
     """Update active tasks."""
     try:
-        init_task_document(username=username)
+        init_task_document(username=username, backend=backend)
         typer.echo(f"Active tasks updated successfully (username: {username})")
+        typer.echo(f"Backend: {backend}")
     except Exception as e:
         typer.echo(f"Error updating active tasks: {e}", err=True)
         raise typer.Exit(1)

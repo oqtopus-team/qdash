@@ -15,6 +15,7 @@ class CheckResonatorSpectroscopy(BaseTask):
     """Task to check the resonator spectroscopy."""
 
     name: str = "CheckResonatorSpectroscopy"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "frequency_range": InputParameterModel(

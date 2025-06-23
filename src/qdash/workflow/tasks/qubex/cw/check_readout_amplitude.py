@@ -17,6 +17,7 @@ class CheckReadoutAmplitude(BaseTask):
     """Task to check the readout amplitude."""
 
     name: str = "CheckReadoutAmplitude"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "amplitude_range": InputParameterModel(

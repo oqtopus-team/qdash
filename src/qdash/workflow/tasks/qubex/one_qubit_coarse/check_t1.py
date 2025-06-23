@@ -17,6 +17,7 @@ class CheckT1(BaseTask):
     """Task to check the T1 time."""
 
     name: str = "CheckT1"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "time_range": InputParameterModel(

@@ -14,6 +14,7 @@ class CheckStatus(BaseTask):
     """Task to check the status of the experiment."""
 
     name: str = "CheckStatus"
+    backend: str = "qubex"
     task_type: str = "global"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}

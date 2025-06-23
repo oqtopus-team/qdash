@@ -15,6 +15,7 @@ class CheckDRAGPIPulse(BaseTask):
     """Task to check the DRAG PI pulse."""
 
     name: str = "CheckDRAGPIPulse"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "repetitions": InputParameterModel(

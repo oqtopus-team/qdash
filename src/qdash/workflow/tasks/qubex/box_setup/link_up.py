@@ -14,6 +14,7 @@ class LinkUp(BaseTask):
     """Task to link up the box."""
 
     name: str = "LinkUp"
+    backend: str = "qubex"
     task_type: str = "global"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}

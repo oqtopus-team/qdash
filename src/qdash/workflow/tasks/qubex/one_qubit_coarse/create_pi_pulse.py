@@ -17,6 +17,7 @@ class CreatePIPulse(BaseTask):
     """Task to create the pi pulse."""
 
     name: str = "CreatePIPulse"
+    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "pi_length": InputParameterModel(
