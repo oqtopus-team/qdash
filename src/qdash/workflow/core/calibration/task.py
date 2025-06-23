@@ -1,9 +1,4 @@
-# from neodbmodel.task import TaskDocument
-import json
-from pathlib import Path
-
 from prefect import get_run_logger, task
-from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.coupling import CouplingDocument
@@ -15,7 +10,6 @@ from qdash.workflow.core.calibration.execution_manager import ExecutionManager
 from qdash.workflow.core.calibration.task_manager import TaskManager
 from qdash.workflow.core.session.base import BaseSession
 from qdash.workflow.tasks.base import BaseTask
-from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
 
 
 def validate_task_name(task_names: list[str], username: str) -> list[str]:
@@ -104,40 +98,13 @@ def execute_dynamic_task_by_qid(
                 # for record tha failed result, error handling do this step
                 if run_result.has_r2() and run_result.r2[qid] < this_task.r2_threshold:
                     raise ValueError(f"{this_task.name} R² value too low: {run_result.r2[qid]:.4f}")  # noqa: TRY301
-                # # タスクのノートを取得または作成
                 if session.name == "qubex":
-                    calib_note = json.loads(session.get_note())
-                    task_doc = CalibrationNoteDocument.find_one(
-                        {
-                            "execution_id": execution_id,
-                            "task_id": task_manager.id,
-                            "username": task_manager.username,
-                        }
-                    ).run()
-
-                    if task_doc is None:
-                        # タスクノートが存在しない場合は新規作成
-                        task_doc = CalibrationNoteDocument.upsert_note(
-                            username=task_manager.username,
-                            execution_id=execution_id,
-                            task_id=task_manager.id,
-                            note=calib_note,
-                        )
-                    else:
-                        # タスクノートが存在する場合はマージ
-                        merged_note = merge_notes_by_timestamp(task_doc.note, calib_note)
-                        task_doc = CalibrationNoteDocument.upsert_note(
-                            username=task_manager.username,
-                            execution_id=execution_id,
-                            task_id=task_manager.id,
-                            note=merged_note,
-                        )
-
-                    # JSONファイルとして出力
-                    note_dir = Path(f"{task_manager.calib_dir}/calib_note")
-                    note_dir.mkdir(parents=True, exist_ok=True)
-                    note_path = note_dir / f"{task_manager.id}.json"
-                    note_path.write_text(json.dumps(task_doc.note, indent=2))
+                    session.update_note(
+                        username=task_manager.username,
+                        calib_dir=task_manager.calib_dir,
+                        execution_id=execution_id,
+                        task_manager_id=task_manager.id,
+                    )
 
         # タスクの完了処理
         task_manager.update_task_status_to_completed(
@@ -271,40 +238,13 @@ def execute_dynamic_task_batch(
                             f"{this_task.name} R² value too low: {run_result.r2[qid]:.4f}"
                         )
 
-                    # # タスクのノートを取得または作成
                     if session.name == "qubex":
-                        calib_note = json.loads(session.get_note())
-                        task_doc = CalibrationNoteDocument.find_one(
-                            {
-                                "execution_id": execution_id,
-                                "task_id": task_manager.id,
-                                "username": task_manager.username,
-                            }
-                        ).run()
-
-                        if task_doc is None:
-                            # タスクノートが存在しない場合は新規作成
-                            task_doc = CalibrationNoteDocument.upsert_note(
-                                username=task_manager.username,
-                                execution_id=execution_id,
-                                task_id=task_manager.id,
-                                note=calib_note,
-                            )
-                        else:
-                            # タスクノートが存在する場合はマージ
-                            merged_note = merge_notes_by_timestamp(task_doc.note, calib_note)
-                            task_doc = CalibrationNoteDocument.upsert_note(
-                                username=task_manager.username,
-                                execution_id=execution_id,
-                                task_id=task_manager.id,
-                                note=merged_note,
-                            )
-
-                        # JSONファイルとして出力
-                        note_dir = Path(f"{task_manager.calib_dir}/calib_note")
-                        note_dir.mkdir(parents=True, exist_ok=True)
-                        note_path = note_dir / f"{task_manager.id}.json"
-                        note_path.write_text(json.dumps(task_doc.note, indent=2))
+                        session.update_note(
+                            username=task_manager.username,
+                            calib_dir=task_manager.calib_dir,
+                            execution_id=execution_id,
+                            task_manager_id=task_manager.id,
+                        )
 
         for qid in qids:
             # タスクの完了処理
