@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type TaskStartAt = string | null;
+export type TaskResponseBackend = string | null;

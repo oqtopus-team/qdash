@@ -118,13 +118,26 @@ const TaskDetailModal = ({ task, onClose }: TaskDetailModalProps) => {
           )}
 
           {Object.keys(task.output_parameters || {}).length > 0 && (
-            <div>
+            <div className="mb-8">
               <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-base-content/80">
                 <BsArrowUpSquare className="text-lg" />
                 Output Parameters
               </h3>
               <div className="bg-base-200/50 rounded-xl p-6 border border-base-300">
                 {renderParameters(task.output_parameters)}
+              </div>
+            </div>
+          )}
+          {task.backend && (
+            <div>
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-base-content/80">
+                <BsInfoCircle className="text-lg" />
+                Backend Information
+              </h3>
+              <div className="bg-base-200/50 rounded-xl p-6 border border-base-300">
+                <div className="bg-base-100/40 rounded-lg p-4 font-mono text-base">
+                  {task.backend}
+                </div>
               </div>
             </div>
           )}
@@ -150,7 +163,7 @@ export default function TasksPage() {
         acc[type].push(task);
         return acc;
       },
-      {},
+      {}
     ) || {};
 
   const TaskCard = ({ task }: { task: TaskResponse }) => (
@@ -246,7 +259,7 @@ export default function TasksPage() {
                   <TaskCard key={task.name} task={task} />
                 ) : (
                   <TaskRow key={task.name} task={task} />
-                ),
+                )
               )}
             </div>
           </div>

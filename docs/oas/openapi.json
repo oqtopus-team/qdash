@@ -1737,7 +1737,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DeviceTopologyRequst"
+                "$ref": "#/components/schemas/DeviceTopologyRequest"
               }
             }
           },
@@ -1942,6 +1942,32 @@
         ],
         "title": "ChipResponse",
         "description": "Chip is a Pydantic model that represents a chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    name (str): The name of the chip."
+      },
+      "Condition": {
+        "properties": {
+          "coupling_fidelity": {
+            "$ref": "#/components/schemas/FidelityCondition"
+          },
+          "qubit_fidelity": {
+            "$ref": "#/components/schemas/FidelityCondition"
+          },
+          "readout_fidelity": {
+            "$ref": "#/components/schemas/FidelityCondition"
+          },
+          "only_maximum_connected": {
+            "type": "boolean",
+            "title": "Only Maximum Connected",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "coupling_fidelity",
+          "qubit_fidelity",
+          "readout_fidelity"
+        ],
+        "title": "Condition",
+        "description": "Condition for filtering device topology."
       },
       "Coupling": {
         "properties": {
@@ -2184,7 +2210,7 @@
         "title": "Device",
         "description": "Device information."
       },
-      "DeviceTopologyRequst": {
+      "DeviceTopologyRequest": {
         "properties": {
           "name": {
             "type": "string",
@@ -2220,24 +2246,11 @@
             "default": []
           },
           "condition": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Condition",
-            "default": {
-              "coupling_fidelity": {
-                "max": 1,
-                "min": 0.7
-              },
-              "qubit_fidelity": {
-                "max": 1,
-                "min": 0.7
-              },
-              "only_maximum_connected": true
-            }
+            "$ref": "#/components/schemas/Condition"
           }
         },
         "type": "object",
-        "title": "DeviceTopologyRequst",
+        "title": "DeviceTopologyRequest",
         "description": "Request model for device topology."
       },
       "ExecuteCalibRequest": {
@@ -2524,6 +2537,30 @@
         ],
         "title": "ExecutionResponseSummary",
         "description": "ExecutionResponseSummaryV2 is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution."
+      },
+      "FidelityCondition": {
+        "properties": {
+          "min": {
+            "type": "number",
+            "title": "Min"
+          },
+          "max": {
+            "type": "number",
+            "title": "Max"
+          },
+          "is_within_24h": {
+            "type": "boolean",
+            "title": "Is Within 24H",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "min",
+          "max"
+        ],
+        "title": "FidelityCondition",
+        "description": "Condition for fidelity filtering."
       },
       "GetMenuResponse": {
         "properties": {
@@ -3331,6 +3368,11 @@
             "type": "string",
             "title": "Qpu Data Path"
           },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "default": "qubex"
+          },
           "mongo_port": {
             "type": "integer",
             "title": "Mongo Port",
@@ -3608,6 +3650,17 @@
           "description": {
             "type": "string",
             "title": "Description"
+          },
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
           },
           "task_type": {
             "type": "string",

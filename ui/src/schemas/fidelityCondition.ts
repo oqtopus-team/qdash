@@ -5,11 +5,12 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { Tag } from "./tag";
 
 /**
- * Response model for a list of tasks.
+ * Condition for fidelity filtering.
  */
-export interface ListTagResponse {
-  tags: Tag[];
+export interface FidelityCondition {
+  min: number;
+  max: number;
+  is_within_24h?: boolean;
 }
