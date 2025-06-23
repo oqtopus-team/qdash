@@ -22,6 +22,7 @@ def downsample(
     data: npt.NDArray,
     n_samples: int | None,
 ) -> npt.NDArray:
+    """Downsample the data to a specified number of samples."""
     if n_samples is None:
         return data
     if len(data) <= n_samples:
@@ -33,17 +34,19 @@ def downsample(
 class CustomSimulationResult(SimulationResult):
     """Custom simulation result to handle Rabi parameters."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """Initialize the custom simulation result."""
         super().__init__(**kwargs)
 
-    def plot_population_dynamics(self, label=None, *, n_samples=None):
+    def plot_population_dynamics(self, label=None, *, n_samples=None) -> go.Figure:
         """Plot the population dynamics of the states.
 
         Parameters
         ----------
         label : Optional[str], optional
             The label of the qubit, by default
+        n_samples : Optional[int], optional
+            The number of samples to downsample the data, by default None
 
         """
         states = self.states if label is None else self.get_substates(label)
@@ -66,7 +69,7 @@ class CustomSimulationResult(SimulationResult):
                 go.Scatter(
                     x=sampled_times,
                     y=value,
-                    mode="lines",
+                    mode="lines+markers",
                     name=key,
                 )
             )
@@ -75,7 +78,6 @@ class CustomSimulationResult(SimulationResult):
             xaxis_title="Time (ns)",
             yaxis_title="Population",
         )
-        fig.show()
         return fig
 
 
