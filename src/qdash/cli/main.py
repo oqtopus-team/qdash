@@ -104,6 +104,23 @@ def init_task_data(
 
 
 @app.command()
+def init_backend_data(
+    username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
+    backend: str = typer.Option("qubex", "--backend", "-b", help="Backend for initialization"),
+) -> None:
+    """Initialize backend data."""
+    try:
+        from qdash.db.init.backend import init_backend_document
+
+        typer.echo(f"Initializing backend data for username: {username}")
+        init_backend_document(username=username, backend=backend)
+        typer.echo(f"Backend data initialized successfully (username: {username})")
+    except Exception as e:
+        typer.echo(f"Error initializing backend data: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
 def migrate_v1_0_16_to_v1_0_17(
     username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
     chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),

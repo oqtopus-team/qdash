@@ -39,7 +39,7 @@ from qubex.version import get_package_version
 
 
 def build_workflow(
-    task_names: list[str], qubits: list[str], task_details: dict[str, Any]
+    task_names: list[str], qubits: list[str], task_details: dict[str, Any], backend: str
 ) -> TaskResultModel:
     """Build a workflow model for task execution.
 
@@ -68,7 +68,7 @@ def build_workflow(
     qubit_previous_task_id = {qubit: "" for qubit in qubits}
     coupling_previous_task_id = {qubit: "" for qubit in qubits}
     task_instances = generate_task_instances(
-        task_names=task_names, task_details=task_details, backend=settings.backend
+        task_names=task_names, task_details=task_details, backend=backend
     )
     for name in task_names:
         if name in task_instances:
@@ -299,6 +299,7 @@ def setup_calibration(
         task_names=validated_task_names,
         qubits=qubits,
         task_details=menu.task_details,
+        backend=menu.backend,
     )
     task_manager.task_result = task_result
     logger.info(f"workflow: {task_manager.task_result}")

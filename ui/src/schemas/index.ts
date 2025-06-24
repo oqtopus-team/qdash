@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
+export * from "./backendResponseModel";
 export * from "./batchNode";
 export * from "./bodyAuthLoginForAccessToken";
 export * from "./calibrationNoteResponse";
@@ -42,6 +43,7 @@ export * from "./executionResponseDetail";
 export * from "./executionResponseDetailNote";
 export * from "./executionResponseSummary";
 export * from "./executionResponseSummaryNote";
+export * from "./fetchAllTasksParams";
 export * from "./fetchFigureByPathParams";
 export * from "./fetchTimeseriesTaskResultByTagAndParameterAndQidParams";
 export * from "./fetchTimeseriesTaskResultByTagAndParameterParams";

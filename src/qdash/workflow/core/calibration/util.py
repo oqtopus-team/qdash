@@ -131,6 +131,7 @@ def update_active_tasks(username: str, backend: str) -> list[TaskModel]:
     return [
         TaskModel(
             username=username,
+            backend=backend,
             name=cls.name,
             description=cls.__doc__,
             task_type=cls.task_type,
