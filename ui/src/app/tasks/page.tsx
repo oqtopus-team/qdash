@@ -4,6 +4,7 @@ import { useFetchAllTasks } from "@/client/task/task";
 import { TaskResponse } from "@/schemas";
 import { useState } from "react";
 import { BsGrid, BsListUl, BsX } from "react-icons/bs";
+import { BackendSelector } from "@/app/components/BackendSelector";
 import {
   BsInfoCircle,
   BsArrowDownSquare,
@@ -148,7 +149,10 @@ const TaskDetailModal = ({ task, onClose }: TaskDetailModalProps) => {
 };
 
 export default function TasksPage() {
-  const { data: tasksData } = useFetchAllTasks();
+  const [selectedBackend, setSelectedBackend] = useState<string | null>(null);
+  const { data: tasksData } = useFetchAllTasks({
+    backend: selectedBackend,
+  });
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [selectedTask, setSelectedTask] = useState<TaskResponse | null>(null);
 
@@ -163,7 +167,7 @@ export default function TasksPage() {
         acc[type].push(task);
         return acc;
       },
-      {},
+      {}
     ) || {};
 
   const TaskCard = ({ task }: { task: TaskResponse }) => (
@@ -219,25 +223,31 @@ export default function TasksPage() {
   return (
     <div className="w-full px-6 py-6" style={{ width: "calc(100vw - 20rem)" }}>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-4">
           <h1 className="text-2xl font-bold">Task Definitions</h1>
-          <div className="join">
-            <button
-              className={`join-item btn btn-sm ${
-                viewMode === "grid" ? "btn-active" : ""
-              }`}
-              onClick={() => setViewMode("grid")}
-            >
-              <BsGrid className="text-lg" />
-            </button>
-            <button
-              className={`join-item btn btn-sm ${
-                viewMode === "list" ? "btn-active" : ""
-              }`}
-              onClick={() => setViewMode("list")}
-            >
-              <BsListUl className="text-lg" />
-            </button>
+          <div className="flex items-center gap-4">
+            <BackendSelector
+              selectedBackend={selectedBackend}
+              onBackendSelect={setSelectedBackend}
+            />
+            <div className="join">
+              <button
+                className={`join-item btn btn-sm ${
+                  viewMode === "grid" ? "btn-active" : ""
+                }`}
+                onClick={() => setViewMode("grid")}
+              >
+                <BsGrid className="text-lg" />
+              </button>
+              <button
+                className={`join-item btn btn-sm ${
+                  viewMode === "list" ? "btn-active" : ""
+                }`}
+                onClick={() => setViewMode("list")}
+              >
+                <BsListUl className="text-lg" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -259,7 +269,7 @@ export default function TasksPage() {
                   <TaskCard key={task.name} task={task} />
                 ) : (
                   <TaskRow key={task.name} task={task} />
-                ),
+                )
               )}
             </div>
           </div>

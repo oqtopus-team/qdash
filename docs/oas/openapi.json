@@ -1650,8 +1650,33 @@
           "task"
         ],
         "summary": "Fetch all tasks",
-        "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
+        "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n    backend (Optional[str]): Optional backend name to filter tasks by.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
         "operationId": "fetch_all_tasks",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "backend",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional backend name to filter tasks by",
+              "title": "Backend"
+            },
+            "description": "Optional backend name to filter tasks by"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1662,13 +1687,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/parameter": {
@@ -1811,10 +1841,60 @@
           }
         ]
       }
+    },
+    "/api/backend": {
+      "get": {
+        "tags": [
+          "backend"
+        ],
+        "summary": "Get all backends",
+        "description": "Retrieve a list of all registered backends",
+        "operationId": "fetchAllBackends",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BackendResponseModel"
+                  },
+                  "type": "array",
+                  "title": "Response Fetchallbackends"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "BackendResponseModel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "username"
+        ],
+        "title": "BackendResponseModel",
+        "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
+      },
       "BatchNode": {
         "properties": {
           "batch": {

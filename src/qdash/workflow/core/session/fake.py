@@ -13,6 +13,10 @@ class FakeSession(BaseSession):
         self._config = config
         self._session: Any | None = None
 
+    def version(self) -> str:
+        """Return the version of the Fake session."""
+        return "0.1.0"
+
     def connect(self) -> None:
         if self._session is None:
             self._session = object()

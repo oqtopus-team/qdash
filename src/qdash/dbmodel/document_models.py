@@ -1,3 +1,4 @@
+from qdash.dbmodel.backend import BackendDocument
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
@@ -35,4 +36,5 @@ def document_models() -> list[str]:
         QubitHistoryDocument,
         ChipHistoryDocument,
         CouplingHistoryDocument,
+        BackendDocument,
     ]

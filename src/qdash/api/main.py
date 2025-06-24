@@ -4,6 +4,7 @@ from fastapi.routing import APIRoute
 from qdash.api.db.session import lifespan
 from qdash.api.routers import (
     auth,
+    backend,
     calibration,
     chip,
     device_topology,
@@ -75,3 +76,4 @@ app.include_router(task.router, prefix="/api", tags=["task"])
 app.include_router(parameter.router, prefix="/api", tags=["parameter"])
 app.include_router(tag.router, prefix="/api", tags=["tag"])
 app.include_router(device_topology.router, prefix="/api", tags=["device_topology"])
+app.include_router(backend.router, prefix="/api", tags=["backend"])
