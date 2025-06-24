@@ -4,7 +4,7 @@ from typing import Any, ClassVar, Literal
 import plotly.graph_objs as go
 from pydantic import BaseModel
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qubex.experiment import Experiment
+from qdash.workflow.core.session.base import BaseSession
 
 
 class PreProcessResult(BaseModel):
@@ -46,12 +46,16 @@ class BaseTask(ABC):
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
     r2_threshold: float = 0.7
     timeout = 60 * 60  # Default timeout of 1 hour
-    registry: ClassVar[dict] = {}
+    backend = "qubex"
+    registry: ClassVar[dict[str, dict[str, type["BaseTask"]]]] = {}
 
-    def __init_subclass__(cls, **kwargs) -> None:  # noqa: ANN003
-        """Register the task class."""
+    def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
-        BaseTask.registry[cls.__name__] = cls
+        backend = getattr(cls, "backend", None)
+        if backend is None:
+            raise ValueError(f"{cls.__name__} に backend を定義してください")
+        task_name = getattr(cls, "name", cls.__name__)
+        BaseTask.registry.setdefault(backend, {})[task_name] = cls
 
     def __init__(self, params: dict[str, Any] | None = None) -> None:
         """Initialize task with parameters.
@@ -119,12 +123,12 @@ class BaseTask(ABC):
                         self.input_parameters[name].value = converted_value
 
     @abstractmethod
-    def preprocess(self, exp: Experiment, qid: str) -> PreProcessResult:
+    def preprocess(self, session: BaseSession, qid: str) -> PreProcessResult:
         """Preprocess the task. This method is called before the task is executed.
 
         Args:
         ----
-            exp: Experiment object
+            session: Session object
             qid: qubit id
 
         """
@@ -142,23 +146,23 @@ class BaseTask(ABC):
         """
 
     @abstractmethod
-    def run(self, exp: Experiment, qid: str) -> RunResult:
+    def run(self, session: BaseSession, qid: str) -> RunResult:
         """Run the task.
 
         Args:
         ----
-            exp: Experiment object
+            session: Session object
             qid: qubit id
 
         """
 
     @abstractmethod
-    def batch_run(self, exp: Experiment, qids: list[str]) -> RunResult:
+    def batch_run(self, session: BaseSession, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits.
 
         Args:
         ----
-            exp: Experiment object
+            session: Session object
             qids: list of qubit ids
 
         """

@@ -263,6 +263,7 @@ async def schedule_calib(
         name=menu.name,
         chip_id=menu.chip_id,
         username=menu.username,
+        backend=menu.backend,
         description=menu.description,
         schedule=menu.schedule,
         notify_bool=menu.notify_bool,

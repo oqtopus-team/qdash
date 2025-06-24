@@ -50,6 +50,7 @@ class MenuModel(BaseModel):
     chip_id: str
     username: str
     description: str
+    backend: str = ""
     schedule: ScheduleNode
     notify_bool: bool = False
     tasks: list[str] | None = Field(default=None)

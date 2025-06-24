@@ -1650,8 +1650,33 @@
           "task"
         ],
         "summary": "Fetch all tasks",
-        "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
+        "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n    backend (Optional[str]): Optional backend name to filter tasks by.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
         "operationId": "fetch_all_tasks",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "backend",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional backend name to filter tasks by",
+              "title": "Backend"
+            },
+            "description": "Optional backend name to filter tasks by"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1662,13 +1687,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/parameter": {
@@ -1737,7 +1767,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DeviceTopologyRequst"
+                "$ref": "#/components/schemas/DeviceTopologyRequest"
               }
             }
           },
@@ -1811,10 +1841,60 @@
           }
         ]
       }
+    },
+    "/api/backend": {
+      "get": {
+        "tags": [
+          "backend"
+        ],
+        "summary": "Get all backends",
+        "description": "Retrieve a list of all registered backends",
+        "operationId": "fetchAllBackends",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BackendResponseModel"
+                  },
+                  "type": "array",
+                  "title": "Response Fetchallbackends"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "BackendResponseModel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "username"
+        ],
+        "title": "BackendResponseModel",
+        "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
+      },
       "BatchNode": {
         "properties": {
           "batch": {
@@ -1943,6 +2023,32 @@
         "title": "ChipResponse",
         "description": "Chip is a Pydantic model that represents a chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    name (str): The name of the chip."
       },
+      "Condition": {
+        "properties": {
+          "coupling_fidelity": {
+            "$ref": "#/components/schemas/FidelityCondition"
+          },
+          "qubit_fidelity": {
+            "$ref": "#/components/schemas/FidelityCondition"
+          },
+          "readout_fidelity": {
+            "$ref": "#/components/schemas/FidelityCondition"
+          },
+          "only_maximum_connected": {
+            "type": "boolean",
+            "title": "Only Maximum Connected",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "coupling_fidelity",
+          "qubit_fidelity",
+          "readout_fidelity"
+        ],
+        "title": "Condition",
+        "description": "Condition for filtering device topology."
+      },
       "Coupling": {
         "properties": {
           "control": {
@@ -2002,6 +2108,11 @@
           "description": {
             "type": "string",
             "title": "Description"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "default": ""
           },
           "schedule": {
             "anyOf": [
@@ -2074,6 +2185,7 @@
         "title": "CreateMenuRequest",
         "description": "CreateMenuRequest is a Pydantic model for creating a menu item.",
         "example": {
+          "backend": "qubex",
           "batch_mode": false,
           "description": "This is a sample menu item.",
           "name": "CheckOneQubit",
@@ -2184,7 +2296,7 @@
         "title": "Device",
         "description": "Device information."
       },
-      "DeviceTopologyRequst": {
+      "DeviceTopologyRequest": {
         "properties": {
           "name": {
             "type": "string",
@@ -2220,24 +2332,11 @@
             "default": []
           },
           "condition": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Condition",
-            "default": {
-              "coupling_fidelity": {
-                "max": 1,
-                "min": 0.7
-              },
-              "qubit_fidelity": {
-                "max": 1,
-                "min": 0.7
-              },
-              "only_maximum_connected": true
-            }
+            "$ref": "#/components/schemas/Condition"
           }
         },
         "type": "object",
-        "title": "DeviceTopologyRequst",
+        "title": "DeviceTopologyRequest",
         "description": "Request model for device topology."
       },
       "ExecuteCalibRequest": {
@@ -2257,6 +2356,11 @@
           "description": {
             "type": "string",
             "title": "Description"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "default": ""
           },
           "schedule": {
             "anyOf": [
@@ -2330,6 +2434,7 @@
         "description": "ExecuteCalibRequest is a subclass of MenuModel.",
         "examples": [
           {
+            "backend": "qubex",
             "chip_id": "chip1",
             "description": "check one qubit characteristics short",
             "name": "CheckRabi",
@@ -2525,6 +2630,30 @@
         "title": "ExecutionResponseSummary",
         "description": "ExecutionResponseSummaryV2 is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution."
       },
+      "FidelityCondition": {
+        "properties": {
+          "min": {
+            "type": "number",
+            "title": "Min"
+          },
+          "max": {
+            "type": "number",
+            "title": "Max"
+          },
+          "is_within_24h": {
+            "type": "boolean",
+            "title": "Is Within 24H",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "min",
+          "max"
+        ],
+        "title": "FidelityCondition",
+        "description": "Condition for fidelity filtering."
+      },
       "GetMenuResponse": {
         "properties": {
           "name": {
@@ -2542,6 +2671,11 @@
           "description": {
             "type": "string",
             "title": "Description"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "default": ""
           },
           "schedule": {
             "anyOf": [
@@ -2832,6 +2966,11 @@
           "description": {
             "type": "string",
             "title": "Description"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "default": ""
           },
           "schedule": {
             "anyOf": [
@@ -3331,6 +3470,11 @@
             "type": "string",
             "title": "Qpu Data Path"
           },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "default": "qubex"
+          },
           "mongo_port": {
             "type": "integer",
             "title": "Mongo Port",
@@ -3609,6 +3753,17 @@
             "type": "string",
             "title": "Description"
           },
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
+          },
           "task_type": {
             "type": "string",
             "title": "Task Type"
@@ -3692,6 +3847,11 @@
           "description": {
             "type": "string",
             "title": "Description"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "default": ""
           },
           "schedule": {
             "anyOf": [

@@ -21,6 +21,7 @@ class MenuDocument(Document):
 
     name: str
     username: str
+    backend: str | None = Field(default="", description="The backend used for the menu.")
     description: str
     chip_id: str | None = Field(default=None)
     schedule: ScheduleNode = Field(

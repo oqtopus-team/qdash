@@ -3,15 +3,15 @@ from prefect import serve
 
 from prefect.client.schemas.schedules import CronSchedule
 
-from qdash.workflow.calibration.flow import serial_cal_flow
-from qdash.workflow.calibration.flow import batch_cal_flow
-from qdash.workflow.handler import main_flow
+from qdash.workflow.core.calibration.flow import serial_cal_flow
+from qdash.workflow.core.calibration.flow import batch_cal_flow
+from qdash.workflow.entrypoints.handler import main_flow
 
 # from qdash.workflow.subflow.chip_info.update_props_pr import update_props_pr
-from qdash.workflow.subflow.chip_info.flow import update_props
+from qdash.workflow.worker.chip_info.flow import update_props
 
-from qdash.workflow.subflow.scheduler.flow import cron_scheduler_flow
-from qdash.workflow.subflow.device_gateway_integration.flow import device_gateway_integration_flow
+from qdash.workflow.worker.scheduler.flow import cron_scheduler_flow
+from qdash.workflow.worker.device_gateway_integration.flow import device_gateway_integration_flow
 
 deployment_name = "oqtopus"
 
