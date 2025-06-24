@@ -20,7 +20,6 @@ from qdash.workflow.utiltask.create_directory import (
     create_directory_task,
 )
 from qdash.workflow.worker.config_downloader.flow import update_config
-from qubex.version import get_package_version
 
 
 class CalibrationRunningError(Exception):
@@ -131,7 +130,6 @@ def main_flow(
             fridge_info={"temperature": 0.0},
             chip_id=menu.chip_id,
             note={
-                "qubex_version": get_package_version("qubex"),
                 "ui_url": ui_url,
                 "config_commit_id": commit_id,
             },

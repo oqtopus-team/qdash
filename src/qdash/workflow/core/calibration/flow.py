@@ -5,7 +5,6 @@ from typing import Any
 from prefect import flow, get_run_logger, task
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
-from qdash.config import get_settings
 from qdash.datamodel.menu import BatchNode, ParallelNode, ScheduleNode, SerialNode
 from qdash.datamodel.menu import MenuModel as Menu
 from qdash.datamodel.task import (
@@ -35,7 +34,6 @@ from qdash.workflow.core.calibration.util import (
 from qdash.workflow.core.session.base import BaseSession
 from qdash.workflow.core.session.factory import create_session
 from qdash.workflow.tasks.active_protocols import generate_task_instances
-from qubex.version import get_package_version
 
 
 def build_workflow(
@@ -51,6 +49,7 @@ def build_workflow(
     ----
         task_names: List of task names to be executed
         qubits: List of qubit IDs involved in the workflow
+        backend: Backend identifier for the tasks
         task_details: Dictionary containing task-specific configuration details
 
     Returns:
@@ -63,7 +62,6 @@ def build_workflow(
 
     """
     task_result = TaskResultModel()
-    settings = get_settings()
     global_previous_task_id = ""
     qubit_previous_task_id = {qubit: "" for qubit in qubits}
     coupling_previous_task_id = {qubit: "" for qubit in qubits}
@@ -286,7 +284,6 @@ def setup_calibration(
     """
     logger = get_run_logger()
     logger.info(f"Menu name: {menu.name}")
-    logger.info(f"Qubex version: {get_package_version('qubex')}")
 
     # Initialize task manager and validate task names
     validated_task_names = validate_task_name(task_names=task_names, username=menu.username)
@@ -322,13 +319,6 @@ def setup_calibration(
         error_message = "Invalid task names"
         raise ValueError(error_message)
 
-    # Initialize ExecutionManager
-    ExecutionManager(
-        username=menu.username,
-        execution_id=execution_id,
-        calib_data_path=calib_dir,
-    ).reload().update_with_task_manager(task_manager).update_execution_status_to_running()
-
     # Initialize experiment
     note_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
     initialize()
@@ -351,6 +341,13 @@ def setup_calibration(
             execution_id=execution_id,
             task_manager_id=task_manager.id,
         )
+        # Initialize ExecutionManager
+    ExecutionManager(
+        username=menu.username,
+        execution_id=execution_id,
+        calib_data_path=calib_dir,
+    ).reload().update_with_task_manager(task_manager).update_execution_status_to_running()
+    logger.info(f"software version: {session.version()}")
 
     return task_manager, session
 
@@ -578,7 +575,6 @@ async def dispatch_cal_flow(
     """
     logger = get_run_logger()
     logger.info(f"Menu name: {menu.name}")
-    logger.info(f"Qubex version: {get_package_version('qubex')}")
     schedule = menu.schedule
     logger.info(f"schedule: {schedule}")
     logger.info(f"serial type:{isinstance(schedule,SerialNode)}")

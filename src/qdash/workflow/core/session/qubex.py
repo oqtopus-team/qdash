@@ -28,6 +28,12 @@ class QubexSession(BaseSession):
         self._config = config
         self._exp: Any | None = None
 
+    def version(self) -> str:
+        """Return the version of the Qubex session."""
+        from qubex.version import get_package_version
+
+        return get_package_version("qubex")
+
     def connect(self) -> None:
         if self._exp is None:
             chip = ChipDocument.get_current_chip(username=self._config.get("username", "admin"))
