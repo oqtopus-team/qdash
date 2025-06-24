@@ -19,6 +19,7 @@ class ExecuteCalibRequest(MenuModel):
                     "description": "check one qubit characteristics short",
                     "qids": [["28"]],
                     "notify_bool": False,
+                    "backend": "qubex",
                     "tasks": [
                         "CheckRabi",
                     ],

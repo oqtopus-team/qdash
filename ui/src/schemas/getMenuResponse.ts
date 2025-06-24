@@ -18,6 +18,7 @@ export interface GetMenuResponse {
   chip_id: string;
   username: string;
   description: string;
+  backend?: string;
   schedule: GetMenuResponseSchedule;
   notify_bool?: boolean;
   tasks?: GetMenuResponseTasks;

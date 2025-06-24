@@ -163,7 +163,7 @@ export default function TasksPage() {
         acc[type].push(task);
         return acc;
       },
-      {}
+      {},
     ) || {};
 
   const TaskCard = ({ task }: { task: TaskResponse }) => (
@@ -259,7 +259,7 @@ export default function TasksPage() {
                   <TaskCard key={task.name} task={task} />
                 ) : (
                   <TaskRow key={task.name} task={task} />
-                )
+                ),
               )}
             </div>
           </div>

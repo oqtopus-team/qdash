@@ -18,6 +18,7 @@ export interface UpdateMenuRequest {
   chip_id: string;
   username: string;
   description: string;
+  backend?: string;
   schedule: UpdateMenuRequestSchedule;
   notify_bool?: boolean;
   tasks?: UpdateMenuRequestTasks;

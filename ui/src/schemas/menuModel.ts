@@ -28,6 +28,7 @@ export interface MenuModel {
   chip_id: string;
   username: string;
   description: string;
+  backend?: string;
   schedule: MenuModelSchedule;
   notify_bool?: boolean;
   tasks?: MenuModelTasks;

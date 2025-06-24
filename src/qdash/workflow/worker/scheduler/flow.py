@@ -38,6 +38,7 @@ def cron_scheduler_flow(menu_name: str) -> None:
     menu = MenuModel(
         name=menu.name,
         username=menu.username,
+        backend=menu.backend,
         chip_id=menu.chip_id,
         description=menu.description,
         schedule=menu.schedule,

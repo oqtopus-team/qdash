@@ -2029,6 +2029,11 @@
             "type": "string",
             "title": "Description"
           },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "default": ""
+          },
           "schedule": {
             "anyOf": [
               {
@@ -2100,6 +2105,7 @@
         "title": "CreateMenuRequest",
         "description": "CreateMenuRequest is a Pydantic model for creating a menu item.",
         "example": {
+          "backend": "qubex",
           "batch_mode": false,
           "description": "This is a sample menu item.",
           "name": "CheckOneQubit",
@@ -2271,6 +2277,11 @@
             "type": "string",
             "title": "Description"
           },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "default": ""
+          },
           "schedule": {
             "anyOf": [
               {
@@ -2343,6 +2354,7 @@
         "description": "ExecuteCalibRequest is a subclass of MenuModel.",
         "examples": [
           {
+            "backend": "qubex",
             "chip_id": "chip1",
             "description": "check one qubit characteristics short",
             "name": "CheckRabi",
@@ -2579,6 +2591,11 @@
           "description": {
             "type": "string",
             "title": "Description"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "default": ""
           },
           "schedule": {
             "anyOf": [
@@ -2869,6 +2886,11 @@
           "description": {
             "type": "string",
             "title": "Description"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "default": ""
           },
           "schedule": {
             "anyOf": [
@@ -3745,6 +3767,11 @@
           "description": {
             "type": "string",
             "title": "Description"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "default": ""
           },
           "schedule": {
             "anyOf": [

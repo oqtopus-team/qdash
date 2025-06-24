@@ -18,6 +18,7 @@ export interface ExecuteCalibRequest {
   chip_id: string;
   username: string;
   description: string;
+  backend?: string;
   schedule: ExecuteCalibRequestSchedule;
   notify_bool?: boolean;
   tasks?: ExecuteCalibRequestTasks;

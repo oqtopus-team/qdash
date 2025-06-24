@@ -18,6 +18,7 @@ export interface CreateMenuRequest {
   chip_id: string;
   username: string;
   description: string;
+  backend?: string;
   schedule: CreateMenuRequestSchedule;
   notify_bool?: boolean;
   tasks?: CreateMenuRequestTasks;

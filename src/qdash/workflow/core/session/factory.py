@@ -1,11 +1,8 @@
-from qdash.config import get_settings
 from qdash.workflow.core.session.base import BaseSession
 
 
-def get_session(config: dict) -> BaseSession:
+def create_session(backend: str, config: dict) -> BaseSession:
     """Return the appropriate session based on the backend configuration."""
-    settings = get_settings()
-    backend = settings.backend
     if backend == "qubex":
         return _load_qubex_session(config)
     if backend == "fake":
