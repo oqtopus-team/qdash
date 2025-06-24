@@ -32,7 +32,7 @@ export function ExecuteConfirmModal({
   const handleConfirmClick = () => {
     if (isLocked) {
       toast.error(
-        "実行がロックされています。他のキャリブレーションが完了するまでお待ちください。",
+        "実行がロックされています。他のキャリブレーションが完了するまでお待ちください。"
       );
       return;
     }
@@ -43,6 +43,7 @@ export function ExecuteConfirmModal({
           name: menu.name,
           chip_id: menu.chip_id,
           username: user?.username ?? "default-user",
+          backend: menu.backend,
           description: menu.description,
           schedule: menu.schedule,
           notify_bool: menu.notify_bool,
@@ -65,7 +66,7 @@ export function ExecuteConfirmModal({
               >
                 View Details →
               </a>
-            </div>,
+            </div>
           );
           onClose();
         },
@@ -73,7 +74,7 @@ export function ExecuteConfirmModal({
           console.error("Error executing calibration:", error);
           toast.error("Error executing calibration");
         },
-      },
+      }
     );
   };
 
@@ -112,6 +113,18 @@ export function ExecuteConfirmModal({
               <h3 className="font-medium mb-2">Chip ID</h3>
               <p className="text-base-content/80">{menu.chip_id}</p>
             </div>
+
+            <div>
+              <h3 className="font-medium mb-2">Username</h3>
+              <p className="text-base-content/80">{menu.username}</p>
+            </div>
+
+            {menu.backend && (
+              <div>
+                <h3 className="font-medium mb-2">Backend</h3>
+                <p className="text-base-content/80">{menu.backend}</p>
+              </div>
+            )}
 
             <div>
               <h3 className="font-medium mb-2">Description</h3>

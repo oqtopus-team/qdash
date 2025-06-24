@@ -33,7 +33,7 @@ from qdash.workflow.core.calibration.util import (
     update_active_tasks,
 )
 from qdash.workflow.core.session.base import BaseSession
-from qdash.workflow.core.session.factory import get_session
+from qdash.workflow.core.session.factory import create_session
 from qdash.workflow.tasks.active_protocols import generate_task_instances
 from qubex.version import get_package_version
 
@@ -331,8 +331,9 @@ def setup_calibration(
     # Initialize experiment
     note_path = Path(f"{calib_dir}/calib_note/{task_manager.id}.json")
     initialize()
-    session = get_session(
-        config={"username": menu.username, "qubits": labels, "note_path": note_path}
+    session = create_session(
+        backend=menu.backend,
+        config={"username": menu.username, "qubits": labels, "note_path": note_path},
     )
     session.connect()
     # Update parameters and tasks

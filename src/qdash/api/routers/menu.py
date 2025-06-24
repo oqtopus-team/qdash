@@ -37,6 +37,7 @@ class CreateMenuRequest(MenuModel):
                 "name": "CheckOneQubit",
                 "username": "admin",
                 "description": "This is a sample menu item.",
+                "backend": "qubex",
                 "qids": [["28", "29"]],
                 "batch_mode": False,
                 "notify_bool": False,
@@ -105,6 +106,7 @@ def list_menu(current_user: Annotated[User, Depends(get_current_active_user)]) -
             name=menu.name,
             chip_id=menu.chip_id,
             username=menu.username,
+            backend=menu.backend,
             description=menu.description,
             schedule=menu.schedule,
             tasks=menu.tasks,
@@ -162,6 +164,7 @@ def create_menu(
         name=request.name,
         chip_id=request.chip_id,
         username=current_user.username,
+        backend=request.backend,
         description=request.description,
         tasks=request.tasks,
         schedule=request.schedule,
@@ -325,6 +328,7 @@ def get_menu_by_name(
         chip_id=menu.chip_id,
         username=menu.username,
         description=menu.description,
+        backend=menu.backend,
         schedule=menu.schedule,
         tasks=menu.tasks,
         notify_bool=menu.notify_bool,
@@ -363,6 +367,7 @@ def update_menu(
         existing_menu.name = req.name
         existing_menu.chip_id = req.chip_id
         existing_menu.description = req.description
+        existing_menu.backend = req.backend
         existing_menu.schedule = req.schedule
         existing_menu.tasks = req.tasks
         existing_menu.notify_bool = req.notify_bool
