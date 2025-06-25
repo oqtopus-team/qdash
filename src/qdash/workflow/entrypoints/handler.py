@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 
@@ -7,7 +6,6 @@ from dotenv import load_dotenv
 from prefect import flow, get_run_logger, runtime
 from qdash.config import get_settings
 from qdash.datamodel.menu import MenuModel as Menu
-from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
@@ -19,7 +17,9 @@ from qdash.workflow.utils.slack import SlackContents, Status
 from qdash.workflow.utiltask.create_directory import (
     create_directory_task,
 )
-from qdash.workflow.worker.config_downloader.flow import update_config
+from qdash.workflow.worker.flows.push_calib_note.flow import push_calib_note
+from qdash.workflow.worker.flows.push_props.flow import push_props
+from qdash.workflow.worker.tasks.pull_github import pull_github
 
 
 class CalibrationRunningError(Exception):
@@ -102,7 +102,7 @@ def main_flow(
         ui_url = ui_url.replace("127.0.0.1", "localhost").replace("prefect-server", "localhost")
     logger.info(f"Execution ID: {execution_id}")
     exectuion_is_locked = ExecutionLockDocument.get_lock_status()
-    commit_id = "local" if os.getenv("CONFIG_REPO_URL") == "" else update_config()
+    commit_id = "local" if os.getenv("CONFIG_REPO_URL") == "" else pull_github()
     if exectuion_is_locked:
         logger.error("Calibration is already running.")
         error_message = "Calibration is already running."
@@ -116,10 +116,7 @@ def main_flow(
         raise ValueError(error_message)
     calib_dir = f"/app/calib_data/{menu.username}/{date_str}/{index}"
     create_directory_task.submit(calib_dir).result()
-    calib_note_dir = f"/app/calib_data/{menu.username}/.calibration"
-    create_directory_task.submit(calib_note_dir).result()
     success_map = {flow_name: False for flow_name in calibration_flow_map}
-    chip_id = ChipDocument.get_current_chip(username=menu.username).chip_id
     execution_manager = (
         ExecutionManager(
             username=menu.username,
@@ -189,16 +186,9 @@ def main_flow(
         raise RuntimeError(f"Failed to execute task: {e}") from e
     finally:
         ExecutionLockDocument.unlock()
-        latest = (
-            CalibrationNoteDocument.find({"task_id": "master"})
-            .sort([("timestamp", -1)])  # 更新時刻で降順ソート
-            .limit(1)
-            .run()
-        )[0]
-        calib_note = latest.note
-        calib_note_path = f"{calib_note_dir}/{chip_id}.json"
-        with Path(calib_note_path).open("w", encoding="utf-8") as f:
-            json.dump(calib_note, f, indent=4, ensure_ascii=False)
+        if settings.env == "qiqb-prod":
+            push_calib_note(username=menu.username)
+            push_props(username=menu.username)
         if menu.notify_bool:
             slack.update_contents(
                 status=Status.SUCCESS if success_map else Status.FAILURE,
@@ -208,13 +198,4 @@ def main_flow(
                 broadcast=True,
             )
             logger.info(f"exection manager: {execution_manager}")
-            slack.send_slack()
-            slack.update_contents(
-                status=Status.SUCCESS if success_map else Status.FAILURE,
-                title="📄 the calibration result is attached.",
-                msg="SUCCESS",
-                ts=parent_ts,
-                path=calib_note_path,
-                broadcast=False,
-            )
             slack.send_slack()
