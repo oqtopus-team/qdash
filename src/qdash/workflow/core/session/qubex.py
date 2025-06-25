@@ -8,8 +8,8 @@ from qdash.workflow.core.session.base import BaseSession
 from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
 
 # Constants
-CONFIG_DIR = "/app/config"
-PARAMS_DIR = "/app/config"
+CONFIG_DIR = "/app/config/qubex/64Q/config"
+PARAMS_DIR = "/app/config/qubex/64Q/params"
 CHIP_SIZE_64 = 64
 CHIP_SIZE_144 = 144
 CHIP_SIZE_256 = 256
@@ -27,6 +27,11 @@ class QubexSession(BaseSession):
         """Initialize the Qubex session with a configuration dictionary."""
         self._config = config
         self._exp: Any | None = None
+
+    @property
+    def config(self) -> dict:
+        """Return the configuration dictionary for the Qubex session."""
+        return self._config
 
     def version(self) -> str:
         """Return the version of the Qubex session."""

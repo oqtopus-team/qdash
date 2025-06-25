@@ -74,9 +74,9 @@ services:
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/config.py:/app/qdash/config.py
       - ${CALIB_DATA_PATH}:/app/calib_data
-      - ${CONFIG_PATH}:/app/config
+      - ${CONFIG_PATH}:/app/config/qubex
     working_dir: /app/qdash/workflow
-    command: python deployment/${ENV}/main.py
+    command: python deployment/oqtopus/main.py
     environment:
       - BACKEND_URL=http://api:${API_PORT:-5715}
       - PREFECT_API_URL=http://prefect-server:4200/api

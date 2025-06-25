@@ -7,11 +7,11 @@ from urllib.parse import urlparse, urlunparse
 
 from git import Repo
 from git.exc import GitCommandError
-from prefect import flow, get_run_logger
+from prefect import get_run_logger, task
 
 
-@flow(flow_run_name="Update Config")
-def update_config(target_dir: str | Path = "/app/config/qubex") -> str:
+@task(task_run_name="Pull GitHub")
+def pull_github(target_dir: str | Path = "/app/config/qubex") -> str:
     """Update configuration files from the remote repository.
 
     Args:
