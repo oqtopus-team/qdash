@@ -8,7 +8,7 @@ def push_props(
     username: str = "admin",
     source_path: str = "/app/config/qubex/64Q/params/props.yaml",
     repo_subpath: str = "64Q/params/props.yaml",
-    commit_message: str = "Update chip_properties.yaml",
+    commit_message: str = "Update props.yaml",
     branch: str = "main",
 ) -> str:
     """Push local chip_properties.yaml to the GitHub repository.
