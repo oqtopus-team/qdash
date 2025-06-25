@@ -5,6 +5,7 @@ from typing import Any
 from prefect import flow, get_run_logger, task
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
+from qdash.config import get_settings
 from qdash.datamodel.menu import BatchNode, ParallelNode, ScheduleNode, SerialNode
 from qdash.datamodel.menu import MenuModel as Menu
 from qdash.datamodel.task import (
@@ -34,6 +35,9 @@ from qdash.workflow.core.calibration.util import (
 from qdash.workflow.core.session.base import BaseSession
 from qdash.workflow.core.session.factory import create_session
 from qdash.workflow.tasks.active_protocols import generate_task_instances
+
+settings = get_settings()
+env = settings.env
 
 
 def build_workflow(
@@ -326,14 +330,14 @@ def setup_calibration(
         backend=menu.backend,
         config={"username": menu.username, "qubits": labels, "note_path": note_path},
     )
-    session.connect()
+    logger.info(f"session: {session} created, config: {session.config}")
+
     # Update parameters and tasks
     parameters = update_active_output_parameters(username=menu.username, backend=session.name)
     ParameterDocument.insert_parameters(parameters, username=menu.username)
     tasks = update_active_tasks(username=menu.username, backend=session.name)
     logger.info(f"updating tasks: {tasks}")
     TaskDocument.insert_tasks(tasks)
-
     if session.name == "qubex":
         session.save_note(
             username=menu.username,
@@ -341,7 +345,9 @@ def setup_calibration(
             execution_id=execution_id,
             task_manager_id=task_manager.id,
         )
-        # Initialize ExecutionManager
+    # load the previous calibration note before connecting
+    session.connect()
+    logger.info("session connected!")
     ExecutionManager(
         username=menu.username,
         execution_id=execution_id,
@@ -505,7 +511,7 @@ async def dispatch(
                     }
                     parallel_deployments.append(
                         run_deployment(
-                            "serial-cal-flow/oqtopus-serial-cal-flow", parameters=parameters
+                            f"serial-cal-flow/{env}-serial-cal-flow", parameters=parameters
                         )
                     )
                 await asyncio.gather(*parallel_deployments)
@@ -522,7 +528,7 @@ async def dispatch(
                     "task_names": task_names,
                 }
                 deployments.append(
-                    run_deployment("serial-cal-flow/oqtopus-serial-cal-flow", parameters=parameters)
+                    run_deployment(f"serial-cal-flow/{env}-serial-cal-flow", parameters=parameters)
                 )
             if isinstance(schedule_node, BatchNode):
                 parameters = {
@@ -534,7 +540,7 @@ async def dispatch(
                     "task_names": task_names,
                 }
                 deployments.append(
-                    run_deployment("batch-cal-flow/oqtopus-batch-cal-flow", parameters=parameters)
+                    run_deployment(f"batch-cal-flow/{env}-batch-cal-flow", parameters=parameters)
                 )
         await asyncio.gather(*deployments)
     else:

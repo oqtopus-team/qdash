@@ -12,8 +12,10 @@ from qdash.workflow.worker.chip_info.flow import update_props
 
 from qdash.workflow.worker.scheduler.flow import cron_scheduler_flow
 from qdash.workflow.worker.device_gateway_integration.flow import device_gateway_integration_flow
+from qdash.config import get_settings
 
-deployment_name = "oqtopus"
+settings = get_settings()
+deployment_name = settings.env
 
 if __name__ == "__main__":
     main_deploy = main_flow.to_deployment(

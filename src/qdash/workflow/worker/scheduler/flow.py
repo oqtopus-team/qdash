@@ -5,10 +5,14 @@ from zoneinfo import ZoneInfo
 import pendulum
 from prefect import flow
 from prefect.deployments import run_deployment
+from qdash.config import get_settings
 from qdash.datamodel.menu import MenuModel
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.menu import MenuDocument
+
+settings = get_settings()
+env = settings.env
 
 
 def generate_execution_id(username: str, chip_id: str) -> str:
@@ -52,7 +56,7 @@ def cron_scheduler_flow(menu_name: str) -> None:
 
     execution_id = generate_execution_id(menu.username, menu.chip_id)
     run_deployment(
-        name="main/oqtopus-main",
+        name=f"main/{env}-main",
         parameters={"menu": menu.model_dump(), "execution_id": execution_id},
         scheduled_time=target,
     )
