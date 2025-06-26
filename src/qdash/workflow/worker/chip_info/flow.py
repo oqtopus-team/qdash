@@ -164,6 +164,9 @@ def _process_coupling_data(coupling_data: dict, within_24hrs: bool = False) -> C
         v = value.get("value") if is_recent else None
 
         if key == "zx90_gate_fidelity":
+            if v is not None and v > 1.0:
+                # Ensure fidelity is within [0, 1]
+                v = None
             coupling_props.zx90_gate_fidelity = v
         elif key == "static_zz_interaction":
             coupling_props.static_zz_interaction = v

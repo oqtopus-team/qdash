@@ -8,7 +8,7 @@ from qdash.workflow.core.calibration.flow import batch_cal_flow
 from qdash.workflow.entrypoints.handler import main_flow
 
 # from qdash.workflow.subflow.chip_info.update_props_pr import update_props_pr
-from qdash.workflow.worker.chip_info.flow import update_props
+from qdash.workflow.worker.flows.chip_report.flow import chip_report
 
 from qdash.workflow.worker.scheduler.flow import cron_scheduler_flow
 from qdash.workflow.worker.device_gateway_integration.flow import device_gateway_integration_flow
@@ -105,8 +105,8 @@ if __name__ == "__main__":
         description="""This is a batch cal flow.
         """,
     )
-    update_props_deploy = update_props.to_deployment(
-        name=f"{deployment_name}-update-props",
+    chip_report_deploy = chip_report.to_deployment(
+        name=f"{deployment_name}-chip-report",
         description="""This is a props update flow.
         """,
         tags=["system"],
@@ -153,7 +153,7 @@ if __name__ == "__main__":
         cron_scheduler_deploy_5,  # type: ignore
         serial_cal_flow_deploy,  # type: ignore
         batch_cal_flow_deploy,  # type: ignore
-        update_props_deploy,  # type: ignore
+        chip_report_deploy,  # type: ignore
         device_gateway_integration_deploy,  # type: ignore
         webserver=True,
         limit=50,
