@@ -31,5 +31,9 @@ def _process_data(
             if field.startswith("t"):
                 v *= 1e3  # us -> ns
             setattr(result, field, v)
+        if field == "zx90_gate_fidelity" and v is not None and v > 1.0:
+            # Ensure fidelity is within [0, 1]
+            v = None
+            setattr(result, field, v)
 
     return result
