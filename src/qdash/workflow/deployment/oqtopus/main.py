@@ -7,11 +7,10 @@ from qdash.workflow.core.calibration.flow import serial_cal_flow
 from qdash.workflow.core.calibration.flow import batch_cal_flow
 from qdash.workflow.entrypoints.handler import main_flow
 
-# from qdash.workflow.subflow.chip_info.update_props_pr import update_props_pr
 from qdash.workflow.worker.flows.chip_report.flow import chip_report
 
-from qdash.workflow.worker.scheduler.flow import cron_scheduler_flow
-from qdash.workflow.worker.device_gateway_integration.flow import device_gateway_integration_flow
+from qdash.workflow.worker.flows.scheduler.flow import cron_scheduler_flow
+from qdash.workflow.worker.flows.gateway_integration.flow import gateway_integration
 from qdash.config import get_settings
 
 settings = get_settings()
@@ -117,8 +116,8 @@ if __name__ == "__main__":
         parameters={"username": "admin"},
         is_schedule_active=True,
     )
-    device_gateway_integration_deploy = device_gateway_integration_flow.to_deployment(
-        name=f"{deployment_name}-device-gateway-integration",
+    gateway_integration_deploy = gateway_integration.to_deployment(
+        name=f"{deployment_name}-gateway-integration",
         description="""This is a flow to integrate the device gateway with the system.
         """,
         tags=["system"],
@@ -132,7 +131,7 @@ if __name__ == "__main__":
                 "condition": {
                     "coupling_fidelity": {"min": 0.7, "max": 1.0, "is_within_24h": True},
                     "qubit_fidelity": {"min": 0.9, "max": 1.0, "is_within_24h": False},
-                    "readout_fidelity": {"min": 0.5, "max": 1.0, "is_within_24h": True},
+                    "readout_fidelity": {"min": 0.6, "max": 1.0, "is_within_24h": True},
                     "only_maximum_connected": True,
                 },
             },
@@ -154,7 +153,7 @@ if __name__ == "__main__":
         serial_cal_flow_deploy,  # type: ignore
         batch_cal_flow_deploy,  # type: ignore
         chip_report_deploy,  # type: ignore
-        device_gateway_integration_deploy,  # type: ignore
+        gateway_integration_deploy,  # type: ignore
         webserver=True,
         limit=50,
     )
