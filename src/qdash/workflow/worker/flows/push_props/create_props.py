@@ -48,11 +48,22 @@ def merge_properties(base_props: CommentedMap, chip_props: ChipProperties) -> Co
 
     for qid, qubit in chip_props.qubits.items():
         for field, value in qubit.model_dump(exclude_none=True).items():
-            update_if_different(field, qid, value)
+            if (
+                field == "x90_gate_fidelity"
+                and value > 1.0
+                or field == "x180_gate_fidelity"
+                and value > 1.0
+            ):
+                update_if_different(field, qid, None)
+            else:
+                update_if_different(field, qid, value)
 
     for cid, coupling in chip_props.couplings.items():
         for field, value in coupling.model_dump(exclude_none=True).items():
-            update_if_different(field, cid, value)
+            if field == "zx90_gate_fidelity" and (value > 1.0 or cid in {"Q40-Q37", "Q40-Q41"}):
+                update_if_different(field, cid, None)
+            else:
+                update_if_different(field, cid, value)
 
     return base_props
 
