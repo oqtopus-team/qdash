@@ -1,7 +1,9 @@
 import pendulum
 from prefect import flow
+from qdash.config import get_settings
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
+from qdash.workflow.utils.slack import SlackContents, Status
 from qdash.workflow.utiltask.create_directory import (
     create_directory_task,
 )
@@ -51,3 +53,37 @@ def chip_report(
     props_save_path_24h = f"{chip_info_dir}/props_24h.yaml"
     handler_24h.write(merged_24h, props_save_path_24h)
     generate_chip_info_report(chip_info_dir=chip_info_dir)
+    settings = get_settings()
+    slack = SlackContents(
+        status=Status.SUCCESS,
+        title="🧪 For Experiment User",
+        msg="Check the report.",
+        ts="",
+        path="",
+        header="For Experiment User",
+        channel=settings.slack_channel_id,
+        token=settings.slack_bot_token,
+    )
+    ts = slack.send_slack()
+    slack = SlackContents(
+        status=Status.SUCCESS,
+        title="props.yaml",
+        msg="props.yaml updated successfully.",
+        ts=ts,
+        path=props_save_path,
+        header=f"file: {props_save_path}",
+        channel=settings.slack_channel_id,
+        token=settings.slack_bot_token,
+    )
+    slack.send_slack()
+    slack = SlackContents(
+        status=Status.SUCCESS,
+        title="chip_info_report.pdf",
+        msg="chip_info_report.pdf updated successfully.",
+        ts=ts,
+        path=f"{chip_info_dir}/chip_info_report.pdf",
+        header=f"file: {chip_info_dir}/chip_info_report.pdf",
+        channel=settings.slack_channel_id,
+        token=settings.slack_bot_token,
+    )
+    slack.send_slack()

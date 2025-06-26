@@ -47,7 +47,7 @@ class DeviceTopologyRequest(BaseModel):
         default_factory=lambda: Condition(
             coupling_fidelity=FidelityCondition(min=0.7, max=1.0, is_within_24h=True),
             qubit_fidelity=FidelityCondition(min=0.9, max=1.0, is_within_24h=False),
-            readout_fidelity=FidelityCondition(min=0.5, max=1.0, is_within_24h=True),
+            readout_fidelity=FidelityCondition(min=0.6, max=1.0, is_within_24h=True),
             only_maximum_connected=True,
         )
     )

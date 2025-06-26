@@ -7,7 +7,7 @@ from qdash.workflow.utils.slack import SlackContents, Status
 from qdash.workflow.utiltask.create_directory import (
     create_directory_task,
 )
-from qdash.workflow.worker.device_gateway_integration.task import (
+from qdash.workflow.worker.flows.gateway_integration.task import (
     DeviceTopologyRequest,
     generate_device_topology_request,
     generate_topology_plot,
@@ -15,10 +15,8 @@ from qdash.workflow.worker.device_gateway_integration.task import (
 )
 
 
-@flow(name="device-gateway-integration-flow")
-def device_gateway_integration_flow(
-    request: DeviceTopologyRequest, username: str = "admin"
-) -> None:
+@flow(name="gateway-integration")
+def gateway_integration(request: DeviceTopologyRequest, username: str = "admin") -> None:
     """Flow to integrate the device gateway with the system."""
     # Placeholder for actual implementation
     logging = get_run_logger()
