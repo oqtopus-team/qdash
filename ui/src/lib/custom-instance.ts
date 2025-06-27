@@ -1,6 +1,40 @@
-import Axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import Axios, {
+  AxiosError,
+  AxiosRequestConfig,
+  AxiosResponse,
+  AxiosHeaders,
+} from "axios";
 
 export const AXIOS_INSTANCE = Axios.create();
+
+// リクエストインターセプターを追加
+AXIOS_INSTANCE.interceptors.request.use((config) => {
+  // クッキーからユーザー名を取得
+  const username = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith("username="))
+    ?.split("=")[1];
+
+  if (username) {
+    // ユーザー名をデコード
+    const decodedUsername = decodeURIComponent(username);
+    // X-Usernameヘッダーを設定
+    if (!config.headers) {
+      config.headers = new AxiosHeaders();
+    }
+    if (config.headers instanceof AxiosHeaders) {
+      config.headers.set("X-Username", decodedUsername);
+      console.debug(
+        "Setting X-Username header:",
+        decodedUsername,
+        "for URL:",
+        config.url,
+      );
+    }
+  }
+
+  return config;
+});
 
 export const customInstance = <T>(
   config: AxiosRequestConfig,

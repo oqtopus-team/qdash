@@ -13,9 +13,6 @@ module.exports = {
       },
       clean: true,
       mock: false,
-      headers: {
-        "X-User-ID": "default_user",
-      },
     },
     input: {
       target: "../docs/oas/openapi.json",
