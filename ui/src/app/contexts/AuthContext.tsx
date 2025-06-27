@@ -100,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (username: string, password: string) => {
       try {
+        setLoading(true); // ローディング開始
         const response = await loginMutation.mutateAsync({
           data: {
             username,
@@ -131,9 +132,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error("Login failed:", error);
         throw error;
+      } finally {
+        setLoading(false); // ローディング終了
       }
     },
-    [loginMutation, saveAuth, router, userData],
+    [loginMutation, saveAuth, router, userData]
   );
 
   const logout = useCallback(async () => {
