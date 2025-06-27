@@ -1,11 +1,8 @@
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Optional, cast
+from typing import cast
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import APIKeyHeader
-from jose import jwt
-from jose.constants import ALGORITHMS
 from passlib.context import CryptContext
 from qdash.api.schemas.auth import User, UserInDB
 from qdash.dbmodel.initialize import initialize
@@ -18,10 +15,6 @@ logger.setLevel(logging.DEBUG)
 # モジュールレベルで初期化
 initialize()
 
-# 認証設定
-SECRET_KEY = "your-secret-key"  # 本番環境では環境変数から取得すべき
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
 # bcryptのバージョン問題を回避するための設定
 pwd_context = CryptContext(
     schemes=["bcrypt"],
@@ -29,19 +22,6 @@ pwd_context = CryptContext(
     bcrypt__rounds=12,  # デフォルトのラウンド数
     bcrypt__ident="2b",  # bcryptのバージョン識別子
 )
-
-
-def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    # jose.jwt.encode returns str in Python 3 when using HS256
-    encoded_jwt: str = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHMS.HS256)
-    return encoded_jwt
-
 
 # Optional authentication scheme
 # Simple username header authentication
