@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export interface Token {
-  access_token: string;
-  token_type: string;
+export interface BodyAuthLogin {
+  username: string;
+  password: string;
 }

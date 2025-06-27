@@ -4,20 +4,25 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const token = request.cookies.get("token");
   const isLoginPage = request.nextUrl.pathname === "/login";
+  const isSignupPage = request.nextUrl.pathname === "/signup";
   const isApiRequest = request.nextUrl.pathname.startsWith("/api/");
 
-  // APIリクエストはスキップ
+  // 1. APIリクエストはスキップ
   if (isApiRequest) {
     return NextResponse.next();
   }
 
-  // ログインページにいる場合、トークンがあればexecutionにリダイレクト
-  if (isLoginPage && token) {
-    return NextResponse.redirect(new URL("/execution", request.url));
+  // 2. 認証不要なページの処理
+  if (isLoginPage || isSignupPage) {
+    // ログインページで認証済みの場合はexecutionにリダイレクト
+    if (isLoginPage && token) {
+      return NextResponse.redirect(new URL("/execution", request.url));
+    }
+    return NextResponse.next();
   }
 
-  // ログインページ以外でトークンがない場合、ログインページにリダイレクト
-  if (!isLoginPage && !token && !isApiRequest) {
+  // 3. その他のページは認証が必要
+  if (!token) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -29,19 +34,10 @@ export const config = {
   matcher: [
     /*
      * 以下のパスに対してミドルウェアを適用:
-     * - / (ルートパス)
-     * - /login
-     * - /calibration, /chip, /execution, /experiment, /fridge, /setting
+     * - すべてのパス（/:path*）
+     * - ルートパス（/）
      * - /api/* (APIリクエストをスキップするため)
      */
-    "/",
-    "/login",
-    "/calibration/:path*",
-    "/chip/:path*",
-    "/execution/:path*",
-    "/experiment/:path*",
-    "/fridge/:path*",
-    "/setting/:path*",
-    "/api/:path*",
+    "/((?!_next/static|favicon.ico).*)",
   ],
 };

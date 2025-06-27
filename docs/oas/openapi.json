@@ -34,12 +34,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/calibration/cron-schedule": {
@@ -101,12 +96,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/calibration": {
@@ -148,12 +138,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/calibration/schedule": {
@@ -219,12 +204,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/calibration/schedule/{flow_run_id}": {
@@ -287,12 +267,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       },
       "post": {
         "tags": [
@@ -332,12 +307,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/menu/preset": {
@@ -369,12 +339,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/menu/{name}": {
@@ -385,11 +350,6 @@
         "summary": "Retrieve a menu by its name.",
         "description": "Retrieve a menu by its name.\n\nArgs:\n----\n    name (str): The name of the menu.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    GetMenuResponse: The response containing the menu details.\n\nRaises:\n------\n    InternalServerError: If there is an error retrieving the menu.\n    NotFoundErrorResponse: If the menu is not found.",
         "operationId": "get_menu_by_name",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "name",
@@ -441,11 +401,6 @@
         "summary": "Update a menu with the given name.",
         "description": "Update a menu with the given name.\n\nArgs:\n----\n    name (str): The name of the menu to update.\n    req (UpdateMenuRequest): The request object containing the updated menu data.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    Union[UpdateMenuResponse, NotFoundErrorResponse]: The response object indicating the success of the update or an error if the menu is not found.",
         "operationId": "update_menu",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "name",
@@ -507,11 +462,6 @@
         "summary": "Delete a menu by its name.",
         "description": "Delete a menu by its name.\n\nArgs:\n----\n    name (str): The name of the menu to be deleted.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    DeleteMenuResponse | NotFoundErrorResponse: The response indicating the success or failure of the deletion.",
         "operationId": "delete_menu",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "name",
@@ -686,11 +636,6 @@
         "summary": "Fetch available dates for a chip",
         "description": "Fetch available dates for a chip from execution counter.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nlist[str]\n    List of available dates in ISO format",
         "operationId": "fetchChipDates",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -734,11 +679,6 @@
         "summary": "Fetch a chip",
         "description": "Fetch a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Chip information",
         "operationId": "fetchChip",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -782,11 +722,6 @@
         "summary": "Fetch executions",
         "description": "Fetch all executions for a given chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch executions for\ncurrent_user : str\n    Current user ID from authentication\n\nReturns\n-------\nlist[ExecutionResponseSummary]\n    List of executions for the chip",
         "operationId": "listExecutionsByChipId",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -834,11 +769,6 @@
         "summary": "Fetch an execution by its ID",
         "description": "Return the execution detail by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nexecution_id : str\n    ID of the execution to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
         "operationId": "fetchExecutionByChipId",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -891,11 +821,6 @@
         "summary": "Fetch the multiplexer details",
         "description": "Fetch the multiplexer details.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmux_id : int\n    ID of the multiplexer\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nMuxDetailResponse\n    Multiplexer details",
         "operationId": "fetchMuxDetails",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -948,11 +873,6 @@
         "summary": "Fetch the multiplexers",
         "description": "Fetch the multiplexers.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListMuxResponse\n    Multiplexdetails",
         "operationId": "listMuxes",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -996,11 +916,6 @@
         "summary": "Fetch historical task results",
         "description": "Fetch historical task results for a specific date.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ntask_name : str\n    Name of the task to fetch\nrecorded_date : str\n    Date to fetch history for (ISO format YYYY-MM-DD)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskGroupedByChipResponse\n    Historical task results for all qubits on the specified date",
         "operationId": "fetchHistoricalQubitTaskGroupedByChip",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -1062,11 +977,6 @@
         "summary": "Fetch the multiplexers",
         "description": "Fetch the multiplexers.",
         "operationId": "fetchLatestQubitTaskGroupedByChip",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -1119,11 +1029,6 @@
         "summary": "Fetch historical task results",
         "description": "Fetch historical task results for a specific date.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ntask_name : str\n    Name of the task to fetch\nrecorded_date : str\n    Date to fetch history for (ISO format YYYY-MM-DD)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskGroupedByChipResponse\n    Historical task results for all qubits on the specified date",
         "operationId": "fetchHistoricalCouplingTaskGroupedByChip",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -1185,11 +1090,6 @@
         "summary": "Fetch the multiplexers",
         "description": "Fetch the multiplexers.",
         "operationId": "fetchLatestCouplingTaskGroupedByChip",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -1242,11 +1142,6 @@
         "summary": "Fetch the timeseries task result by tag and parameter for a specific qid",
         "description": "Fetch the timeseries task result by tag and parameter for a specific qid.\n\nReturns\n-------\n    TimeSeriesData: Time series data for the specified qid.",
         "operationId": "fetchTimeseriesTaskResultByTagAndParameterAndQid",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -1335,11 +1230,6 @@
         "summary": "Fetch the timeseries task result by tag and parameter for all qids",
         "description": "Fetch the timeseries task result by tag and parameter for all qids.\n\nReturns\n-------\n    TimeSeriesData: Time series data for all qids.",
         "operationId": "fetchTimeseriesTaskResultByTagAndParameter",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "chip_id",
@@ -1483,36 +1373,20 @@
         }
       }
     },
-    "/api/auth/token": {
+    "/api/auth/login": {
       "post": {
         "tags": [
           "auth",
           "authentication"
         ],
-        "summary": "Login For Access Token",
-        "operationId": "auth-login_for_access_token",
+        "summary": "Login",
+        "description": "Login endpoint to authenticate user and return username.",
+        "operationId": "auth-login",
         "requestBody": {
           "content": {
             "application/x-www-form-urlencoded": {
               "schema": {
-                "$ref": "#/components/schemas/Body_auth-login_for_access_token",
-                "properties": {
-                  "username": {
-                    "type": "string"
-                  },
-                  "password": {
-                    "type": "string"
-                  },
-                  "grant_type": {
-                    "type": "string",
-                    "default": "password"
-                  }
-                },
-                "type": "object",
-                "required": [
-                  "username",
-                  "password"
-                ]
+                "$ref": "#/components/schemas/Body_auth-login"
               }
             }
           },
@@ -1524,7 +1398,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Token"
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Auth-Login"
                 }
               }
             }
@@ -1552,6 +1430,7 @@
           "authentication"
         ],
         "summary": "Register User",
+        "description": "Register a new user.",
         "operationId": "auth-register_user",
         "requestBody": {
           "content": {
@@ -1597,6 +1476,7 @@
           "authentication"
         ],
         "summary": "Read Users Me",
+        "description": "Get current user information.",
         "operationId": "auth-read_users_me",
         "responses": {
           "200": {
@@ -1612,12 +1492,7 @@
           "404": {
             "description": "Not found"
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/auth/logout": {
@@ -1627,14 +1502,20 @@
           "authentication"
         ],
         "summary": "Logout",
-        "description": "Logout endpoint.\n\nThis endpoint doesn't need to do anything on the backend since the token is managed client-side.\nThe client will remove the token from cookies.",
+        "description": "Logout endpoint.\n\nThis endpoint doesn't need to do anything on the backend since the username is managed client-side.\nThe client will remove the username from cookies.",
         "operationId": "auth-logout",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Auth-Logout"
+                }
               }
             }
           },
@@ -1652,11 +1533,6 @@
         "summary": "Fetch all tasks",
         "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n    backend (Optional[str]): Optional backend name to filter tasks by.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
         "operationId": "fetch_all_tasks",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
         "parameters": [
           {
             "name": "backend",
@@ -1720,12 +1596,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/tag": {
@@ -1747,12 +1618,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/device_topology": {
@@ -1794,12 +1660,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/device_topology/plot": {
@@ -1834,12 +1695,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/backend": {
@@ -1912,7 +1768,7 @@
         "title": "BatchNode",
         "description": "Batch node model."
       },
-      "Body_auth-login_for_access_token": {
+      "Body_auth-login": {
         "properties": {
           "username": {
             "type": "string",
@@ -1921,11 +1777,6 @@
           "password": {
             "type": "string",
             "title": "Password"
-          },
-          "grant_type": {
-            "type": "string",
-            "title": "Grant Type",
-            "default": "password"
           }
         },
         "type": "object",
@@ -1933,7 +1784,7 @@
           "username",
           "password"
         ],
-        "title": "Body_auth-login_for_access_token"
+        "title": "Body_auth-login"
       },
       "CalibrationNoteResponse": {
         "properties": {
@@ -3812,24 +3663,6 @@
         "title": "TimeSeriesData",
         "description": "TimeSeriesData is a Pydantic model that represents the time series data."
       },
-      "Token": {
-        "properties": {
-          "access_token": {
-            "type": "string",
-            "title": "Access Token"
-          },
-          "token_type": {
-            "type": "string",
-            "title": "Token Type"
-          }
-        },
-        "type": "object",
-        "required": [
-          "access_token",
-          "token_type"
-        ],
-        "title": "Token"
-      },
       "UpdateMenuRequest": {
         "properties": {
           "name": {
@@ -3971,7 +3804,8 @@
         "required": [
           "username"
         ],
-        "title": "User"
+        "title": "User",
+        "description": "User model for authentication and user management."
       },
       "UserCreate": {
         "properties": {
@@ -4000,7 +3834,8 @@
           "username",
           "password"
         ],
-        "title": "UserCreate"
+        "title": "UserCreate",
+        "description": "User creation model for registration."
       },
       "ValidationError": {
         "properties": {
