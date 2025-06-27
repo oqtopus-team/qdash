@@ -133,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [loginMutation, saveAuth, router, userData]
+    [loginMutation, saveAuth, router, userData],
   );
 
   const logout = useCallback(async () => {
