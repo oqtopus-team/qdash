@@ -22,9 +22,10 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
-  BodyAuthLoginForAccessToken,
+  AuthLogin200,
+  AuthLogout200,
+  BodyAuthLogin,
   HTTPValidationError,
-  Token,
   User,
   UserCreate,
 } from "../../schemas";
@@ -35,23 +36,21 @@ import type { ErrorType, BodyType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * @summary Login For Access Token
+ * Login endpoint to authenticate user and return username.
+ * @summary Login
  */
-export const authLoginForAccessToken = (
-  bodyAuthLoginForAccessToken: BodyType<BodyAuthLoginForAccessToken>,
+export const authLogin = (
+  bodyAuthLogin: BodyType<BodyAuthLogin>,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   const formUrlEncoded = new URLSearchParams();
-  formUrlEncoded.append(`username`, bodyAuthLoginForAccessToken.username);
-  formUrlEncoded.append(`password`, bodyAuthLoginForAccessToken.password);
-  if (bodyAuthLoginForAccessToken.grant_type !== undefined) {
-    formUrlEncoded.append(`grant_type`, bodyAuthLoginForAccessToken.grant_type);
-  }
+  formUrlEncoded.append(`username`, bodyAuthLogin.username);
+  formUrlEncoded.append(`password`, bodyAuthLogin.password);
 
-  return customInstance<Token>(
+  return customInstance<AuthLogin200>(
     {
-      url: `/api/auth/token`,
+      url: `/api/auth/login`,
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       data: formUrlEncoded,
@@ -61,24 +60,24 @@ export const authLoginForAccessToken = (
   );
 };
 
-export const getAuthLoginForAccessTokenMutationOptions = <
+export const getAuthLoginMutationOptions = <
   TError = ErrorType<void | HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof authLoginForAccessToken>>,
+    Awaited<ReturnType<typeof authLogin>>,
     TError,
-    { data: BodyType<BodyAuthLoginForAccessToken> },
+    { data: BodyType<BodyAuthLogin> },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof authLoginForAccessToken>>,
+  Awaited<ReturnType<typeof authLogin>>,
   TError,
-  { data: BodyType<BodyAuthLoginForAccessToken> },
+  { data: BodyType<BodyAuthLogin> },
   TContext
 > => {
-  const mutationKey = ["authLoginForAccessToken"];
+  const mutationKey = ["authLogin"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -88,53 +87,52 @@ export const getAuthLoginForAccessTokenMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof authLoginForAccessToken>>,
-    { data: BodyType<BodyAuthLoginForAccessToken> }
+    Awaited<ReturnType<typeof authLogin>>,
+    { data: BodyType<BodyAuthLogin> }
   > = (props) => {
     const { data } = props ?? {};
 
-    return authLoginForAccessToken(data, requestOptions);
+    return authLogin(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type AuthLoginForAccessTokenMutationResult = NonNullable<
-  Awaited<ReturnType<typeof authLoginForAccessToken>>
+export type AuthLoginMutationResult = NonNullable<
+  Awaited<ReturnType<typeof authLogin>>
 >;
-export type AuthLoginForAccessTokenMutationBody =
-  BodyType<BodyAuthLoginForAccessToken>;
-export type AuthLoginForAccessTokenMutationError =
-  ErrorType<void | HTTPValidationError>;
+export type AuthLoginMutationBody = BodyType<BodyAuthLogin>;
+export type AuthLoginMutationError = ErrorType<void | HTTPValidationError>;
 
 /**
- * @summary Login For Access Token
+ * @summary Login
  */
-export const useAuthLoginForAccessToken = <
+export const useAuthLogin = <
   TError = ErrorType<void | HTTPValidationError>,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof authLoginForAccessToken>>,
+      Awaited<ReturnType<typeof authLogin>>,
       TError,
-      { data: BodyType<BodyAuthLoginForAccessToken> },
+      { data: BodyType<BodyAuthLogin> },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof authLoginForAccessToken>>,
+  Awaited<ReturnType<typeof authLogin>>,
   TError,
-  { data: BodyType<BodyAuthLoginForAccessToken> },
+  { data: BodyType<BodyAuthLogin> },
   TContext
 > => {
-  const mutationOptions = getAuthLoginForAccessTokenMutationOptions(options);
+  const mutationOptions = getAuthLoginMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
 /**
+ * Register a new user.
  * @summary Register User
  */
 export const authRegisterUser = (
@@ -227,6 +225,7 @@ export const useAuthRegisterUser = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
+ * Get current user information.
  * @summary Read Users Me
  */
 export const authReadUsersMe = (
@@ -373,15 +372,15 @@ export function useAuthReadUsersMe<
 /**
  * Logout endpoint.
 
-This endpoint doesn't need to do anything on the backend since the token is managed client-side.
-The client will remove the token from cookies.
+This endpoint doesn't need to do anything on the backend since the username is managed client-side.
+The client will remove the username from cookies.
  * @summary Logout
  */
 export const authLogout = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
-  return customInstance<unknown>(
+  return customInstance<AuthLogout200>(
     { url: `/api/auth/logout`, method: "POST", signal },
     options,
   );

@@ -8,9 +8,10 @@ import {
   useEffect,
   ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import {
   useAuthReadUsersMe,
-  useAuthLoginForAccessToken,
+  useAuthLogin,
   useAuthLogout,
 } from "@/client/auth/auth";
 import type { User } from "../../schemas";
@@ -26,28 +27,29 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ユーザー名の保存
-  const saveUsername = useCallback((username: string) => {
-    const encodedUsername = encodeURIComponent(username);
-    document.cookie = `username=${encodedUsername}; path=/; max-age=${
+  // 認証情報の保存
+  const saveAuth = useCallback((username: string) => {
+    // トークンとしてユーザー名を保存（実際のJWTトークンと同様の扱い）
+    document.cookie = `token=${encodeURIComponent(username)}; path=/; max-age=${
       7 * 24 * 60 * 60
     }; SameSite=Lax`;
     setUsername(username);
   }, []);
 
-  // ユーザー名の削除
-  const removeUsername = useCallback(() => {
+  // 認証情報の削除
+  const removeAuth = useCallback(() => {
     document.cookie =
-      "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+      "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
     setUsername(null);
   }, []);
 
   // ログイン処理
-  const loginMutation = useAuthLoginForAccessToken();
+  const loginMutation = useAuthLogin();
 
   // ログアウト処理
   const logoutMutation = useAuthLogout();
@@ -57,9 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     query: {
       enabled: !!username,
       retry: false,
-    },
-    request: {
-      headers: username ? { "X-Username": username } : undefined,
     },
   });
 
@@ -74,29 +73,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (userError) {
       console.error("Failed to fetch user info:", userError);
-      removeUsername();
+      removeAuth();
       setUser(null);
     }
-  }, [userError, removeUsername]);
+  }, [userError, removeAuth]);
 
   // 初期化処理
   useEffect(() => {
-    const storedUsername = document.cookie
+    const token = document.cookie
       .split("; ")
-      .find((row) => row.startsWith("username="))
+      .find((row) => row.startsWith("token="))
       ?.split("=")[1];
 
-    if (storedUsername) {
+    if (token) {
       try {
-        const decodedUsername = decodeURIComponent(storedUsername);
-        setUsername(decodedUsername);
+        const username = decodeURIComponent(token);
+        setUsername(username);
       } catch (error) {
-        console.error("Failed to decode username:", error);
-        removeUsername();
+        console.error("Failed to decode token:", error);
+        removeAuth();
       }
     }
     setLoading(false);
-  }, [removeUsername]);
+  }, [removeAuth]);
 
   const login = useCallback(
     async (username: string, password: string) => {
@@ -105,50 +104,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data: {
             username,
             password,
-            grant_type: "password",
           },
         });
-        // トークンとユーザー名を保存
-        const token = response.data.access_token;
-        document.cookie = `token=${encodeURIComponent(
-          token,
-        )}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-        saveUsername(username);
-        // ログイン成功後に直接リダイレクト
-        window.location.href = "/";
+        // 認証情報を保存
+        saveAuth(response.data.username);
+        // ユーザー情報が取得されるまで待つ
+        await new Promise((resolve) => {
+          const unsubscribe = () => {
+            if (userData?.data) {
+              clearInterval(interval);
+              resolve(undefined);
+            }
+          };
+          const interval = setInterval(() => {
+            unsubscribe();
+          }, 100);
+          // 最大3秒待つ
+          setTimeout(() => {
+            clearInterval(interval);
+            console.debug("User info fetch timeout, proceeding anyway");
+            resolve(undefined);
+          }, 3000);
+        });
+        // ログイン成功後にリダイレクト
+        router.replace("/execution");
       } catch (error) {
         console.error("Login failed:", error);
         throw error;
       }
     },
-    [loginMutation, saveUsername],
+    [loginMutation, saveAuth, router, userData]
   );
 
   const logout = useCallback(async () => {
     try {
+      // まずログアウトAPIを呼び出し
       await logoutMutation.mutateAsync();
-      // すべての状態をクリア
-      setUser(null);
-      removeUsername();
-      // トークンを削除
-      document.cookie =
-        "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
       // キャッシュをクリア
       await Promise.all([loginMutation.reset(), logoutMutation.reset()]);
-      // ページをリロードしてすべての状態をリセット
-      // クエリパラメータなしでリダイレクト
-      window.location.replace("/login");
+      // 状態をクリア
+      setUser(null);
+      // 認証情報を削除（これによりmiddlewareが自動的にリダイレクトを行う）
+      removeAuth();
+      // 明示的にログインページに遷移
+      window.location.href = "/login";
     } catch (error) {
       console.error("Logout failed:", error);
-      // エラーが発生しても状態をクリーンアップ
+      // エラー時も同様の処理
       setUser(null);
-      removeUsername();
-      document.cookie =
-        "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-      // クエリパラメータなしでリダイレクト
-      window.location.replace("/login");
+      removeAuth();
+      window.location.href = "/login";
     }
-  }, [logoutMutation, removeUsername, loginMutation]);
+  }, [logoutMutation, removeAuth, loginMutation]);
 
   return (
     <AuthContext.Provider value={{ user, username, login, logout, loading }}>

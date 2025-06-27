@@ -6,8 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export interface BodyAuthLoginForAccessToken {
-  username: string;
-  password: string;
-  grant_type?: string;
-}
+export type AuthLogin200 = { [key: string]: string };
