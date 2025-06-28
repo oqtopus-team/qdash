@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import { DndContext, DragEndEvent } from "@dnd-kit/core";
 import {
   useListMenu,
   useUpdateMenu,
@@ -30,9 +31,12 @@ import { BulkDeleteTasksConfirmModal } from "./BulkDeleteTasksConfirmModal";
 import { CreateFromTemplateModal } from "./CreateFromTemplateModal";
 import { Toast } from "@/app/setting/components/Toast";
 
+import AvailableTasksList from "./AvailableTasksList";
+import DroppableTaskList from "./DroppableTaskList";
+
 interface TaskSelectModalProps {
   onClose: () => void;
-  onSelect: (task: TaskResponse) => void;
+  onSelect: (tasks: TaskResponse[]) => void;
 }
 
 const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
@@ -40,86 +44,142 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
   onSelect,
 }) => {
   const { data: tasksData } = useFetchAllTasks();
-  const [selectedTask, setSelectedTask] = useState<TaskResponse | null>(null);
+  const [selectedTasks, setSelectedTasks] = useState<TaskResponse[]>([]);
 
-  // タスクをタイプごとにグループ化
-  const groupedTasks =
-    tasksData?.data?.tasks?.reduce(
-      (acc: { [key: string]: TaskResponse[] }, task: TaskResponse) => {
-        const type = task.task_type || "other";
-        if (!acc[type]) {
-          acc[type] = [];
-        }
-        acc[type].push(task);
-        return acc;
-      },
-      {}
-    ) || {};
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || !active.data.current) return;
+
+    // If dragging from available tasks to task list
+    if (over.id === "task-list" && "task_type" in active.data.current) {
+      const task = active.data.current as TaskResponse;
+      if (!selectedTasks.find((t) => t.name === task.name)) {
+        setSelectedTasks([...selectedTasks, task]);
+      }
+    }
+  };
+
+  const handleTaskClick = (task: TaskResponse) => {
+    if (!selectedTasks.find((t) => t.name === task.name)) {
+      setSelectedTasks([...selectedTasks, task]);
+    }
+  };
+
+  const handleRemoveTask = (taskName: string) => {
+    setSelectedTasks(selectedTasks.filter((t) => t.name !== taskName));
+  };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4"
-      onClick={onClose}
-    >
+    <DndContext onDragEnd={handleDragEnd}>
       <div
-        className="bg-base-100 rounded-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4"
+        onClick={onClose}
       >
-        <div className="px-6 py-4 border-b border-base-300 flex items-center justify-between bg-base-100/80 backdrop-blur supports-[backdrop-filter]:bg-base-100/60">
-          <h2 className="text-2xl font-bold">Select Task</h2>
-          <button
-            onClick={onClose}
-            className="btn btn-ghost btn-sm btn-square hover:rotate-90 transition-transform"
-          >
-            <BsPlus className="text-xl rotate-45" />
-          </button>
-        </div>
-        <div className="p-8 overflow-y-auto">
-          {Object.entries(groupedTasks).map(([type, tasks]) => (
-            <div key={type} className="mb-8 last:mb-0">
-              <h3 className="text-lg font-semibold mb-4 capitalize">{type}</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {tasks.map((task) => (
-                  <div
-                    key={task.name}
-                    className={`p-4 rounded-lg border cursor-pointer hover:border-primary transition-colors ${
-                      selectedTask?.name === task.name
-                        ? "border-primary bg-primary/5"
-                        : "border-base-300"
-                    }`}
-                    onClick={() => setSelectedTask(task)}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-medium">{task.name}</h4>
-                      <div className="badge badge-primary badge-outline">
-                        {task.task_type}
+        <div
+          className="bg-base-100 rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-6 py-4 border-b border-base-300 flex items-center justify-between bg-base-100/80 backdrop-blur supports-[backdrop-filter]:bg-base-100/60">
+            <h2 className="text-2xl font-bold">Select Tasks</h2>
+            <div className="flex items-center gap-2">
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  onSelect(selectedTasks);
+                  onClose();
+                }}
+                disabled={selectedTasks.length === 0}
+              >
+                Save
+              </button>
+              <button
+                onClick={onClose}
+                className="btn btn-ghost btn-sm btn-square hover:rotate-90 transition-transform"
+              >
+                <BsPlus className="text-xl rotate-45" />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-hidden flex">
+            {/* Left side: Available tasks */}
+            <div className="w-2/3 border-r border-base-300">
+              {tasksData?.data?.tasks && (
+                <AvailableTasksList
+                  tasks={tasksData.data.tasks}
+                  onTaskSelect={handleTaskClick}
+                />
+              )}
+            </div>
+
+            {/* Right side: Selected tasks */}
+            <div className="w-1/3 p-4 flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Selected Tasks</h3>
+                <span className="text-sm text-base-content/70">
+                  {selectedTasks.length} tasks
+                </span>
+              </div>
+              <DroppableTaskList id="task-list">
+                <div className="space-y-2">
+                  {selectedTasks.map((task) => (
+                    <div
+                      key={task.name}
+                      className="p-3 rounded-lg bg-base-100 border border-base-300 hover:border-primary group shadow-sm"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-medium">{task.name}</h4>
+                            <div className="badge badge-primary badge-outline">
+                              {task.task_type}
+                            </div>
+                          </div>
+                          {task.description && (
+                            <p className="text-sm text-base-content/70 line-clamp-2">
+                              {task.description}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleRemoveTask(task.name)}
+                          className="btn btn-ghost btn-xs btn-square hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <BsTrash className="text-sm" />
+                        </button>
                       </div>
                     </div>
-                    {task.description && (
-                      <p className="text-sm text-base-content/70 line-clamp-2">
-                        {task.description}
+                  ))}
+                  {selectedTasks.length === 0 && (
+                    <div className="text-base-content/50 text-center py-8">
+                      <svg
+                        className="mx-auto h-12 w-12 text-base-content/30"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                        />
+                      </svg>
+                      <h3 className="mt-2 text-sm font-medium">
+                        No tasks selected
+                      </h3>
+                      <p className="mt-1 text-sm text-base-content/70">
+                        Drag tasks from the left or click to add them
                       </p>
-                    )}
-                  </div>
-                ))}
-              </div>
+                    </div>
+                  )}
+                </div>
+              </DroppableTaskList>
             </div>
-          ))}
-        </div>
-        <div className="px-6 py-4 border-t border-base-300 flex justify-end gap-2">
-          <button className="btn btn-ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => selectedTask && onSelect(selectedTask)}
-            disabled={!selectedTask}
-          >
-            Select
-          </button>
+          </div>
         </div>
       </div>
-    </div>
+    </DndContext>
   );
 };
 
@@ -249,7 +309,7 @@ function MenuEditor() {
   };
 
   // 新しいtask_detailを追加（最下部に追加）
-  const handleAddTaskDetail = (task: TaskResponse) => {
+  const handleAddTaskDetails = (tasks: TaskResponse[]) => {
     if (!selectedMenu) return;
 
     try {
@@ -257,15 +317,19 @@ function MenuEditor() {
       const menuData = JSON.parse(menuContent);
       const currentTasks = menuData.tasks || [];
 
-      // tasksの最後にタスクを追加
-      const updatedTasks = [...currentTasks, task.name];
-      const updatedTaskDetails = {
-        ...selectedMenu.task_details,
-        [task.name]: {
-          input_parameters: task.input_parameters || {},
-          output_parameters: task.output_parameters || {},
-        },
-      };
+      // Add all tasks to the end
+      const updatedTasks = [...currentTasks];
+      const updatedTaskDetails = { ...selectedMenu.task_details };
+
+      tasks.forEach((task) => {
+        if (!currentTasks.includes(task.name)) {
+          updatedTasks.push(task.name);
+          updatedTaskDetails[task.name] = {
+            input_parameters: task.input_parameters || {},
+            output_parameters: task.output_parameters || {},
+          };
+        }
+      });
 
       // menuContentを更新
       setMenuContent(
@@ -291,12 +355,14 @@ function MenuEditor() {
         },
         {
           onSuccess: () => {
-            setSelectedTaskDetail(task.name);
+            // Select the last added task
+            const lastTask = tasks[tasks.length - 1];
+            setSelectedTaskDetail(lastTask.name);
             setTaskDetailContent(
               JSON.stringify(
                 {
-                  input_parameters: task.input_parameters || {},
-                  output_parameters: task.output_parameters || {},
+                  input_parameters: lastTask.input_parameters || {},
+                  output_parameters: lastTask.output_parameters || {},
                 },
                 null,
                 2
@@ -307,7 +373,6 @@ function MenuEditor() {
               tasks: updatedTasks,
               task_details: updatedTaskDetails,
             });
-            setIsTaskSelectOpen(false);
           },
         }
       );
@@ -317,519 +382,507 @@ function MenuEditor() {
     }
   };
 
-  // ドラッグアンドドロップの処理
-  const handleDragEnd = (result: any) => {
-    if (!result.destination || !selectedMenu) return;
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || !active.data.current) return;
 
-    try {
-      const menuData = JSON.parse(menuContent);
-      const currentTasks = menuData.tasks || [];
-      const currentTaskDetails = selectedMenu.task_details || {};
+    // If dragging from available tasks to task list in the main view
+    if (
+      !isTaskSelectOpen &&
+      over.id === "task-list" &&
+      "task_type" in active.data.current
+    ) {
+      handleAddTaskDetails([active.data.current as TaskResponse]);
+    }
+    // If reordering within task list
+    else if (active.id !== over.id && selectedMenu?.tasks) {
+      const taskNames = selectedMenu.tasks;
+      const sourceIndex = taskNames.indexOf(active.id.toString());
+      const destinationIndex = taskNames.indexOf(over.id.toString());
 
-      // task_detailsの順序を変更
-      const taskEntries = Object.entries(currentTaskDetails);
-      const [reorderedTask] = taskEntries.splice(result.source.index, 1);
-      taskEntries.splice(result.destination.index, 0, reorderedTask);
+      if (sourceIndex !== -1 && destinationIndex !== -1) {
+        // Create new array with reordered tasks
+        const newTasks = [...taskNames];
+        const [movedTask] = newTasks.splice(sourceIndex, 1);
+        newTasks.splice(destinationIndex, 0, movedTask);
 
-      // tasksの順序も同期
-      const [movedTask] = currentTasks.splice(result.source.index, 1);
-      currentTasks.splice(result.destination.index, 0, movedTask);
+        // Update menu content
+        const menuData = JSON.parse(menuContent);
+        menuData.tasks = newTasks;
+        setMenuContent(JSON.stringify(menuData, null, 2));
 
-      // 新しい順序でオブジェクトを再構築
-      const updatedTaskDetails = Object.fromEntries(taskEntries);
-
-      // menuContentを更新
-      setMenuContent(
-        JSON.stringify(
-          {
-            ...menuData,
-            tasks: currentTasks,
-          },
-          null,
-          2
-        )
-      );
-
-      // task_detailsを更新
-      updateMenu.mutate(
-        {
+        // Update menu state
+        updateMenu.mutate({
           name: selectedMenu.name,
           data: {
             ...selectedMenu,
-            tasks: currentTasks,
-            task_details: updatedTaskDetails,
+            tasks: newTasks,
           },
-        },
-        {
-          onSuccess: () => {
-            setSelectedMenu({
-              ...selectedMenu,
-              tasks: currentTasks,
-              task_details: updatedTaskDetails,
-            });
-          },
-        }
-      );
-    } catch (e) {
-      // JSON解析エラー
-      console.error("Invalid JSON:", e);
+        });
+      }
     }
   };
 
   return (
-    <div className="container mx-auto h-[calc(100vh-4rem)] max-w-[3000px] p-4">
-      <div className="flex flex-col md:flex-row bg-base-200/50 backdrop-blur-sm rounded-lg shadow-xl overflow-hidden border border-base-300 h-full">
-        {/* Menu Editor */}
-        <div className="flex-1 md:w-[45%] flex flex-col md:flex-row h-full min-w-0">
-          {/* File explorer */}
-          <div className="w-full md:w-[25%] h-48 md:h-full bg-base-200/80 border-r border-base-300 flex flex-col shrink-0">
-            <div className="px-4 py-3 border-b border-base-300 flex justify-between items-center shrink-0 bg-base-200/90">
-              <h2 className="font-bold text-sm uppercase tracking-wide">
-                Menus
-              </h2>
-              <div className="flex gap-1">
-                <button
-                  className="btn btn-ghost btn-sm btn-square"
-                  onClick={() => setShowCreateFromTemplate(true)}
-                  title="Create from template"
-                >
-                  <BsFileEarmarkPlus className="text-lg" />
-                </button>
-                <button
-                  className="btn btn-ghost btn-sm btn-square"
-                  onClick={() => {
+    <DndContext onDragEnd={handleDragEnd}>
+      <div className="container mx-auto h-[calc(100vh-4rem)] max-w-[3000px] p-4">
+        <div className="flex flex-col md:flex-row bg-base-200/50 backdrop-blur-sm rounded-lg shadow-xl overflow-hidden border border-base-300 h-full gap-px relative">
+          {/* Menu Editor */}
+          <div className="flex-1 md:w-[30%] flex flex-col md:flex-row h-full min-w-0">
+            {/* File explorer */}
+            <div className="w-full md:w-[25%] h-48 md:h-full bg-base-200/80 border-r border-base-300 flex flex-col shrink-0">
+              <div className="px-4 py-3 border-b border-base-300 flex justify-between items-center shrink-0 bg-base-200/90">
+                <h2 className="font-bold text-sm uppercase tracking-wide">
+                  Menus
+                </h2>
+                <div className="flex gap-1">
+                  <button
+                    className="btn btn-ghost btn-sm btn-square"
+                    onClick={() => setShowCreateFromTemplate(true)}
+                    title="Create from template"
+                  >
+                    <BsFileEarmarkPlus className="text-lg" />
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm btn-square"
+                    onClick={() => {
+                      setSelectedMenu(null);
+                      setSelectedTaskDetail(null);
+                      setMenuContent("");
+                      setTaskDetailContent("");
+                    }}
+                    title="Create new"
+                  >
+                    <BsPlus className="text-lg" />
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-y-auto flex-1 p-2">
+                {menusData?.data?.menus?.map((menu) => (
+                  <div
+                    key={menu.name}
+                    className={`p-2 rounded cursor-pointer hover:bg-base-300/50 flex items-center gap-2 transition-colors group ${
+                      selectedMenu?.name === menu.name ? "bg-primary/10" : ""
+                    }`}
+                    onClick={() => handleMenuSelect(menu)}
+                  >
+                    <BsFileEarmarkText className="text-base-content/70" />
+                    <span className="font-medium text-sm truncate flex-1">
+                      {menu.name}
+                    </span>
+                    <button
+                      className="btn btn-ghost btn-xs btn-square opacity-50 hover:opacity-100 transition-opacity tooltip tooltip-left"
+                      data-tip="Duplicate menu"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const newName = `${menu.name}_copy`;
+                        const menuData = {
+                          ...menu,
+                          name: newName,
+                        };
+                        createMenu.mutate(
+                          { data: menuData },
+                          {
+                            onSuccess: () => {
+                              refetchMenus();
+                            },
+                          }
+                        );
+                      }}
+                      title="Duplicate menu"
+                    >
+                      <BsCopy className="text-sm" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Editor */}
+            <div className="flex-1 flex flex-col min-w-0 h-full bg-base-100/50">
+              {/* Editor toolbar */}
+              <div className="px-4 py-2 border-b border-base-300 flex items-center justify-between shrink-0 bg-base-200/90">
+                <div className="flex items-center gap-2">
+                  {selectedMenu && (
+                    <>
+                      <span className="font-medium text-sm">
+                        {selectedMenu.name}
+                      </span>
+                      <div className="badge badge-sm badge-ghost">json</div>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {selectedMenu && (
+                    <>
+                      <button
+                        className={`btn btn-sm ${
+                          lockStatus?.data.lock ? "btn-disabled" : "btn-success"
+                        }`}
+                        onClick={() => setShowExecuteModal(true)}
+                        disabled={lockStatus?.data.lock || isLockStatusLoading}
+                      >
+                        <BsPlay className="text-lg" />
+                        <span>
+                          {lockStatus?.data.lock ? "Locked" : "Execute"}
+                        </span>
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => {
+                          const menuData = {
+                            ...selectedMenu,
+                            task_details: selectedMenu.task_details || {},
+                          };
+                          const blob = new Blob(
+                            [JSON.stringify(menuData, null, 2)],
+                            {
+                              type: "application/json",
+                            }
+                          );
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `${selectedMenu.name}.json`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                        }}
+                      >
+                        <BsDownload className="text-lg" />
+                        <span>Download</span>
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setShowDeleteModal(true)}
+                      >
+                        <BsTrash className="text-lg" />
+                        <span>Delete</span>
+                      </button>
+                    </>
+                  )}
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={handleSave}
+                    disabled={!selectedMenu}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+
+              {/* Editor content */}
+              <div className="flex-1 overflow-auto p-3">
+                <div className="h-full rounded-lg overflow-hidden bg-base-300/30 shadow-inner">
+                  <Editor
+                    defaultLanguage="json"
+                    value={menuContent}
+                    onChange={(value: string | undefined) =>
+                      setMenuContent(value || "")
+                    }
+                    options={{
+                      minimap: { enabled: false },
+                      scrollBeyondLastLine: false,
+                      fontSize: 14,
+                      lineNumbers: "on",
+                      renderLineHighlight: "all",
+                      automaticLayout: true,
+                      tabSize: 2,
+                      wordWrap: "on",
+                      theme: "vs-dark",
+                    }}
+                    className="h-full"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Task Detail Editor */}
+          <div className="flex-1 md:w-[40%] flex flex-col md:flex-row h-full border-t md:border-t-0 md:border-l border-base-300 min-w-0">
+            {/* File explorer */}
+            <div className="w-full md:w-[25%] h-48 md:h-full bg-base-200/80 border-r border-base-300 flex flex-col shrink-0">
+              <div className="px-4 py-3 border-b border-base-300 flex justify-between items-center shrink-0 bg-base-200/90">
+                <h2 className="font-bold text-sm uppercase tracking-wide">
+                  Task Details
+                </h2>
+                {selectedMenu && (
+                  <button
+                    className="btn btn-ghost btn-sm btn-square"
+                    onClick={() => setIsTaskSelectOpen(true)}
+                    title="Add task"
+                  >
+                    <BsPlus className="text-lg" />
+                  </button>
+                )}
+              </div>
+              {selectedMenu?.task_details && (
+                <div className="flex-1 overflow-hidden">
+                  <TaskDetailList
+                    tasks={selectedMenu.task_details}
+                    selectedTask={selectedTaskDetail}
+                    onTaskSelect={handleTaskDetailSelect}
+                    onDragEnd={handleDragEnd}
+                    onDeleteTask={(taskName) => {
+                      setTaskToDelete(taskName);
+                      setShowDeleteTaskModal(true);
+                    }}
+                    onBulkDeleteTasks={(taskNames) => {
+                      setTasksToDelete(taskNames);
+                      setShowBulkDeleteModal(true);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Editor */}
+            <div className="flex-1 flex flex-col min-w-0 h-full bg-base-100/50">
+              {/* Editor toolbar */}
+              <div className="px-4 py-2 border-b border-base-300 flex items-center justify-between shrink-0 bg-base-200/90">
+                <div className="flex items-center gap-2">
+                  {selectedMenu && selectedTaskDetail && (
+                    <>
+                      <span className="font-medium text-sm">
+                        {selectedMenu.name}
+                      </span>
+                      <span className="text-base-content/70">/</span>
+                      <span className="font-medium text-sm">
+                        {selectedTaskDetail}
+                      </span>
+                      <div className="badge badge-sm badge-ghost">json</div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Editor content */}
+              <div className="flex-1 overflow-auto p-3">
+                <div className="h-full rounded-lg overflow-hidden bg-base-300/30 shadow-inner">
+                  <Editor
+                    defaultLanguage="json"
+                    value={taskDetailContent}
+                    onChange={(value: string | undefined) =>
+                      setTaskDetailContent(value || "")
+                    }
+                    options={{
+                      minimap: { enabled: false },
+                      scrollBeyondLastLine: false,
+                      fontSize: 14,
+                      lineNumbers: "on",
+                      renderLineHighlight: "all",
+                      automaticLayout: true,
+                      tabSize: 2,
+                      wordWrap: "on",
+                      theme: "vs-dark",
+                    }}
+                    className="h-full"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Save Success Toast */}
+        {showSaveToast && (
+          <div className="fixed bottom-4 right-4 z-50">
+            <Toast
+              message="変更を保存しました"
+              onClose={() => setShowSaveToast(false)}
+            />
+          </div>
+        )}
+        {/* Execute Confirm Modal */}
+        {showExecuteModal && selectedMenu && (
+          <ExecuteConfirmModal
+            selectedMenu={selectedMenu}
+            onClose={() => setShowExecuteModal(false)}
+          />
+        )}
+
+        {/* Delete Confirm Modal */}
+        {showDeleteModal && selectedMenu && (
+          <DeleteConfirmModal
+            selectedMenu={selectedMenu}
+            onConfirm={() => {
+              deleteMutation.mutate(
+                { name: selectedMenu.name },
+                {
+                  onSuccess: () => {
+                    setShowDeleteModal(false);
                     setSelectedMenu(null);
                     setSelectedTaskDetail(null);
                     setMenuContent("");
                     setTaskDetailContent("");
-                  }}
-                  title="Create new"
-                >
-                  <BsPlus className="text-lg" />
-                </button>
-              </div>
-            </div>
-            <div className="overflow-y-auto flex-1 p-2">
-              {menusData?.data?.menus?.map((menu) => (
-                <div
-                  key={menu.name}
-                  className={`p-2 rounded cursor-pointer hover:bg-base-300/50 flex items-center gap-2 transition-colors group ${
-                    selectedMenu?.name === menu.name ? "bg-primary/10" : ""
-                  }`}
-                  onClick={() => handleMenuSelect(menu)}
-                >
-                  <BsFileEarmarkText className="text-base-content/70" />
-                  <span className="font-medium text-sm truncate flex-1">
-                    {menu.name}
-                  </span>
-                  <button
-                    className="btn btn-ghost btn-xs btn-square opacity-50 hover:opacity-100 transition-opacity tooltip tooltip-left"
-                    data-tip="Duplicate menu"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const newName = `${menu.name}_copy`;
-                      const menuData = {
-                        ...menu,
-                        name: newName,
-                      };
-                      createMenu.mutate(
-                        { data: menuData },
-                        {
-                          onSuccess: () => {
-                            refetchMenus();
-                          },
-                        }
-                      );
-                    }}
-                    title="Duplicate menu"
-                  >
-                    <BsCopy className="text-sm" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Editor */}
-          <div className="flex-1 flex flex-col min-w-0 h-full bg-base-100/50">
-            {/* Editor toolbar */}
-            <div className="px-4 py-2 border-b border-base-300 flex items-center justify-between shrink-0 bg-base-200/90">
-              <div className="flex items-center gap-2">
-                {selectedMenu && (
-                  <>
-                    <span className="font-medium text-sm">
-                      {selectedMenu.name}
-                    </span>
-                    <div className="badge badge-sm badge-ghost">json</div>
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {selectedMenu && (
-                  <>
-                    <button
-                      className={`btn btn-sm ${
-                        lockStatus?.data.lock ? "btn-disabled" : "btn-success"
-                      }`}
-                      onClick={() => setShowExecuteModal(true)}
-                      disabled={lockStatus?.data.lock || isLockStatusLoading}
-                    >
-                      <BsPlay className="text-lg" />
-                      <span>
-                        {lockStatus?.data.lock ? "Locked" : "Execute"}
-                      </span>
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => {
-                        const menuData = {
-                          ...selectedMenu,
-                          task_details: selectedMenu.task_details || {},
-                        };
-                        const blob = new Blob(
-                          [JSON.stringify(menuData, null, 2)],
-                          {
-                            type: "application/json",
-                          }
-                        );
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `${selectedMenu.name}.json`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                      }}
-                    >
-                      <BsDownload className="text-lg" />
-                      <span>Download</span>
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => setShowDeleteModal(true)}
-                    >
-                      <BsTrash className="text-lg" />
-                      <span>Delete</span>
-                    </button>
-                  </>
-                )}
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={handleSave}
-                  disabled={!selectedMenu}
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-
-            {/* Editor content */}
-            <div className="flex-1 overflow-auto p-3">
-              <div className="h-full rounded-lg overflow-hidden bg-base-300/30 shadow-inner">
-                <Editor
-                  defaultLanguage="json"
-                  value={menuContent}
-                  onChange={(value: string | undefined) =>
-                    setMenuContent(value || "")
-                  }
-                  options={{
-                    minimap: { enabled: false },
-                    scrollBeyondLastLine: false,
-                    fontSize: 14,
-                    lineNumbers: "on",
-                    renderLineHighlight: "all",
-                    automaticLayout: true,
-                    tabSize: 2,
-                    wordWrap: "on",
-                    theme: "vs-dark",
-                  }}
-                  className="h-full"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Task Detail Editor */}
-        <div className="flex-1 md:w-[55%] flex flex-col md:flex-row h-full border-t md:border-t-0 md:border-l border-base-300 min-w-0">
-          {/* File explorer */}
-          <div className="w-full md:w-[25%] h-48 md:h-full bg-base-200/80 border-r border-base-300 flex flex-col shrink-0">
-            <div className="px-4 py-3 border-b border-base-300 flex justify-between items-center shrink-0 bg-base-200/90">
-              <h2 className="font-bold text-sm uppercase tracking-wide">
-                Task Details
-              </h2>
-              {selectedMenu && (
-                <button
-                  className="btn btn-ghost btn-sm btn-square"
-                  onClick={() => setIsTaskSelectOpen(true)}
-                >
-                  <BsPlus className="text-lg" />
-                </button>
-              )}
-            </div>
-            {selectedMenu?.task_details && (
-              <div className="flex-1 overflow-hidden">
-                <TaskDetailList
-                  tasks={selectedMenu.task_details}
-                  selectedTask={selectedTaskDetail}
-                  onTaskSelect={handleTaskDetailSelect}
-                  onDragEnd={handleDragEnd}
-                  onDeleteTask={(taskName) => {
-                    setTaskToDelete(taskName);
-                    setShowDeleteTaskModal(true);
-                  }}
-                  onBulkDeleteTasks={(taskNames) => {
-                    setTasksToDelete(taskNames);
-                    setShowBulkDeleteModal(true);
-                  }}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Editor */}
-          <div className="flex-1 flex flex-col min-w-0 h-full bg-base-100/50">
-            {/* Editor toolbar */}
-            <div className="px-4 py-2 border-b border-base-300 flex items-center justify-between shrink-0 bg-base-200/90">
-              <div className="flex items-center gap-2">
-                {selectedMenu && selectedTaskDetail && (
-                  <>
-                    <span className="font-medium text-sm">
-                      {selectedMenu.name}
-                    </span>
-                    <span className="text-base-content/70">/</span>
-                    <span className="font-medium text-sm">
-                      {selectedTaskDetail}
-                    </span>
-                    <div className="badge badge-sm badge-ghost">json</div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Editor content */}
-            <div className="flex-1 overflow-auto p-3">
-              <div className="h-full rounded-lg overflow-hidden bg-base-300/30 shadow-inner">
-                <Editor
-                  defaultLanguage="json"
-                  value={taskDetailContent}
-                  onChange={(value: string | undefined) =>
-                    setTaskDetailContent(value || "")
-                  }
-                  options={{
-                    minimap: { enabled: false },
-                    scrollBeyondLastLine: false,
-                    fontSize: 14,
-                    lineNumbers: "on",
-                    renderLineHighlight: "all",
-                    automaticLayout: true,
-                    tabSize: 2,
-                    wordWrap: "on",
-                    theme: "vs-dark",
-                  }}
-                  className="h-full"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Save Success Toast */}
-      {showSaveToast && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <Toast
-            message="変更を保存しました"
-            onClose={() => setShowSaveToast(false)}
-          />
-        </div>
-      )}
-
-      {/* Task Select Modal */}
-      {isTaskSelectOpen && (
-        <TaskSelectModal
-          onClose={() => setIsTaskSelectOpen(false)}
-          onSelect={handleAddTaskDetail}
-        />
-      )}
-      {/* Execute Confirm Modal */}
-      {showExecuteModal && selectedMenu && (
-        <ExecuteConfirmModal
-          selectedMenu={selectedMenu}
-          onClose={() => setShowExecuteModal(false)}
-        />
-      )}
-
-      {/* Delete Confirm Modal */}
-      {showDeleteModal && selectedMenu && (
-        <DeleteConfirmModal
-          selectedMenu={selectedMenu}
-          onConfirm={() => {
-            deleteMutation.mutate(
-              { name: selectedMenu.name },
-              {
-                onSuccess: () => {
-                  setShowDeleteModal(false);
-                  setSelectedMenu(null);
-                  setSelectedTaskDetail(null);
-                  setMenuContent("");
-                  setTaskDetailContent("");
-                  refetchMenus(); // 一覧を更新
-                },
-              }
-            );
-          }}
-          onClose={() => setShowDeleteModal(false)}
-        />
-      )}
-
-      {/* Bulk Delete Tasks Confirm Modal */}
-      {showBulkDeleteModal && tasksToDelete.length > 0 && selectedMenu && (
-        <BulkDeleteTasksConfirmModal
-          taskNames={tasksToDelete}
-          onConfirm={() => {
-            try {
-              // メニューデータを取得
-              const menuData = JSON.parse(menuContent);
-              const currentTasks = menuData.tasks || [];
-              const currentTaskDetails = { ...selectedMenu.task_details };
-
-              // タスクを削除
-              const updatedTasks = currentTasks.filter(
-                (task: string) => !tasksToDelete.includes(task)
-              );
-
-              // task_detailsから削除
-              tasksToDelete.forEach((taskName) => {
-                delete currentTaskDetails[taskName];
-              });
-
-              // メニューを更新
-              updateMenu.mutate(
-                {
-                  name: selectedMenu.name,
-                  data: {
-                    ...selectedMenu,
-                    tasks: updatedTasks,
-                    task_details: currentTaskDetails,
+                    refetchMenus(); // 一覧を更新
                   },
-                },
-                {
-                  onSuccess: () => {
-                    setShowBulkDeleteModal(false);
-                    setTasksToDelete([]);
-                    if (
-                      selectedTaskDetail &&
-                      tasksToDelete.includes(selectedTaskDetail)
-                    ) {
-                      setSelectedTaskDetail(null);
-                      setTaskDetailContent("");
-                    }
-                    setSelectedMenu({
+                }
+              );
+            }}
+            onClose={() => setShowDeleteModal(false)}
+          />
+        )}
+
+        {/* Bulk Delete Tasks Confirm Modal */}
+        {showBulkDeleteModal && tasksToDelete.length > 0 && selectedMenu && (
+          <BulkDeleteTasksConfirmModal
+            taskNames={tasksToDelete}
+            onConfirm={() => {
+              try {
+                // メニューデータを取得
+                const menuData = JSON.parse(menuContent);
+                const currentTasks = menuData.tasks || [];
+                const currentTaskDetails = { ...selectedMenu.task_details };
+
+                // タスクを削除
+                const updatedTasks = currentTasks.filter(
+                  (task: string) => !tasksToDelete.includes(task)
+                );
+
+                // task_detailsから削除
+                tasksToDelete.forEach((taskName) => {
+                  delete currentTaskDetails[taskName];
+                });
+
+                // メニューを更新
+                updateMenu.mutate(
+                  {
+                    name: selectedMenu.name,
+                    data: {
                       ...selectedMenu,
                       tasks: updatedTasks,
                       task_details: currentTaskDetails,
-                    });
-                    setMenuContent(
-                      JSON.stringify(
-                        {
-                          ...menuData,
-                          tasks: updatedTasks,
-                        },
-                        null,
-                        2
-                      )
-                    );
+                    },
                   },
-                }
-              );
-            } catch (e) {
-              console.error("Invalid JSON:", e);
-            }
-          }}
-          onClose={() => {
-            setShowBulkDeleteModal(false);
-            setTasksToDelete([]);
-          }}
-        />
-      )}
-
-      {/* Delete Task Confirm Modal */}
-      {showDeleteTaskModal && taskToDelete && selectedMenu && (
-        <DeleteTaskConfirmModal
-          taskName={taskToDelete}
-          onConfirm={() => {
-            try {
-              // メニューデータを取得
-              const menuData = JSON.parse(menuContent);
-              const currentTasks = menuData.tasks || [];
-              const currentTaskDetails = { ...selectedMenu.task_details };
-
-              // タスクを削除
-              const taskIndex = currentTasks.indexOf(taskToDelete);
-              if (taskIndex > -1) {
-                currentTasks.splice(taskIndex, 1);
+                  {
+                    onSuccess: () => {
+                      setShowBulkDeleteModal(false);
+                      setTasksToDelete([]);
+                      if (
+                        selectedTaskDetail &&
+                        tasksToDelete.includes(selectedTaskDetail)
+                      ) {
+                        setSelectedTaskDetail(null);
+                        setTaskDetailContent("");
+                      }
+                      setSelectedMenu({
+                        ...selectedMenu,
+                        tasks: updatedTasks,
+                        task_details: currentTaskDetails,
+                      });
+                      setMenuContent(
+                        JSON.stringify(
+                          {
+                            ...menuData,
+                            tasks: updatedTasks,
+                          },
+                          null,
+                          2
+                        )
+                      );
+                    },
+                  }
+                );
+              } catch (e) {
+                console.error("Invalid JSON:", e);
               }
-              delete currentTaskDetails[taskToDelete];
+            }}
+            onClose={() => {
+              setShowBulkDeleteModal(false);
+              setTasksToDelete([]);
+            }}
+          />
+        )}
 
-              // メニューを更新
-              updateMenu.mutate(
-                {
-                  name: selectedMenu.name,
-                  data: {
-                    ...selectedMenu,
-                    tasks: currentTasks,
-                    task_details: currentTaskDetails,
-                  },
-                },
-                {
-                  onSuccess: () => {
-                    setShowDeleteTaskModal(false);
-                    setTaskToDelete(null);
-                    if (selectedTaskDetail === taskToDelete) {
-                      setSelectedTaskDetail(null);
-                      setTaskDetailContent("");
-                    }
-                    setSelectedMenu({
+        {/* Delete Task Confirm Modal */}
+        {showDeleteTaskModal && taskToDelete && selectedMenu && (
+          <DeleteTaskConfirmModal
+            taskName={taskToDelete}
+            onConfirm={() => {
+              try {
+                // メニューデータを取得
+                const menuData = JSON.parse(menuContent);
+                const currentTasks = menuData.tasks || [];
+                const currentTaskDetails = { ...selectedMenu.task_details };
+
+                // タスクを削除
+                const taskIndex = currentTasks.indexOf(taskToDelete);
+                if (taskIndex > -1) {
+                  currentTasks.splice(taskIndex, 1);
+                }
+                delete currentTaskDetails[taskToDelete];
+
+                // メニューを更新
+                updateMenu.mutate(
+                  {
+                    name: selectedMenu.name,
+                    data: {
                       ...selectedMenu,
                       tasks: currentTasks,
                       task_details: currentTaskDetails,
-                    });
-                    setMenuContent(
-                      JSON.stringify(
-                        {
-                          ...menuData,
-                          tasks: currentTasks,
-                        },
-                        null,
-                        2
-                      )
-                    );
+                    },
                   },
-                }
-              );
-            } catch (e) {
-              console.error("Invalid JSON:", e);
-            }
-          }}
-          onClose={() => {
-            setShowDeleteTaskModal(false);
-            setTaskToDelete(null);
-          }}
-        />
-      )}
+                  {
+                    onSuccess: () => {
+                      setShowDeleteTaskModal(false);
+                      setTaskToDelete(null);
+                      if (selectedTaskDetail === taskToDelete) {
+                        setSelectedTaskDetail(null);
+                        setTaskDetailContent("");
+                      }
+                      setSelectedMenu({
+                        ...selectedMenu,
+                        tasks: currentTasks,
+                        task_details: currentTaskDetails,
+                      });
+                      setMenuContent(
+                        JSON.stringify(
+                          {
+                            ...menuData,
+                            tasks: currentTasks,
+                          },
+                          null,
+                          2
+                        )
+                      );
+                    },
+                  }
+                );
+              } catch (e) {
+                console.error("Invalid JSON:", e);
+              }
+            }}
+            onClose={() => {
+              setShowDeleteTaskModal(false);
+              setTaskToDelete(null);
+            }}
+          />
+        )}
 
-      {/* Create from Template Modal */}
-      {showCreateFromTemplate && (
-        <CreateFromTemplateModal
-          onClose={() => setShowCreateFromTemplate(false)}
-          onSuccess={() => {
-            refetchMenus();
-          }}
-        />
-      )}
-    </div>
+        {/* Create from Template Modal */}
+        {showCreateFromTemplate && (
+          <CreateFromTemplateModal
+            onClose={() => setShowCreateFromTemplate(false)}
+            onSuccess={() => {
+              refetchMenus();
+            }}
+          />
+        )}
+
+        {/* Task Select Modal */}
+        {isTaskSelectOpen && (
+          <TaskSelectModal
+            onClose={() => setIsTaskSelectOpen(false)}
+            onSelect={(tasks) => {
+              handleAddTaskDetails(tasks);
+              setIsTaskSelectOpen(false);
+            }}
+          />
+        )}
+      </div>
+    </DndContext>
   );
 }
 
