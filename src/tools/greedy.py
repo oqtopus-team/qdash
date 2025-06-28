@@ -160,7 +160,7 @@ def group_cr_pairs_by_conflict(
         if mux_b1 in conflict_muxes or mux_b2 in conflict_muxes:
             G.add_edge(a, b)
 
-    coloring = nx.coloring.greedy_color(G, strategy="DSATUR")
+    coloring = nx.coloring.greedy_color(G, strategy="largest_first")
 
     # Group pairs by color
     color_groups = defaultdict(list)
@@ -255,23 +255,49 @@ def visualize_each_step(
         plt.savefig(f"schedule/schedule_step_{i + 1}.png", dpi=300, bbox_inches="tight")
 
 
+def split_fast_slow_pairs(
+    cr_pairs: list[str], qid_to_mux: dict[str, int]
+) -> tuple[list[str], list[str]]:
+    fast = []
+    slow = []
+    for pair in cr_pairs:
+        q1, q2 = pair.split("-")
+        if qid_to_mux.get(q1) == qid_to_mux.get(q2):
+            fast.append(pair)
+        else:
+            slow.append(pair)
+    return fast, slow
+
+
 if __name__ == "__main__":
     initialize()
     # Maximum number of parallel operations allowed
-    MAX_PARALLEL_OPS = 3  # Can be adjusted as needed
+    MAX_PARALLEL_OPS = 10  # Can be adjusted as needed
+    EXCLUDE_QUBITS = {"12", "13", "14", "28", "29", "30", "31", "48", "49", "50", "51"}
 
     # create schedule directory
     chip_doc = ChipDocument.get_current_chip("admin")
     two_qubit_list = get_two_qubit_pair_list(chip_doc)
     bare_freq = extract_bare_frequency(chip_doc.qubits)
     cr_pairs = cr_pair_list(two_qubit_list, bare_freq)
+    cr_pairs = [pair for pair in cr_pairs if not set(pair.split("-")) & EXCLUDE_QUBITS]
 
-    wiring_path = Path("/workspace/qdash/config/wiring.yaml")
+    wiring_path = Path("/workspace/qdash/config/qubex/64Q/config/wiring.yaml")
     yaml_data = yaml.safe_load(wiring_path.read_text())
     mux_conflict_map = build_mux_conflict_map(yaml_data["64Q"])
     qid_to_mux = build_qubit_to_mux_map(yaml_data["64Q"])
 
-    grouped = group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, mux_conflict_map, MAX_PARALLEL_OPS)
+    fast_pairs, slow_pairs = split_fast_slow_pairs(cr_pairs, qid_to_mux)
+    grouped_fast = group_cr_pairs_by_conflict(
+        fast_pairs, qid_to_mux, mux_conflict_map, MAX_PARALLEL_OPS
+    )
+    grouped_slow = group_cr_pairs_by_conflict(
+        slow_pairs, qid_to_mux, mux_conflict_map, MAX_PARALLEL_OPS
+    )
+
+    grouped = grouped_fast + grouped_slow
+
+    # grouped = group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, mux_conflict_map, MAX_PARALLEL_OPS)
 
     internal_pairs = set(itertools.chain.from_iterable(grouped))
     external_pairs = [pair for pair in cr_pairs if pair not in internal_pairs]
@@ -279,7 +305,7 @@ if __name__ == "__main__":
     internal_schedule = convert_to_serial_parallel(grouped)
     print("\n\U0001f4e6 Schedule")
     print(json.dumps(internal_schedule, indent=2))
-
+    print(f"steps: {len(internal_schedule['serial'])}")
     lattice_pos = qubit_lattice(64, 4)
     visualize_each_step(internal_schedule, qid_to_mux=qid_to_mux, lattice_pos=lattice_pos)
     visualize_combined_schedule(internal_schedule, qid_to_mux=qid_to_mux, lattice_pos=lattice_pos)

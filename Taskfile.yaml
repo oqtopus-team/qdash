@@ -34,12 +34,12 @@ tasks:
     cmds:
       - npm run docs:build
 
-  fmt-client:
-    dir: client
+  fmt-ui:
+    dir: ui
     cmds:
-      - npx prettier . --write
-      - npx eslint . --fix
-    desc: Format the client
+      - bunx prettier . --write
+      - bunx eslint . --fix -c eslint.config.js
+    desc: Format the UI code
 
   fmt:
     cmds:
