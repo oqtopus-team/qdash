@@ -19,7 +19,7 @@ export default function AvailableTasksList({
       }
       // Add task to the group while maintaining the original order
       const insertIndex = acc[type].findIndex(
-        (t) => tasks.indexOf(t) > tasks.indexOf(task)
+        (t) => tasks.indexOf(t) > tasks.indexOf(task),
       );
       if (insertIndex === -1) {
         acc[type].push(task);
@@ -28,7 +28,7 @@ export default function AvailableTasksList({
       }
       return acc;
     },
-    {}
+    {},
   );
 
   return (
