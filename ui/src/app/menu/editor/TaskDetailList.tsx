@@ -6,6 +6,7 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragOverlay,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -16,6 +17,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { BsGripVertical, BsTrash, BsCheck } from "react-icons/bs";
 import { useState, useCallback, useEffect } from "react";
+import DroppableTaskList from "./DroppableTaskList";
 
 interface TaskDetailListProps {
   tasks: Record<string, any>;
@@ -128,11 +130,17 @@ export default function TaskDetailList({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && active.id !== over.id) {
-      onDragEnd({
-        source: { index: taskNames.indexOf(active.id.toString()) },
-        destination: { index: taskNames.indexOf(over.id.toString()) },
-      });
+    if (over && active.id !== over.id && over.id === "task-list") {
+      const sourceIndex = taskNames.indexOf(active.id.toString());
+      const destinationIndex = taskNames.length;
+
+      if (sourceIndex !== -1) {
+        // Internal reordering
+        onDragEnd({
+          source: { index: sourceIndex },
+          destination: { index: destinationIndex },
+        });
+      }
     }
   };
 
@@ -190,34 +198,36 @@ export default function TaskDetailList({
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
-          <SortableContext
-            items={taskNames}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="p-2 space-y-1">
-              {taskNames.map((taskName) => (
-                <SortableItem
-                  key={taskName}
-                  id={taskName}
-                  content={tasks[taskName]}
-                  isSelected={selectedTask === taskName}
-                  isChecked={selectedTasks.has(taskName)}
-                  onSelect={() => onTaskSelect(taskName, tasks[taskName])}
-                  onDelete={
-                    onDeleteTask
-                      ? (e) => {
-                          e.stopPropagation();
-                          onDeleteTask(taskName);
-                        }
-                      : undefined
-                  }
-                  onCheckboxChange={(checked) =>
-                    handleCheckboxChange(taskName, checked)
-                  }
-                />
-              ))}
-            </div>
-          </SortableContext>
+          <DroppableTaskList id="task-list">
+            <SortableContext
+              items={taskNames}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-1">
+                {taskNames.map((taskName) => (
+                  <SortableItem
+                    key={taskName}
+                    id={taskName}
+                    content={tasks[taskName]}
+                    isSelected={selectedTask === taskName}
+                    isChecked={selectedTasks.has(taskName)}
+                    onSelect={() => onTaskSelect(taskName, tasks[taskName])}
+                    onDelete={
+                      onDeleteTask
+                        ? (e) => {
+                            e.stopPropagation();
+                            onDeleteTask(taskName);
+                          }
+                        : undefined
+                    }
+                    onCheckboxChange={(checked) =>
+                      handleCheckboxChange(taskName, checked)
+                    }
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DroppableTaskList>
         </DndContext>
       </div>
     </div>
