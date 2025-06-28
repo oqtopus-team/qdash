@@ -20,6 +20,7 @@ import TaskDetailList from "./TaskDetailList";
 import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { DeleteTaskConfirmModal } from "./DeleteTaskConfirmModal";
+import { BulkDeleteTasksConfirmModal } from "./BulkDeleteTasksConfirmModal";
 import { CreateFromTemplateModal } from "./CreateFromTemplateModal";
 import { Toast } from "@/app/setting/components/Toast";
 
@@ -46,7 +47,7 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
         acc[type].push(task);
         return acc;
       },
-      {},
+      {}
     ) || {};
 
   return (
@@ -122,6 +123,8 @@ function MenuEditor() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteTaskModal, setShowDeleteTaskModal] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+  const [tasksToDelete, setTasksToDelete] = useState<string[]>([]);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const { data: menusData, refetch: refetchMenus } = useListMenu();
   const { data: lockStatus, isLoading: isLockStatusLoading } =
     useFetchExecutionLockStatus({
@@ -133,10 +136,10 @@ function MenuEditor() {
   const updateMenu = useUpdateMenu();
   const deleteMutation = useDeleteMenu();
   const [selectedMenu, setSelectedMenu] = useState<GetMenuResponse | null>(
-    null,
+    null
   );
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<string | null>(
-    null,
+    null
   );
   const [menuContent, setMenuContent] = useState<string>("");
   const [taskDetailContent, setTaskDetailContent] = useState<string>("");
@@ -150,7 +153,7 @@ function MenuEditor() {
       setSelectedTaskDetail(taskName);
       setTaskDetailContent(JSON.stringify(content, null, 2));
     },
-    [],
+    []
   );
 
   // メニューが選択された時の処理
@@ -164,14 +167,14 @@ function MenuEditor() {
             task_details: undefined, // task_detailsは左側のエディターには表示しない
           },
           null,
-          2,
-        ),
+          2
+        )
       );
       // 最初のtask_detailを選択
       const firstTask = Object.keys(menu.task_details || {})[0];
       handleTaskDetailSelect(firstTask, menu.task_details?.[firstTask]);
     },
-    [handleTaskDetailSelect],
+    [handleTaskDetailSelect]
   );
 
   useEffect(() => {
@@ -230,7 +233,7 @@ function MenuEditor() {
             });
             setShowSaveToast(true);
           },
-        },
+        }
       );
     } catch (e) {
       // メニューのJSONが不正な場合
@@ -265,8 +268,8 @@ function MenuEditor() {
             tasks: updatedTasks,
           },
           null,
-          2,
-        ),
+          2
+        )
       );
 
       // task_detailsを更新
@@ -289,8 +292,8 @@ function MenuEditor() {
                   output_parameters: task.output_parameters || {},
                 },
                 null,
-                2,
-              ),
+                2
+              )
             );
             setSelectedMenu({
               ...selectedMenu,
@@ -299,7 +302,7 @@ function MenuEditor() {
             });
             setIsTaskSelectOpen(false);
           },
-        },
+        }
       );
     } catch (e) {
       // JSON解析エラー
@@ -336,8 +339,8 @@ function MenuEditor() {
             tasks: currentTasks,
           },
           null,
-          2,
-        ),
+          2
+        )
       );
 
       // task_detailsを更新
@@ -358,7 +361,7 @@ function MenuEditor() {
               task_details: updatedTaskDetails,
             });
           },
-        },
+        }
       );
     } catch (e) {
       // JSON解析エラー
@@ -457,7 +460,7 @@ function MenuEditor() {
                           [JSON.stringify(menuData, null, 2)],
                           {
                             type: "application/json",
-                          },
+                          }
                         );
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement("a");
@@ -545,6 +548,10 @@ function MenuEditor() {
                   onDeleteTask={(taskName) => {
                     setTaskToDelete(taskName);
                     setShowDeleteTaskModal(true);
+                  }}
+                  onBulkDeleteTasks={(taskNames) => {
+                    setTasksToDelete(taskNames);
+                    setShowBulkDeleteModal(true);
                   }}
                 />
               </div>
@@ -640,10 +647,81 @@ function MenuEditor() {
                   setTaskDetailContent("");
                   refetchMenus(); // 一覧を更新
                 },
-              },
+              }
             );
           }}
           onClose={() => setShowDeleteModal(false)}
+        />
+      )}
+
+      {/* Bulk Delete Tasks Confirm Modal */}
+      {showBulkDeleteModal && tasksToDelete.length > 0 && selectedMenu && (
+        <BulkDeleteTasksConfirmModal
+          taskNames={tasksToDelete}
+          onConfirm={() => {
+            try {
+              // メニューデータを取得
+              const menuData = JSON.parse(menuContent);
+              const currentTasks = menuData.tasks || [];
+              const currentTaskDetails = { ...selectedMenu.task_details };
+
+              // タスクを削除
+              const updatedTasks = currentTasks.filter(
+                (task: string) => !tasksToDelete.includes(task)
+              );
+
+              // task_detailsから削除
+              tasksToDelete.forEach((taskName) => {
+                delete currentTaskDetails[taskName];
+              });
+
+              // メニューを更新
+              updateMenu.mutate(
+                {
+                  name: selectedMenu.name,
+                  data: {
+                    ...selectedMenu,
+                    tasks: updatedTasks,
+                    task_details: currentTaskDetails,
+                  },
+                },
+                {
+                  onSuccess: () => {
+                    setShowBulkDeleteModal(false);
+                    setTasksToDelete([]);
+                    if (
+                      selectedTaskDetail &&
+                      tasksToDelete.includes(selectedTaskDetail)
+                    ) {
+                      setSelectedTaskDetail(null);
+                      setTaskDetailContent("");
+                    }
+                    setSelectedMenu({
+                      ...selectedMenu,
+                      tasks: updatedTasks,
+                      task_details: currentTaskDetails,
+                    });
+                    setMenuContent(
+                      JSON.stringify(
+                        {
+                          ...menuData,
+                          tasks: updatedTasks,
+                        },
+                        null,
+                        2
+                      )
+                    );
+                  },
+                }
+              );
+            } catch (e) {
+              console.error("Invalid JSON:", e);
+            }
+          }}
+          onClose={() => {
+            setShowBulkDeleteModal(false);
+            setTasksToDelete([]);
+          }}
         />
       )}
 
@@ -695,11 +773,11 @@ function MenuEditor() {
                           tasks: currentTasks,
                         },
                         null,
-                        2,
-                      ),
+                        2
+                      )
                     );
                   },
-                },
+                }
               );
             } catch (e) {
               console.error("Invalid JSON:", e);
