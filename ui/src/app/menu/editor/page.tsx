@@ -21,6 +21,7 @@ import {
   BsFileEarmarkPlus,
   BsDownload,
   BsCopy,
+  BsPencil,
 } from "react-icons/bs";
 import TaskDetailList from "./TaskDetailList";
 import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
@@ -461,11 +462,11 @@ function MenuEditor() {
                 </h2>
                 {selectedMenu && (
                   <button
-                    className="btn btn-ghost btn-sm btn-square"
+                    className="btn btn-primary btn-sm"
                     onClick={() => setIsTaskSelectOpen(true)}
-                    title="Add task"
                   >
-                    <BsPlus className="text-lg" />
+                    <BsPencil className="text-lg" />
+                    <span>Edit</span>
                   </button>
                 )}
               </div>
@@ -541,7 +542,7 @@ function MenuEditor() {
         {showSaveToast && (
           <div className="fixed bottom-4 right-4 z-50">
             <Toast
-              message="変更を保存しました"
+              message="Menu saved successfully!"
               onClose={() => setShowSaveToast(false)}
             />
           </div>
