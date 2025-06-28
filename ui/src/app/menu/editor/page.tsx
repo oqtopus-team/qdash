@@ -8,7 +8,6 @@ import {
   useDeleteMenu,
   useCreateMenu,
 } from "@/client/menu/menu";
-import { useFetchAllTasks } from "@/client/task/task";
 import { useFetchExecutionLockStatus } from "@/client/execution/execution";
 import { GetMenuResponse, TaskResponse } from "@/schemas";
 import { useState, useEffect, useCallback } from "react";
@@ -30,173 +29,7 @@ import { DeleteTaskConfirmModal } from "./DeleteTaskConfirmModal";
 import { BulkDeleteTasksConfirmModal } from "./BulkDeleteTasksConfirmModal";
 import { CreateFromTemplateModal } from "./CreateFromTemplateModal";
 import { Toast } from "@/app/setting/components/Toast";
-
-import AvailableTasksList from "./AvailableTasksList";
-import DroppableTaskList from "./DroppableTaskList";
-
-interface TaskSelectModalProps {
-  onClose: () => void;
-  onSelect: (tasks: TaskResponse[]) => void;
-  selectedTaskNames?: string[];
-}
-
-const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
-  onClose,
-  onSelect,
-  selectedTaskNames = [],
-}) => {
-  const { data: tasksData } = useFetchAllTasks();
-  const [selectedTasks, setSelectedTasks] = useState<TaskResponse[]>([]);
-
-  // 初期化時に既存のタスクを選択状態にする
-  useEffect(() => {
-    if (tasksData?.data?.tasks) {
-      const existingTasks = tasksData.data.tasks.filter((task) =>
-        selectedTaskNames.includes(task.name)
-      );
-      setSelectedTasks(existingTasks);
-    }
-  }, [tasksData, selectedTaskNames]);
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || !active.data.current) return;
-
-    // If dragging from available tasks to task list
-    if (over.id === "task-list" && "task_type" in active.data.current) {
-      const task = active.data.current as TaskResponse;
-      if (!selectedTasks.find((t) => t.name === task.name)) {
-        setSelectedTasks([...selectedTasks, task]);
-      }
-    }
-  };
-
-  const handleTaskClick = (task: TaskResponse) => {
-    if (!selectedTasks.find((t) => t.name === task.name)) {
-      setSelectedTasks([...selectedTasks, task]);
-    }
-  };
-
-  const handleRemoveTask = (taskName: string) => {
-    setSelectedTasks(selectedTasks.filter((t) => t.name !== taskName));
-  };
-
-  return (
-    <DndContext onDragEnd={handleDragEnd}>
-      <div
-        className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4"
-        onClick={onClose}
-      >
-        <div
-          className="bg-base-100 rounded-xl w-full max-w-5xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="px-6 py-4 border-b border-base-300 flex items-center justify-between bg-base-100/80 backdrop-blur supports-[backdrop-filter]:bg-base-100/60">
-            <h2 className="text-2xl font-bold">Select Tasks</h2>
-            <div className="flex items-center gap-2">
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => {
-                  onSelect(selectedTasks);
-                  onClose();
-                }}
-                disabled={selectedTasks.length === 0}
-              >
-                Save
-              </button>
-              <button
-                onClick={onClose}
-                className="btn btn-ghost btn-sm btn-square hover:rotate-90 transition-transform"
-              >
-                <BsPlus className="text-xl rotate-45" />
-              </button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-hidden flex gap-4 p-4">
-            {/* Left side: Available tasks */}
-            <div className="w-1/2">
-              {tasksData?.data?.tasks && (
-                <AvailableTasksList
-                  tasks={tasksData.data.tasks}
-                  onTaskSelect={handleTaskClick}
-                />
-              )}
-            </div>
-
-            {/* Right side: Selected tasks */}
-            <div className="w-1/2 flex flex-col overflow-hidden">
-              <div className="flex items-center justify-between mb-4 shrink-0">
-                <h3 className="text-lg font-semibold">Selected Tasks</h3>
-                <span className="text-sm text-base-content/70">
-                  {selectedTasks.length} tasks
-                </span>
-              </div>
-              <DroppableTaskList
-                id="task-list"
-                className="flex-1 overflow-y-auto"
-              >
-                <div className="space-y-2">
-                  {selectedTasks.map((task) => (
-                    <div
-                      key={task.name}
-                      className="p-3 rounded-lg bg-base-100 border border-base-300 hover:border-primary group shadow-sm"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-medium">{task.name}</h4>
-                            <div className="badge badge-primary badge-outline">
-                              {task.task_type}
-                            </div>
-                          </div>
-                          {task.description && (
-                            <p className="text-sm text-base-content/70 line-clamp-2">
-                              {task.description}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => handleRemoveTask(task.name)}
-                          className="btn btn-ghost btn-xs btn-square hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <BsTrash className="text-sm" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {selectedTasks.length === 0 && (
-                    <div className="text-base-content/50 text-center py-8">
-                      <svg
-                        className="mx-auto h-12 w-12 text-base-content/30"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                        />
-                      </svg>
-                      <h3 className="mt-2 text-sm font-medium">
-                        No tasks selected
-                      </h3>
-                      <p className="mt-1 text-sm text-base-content/70">
-                        Drag tasks from the left or click to add them
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </DroppableTaskList>
-            </div>
-          </div>
-        </div>
-      </div>
-    </DndContext>
-  );
-};
+import TaskSelectModal from "./TaskSelectModal";
 
 function MenuEditor() {
   const searchParams = useSearchParams();
@@ -713,6 +546,7 @@ function MenuEditor() {
             />
           </div>
         )}
+
         {/* Execute Confirm Modal */}
         {showExecuteModal && selectedMenu && (
           <ExecuteConfirmModal

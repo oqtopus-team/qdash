@@ -10,14 +10,22 @@ export default function AvailableTasksList({
   tasks,
   onTaskSelect,
 }: AvailableTasksListProps) {
-  // Group tasks by type
+  // Group tasks by type while maintaining original order
   const groupedTasks = tasks.reduce(
     (acc: { [key: string]: TaskResponse[] }, task: TaskResponse) => {
       const type = task.task_type || "other";
       if (!acc[type]) {
         acc[type] = [];
       }
-      acc[type].push(task);
+      // Add task to the group while maintaining the original order
+      const insertIndex = acc[type].findIndex(
+        (t) => tasks.indexOf(t) > tasks.indexOf(task)
+      );
+      if (insertIndex === -1) {
+        acc[type].push(task);
+      } else {
+        acc[type].splice(insertIndex, 0, task);
+      }
       return acc;
     },
     {}
