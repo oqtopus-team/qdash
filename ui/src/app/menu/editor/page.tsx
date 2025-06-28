@@ -1,7 +1,12 @@
 "use client";
 
 import { Suspense } from "react";
-import { useListMenu, useUpdateMenu, useDeleteMenu } from "@/client/menu/menu";
+import {
+  useListMenu,
+  useUpdateMenu,
+  useDeleteMenu,
+  useCreateMenu,
+} from "@/client/menu/menu";
 import { useFetchAllTasks } from "@/client/task/task";
 import { useFetchExecutionLockStatus } from "@/client/execution/execution";
 import { GetMenuResponse, TaskResponse } from "@/schemas";
@@ -15,6 +20,7 @@ import {
   BsPlay,
   BsFileEarmarkPlus,
   BsDownload,
+  BsCopy,
 } from "react-icons/bs";
 import TaskDetailList from "./TaskDetailList";
 import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
@@ -135,6 +141,7 @@ function MenuEditor() {
 
   const updateMenu = useUpdateMenu();
   const deleteMutation = useDeleteMenu();
+  const createMenu = useCreateMenu();
   const [selectedMenu, setSelectedMenu] = useState<GetMenuResponse | null>(
     null
   );
@@ -406,15 +413,38 @@ function MenuEditor() {
               {menusData?.data?.menus?.map((menu) => (
                 <div
                   key={menu.name}
-                  className={`p-2 rounded cursor-pointer hover:bg-base-300/50 flex items-center gap-2 transition-colors ${
+                  className={`p-2 rounded cursor-pointer hover:bg-base-300/50 flex items-center gap-2 transition-colors group ${
                     selectedMenu?.name === menu.name ? "bg-primary/10" : ""
                   }`}
                   onClick={() => handleMenuSelect(menu)}
                 >
                   <BsFileEarmarkText className="text-base-content/70" />
-                  <span className="font-medium text-sm truncate">
+                  <span className="font-medium text-sm truncate flex-1">
                     {menu.name}
                   </span>
+                  <button
+                    className="btn btn-ghost btn-xs btn-square opacity-50 hover:opacity-100 transition-opacity tooltip tooltip-left"
+                    data-tip="Duplicate menu"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const newName = `${menu.name}_copy`;
+                      const menuData = {
+                        ...menu,
+                        name: newName,
+                      };
+                      createMenu.mutate(
+                        { data: menuData },
+                        {
+                          onSuccess: () => {
+                            refetchMenus();
+                          },
+                        }
+                      );
+                    }}
+                    title="Duplicate menu"
+                  >
+                    <BsCopy className="text-sm" />
+                  </button>
                 </div>
               ))}
             </div>

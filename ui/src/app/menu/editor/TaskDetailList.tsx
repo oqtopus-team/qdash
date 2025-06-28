@@ -179,7 +179,7 @@ export default function TaskDetailList({
               className="btn btn-error btn-sm"
               onClick={() => onBulkDeleteTasks(Array.from(selectedTasks))}
             >
-              Delete
+              <BsTrash className="text-lg" />
             </button>
           )}
         </div>
