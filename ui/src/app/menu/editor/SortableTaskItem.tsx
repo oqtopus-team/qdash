@@ -45,10 +45,17 @@ export default function SortableTaskItem({
           )}
         </div>
         <button
-          onClick={() => onRemove(task.name)}
-          className="btn btn-ghost btn-xs btn-square hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(task.name);
+          }}
+          className="btn btn-ghost btn-sm btn-square hover:bg-error/10 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label={`Remove ${task.name}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
         >
-          <BsTrash className="text-sm" />
+          <BsTrash className="text-base" />
         </button>
       </div>
     </div>

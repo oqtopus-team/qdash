@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 interface TaskDetailListProps {
   tasks: Record<string, any>;
   taskOrder: string[];
@@ -9,7 +7,6 @@ interface TaskDetailListProps {
 
 function TaskItem({
   id,
-  content,
   isSelected,
   onSelect,
 }: {
