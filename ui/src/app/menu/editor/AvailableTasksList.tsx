@@ -24,13 +24,9 @@ export default function AvailableTasksList({
   );
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="px-4 py-3 border-b border-base-300 flex justify-between items-center shrink-0 bg-base-200/90">
-        <h2 className="font-bold text-sm uppercase tracking-wide">
-          Available Tasks
-        </h2>
-      </div>
-      <div className="overflow-y-auto flex-1 p-4">
+    <div className="h-full flex flex-col">
+      <h2 className="font-bold text-lg mb-4">Available Tasks</h2>
+      <div className="overflow-y-auto overflow-x-hidden flex-1">
         {Object.entries(groupedTasks).map(([type, tasks]) => (
           <div key={type} className="mb-6 last:mb-0">
             <h3 className="text-lg font-semibold mb-3 capitalize">{type}</h3>
