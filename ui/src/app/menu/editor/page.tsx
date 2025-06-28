@@ -37,14 +37,26 @@ import DroppableTaskList from "./DroppableTaskList";
 interface TaskSelectModalProps {
   onClose: () => void;
   onSelect: (tasks: TaskResponse[]) => void;
+  selectedTaskNames?: string[];
 }
 
 const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
   onClose,
   onSelect,
+  selectedTaskNames = [],
 }) => {
   const { data: tasksData } = useFetchAllTasks();
   const [selectedTasks, setSelectedTasks] = useState<TaskResponse[]>([]);
+
+  // 初期化時に既存のタスクを選択状態にする
+  useEffect(() => {
+    if (tasksData?.data?.tasks) {
+      const existingTasks = tasksData.data.tasks.filter((task) =>
+        selectedTaskNames.includes(task.name)
+      );
+      setSelectedTasks(existingTasks);
+    }
+  }, [tasksData, selectedTaskNames]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -311,27 +323,31 @@ function MenuEditor() {
     }
   };
 
-  // 新しいtask_detailを追加（最下部に追加）
+  // task_detailを更新
   const handleAddTaskDetails = (tasks: TaskResponse[]) => {
     if (!selectedMenu) return;
 
     try {
-      // 現在のmenuContentからtasksを取得
+      // 現在のmenuContentからデータを取得
       const menuData = JSON.parse(menuContent);
-      const currentTasks = menuData.tasks || [];
 
-      // Add all tasks to the end
-      const updatedTasks = [...currentTasks];
+      // 選択されたタスクのみを使用して更新
+      const updatedTasks = tasks.map((task) => task.name);
       const updatedTaskDetails = { ...selectedMenu.task_details };
 
-      tasks.forEach((task) => {
-        if (!currentTasks.includes(task.name)) {
-          updatedTasks.push(task.name);
-          updatedTaskDetails[task.name] = {
-            input_parameters: task.input_parameters || {},
-            output_parameters: task.output_parameters || {},
-          };
+      // 選択されていないタスクのtask_detailsを削除
+      Object.keys(updatedTaskDetails).forEach((taskName) => {
+        if (!updatedTasks.includes(taskName)) {
+          delete updatedTaskDetails[taskName];
         }
+      });
+
+      // 選択されたタスクのtask_detailsを更新または追加
+      tasks.forEach((task) => {
+        updatedTaskDetails[task.name] = updatedTaskDetails[task.name] || {
+          input_parameters: task.input_parameters || {},
+          output_parameters: task.output_parameters || {},
+        };
       });
 
       // menuContentを更新
@@ -882,6 +898,7 @@ function MenuEditor() {
               handleAddTaskDetails(tasks);
               setIsTaskSelectOpen(false);
             }}
+            selectedTaskNames={selectedMenu?.tasks || []}
           />
         )}
       </div>
