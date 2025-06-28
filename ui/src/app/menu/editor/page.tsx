@@ -76,7 +76,7 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
         onClick={onClose}
       >
         <div
-          className="bg-base-100 rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+          className="bg-base-100 rounded-xl w-full max-w-5xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-6 py-4 border-b border-base-300 flex items-center justify-between bg-base-100/80 backdrop-blur supports-[backdrop-filter]:bg-base-100/60">
@@ -100,9 +100,9 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
               </button>
             </div>
           </div>
-          <div className="flex-1 overflow-hidden flex">
+          <div className="flex-1 overflow-hidden flex gap-4 p-4">
             {/* Left side: Available tasks */}
-            <div className="w-2/3 border-r border-base-300">
+            <div className="w-1/2">
               {tasksData?.data?.tasks && (
                 <AvailableTasksList
                   tasks={tasksData.data.tasks}
@@ -112,14 +112,17 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
             </div>
 
             {/* Right side: Selected tasks */}
-            <div className="w-1/3 p-4 flex flex-col">
-              <div className="flex items-center justify-between mb-4">
+            <div className="w-1/2 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between mb-4 shrink-0">
                 <h3 className="text-lg font-semibold">Selected Tasks</h3>
                 <span className="text-sm text-base-content/70">
                   {selectedTasks.length} tasks
                 </span>
               </div>
-              <DroppableTaskList id="task-list">
+              <DroppableTaskList
+                id="task-list"
+                className="flex-1 overflow-y-auto"
+              >
                 <div className="space-y-2">
                   {selectedTasks.map((task) => (
                     <div

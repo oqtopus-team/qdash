@@ -17,6 +17,7 @@ export default function DraggableTask({ task, onClick }: DraggableTaskProps) {
   const style = transform
     ? {
         transform: CSS.Translate.toString(transform),
+        zIndex: 50, // ドラッグ中は高いz-indexを設定
       }
     : undefined;
 
@@ -26,14 +27,14 @@ export default function DraggableTask({ task, onClick }: DraggableTaskProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className="p-3 rounded-lg border border-base-300 hover:border-primary cursor-pointer transition-colors group touch-none"
+      className="p-3 rounded-lg border border-base-300 hover:border-primary cursor-pointer transition-colors group touch-none bg-base-100"
       onClick={onClick}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <h4 className="font-medium">{task.name}</h4>
-            <div className="badge badge-primary badge-outline">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <h4 className="font-medium break-all">{task.name}</h4>
+            <div className="badge badge-primary badge-outline shrink-0">
               {task.task_type}
             </div>
           </div>
