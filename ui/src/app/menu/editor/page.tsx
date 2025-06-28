@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense } from "react";
-import { DndContext, DragEndEvent } from "@dnd-kit/core";
 import {
   useListMenu,
   useUpdateMenu,
@@ -26,8 +25,6 @@ import {
 import TaskDetailList from "./TaskDetailList";
 import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
-import { DeleteTaskConfirmModal } from "./DeleteTaskConfirmModal";
-import { BulkDeleteTasksConfirmModal } from "./BulkDeleteTasksConfirmModal";
 import { CreateFromTemplateModal } from "./CreateFromTemplateModal";
 import { Toast } from "@/app/setting/components/Toast";
 import TaskSelectModal from "./TaskSelectModal";
@@ -36,10 +33,6 @@ function MenuEditor() {
   const searchParams = useSearchParams();
   const [showExecuteModal, setShowExecuteModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showDeleteTaskModal, setShowDeleteTaskModal] = useState(false);
-  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
-  const [tasksToDelete, setTasksToDelete] = useState<string[]>([]);
-  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const { data: menusData, refetch: refetchMenus } = useListMenu();
   const { data: lockStatus, isLoading: isLockStatusLoading } =
     useFetchExecutionLockStatus({
@@ -169,13 +162,6 @@ function MenuEditor() {
       const updatedTasks = tasks.map((task) => task.name);
       const updatedTaskDetails = { ...selectedMenu.task_details };
 
-      // 選択されていないタスクのtask_detailsを削除
-      Object.keys(updatedTaskDetails).forEach((taskName) => {
-        if (!updatedTasks.includes(taskName)) {
-          delete updatedTaskDetails[taskName];
-        }
-      });
-
       // 選択されたタスクのtask_detailsを更新または追加
       tasks.forEach((task) => {
         updatedTaskDetails[task.name] = updatedTaskDetails[task.name] || {
@@ -235,49 +221,8 @@ function MenuEditor() {
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || !active.data.current) return;
-
-    // If dragging from available tasks to task list in the main view
-    if (
-      !isTaskSelectOpen &&
-      over.id === "task-list" &&
-      "task_type" in active.data.current
-    ) {
-      handleAddTaskDetails([active.data.current as TaskResponse]);
-    }
-    // If reordering within task list
-    else if (active.id !== over.id && selectedMenu?.tasks) {
-      const taskNames = selectedMenu.tasks;
-      const sourceIndex = taskNames.indexOf(active.id.toString());
-      const destinationIndex = taskNames.indexOf(over.id.toString());
-
-      if (sourceIndex !== -1 && destinationIndex !== -1) {
-        // Create new array with reordered tasks
-        const newTasks = [...taskNames];
-        const [movedTask] = newTasks.splice(sourceIndex, 1);
-        newTasks.splice(destinationIndex, 0, movedTask);
-
-        // Update menu content
-        const menuData = JSON.parse(menuContent);
-        menuData.tasks = newTasks;
-        setMenuContent(JSON.stringify(menuData, null, 2));
-
-        // Update menu state
-        updateMenu.mutate({
-          name: selectedMenu.name,
-          data: {
-            ...selectedMenu,
-            tasks: newTasks,
-          },
-        });
-      }
-    }
-  };
-
   return (
-    <DndContext onDragEnd={handleDragEnd}>
+    <>
       <div className="container mx-auto h-[calc(100vh-4rem)] max-w-[3000px] p-4">
         <div className="flex flex-col md:flex-row bg-base-200/50 backdrop-blur-sm rounded-lg shadow-xl overflow-hidden border border-base-300 h-full gap-px relative">
           {/* Menu Editor */}
@@ -474,17 +419,9 @@ function MenuEditor() {
                 <div className="flex-1 overflow-hidden">
                   <TaskDetailList
                     tasks={selectedMenu.task_details}
+                    taskOrder={selectedMenu.tasks || []}
                     selectedTask={selectedTaskDetail}
                     onTaskSelect={handleTaskDetailSelect}
-                    onDragEnd={handleDragEnd}
-                    onDeleteTask={(taskName) => {
-                      setTaskToDelete(taskName);
-                      setShowDeleteTaskModal(true);
-                    }}
-                    onBulkDeleteTasks={(taskNames) => {
-                      setTasksToDelete(taskNames);
-                      setShowBulkDeleteModal(true);
-                    }}
                   />
                 </div>
               )}
@@ -542,7 +479,7 @@ function MenuEditor() {
         {showSaveToast && (
           <div className="fixed bottom-4 right-4 z-50">
             <Toast
-              message="Menu saved successfully!"
+              message="変更を保存しました"
               onClose={() => setShowSaveToast(false)}
             />
           </div>
@@ -579,142 +516,6 @@ function MenuEditor() {
           />
         )}
 
-        {/* Bulk Delete Tasks Confirm Modal */}
-        {showBulkDeleteModal && tasksToDelete.length > 0 && selectedMenu && (
-          <BulkDeleteTasksConfirmModal
-            taskNames={tasksToDelete}
-            onConfirm={() => {
-              try {
-                // メニューデータを取得
-                const menuData = JSON.parse(menuContent);
-                const currentTasks = menuData.tasks || [];
-                const currentTaskDetails = { ...selectedMenu.task_details };
-
-                // タスクを削除
-                const updatedTasks = currentTasks.filter(
-                  (task: string) => !tasksToDelete.includes(task)
-                );
-
-                // task_detailsから削除
-                tasksToDelete.forEach((taskName) => {
-                  delete currentTaskDetails[taskName];
-                });
-
-                // メニューを更新
-                updateMenu.mutate(
-                  {
-                    name: selectedMenu.name,
-                    data: {
-                      ...selectedMenu,
-                      tasks: updatedTasks,
-                      task_details: currentTaskDetails,
-                    },
-                  },
-                  {
-                    onSuccess: () => {
-                      setShowBulkDeleteModal(false);
-                      setTasksToDelete([]);
-                      if (
-                        selectedTaskDetail &&
-                        tasksToDelete.includes(selectedTaskDetail)
-                      ) {
-                        setSelectedTaskDetail(null);
-                        setTaskDetailContent("");
-                      }
-                      setSelectedMenu({
-                        ...selectedMenu,
-                        tasks: updatedTasks,
-                        task_details: currentTaskDetails,
-                      });
-                      setMenuContent(
-                        JSON.stringify(
-                          {
-                            ...menuData,
-                            tasks: updatedTasks,
-                          },
-                          null,
-                          2
-                        )
-                      );
-                    },
-                  }
-                );
-              } catch (e) {
-                console.error("Invalid JSON:", e);
-              }
-            }}
-            onClose={() => {
-              setShowBulkDeleteModal(false);
-              setTasksToDelete([]);
-            }}
-          />
-        )}
-
-        {/* Delete Task Confirm Modal */}
-        {showDeleteTaskModal && taskToDelete && selectedMenu && (
-          <DeleteTaskConfirmModal
-            taskName={taskToDelete}
-            onConfirm={() => {
-              try {
-                // メニューデータを取得
-                const menuData = JSON.parse(menuContent);
-                const currentTasks = menuData.tasks || [];
-                const currentTaskDetails = { ...selectedMenu.task_details };
-
-                // タスクを削除
-                const taskIndex = currentTasks.indexOf(taskToDelete);
-                if (taskIndex > -1) {
-                  currentTasks.splice(taskIndex, 1);
-                }
-                delete currentTaskDetails[taskToDelete];
-
-                // メニューを更新
-                updateMenu.mutate(
-                  {
-                    name: selectedMenu.name,
-                    data: {
-                      ...selectedMenu,
-                      tasks: currentTasks,
-                      task_details: currentTaskDetails,
-                    },
-                  },
-                  {
-                    onSuccess: () => {
-                      setShowDeleteTaskModal(false);
-                      setTaskToDelete(null);
-                      if (selectedTaskDetail === taskToDelete) {
-                        setSelectedTaskDetail(null);
-                        setTaskDetailContent("");
-                      }
-                      setSelectedMenu({
-                        ...selectedMenu,
-                        tasks: currentTasks,
-                        task_details: currentTaskDetails,
-                      });
-                      setMenuContent(
-                        JSON.stringify(
-                          {
-                            ...menuData,
-                            tasks: currentTasks,
-                          },
-                          null,
-                          2
-                        )
-                      );
-                    },
-                  }
-                );
-              } catch (e) {
-                console.error("Invalid JSON:", e);
-              }
-            }}
-            onClose={() => {
-              setShowDeleteTaskModal(false);
-              setTaskToDelete(null);
-            }}
-          />
-        )}
-
         {/* Create from Template Modal */}
         {showCreateFromTemplate && (
           <CreateFromTemplateModal
@@ -737,7 +538,7 @@ function MenuEditor() {
           />
         )}
       </div>
-    </DndContext>
+    </>
   );
 }
 
