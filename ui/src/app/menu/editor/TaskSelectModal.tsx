@@ -28,7 +28,7 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
   // 選択されていないタスクのみをフィルタリング
   const availableTasks =
     tasksData?.data?.tasks?.filter(
-      (task: TaskResponse) => !selectedTasks.some((t) => t.name === task.name)
+      (task: TaskResponse) => !selectedTasks.some((t) => t.name === task.name),
     ) ?? [];
 
   // 初期化時に既存のタスクを選択状態にする
@@ -36,7 +36,7 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
     if (tasksData?.data?.tasks) {
       // Set selected tasks with a new array reference
       const existingTasks = [...tasksData.data.tasks].filter(
-        (task: TaskResponse) => selectedTaskNames.includes(task.name)
+        (task: TaskResponse) => selectedTaskNames.includes(task.name),
       );
       setSelectedTasks(existingTasks);
     }
