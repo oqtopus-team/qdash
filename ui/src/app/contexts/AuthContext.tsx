@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false); // ローディング終了
       }
     },
-    [loginMutation, saveAuth, router, userData]
+    [loginMutation, saveAuth, router, userData],
   );
 
   const logout = useCallback(async () => {
