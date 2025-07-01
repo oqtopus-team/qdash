@@ -24,9 +24,11 @@ class QubexSession(BaseSession):
     from qubex import Experiment
 
     def __init__(self, config: dict) -> None:
+        from qubex import Experiment
+
         """Initialize the Qubex session with a configuration dictionary."""
         self._config = config
-        self._exp: Any | None = None
+        self._exp: Experiment | None = None
 
     @property
     def config(self) -> dict:
@@ -67,6 +69,7 @@ class QubexSession(BaseSession):
                 params_dir=self._config.get("params_dir", PARAMS_DIR),
                 calib_note_path=self._config.get("note_path", "/app/calib_note.json"),
             )
+            self._exp.linkup()
 
     def get_session(self) -> Experiment | None:
         if self._exp is None:
