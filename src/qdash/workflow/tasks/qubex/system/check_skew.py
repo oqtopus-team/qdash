@@ -47,7 +47,7 @@ class CheckSkew(BaseTask):
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         result = run_result.raw_result
-        figures: list = [result.get("fig")]
+        figures: list = [result["fig"]]
         return PostProcessResult(
             output_parameters=self.attach_execution_id(execution_id), figures=figures
         )
@@ -62,7 +62,7 @@ class CheckSkew(BaseTask):
             box_ids=self.input_parameters["box_ids"].get_value(),
         )
         result = {
-            "fig": result.get("fig"),
+            "fig": result["fig"],
         }
         return RunResult(raw_result=result)
 
