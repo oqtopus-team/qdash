@@ -10,6 +10,7 @@ from qdash.workflow.tasks.base import (
     PreProcessResult,
     RunResult,
 )
+from qubecalib.instrument.quel.quel1.tool.skew import Skew, SkewSetting
 
 
 class CheckSkew(BaseTask):
@@ -19,24 +20,10 @@ class CheckSkew(BaseTask):
     backend: str = "qubex"
     task_type: str = "system"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "box_ids": InputParameterModel(
+        "muxes": InputParameterModel(
             unit="a.u.",
             value_type="list",
-            value=[
-                "R21B",
-                "U15A",
-                "Q2A",
-                "S159A",
-                "U10B",
-                "R20A",
-                "R26A",
-                "R31A",
-                "R28A",
-                "R19A",
-                "Q73A",
-                "U13B",
-                "R23A",
-            ],
+            value=[0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
             description="List of muxes to check skew",
         ),
     }
@@ -57,12 +44,32 @@ class CheckSkew(BaseTask):
             return yaml.safe_load(file)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:  # noqa: ARG002
-        exp = session.get_session()
-        result = exp.tool.check_skew(
-            box_ids=self.input_parameters["box_ids"].get_value(),
+        skew_config = self.load("/app/config/qubex/64Q/config/skew.yaml")
+        for k, v in skew_config["box_setting"].items():
+            print(f"Box {k} setting: {v}")
+        from qubex import Experiment
+
+        exp = Experiment(
+            chip_id="64Q",
+            muxes=self.input_parameters["muxes"].get_value(),
+            config_dir="/app/config/qubex/64Q/config",
+            params_dir="/app/config/qubex/64Q/params",
         )
+        qc = exp.tool.get_qubecalib()
+        qc.sysdb.load_box_yaml("/app/config/qubex/64Q/config/box.yaml")
+        setting = SkewSetting.from_yaml("/app/config/qubex/64Q/config/skew.yaml")
+        boxes = [*list(exp.boxes), setting.monitor_box_name]
+        system = qc.sysdb.create_quel1system(*boxes)
+        system.initialize()
+        system.resync(*boxes)
+        skew = Skew.create(setting=setting, system=system, sysdb=qc.sysdb)
+        skew.measure()
+        skew.estimate()
+        for v, k in skew._estimated.items():
+            print(f"Estimated skew for {v[0]}: {k.idx:.3f} ns")
+        fig = skew.plot()
         result = {
-            "fig": result["fig"],
+            "fig": fig,
         }
         return RunResult(raw_result=result)
 

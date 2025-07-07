@@ -34,17 +34,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 認証情報の保存
   const saveAuth = useCallback((username: string) => {
-    // トークンとしてユーザー名を保存（実際のJWTトークンと同様の扱い）
-    document.cookie = `token=${encodeURIComponent(username)}; path=/; max-age=${
-      7 * 24 * 60 * 60
-    }; SameSite=Lax`;
+    const maxAge = 7 * 24 * 60 * 60; // 7 days
+    // Save both token and username cookies
+    document.cookie = `token=${encodeURIComponent(
+      username
+    )}; path=/; max-age=${maxAge}; SameSite=Lax`;
+    document.cookie = `username=${encodeURIComponent(
+      username
+    )}; path=/; max-age=${maxAge}; SameSite=Lax`;
     setUsername(username);
   }, []);
 
   // 認証情報の削除
   const removeAuth = useCallback(() => {
+    // Remove both token and username cookies
     document.cookie =
       "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+    document.cookie =
+      "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
     setUsername(null);
   }, []);
 
@@ -107,36 +114,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             password,
           },
         });
+
         // 認証情報を保存
         saveAuth(response.data.username);
-        // ユーザー情報が取得されるまで待つ
-        await new Promise((resolve) => {
-          const unsubscribe = () => {
-            if (userData?.data) {
-              clearInterval(interval);
-              resolve(undefined);
-            }
-          };
-          const interval = setInterval(() => {
-            unsubscribe();
-          }, 100);
-          // 最大3秒待つ
-          setTimeout(() => {
-            clearInterval(interval);
-            console.debug("User info fetch timeout, proceeding anyway");
-            resolve(undefined);
-          }, 3000);
-        });
-        // ログイン成功後にリダイレクト
+
+        // 即座にリダイレクト
         router.replace("/execution");
       } catch (error) {
         console.error("Login failed:", error);
+        // 認証情報をクリア
+        removeAuth();
+        setUser(null);
         throw error;
       } finally {
         setLoading(false); // ローディング終了
       }
     },
-    [loginMutation, saveAuth, router, userData],
+    [loginMutation, saveAuth, router, removeAuth]
   );
 
   const logout = useCallback(async () => {
