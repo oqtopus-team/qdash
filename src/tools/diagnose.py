@@ -216,9 +216,7 @@ def generate_rich_pdf_report(image_paths: list[str], pdf_path: str = "rich_repor
 
 
 if __name__ == "__main__":
-    props = read_base_properties(
-        filename="/workspace/qdash/calib_data/orangekame3/.calibration/props.yaml"
-    )["64Q"]
+    props = read_base_properties(filename="/workspace/config/qubex/64Q/config/props.yaml")["64Q"]
     info_type = (
         "qubit_frequency",
         "qubit_anharmonicity",

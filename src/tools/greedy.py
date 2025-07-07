@@ -273,7 +273,17 @@ if __name__ == "__main__":
     initialize()
     # Maximum number of parallel operations allowed
     MAX_PARALLEL_OPS = 10  # Can be adjusted as needed
-    EXCLUDE_QUBITS = {"12", "13", "14", "28", "29", "30", "31", "48", "49", "50", "51"}
+    # EXCLUDE_QUBITS = {
+    #     "32",
+    #     "33",
+    #     "34",
+    #     "35",
+    #     "48",
+    #     "49",
+    #     "50",
+    #     "51",
+    # }  # Example qubits to exclude from scheduling
+    EXCLUDE_QUBITS = set()  # No qubits excluded by default
 
     # create schedule directory
     chip_doc = ChipDocument.get_current_chip("admin")
