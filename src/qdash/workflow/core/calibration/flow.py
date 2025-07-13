@@ -105,7 +105,7 @@ def build_workflow(
     return task_result
 
 
-@flow(flow_run_name="{qid}")
+@flow(flow_run_name="{qid}", validate_parameters=False)
 def cal_serial(
     menu: Menu,
     session: BaseSession,
@@ -186,7 +186,7 @@ def cal_serial(
     return task_manager
 
 
-@flow(flow_run_name="{qids}")
+@flow(flow_run_name="{qids}", validate_parameters=False)
 def cal_batch(
     menu: Menu,
     session: BaseSession,
