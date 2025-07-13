@@ -9,7 +9,8 @@ from qdash.workflow.tasks.base import (
     PreProcessResult,
     RunResult,
 )
-from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
+from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
+from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class CheckRabi(BaseTask):
@@ -22,13 +23,13 @@ class CheckRabi(BaseTask):
         "time_range": InputParameterModel(
             unit="ns",
             value_type="range",
-            value=(0, 201, 4),
+            value=(0, 401, 8),
             description="Time range for Rabi oscillation",
         ),
         "shots": InputParameterModel(
             unit="a.u.",
             value_type="int",
-            value=DEFAULT_SHOTS,
+            value=CALIBRATION_SHOTS,
             description="Number of shots for Rabi oscillation",
         ),
         "interval": InputParameterModel(
@@ -49,6 +50,10 @@ class CheckRabi(BaseTask):
         "rabi_offset": OutputParameterModel(unit="a.u.", description="Rabi oscillation offset"),
         "rabi_angle": OutputParameterModel(unit="degree", description="Rabi angle (in degree)"),
         "rabi_noise": OutputParameterModel(unit="a.u.", description="Rabi oscillation noise"),
+        "rabi_distance": OutputParameterModel(unit="a.u.", description="Rabi distance"),
+        "rabi_reference_phase": OutputParameterModel(
+            unit="a.u.", description="Rabi reference phase"
+        ),
     }
 
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
@@ -73,6 +78,10 @@ class CheckRabi(BaseTask):
         self.output_parameters["rabi_offset"].error = result.data[label].fit()["offset_err"]
         self.output_parameters["rabi_angle"].value = result.rabi_params[label].angle
         self.output_parameters["rabi_noise"].value = result.rabi_params[label].noise
+        self.output_parameters["rabi_distance"].value = result.rabi_params[label].distance
+        self.output_parameters["rabi_reference_phase"].value = result.rabi_params[
+            label
+        ].reference_phase
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
         raw_data = [result.data[label].data]

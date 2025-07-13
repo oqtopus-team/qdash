@@ -122,4 +122,4 @@ dev = [
 ]
 
 [tool.uv.sources]
-qubex = { git = "https://github.com/amachino/qubex.git", rev = "develop" }
+qubex = { git = "https://github.com/amachino/qubex.git", rev = "v1.4.0rc3" }

@@ -69,7 +69,7 @@ class QubexSession(BaseSession):
                 params_dir=self._config.get("params_dir", PARAMS_DIR),
                 calib_note_path=self._config.get("note_path", "/app/calib_note.json"),
             )
-            self._exp.linkup()
+            self._exp.connect()
 
     def get_session(self) -> Experiment | None:
         if self._exp is None:
