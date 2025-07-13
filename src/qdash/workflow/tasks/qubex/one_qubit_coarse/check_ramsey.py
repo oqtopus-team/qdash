@@ -119,19 +119,19 @@ class CheckRamsey(BaseTask):
         result_x = run_result.raw_result["x"].data[label]
         result_y = run_result.raw_result["y"].data[label]
         self.output_parameters["ramsey_frequency"].value = (
-            result_x.fit()["f"] * 1000
+            result_y.fit()["f"] * 1000
         )  # convert to MHz
-        self.output_parameters["ramsey_frequency"].error = result_x.fit()["f_err"] * 1000
-        self.output_parameters["bare_frequency"].value = result_x.bare_freq
-        self.output_parameters["t2_star"].value = result_x.t2 * 0.001  # convert to μs
-        self.output_parameters["t2_star"].error = result_x.fit()["tau_err"] * 0.001  # convert to μs
+        self.output_parameters["ramsey_frequency"].error = result_y.fit()["f_err"] * 1000
+        self.output_parameters["bare_frequency"].value = result_y.bare_freq
+        self.output_parameters["t2_star"].value = result_y.t2 * 0.001  # convert to μs
+        self.output_parameters["t2_star"].error = result_y.fit()["tau_err"] * 0.001  # convert to μs
         output_parameters = self.attach_execution_id(execution_id)
         figures = [
             result_x.fit()["fig"],
             result_y.fit()["fig"],
             self.make_figure(result_x, result_y, qid),
         ]
-        raw_data = [result_x.data]
+        raw_data = [result_y.data]
         return PostProcessResult(
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
         )
@@ -140,21 +140,21 @@ class CheckRamsey(BaseTask):
         """Run the task."""
         label = qid_to_label(qid)
         exp = session.get_session()
-        result_x = exp.ramsey_experiment(
-            time_range=self.input_parameters["time_range"].get_value(),
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
-            detuning=self.input_parameters["detuning"].get_value(),
-            secound_rotation_axis="X",  # Default axis for Ramsey
-            spectator_state="0",
-            targets=label,
-        )
         result_y = exp.ramsey_experiment(
             time_range=self.input_parameters["time_range"].get_value(),
             shots=self.input_parameters["shots"].get_value(),
             interval=self.input_parameters["interval"].get_value(),
             detuning=self.input_parameters["detuning"].get_value(),
-            secound_rotation_axis="Y",  # Default axis for Ramsey
+            second_rotation_axis="Y",  # Default axis for Ramsey
+            spectator_state="0",
+            targets=label,
+        )
+        result_x = exp.ramsey_experiment(
+            time_range=self.input_parameters["time_range"].get_value(),
+            shots=self.input_parameters["shots"].get_value(),
+            interval=self.input_parameters["interval"].get_value(),
+            detuning=self.input_parameters["detuning"].get_value(),
+            second_rotation_axis="X",  # Default axis for Ramsey
             spectator_state="0",
             targets=label,
         )

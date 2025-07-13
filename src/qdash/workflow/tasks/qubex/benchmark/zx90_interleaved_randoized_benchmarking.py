@@ -22,16 +22,10 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "n_cliffords_range": InputParameterModel(
-            unit="a.u.",
-            value_type="np.arange",
-            value=(0, 21, 2),
-            description="Number of cliffords range",
-        ),
         "n_trials": InputParameterModel(
             unit="a.u.",
             value_type="int",
-            value=30,
+            value=10,
             description="Number of trials",
         ),
         "shots": InputParameterModel(
@@ -53,34 +47,42 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
             description="ZX90 gate fidelity",
             value_type="float",
         ),
+        "zx90_depolarizing_rate": OutputParameterModel(
+            unit="a.u.",
+            description="Depolarization error of the ZX90 gate",
+            value_type="float",
+        ),
     }
 
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
         return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
+        label = qid_to_cr_label(qid)
         result = run_result.raw_result
-        self.output_parameters["zx90_gate_fidelity"].value = result["gate_fidelity"]
+        self.output_parameters["zx90_gate_fidelity"].value = result[label]["gate_fidelity"]
+        self.output_parameters["zx90_gate_fidelity"].error = result[label]["gate_fidelity_err"]
+        self.output_parameters["zx90_depolarizing_rate"].value = result[label]["rb_fit_result"][
+            "depolarizing_rate"
+        ]
         output_parameters = self.attach_execution_id(execution_id)
-        figures = [result["fig"]]
+        figures = [result[label]["fig"]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         label = qid_to_cr_label(qid)
-        control, target = qid_to_cr_pair(qid)
         exp = session.get_session()
         result = exp.interleaved_randomized_benchmarking(
-            target=label,
-            interleaved_waveform=exp.zx90(control, target),
-            interleaved_clifford=Clifford.ZX90(),
-            n_cliffords_range=self.input_parameters["n_cliffords_range"].get_value(),
+            targets=label,
+            interleaved_clifford="ZX90",
             n_trials=self.input_parameters["n_trials"].get_value(),
             save_image=False,
             shots=self.input_parameters["shots"].get_value(),
             interval=self.input_parameters["interval"].get_value(),
         )
         exp.calib_note.save()
-        return RunResult(raw_result=result)
+        r2 = result[label]["rb_fit_result"]["r2"]
+        return RunResult(raw_result=result, r2={qid: r2})
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
