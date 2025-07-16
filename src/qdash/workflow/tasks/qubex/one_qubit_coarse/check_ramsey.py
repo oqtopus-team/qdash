@@ -160,7 +160,7 @@ class CheckRamsey(BaseTask):
         )
         exp.calib_note.save()
         result = {"x": result_x, "y": result_y}
-        r2 = result_x.data[label].r2 if result_x.data else None
+        r2 = result_y.data[label].r2 if result_y.data else None
         return RunResult(raw_result=result, r2={qid: r2})
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
