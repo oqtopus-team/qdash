@@ -61,7 +61,7 @@ charset-normalizer==3.4.1
     # via requests
 chex==0.1.89
     # via optax
-clarabel==0.11.0
+clarabel==0.11.1
     # via cvxpy
 click==8.1.8
     # via
@@ -96,7 +96,7 @@ cryptography==44.0.2
     #   service-identity
 cvxopt==1.3.2
     # via qubex
-cvxpy==1.6.5
+cvxpy==1.7.0
     # via qubex
 cycler==0.12.1
     # via matplotlib
@@ -421,7 +421,7 @@ pyasn1==0.4.8
     #   service-identity
 pyasn1-modules==0.4.1
     # via service-identity
-pybind11-stubgen==2.5.3
+pybind11-stubgen==2.5.4
     # via quel-ic-config
 pycairo==1.28.0
     # via
@@ -470,7 +470,7 @@ pytest==8.3.2
     #   qubecalib
 pytest-cov==5.0.0
 pytest-env==1.1.3
-pytest-mock==3.14.0
+pytest-mock==3.14.1
     # via qubecalib
 pytest-mypy==0.10.3
 python-dateutil==2.9.0.post0
@@ -507,9 +507,9 @@ pyzmq==26.2.1
     #   jupyter-server
 qctrl-visualizer==8.0.2
     # via qubex
-qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@e7defabcffd4e4b22952eeb3a28dc33441a8497e
+qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@e81cb57adec024c91ff103311f5406f6feae97e3
     # via qubex
-qubex @ git+https://github.com/amachino/qubex.git@0ed6d653cbfbe6a2c8f4d3d7636eadb52a08577c
+qubex @ git+https://github.com/amachino/qubex.git@c0dd5bb7d2a9882009a5ac7fc0fd6d8becb7b2e8
 quel-clock-master @ git+https://github.com/quel-inc/quelware.git@de4dd6caf967b025b7d529e41a1d6e8c3029cc66#subdirectory=quel_clock_master
     # via
     #   qubecalib
@@ -651,7 +651,7 @@ typer==0.14.0
     # via fastapi-cli
 types-python-dateutil==2.9.0.20240316
     # via arrow
-types-pyyaml==6.0.12.20250402
+types-pyyaml==6.0.12.20250516
     # via qubecalib
 typing-extensions==4.12.2
     # via
