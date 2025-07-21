@@ -233,6 +233,22 @@ def update_active_tasks(
 
 
 @app.command()
+def update_qubit_positions(
+    username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
+    chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),
+) -> None:
+    """Update qubit positions."""
+    try:
+        from qdash.cli.add import update_qubit_positions
+
+        update_qubit_positions(username=username, chip_id=chip_id)
+        typer.echo(f"Qubit positions updated successfully (username: {username})")
+    except Exception as e:
+        typer.echo(f"Error updating qubit positions: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@app.command()
 def init_all_data(
     username: str = typer.Option("admin", "--username", "-u", help="Username for initialization"),
     chip_id: str = typer.Option("64Q", "--chip-id", "-c", help="Chip ID for initialization"),
