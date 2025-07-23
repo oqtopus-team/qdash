@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -30,8 +29,11 @@ class CheckDRAGHPIPulse(BaseTask):
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
-        label = qid_to_label(qid)
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
+        exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result = run_result.raw_result
         figures = [result.data[label].plot(normalize=True, return_figure=True)]
         return PostProcessResult(
@@ -39,8 +41,8 @@ class CheckDRAGHPIPulse(BaseTask):
         )
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        labels = [qid_to_label(qid)]
         exp = session.get_session()
+        labels = [exp.get_qubit_label(int(qid))]
         drag_hpi_pulse = {qubit: exp.drag_hpi_pulse[qubit] for qubit in labels}
         result = exp.repeat_sequence(
             sequence=drag_hpi_pulse,

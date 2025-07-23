@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -53,8 +52,11 @@ class RandomizedBenchmarking(BaseTask):
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
-        label = qid_to_label(qid)
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
+        exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result = run_result.raw_result
         self.output_parameters["average_gate_fidelity"].value = result[label]["avg_gate_fidelity"]
         self.output_parameters["average_gate_fidelity"].error = result[label][
@@ -66,8 +68,8 @@ class RandomizedBenchmarking(BaseTask):
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        label = qid_to_label(qid)
         exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result = exp.randomized_benchmarking(
             targets=label,
             n_trials=self.input_parameters["n_trials"].get_value(),

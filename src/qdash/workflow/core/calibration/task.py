@@ -72,7 +72,7 @@ def execute_dynamic_task_by_qid(
         run_result = this_task.run(session=session, qid=qid)
         if run_result is not None:
             postprocess_result = this_task.postprocess(
-                execution_id=execution_id, run_result=run_result, qid=qid
+                session=session, execution_id=execution_id, run_result=run_result, qid=qid
             )
             if postprocess_result is not None:
                 # 出力パラメータと結果の保存
@@ -210,7 +210,7 @@ def execute_dynamic_task_batch(
         if run_result is not None:
             for qid in qids:
                 postprocess_result = this_task.postprocess(
-                    execution_id=execution_id, run_result=run_result, qid=qid
+                    session=session, execution_id=execution_id, run_result=run_result, qid=qid
                 )
                 if postprocess_result is not None:
                     # 出力パラメータと結果の保存

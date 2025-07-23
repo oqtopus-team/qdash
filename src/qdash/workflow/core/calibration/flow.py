@@ -27,8 +27,6 @@ from qdash.workflow.core.calibration.task import (
 )
 from qdash.workflow.core.calibration.task_manager import TaskManager
 from qdash.workflow.core.calibration.util import (
-    coupling_qids_to_qubit_labels,
-    qid_to_label,
     update_active_output_parameters,
     update_active_tasks,
 )
@@ -307,16 +305,15 @@ def setup_calibration(
     task_manager.save()
 
     # Determine labels based on task types
-    labels: list[str] = []
     if task_manager.has_only_qubit_or_global_tasks(task_names=validated_task_names):
         logger.info("Only qubit or global tasks are present")
-        labels = [qid_to_label(q) for q in qubits]
+        task_type = "qubit"
     elif task_manager.has_only_coupling_or_global_tasks(task_names=validated_task_names):
         logger.info("Only coupling or global tasks are present")
-        labels = coupling_qids_to_qubit_labels(qids=qubits)
+        task_type = "coupling"
     elif task_manager.has_only_system_tasks(task_names=validated_task_names):
         logger.info("Only system tasks are present")
-        labels = []
+        task_type = "system"
     else:
         logger.info(f"task names:{validated_task_names}")
         logger.error("this task is not supported")
@@ -329,8 +326,9 @@ def setup_calibration(
     session = create_session(
         backend=menu.backend,
         config={
+            "task_type": task_type,
             "username": menu.username,
-            "qubits": labels,
+            "qids": qubits,
             "note_path": note_path,
             "chip_id": menu.chip_id,
         },

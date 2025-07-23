@@ -3,7 +3,6 @@ from typing import ClassVar
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -33,8 +32,7 @@ class CheckReadoutAmplitude(BaseTask):
         """Preprocess the task."""
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def make_figure(self, signal: dict, noise: dict, snr: dict, qid: str) -> go.Figure:
-        label = qid_to_label(qid)
+    def make_figure(self, signal: dict, noise: dict, snr: dict, label: str) -> go.Figure:
         fig = make_subplots(rows=3, cols=1, shared_xaxes=True)
         fig.add_trace(
             go.Scatter(
@@ -78,13 +76,17 @@ class CheckReadoutAmplitude(BaseTask):
         )
         return fig
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
         """Process the results of the task."""
+        exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result = run_result.raw_result
         signal = result["signal"]
         noise = result["noise"]
         snr = result["snr"]
-        figures = [self.make_figure(signal, noise, snr, qid)]
+        figures = [self.make_figure(signal, noise, snr, label)]
         output_parameters = self.attach_execution_id(execution_id)
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
@@ -94,7 +96,7 @@ class CheckReadoutAmplitude(BaseTask):
     def batch_run(self, session: QubexSession, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits."""
         exp = session.get_session()
-        labels = [qid_to_label(qid) for qid in qids]
+        labels = [exp.get_qubit_label(int(qid)) for qid in qids]
         result = exp.sweep_readout_amplitude(
             targets=labels, amplitude_range=self.input_parameters["amplitude_range"].get_value()
         )

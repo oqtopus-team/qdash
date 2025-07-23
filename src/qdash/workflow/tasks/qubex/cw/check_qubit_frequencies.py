@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -28,9 +27,12 @@ class CheckQubitFrequencies(BaseTask):
         """Preprocess the task."""
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
         """Process the results of the task."""
-        label = qid_to_label(qid)
+        exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result = run_result.raw_result
         figures = [result[label]["fig"]]
         coarse_qubit_frequency = 0
@@ -42,15 +44,16 @@ class CheckQubitFrequencies(BaseTask):
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         """Run the task."""
-        label = qid_to_label(qid)
         exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result = exp.scan_qubit_frequencies(label)
         exp.calib_note.save()
         return RunResult(raw_result=result)
 
     def batch_run(self, session: QubexSession, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits."""
-        labels = [qid_to_label(qid) for qid in qids]
+        exp = session.get_session()
+        labels = [exp.get_qubit_label(int(qid)) for qid in qids]
         results = {}
         exp = session.get_session()
         for label in labels:

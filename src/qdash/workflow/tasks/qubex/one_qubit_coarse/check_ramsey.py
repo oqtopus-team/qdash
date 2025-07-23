@@ -2,7 +2,6 @@ from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -57,9 +56,8 @@ class CheckRamsey(BaseTask):
         """Preprocess the task."""
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def make_figure(self, result_x: Any, result_y: Any, qid: str) -> go.Figure:
+    def make_figure(self, result_x: Any, result_y: Any, label: str) -> go.Figure:
         """Create a figure for the results."""
-        label = qid_to_label(qid)
         x_data = result_x.normalized.astype(float)
         y_data = result_y.normalized.astype(float)
         sweep = result_x.sweep_range.astype(float)
@@ -113,9 +111,12 @@ class CheckRamsey(BaseTask):
 
         return fig
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
         """Process the results of the task."""
-        label = qid_to_label(qid)
+        exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result_x = run_result.raw_result["x"].data[label]
         result_y = run_result.raw_result["y"].data[label]
         self.output_parameters["ramsey_frequency"].value = (
@@ -129,7 +130,7 @@ class CheckRamsey(BaseTask):
         figures = [
             result_x.fit()["fig"],
             result_y.fit()["fig"],
-            self.make_figure(result_x, result_y, qid),
+            self.make_figure(result_x, result_y, label),
         ]
         raw_data = [result_y.data]
         return PostProcessResult(
@@ -138,8 +139,8 @@ class CheckRamsey(BaseTask):
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         """Run the task."""
-        label = qid_to_label(qid)
         exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result_y = exp.ramsey_experiment(
             time_range=self.input_parameters["time_range"].get_value(),
             shots=self.input_parameters["shots"].get_value(),

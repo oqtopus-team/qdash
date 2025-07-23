@@ -3,7 +3,6 @@ from typing import ClassVar
 import numpy as np
 import plotly.graph_objects as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_cr_label, qid_to_cr_pair
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -48,7 +47,7 @@ class CheckCrossResonance(BaseTask):
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def _plot_coeffs_history(self, coeffs_history: dict, qid: str) -> go.Figure:
+    def _plot_coeffs_history(self, coeffs_history: dict, label: str) -> go.Figure:
         fig = go.Figure()
         for key, value in coeffs_history.items():
             fig.add_trace(
@@ -60,14 +59,20 @@ class CheckCrossResonance(BaseTask):
                 )
             )
         fig.update_layout(
-            title=f"CR Hamiltonian coefficients : {qid_to_cr_label(qid)}",
+            title=f"CR Hamiltonian coefficients : {label}",
             xaxis_title="Number of steps",
             yaxis_title="Coefficient (MHz)",
             xaxis={"tickmode": "array", "tickvals": np.arange(len(value))},
         )
         return fig
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
+        exp = session.get_session()
+        label = "-".join(
+            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
+        )  # e.g., "0-1" → "Q00-Q01"
         result = run_result.raw_result
         self.output_parameters["cr_amplitude"].value = result["cr_amplitude"]
         self.output_parameters["cr_phase"].value = result["cr_phase"]
@@ -78,7 +83,7 @@ class CheckCrossResonance(BaseTask):
         self.output_parameters["zx_rotation_rate"].value = result["zx_rotation_rate"]
 
         output_parameters = self.attach_execution_id(execution_id)
-        fig = self._plot_coeffs_history(result["coeffs_history"], qid)
+        fig = self._plot_coeffs_history(result["coeffs_history"], label=label)
         figures: list = [fig]
         raw_data: list = []
         return PostProcessResult(
@@ -86,10 +91,16 @@ class CheckCrossResonance(BaseTask):
         )
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        control, target = qid_to_cr_pair(qid)
         exp = session.get_session()
+        label = "-".join(
+            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
+        )  # e.g., "0-1" → "Q00-Q01"
+        control, target = (
+            exp.get_qubit_label(int(q)) for q in qid.split("-")
+        )  # e.g., "0-1" → "Q00","Q01"
+
         raw_result = exp.obtain_cr_params(control, target)
-        fit_result = exp.calib_note.get_cr_param(qid_to_cr_label(qid))
+        fit_result = exp.calib_note.get_cr_param(label)
         if fit_result is None:
             error_message = "Fit result is None."
             raise ValueError(error_message)

@@ -41,10 +41,22 @@ class QubexSession(BaseSession):
                 raise ValueError(msg)
             from qubex import Experiment
 
+            if self._config.get("task_type") == "qubit":
+                qubits = [
+                    int(qid) for qid in self._config.get("qids", [])
+                ]  # e.g. : ["0", "1", "2"] → [0, 1, 2]
+            elif self._config.get("task_type") == "coupling":
+                qubits = sorted(
+                    {int(q) for qid in self._config.get("qids", []) for q in qid.split("-")}
+                )  # e.g. : ["0-1", "1-2"] → [0, 1, 2]
+            else:
+                # Default to all qubits if task_type is not specified
+                qubits = []
+
             chip_id = chip.chip_id
             self._exp = Experiment(
                 chip_id=self._config.get("chip_id", chip_id),
-                qubits=self._config.get("qubits", []),
+                qubits=qubits,
                 config_dir=self._config.get("config_dir", f"/app/config/qubex/{chip_id}/config"),
                 params_dir=self._config.get("params_dir", f"/app/config/qubex/{chip_id}/params"),
                 calib_note_path=self._config.get("note_path", "/app/calib_note.json"),

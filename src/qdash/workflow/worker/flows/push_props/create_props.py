@@ -37,16 +37,10 @@ def merge_properties(
         if value is None:
             return
 
-        if section not in base_props[chip_id]:
-            base_props[chip_id][section] = CommentedMap()
-
         section_map = base_props[chip_id][section]
         old_value = section_map.get(key)
         if old_value != value:
             section_map[key] = format_number(value)
-            base_props[chip_id][section].yaml_add_eol_comment(
-                f"updated {old_value} -> {format_number(value)}", key, column=40
-            )
 
     for qid, qubit in chip_props.qubits.items():
         for field, value in qubit.model_dump(exclude_none=True).items():

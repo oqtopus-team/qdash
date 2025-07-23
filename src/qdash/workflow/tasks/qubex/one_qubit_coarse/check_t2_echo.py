@@ -2,7 +2,6 @@ from typing import ClassVar
 
 import numpy as np
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -46,8 +45,11 @@ class CheckT2Echo(BaseTask):
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
-        label = qid_to_label(qid)
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
+        exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result = run_result.raw_result
         self.output_parameters["t2_echo"].value = result.data[label].t2 * 0.001  # convert to μs
         self.output_parameters["t2_echo"].error = result.data[label].t2_err * 0.001  # convert to μs
@@ -56,8 +58,8 @@ class CheckT2Echo(BaseTask):
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        labels = [qid_to_label(qid)]
         exp = session.get_session()
+        labels = [exp.get_qubit_label(int(qid))]
         result = exp.t2_experiment(
             labels,
             time_range=self.input_parameters["time_range"].get_value(),
@@ -65,7 +67,7 @@ class CheckT2Echo(BaseTask):
             interval=self.input_parameters["interval"].get_value(),
             save_image=False,
         )
-        r2 = result.data[qid_to_label(qid)].r2
+        r2 = result.data[exp.get_qubit_label(int(qid))].r2
         exp.calib_note.save()
         return RunResult(raw_result=result, r2={qid: r2})
 

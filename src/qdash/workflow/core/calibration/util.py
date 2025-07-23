@@ -7,55 +7,12 @@ from qdash.datamodel.task import TaskModel
 from qdash.workflow.tasks.base import BaseTask
 
 
-def label_to_qid(qid: str) -> str:
-    """Convert QXX to XX. e.g. "Q0" -> "0", "Q01" -> "1"."""
-    if re.fullmatch(r"Q\d+", qid):
-        return qid[1:]
-    error_message = "Invalid qid format."
-    raise ValueError(error_message)
-
-
 def qid_to_label(qid: str) -> str:
     """Convert a numeric qid string to a label with at least two digits. e.g. '0' -> 'Q00'."""
     if re.fullmatch(r"\d+", qid):
         return "Q" + qid.zfill(2)
     error_message = "Invalid qid format."
     raise ValueError(error_message)
-
-
-def qids_to_labels(qids: list[str]) -> list[str]:
-    """Convert a list of qids to labels. e.g. ["0", "1", "2"] -> ["Q00", "Q01", "Q02"]."""
-    return [qid_to_label(qid) for qid in qids]
-
-
-def coupling_qids_to_qubit_labels(qids: list[str]) -> list[str]:
-    """Convert a list of qids to qubit labels. e.g. ["0-1", "1-2","2-3"] -> ["Q00", "Q01", "Q02", "Q03"]."""
-    labels: list = []
-    for qid in qids:
-        labels.extend(qid_to_cr_pair(qid))
-    return labels
-
-
-def qid_to_cr_pair(qid: str) -> tuple[str, str]:
-    """Convert a qid to a cross resonance pair.
-
-    e.g. "0-1" -> ("Q00", "Q01").
-    """
-    parts = qid.split("-")
-    if len(parts) != 2:
-        error_message = "Invalid qid format for cross resonance pair. Expected format 'num-num'."
-        raise ValueError(error_message)
-    left, right = parts[0].strip(), parts[1].strip()
-    return (qid_to_label(left), qid_to_label(right))
-
-
-def qid_to_cr_label(qid: str) -> str:
-    """Convert a qid to a cross resonance label.
-
-    e.g. "0-1" -> "Q00-Q01".
-    """
-    left, right = qid_to_cr_pair(qid)
-    return f"{left}-{right}"
 
 
 def pydantic_serializer(obj: BaseModel) -> dict:

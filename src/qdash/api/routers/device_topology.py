@@ -98,7 +98,7 @@ def search_coupling_data_by_control_qid(cr_params: dict, search_term: str) -> di
 def qid_to_label(qid: str) -> str:
     """Convert a numeric qid string to a label with at least two digits. e.g. '0' -> 'Q00'."""
     if re.fullmatch(r"\d+", qid):
-        return "Q" + qid.zfill(2)
+        return "Q" + qid.zfill(3)
     error_message = "Invalid qid format."
     raise ValueError(error_message)
 
