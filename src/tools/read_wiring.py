@@ -57,8 +57,8 @@ if __name__ == "__main__":
     yaml_path = Path("/workspace/qdash/config/wiring.yaml")
     data = yaml.safe_load(yaml_path.read_text())
 
-    mux_readout_conflicts = build_mux_readout_sharing_by_module(data["64Q"])
-    mux_ctrl_conflicts = build_mux_control_conflicts_by_module(data["64Q"])
+    mux_readout_conflicts = build_mux_readout_sharing_by_module(data["64Qv1"])
+    mux_ctrl_conflicts = build_mux_control_conflicts_by_module(data["64Qv1"])
     mux_conflict_map = merge_mux_conflicts(mux_readout_conflicts, mux_ctrl_conflicts)
 
     print("📡 Mux Conflict Map (Readout + Control):")

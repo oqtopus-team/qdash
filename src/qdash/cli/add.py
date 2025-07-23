@@ -215,7 +215,7 @@ def qubit_lattice(n: int, d: int) -> tuple[range, list, dict]:
 
     # 均等なグリッド配置
     pos = {}
-    scale = 100  # spacing between nodes
+    scale = 50  # spacing between nodes
     for i in range(d):
         for j in range(d):
             x_base = j * 2 * scale

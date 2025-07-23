@@ -44,7 +44,8 @@ class CheckSkew(BaseTask):
             return yaml.safe_load(file)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:  # noqa: ARG002
-        skew_config = self.load("/app/config/qubex/64Q/config/skew.yaml")
+        chip_id = session.config.get("chip_id", "64Qv1")
+        skew_config = self.load(f"/app/config/qubex/{chip_id}/config/skew.yaml")
         for k, v in skew_config["box_setting"].items():
             print(f"Box {k} setting: {v}")
         from qubex import Experiment
@@ -52,12 +53,12 @@ class CheckSkew(BaseTask):
         exp = Experiment(
             chip_id="64Q",
             muxes=self.input_parameters["muxes"].get_value(),
-            config_dir="/app/config/qubex/64Q/config",
-            params_dir="/app/config/qubex/64Q/params",
+            config_dir=f"/app/config/qubex/{chip_id}/config",
+            params_dir=f"/app/config/qubex/{chip_id}/params",
         )
         qc = exp.tool.get_qubecalib()
-        qc.sysdb.load_box_yaml("/app/config/qubex/64Q/config/box.yaml")
-        setting = SkewSetting.from_yaml("/app/config/qubex/64Q/config/skew.yaml")
+        qc.sysdb.load_box_yaml(f"/app/config/qubex/{chip_id}/config/box.yaml")
+        setting = SkewSetting.from_yaml(f"/app/config/qubex/{chip_id}/config/skew.yaml")
         boxes = [*list(exp.boxes), setting.monitor_box_name]
         system = qc.sysdb.create_quel1system(*boxes)
         system.initialize()

@@ -9,8 +9,7 @@ from qdash.workflow.worker.tasks.push_github import push_github
 @flow(flow_run_name="Push Calibration Note")
 def push_calib_note(
     username: str = "admin",
-    source_path: str = "/app/config/qubex/64Q/calibration/calib_note.json",
-    repo_subpath: str = "64Q/calibration/calib_note.json",
+    chip_id: str = "64Qv1",
     commit_message: str = "Update calib_note.json",
     branch: str = "main",
 ) -> str:
@@ -19,8 +18,7 @@ def push_calib_note(
     Args:
     ----
         username: Username for the calibration note
-        source_path: Local path to the updated calib_note.json
-        repo_subpath: Relative path inside the repo to replace
+        chip_id: Chip ID for the calibration note
         commit_message: Commit message
         branch: Branch to push to
 
@@ -29,13 +27,15 @@ def push_calib_note(
         str: Commit SHA
 
     """
+    source_path = f"/app/config/qubex/{chip_id}/calibration/calib_note.json"
+    repo_subpath = f"{chip_id}/calibration/calib_note.json"
     latest = (
         CalibrationNoteDocument.find({"username": username, "task_id": "master"})
         .sort([("timestamp", -1)])  # 更新時刻で降順ソート
         .limit(1)
         .run()
     )[0]
-    calib_note_dir = "/app/config/qubex/64Q/calibration"
+    calib_note_dir = f"/app/config/qubex/{chip_id}/calibration"
     calib_note = latest.note
     calib_note_path = f"{calib_note_dir}/calib_note.json"
     with Path(calib_note_path).open("w", encoding="utf-8") as f:

@@ -571,11 +571,12 @@ def generate_figures(props: dict, chip_info_dir: str, suffix: str = "") -> list[
 @task
 def generate_chip_info_report(
     chip_info_dir: str = "",
+    chip_id: str = "64Qv1",
 ) -> None:
     """Generate a report for chip information."""
     # Read regular properties
     props_path = f"{chip_info_dir}/props.yaml"
-    props = read_base_properties(filename=props_path)["64Q"]
+    props = read_base_properties(filename=props_path)[chip_id]
 
     # Generate regular figures
     regular_files = generate_figures(props, chip_info_dir)
@@ -583,7 +584,7 @@ def generate_chip_info_report(
     # Read and generate 24hr properties if available
     props_path_24hrs = f"{chip_info_dir}/props_24h.yaml"
     if Path(props_path_24hrs).exists():
-        props_24hrs = read_base_properties(filename=props_path_24hrs)["64Q"]
+        props_24hrs = read_base_properties(filename=props_path_24hrs)[chip_id]
         hrs24_files = generate_figures(props_24hrs, chip_info_dir, "_24hrs")
 
         # Generate combined report
