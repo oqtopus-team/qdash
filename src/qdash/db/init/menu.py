@@ -4,56 +4,18 @@ from qdash.db.init.initialize import initialize
 from qdash.dbmodel.menu import MenuDocument
 
 
-def init_menu(username: str, chip_id: str) -> None:
+def init_menu(username: str, chip_id: str, backend: str) -> None:
     """Initialize menu document."""
     initialize()
     MenuDocument(
         name="OneQubitCheck",
         username=username,
+        backend=backend,
         description="description",
         chip_id=chip_id,
         schedule={"parallel": [{"serial": ["28", "29"]}]},
-        tasks=["CheckStatus", "DumpBox", "CheckNoise", "CheckRabi"],
+        tasks=["CheckRabi"],
         task_details={
-            "CheckStatus": {
-                "username": username,
-                "name": "CheckStatus",
-                "description": "Task to check the status of the qubit.",
-                "task_type": "qubit",
-                "input_parameters": {},
-                "output_parameters": {
-                    "status": {
-                        "unit": "a.u.",
-                        "description": "Qubit status",
-                    },
-                },
-            },
-            "DumpBox": {
-                "username": username,
-                "name": "DumpBox",
-                "description": "Task to dump the box.",
-                "task_type": "qubit",
-                "input_parameters": {},
-                "output_parameters": {
-                    "box": {
-                        "unit": "a.u.",
-                        "description": "Box",
-                    },
-                },
-            },
-            "CheckNoise": {
-                "username": username,
-                "name": "CheckNoise",
-                "description": "Task to check the noise.",
-                "task_type": "qubit",
-                "input_parameters": {},
-                "output_parameters": {
-                    "noise": {
-                        "unit": "a.u.",
-                        "description": "Noise",
-                    },
-                },
-            },
             "CheckRabi": {
                 "username": username,
                 "name": "CheckRabi",
@@ -87,6 +49,30 @@ def init_menu(username: str, chip_id: str) -> None:
                     "rabi_frequency": {
                         "unit": "GHz",
                         "description": "Rabi oscillation frequency",
+                    },
+                    "rabi_phase": {
+                        "unit": "a.u.",
+                        "description": "Rabi oscillation phase",
+                    },
+                    "rabi_offset": {
+                        "unit": "a.u.",
+                        "description": "Rabi oscillation offset",
+                    },
+                    "rabi_angle": {
+                        "unit": "degree",
+                        "description": "Rabi angle (in degree)",
+                    },
+                    "rabi_noise": {
+                        "unit": "a.u.",
+                        "description": "Rabi oscillation noise",
+                    },
+                    "rabi_distance": {
+                        "unit": "a.u.",
+                        "description": "Rabi distance",
+                    },
+                    "rabi_reference_phase": {
+                        "unit": "a.u.",
+                        "description": "Rabi reference phase",
                     },
                 },
             },

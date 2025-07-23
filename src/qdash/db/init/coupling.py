@@ -1,8 +1,6 @@
 """Coupling initialization module."""
 
 from qdash.datamodel.coupling import EdgeInfoModel
-from qdash.db.init.initialize import initialize
-from qdash.db.init.qubit import qubit_lattice
 from qdash.dbmodel.coupling import CouplingDocument
 
 
@@ -40,11 +38,6 @@ def generate_coupling(edges: list, username: str, chip_id: str) -> list:
     ]
 
 
-def init_coupling_document(username: str, chip_id: str) -> None:
+def init_coupling_document() -> None:
     """Initialize coupling documents."""
-    initialize()
-    _, edges, _ = qubit_lattice(n=64, d=4)
-    edges = bi_direction(edges)
-    couplings = generate_coupling(edges, username=username, chip_id=chip_id)
-    for c in couplings:
-        c.insert()
+    # init_chip_document initializes the chip document which includes couplings
