@@ -186,13 +186,13 @@ def merge_properties(base_props: CommentedMap, chip_props: ChipProperties) -> Co
 
     # Helper function to update a property if it differs
     def update_if_different(section: str, key: str, value: float | str | bool | None) -> None:
-        if value is not None and key in base_props["64Q"][section]:
-            old_value = base_props["64Q"][section][key]
+        if value is not None and key in base_props["64Qv1"][section]:
+            old_value = base_props["64Qv1"][section][key]
             if old_value != value:
                 if section not in updated_values:
                     updated_values[section] = {}
                 updated_values[section][key] = (old_value, value)
-                base_props["64Q"][section][key] = format_number(value)
+                base_props["64Qv1"][section][key] = format_number(value)
 
     # Update qubit properties
     for qid, qubit in chip_props.qubits.items():
@@ -210,7 +210,7 @@ def merge_properties(base_props: CommentedMap, chip_props: ChipProperties) -> Co
     for section, updates in updated_values.items():
         for key, (old_value, value) in updates.items():
             if value is not None:
-                base_props["64Q"][section].yaml_add_eol_comment(
+                base_props["64Qv1"][section].yaml_add_eol_comment(
                     f"updated {old_value} -> {format_number(value)}", key, column=40
                 )
 
@@ -226,7 +226,7 @@ def write_yaml(data: CommentedMap | ChipProperties, filename: str = "chip_proper
 
         # Initialize output structure
         output_dict = CommentedMap()
-        output_dict["64Q"] = CommentedMap()
+        output_dict["64Qv1"] = CommentedMap()
         sections = [
             "resonator_frequency",
             "qubit_frequency",
@@ -245,19 +245,19 @@ def write_yaml(data: CommentedMap | ChipProperties, filename: str = "chip_proper
             "zx90_gate_fidelity",
         ]
         for section in sections:
-            output_dict["64Q"][section] = CommentedMap()
+            output_dict["64Qv1"][section] = CommentedMap()
 
         # Process qubits
         for qid, qubit in data.qubits.items():
             qubit_dict = process_model(qubit)
             for field, value in qubit_dict.items():
-                output_dict["64Q"][field][qid] = value
+                output_dict["64Qv1"][field][qid] = value
 
         # Process couplings
         for coupling_id, coupling in data.couplings.items():
             coupling_dict = process_model(coupling)
             for field, value in coupling_dict.items():
-                output_dict["64Q"][field][coupling_id] = value
+                output_dict["64Qv1"][field][coupling_id] = value
 
         data = output_dict
 

@@ -328,7 +328,12 @@ def setup_calibration(
     initialize()
     session = create_session(
         backend=menu.backend,
-        config={"username": menu.username, "qubits": labels, "note_path": note_path},
+        config={
+            "username": menu.username,
+            "qubits": labels,
+            "note_path": note_path,
+            "chip_id": menu.chip_id,
+        },
     )
     logger.info(f"session: {session} created, config: {session.config}")
 

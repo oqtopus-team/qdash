@@ -220,6 +220,6 @@ src/qdash/workflow/images/*
 src/qdash/workflow/.system_note.json
 src/qdash/workflow/*.json
 src/qdash/workflow/.calibration/*.json
-src/qdash/workflow/.classifier/64Q/*
+src/qdash/workflow/.classifier/*/*
 config
 src/tools/schedule/*

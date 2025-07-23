@@ -216,7 +216,9 @@ def generate_rich_pdf_report(image_paths: list[str], pdf_path: str = "rich_repor
 
 
 if __name__ == "__main__":
-    props = read_base_properties(filename="/workspace/config/qubex/64Q/config/props.yaml")["64Q"]
+    props = read_base_properties(filename="/workspace/config/qubex/64Qv1/config/props.yaml")[
+        "64Qv1"
+    ]
     info_type = (
         "qubit_frequency",
         "qubit_anharmonicity",

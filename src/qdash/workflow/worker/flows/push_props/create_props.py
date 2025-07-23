@@ -28,21 +28,23 @@ coupling_field_map = {
 }
 
 
-def merge_properties(base_props: CommentedMap, chip_props: ChipProperties) -> CommentedMap:
+def merge_properties(
+    base_props: CommentedMap, chip_props: ChipProperties, chip_id: str = "64Qv1"
+) -> CommentedMap:
     """Merge chip properties into the base properties map."""
 
     def update_if_different(section: str, key: str, value: float | str | None) -> None:
         if value is None:
             return
 
-        if section not in base_props["64Q"]:
-            base_props["64Q"][section] = CommentedMap()
+        if section not in base_props[chip_id]:
+            base_props[chip_id][section] = CommentedMap()
 
-        section_map = base_props["64Q"][section]
+        section_map = base_props[chip_id][section]
         old_value = section_map.get(key)
         if old_value != value:
             section_map[key] = format_number(value)
-            base_props["64Q"][section].yaml_add_eol_comment(
+            base_props[chip_id][section].yaml_add_eol_comment(
                 f"updated {old_value} -> {format_number(value)}", key, column=40
             )
 
@@ -90,7 +92,9 @@ def get_chip_properties(chip: ChipDocument, within_24hrs: bool = False) -> ChipP
     return props
 
 
-def create_chip_properties(username: str, source_path: str, target_path: str) -> None:
+def create_chip_properties(
+    username: str, source_path: str, target_path: str, chip_id: str = "64Qv1"
+) -> None:
     """Create and write chip properties to a YAML file."""
     initialize()
     chip = ChipDocument.get_current_chip(username=username)
@@ -99,13 +103,13 @@ def create_chip_properties(username: str, source_path: str, target_path: str) ->
     handler = ChipPropertyYAMLHandler(source_path)
     base = handler.read()
 
-    merged = merge_properties(base, props)
+    merged = merge_properties(base, props, chip_id=chip_id)
     handler.write(merged, target_path)
 
 
 if __name__ == "__main__":
     create_chip_properties(
         "orangekame3",
-        source_path="/app/config/qubex/64Q/properties/chip_properties.yaml",
-        target_path="/app/config/qubex/64Q/properties/chip_properties.yaml",
+        source_path="/app/config/qubex/64Qv1/properties/chip_properties.yaml",
+        target_path="/app/config/qubex/64Qv1/properties/chip_properties.yaml",
     )
