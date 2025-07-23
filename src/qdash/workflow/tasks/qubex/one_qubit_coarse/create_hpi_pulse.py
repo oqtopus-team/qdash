@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -43,8 +42,11 @@ class CreateHPIPulse(BaseTask):
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
-        label = qid_to_label(qid)
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
+        exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result = run_result.raw_result
         self.output_parameters["hpi_amplitude"].value = result.data[label].calib_value
         output_parameters = self.attach_execution_id(execution_id)
@@ -52,8 +54,8 @@ class CreateHPIPulse(BaseTask):
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        labels = [qid_to_label(qid)]
         exp = session.get_session()
+        labels = [exp.get_qubit_label(int(qid))]
         result = exp.calibrate_hpi_pulse(
             targets=labels,
             n_rotations=1,
@@ -61,7 +63,7 @@ class CreateHPIPulse(BaseTask):
             interval=self.input_parameters["interval"].get_value(),
         )
         exp.calib_note.save()
-        r2 = result.data[qid_to_label(qid)].r2
+        r2 = result.data[exp.get_qubit_label(int(qid))].r2
         return RunResult(raw_result=result, r2={qid: r2})
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:

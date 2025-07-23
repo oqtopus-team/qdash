@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -9,7 +8,6 @@ from qdash.workflow.tasks.base import (
     PreProcessResult,
     RunResult,
 )
-from qubex.clifford import Clifford
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement import DEFAULT_INTERVAL
 
@@ -55,8 +53,11 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
-        label = qid_to_label(qid)
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
+        exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result = run_result.raw_result
         self.output_parameters["x90_gate_fidelity"].value = result[label]["gate_fidelity"]
         self.output_parameters["x90_gate_fidelity"].error = result[label]["gate_fidelity_err"]
@@ -69,8 +70,8 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         """Run the X90 interleaved randomized benchmarking task with timeout."""
-        label = qid_to_label(qid)
         exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result = exp.interleaved_randomized_benchmarking(
             targets=label,
             interleaved_clifford="X90",

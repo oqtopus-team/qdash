@@ -134,11 +134,14 @@ class BaseTask(ABC):
         """
 
     @abstractmethod
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
+    def postprocess(
+        self, session: BaseSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
         """Postprocess the task. This method is called after the task is executed.
 
         Args:
         ----
+            session: Session object
             execution_id: execution id
             run_result: RunResult object
             qid: qubit id

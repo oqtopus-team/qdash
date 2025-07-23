@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, ClassVar
 if TYPE_CHECKING:
     import plotly.graph_objs as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -39,8 +38,11 @@ class ReadoutClassification(BaseTask):
         """Preprocess the task."""
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
-        label = qid_to_label(qid)
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
+        exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result = run_result.raw_result
         self.output_parameters["average_readout_fidelity"].value = result[
             "average_readout_fidelity"
@@ -54,7 +56,7 @@ class ReadoutClassification(BaseTask):
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         exp = session.get_session()
-        label = qid_to_label(qid)
+        label = exp.get_qubit_label(int(qid))
         result = exp.build_classifier(targets=label)
         exp.calib_note.save()
         return RunResult(raw_result=result)

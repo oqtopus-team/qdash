@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, ClassVar
 if TYPE_CHECKING:
     import plotly.graph_objs as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -53,8 +52,11 @@ class CheckQubitFrequency(BaseTask):
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
-        label = qid_to_label(qid)
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
+        exp = session.get_session()
+        label = exp.get_qubit_label(int(qid))
         result = run_result.raw_result
         self.output_parameters["qubit_frequency"].value = result[label]
         output_parameters = self.attach_execution_id(execution_id)
@@ -62,8 +64,8 @@ class CheckQubitFrequency(BaseTask):
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        labels = [qid_to_label(qid)]
         exp = session.get_session()
+        labels = [exp.get_qubit_label(int(qid))]
         result = exp.calibrate_control_frequency(
             labels,
             detuning_range=self.input_parameters["detuning_range"].get_value(),
