@@ -3,7 +3,6 @@ from typing import ClassVar
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_cr_pair
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -32,7 +31,7 @@ class CheckBellStateTomography(BaseTask):
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def make_figure(self, result: dict, qid: str) -> go.Figure:
+    def make_figure(self, result: dict, label: str) -> go.Figure:
         """Create a figure from the result."""
         # Assuming result contains a 'figure' key with the figure data
         fig = make_subplots(
@@ -65,7 +64,7 @@ class CheckBellStateTomography(BaseTask):
             col=2,
         )
         fig.update_layout(
-            title=f"Bell state tomography: {qid}",
+            title=f"Bell state tomography: {label}",
             annotations=[
                 {
                     "x": 0.5,
@@ -110,11 +109,17 @@ class CheckBellStateTomography(BaseTask):
         )
         return fig
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
+        exp = session.get_session()
+        label = "-".join(
+            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
+        )  # e.g., "0-1" → "Q00-Q01"
         result = run_result.raw_result
         self.output_parameters["bell_state_fidelity"].value = result["fidelity"]
         output_parameters = self.attach_execution_id(execution_id)
-        result["figure"] = self.make_figure(result, qid)
+        result["figure"] = self.make_figure(result, label)
         figures: list = [result["figure"]]
         raw_data: list = []
         return PostProcessResult(
@@ -122,8 +127,10 @@ class CheckBellStateTomography(BaseTask):
         )
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        control, target = qid_to_cr_pair(qid)
         exp = session.get_session()
+        control, target = (
+            exp.get_qubit_label(int(q)) for q in qid.split("-")
+        )  # e.g., "0-1" → "Q00","Q01"
         result = exp.bell_state_tomography(control, target)
         exp.calib_note.save()
         return RunResult(raw_result=result)

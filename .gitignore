@@ -206,7 +206,7 @@ backend/qcflow/storage
 postgres_data/
 mongo_data/
 calib_data/
-*.env*
+*.env
 docker_node_modules/
 .venv/src/
 log/
@@ -220,6 +220,6 @@ src/qdash/workflow/images/*
 src/qdash/workflow/.system_note.json
 src/qdash/workflow/*.json
 src/qdash/workflow/.calibration/*.json
-src/qdash/workflow/.classifier/64Q/*
+src/qdash/workflow/.classifier/*/*
 config
 src/tools/schedule/*

@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_cr_label, qid_to_cr_pair
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -46,7 +45,9 @@ class CreateZX90(BaseTask):
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
         result = run_result.raw_result
         self.output_parameters["cr_amplitude"].value = result["cr_amplitude"]
         self.output_parameters["cr_phase"].value = result["cr_phase"]
@@ -63,12 +64,17 @@ class CreateZX90(BaseTask):
         )
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        control, target = qid_to_cr_pair(qid)
         exp = session.get_session()
+        control, target = (
+            exp.get_qubit_label(int(q)) for q in qid.split("-")
+        )  # e.g., "0-1" → "Q00","Q01"
+        label = "-".join(
+            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
+        )  # e.g., "0-1" → "Q00-Q01"
         raw_result = exp.calibrate_zx90(control, target)
-        fit_result = exp.calib_note.get_cr_param(qid_to_cr_label(qid))
+        fit_result = exp.calib_note.get_cr_param(label)
         if fit_result is None:
-            err_msg = f"CR parameters for {qid_to_cr_label(qid)} not found."
+            err_msg = f"CR parameters for {label} not found."
             raise ValueError(err_msg)
         result = {
             "cr_amplitude": fit_result["cr_amplitude"],

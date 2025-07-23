@@ -273,17 +273,33 @@ if __name__ == "__main__":
     initialize()
     # Maximum number of parallel operations allowed
     MAX_PARALLEL_OPS = 10  # Can be adjusted as needed
-    # EXCLUDE_QUBITS = {
-    #     "32",
-    #     "33",
-    #     "34",
-    #     "35",
-    #     "48",
-    #     "49",
-    #     "50",
-    #     "51",
-    # }  # Example qubits to exclude from scheduling
-    EXCLUDE_QUBITS = set()  # No qubits excluded by default
+    EXCLUDE_QUBITS = {
+        "0",
+        "1",
+        "2",
+        "3",
+        "16",
+        "17",
+        "18",
+        "19",
+        "12",
+        "13",
+        "14",
+        "15",
+        "28",
+        "29",
+        "30",
+        "31",
+        "44",
+        "45",
+        "46",
+        "47",
+        "60",
+        "61",
+        "62",
+        "63",
+    }
+    # EXCLUDE_QUBITS = set()  # No qubits excluded by default
 
     # create schedule directory
     chip_doc = ChipDocument.get_current_chip("admin")
@@ -292,20 +308,20 @@ if __name__ == "__main__":
     cr_pairs = cr_pair_list(two_qubit_list, bare_freq)
     cr_pairs = [pair for pair in cr_pairs if not set(pair.split("-")) & EXCLUDE_QUBITS]
 
-    wiring_path = Path("/workspace/qdash/config/qubex/64Q/config/wiring.yaml")
+    wiring_path = Path("/workspace/qdash/config/qubex/64Qv1/config/wiring.yaml")
     yaml_data = yaml.safe_load(wiring_path.read_text())
-    mux_conflict_map = build_mux_conflict_map(yaml_data["64Q"])
-    qid_to_mux = build_qubit_to_mux_map(yaml_data["64Q"])
+    mux_conflict_map = build_mux_conflict_map(yaml_data["64Qv1"])
+    qid_to_mux = build_qubit_to_mux_map(yaml_data["64Qv1"])
 
     fast_pairs, slow_pairs = split_fast_slow_pairs(cr_pairs, qid_to_mux)
     grouped_fast = group_cr_pairs_by_conflict(
         fast_pairs, qid_to_mux, mux_conflict_map, MAX_PARALLEL_OPS
     )
-    grouped_slow = group_cr_pairs_by_conflict(
-        slow_pairs, qid_to_mux, mux_conflict_map, MAX_PARALLEL_OPS
-    )
+    # grouped_slow = group_cr_pairs_by_conflict(
+    #     slow_pairs, qid_to_mux, mux_conflict_map, MAX_PARALLEL_OPS
+    # )
 
-    grouped = grouped_fast + grouped_slow
+    grouped = grouped_fast  # + grouped_slow
 
     # grouped = group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, mux_conflict_map, MAX_PARALLEL_OPS)
 

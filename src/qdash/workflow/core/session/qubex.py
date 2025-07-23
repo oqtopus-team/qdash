@@ -7,14 +7,6 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.workflow.core.session.base import BaseSession
 from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
 
-# Constants
-CONFIG_DIR = "/app/config/qubex/64Q/config"
-PARAMS_DIR = "/app/config/qubex/64Q/params"
-CHIP_SIZE_64 = 64
-CHIP_SIZE_144 = 144
-CHIP_SIZE_256 = 256
-CHIP_SIZE_1024 = 1024
-
 
 class QubexSession(BaseSession):
     """Session management for Qubex experiments."""
@@ -49,24 +41,24 @@ class QubexSession(BaseSession):
                 raise ValueError(msg)
             from qubex import Experiment
 
-            if chip.size == CHIP_SIZE_64:
-                chip_id = f"{CHIP_SIZE_64!s}Q"
-            elif chip.size == CHIP_SIZE_144:
-                chip_id = f"{CHIP_SIZE_144!s}Q"
-            elif chip.size == CHIP_SIZE_256:
-                chip_id = f"{CHIP_SIZE_256!s}Q"
-            elif chip.size == CHIP_SIZE_1024:
-                chip_id = f"{CHIP_SIZE_1024!s}Q"
+            if self._config.get("task_type") == "qubit":
+                qubits = [
+                    int(qid) for qid in self._config.get("qids", [])
+                ]  # e.g. : ["0", "1", "2"] → [0, 1, 2]
+            elif self._config.get("task_type") == "coupling":
+                qubits = sorted(
+                    {int(q) for qid in self._config.get("qids", []) for q in qid.split("-")}
+                )  # e.g. : ["0-1", "1-2"] → [0, 1, 2]
             else:
-                raise ValueError(
-                    f"Unsupported chip size: {chip.size}. Supported sizes are {CHIP_SIZE_64}, {CHIP_SIZE_144}, and {CHIP_SIZE_256}."
-                )
+                # Default to all qubits if task_type is not specified
+                qubits = []
 
+            chip_id = chip.chip_id
             self._exp = Experiment(
                 chip_id=self._config.get("chip_id", chip_id),
-                qubits=self._config.get("qubits", []),
-                config_dir=self._config.get("config_dir", CONFIG_DIR),
-                params_dir=self._config.get("params_dir", PARAMS_DIR),
+                qubits=qubits,
+                config_dir=self._config.get("config_dir", f"/app/config/qubex/{chip_id}/config"),
+                params_dir=self._config.get("params_dir", f"/app/config/qubex/{chip_id}/params"),
                 calib_note_path=self._config.get("note_path", "/app/calib_note.json"),
             )
             self._exp.connect()

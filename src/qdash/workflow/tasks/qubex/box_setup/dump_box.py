@@ -22,7 +22,9 @@ class DumpBox(BaseTask):
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
         pass
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
         pass
 
     def run(self, session: QubexSession, qid: str) -> RunResult:  # noqa: ARG002

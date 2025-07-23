@@ -12,8 +12,8 @@ from prefect import get_run_logger, task
 
 @task(task_run_name="Push GitHub")
 def push_github(
-    source_path: str = "/app/config/qubex/64Q/calibration/calib_note.json",
-    repo_subpath: str = "64Q/calibration/calib_note.json",
+    source_path: str = "/app/config/qubex/64Qv1/calibration/calib_note.json",
+    repo_subpath: str = "64Qv1/calibration/calib_note.json",
     commit_message: str = "Update calib_note.json",
     branch: str = "main",
 ) -> str:
@@ -90,8 +90,8 @@ def push_github(
 if __name__ == "__main__":
     # Example usage
     push_github(
-        source_path="/workspace/qdash/config/qubex/64Q/calibration/calib_note.json",
-        repo_subpath="64Q/calibration/calib_note.json",
+        source_path="/workspace/qdash/config/qubex/64Qv1/calibration/calib_note.json",
+        repo_subpath="64Qv1/calibration/calib_note.json",
         commit_message="Update calib_note.json",
         branch="main",
     )

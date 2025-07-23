@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_cr_pair
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     BaseTask,
@@ -31,8 +30,13 @@ class CheckZX90(BaseTask):
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
         return PreProcessResult(input_parameters=self.input_parameters)
 
-    def postprocess(self, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
-        control, target = qid_to_cr_pair(qid)
+    def postprocess(
+        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+    ) -> PostProcessResult:
+        exp = session.get_session()
+        control, target = (
+            exp.get_qubit_label(int(q)) for q in qid.split("-")
+        )  # e.g., "0-1" → "Q00","Q01"
         result = run_result.raw_result
         figures = [
             result.data[control].plot(normalize=True, return_figure=True),
@@ -43,9 +47,11 @@ class CheckZX90(BaseTask):
         )
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        cr_control, cr_target = qid_to_cr_pair(qid)
         exp = session.get_session()
-        zx90_pulse = exp.zx90(cr_control, cr_target)
+        control, target = (
+            exp.get_qubit_label(int(q)) for q in qid.split("-")
+        )  # e.g., "0-1" → "Q00","Q01"
+        zx90_pulse = exp.zx90(control, target)
         result = exp.repeat_sequence(
             sequence=zx90_pulse,
             repetitions=self.input_parameters["repetitions"].get_value(),

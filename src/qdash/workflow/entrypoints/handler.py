@@ -186,9 +186,9 @@ def main_flow(
         raise RuntimeError(f"Failed to execute task: {e}") from e
     finally:
         ExecutionLockDocument.unlock()
-        if settings.env == "qiqb-prod":
-            push_calib_note(username=menu.username)
-            push_props(username=menu.username)
+        if settings.env in {"qiqb-prod", "urchin-prod"}:
+            push_calib_note(username=menu.username, chip_id=menu.chip_id)
+            push_props(username=menu.username, chip_id=menu.chip_id)
         if menu.notify_bool:
             slack.update_contents(
                 status=Status.SUCCESS if success_map else Status.FAILURE,
