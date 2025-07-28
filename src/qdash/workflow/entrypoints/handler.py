@@ -91,7 +91,7 @@ def main_flow(
             msg="RUNNING",
             ts="",
             path="",
-            header=f"{menu.name}: http://localhost:{settings.ui_port}/execution/64Q/{execution_id}",
+            header=f" *{menu.chip_id}* : {menu.name}",
             channel=settings.slack_channel_id,
             token=settings.slack_bot_token,
         )
@@ -187,6 +187,7 @@ def main_flow(
     finally:
         ExecutionLockDocument.unlock()
         if settings.env in {"qiqb-prod", "urchin-prod"}:
+            logger.info(f"update chip:{menu.chip_id}")
             push_calib_note(username=menu.username, chip_id=menu.chip_id)
             push_props(username=menu.username, chip_id=menu.chip_id)
         if menu.notify_bool:

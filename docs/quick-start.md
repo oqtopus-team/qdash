@@ -25,6 +25,14 @@ scripts/init.sh
 docker compose up -d
 ```
 
+## (Option) if you specified a custom network in the `.env` file
+
+If you specified a custom network in the `.env` file, you need to create the network before starting the application:
+
+```bash
+docker compose -f compose.yaml -f compose.override.yaml up
+```
+
 You can now access the application at <a href="http://localhost:5714/signup"> localhost:5714 </a>.
 
 ## Create account

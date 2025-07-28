@@ -12,7 +12,8 @@ services:
       MONGO_INIT_DATABASE: qubex
     volumes:
       - ${MONGO_DATA_PATH}:/data/db
-
+    networks:
+      - custom_net
   mongo-express:
     image: mongo-express
     restart: always
@@ -27,7 +28,8 @@ services:
       ME_CONFIG_BASICAUTH: false
     depends_on:
       - mongo
-
+    networks:
+      - custom_net
   postgres:
     image: postgres:14
     restart: always
@@ -41,7 +43,8 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ${POSTGRES_DATA_PATH}:/var/lib/postgresql/data
-
+    networks:
+      - custom_net
   prefect-server:
     image: prefecthq/prefect:2.20-python3.11
     restart: always
@@ -57,7 +60,8 @@ services:
       - PREFECT_WORKER_WEBSERVER_PORT=9090
     depends_on:
       - postgres
-
+    networks:
+      - custom_net
   workflow:
     build:
       context: .
@@ -84,7 +88,8 @@ services:
       - PREFECT_EXPERIMENTAL_ENABLE_ENHANCED_CANCELLATION=True
       - PREFECT_RUNNER_SERVER_HOST=127.0.0.1
       - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
-
+    networks:
+      - custom_net
   api:
     build:
       context: .
@@ -118,7 +123,8 @@ services:
       - CALIB_DATA_PATH=/app/calib_data
       - QPU_DATA_PATH=/app/qpu_data
       - PREFECT_API_URL=http://prefect-server:4200/api
-
+    networks:
+      - custom_net
   ui:
     build:
       context: .
@@ -142,3 +148,8 @@ services:
         "--port",
         "${UI_PORT:-5714}",
       ]
+    networks:
+      - custom_net
+networks:
+  custom_net:
+    external: false

@@ -19,7 +19,11 @@ class CheckCrossResonance(BaseTask):
     backend: str = "qubex"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
+        "ramptime": InputParameterModel(
+            unit="ns", value_type="int", value=128, description="Ramp time for the CR pulse."
+        ),
+    }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "cr_amplitude": OutputParameterModel(
             unit="a.u.", value_type="float", description="Amplitude of the CR pulse."
@@ -99,7 +103,10 @@ class CheckCrossResonance(BaseTask):
             exp.get_qubit_label(int(q)) for q in qid.split("-")
         )  # e.g., "0-1" → "Q00","Q01"
 
-        raw_result = exp.obtain_cr_params(control, target)
+        raw_result = exp.obtain_cr_params(
+            control,
+            target,  # , ramptime=self.input_parameters["ramptime"].get_value()
+        )
         fit_result = exp.calib_note.get_cr_param(label)
         if fit_result is None:
             error_message = "Fit result is None."
