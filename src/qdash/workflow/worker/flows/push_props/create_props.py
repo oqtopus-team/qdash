@@ -1,5 +1,6 @@
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
+from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.worker.flows.push_props.formatter import format_number
 from qdash.workflow.worker.flows.push_props.io import ChipPropertyYAMLHandler
 from qdash.workflow.worker.flows.push_props.models import (
@@ -36,8 +37,16 @@ def merge_properties(
     def update_if_different(section: str, key: str, value: float | str | None) -> None:
         if value is None:
             return
+        if chip_id not in base_props:
+            base_props[chip_id] = CommentedMap()
 
-        section_map = base_props[chip_id][section]
+        if section not in base_props[chip_id]:
+            base_props[chip_id][section] = CommentedMap()
+
+        section_map = base_props[chip_id].get(section)
+        if section_map is None:
+            section_map = CommentedMap()
+            base_props[chip_id][section] = section_map
         old_value = section_map.get(key)
         if old_value != value:
             section_map[key] = format_number(value)
@@ -51,34 +60,42 @@ def merge_properties(
                 and value > 1.0
             ):
                 update_if_different(field, qid, None)
+            elif field == "qubit_frequency":
+                continue
             else:
                 update_if_different(field, qid, value)
-
     for cid, coupling in chip_props.couplings.items():
         for field, value in coupling.model_dump(exclude_none=True).items():
-            if field == "zx90_gate_fidelity" and (value > 1.0 or cid in {"Q40-Q37", "Q40-Q41"}):
+            if field == "zx90_gate_fidelity" and (value > 1.0):
                 update_if_different(field, cid, None)
             else:
                 update_if_different(field, cid, value)
-
     return base_props
 
 
-def get_chip_properties(chip: ChipDocument, within_24hrs: bool = False) -> ChipProperties:
+def get_chip_properties(
+    chip: ChipDocument, session: QubexSession, within_24hrs: bool = False
+) -> ChipProperties:
     """Extract chip properties from the ChipDocument."""
     props = ChipProperties()
+    import re
 
-    for i in range(64):
-        props.qubits[f"Q{i:02d}"] = QubitProperties()
+    match = re.search(r"\d+", session.config["chip_id"])
+    if not match:
+        raise ValueError(f"No digits found in chip_id: {session.config['chip_id']}")
+    n = int(match.group())
+    exp = session.get_session()
+    for i in range(n):
+        props.qubits[exp.get_qubit_label(i)] = QubitProperties()
 
     for qid, q in chip.qubits.items():
-        props.qubits[f"Q{int(qid):02d}"] = _process_data(
+        props.qubits[exp.get_qubit_label(int(qid))] = _process_data(
             q.data, qubit_field_map, QubitProperties, within_24hrs
         )
 
     for cid, c in chip.couplings.items():
         source, target = cid.split("-")
-        cid_str = f"Q{int(source):02d}-Q{int(target):02d}"
+        cid_str = f"{exp.get_qubit_label(int(source))}-{exp.get_qubit_label(int(target))}"
         props.couplings[cid_str] = _process_data(
             c.data, coupling_field_map, CouplingProperties, within_24hrs
         )
@@ -92,7 +109,19 @@ def create_chip_properties(
     """Create and write chip properties to a YAML file."""
     initialize()
     chip = ChipDocument.get_current_chip(username=username)
-    props = get_chip_properties(chip, within_24hrs=False)
+    from qdash.workflow.core.session.factory import create_session
+
+    session = create_session(
+        backend="qubex",
+        config={
+            "task_type": "",
+            "username": "admin",
+            "qids": "",
+            "note_path": "",
+            "chip_id": chip_id,
+        },
+    )
+    props = get_chip_properties(chip, within_24hrs=False, session=session)
 
     handler = ChipPropertyYAMLHandler(source_path)
     base = handler.read()

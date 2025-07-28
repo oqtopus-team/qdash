@@ -341,7 +341,7 @@ def get_device_topology(
             cr_duration = cr_value.get("duration", 20)
             # Get coupling fidelity data with timestamp check
             coupling_data = chip_docs.couplings[f"{control}-{target}"].data.get(
-                "bell_state_fidelity", {}
+                "zx90_gate_fidelity", {}
             )
             # zx90_gate_fidelity = (
             #     coupling_data["value"]
