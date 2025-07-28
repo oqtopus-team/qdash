@@ -345,13 +345,13 @@ def create_undirected_data(
     return result
 
 
-def pad_qubit_data(data: dict[str, float], n_qubits: int = 64) -> dict[str, float]:
+def pad_qubit_data(data: dict[str, float], chip_id: str = "64Qv1") -> dict[str, float]:
     """Pad missing qubit data with NaN values.
 
     Args:
     ----
         data: Dictionary of qubit data with format {"Q00": value, "Q01": value, ...}
-        n_qubits: Total number of qubits to pad to
+        chip_id: Chip ID to determine the number of qubits
 
     Returns:
     -------
@@ -359,13 +359,34 @@ def pad_qubit_data(data: dict[str, float], n_qubits: int = 64) -> dict[str, floa
 
     """
     result: dict[str, float] = {}
+    import re
+
+    from qdash.workflow.core.session.factory import create_session
+
+    session = create_session(
+        backend="qubex",
+        config={
+            "task_type": "",
+            "username": "admin",
+            "qids": "",
+            "note_path": "",
+            "chip_id": chip_id,
+        },
+    )
+    match = re.search(r"\d+", chip_id)
+    if not match:
+        raise ValueError(f"Could not extract number of qubits from chip_id: {chip_id}")
+    n_qubits = int(match.group())
+    exp = session.get_session()
     for i in range(n_qubits):
-        qubit = f"Q{i:02d}"  # Use zero-padded format Q00, Q01, etc.
+        qubit = exp.get_qubit_label(i)  # Use zero-padded format Q00, Q01, etc.
         result[qubit] = data.get(qubit, math.nan)
     return result
 
 
-def generate_figures(props: dict, chip_info_dir: str, suffix: str = "") -> list[str]:
+def generate_figures(
+    props: dict, chip_info_dir: str, suffix: str = "", chip_id: str = "64Qv1"
+) -> list[str]:
     """Generate figures for chip information.
 
     Args:
@@ -391,10 +412,16 @@ def generate_figures(props: dict, chip_info_dir: str, suffix: str = "") -> list[
     )
 
     generated_files = []
-    graph = CustomLatticeGraph(64)
+    import re
+
+    match = re.search(r"\d+", chip_id)
+    if not match:
+        raise ValueError(f"Could not extract number of qubits from chip_id: {chip_id}")
+    n_qubits = int(match.group())
+    graph = CustomLatticeGraph(n_qubits=n_qubits)
 
     if "resonator_frequency" in info_type and "resonator_frequency" in props:
-        values = pad_qubit_data(props["resonator_frequency"])
+        values = pad_qubit_data(props["resonator_frequency"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
             title=f"Resonator frequency (GHz){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
@@ -412,7 +439,7 @@ def generate_figures(props: dict, chip_info_dir: str, suffix: str = "") -> list[
         generated_files.append(path)
 
     if "qubit_frequency" in info_type and "qubit_frequency" in props:
-        values = pad_qubit_data(props["qubit_frequency"])
+        values = pad_qubit_data(props["qubit_frequency"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
             title=f"Qubit frequency (GHz){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
@@ -430,7 +457,7 @@ def generate_figures(props: dict, chip_info_dir: str, suffix: str = "") -> list[
         generated_files.append(path)
 
     if "qubit_anharmonicity" in info_type and "anharmonicity" in props:
-        values = pad_qubit_data(props["anharmonicity"])
+        values = pad_qubit_data(props["anharmonicity"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
             title=f"Qubit anharmonicity (MHz){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
@@ -448,7 +475,7 @@ def generate_figures(props: dict, chip_info_dir: str, suffix: str = "") -> list[
         generated_files.append(path)
 
     if "t1" in info_type and "t1" in props:
-        values = pad_qubit_data(props["t1"])
+        values = pad_qubit_data(props["t1"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
             title=f"T1 (μs){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
@@ -466,7 +493,7 @@ def generate_figures(props: dict, chip_info_dir: str, suffix: str = "") -> list[
         generated_files.append(path)
 
     if "t2_echo" in info_type and "t2_echo" in props:
-        values = pad_qubit_data(props["t2_echo"])
+        values = pad_qubit_data(props["t2_echo"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
             title=f"T2 echo (μs){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
@@ -484,7 +511,7 @@ def generate_figures(props: dict, chip_info_dir: str, suffix: str = "") -> list[
         generated_files.append(path)
 
     if "average_readout_fidelity" in info_type and "average_readout_fidelity" in props:
-        values = pad_qubit_data(props["average_readout_fidelity"])
+        values = pad_qubit_data(props["average_readout_fidelity"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
             title=f"Average readout fidelity (%){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
@@ -502,7 +529,7 @@ def generate_figures(props: dict, chip_info_dir: str, suffix: str = "") -> list[
         generated_files.append(path)
 
     if "x90_gate_fidelity" in info_type and "x90_gate_fidelity" in props:
-        values = pad_qubit_data(props["x90_gate_fidelity"])
+        values = pad_qubit_data(props["x90_gate_fidelity"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
             title=f"X90 gate fidelity (%){' (24hrs)' if suffix else ''}",
             values=list(values.values()),
@@ -579,13 +606,13 @@ def generate_chip_info_report(
     props = read_base_properties(filename=props_path)[chip_id]
 
     # Generate regular figures
-    regular_files = generate_figures(props, chip_info_dir)
+    regular_files = generate_figures(props, chip_info_dir, chip_id=chip_id)
 
     # Read and generate 24hr properties if available
     props_path_24hrs = f"{chip_info_dir}/props_24h.yaml"
     if Path(props_path_24hrs).exists():
         props_24hrs = read_base_properties(filename=props_path_24hrs)[chip_id]
-        hrs24_files = generate_figures(props_24hrs, chip_info_dir, "_24hrs")
+        hrs24_files = generate_figures(props_24hrs, chip_info_dir, "_24hrs", chip_id=chip_id)
 
         # Generate combined report
         generate_rich_pdf_report(
