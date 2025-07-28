@@ -1,0 +1,7 @@
+networks:
+  custom_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${SUBNET}
+          gateway: ${GATEWAY}
