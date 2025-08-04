@@ -8,9 +8,8 @@ from qdash.workflow.tasks.base import (
     PreProcessResult,
     RunResult,
 )
-from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-
-# from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, PI_DURATION
+from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class CreatePIPulse(BaseTask):
@@ -21,7 +20,7 @@ class CreatePIPulse(BaseTask):
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "duration": InputParameterModel(
-            unit="ns", value_type="int", value=36, description="PI pulse length"
+            unit="ns", value_type="int", value=PI_DURATION, description="PI pulse length"
         ),
         "shots": InputParameterModel(
             unit="",
@@ -32,7 +31,7 @@ class CreatePIPulse(BaseTask):
         "interval": InputParameterModel(
             unit="ns",
             value_type="int",
-            value=300 * 1024,
+            value=DEFAULT_INTERVAL,
             description="Time interval for calibration",
         ),
     }
