@@ -10,9 +10,8 @@ from qdash.workflow.tasks.base import (
     PreProcessResult,
     RunResult,
 )
-from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-
-# from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, DRAG_HPI_DURATION
+from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class CreateDRAGHPIPulse(BaseTask):
@@ -25,7 +24,7 @@ class CreateDRAGHPIPulse(BaseTask):
         "duration": InputParameterModel(
             unit="ns",
             value_type="int",
-            value=24,
+            value=DRAG_HPI_DURATION,
             description="HPI pulse length",
         ),
         "shots": InputParameterModel(
@@ -37,7 +36,7 @@ class CreateDRAGHPIPulse(BaseTask):
         "interval": InputParameterModel(
             unit="ns",
             value_type="int",
-            value=300 * 1024,
+            value=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }

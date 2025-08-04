@@ -17,20 +17,7 @@ class CreateZX90(BaseTask):
     backend: str = "qubex"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "ramptime": InputParameterModel(
-            unit="ns", value_type="int", value=128, description="Ramp time for the CR pulse."
-        ),
-        "duratoin": InputParameterModel(
-            unit="ns", value_type="int", value=256 + 128, description="Duration of the ZX90 pulse."
-        ),
-        "duration_buffer": InputParameterModel(
-            unit="ns",
-            value_type="float",
-            value=1.1,
-            description="Buffer duration for the ZX90 pulse.",
-        ),
-    }
+    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "cr_amplitude": OutputParameterModel(
             unit="a.u.", value_type="float", description="Amplitude of the CR pulse."
@@ -87,9 +74,6 @@ class CreateZX90(BaseTask):
         raw_result = exp.calibrate_zx90(
             control,
             target,
-            # ramptime=self.input_parameters["ramptime"].get_value(),
-            # duration=self.input_parameters["duratoin"].get_value(),
-            # duration_buffer=self.input_parameters["duration_buffer"].get_value(),
         )
         fit_result = exp.calib_note.get_cr_param(label)
         if fit_result is None:
