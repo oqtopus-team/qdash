@@ -150,6 +150,26 @@ services:
       ]
     networks:
       - custom_net
+
+  agent:
+    build:
+      context: .
+      dockerfile: ./src/qdash/slack_agent/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./src/qdash/slack_agent:/app/qdash/slack_agent
+      - ./src/qdash/dbmodel:/app/qdash/dbmodel
+      - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./src/qdash/config.py:/app/qdash/config.py
+    environment:
+      - PYTHONPATH=/app:/app/qdash:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
+    working_dir: /app/qdash/slack_agent
+    command: python main.py
+    networks:
+      - custom_net
+
 networks:
   custom_net:
     external: false

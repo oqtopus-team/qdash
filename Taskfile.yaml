@@ -68,11 +68,16 @@ tasks:
       - uv export --all-groups --no-hashes --no-emit-project --no-editable --format requirements-txt > .devcontainer/requirements.txt
     desc: Export all requirements
 
+  export-agent:
+    cmds:
+      - uv export --group agent --no-hashes --no-emit-project --no-editable --format requirements-txt > ./src/qdash/slack_agent/requirements.txt
+    desc: Export agent requirements
   export-all:
     cmds:
       - task export-api
       - task export-workflow
       - task export-dev
+      - task export-agent
     desc: Export all requirements
 
   build-api:

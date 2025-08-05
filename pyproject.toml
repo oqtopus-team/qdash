@@ -7,7 +7,12 @@ authors = [
 ]
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
-dependencies = []
+dependencies = [
+    "bunnet>=1.3.0",
+    "numpy>=1.26.0",
+    "pendulum>=3.1.0",
+    "pymongo>=4.8.0",
+]
 
 
 [build-system]
@@ -101,7 +106,7 @@ api = [
 workflow = [
     "pymongo==4.8.0",
     "bunnet==1.3.0",
-    "slack-sdk==3.31.0",
+    "slack-sdk==3.36.0",
     "python-dotenv==1.0.1",
     "numpy>=1.26.0,<1.27.0",
     "matplotlib>=3.8.0,<4.0.0",
@@ -119,6 +124,12 @@ dev = [
     "pytest-mypy==0.10.3",
     "typer==0.14.0",
     "go-task-bin>=3.41.0",
+]
+agent = [
+    "aiohttp>=3.8.0,<4.0.0",
+    "openai>=1.98.0",
+    "slack-bolt>=1.18.0",
+    "pydantic-settings"
 ]
 
 [tool.uv.sources]
