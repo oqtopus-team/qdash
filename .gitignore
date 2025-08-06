@@ -223,3 +223,4 @@ src/qdash/workflow/.calibration/*.json
 src/qdash/workflow/.classifier/*/*
 config
 src/tools/schedule/*
+.serena/cache/*
