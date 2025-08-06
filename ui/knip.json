@@ -1,0 +1,39 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/app/**/*.{ts,tsx}",
+    "src/pages/**/*.{ts,tsx}"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx,js,jsx}"
+  ],
+  "ignore": [
+    "**/*.d.ts",
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/build/**",
+    "**/dist/**",
+    "src/client/**/*.ts"
+  ],
+  "ignoreDependencies": [
+    "sharp",
+    "daisyui",
+    "tailwindcss",
+    "autoprefixer"
+  ],
+  "next": {
+    "entry": [
+      "next.config.js",
+      "src/app/**/page.tsx",
+      "src/app/**/layout.tsx",
+      "src/app/**/error.tsx",
+      "src/app/**/loading.tsx",
+      "src/app/**/not-found.tsx",
+      "src/app/**/route.ts",
+      "src/middleware.ts"
+    ]
+  },
+  "eslint": true,
+  "postcss": true,
+  "typescript": true
+}
