@@ -1,13 +1,17 @@
-from typing import ClassVar
+import logging
+from typing import ClassVar, cast
 
 import pendulum
 from bunnet import Document
+from bunnet.operators import Set
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
+
+logger = logging.getLogger(__name__)
 
 
 class ChipHistoryDocument(Document):
@@ -80,28 +84,61 @@ class ChipHistoryDocument(Document):
 
     @classmethod
     def create_history(cls, chip_doc: ChipDocument) -> "ChipHistoryDocument":
-        """Create a history record from a ChipDocument."""
+        """Create a history record from a ChipDocument using atomic upsert.
+
+        This method performs an atomic upsert operation to handle concurrent writes.
+        It updates existing records or creates new ones based on chip_id, username,
+        and recorded_date (today's date).
+
+        Note: chip_id and username are not updated as they are part of the query criteria.
+        Only the following fields are updated: size, qubits, couplings, installed_at, system_info.
+
+        Args:
+            chip_doc: The ChipDocument to create history from
+
+        Returns:
+            ChipHistoryDocument: The created or updated history record
+
+        Raises:
+            Exception: If database operation fails
+        """
         today = pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD")
-        existing_history = cls.find_one(
-            {
-                "chip_id": chip_doc.chip_id,
-                "username": chip_doc.username,
-                "recorded_date": today,
-            }
-        ).run()
-        if existing_history:
-            history = existing_history
-            history.qubits = chip_doc.qubits
-            history.couplings = chip_doc.couplings
-        else:
-            history = cls(
-                chip_id=chip_doc.chip_id,
-                username=chip_doc.username,
-                size=chip_doc.size,
-                qubits=chip_doc.qubits,
-                couplings=chip_doc.couplings,
-                installed_at=chip_doc.installed_at,
-                system_info=chip_doc.system_info,
+
+        try:
+            # Bunnet's upsert is atomic - updates if exists, inserts if not
+            result = (
+                cls.find_one(
+                    {
+                        "chip_id": chip_doc.chip_id,
+                        "username": chip_doc.username,
+                        "recorded_date": today,
+                    }
+                )
+                .upsert(
+                    Set(
+                        {
+                            # Only update mutable fields, not the query criteria
+                            "size": chip_doc.size,
+                            "qubits": chip_doc.qubits,
+                            "couplings": chip_doc.couplings,
+                            "installed_at": chip_doc.installed_at,
+                            "system_info": chip_doc.system_info,
+                        }
+                    ),
+                    on_insert=cls(
+                        chip_id=chip_doc.chip_id,
+                        username=chip_doc.username,
+                        size=chip_doc.size,
+                        qubits=chip_doc.qubits,
+                        couplings=chip_doc.couplings,
+                        installed_at=chip_doc.installed_at,
+                        system_info=chip_doc.system_info,
+                        recorded_date=today,
+                    ),
+                )
+                .run()
             )
-        history.save()
-        return history
+            return cast("ChipHistoryDocument", result)
+        except Exception as e:
+            logger.error(f"Failed to create/update chip history: {e}")
+            raise
