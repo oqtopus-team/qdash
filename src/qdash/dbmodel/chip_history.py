@@ -1,7 +1,8 @@
-from typing import ClassVar
+from typing import ClassVar, cast
 
 import pendulum
 from bunnet import Document
+from bunnet.operators import Set
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.coupling import CouplingModel
@@ -80,28 +81,39 @@ class ChipHistoryDocument(Document):
 
     @classmethod
     def create_history(cls, chip_doc: ChipDocument) -> "ChipHistoryDocument":
-        """Create a history record from a ChipDocument."""
+        """Create a history record from a ChipDocument using atomic upsert."""
         today = pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD")
-        existing_history = cls.find_one(
-            {
-                "chip_id": chip_doc.chip_id,
-                "username": chip_doc.username,
-                "recorded_date": today,
-            }
-        ).run()
-        if existing_history:
-            history = existing_history
-            history.qubits = chip_doc.qubits
-            history.couplings = chip_doc.couplings
-        else:
-            history = cls(
-                chip_id=chip_doc.chip_id,
-                username=chip_doc.username,
-                size=chip_doc.size,
-                qubits=chip_doc.qubits,
-                couplings=chip_doc.couplings,
-                installed_at=chip_doc.installed_at,
-                system_info=chip_doc.system_info,
+
+        # Bunnet's upsert is atomic - updates if exists, inserts if not
+        result = (
+            cls.find_one(
+                {
+                    "chip_id": chip_doc.chip_id,
+                    "username": chip_doc.username,
+                    "recorded_date": today,
+                }
             )
-        history.save()
-        return history
+            .upsert(
+                Set(
+                    {
+                        "size": chip_doc.size,
+                        "qubits": chip_doc.qubits,
+                        "couplings": chip_doc.couplings,
+                        "installed_at": chip_doc.installed_at,
+                        "system_info": chip_doc.system_info,
+                    }
+                ),
+                on_insert=cls(
+                    chip_id=chip_doc.chip_id,
+                    username=chip_doc.username,
+                    size=chip_doc.size,
+                    qubits=chip_doc.qubits,
+                    couplings=chip_doc.couplings,
+                    installed_at=chip_doc.installed_at,
+                    system_info=chip_doc.system_info,
+                    recorded_date=today,
+                ),
+            )
+            .run()
+        )
+        return cast("ChipHistoryDocument", result)
