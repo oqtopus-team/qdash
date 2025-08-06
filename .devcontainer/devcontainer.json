@@ -3,6 +3,7 @@
   "dockerComposeFile": ["../compose.dev.yaml"],
   "service": "devcontainer",
   "workspaceFolder": "/workspace/qdash",
+
   "customizations": {
     "vscode": {
       "extensions": [
@@ -18,9 +19,50 @@
         "saoudrizwan.claude-dev"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python"
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "files.watcherExclude": {
+          "**/node_modules/**": true,
+          "**/.venv/**": true,
+          "**/calib_data/**": true,
+          "**/mongo_data/**": true,
+          "**/postgres_data/**": true
+        }
+      },
+      "terminal.integrated.defaultProfile.linux": "zsh",
+      "terminal.integrated.profiles.linux": {
+        "bash": {
+          "path": "bash",
+          "icon": "terminal-bash"
+        },
+        "zsh": {
+          "path": "zsh"
+        }
       }
     }
   },
-  "remoteUser": "root"
+
+  "remoteUser": "root",
+
+  // Volume mounts (persistence configuration)
+  "mounts": [
+    "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
+    "source=claude-code-config-${devcontainerId},target=/home/root/.claude,type=volume",
+    "source=qdash-vscode-extensions-${devcontainerId},target=/root/.vscode-server/extensions,type=volume",
+    "source=qdash-pip-cache,target=/root/.cache/pip,type=volume",
+    "source=qdash-uv-cache,target=/root/.cache/uv,type=volume"
+  ],
+
+  "containerEnv": {
+    "NODE_OPTIONS": "--max-old-space-size=4096",
+    "CLAUDE_CONFIG_DIR": "/home/root/.claude",
+    "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
+    "PIP_CACHE_DIR": "/root/.cache/pip",
+    "UV_CACHE_DIR": "/root/.cache/uv"
+  },
+  // Startup optimization settings
+  "overrideCommand": false,
+  "shutdownAction": "none",
+
+  // Disable features (reduce build time)
+  "features": {}
 }
