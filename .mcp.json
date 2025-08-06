@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "o3": {
+      "command": "npx",
+      "args": [
+        "o3-search-mcp"
+      ],
+      "env": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+        "SEARCH_CONTEXT_SIZE": "medium",
+        "REASONING_EFFORT": "medium"
+      }
+    },
+    "serena": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server"
+      ]
+    }
+  }
+}
