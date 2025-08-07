@@ -71,8 +71,6 @@ export function TaskResultGrid({
     }
   }, [originalNavigateToNextDay, selectedTaskInfo]);
 
-
-
   const {
     data: taskResponse,
     isLoading: isLoadingTask,
@@ -113,7 +111,7 @@ export function TaskResultGrid({
   // Update modal data with debounce to prevent race conditions
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
-    
+
     if (selectedTaskInfo && taskResponse?.data?.result) {
       timeoutId = setTimeout(() => {
         const updatedTask = taskResponse.data.result?.[selectedTaskInfo.qid];

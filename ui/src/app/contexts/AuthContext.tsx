@@ -37,10 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const maxAge = 7 * 24 * 60 * 60; // 7 days
     // Save both token and username cookies
     document.cookie = `token=${encodeURIComponent(
-      username
+      username,
     )}; path=/; max-age=${maxAge}; SameSite=Lax`;
     document.cookie = `username=${encodeURIComponent(
-      username
+      username,
     )}; path=/; max-age=${maxAge}; SameSite=Lax`;
     setUsername(username);
   }, []);
@@ -130,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false); // ローディング終了
       }
     },
-    [loginMutation, saveAuth, router, removeAuth]
+    [loginMutation, saveAuth, router, removeAuth],
   );
 
   const logout = useCallback(async () => {

@@ -16,8 +16,9 @@ import { useExecutionUrlState } from "@/app/hooks/useUrlState";
 
 function ExecutionPageContent() {
   // URL state management
-  const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();
-  
+  const { selectedChip, setSelectedChip, isInitialized } =
+    useExecutionUrlState();
+
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
     null,
   );
@@ -27,13 +28,13 @@ function ExecutionPageContent() {
   );
   const [cardData, setCardData] = useState<ExecutionResponseSummary[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  
+
   // Track if we've already set the default chip to prevent race conditions
   const hasSetDefaultChip = useRef(false);
 
   // Get list of chips to set default
   const { data: chipsData } = useListChips();
-  
+
   // Memoize sorted chips to avoid recalculating on every render
   const sortedChips = useMemo(() => {
     if (!chipsData?.data) return [];
@@ -46,7 +47,12 @@ function ExecutionPageContent() {
 
   // Set the latest chip as default when chips are loaded and no chip is selected from URL
   useEffect(() => {
-    if (isInitialized && !selectedChip && !hasSetDefaultChip.current && sortedChips.length > 0) {
+    if (
+      isInitialized &&
+      !selectedChip &&
+      !hasSetDefaultChip.current &&
+      sortedChips.length > 0
+    ) {
       hasSetDefaultChip.current = true;
       setSelectedChip(sortedChips[0].chip_id);
     }
@@ -374,9 +380,13 @@ function ExecutionPageContent() {
 
 export default function ExecutionPage() {
   return (
-    <Suspense fallback={<div className="w-full flex justify-center py-12">
-      <span className="loading loading-spinner loading-lg"></span>
-    </div>}>
+    <Suspense
+      fallback={
+        <div className="w-full flex justify-center py-12">
+          <span className="loading loading-spinner loading-lg"></span>
+        </div>
+      }
+    >
       <ExecutionPageContent />
     </Suspense>
   );

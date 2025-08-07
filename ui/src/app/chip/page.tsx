@@ -42,7 +42,12 @@ function ChipPageContent() {
 
   // Set default chip only when URL is initialized and no chip is selected from URL
   useEffect(() => {
-    if (isInitialized && !selectedChip && chipsData?.data && chipsData.data.length > 0) {
+    if (
+      isInitialized &&
+      !selectedChip &&
+      chipsData?.data &&
+      chipsData.data.length > 0
+    ) {
       // Sort chips by installation date and select the most recent one
       const sortedChips = [...chipsData.data].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
@@ -64,7 +69,6 @@ function ChipPageContent() {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
 
-  
   // Track previous date to distinguish modal navigation from external navigation
   const [previousDate, setPreviousDate] = useState(selectedDate);
 
@@ -83,12 +87,10 @@ function ChipPageContent() {
   const navigateToPreviousDay = originalNavigateToPreviousDay;
   const navigateToNextDay = originalNavigateToNextDay;
 
-
-
   // Update selected task when view mode changes only if no task is selected from URL
   useEffect(() => {
     if (!isInitialized) return; // Wait for URL state to be initialized
-    
+
     // Only set defaults if no task is selected or if the current task doesn't match the view mode
     if (viewMode === "2q" && tasks?.data?.tasks) {
       const availableTasks = tasks.data.tasks.filter(
@@ -96,9 +98,9 @@ function ChipPageContent() {
       );
       // Check if current task is valid for 2q view
       const currentTaskValid = availableTasks.some(
-        (task: TaskResponse) => task.name === selectedTask
+        (task: TaskResponse) => task.name === selectedTask,
       );
-      
+
       if (!currentTaskValid) {
         const checkBellState = availableTasks.find(
           (task: TaskResponse) => task.name === "CheckBellState",
@@ -115,15 +117,21 @@ function ChipPageContent() {
       );
       // Check if current task is valid for 1q view
       const currentTaskValid = availableTasks.some(
-        (task: TaskResponse) => task.name === selectedTask
+        (task: TaskResponse) => task.name === selectedTask,
       );
-      
+
       if (!currentTaskValid && !selectedTask) {
         // Only set default if no task is selected
         setSelectedTask("CheckRabi");
       }
     }
-  }, [viewMode, tasks?.data?.tasks, isInitialized, selectedTask, setSelectedTask]);
+  }, [
+    viewMode,
+    tasks?.data?.tasks,
+    isInitialized,
+    selectedTask,
+    setSelectedTask,
+  ]);
   const {
     data: muxData,
     isLoading: isLoadingMux,
@@ -149,18 +157,20 @@ function ChipPageContent() {
   // Update modal data with debounce to prevent race conditions
   React.useEffect(() => {
     let timeoutId: NodeJS.Timeout;
-    
+
     if (selectedTaskInfo && muxData?.data) {
       timeoutId = setTimeout(() => {
         // Find the updated task from mux data
         let foundTask: Task | null = null;
         Object.values(muxData.data.muxes).forEach((muxDetail) => {
           Object.values(muxDetail.detail).forEach((tasksByName) => {
-            Object.values(tasksByName as { [key: string]: Task }).forEach((task) => {
-              if (task.qid === selectedTaskInfo.qid && task.figure_path) {
-                foundTask = task;
-              }
-            });
+            Object.values(tasksByName as { [key: string]: Task }).forEach(
+              (task) => {
+                if (task.qid === selectedTaskInfo.qid && task.figure_path) {
+                  foundTask = task;
+                }
+              },
+            );
           });
         });
 
@@ -168,8 +178,8 @@ function ChipPageContent() {
           const figurePath = Array.isArray((foundTask as Task).figure_path)
             ? ((foundTask as Task).figure_path as string[])[0]
             : (foundTask as Task).figure_path || null;
-          
-          if (figurePath && typeof figurePath === 'string') {
+
+          if (figurePath && typeof figurePath === "string") {
             setSelectedTaskInfo((prev) => {
               // Only update if the modal is still open and for the same qid
               if (prev?.qid === selectedTaskInfo.qid) {
@@ -635,9 +645,13 @@ function ChipPageContent() {
 
 export default function ChipPage() {
   return (
-    <Suspense fallback={<div className="w-full flex justify-center py-12">
-      <span className="loading loading-spinner loading-lg"></span>
-    </div>}>
+    <Suspense
+      fallback={
+        <div className="w-full flex justify-center py-12">
+          <span className="loading loading-spinner loading-lg"></span>
+        </div>
+      }
+    >
       <ChipPageContent />
     </Suspense>
   );
