@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useListChips } from "@/client/chip/chip";
 import Select, { SingleValue } from "react-select";
 
@@ -13,13 +13,11 @@ interface ChipOption {
 interface ChipSelectorProps {
   selectedChip: string;
   onChipSelect: (chipId: string) => void;
-  isUrlInitialized?: boolean;
 }
 
 export function ChipSelector({
   selectedChip,
   onChipSelect,
-  isUrlInitialized = true,
 }: ChipSelectorProps) {
   const { data: chips, isLoading, isError } = useListChips();
 
