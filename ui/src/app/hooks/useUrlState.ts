@@ -21,8 +21,8 @@ interface UseChipUrlStateResult {
 }
 
 interface UseExecutionUrlStateResult {
-  selectedChip: string;
-  setSelectedChip: (chip: string) => void;
+  selectedChip: string | null;
+  setSelectedChip: (chip: string | null) => void;
   isInitialized: boolean;
 }
 
@@ -111,16 +111,16 @@ export function useExecutionUrlState(): UseExecutionUrlStateResult {
     setIsInitialized(true);
   }, []);
 
-  // Wrapped setter to handle URL updates
+  // Wrapped setter to handle URL updates - now accepts null explicitly
   const setSelectedChip = useCallback(
-    (chip: string) => {
+    (chip: string | null) => {
       setSelectedChipState(chip || null); // null removes the parameter from URL
     },
     [setSelectedChipState]
   );
 
   return {
-    selectedChip: selectedChip ?? "",
+    selectedChip,  // Return null as-is instead of converting to empty string
     setSelectedChip,
     isInitialized,
   };

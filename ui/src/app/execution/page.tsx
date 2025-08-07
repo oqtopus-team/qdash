@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import {
   useListExecutionsByChipId,
   useFetchExecutionByChipId,
@@ -27,29 +27,37 @@ function ExecutionPageContent() {
   );
   const [cardData, setCardData] = useState<ExecutionResponseSummary[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  
+  // Track if we've already set the default chip to prevent race conditions
+  const hasSetDefaultChip = useRef(false);
 
   // Get list of chips to set default
   const { data: chipsData } = useListChips();
+  
+  // Memoize sorted chips to avoid recalculating on every render
+  const sortedChips = useMemo(() => {
+    if (!chipsData?.data) return [];
+    return [...chipsData.data].sort((a, b) => {
+      const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
+      const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [chipsData?.data]);
 
   // Set the latest chip as default when chips are loaded and no chip is selected from URL
   useEffect(() => {
-    if (isInitialized && !selectedChip && chipsData?.data && chipsData.data.length > 0) {
-      // Sort chips by installed_at date in descending order and get the latest one
-      const sortedChips = [...chipsData.data].sort((a, b) => {
-        const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
-        const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
-        return dateB - dateA;
-      });
+    if (isInitialized && !selectedChip && !hasSetDefaultChip.current && sortedChips.length > 0) {
+      hasSetDefaultChip.current = true;
       setSelectedChip(sortedChips[0].chip_id);
     }
-  }, [isInitialized, selectedChip, chipsData, setSelectedChip]);
+  }, [isInitialized, selectedChip, sortedChips, setSelectedChip]);
 
   // chip_id による実行概要一覧の取得
   const {
     data: executionData,
     isError,
     isLoading,
-  } = useListExecutionsByChipId(selectedChip, {
+  } = useListExecutionsByChipId(selectedChip || "", {
     query: {
       // Refresh every 5 seconds
       refetchInterval: 5000,
@@ -64,7 +72,7 @@ function ExecutionPageContent() {
     isLoading: isDetailLoading,
     isError: isDetailError,
   } = useFetchExecutionByChipId(
-    selectedChip,
+    selectedChip || "",
     selectedExecutionId ? selectedExecutionId : "",
     {
       query: {
@@ -87,7 +95,7 @@ function ExecutionPageContent() {
 
   // チップ選択の変更ハンドラ
   const handleChipChange = (chipId: string) => {
-    setSelectedChip(chipId);
+    setSelectedChip(chipId || null);
     setSelectedExecutionId(null);
     setIsSidebarOpen(false);
     setCardData([]);
@@ -143,7 +151,7 @@ function ExecutionPageContent() {
       </div>
       <div className="px-10 pb-6">
         <ChipSelector
-          selectedChip={selectedChip}
+          selectedChip={selectedChip || ""}
           onChipSelect={handleChipChange}
         />
       </div>
@@ -228,7 +236,7 @@ function ExecutionPageContent() {
               </h2>
               <div className="flex space-x-4 mt-4">
                 <a
-                  href={`/execution/${selectedChip}/${selectedExecutionId}`}
+                  href={`/execution/${selectedChip || ""}/${selectedExecutionId}`}
                   className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
                 >
                   <FaExternalLinkAlt className="mr-2" />
