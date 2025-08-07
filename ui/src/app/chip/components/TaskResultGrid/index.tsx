@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { Task } from "@/schemas";
 import {
   useFetchLatestQubitTaskGroupedByChip,
   useFetchHistoricalQubitTaskGroupedByChip,
+  useFetchChipDates,
 } from "@/client/chip/chip";
 import { TaskFigure } from "@/app/components/TaskFigure";
 import dynamic from "next/dynamic";
@@ -19,6 +21,7 @@ interface TaskResultGridProps {
   selectedTask: string;
   selectedDate: string;
   gridSize: number;
+  onDateChange?: (date: string) => void;
 }
 
 interface SelectedTaskInfo {
@@ -34,22 +37,87 @@ export function TaskResultGrid({
   selectedTask,
   selectedDate,
   gridSize,
+  onDateChange,
 }: TaskResultGridProps) {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
+
+  // Fetch available dates for navigation
+  const { data: datesResponse } = useFetchChipDates(chipId, {
+    query: {
+      enabled: !!chipId,
+      staleTime: 300000, // 5 minutes - dates don't change frequently
+    },
+  });
+
+  // Get available dates for navigation
+  const availableDates = React.useMemo(() => {
+    const dates = ["latest"];
+    if (datesResponse?.data?.data && Array.isArray(datesResponse.data.data)) {
+      dates.push(...datesResponse.data.data.sort((a, b) => b.localeCompare(a)));
+    }
+    return dates;
+  }, [datesResponse]);
+
+  // Navigation functions
+  const navigateToPreviousDay = () => {
+    if (!onDateChange) return;
+    
+    const currentIndex = availableDates.indexOf(selectedDate);
+    if (currentIndex > 0) {
+      onDateChange(availableDates[currentIndex - 1]);
+    }
+  };
+
+  const navigateToNextDay = () => {
+    if (!onDateChange) return;
+    
+    const currentIndex = availableDates.indexOf(selectedDate);
+    if (currentIndex < availableDates.length - 1) {
+      onDateChange(availableDates[currentIndex + 1]);
+    }
+  };
+
+  const canNavigatePrevious = availableDates.indexOf(selectedDate) > 0;
+  const canNavigateNext = availableDates.indexOf(selectedDate) < availableDates.length - 1;
+
+
 
   const {
     data: taskResponse,
     isLoading: isLoadingTask,
     isError: isTaskError,
   } = selectedDate === "latest"
-    ? useFetchLatestQubitTaskGroupedByChip(chipId, selectedTask)
+    ? useFetchLatestQubitTaskGroupedByChip(chipId, selectedTask, {
+        query: {
+          placeholderData: keepPreviousData,
+          staleTime: 30000, // 30 seconds
+        },
+      })
     : useFetchHistoricalQubitTaskGroupedByChip(
         chipId,
         selectedTask,
         selectedDate,
+        {
+          query: {
+            placeholderData: keepPreviousData,
+            staleTime: 30000, // 30 seconds
+          },
+        },
       );
+
+  // Update modal data when date changes or new data is fetched
+  React.useEffect(() => {
+    if (selectedTaskInfo && taskResponse?.data?.result) {
+      const updatedTask = taskResponse.data.result[selectedTaskInfo.qid];
+      if (updatedTask) {
+        setSelectedTaskInfo((prev) =>
+          prev ? { ...prev, task: updatedTask } : null
+        );
+      }
+    }
+  }, [selectedDate, taskResponse?.data?.result, selectedTaskInfo?.qid]);
 
   if (isLoadingTask)
     return (
@@ -163,12 +231,40 @@ export function TaskResultGrid({
               <h3 className="font-bold text-lg">
                 Result for QID {selectedTaskInfo.qid}
               </h3>
-              <button
-                onClick={() => setSelectedTaskInfo(null)}
-                className="btn btn-sm btn-circle btn-ghost"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                {onDateChange && (
+                  <>
+                    <button
+                      onClick={navigateToPreviousDay}
+                      disabled={!canNavigatePrevious}
+                      className="btn btn-sm btn-ghost"
+                      title="Previous Day"
+                    >
+                      ←
+                    </button>
+                    <span className="text-sm text-base-content/70 px-2">
+                      {selectedDate === "latest" 
+                        ? "Latest" 
+                        : `${selectedDate.slice(0, 4)}/${selectedDate.slice(4, 6)}/${selectedDate.slice(6, 8)}`
+                      }
+                    </span>
+                    <button
+                      onClick={navigateToNextDay}
+                      disabled={!canNavigateNext}
+                      className="btn btn-sm btn-ghost"
+                      title="Next Day"
+                    >
+                      →
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setSelectedTaskInfo(null)}
+                  className="btn btn-sm btn-circle btn-ghost"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {viewMode === "static" &&

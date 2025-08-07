@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useListMuxes, useFetchChip } from "@/client/chip/chip";
+import React, { useState, useEffect } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
+import { useListMuxes, useFetchChip, useFetchChipDates } from "@/client/chip/chip";
 import { useFetchAllTasks } from "@/client/task/task";
 import { BsGrid, BsListUl } from "react-icons/bs";
 import { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
@@ -41,6 +42,43 @@ export default function ChipPage() {
 
   const { data: tasks } = useFetchAllTasks();
 
+  // Fetch available dates for navigation
+  const { data: datesResponse } = useFetchChipDates(selectedChip, {
+    query: {
+      enabled: !!selectedChip,
+      staleTime: 300000, // 5 minutes - dates don't change frequently
+    },
+  });
+
+  // Get available dates for navigation
+  const availableDates = React.useMemo(() => {
+    const dates = ["latest"];
+    if (datesResponse?.data?.data && Array.isArray(datesResponse.data.data)) {
+      dates.push(...datesResponse.data.data.sort((a, b) => b.localeCompare(a)));
+    }
+    return dates;
+  }, [datesResponse]);
+
+  // Navigation functions
+  const navigateToPreviousDay = () => {
+    const currentIndex = availableDates.indexOf(selectedDate);
+    if (currentIndex > 0) {
+      setSelectedDate(availableDates[currentIndex - 1]);
+    }
+  };
+
+  const navigateToNextDay = () => {
+    const currentIndex = availableDates.indexOf(selectedDate);
+    if (currentIndex < availableDates.length - 1) {
+      setSelectedDate(availableDates[currentIndex + 1]);
+    }
+  };
+
+  const canNavigatePrevious = availableDates.indexOf(selectedDate) > 0;
+  const canNavigateNext = availableDates.indexOf(selectedDate) < availableDates.length - 1;
+
+
+
   // Update selected task when view mode changes
   useEffect(() => {
     if (viewMode === "2q" && tasks?.data?.tasks) {
@@ -63,7 +101,41 @@ export default function ChipPage() {
     data: muxData,
     isLoading: isLoadingMux,
     isError: isMuxError,
-  } = useListMuxes(selectedChip || "");
+  } = useListMuxes(selectedChip || "", {
+    query: {
+      placeholderData: keepPreviousData,
+      staleTime: 30000, // 30 seconds
+    },
+  });
+
+  // Update modal data when date changes or new data is fetched
+  React.useEffect(() => {
+    if (selectedTaskInfo && muxData?.data) {
+      // Find the updated task from mux data
+      let foundTask: Task | null = null;
+      Object.values(muxData.data.muxes).forEach((muxDetail) => {
+        Object.values(muxDetail.detail).forEach((tasksByName) => {
+          Object.values(tasksByName as { [key: string]: Task }).forEach((task) => {
+            if (task.qid === selectedTaskInfo.qid && task.figure_path) {
+              foundTask = task;
+            }
+          });
+        });
+      });
+
+      if (foundTask) {
+        const figurePath = Array.isArray((foundTask as Task).figure_path)
+          ? ((foundTask as Task).figure_path as string[])[0]
+          : (foundTask as Task).figure_path || null;
+        
+        if (figurePath && typeof figurePath === 'string') {
+          setSelectedTaskInfo((prev) =>
+            prev ? { ...prev, path: figurePath, task: foundTask! } : null
+          );
+        }
+      }
+    }
+  }, [selectedDate, muxData?.data, selectedTaskInfo?.qid]);
 
   // Get all QIDs from mux detail
   const getQids = (detail: MuxDetailResponseDetail): string[] => {
@@ -264,6 +336,7 @@ export default function ChipPage() {
               selectedTask={selectedTask}
               selectedDate={selectedDate}
               gridSize={gridSize}
+              onDateChange={setSelectedDate}
             />
           ) : viewMode === "2q" ? (
             <CouplingGrid
@@ -271,6 +344,7 @@ export default function ChipPage() {
               selectedTask={selectedTask}
               selectedDate={selectedDate}
               gridSize={gridSize}
+              onDateChange={setSelectedDate}
             />
           ) : (
             <div className="space-y-4">
@@ -409,12 +483,36 @@ export default function ChipPage() {
                 Result for {viewMode === "2q" ? "Coupling" : "QID"}{" "}
                 {selectedTaskInfo.qid}
               </h3>
-              <button
-                onClick={() => setSelectedTaskInfo(null)}
-                className="btn btn-sm btn-circle btn-ghost"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={navigateToPreviousDay}
+                  disabled={!canNavigatePrevious}
+                  className="btn btn-sm btn-ghost"
+                  title="Previous Day"
+                >
+                  ←
+                </button>
+                <span className="text-sm text-base-content/70 px-2">
+                  {selectedDate === "latest" 
+                    ? "Latest" 
+                    : `${selectedDate.slice(0, 4)}/${selectedDate.slice(4, 6)}/${selectedDate.slice(6, 8)}`
+                  }
+                </span>
+                <button
+                  onClick={navigateToNextDay}
+                  disabled={!canNavigateNext}
+                  className="btn btn-sm btn-ghost"
+                  title="Next Day"
+                >
+                  →
+                </button>
+                <button
+                  onClick={() => setSelectedTaskInfo(null)}
+                  className="btn btn-sm btn-circle btn-ghost"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-8">
               <div className="aspect-square bg-base-200/50 rounded-xl p-4">

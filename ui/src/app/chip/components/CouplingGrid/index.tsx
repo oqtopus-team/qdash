@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { Task } from "@/schemas";
 import dynamic from "next/dynamic";
 import { TaskFigure } from "@/app/components/TaskFigure";
 import {
   useFetchLatestCouplingTaskGroupedByChip,
   useFetchHistoricalCouplingTaskGroupedByChip,
+  useFetchChipDates,
 } from "@/client/chip/chip";
 
 const PlotlyRenderer = dynamic(
@@ -19,6 +21,7 @@ interface CouplingGridProps {
   selectedTask: string;
   selectedDate: string;
   gridSize: number;
+  onDateChange?: (date: string) => void;
 }
 
 interface ParameterValue {
@@ -67,11 +70,53 @@ export function CouplingGrid({
   selectedTask,
   selectedDate,
   gridSize,
+  onDateChange,
 }: CouplingGridProps) {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [cellSize, setCellSize] = useState(60);
+
+  // Fetch available dates for navigation
+  const { data: datesResponse } = useFetchChipDates(chipId, {
+    query: {
+      enabled: !!chipId,
+      staleTime: 300000, // 5 minutes - dates don't change frequently
+    },
+  });
+
+  // Get available dates for navigation
+  const availableDates = React.useMemo(() => {
+    const dates = ["latest"];
+    if (datesResponse?.data?.data && Array.isArray(datesResponse.data.data)) {
+      dates.push(...datesResponse.data.data.sort((a, b) => b.localeCompare(a)));
+    }
+    return dates;
+  }, [datesResponse]);
+
+  // Navigation functions
+  const navigateToPreviousDay = () => {
+    if (!onDateChange) return;
+    
+    const currentIndex = availableDates.indexOf(selectedDate);
+    if (currentIndex > 0) {
+      onDateChange(availableDates[currentIndex - 1]);
+    }
+  };
+
+  const navigateToNextDay = () => {
+    if (!onDateChange) return;
+    
+    const currentIndex = availableDates.indexOf(selectedDate);
+    if (currentIndex < availableDates.length - 1) {
+      onDateChange(availableDates[currentIndex + 1]);
+    }
+  };
+
+  const canNavigatePrevious = availableDates.indexOf(selectedDate) > 0;
+  const canNavigateNext = availableDates.indexOf(selectedDate) < availableDates.length - 1;
+
+
 
   useEffect(() => {
     const updateSize = () => {
@@ -88,12 +133,49 @@ export function CouplingGrid({
     isLoading,
     isError,
   } = selectedDate === "latest"
-    ? useFetchLatestCouplingTaskGroupedByChip(chipId, selectedTask)
+    ? useFetchLatestCouplingTaskGroupedByChip(chipId, selectedTask, {
+        query: {
+          placeholderData: keepPreviousData,
+          staleTime: 30000, // 30 seconds
+        },
+      })
     : useFetchHistoricalCouplingTaskGroupedByChip(
         chipId,
         selectedTask,
         selectedDate,
+        {
+          query: {
+            placeholderData: keepPreviousData,
+            staleTime: 30000, // 30 seconds
+          },
+        },
       );
+
+  // Update modal data when date changes or new data is fetched
+  React.useEffect(() => {
+    if (selectedTaskInfo && taskResponse?.data?.result) {
+      const normalizedResultMap: Record<string, ExtendedTask[]> = {};
+      for (const [couplingId, task] of Object.entries(taskResponse.data.result)) {
+        const [a, b] = couplingId.split("-").map(Number);
+        const normKey = a < b ? `${a}-${b}` : `${b}-${a}`;
+        if (!normalizedResultMap[normKey]) normalizedResultMap[normKey] = [];
+        normalizedResultMap[normKey].push({
+          ...task,
+          couplingId,
+        } as ExtendedTask);
+        normalizedResultMap[normKey].sort(
+          (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0),
+        );
+      }
+      
+      const updatedTaskList = normalizedResultMap[selectedTaskInfo.couplingId];
+      if (updatedTaskList) {
+        setSelectedTaskInfo((prev) =>
+          prev ? { ...prev, taskList: updatedTaskList } : null
+        );
+      }
+    }
+  }, [selectedDate, taskResponse?.data?.result, selectedTaskInfo?.couplingId]);
 
   const normalizedResultMap: Record<string, ExtendedTask[]> = {};
   if (taskResponse?.data?.result) {
@@ -214,12 +296,40 @@ export function CouplingGrid({
                 Coupling{" "}
                 {selectedTaskInfo.taskList[selectedTaskInfo.index].couplingId}
               </h3>
-              <button
-                onClick={() => setSelectedTaskInfo(null)}
-                className="btn btn-sm btn-circle btn-ghost"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                {onDateChange && (
+                  <>
+                    <button
+                      onClick={navigateToPreviousDay}
+                      disabled={!canNavigatePrevious}
+                      className="btn btn-sm btn-ghost"
+                      title="Previous Day"
+                    >
+                      ←
+                    </button>
+                    <span className="text-sm text-base-content/70 px-2">
+                      {selectedDate === "latest" 
+                        ? "Latest" 
+                        : `${selectedDate.slice(0, 4)}/${selectedDate.slice(4, 6)}/${selectedDate.slice(6, 8)}`
+                      }
+                    </span>
+                    <button
+                      onClick={navigateToNextDay}
+                      disabled={!canNavigateNext}
+                      className="btn btn-sm btn-ghost"
+                      title="Next Day"
+                    >
+                      →
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setSelectedTaskInfo(null)}
+                  className="btn btn-sm btn-circle btn-ghost"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {viewMode === "static" ? (
