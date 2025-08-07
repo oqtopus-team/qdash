@@ -3,8 +3,20 @@ name: CI
 on:
   push:
     branches: [main, develop]
+    paths:
+      - 'src/qdash/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main, develop]
+    paths:
+      - 'src/qdash/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/ci.yml'
 
 jobs:
   lint-and-format:
@@ -87,25 +99,4 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  frontend-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - name: Install Go Task
-        uses: arduino/setup-task@v2
-        with:
-          version: 3.x
-
-      - name: Install dependencies
-        working-directory: ./ui
-        run: bun install
-
-      - name: Run UI formatting and linting
-        run: task fmt-ui
