@@ -26,12 +26,8 @@
   },
   "python.defaultInterpreterPath": "/workspace/qdash/.venv/bin/python",
   "python.terminal.activateEnvironment": true,
-  "python.analysis.extraPaths": [
-    "/workspace/qdash/src"
-  ],
-  "python.autoComplete.extraPaths": [
-    "/workspace/qdash/src"
-  ],
+  "python.analysis.extraPaths": ["/workspace/qdash/src"],
+  "python.autoComplete.extraPaths": ["/workspace/qdash/src"],
   "python.testing.pytestArgs": [
     "tests",
     "-v",

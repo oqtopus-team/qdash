@@ -2,38 +2,37 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   lint-and-format:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v4
-      with:
-        version: "latest"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
 
-    - name: Install Go Task
-      uses: arduino/setup-task@v2
-      with:
-        version: 3.x
+      - name: Install Go Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
 
-    - name: Set up Python
-      run: uv python install 3.10
+      - name: Set up Python
+        run: uv python install 3.10
 
-    - name: Install dependencies
-      run: uv sync --all-groups
+      - name: Install dependencies
+        run: uv sync --all-groups
 
-    - name: Run linting
-      run: task lint
-
-    - name: Run mypy
-      run: task lint-mypy
+      - name: Run linting and format check
+        run: |
+          task lint
+          task lint-mypy
 
   test:
     runs-on: ubuntu-latest
@@ -54,60 +53,63 @@ jobs:
           --health-retries 5
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v4
-      with:
-        version: "latest"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
 
-    - name: Install Go Task
-      uses: arduino/setup-task@v2
-      with:
-        version: 3.x
+      - name: Install Go Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
 
-    - name: Set up Python ${{ matrix.python-version }}
-      run: uv python install ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
 
-    - name: Install dependencies
-      run: uv sync --all-groups
+      - name: Install dependencies
+        run: uv sync --all-groups
 
-    - name: Run tests using Task
-      run: task test
+      - name: Run tests using Task
+        run: task test
 
-    - name: Generate coverage report
-      if: matrix.python-version == '3.10'
-      run: |
-        uv run pytest tests/ --cov=src/qdash --cov-report=xml --cov-report=term
+      - name: Generate coverage report
+        if: matrix.python-version == '3.10'
+        run: task test-coverage
 
-    - name: Upload coverage to Codecov
-      if: matrix.python-version == '3.10'
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: false
-        token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.10'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   frontend-test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./ui
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Bun
-      uses: oven-sh/setup-bun@v1
-      with:
-        bun-version: latest
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
 
-    - name: Install dependencies
-      run: bun install
+      - name: Install Go Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
 
-    - name: Run linting
-      run: bun run lint
+      - name: Install dependencies
+        working-directory: ./ui
+        run: bun install
 
-    - name: Run build
-      run: bun run build
+      - name: Run UI formatting and linting
+        run: task fmt-ui
+
+      - name: Build UI
+        working-directory: ./ui
+        run: bun run build

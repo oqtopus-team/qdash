@@ -1,12 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": [
-    "src/app/**/*.{ts,tsx}",
-    "src/pages/**/*.{ts,tsx}"
-  ],
-  "project": [
-    "src/**/*.{ts,tsx,js,jsx}"
-  ],
+  "entry": ["src/app/**/*.{ts,tsx}", "src/pages/**/*.{ts,tsx}"],
+  "project": ["src/**/*.{ts,tsx,js,jsx}"],
   "ignore": [
     "**/*.d.ts",
     "**/node_modules/**",
@@ -15,12 +10,7 @@
     "**/dist/**",
     "src/client/**/*.ts"
   ],
-  "ignoreDependencies": [
-    "sharp",
-    "daisyui",
-    "tailwindcss",
-    "autoprefixer"
-  ],
+  "ignoreDependencies": ["sharp", "daisyui", "tailwindcss", "autoprefixer"],
   "next": {
     "entry": [
       "next.config.js",

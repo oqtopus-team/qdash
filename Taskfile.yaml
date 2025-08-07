@@ -65,8 +65,12 @@ tasks:
     cmds:
       - uv run ruff format .
       - npx prettier . --write
-      - npx eslint . --fix
     desc: Format common code
+
+  fmt-python:
+    cmds:
+      - uv run ruff format .
+    desc: Format Python code only
 
   lint:
     cmds:

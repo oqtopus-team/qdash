@@ -41,6 +41,7 @@ qdash/
 ## Key Components
 
 ### API Routers (src/qdash/api/routers/)
+
 - `calibration.py` - Calibration workflow management
 - `menu.py` - Menu and experiment configuration
 - `settings.py` - Application settings
@@ -51,6 +52,7 @@ qdash/
 - `backend.py` - Backend operations
 
 ### Docker Services
+
 - `mongo` - MongoDB database (port 27017)
 - `postgres` - PostgreSQL database (port 5432)
 - `prefect-server` - Prefect UI (port 4200)
@@ -60,5 +62,6 @@ qdash/
 - `slack-agent` - Slack AI assistant
 
 ### Database Collections
+
 - **MongoDB**: Calibration data, execution logs, device configurations, user settings
 - **PostgreSQL**: Prefect workflow metadata, execution state tracking

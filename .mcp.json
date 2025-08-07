@@ -2,9 +2,7 @@
   "mcpServers": {
     "o3": {
       "command": "npx",
-      "args": [
-        "o3-search-mcp"
-      ],
+      "args": ["o3-search-mcp"],
       "env": {
         "OPENAI_API_KEY": "${OPENAI_API_KEY}",
         "SEARCH_CONTEXT_SIZE": "medium",

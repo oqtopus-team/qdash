@@ -129,7 +129,7 @@ class Agent:
 
         web_search_keywords = [
             "search",
-            "find", 
+            "find",
             "news",
             "today",
             "検索",
@@ -138,11 +138,15 @@ class Agent:
         might_need_web_search = any(
             keyword.lower() in user_input.lower() for keyword in web_search_keywords
         )
-        
+
         # Remove "latest", "recent", "最新" from web search keywords since they are common in calibration queries
-        
+
         # NEVER use web search for calibration-related queries
-        if might_need_web_search and not is_calibration_query and self.model in ["gpt-4.1", "gpt-4.1-mini", "o4-mini"]:
+        if (
+            might_need_web_search
+            and not is_calibration_query
+            and self.model in ["gpt-4.1", "gpt-4.1-mini", "o4-mini"]
+        ):
             # Use Responses API with built-in web search for supported models
             try:
                 logger.info(f"🌐 Using OpenAI built-in web search for model: {self.model}")
