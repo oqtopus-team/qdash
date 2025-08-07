@@ -12,7 +12,7 @@ services:
       - /workspace/qdash/.venv
       - /workspace/qdash/ui/node_modules
     environment:
-      - PYTHONPATH=/workspace:/workspace/src:/workspace/src/qdash/workflow:/workspace/src/qdash/dbmodel:/workspace/src/qdash/datamodel:/workspace/src/qdash/api:/workspace/src/qdash/slack_agent
+      - PYTHONPATH=/workspace/qdash/src
     network_mode: host
 
     develop:

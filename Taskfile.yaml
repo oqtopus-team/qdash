@@ -24,6 +24,26 @@ tasks:
     cmds:
       - npm run docs:dev
 
+  test:
+    cmds:
+      - uv run pytest tests/
+    desc: Run all tests with pytest
+
+  test-dbmodel:
+    cmds:
+      - uv run pytest tests/qdash/dbmodel/
+    desc: Run database model tests
+
+  test-coverage:
+    cmds:
+      - uv run pytest tests/ --cov=src/qdash --cov-report=term --cov-report=html
+    desc: Run tests with coverage report
+
+  test-mypy:
+    cmds:
+      - uv run mypy tests/
+    desc: Run mypy type checking on tests
+
   build:
     dir: ui
     cmds:
@@ -43,10 +63,21 @@ tasks:
 
   fmt:
     cmds:
-      - ruff format .
+      - uv run ruff format .
       - npx prettier . --write
       - npx eslint . --fix
     desc: Format common code
+
+  lint:
+    cmds:
+      - uv run ruff check .
+      - uv run ruff format --check .
+    desc: Run linting checks
+
+  lint-mypy:
+    cmds:
+      - uv run mypy src/
+    desc: Run mypy type checking on source code
 
   tbls-docs:
     cmds:

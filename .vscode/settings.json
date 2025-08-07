@@ -23,5 +23,24 @@
   },
   "[markdown]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "python.defaultInterpreterPath": "/workspace/qdash/.venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  "python.analysis.extraPaths": [
+    "/workspace/qdash/src"
+  ],
+  "python.autoComplete.extraPaths": [
+    "/workspace/qdash/src"
+  ],
+  "python.testing.pytestArgs": [
+    "tests",
+    "-v",
+    "--pythonpath=/workspace/qdash/src"
+  ],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true,
+  "python.envFile": "${workspaceFolder}/.env",
+  "terminal.integrated.env.linux": {
+    "PYTHONPATH": "/workspace/qdash/src"
   }
 }
