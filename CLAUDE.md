@@ -13,6 +13,7 @@ QDash is a comprehensive web platform for managing and monitoring qubit calibrat
 QDash follows a microservices architecture with three major components:
 
 ### 1. Frontend (UI)
+
 - **Location**: `/ui/`
 - **Technology**: React, Next.js 14, TypeScript
 - **Styling**: Tailwind CSS, DaisyUI
@@ -21,6 +22,7 @@ QDash follows a microservices architecture with three major components:
 - **Code Generation**: OpenAPI TypeScript (orval)
 
 ### 2. Backend (API)
+
 - **Location**: `/src/qdash/api/`
 - **Technology**: FastAPI, Python 3.10-3.12
 - **Database**: MongoDB (via Bunnet ODM), PostgreSQL
@@ -28,12 +30,14 @@ QDash follows a microservices architecture with three major components:
 - **API Documentation**: Auto-generated OpenAPI/Swagger
 
 ### 3. Workflow Engine
+
 - **Location**: `/src/qdash/workflow/`
 - **Technology**: Prefect 2.20
 - **Purpose**: Manages qubit calibration workflows
 - **Integration**: Uses qubex library for quantum experiments
 
 ### 4. Slack Agent (New Feature)
+
 - **Location**: `/src/qdash/slack_agent/`
 - **Technology**: Slack Bolt, OpenAI API
 - **Purpose**: AI-powered Slack assistant for QDash operations
@@ -69,6 +73,7 @@ qdash/
 ## Key Technologies
 
 ### Frontend Stack
+
 - **Framework**: Next.js 14.2.24
 - **Language**: TypeScript 5.6.3
 - **Package Manager**: Bun
@@ -77,6 +82,7 @@ qdash/
 - **Data Visualization**: Plotly.js, React Flow, Nivo
 
 ### Backend Stack
+
 - **Framework**: FastAPI 0.111.1
 - **Language**: Python 3.10-3.12
 - **ORM/ODM**: Bunnet (MongoDB), SQLAlchemy (PostgreSQL)
@@ -84,6 +90,7 @@ qdash/
 - **Quantum Library**: qubex v1.4.1b1
 
 ### Infrastructure
+
 - **Containerization**: Docker & Docker Compose
 - **Databases**: MongoDB, PostgreSQL 14
 - **Task Runner**: go-task v3.41.0
@@ -92,6 +99,7 @@ qdash/
 ## Development Commands
 
 ### Frontend Commands (in `/ui/` directory)
+
 ```bash
 # Development server
 bun run dev
@@ -113,6 +121,7 @@ bun run generate-qdash
 ```
 
 ### Backend Commands
+
 ```bash
 # Run API server (from project root)
 uvicorn src.qdash.api.main:app --reload
@@ -131,6 +140,7 @@ mypy src/
 ```
 
 ### Task Commands (using go-task)
+
 ```bash
 # Show all available tasks
 task
@@ -152,6 +162,7 @@ task export-all
 ## API Endpoints
 
 The API is organized into the following router modules:
+
 - `/api/calibration` - Calibration workflow management
 - `/api/menu` - Menu and experiment configuration
 - `/api/settings` - Application settings
@@ -168,12 +179,14 @@ The API is organized into the following router modules:
 ## Database Schema
 
 ### MongoDB Collections
+
 - Calibration data
 - Execution logs
 - Device configurations
 - User settings
 
 ### PostgreSQL Tables
+
 - Prefect workflow metadata
 - Execution state tracking
 - User authentication
@@ -205,6 +218,7 @@ pytest tests/qdash/api/test_main.py
 ## Environment Variables
 
 Key environment variables (see `.env.example`):
+
 - `API_PORT` - API server port (default: 5715)
 - `MONGO_PORT` - MongoDB port (default: 27017)
 - `POSTGRES_PORT` - PostgreSQL port (default: 5432)

@@ -4,8 +4,8 @@ import { useCallback, useState, useEffect } from "react";
 // Default values for URL parameters - used to determine when to remove params from URL
 const URL_DEFAULTS = {
   DATE: "latest",
-  TASK: "CheckRabi", 
-  VIEW: "1q"
+  TASK: "CheckRabi",
+  VIEW: "1q",
 } as const;
 
 interface UseChipUrlStateResult {
@@ -20,29 +20,32 @@ interface UseChipUrlStateResult {
   isInitialized: boolean; // Track if URL state has been initialized
 }
 
+interface UseExecutionUrlStateResult {
+  selectedChip: string | null;
+  setSelectedChip: (chip: string | null) => void;
+  isInitialized: boolean;
+}
+
 export function useChipUrlState(): UseChipUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
-  
+
   // URL state management - don't use withDefault to preserve URL params
   const [selectedChip, setSelectedChipState] = useQueryState(
     "chip",
-    parseAsString
+    parseAsString,
   );
-  
+
   const [selectedDate, setSelectedDateState] = useQueryState(
-    "date", 
-    parseAsString
+    "date",
+    parseAsString,
   );
-  
+
   const [selectedTask, setSelectedTaskState] = useQueryState(
     "task",
-    parseAsString
+    parseAsString,
   );
-  
-  const [viewMode, setViewModeState] = useQueryState(
-    "view",
-    parseAsString
-  );
+
+  const [viewMode, setViewModeState] = useQueryState("view", parseAsString);
 
   // Mark as initialized after first render
   useEffect(() => {
@@ -54,39 +57,68 @@ export function useChipUrlState(): UseChipUrlStateResult {
     (chip: string) => {
       setSelectedChipState(chip || null); // null removes the parameter from URL
     },
-    [setSelectedChipState]
+    [setSelectedChipState],
   );
 
   const setSelectedDate = useCallback(
     (date: string) => {
       setSelectedDateState(date === URL_DEFAULTS.DATE ? null : date); // Remove default from URL
     },
-    [setSelectedDateState]
+    [setSelectedDateState],
   );
 
   const setSelectedTask = useCallback(
     (task: string) => {
       setSelectedTaskState(task === URL_DEFAULTS.TASK ? null : task); // Remove default from URL
     },
-    [setSelectedTaskState]
+    [setSelectedTaskState],
   );
-  
+
   const setViewMode = useCallback(
     (mode: string) => {
       setViewModeState(mode === URL_DEFAULTS.VIEW ? null : mode); // Remove default from URL
     },
-    [setViewModeState]
+    [setViewModeState],
   );
 
   return {
     selectedChip: selectedChip ?? "",
-    selectedDate: selectedDate ?? URL_DEFAULTS.DATE, 
+    selectedDate: selectedDate ?? URL_DEFAULTS.DATE,
     selectedTask: selectedTask ?? URL_DEFAULTS.TASK,
     viewMode: viewMode ?? URL_DEFAULTS.VIEW,
     setSelectedChip,
     setSelectedDate,
     setSelectedTask,
     setViewMode,
+    isInitialized,
+  };
+}
+
+export function useExecutionUrlState(): UseExecutionUrlStateResult {
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // URL state management for execution page
+  const [selectedChip, setSelectedChipState] = useQueryState(
+    "chip",
+    parseAsString,
+  );
+
+  // Mark as initialized after first render
+  useEffect(() => {
+    setIsInitialized(true);
+  }, []);
+
+  // Wrapped setter to handle URL updates - now accepts null explicitly
+  const setSelectedChip = useCallback(
+    (chip: string | null) => {
+      setSelectedChipState(chip || null); // null removes the parameter from URL
+    },
+    [setSelectedChipState],
+  );
+
+  return {
+    selectedChip, // Return null as-is instead of converting to empty string
+    setSelectedChip,
     isInitialized,
   };
 }

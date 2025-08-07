@@ -76,7 +76,7 @@ export function CouplingGrid({
     useState<SelectedTaskInfo | null>(null);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [cellSize, setCellSize] = useState(60);
-  
+
   // Track previous date to distinguish modal navigation from external navigation
   const [previousDate, setPreviousDate] = useState(selectedDate);
 
@@ -107,8 +107,6 @@ export function CouplingGrid({
       originalNavigateToNextDay();
     }
   }, [originalNavigateToNextDay, selectedTaskInfo]);
-
-
 
   useEffect(() => {
     const updateSize = () => {
@@ -157,11 +155,13 @@ export function CouplingGrid({
   // Update modal data with debounce to prevent race conditions
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
-    
+
     if (selectedTaskInfo && taskResponse?.data?.result) {
       timeoutId = setTimeout(() => {
         const normalizedResultMap: Record<string, ExtendedTask[]> = {};
-        for (const [couplingId, task] of Object.entries(taskResponse.data.result)) {
+        for (const [couplingId, task] of Object.entries(
+          taskResponse.data.result,
+        )) {
           const [a, b] = couplingId.split("-").map(Number);
           const normKey = a < b ? `${a}-${b}` : `${b}-${a}`;
           if (!normalizedResultMap[normKey]) normalizedResultMap[normKey] = [];
@@ -173,8 +173,9 @@ export function CouplingGrid({
             (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0),
           );
         }
-        
-        const updatedTaskList = normalizedResultMap[selectedTaskInfo.couplingId];
+
+        const updatedTaskList =
+          normalizedResultMap[selectedTaskInfo.couplingId];
         if (updatedTaskList) {
           setSelectedTaskInfo((prev) => {
             // Only update if the modal is still open and for the same couplingId
@@ -216,7 +217,8 @@ export function CouplingGrid({
         <span className="loading loading-spinner loading-lg"></span>
       </div>
     );
-  if (isError) return <div className="alert alert-error">Failed to load data</div>;
+  if (isError)
+    return <div className="alert alert-error">Failed to load data</div>;
 
   return (
     <div className="space-y-6 px-4">

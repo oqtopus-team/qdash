@@ -15,7 +15,7 @@ interface UseDateNavigationResult {
 export function useDateNavigation(
   chipId: string,
   selectedDate: string,
-  onDateChange?: (date: string) => void
+  onDateChange?: (date: string) => void,
 ): UseDateNavigationResult {
   // Fetch available dates for navigation
   const {
@@ -35,7 +35,7 @@ export function useDateNavigation(
     if (datesResponse?.data?.data && Array.isArray(datesResponse.data.data)) {
       // Sort dates in descending order (newest first)
       const sortedDates = [...datesResponse.data.data].sort((a, b) =>
-        b.localeCompare(a)
+        b.localeCompare(a),
       );
       dates.push(...sortedDates);
     }
@@ -47,14 +47,14 @@ export function useDateNavigation(
     if (dateStr === "latest") return "Latest";
     return `${dateStr.slice(0, 4)}/${dateStr.slice(4, 6)}/${dateStr.slice(
       6,
-      8
+      8,
     )}`;
   }, []);
 
   // Optimize indexOf performance by caching the current index
   const currentIndex = useMemo(
     () => availableDates.indexOf(selectedDate),
-    [availableDates, selectedDate]
+    [availableDates, selectedDate],
   );
 
   // Navigation functions using cached index

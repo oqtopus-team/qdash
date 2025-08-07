@@ -5,6 +5,7 @@ When completing development tasks in QDash, follow this checklist to ensure code
 ## 1. Code Formatting and Linting
 
 ### Python Code
+
 ```bash
 # Format Python code
 ruff format .
@@ -17,6 +18,7 @@ mypy src/
 ```
 
 ### TypeScript/Frontend Code
+
 ```bash
 cd ui
 # Format and lint UI code
@@ -26,12 +28,14 @@ task fmt-ui
 ```
 
 ### All Code (Recommended)
+
 ```bash
 # Format both Python and TypeScript
 task fmt
 ```
 
 ## 2. Testing
+
 ```bash
 # Run all tests
 pytest
@@ -44,7 +48,9 @@ pytest tests/qdash/api/test_main.py
 ```
 
 ## 3. API Client Generation
+
 If backend API changes were made:
+
 ```bash
 # Regenerate frontend API client
 task generate
@@ -53,6 +59,7 @@ cd ui && bun run generate-qdash
 ```
 
 ## 4. Build Verification
+
 ```bash
 # Build frontend to check for errors
 cd ui && bun run build
@@ -63,7 +70,9 @@ task build-workflow # If workflow changed
 ```
 
 ## 5. Documentation Updates
+
 If applicable:
+
 ```bash
 # Update database schema docs
 task tbls-docs
@@ -73,13 +82,16 @@ task build-docs
 ```
 
 ## 6. Export Requirements
+
 If dependencies changed:
+
 ```bash
 # Export all requirements files
 task export-all
 ```
 
 ## 7. Git Workflow
+
 ```bash
 # Check status
 git status
@@ -96,8 +108,9 @@ git push origin feat/feature-name
 ```
 
 ## Pre-commit Checklist Summary
+
 1. ✅ Code formatted (ruff format)
-2. ✅ Linting passed (ruff check)  
+2. ✅ Linting passed (ruff check)
 3. ✅ Type checking passed (mypy)
 4. ✅ Tests passing (pytest)
 5. ✅ Frontend builds successfully
@@ -106,7 +119,9 @@ git push origin feat/feature-name
 8. ✅ Commit follows conventional format
 
 ## Development Server Testing
+
 Before committing, verify functionality:
+
 ```bash
 # Start backend
 uvicorn src.qdash.api.main:app --reload
@@ -119,6 +134,7 @@ docker compose up
 ```
 
 ## Branch Strategy
+
 - Main branch: `develop`
 - Feature branches: `feat/feature-name`
 - Bug fixes: `fix/bug-description`

@@ -1,6 +1,7 @@
 # Suggested Commands for QDash Development
 
 ## Task Runner Commands (Preferred)
+
 Use `task` command to run predefined tasks from Taskfile.yaml:
 
 ```bash
@@ -35,11 +36,12 @@ task tbls-docs      # Generate DB schema docs
 ## Python Development Commands
 
 ### Code Quality
+
 ```bash
 # Format Python code
 ruff format .
 
-# Lint Python code  
+# Lint Python code
 ruff check .
 
 # Fix auto-fixable issues
@@ -56,6 +58,7 @@ pytest --cov=src/qdash
 ```
 
 ### Development Server
+
 ```bash
 # Run API server (from project root)
 uvicorn src.qdash.api.main:app --reload
@@ -67,12 +70,14 @@ uvicorn src.qdash.api.main:app --reload --port 5715
 ## Frontend (UI) Development Commands
 
 ### Package Management
+
 ```bash
 cd ui
 bun install          # Install dependencies
 ```
 
 ### Development
+
 ```bash
 cd ui
 bun run dev          # Development server
@@ -83,6 +88,7 @@ bun run fmt          # Format with ESLint --fix
 ```
 
 ### API Client Generation
+
 ```bash
 cd ui
 bun run generate-qdash   # Generate API client from OpenAPI spec
@@ -91,6 +97,7 @@ bun run generate-qdash   # Generate API client from OpenAPI spec
 ## Docker Commands
 
 ### Full Stack Development
+
 ```bash
 # Start all services
 docker compose up
@@ -109,6 +116,7 @@ docker compose logs -f [service_name]
 ```
 
 ### Development Mode
+
 ```bash
 # Start development services
 docker compose -f compose.dev.yaml up
@@ -117,13 +125,15 @@ docker compose -f compose.dev.yaml up
 ## Utility Commands
 
 ### System Commands (Linux)
+
 - `ls` - List files
-- `cd` - Change directory  
+- `cd` - Change directory
 - `grep` - Search text patterns
 - `find` - Find files
 - `git` - Version control
 
 ### Project Specific
+
 ```bash
 # Show git status
 git status
@@ -136,6 +146,7 @@ git log --oneline
 ```
 
 ## Environment Setup
+
 ```bash
 # Copy environment template
 cp .env.example .env
@@ -145,6 +156,7 @@ nano .env
 ```
 
 ## Testing
+
 ```bash
 # Run specific test file
 pytest tests/qdash/api/test_main.py
