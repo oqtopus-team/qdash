@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useFetchChipDates } from "@/client/chip/chip";
 import Select, { SingleValue } from "react-select";
 
@@ -14,7 +14,6 @@ interface DateSelectorProps {
   selectedDate: string;
   onDateSelect: (date: string) => void;
   disabled?: boolean;
-  isUrlInitialized?: boolean;
 }
 
 /**
@@ -25,7 +24,6 @@ export function DateSelector({
   selectedDate,
   onDateSelect,
   disabled = false,
-  isUrlInitialized = true,
 }: DateSelectorProps) {
   const {
     data: datesResponse,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useListMuxes, useFetchChip, useListChips } from "@/client/chip/chip";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
@@ -324,7 +324,6 @@ function ChipPageContent() {
             <ChipSelector
               selectedChip={selectedChip}
               onChipSelect={setSelectedChip}
-              isUrlInitialized={isInitialized}
             />
 
             <DateSelector
@@ -332,7 +331,6 @@ function ChipPageContent() {
               selectedDate={selectedDate}
               onDateSelect={setSelectedDate}
               disabled={!selectedChip}
-              isUrlInitialized={isInitialized}
             />
 
             <TaskSelector
