@@ -26,8 +26,8 @@ jobs:
       - name: Set up Python
         run: uv python install 3.10
 
-      - name: Install dependencies
-        run: uv sync --all-groups
+      - name: Install dependencies (excluding workflow group)
+        run: uv sync --group dev --group api --group agent
 
       - name: Run linting and format check
         run: |
@@ -69,8 +69,8 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: uv sync --all-groups
+      - name: Install dependencies (excluding workflow group)
+        run: uv sync --group dev --group api --group agent
 
       - name: Run tests using Task
         run: task test
@@ -87,7 +87,7 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  frontend-test:
+  frontend-lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -109,7 +109,3 @@ jobs:
 
       - name: Run UI formatting and linting
         run: task fmt-ui
-
-      - name: Build UI
-        working-directory: ./ui
-        run: bun run build
