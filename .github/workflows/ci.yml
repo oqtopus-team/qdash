@@ -47,10 +47,10 @@ jobs:
         ports:
           - 27017:27017
         options: >-
-          --health-cmd "mongo --eval 'db.adminCommand(\\"ping\\")'\"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-cmd "sh -c 'mongosh --quiet --eval \"db.runCommand({ping:1}).ok || quit(1)\"'"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 8
 
     steps:
       - name: Checkout code
