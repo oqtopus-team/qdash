@@ -1,6 +1,13 @@
 import { useQueryState, parseAsString } from "nuqs";
 import { useCallback, useState, useEffect } from "react";
 
+// Default values for URL parameters - used to determine when to remove params from URL
+const URL_DEFAULTS = {
+  DATE: "latest",
+  TASK: "CheckRabi", 
+  VIEW: "1q"
+} as const;
+
 interface UseChipUrlStateResult {
   selectedChip: string;
   selectedDate: string;
@@ -52,30 +59,30 @@ export function useChipUrlState(): UseChipUrlStateResult {
 
   const setSelectedDate = useCallback(
     (date: string) => {
-      setSelectedDateState(date === "latest" ? null : date); // Remove "latest" from URL as it's default
+      setSelectedDateState(date === URL_DEFAULTS.DATE ? null : date); // Remove default from URL
     },
     [setSelectedDateState]
   );
 
   const setSelectedTask = useCallback(
     (task: string) => {
-      setSelectedTaskState(task === "CheckRabi" ? null : task); // Remove default from URL
+      setSelectedTaskState(task === URL_DEFAULTS.TASK ? null : task); // Remove default from URL
     },
     [setSelectedTaskState]
   );
   
   const setViewMode = useCallback(
     (mode: string) => {
-      setViewModeState(mode === "1q" ? null : mode); // Remove default "1q" from URL
+      setViewModeState(mode === URL_DEFAULTS.VIEW ? null : mode); // Remove default from URL
     },
     [setViewModeState]
   );
 
   return {
     selectedChip: selectedChip ?? "",
-    selectedDate: selectedDate ?? "latest", 
-    selectedTask: selectedTask ?? "CheckRabi",
-    viewMode: viewMode ?? "1q",
+    selectedDate: selectedDate ?? URL_DEFAULTS.DATE, 
+    selectedTask: selectedTask ?? URL_DEFAULTS.TASK,
+    viewMode: viewMode ?? URL_DEFAULTS.VIEW,
     setSelectedChip,
     setSelectedDate,
     setSelectedTask,

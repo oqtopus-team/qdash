@@ -79,24 +79,9 @@ function ChipPageContent() {
     formatDate,
   } = useDateNavigation(selectedChip, selectedDate, setSelectedDate);
 
-  // Wrap navigation functions to track modal navigation
-  const navigateToPreviousDay = useCallback(() => {
-    if (selectedTaskInfo) {
-      // Modal navigation - don't close modal
-      originalNavigateToPreviousDay();
-    } else {
-      originalNavigateToPreviousDay();
-    }
-  }, [originalNavigateToPreviousDay, selectedTaskInfo]);
-
-  const navigateToNextDay = useCallback(() => {
-    if (selectedTaskInfo) {
-      // Modal navigation - don't close modal
-      originalNavigateToNextDay();
-    } else {
-      originalNavigateToNextDay();
-    }
-  }, [originalNavigateToNextDay, selectedTaskInfo]);
+  // Navigation functions - modal state is tracked elsewhere, these just navigate
+  const navigateToPreviousDay = originalNavigateToPreviousDay;
+  const navigateToNextDay = originalNavigateToNextDay;
 
 
 

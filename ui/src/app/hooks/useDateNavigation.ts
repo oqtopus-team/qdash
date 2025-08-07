@@ -51,29 +51,25 @@ export function useDateNavigation(
     )}`;
   }, []);
 
-  // Navigation functions
+  // Optimize indexOf performance by caching the current index
+  const currentIndex = useMemo(
+    () => availableDates.indexOf(selectedDate),
+    [availableDates, selectedDate]
+  );
+
+  // Navigation functions using cached index
   const navigateToPreviousDay = useCallback(() => {
-    if (!onDateChange) return;
-
-    const currentIndex = availableDates.indexOf(selectedDate);
-    if (currentIndex > 0) {
-
-      onDateChange(availableDates[currentIndex - 1]);
-    }
-  }, [availableDates, selectedDate, onDateChange]);
+    if (!onDateChange || currentIndex <= 0) return;
+    onDateChange(availableDates[currentIndex - 1]);
+  }, [availableDates, currentIndex, onDateChange]);
 
   const navigateToNextDay = useCallback(() => {
-    if (!onDateChange) return;
+    if (!onDateChange || currentIndex >= availableDates.length - 1) return;
+    onDateChange(availableDates[currentIndex + 1]);
+  }, [availableDates, currentIndex, onDateChange]);
 
-    const currentIndex = availableDates.indexOf(selectedDate);
-    if (currentIndex < availableDates.length - 1) {
-      onDateChange(availableDates[currentIndex + 1]);
-    }
-  }, [availableDates, selectedDate, onDateChange]);
-
-  const canNavigatePrevious = availableDates.indexOf(selectedDate) > 0;
-  const canNavigateNext =
-    availableDates.indexOf(selectedDate) < availableDates.length - 1;
+  const canNavigatePrevious = currentIndex > 0;
+  const canNavigateNext = currentIndex < availableDates.length - 1;
 
   return {
     availableDates,
