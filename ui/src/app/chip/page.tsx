@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
-import { useListMuxes, useFetchChip } from "@/client/chip/chip";
+import { useListMuxes, useFetchChip, useListChips } from "@/client/chip/chip";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
+import { useChipUrlState } from "@/app/hooks/useUrlState";
 import { useFetchAllTasks } from "@/client/task/task";
 import { BsGrid, BsListUl } from "react-icons/bs";
 import { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
@@ -21,12 +22,35 @@ interface SelectedTaskInfo {
   task: Task;
 }
 
-export default function ChipPage() {
-  const [selectedChip, setSelectedChip] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState<string>("latest");
+function ChipPageContent() {
+  // URL state management
+  const {
+    selectedChip,
+    selectedDate,
+    selectedTask,
+    setSelectedChip,
+    setSelectedDate,
+    setSelectedTask,
+    isInitialized,
+  } = useChipUrlState();
+
   const [gridSize, setGridSize] = useState<number>(8);
 
   const { data: chipData } = useFetchChip(selectedChip);
+  const { data: chipsData } = useListChips();
+
+  // Set default chip only when URL is initialized and no chip is selected from URL
+  useEffect(() => {
+    if (isInitialized && !selectedChip && chipsData?.data && chipsData.data.length > 0) {
+      // Sort chips by installation date and select the most recent one
+      const sortedChips = [...chipsData.data].sort((a, b) => {
+        const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
+        const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
+        return dateB - dateA;
+      });
+      setSelectedChip(sortedChips[0].chip_id);
+    }
+  }, [isInitialized, selectedChip, chipsData, setSelectedChip]);
 
   useEffect(() => {
     if (chipData?.data?.size) {
@@ -39,7 +63,7 @@ export default function ChipPage() {
   }>({});
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
-  const [selectedTask, setSelectedTask] = useState<string>("CheckRabi");
+
   
   // Track previous date to distinguish modal navigation from external navigation
   const [previousDate, setPreviousDate] = useState(selectedDate);
@@ -76,24 +100,45 @@ export default function ChipPage() {
 
 
 
-  // Update selected task when view mode changes
+  // Update selected task when view mode changes only if no task is selected from URL
   useEffect(() => {
+    if (!isInitialized) return; // Wait for URL state to be initialized
+    
+    // Only set defaults if no task is selected or if the current task doesn't match the view mode
     if (viewMode === "2q" && tasks?.data?.tasks) {
       const availableTasks = tasks.data.tasks.filter(
         (task: TaskResponse) => task.task_type === "coupling",
       );
-      const checkBellState = availableTasks.find(
-        (task: TaskResponse) => task.name === "CheckBellState",
+      // Check if current task is valid for 2q view
+      const currentTaskValid = availableTasks.some(
+        (task: TaskResponse) => task.name === selectedTask
       );
-      if (checkBellState) {
-        setSelectedTask("CheckBellState");
-      } else if (availableTasks.length > 0) {
-        setSelectedTask(availableTasks[0].name);
+      
+      if (!currentTaskValid) {
+        const checkBellState = availableTasks.find(
+          (task: TaskResponse) => task.name === "CheckBellState",
+        );
+        if (checkBellState) {
+          setSelectedTask("CheckBellState");
+        } else if (availableTasks.length > 0) {
+          setSelectedTask(availableTasks[0].name);
+        }
       }
-    } else if (viewMode === "1q") {
-      setSelectedTask("CheckRabi");
+    } else if (viewMode === "1q" && tasks?.data?.tasks) {
+      const availableTasks = tasks.data.tasks.filter(
+        (task: TaskResponse) => task.task_type === "qubit",
+      );
+      // Check if current task is valid for 1q view
+      const currentTaskValid = availableTasks.some(
+        (task: TaskResponse) => task.name === selectedTask
+      );
+      
+      if (!currentTaskValid && !selectedTask) {
+        // Only set default if no task is selected
+        setSelectedTask("CheckRabi");
+      }
     }
-  }, [viewMode, tasks?.data?.tasks]);
+  }, [viewMode, tasks?.data?.tasks, isInitialized, selectedTask, setSelectedTask]);
   const {
     data: muxData,
     isLoading: isLoadingMux,
@@ -294,6 +339,7 @@ export default function ChipPage() {
             <ChipSelector
               selectedChip={selectedChip}
               onChipSelect={setSelectedChip}
+              isUrlInitialized={isInitialized}
             />
 
             <DateSelector
@@ -301,6 +347,7 @@ export default function ChipPage() {
               selectedDate={selectedDate}
               onDateSelect={setSelectedDate}
               disabled={!selectedChip}
+              isUrlInitialized={isInitialized}
             />
 
             <TaskSelector
@@ -600,5 +647,15 @@ export default function ChipPage() {
         </dialog>
       )}
     </div>
+  );
+}
+
+export default function ChipPage() {
+  return (
+    <Suspense fallback={<div className="w-full flex justify-center py-12">
+      <span className="loading loading-spinner loading-lg"></span>
+    </div>}>
+      <ChipPageContent />
+    </Suspense>
   );
 }
