@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { Task } from "@/schemas";
 import dynamic from "next/dynamic";
@@ -8,8 +8,8 @@ import { TaskFigure } from "@/app/components/TaskFigure";
 import {
   useFetchLatestCouplingTaskGroupedByChip,
   useFetchHistoricalCouplingTaskGroupedByChip,
-  useFetchChipDates,
 } from "@/client/chip/chip";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 
 const PlotlyRenderer = dynamic(
   () => import("@/app/components/PlotlyRenderer").then((mod) => mod.default),
@@ -76,45 +76,37 @@ export function CouplingGrid({
     useState<SelectedTaskInfo | null>(null);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [cellSize, setCellSize] = useState(60);
+  
+  // Track previous date to distinguish modal navigation from external navigation
+  const [previousDate, setPreviousDate] = useState(selectedDate);
 
-  // Fetch available dates for navigation
-  const { data: datesResponse } = useFetchChipDates(chipId, {
-    query: {
-      enabled: !!chipId,
-      staleTime: 300000, // 5 minutes - dates don't change frequently
-    },
-  });
+  // Use custom hook for date navigation
+  const {
+    navigateToPreviousDay: originalNavigateToPreviousDay,
+    navigateToNextDay: originalNavigateToNextDay,
+    canNavigatePrevious,
+    canNavigateNext,
+    formatDate,
+  } = useDateNavigation(chipId, selectedDate, onDateChange);
 
-  // Get available dates for navigation
-  const availableDates = React.useMemo(() => {
-    const dates = ["latest"];
-    if (datesResponse?.data?.data && Array.isArray(datesResponse.data.data)) {
-      dates.push(...datesResponse.data.data.sort((a, b) => b.localeCompare(a)));
+  // Wrap navigation functions to track modal navigation
+  const navigateToPreviousDay = useCallback(() => {
+    if (selectedTaskInfo) {
+      // Modal navigation - don't close modal
+      originalNavigateToPreviousDay();
+    } else {
+      originalNavigateToPreviousDay();
     }
-    return dates;
-  }, [datesResponse]);
+  }, [originalNavigateToPreviousDay, selectedTaskInfo]);
 
-  // Navigation functions
-  const navigateToPreviousDay = () => {
-    if (!onDateChange) return;
-    
-    const currentIndex = availableDates.indexOf(selectedDate);
-    if (currentIndex > 0) {
-      onDateChange(availableDates[currentIndex - 1]);
+  const navigateToNextDay = useCallback(() => {
+    if (selectedTaskInfo) {
+      // Modal navigation - don't close modal
+      originalNavigateToNextDay();
+    } else {
+      originalNavigateToNextDay();
     }
-  };
-
-  const navigateToNextDay = () => {
-    if (!onDateChange) return;
-    
-    const currentIndex = availableDates.indexOf(selectedDate);
-    if (currentIndex < availableDates.length - 1) {
-      onDateChange(availableDates[currentIndex + 1]);
-    }
-  };
-
-  const canNavigatePrevious = availableDates.indexOf(selectedDate) > 0;
-  const canNavigateNext = availableDates.indexOf(selectedDate) < availableDates.length - 1;
+  }, [originalNavigateToNextDay, selectedTaskInfo]);
 
 
 
@@ -151,31 +143,56 @@ export function CouplingGrid({
         },
       );
 
-  // Update modal data when date changes or new data is fetched
-  React.useEffect(() => {
-    if (selectedTaskInfo && taskResponse?.data?.result) {
-      const normalizedResultMap: Record<string, ExtendedTask[]> = {};
-      for (const [couplingId, task] of Object.entries(taskResponse.data.result)) {
-        const [a, b] = couplingId.split("-").map(Number);
-        const normKey = a < b ? `${a}-${b}` : `${b}-${a}`;
-        if (!normalizedResultMap[normKey]) normalizedResultMap[normKey] = [];
-        normalizedResultMap[normKey].push({
-          ...task,
-          couplingId,
-        } as ExtendedTask);
-        normalizedResultMap[normKey].sort(
-          (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0),
-        );
-      }
-      
-      const updatedTaskList = normalizedResultMap[selectedTaskInfo.couplingId];
-      if (updatedTaskList) {
-        setSelectedTaskInfo((prev) =>
-          prev ? { ...prev, taskList: updatedTaskList } : null
-        );
-      }
+  // Reset modal only when date changes externally (not from modal navigation)
+  useEffect(() => {
+    if (previousDate !== selectedDate && !selectedTaskInfo) {
+      // External navigation - no modal open, safe to update
+      setPreviousDate(selectedDate);
+    } else if (previousDate !== selectedDate && selectedTaskInfo) {
+      // Date changed while modal is open - update previous date but keep modal
+      setPreviousDate(selectedDate);
     }
-  }, [selectedDate, taskResponse?.data?.result, selectedTaskInfo?.couplingId]);
+  }, [selectedDate, selectedTaskInfo, previousDate]);
+
+  // Update modal data with debounce to prevent race conditions
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (selectedTaskInfo && taskResponse?.data?.result) {
+      timeoutId = setTimeout(() => {
+        const normalizedResultMap: Record<string, ExtendedTask[]> = {};
+        for (const [couplingId, task] of Object.entries(taskResponse.data.result)) {
+          const [a, b] = couplingId.split("-").map(Number);
+          const normKey = a < b ? `${a}-${b}` : `${b}-${a}`;
+          if (!normalizedResultMap[normKey]) normalizedResultMap[normKey] = [];
+          normalizedResultMap[normKey].push({
+            ...task,
+            couplingId,
+          } as ExtendedTask);
+          normalizedResultMap[normKey].sort(
+            (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0),
+          );
+        }
+        
+        const updatedTaskList = normalizedResultMap[selectedTaskInfo.couplingId];
+        if (updatedTaskList) {
+          setSelectedTaskInfo((prev) => {
+            // Only update if the modal is still open and for the same couplingId
+            if (prev?.couplingId === selectedTaskInfo.couplingId) {
+              return { ...prev, taskList: updatedTaskList };
+            }
+            return prev;
+          });
+        }
+      }, 100); // 100ms debounce
+    }
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [taskResponse?.data?.result, selectedTaskInfo?.couplingId]);
 
   const normalizedResultMap: Record<string, ExtendedTask[]> = {};
   if (taskResponse?.data?.result) {
@@ -199,7 +216,7 @@ export function CouplingGrid({
         <span className="loading loading-spinner loading-lg"></span>
       </div>
     );
-  if (isError) return <div className="alert alert-error">Failed to load</div>;
+  if (isError) return <div className="alert alert-error">Failed to load data</div>;
 
   return (
     <div className="space-y-6 px-4">
@@ -308,10 +325,7 @@ export function CouplingGrid({
                       ←
                     </button>
                     <span className="text-sm text-base-content/70 px-2">
-                      {selectedDate === "latest" 
-                        ? "Latest" 
-                        : `${selectedDate.slice(0, 4)}/${selectedDate.slice(4, 6)}/${selectedDate.slice(6, 8)}`
-                      }
+                      {formatDate(selectedDate)}
                     </span>
                     <button
                       onClick={navigateToNextDay}

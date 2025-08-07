@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
-import { useListMuxes, useFetchChip, useFetchChipDates } from "@/client/chip/chip";
+import { useListMuxes, useFetchChip } from "@/client/chip/chip";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useFetchAllTasks } from "@/client/task/task";
 import { BsGrid, BsListUl } from "react-icons/bs";
 import { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
@@ -39,43 +40,39 @@ export default function ChipPage() {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
   const [selectedTask, setSelectedTask] = useState<string>("CheckRabi");
+  
+  // Track previous date to distinguish modal navigation from external navigation
+  const [previousDate, setPreviousDate] = useState(selectedDate);
 
   const { data: tasks } = useFetchAllTasks();
 
-  // Fetch available dates for navigation
-  const { data: datesResponse } = useFetchChipDates(selectedChip, {
-    query: {
-      enabled: !!selectedChip,
-      staleTime: 300000, // 5 minutes - dates don't change frequently
-    },
-  });
+  // Use custom hook for date navigation
+  const {
+    navigateToPreviousDay: originalNavigateToPreviousDay,
+    navigateToNextDay: originalNavigateToNextDay,
+    canNavigatePrevious,
+    canNavigateNext,
+    formatDate,
+  } = useDateNavigation(selectedChip, selectedDate, setSelectedDate);
 
-  // Get available dates for navigation
-  const availableDates = React.useMemo(() => {
-    const dates = ["latest"];
-    if (datesResponse?.data?.data && Array.isArray(datesResponse.data.data)) {
-      dates.push(...datesResponse.data.data.sort((a, b) => b.localeCompare(a)));
+  // Wrap navigation functions to track modal navigation
+  const navigateToPreviousDay = useCallback(() => {
+    if (selectedTaskInfo) {
+      // Modal navigation - don't close modal
+      originalNavigateToPreviousDay();
+    } else {
+      originalNavigateToPreviousDay();
     }
-    return dates;
-  }, [datesResponse]);
+  }, [originalNavigateToPreviousDay, selectedTaskInfo]);
 
-  // Navigation functions
-  const navigateToPreviousDay = () => {
-    const currentIndex = availableDates.indexOf(selectedDate);
-    if (currentIndex > 0) {
-      setSelectedDate(availableDates[currentIndex - 1]);
+  const navigateToNextDay = useCallback(() => {
+    if (selectedTaskInfo) {
+      // Modal navigation - don't close modal
+      originalNavigateToNextDay();
+    } else {
+      originalNavigateToNextDay();
     }
-  };
-
-  const navigateToNextDay = () => {
-    const currentIndex = availableDates.indexOf(selectedDate);
-    if (currentIndex < availableDates.length - 1) {
-      setSelectedDate(availableDates[currentIndex + 1]);
-    }
-  };
-
-  const canNavigatePrevious = availableDates.indexOf(selectedDate) > 0;
-  const canNavigateNext = availableDates.indexOf(selectedDate) < availableDates.length - 1;
+  }, [originalNavigateToNextDay, selectedTaskInfo]);
 
 
 
@@ -108,34 +105,59 @@ export default function ChipPage() {
     },
   });
 
-  // Update modal data when date changes or new data is fetched
+  // Reset modal only when date changes externally (not from modal navigation)
   React.useEffect(() => {
+    if (previousDate !== selectedDate && !selectedTaskInfo) {
+      // External navigation - no modal open, safe to update
+      setPreviousDate(selectedDate);
+    } else if (previousDate !== selectedDate && selectedTaskInfo) {
+      // Date changed while modal is open - update previous date but keep modal
+      setPreviousDate(selectedDate);
+    }
+  }, [selectedDate, selectedTaskInfo, previousDate]);
+
+  // Update modal data with debounce to prevent race conditions
+  React.useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
     if (selectedTaskInfo && muxData?.data) {
-      // Find the updated task from mux data
-      let foundTask: Task | null = null;
-      Object.values(muxData.data.muxes).forEach((muxDetail) => {
-        Object.values(muxDetail.detail).forEach((tasksByName) => {
-          Object.values(tasksByName as { [key: string]: Task }).forEach((task) => {
-            if (task.qid === selectedTaskInfo.qid && task.figure_path) {
-              foundTask = task;
-            }
+      timeoutId = setTimeout(() => {
+        // Find the updated task from mux data
+        let foundTask: Task | null = null;
+        Object.values(muxData.data.muxes).forEach((muxDetail) => {
+          Object.values(muxDetail.detail).forEach((tasksByName) => {
+            Object.values(tasksByName as { [key: string]: Task }).forEach((task) => {
+              if (task.qid === selectedTaskInfo.qid && task.figure_path) {
+                foundTask = task;
+              }
+            });
           });
         });
-      });
 
-      if (foundTask) {
-        const figurePath = Array.isArray((foundTask as Task).figure_path)
-          ? ((foundTask as Task).figure_path as string[])[0]
-          : (foundTask as Task).figure_path || null;
-        
-        if (figurePath && typeof figurePath === 'string') {
-          setSelectedTaskInfo((prev) =>
-            prev ? { ...prev, path: figurePath, task: foundTask! } : null
-          );
+        if (foundTask) {
+          const figurePath = Array.isArray((foundTask as Task).figure_path)
+            ? ((foundTask as Task).figure_path as string[])[0]
+            : (foundTask as Task).figure_path || null;
+          
+          if (figurePath && typeof figurePath === 'string') {
+            setSelectedTaskInfo((prev) => {
+              // Only update if the modal is still open and for the same qid
+              if (prev?.qid === selectedTaskInfo.qid) {
+                return { ...prev, path: figurePath, task: foundTask! };
+              }
+              return prev;
+            });
+          }
         }
-      }
+      }, 100); // 100ms debounce
     }
-  }, [selectedDate, muxData?.data, selectedTaskInfo?.qid]);
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [muxData?.data, selectedTaskInfo?.qid]);
 
   // Get all QIDs from mux detail
   const getQids = (detail: MuxDetailResponseDetail): string[] => {
@@ -493,10 +515,7 @@ export default function ChipPage() {
                   ←
                 </button>
                 <span className="text-sm text-base-content/70 px-2">
-                  {selectedDate === "latest" 
-                    ? "Latest" 
-                    : `${selectedDate.slice(0, 4)}/${selectedDate.slice(4, 6)}/${selectedDate.slice(6, 8)}`
-                  }
+                  {formatDate(selectedDate)}
                 </span>
                 <button
                   onClick={navigateToNextDay}
