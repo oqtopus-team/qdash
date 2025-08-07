@@ -189,7 +189,9 @@ def test_update_nonexistent_qubit(system_info: SystemInfoModel) -> None:
     chip.insert()
 
     # Act & Assert
-    with pytest.raises(ValueError, match=f"Qubit {nonexistent_qubit_id} not found in chip {chip_id}"):
+    with pytest.raises(
+        ValueError, match=f"Qubit {nonexistent_qubit_id} not found in chip {chip_id}"
+    ):
         chip.update_qubit(nonexistent_qubit_id, create_test_qubit(nonexistent_qubit_id))
 
 
