@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { Task } from "@/schemas";
 import dynamic from "next/dynamic";
 import { TaskFigure } from "@/app/components/TaskFigure";
@@ -8,6 +9,7 @@ import {
   useFetchLatestCouplingTaskGroupedByChip,
   useFetchHistoricalCouplingTaskGroupedByChip,
 } from "@/client/chip/chip";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 
 const PlotlyRenderer = dynamic(
   () => import("@/app/components/PlotlyRenderer").then((mod) => mod.default),
@@ -19,6 +21,7 @@ interface CouplingGridProps {
   selectedTask: string;
   selectedDate: string;
   gridSize: number;
+  onDateChange?: (date: string) => void;
 }
 
 interface ParameterValue {
@@ -67,11 +70,45 @@ export function CouplingGrid({
   selectedTask,
   selectedDate,
   gridSize,
+  onDateChange,
 }: CouplingGridProps) {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [cellSize, setCellSize] = useState(60);
+  
+  // Track previous date to distinguish modal navigation from external navigation
+  const [previousDate, setPreviousDate] = useState(selectedDate);
+
+  // Use custom hook for date navigation
+  const {
+    navigateToPreviousDay: originalNavigateToPreviousDay,
+    navigateToNextDay: originalNavigateToNextDay,
+    canNavigatePrevious,
+    canNavigateNext,
+    formatDate,
+  } = useDateNavigation(chipId, selectedDate, onDateChange);
+
+  // Wrap navigation functions to track modal navigation
+  const navigateToPreviousDay = useCallback(() => {
+    if (selectedTaskInfo) {
+      // Modal navigation - don't close modal
+      originalNavigateToPreviousDay();
+    } else {
+      originalNavigateToPreviousDay();
+    }
+  }, [originalNavigateToPreviousDay, selectedTaskInfo]);
+
+  const navigateToNextDay = useCallback(() => {
+    if (selectedTaskInfo) {
+      // Modal navigation - don't close modal
+      originalNavigateToNextDay();
+    } else {
+      originalNavigateToNextDay();
+    }
+  }, [originalNavigateToNextDay, selectedTaskInfo]);
+
+
 
   useEffect(() => {
     const updateSize = () => {
@@ -88,12 +125,74 @@ export function CouplingGrid({
     isLoading,
     isError,
   } = selectedDate === "latest"
-    ? useFetchLatestCouplingTaskGroupedByChip(chipId, selectedTask)
+    ? useFetchLatestCouplingTaskGroupedByChip(chipId, selectedTask, {
+        query: {
+          placeholderData: keepPreviousData,
+          staleTime: 30000, // 30 seconds
+        },
+      })
     : useFetchHistoricalCouplingTaskGroupedByChip(
         chipId,
         selectedTask,
         selectedDate,
+        {
+          query: {
+            placeholderData: keepPreviousData,
+            staleTime: 30000, // 30 seconds
+          },
+        },
       );
+
+  // Reset modal only when date changes externally (not from modal navigation)
+  useEffect(() => {
+    if (previousDate !== selectedDate && !selectedTaskInfo) {
+      // External navigation - no modal open, safe to update
+      setPreviousDate(selectedDate);
+    } else if (previousDate !== selectedDate && selectedTaskInfo) {
+      // Date changed while modal is open - update previous date but keep modal
+      setPreviousDate(selectedDate);
+    }
+  }, [selectedDate, selectedTaskInfo, previousDate]);
+
+  // Update modal data with debounce to prevent race conditions
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (selectedTaskInfo && taskResponse?.data?.result) {
+      timeoutId = setTimeout(() => {
+        const normalizedResultMap: Record<string, ExtendedTask[]> = {};
+        for (const [couplingId, task] of Object.entries(taskResponse.data.result)) {
+          const [a, b] = couplingId.split("-").map(Number);
+          const normKey = a < b ? `${a}-${b}` : `${b}-${a}`;
+          if (!normalizedResultMap[normKey]) normalizedResultMap[normKey] = [];
+          normalizedResultMap[normKey].push({
+            ...task,
+            couplingId,
+          } as ExtendedTask);
+          normalizedResultMap[normKey].sort(
+            (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0),
+          );
+        }
+        
+        const updatedTaskList = normalizedResultMap[selectedTaskInfo.couplingId];
+        if (updatedTaskList) {
+          setSelectedTaskInfo((prev) => {
+            // Only update if the modal is still open and for the same couplingId
+            if (prev?.couplingId === selectedTaskInfo.couplingId) {
+              return { ...prev, taskList: updatedTaskList };
+            }
+            return prev;
+          });
+        }
+      }, 100); // 100ms debounce
+    }
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [taskResponse?.data?.result, selectedTaskInfo?.couplingId]);
 
   const normalizedResultMap: Record<string, ExtendedTask[]> = {};
   if (taskResponse?.data?.result) {
@@ -117,7 +216,7 @@ export function CouplingGrid({
         <span className="loading loading-spinner loading-lg"></span>
       </div>
     );
-  if (isError) return <div className="alert alert-error">Failed to load</div>;
+  if (isError) return <div className="alert alert-error">Failed to load data</div>;
 
   return (
     <div className="space-y-6 px-4">
@@ -214,12 +313,37 @@ export function CouplingGrid({
                 Coupling{" "}
                 {selectedTaskInfo.taskList[selectedTaskInfo.index].couplingId}
               </h3>
-              <button
-                onClick={() => setSelectedTaskInfo(null)}
-                className="btn btn-sm btn-circle btn-ghost"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                {onDateChange && (
+                  <>
+                    <button
+                      onClick={navigateToPreviousDay}
+                      disabled={!canNavigatePrevious}
+                      className="btn btn-sm btn-ghost"
+                      title="Previous Day"
+                    >
+                      ←
+                    </button>
+                    <span className="text-sm text-base-content/70 px-2">
+                      {formatDate(selectedDate)}
+                    </span>
+                    <button
+                      onClick={navigateToNextDay}
+                      disabled={!canNavigateNext}
+                      className="btn btn-sm btn-ghost"
+                      title="Next Day"
+                    >
+                      →
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setSelectedTaskInfo(null)}
+                  className="btn btn-sm btn-circle btn-ghost"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {viewMode === "static" ? (

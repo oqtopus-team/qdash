@@ -14,6 +14,7 @@ interface DateSelectorProps {
   selectedDate: string;
   onDateSelect: (date: string) => void;
   disabled?: boolean;
+  isUrlInitialized?: boolean;
 }
 
 /**
@@ -24,6 +25,7 @@ export function DateSelector({
   selectedDate,
   onDateSelect,
   disabled = false,
+  isUrlInitialized = true,
 }: DateSelectorProps) {
   const {
     data: datesResponse,
@@ -35,12 +37,7 @@ export function DateSelector({
     },
   });
 
-  // Reset to latest when chip changes
-  useEffect(() => {
-    if (chipId) {
-      onDateSelect("latest");
-    }
-  }, [chipId, onDateSelect]);
+  // Don't auto-reset dates - let the parent component handle it
 
   // Format date string for display (YYYYMMDD -> YYYY/MM/DD)
   const formatDate = (dateStr: string): string => {
@@ -72,12 +69,7 @@ export function DateSelector({
     }));
   }, [datesResponse]);
 
-  // Reset to latest when there's an error or chip changes
-  useEffect(() => {
-    if (isError || !datesResponse?.data?.data) {
-      onDateSelect("latest");
-    }
-  }, [isError, datesResponse, onDateSelect]);
+  // Don't auto-reset on error - preserve user's selection
 
   // Show loading state but keep the current selection visible
   if (isLoading) {

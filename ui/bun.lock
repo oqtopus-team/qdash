@@ -18,6 +18,7 @@
         "date-fns": "4.1.0",
         "js-yaml": "^4.1.0",
         "next": "^14.2.24",
+        "nuqs": "^2.4.3",
         "plotly.js": "^2.29.1",
         "react": "^18.3.1",
         "react-datepicker": "^7.5.0",
@@ -1252,6 +1253,8 @@
 
     "minimist": ["minimist@1.2.8", "", {}, "sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA=="],
 
+    "mitt": ["mitt@3.0.1", "", {}, "sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw=="],
+
     "mnemonist": ["mnemonist@0.39.8", "", { "dependencies": { "obliterator": "^2.0.1" } }, "sha512-vyWo2K3fjrUw8YeeZ1zF0fy6Mu59RHokURlld8ymdUPjMlD9EC9ov1/YPqTgqRvUN9nTr3Gqfz29LYAmu0PHPQ=="],
 
     "monaco-editor": ["monaco-editor@0.52.2", "", {}, "sha512-GEQWEZmfkOGLdd3XK8ryrfWz3AIP8YymVXiPHEdewrUq7mh0qrKrfHLNCXcbB6sTnMLnOZ3ztSiKcciFUkIJwQ=="],
@@ -1293,6 +1296,8 @@
     "normalize-svg-path": ["normalize-svg-path@0.1.0", "", {}, "sha512-1/kmYej2iedi5+ROxkRESL/pI02pkg0OBnaR4hJkSIX6+ORzepwbuUXfrdZaPjysTsJInj0Rj5NuX027+dMBvA=="],
 
     "number-is-integer": ["number-is-integer@1.0.1", "", { "dependencies": { "is-finite": "^1.0.1" } }, "sha512-Dq3iuiFBkrbmuQjGFFF3zckXNCQoSD37/SdSbgcBailUx6knDvDwb5CympBgcoWHy36sfS12u74MHYkXyHq6bg=="],
+
+    "nuqs": ["nuqs@2.4.3", "", { "dependencies": { "mitt": "^3.0.1" }, "peerDependencies": { "@remix-run/react": ">=2", "next": ">=14.2.0", "react": ">=18.2.0 || ^19.0.0-0", "react-router": "^6 || ^7", "react-router-dom": "^6 || ^7" }, "optionalPeers": ["@remix-run/react", "next", "react-router", "react-router-dom"] }, "sha512-BgtlYpvRwLYiJuWzxt34q2bXu/AIS66sLU1QePIMr2LWkb+XH0vKXdbLSgn9t6p7QKzwI7f38rX3Wl9llTXQ8Q=="],
 
     "object-assign": ["object-assign@4.1.1", "", {}, "sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg=="],
 

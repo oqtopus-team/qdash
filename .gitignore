@@ -215,7 +215,7 @@ quel.json
 qpu_data/
 docs/.vitepress/cache/
 ui/.vite/
-
+ui/tsconfig.tsbuildinfo
 src/qdash/workflow/images/*
 src/qdash/workflow/.system_note.json
 src/qdash/workflow/*.json

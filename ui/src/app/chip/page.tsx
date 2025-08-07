@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useListMuxes, useFetchChip } from "@/client/chip/chip";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
+import { useListMuxes, useFetchChip, useListChips } from "@/client/chip/chip";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
+import { useChipUrlState } from "@/app/hooks/useUrlState";
 import { useFetchAllTasks } from "@/client/task/task";
 import { BsGrid, BsListUl } from "react-icons/bs";
 import { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
@@ -11,7 +14,6 @@ import { ChipSelector } from "@/app/components/ChipSelector";
 import { TaskSelector } from "@/app/components/TaskSelector";
 import { DateSelector } from "@/app/components/DateSelector";
 import { TaskFigure } from "@/app/components/TaskFigure";
-type ViewMode = "1q" | "2q" | "mux";
 
 interface SelectedTaskInfo {
   path: string;
@@ -19,51 +21,173 @@ interface SelectedTaskInfo {
   task: Task;
 }
 
-export default function ChipPage() {
-  const [selectedChip, setSelectedChip] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState<string>("latest");
+function ChipPageContent() {
+  // URL state management
+  const {
+    selectedChip,
+    selectedDate,
+    selectedTask,
+    viewMode,
+    setSelectedChip,
+    setSelectedDate,
+    setSelectedTask,
+    setViewMode,
+    isInitialized,
+  } = useChipUrlState();
+
   const [gridSize, setGridSize] = useState<number>(8);
 
   const { data: chipData } = useFetchChip(selectedChip);
+  const { data: chipsData } = useListChips();
+
+  // Set default chip only when URL is initialized and no chip is selected from URL
+  useEffect(() => {
+    if (isInitialized && !selectedChip && chipsData?.data && chipsData.data.length > 0) {
+      // Sort chips by installation date and select the most recent one
+      const sortedChips = [...chipsData.data].sort((a, b) => {
+        const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
+        const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
+        return dateB - dateA;
+      });
+      setSelectedChip(sortedChips[0].chip_id);
+    }
+  }, [isInitialized, selectedChip, chipsData, setSelectedChip]);
 
   useEffect(() => {
     if (chipData?.data?.size) {
       setGridSize(Math.sqrt(chipData.data.size));
     }
   }, [chipData?.data?.size]);
-  const [viewMode, setViewMode] = useState<ViewMode>("1q");
   const [expandedMuxes, setExpandedMuxes] = useState<{
     [key: string]: boolean;
   }>({});
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
-  const [selectedTask, setSelectedTask] = useState<string>("CheckRabi");
+
+  
+  // Track previous date to distinguish modal navigation from external navigation
+  const [previousDate, setPreviousDate] = useState(selectedDate);
 
   const { data: tasks } = useFetchAllTasks();
 
-  // Update selected task when view mode changes
+  // Use custom hook for date navigation
+  const {
+    navigateToPreviousDay: originalNavigateToPreviousDay,
+    navigateToNextDay: originalNavigateToNextDay,
+    canNavigatePrevious,
+    canNavigateNext,
+    formatDate,
+  } = useDateNavigation(selectedChip, selectedDate, setSelectedDate);
+
+  // Navigation functions - modal state is tracked elsewhere, these just navigate
+  const navigateToPreviousDay = originalNavigateToPreviousDay;
+  const navigateToNextDay = originalNavigateToNextDay;
+
+
+
+  // Update selected task when view mode changes only if no task is selected from URL
   useEffect(() => {
+    if (!isInitialized) return; // Wait for URL state to be initialized
+    
+    // Only set defaults if no task is selected or if the current task doesn't match the view mode
     if (viewMode === "2q" && tasks?.data?.tasks) {
       const availableTasks = tasks.data.tasks.filter(
         (task: TaskResponse) => task.task_type === "coupling",
       );
-      const checkBellState = availableTasks.find(
-        (task: TaskResponse) => task.name === "CheckBellState",
+      // Check if current task is valid for 2q view
+      const currentTaskValid = availableTasks.some(
+        (task: TaskResponse) => task.name === selectedTask
       );
-      if (checkBellState) {
-        setSelectedTask("CheckBellState");
-      } else if (availableTasks.length > 0) {
-        setSelectedTask(availableTasks[0].name);
+      
+      if (!currentTaskValid) {
+        const checkBellState = availableTasks.find(
+          (task: TaskResponse) => task.name === "CheckBellState",
+        );
+        if (checkBellState) {
+          setSelectedTask("CheckBellState");
+        } else if (availableTasks.length > 0) {
+          setSelectedTask(availableTasks[0].name);
+        }
       }
-    } else if (viewMode === "1q") {
-      setSelectedTask("CheckRabi");
+    } else if (viewMode === "1q" && tasks?.data?.tasks) {
+      const availableTasks = tasks.data.tasks.filter(
+        (task: TaskResponse) => task.task_type === "qubit",
+      );
+      // Check if current task is valid for 1q view
+      const currentTaskValid = availableTasks.some(
+        (task: TaskResponse) => task.name === selectedTask
+      );
+      
+      if (!currentTaskValid && !selectedTask) {
+        // Only set default if no task is selected
+        setSelectedTask("CheckRabi");
+      }
     }
-  }, [viewMode, tasks?.data?.tasks]);
+  }, [viewMode, tasks?.data?.tasks, isInitialized, selectedTask, setSelectedTask]);
   const {
     data: muxData,
     isLoading: isLoadingMux,
     isError: isMuxError,
-  } = useListMuxes(selectedChip || "");
+  } = useListMuxes(selectedChip || "", {
+    query: {
+      placeholderData: keepPreviousData,
+      staleTime: 30000, // 30 seconds
+    },
+  });
+
+  // Reset modal only when date changes externally (not from modal navigation)
+  React.useEffect(() => {
+    if (previousDate !== selectedDate && !selectedTaskInfo) {
+      // External navigation - no modal open, safe to update
+      setPreviousDate(selectedDate);
+    } else if (previousDate !== selectedDate && selectedTaskInfo) {
+      // Date changed while modal is open - update previous date but keep modal
+      setPreviousDate(selectedDate);
+    }
+  }, [selectedDate, selectedTaskInfo, previousDate]);
+
+  // Update modal data with debounce to prevent race conditions
+  React.useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (selectedTaskInfo && muxData?.data) {
+      timeoutId = setTimeout(() => {
+        // Find the updated task from mux data
+        let foundTask: Task | null = null;
+        Object.values(muxData.data.muxes).forEach((muxDetail) => {
+          Object.values(muxDetail.detail).forEach((tasksByName) => {
+            Object.values(tasksByName as { [key: string]: Task }).forEach((task) => {
+              if (task.qid === selectedTaskInfo.qid && task.figure_path) {
+                foundTask = task;
+              }
+            });
+          });
+        });
+
+        if (foundTask) {
+          const figurePath = Array.isArray((foundTask as Task).figure_path)
+            ? ((foundTask as Task).figure_path as string[])[0]
+            : (foundTask as Task).figure_path || null;
+          
+          if (figurePath && typeof figurePath === 'string') {
+            setSelectedTaskInfo((prev) => {
+              // Only update if the modal is still open and for the same qid
+              if (prev?.qid === selectedTaskInfo.qid) {
+                return { ...prev, path: figurePath, task: foundTask! };
+              }
+              return prev;
+            });
+          }
+        }
+      }, 100); // 100ms debounce
+    }
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [muxData?.data, selectedTaskInfo?.qid]);
 
   // Get all QIDs from mux detail
   const getQids = (detail: MuxDetailResponseDetail): string[] => {
@@ -200,6 +324,7 @@ export default function ChipPage() {
             <ChipSelector
               selectedChip={selectedChip}
               onChipSelect={setSelectedChip}
+              isUrlInitialized={isInitialized}
             />
 
             <DateSelector
@@ -207,6 +332,7 @@ export default function ChipPage() {
               selectedDate={selectedDate}
               onDateSelect={setSelectedDate}
               disabled={!selectedChip}
+              isUrlInitialized={isInitialized}
             />
 
             <TaskSelector
@@ -264,6 +390,7 @@ export default function ChipPage() {
               selectedTask={selectedTask}
               selectedDate={selectedDate}
               gridSize={gridSize}
+              onDateChange={setSelectedDate}
             />
           ) : viewMode === "2q" ? (
             <CouplingGrid
@@ -271,6 +398,7 @@ export default function ChipPage() {
               selectedTask={selectedTask}
               selectedDate={selectedDate}
               gridSize={gridSize}
+              onDateChange={setSelectedDate}
             />
           ) : (
             <div className="space-y-4">
@@ -409,12 +537,33 @@ export default function ChipPage() {
                 Result for {viewMode === "2q" ? "Coupling" : "QID"}{" "}
                 {selectedTaskInfo.qid}
               </h3>
-              <button
-                onClick={() => setSelectedTaskInfo(null)}
-                className="btn btn-sm btn-circle btn-ghost"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={navigateToPreviousDay}
+                  disabled={!canNavigatePrevious}
+                  className="btn btn-sm btn-ghost"
+                  title="Previous Day"
+                >
+                  ←
+                </button>
+                <span className="text-sm text-base-content/70 px-2">
+                  {formatDate(selectedDate)}
+                </span>
+                <button
+                  onClick={navigateToNextDay}
+                  disabled={!canNavigateNext}
+                  className="btn btn-sm btn-ghost"
+                  title="Next Day"
+                >
+                  →
+                </button>
+                <button
+                  onClick={() => setSelectedTaskInfo(null)}
+                  className="btn btn-sm btn-circle btn-ghost"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-8">
               <div className="aspect-square bg-base-200/50 rounded-xl p-4">
@@ -483,5 +632,15 @@ export default function ChipPage() {
         </dialog>
       )}
     </div>
+  );
+}
+
+export default function ChipPage() {
+  return (
+    <Suspense fallback={<div className="w-full flex justify-center py-12">
+      <span className="loading loading-spinner loading-lg"></span>
+    </div>}>
+      <ChipPageContent />
+    </Suspense>
   );
 }

@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./providers/theme-provider";
 import { ThemedToastContainer } from "./components/ThemedToastContainer";
@@ -13,12 +14,14 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AxiosProvider>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <ThemeProvider>
-            {children}
-            <ThemedToastContainer />
-          </ThemeProvider>
-        </AuthProvider>
+        <NuqsAdapter>
+          <AuthProvider>
+            <ThemeProvider>
+              {children}
+              <ThemedToastContainer />
+            </ThemeProvider>
+          </AuthProvider>
+        </NuqsAdapter>
       </QueryClientProvider>
     </AxiosProvider>
   );
