@@ -55,7 +55,11 @@ def _init_db(mongodb_client: MongoClient) -> None:
         document_models=[ChipDocument],
     )
     # Clear collection before each test
-    ChipDocument.get_motor_collection().drop()
+    try:
+        ChipDocument.get_motor_collection().drop()
+    except Exception:
+        # Collection doesn't exist, which is fine
+        pass
 
 
 def create_test_qubit(qid: str, x_180_length: float = 30.0) -> QubitModel:
@@ -185,7 +189,7 @@ def test_update_nonexistent_qubit(system_info: SystemInfoModel) -> None:
     chip.insert()
 
     # Act & Assert
-    with pytest.raises(ValueError, match=f"Qubit {nonexistent_qubit_id} not found"):
+    with pytest.raises(ValueError, match=f"Qubit {nonexistent_qubit_id} not found in chip {chip_id}"):
         chip.update_qubit(nonexistent_qubit_id, create_test_qubit(nonexistent_qubit_id))
 
 
