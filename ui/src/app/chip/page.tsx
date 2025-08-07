@@ -14,7 +14,6 @@ import { ChipSelector } from "@/app/components/ChipSelector";
 import { TaskSelector } from "@/app/components/TaskSelector";
 import { DateSelector } from "@/app/components/DateSelector";
 import { TaskFigure } from "@/app/components/TaskFigure";
-type ViewMode = "1q" | "2q" | "mux";
 
 interface SelectedTaskInfo {
   path: string;
@@ -28,9 +27,11 @@ function ChipPageContent() {
     selectedChip,
     selectedDate,
     selectedTask,
+    viewMode,
     setSelectedChip,
     setSelectedDate,
     setSelectedTask,
+    setViewMode,
     isInitialized,
   } = useChipUrlState();
 
@@ -57,7 +58,6 @@ function ChipPageContent() {
       setGridSize(Math.sqrt(chipData.data.size));
     }
   }, [chipData?.data?.size]);
-  const [viewMode, setViewMode] = useState<ViewMode>("1q");
   const [expandedMuxes, setExpandedMuxes] = useState<{
     [key: string]: boolean;
   }>({});

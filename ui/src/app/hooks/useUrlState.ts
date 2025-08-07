@@ -5,9 +5,11 @@ interface UseChipUrlStateResult {
   selectedChip: string;
   selectedDate: string;
   selectedTask: string;
+  viewMode: string;
   setSelectedChip: (chip: string) => void;
   setSelectedDate: (date: string) => void;
   setSelectedTask: (task: string) => void;
+  setViewMode: (mode: string) => void;
   isInitialized: boolean; // Track if URL state has been initialized
 }
 
@@ -27,6 +29,11 @@ export function useChipUrlState(): UseChipUrlStateResult {
   
   const [selectedTask, setSelectedTaskState] = useQueryState(
     "task",
+    parseAsString
+  );
+  
+  const [viewMode, setViewModeState] = useQueryState(
+    "view",
     parseAsString
   );
 
@@ -56,14 +63,23 @@ export function useChipUrlState(): UseChipUrlStateResult {
     },
     [setSelectedTaskState]
   );
+  
+  const setViewMode = useCallback(
+    (mode: string) => {
+      setViewModeState(mode === "1q" ? null : mode); // Remove default "1q" from URL
+    },
+    [setViewModeState]
+  );
 
   return {
     selectedChip: selectedChip ?? "",
     selectedDate: selectedDate ?? "latest", 
     selectedTask: selectedTask ?? "CheckRabi",
+    viewMode: viewMode ?? "1q",
     setSelectedChip,
     setSelectedDate,
     setSelectedTask,
+    setViewMode,
     isInitialized,
   };
 }
