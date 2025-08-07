@@ -13,11 +13,13 @@ interface ChipOption {
 interface ChipSelectorProps {
   selectedChip: string;
   onChipSelect: (chipId: string) => void;
+  isUrlInitialized?: boolean;
 }
 
 export function ChipSelector({
   selectedChip,
   onChipSelect,
+  isUrlInitialized = true,
 }: ChipSelectorProps) {
   const { data: chips, isLoading, isError } = useListChips();
 
@@ -41,15 +43,8 @@ export function ChipSelector({
       }));
   }, [chips]);
 
-  useEffect(() => {
-    if (
-      sortedOptions.length > 0 &&
-      (!selectedChip || selectedChip === "" || selectedChip === "SAMPLE")
-    ) {
-      // Set the most recently installed chip as default
-      onChipSelect(sortedOptions[0].value);
-    }
-  }, [sortedOptions]); // Only run when options are loaded
+  // Don't set defaults - let the parent component handle initial state
+  // The URL state should be the source of truth
 
   if (isLoading) {
     return (
