@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import {
   useListExecutionsByChipId,
   useFetchExecutionByChipId,
+  useListChips,
 } from "@/client/chip/chip";
 import { ExecutionResponseSummary } from "@/schemas";
 import JsonView from "react18-json-view";
@@ -11,9 +12,12 @@ import { FaExternalLinkAlt } from "react-icons/fa";
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { ExecutionStats } from "./components/ExecutionStats";
 import { TaskFigure } from "@/app/components/TaskFigure";
+import { useExecutionUrlState } from "@/app/hooks/useUrlState";
 
-export default function ExecutionPage() {
-  const [selectedChipId, setSelectedChipId] = useState<string>("");
+function ExecutionPageContent() {
+  // URL state management
+  const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();
+  
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
     null,
   );
@@ -24,12 +28,28 @@ export default function ExecutionPage() {
   const [cardData, setCardData] = useState<ExecutionResponseSummary[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
+  // Get list of chips to set default
+  const { data: chipsData } = useListChips();
+
+  // Set the latest chip as default when chips are loaded and no chip is selected from URL
+  useEffect(() => {
+    if (isInitialized && !selectedChip && chipsData?.data && chipsData.data.length > 0) {
+      // Sort chips by installed_at date in descending order and get the latest one
+      const sortedChips = [...chipsData.data].sort((a, b) => {
+        const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
+        const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
+        return dateB - dateA;
+      });
+      setSelectedChip(sortedChips[0].chip_id);
+    }
+  }, [isInitialized, selectedChip, chipsData, setSelectedChip]);
+
   // chip_id による実行概要一覧の取得
   const {
     data: executionData,
     isError,
     isLoading,
-  } = useListExecutionsByChipId(selectedChipId, {
+  } = useListExecutionsByChipId(selectedChip, {
     query: {
       // Refresh every 5 seconds
       refetchInterval: 5000,
@@ -44,7 +64,7 @@ export default function ExecutionPage() {
     isLoading: isDetailLoading,
     isError: isDetailError,
   } = useFetchExecutionByChipId(
-    selectedChipId,
+    selectedChip,
     selectedExecutionId ? selectedExecutionId : "",
     {
       query: {
@@ -67,7 +87,7 @@ export default function ExecutionPage() {
 
   // チップ選択の変更ハンドラ
   const handleChipChange = (chipId: string) => {
-    setSelectedChipId(chipId);
+    setSelectedChip(chipId);
     setSelectedExecutionId(null);
     setIsSidebarOpen(false);
     setCardData([]);
@@ -123,7 +143,7 @@ export default function ExecutionPage() {
       </div>
       <div className="px-10 pb-6">
         <ChipSelector
-          selectedChip={selectedChipId}
+          selectedChip={selectedChip}
           onChipSelect={handleChipChange}
         />
       </div>
@@ -208,7 +228,7 @@ export default function ExecutionPage() {
               </h2>
               <div className="flex space-x-4 mt-4">
                 <a
-                  href={`/execution/${selectedChipId}/${selectedExecutionId}`}
+                  href={`/execution/${selectedChip}/${selectedExecutionId}`}
                   className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
                 >
                   <FaExternalLinkAlt className="mr-2" />
@@ -341,5 +361,15 @@ export default function ExecutionPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ExecutionPage() {
+  return (
+    <Suspense fallback={<div className="w-full flex justify-center py-12">
+      <span className="loading loading-spinner loading-lg"></span>
+    </div>}>
+      <ExecutionPageContent />
+    </Suspense>
   );
 }

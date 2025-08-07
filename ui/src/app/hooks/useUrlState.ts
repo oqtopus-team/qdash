@@ -20,6 +20,12 @@ interface UseChipUrlStateResult {
   isInitialized: boolean; // Track if URL state has been initialized
 }
 
+interface UseExecutionUrlStateResult {
+  selectedChip: string;
+  setSelectedChip: (chip: string) => void;
+  isInitialized: boolean;
+}
+
 export function useChipUrlState(): UseChipUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
   
@@ -87,6 +93,35 @@ export function useChipUrlState(): UseChipUrlStateResult {
     setSelectedDate,
     setSelectedTask,
     setViewMode,
+    isInitialized,
+  };
+}
+
+export function useExecutionUrlState(): UseExecutionUrlStateResult {
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // URL state management for execution page
+  const [selectedChip, setSelectedChipState] = useQueryState(
+    "chip",
+    parseAsString
+  );
+
+  // Mark as initialized after first render
+  useEffect(() => {
+    setIsInitialized(true);
+  }, []);
+
+  // Wrapped setter to handle URL updates
+  const setSelectedChip = useCallback(
+    (chip: string) => {
+      setSelectedChipState(chip || null); // null removes the parameter from URL
+    },
+    [setSelectedChipState]
+  );
+
+  return {
+    selectedChip: selectedChip ?? "",
+    setSelectedChip,
     isInitialized,
   };
 }
