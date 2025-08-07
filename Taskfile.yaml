@@ -90,12 +90,12 @@ tasks:
 
   export-api:
     cmds:
-      - uv export --group api --no-hashes --no-dev --no-editable --format requirements-txt > ./src/qdash/api/requirements.txt
+      - uv export --group api --no-hashes --no-dev --no-emit-project --no-editable --format requirements-txt > ./src/qdash/api/requirements.txt
     desc: Export server requirements
 
   export-workflow:
     cmds:
-      - uv export --group workflow --no-hashes --no-dev --no-editable --format requirements-txt > ./src/qdash/workflow/requirements.txt
+      - uv export --group workflow --no-hashes --no-dev --no-emit-project --no-editable --format requirements-txt > ./src/qdash/workflow/requirements.txt
     desc: Export qcflow requirements
 
   export-dev:
@@ -105,7 +105,7 @@ tasks:
 
   export-agent:
     cmds:
-      - uv export --group agent --no-hashes --no-dev --no-editable --format requirements-txt > ./src/qdash/slack_agent/requirements.txt
+      - uv export --group agent --no-hashes --no-dev --no-emit-project --no-editable --format requirements-txt > ./src/qdash/slack_agent/requirements.txt
     desc: Export agent requirements
   export-all:
     cmds:
