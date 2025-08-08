@@ -230,7 +230,7 @@ def replace_none_with_nan(obj: dict | list | ScalarFloat | None | float | int | 
         return obj
 
 
-def read_base_properties(filename: str = "props.yaml") -> CommentedMap:
+def read_base_properties(filename: str = "") -> CommentedMap:
     """Read the base properties from props.yaml and replace None with NaN, ScalarFloat with float."""
     with Path(filename).open("r") as f:
         data = yaml_rt.load(f)
@@ -423,7 +423,7 @@ def generate_figures(
     if "resonator_frequency" in info_type and "resonator_frequency" in props:
         values = pad_qubit_data(props["resonator_frequency"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
-            title=f"Resonator frequency (GHz){' (24hrs)' if suffix else ''}",
+            title=f"Resonator frequency (GHz){' (24h)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value:.3f}<br>GHz" if not math.isnan(value) else "N/A"
@@ -441,7 +441,7 @@ def generate_figures(
     if "qubit_frequency" in info_type and "qubit_frequency" in props:
         values = pad_qubit_data(props["qubit_frequency"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
-            title=f"Qubit frequency (GHz){' (24hrs)' if suffix else ''}",
+            title=f"Qubit frequency (GHz){' (24h)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value:.3f}<br>GHz" if not math.isnan(value) else "N/A"
@@ -459,7 +459,7 @@ def generate_figures(
     if "qubit_anharmonicity" in info_type and "anharmonicity" in props:
         values = pad_qubit_data(props["anharmonicity"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
-            title=f"Qubit anharmonicity (MHz){' (24hrs)' if suffix else ''}",
+            title=f"Qubit anharmonicity (MHz){' (24h)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value * 1e3:.1f}<br>MHz" if not math.isnan(value) else "N/A"
@@ -477,7 +477,7 @@ def generate_figures(
     if "t1" in info_type and "t1" in props:
         values = pad_qubit_data(props["t1"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
-            title=f"T1 (μs){' (24hrs)' if suffix else ''}",
+            title=f"T1 (μs){' (24h)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value * 1e-3:.2f}<br>μs" if not math.isnan(value) else "N/A"
@@ -495,7 +495,7 @@ def generate_figures(
     if "t2_echo" in info_type and "t2_echo" in props:
         values = pad_qubit_data(props["t2_echo"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
-            title=f"T2 echo (μs){' (24hrs)' if suffix else ''}",
+            title=f"T2 echo (μs){' (24h)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value * 1e-3:.2f}<br>μs" if not math.isnan(value) else "N/A"
@@ -513,7 +513,7 @@ def generate_figures(
     if "average_readout_fidelity" in info_type and "average_readout_fidelity" in props:
         values = pad_qubit_data(props["average_readout_fidelity"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
-            title=f"Average readout fidelity (%){' (24hrs)' if suffix else ''}",
+            title=f"Average readout fidelity (%){' (24h)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value:.2%}" if not math.isnan(value) else "N/A"
@@ -531,7 +531,7 @@ def generate_figures(
     if "x90_gate_fidelity" in info_type and "x90_gate_fidelity" in props:
         values = pad_qubit_data(props["x90_gate_fidelity"], chip_id=chip_id)
         fig = graph.create_lattice_figure(
-            title=f"X90 gate fidelity (%){' (24hrs)' if suffix else ''}",
+            title=f"X90 gate fidelity (%){' (24h)' if suffix else ''}",
             values=list(values.values()),
             texts=[
                 f"{qubit}<br>{value:.2%}" if not math.isnan(value) else "N/A"
@@ -554,7 +554,7 @@ def generate_figures(
         )
         fig = graph.create_graph_figure(
             directed=False,
-            title=f"ZX90 gate fidelity (%){' (24hrs)' if suffix else ''}",
+            title=f"ZX90 gate fidelity (%){' (24h)' if suffix else ''}",
             edge_values={key: value for key, value in values.items()},
             edge_texts={
                 key: f"{value * 1e2:.1f}" if not math.isnan(value) else None
@@ -603,25 +603,30 @@ def generate_chip_info_report(
     """Generate a report for chip information."""
     # Read regular properties
     props_path = f"{chip_info_dir}/props.yaml"
+    from prefect import get_run_logger
+
+    logger = get_run_logger()
     props = read_base_properties(filename=props_path)[chip_id]
 
     # Generate regular figures
     regular_files = generate_figures(props, chip_info_dir, chip_id=chip_id)
 
     # Read and generate 24hr properties if available
-    props_path_24hrs = f"{chip_info_dir}/props_24h.yaml"
-    if Path(props_path_24hrs).exists():
-        props_24hrs = read_base_properties(filename=props_path_24hrs)[chip_id]
-        hrs24_files = generate_figures(props_24hrs, chip_info_dir, "_24hrs", chip_id=chip_id)
+    props_path_24h = f"{chip_info_dir}/props_24h.yaml"
+    if Path(props_path_24h).exists():
+        props_24h = read_base_properties(filename=props_path_24h)[chip_id]
+        logger.info(f"Generating 24hr figures for {chip_id}...")
+        logger.info(f"Properties: {props_24h}")
+        hrs24_files = generate_figures(props_24h, chip_info_dir, "_24h", chip_id=chip_id)
 
         # Generate combined report
         generate_rich_pdf_report(
             regular_files + hrs24_files,
             pdf_path=f"{chip_info_dir}/chip_info_report.pdf",
         )
-    else:
-        # Generate report with just regular files
-        generate_rich_pdf_report(
-            regular_files,
-            pdf_path=f"{chip_info_dir}/chip_info_report.pdf",
-        )
+    # else:
+    #     # Generate report with just regular files
+    #     generate_rich_pdf_report(
+    #         regular_files,
+    #         pdf_path=f"{chip_info_dir}/chip_info_report.pdf",
+    #     )
