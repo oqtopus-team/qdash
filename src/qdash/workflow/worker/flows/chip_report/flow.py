@@ -46,16 +46,18 @@ def chip_report(username: str = "admin", source_path: str = "") -> None:
     props = get_chip_properties(chip, session=session, within_24hrs=False)
     handler = ChipPropertyYAMLHandler(source_path)
     base = handler.read()
-    merged = merge_properties(base, props)
+    merged = merge_properties(base, props, chip_id=chip.chip_id)
     props_save_path = f"{chip_info_dir}/props.yaml"
     handler.write(merged, props_save_path)
 
-    # 24時間以内のデータを抽出
+    # 24時間以内のデータを抽出（マージせずに空のベースから作成）
     props_24h = get_chip_properties(chip, session=session, within_24hrs=True)
-    handler_24h = ChipPropertyYAMLHandler(source_path)
-    base_24h = handler_24h.read()
-    merged_24h = merge_properties(base_24h, props_24h)
+    from ruamel.yaml.comments import CommentedMap
+
+    base_24h = CommentedMap()
+    merged_24h = merge_properties(base_24h, props_24h, chip_id=chip.chip_id)
     props_save_path_24h = f"{chip_info_dir}/props_24h.yaml"
+    handler_24h = ChipPropertyYAMLHandler(source_path)
     handler_24h.write(merged_24h, props_save_path_24h)
     generate_chip_info_report(chip_info_dir=chip_info_dir, chip_id=chip.chip_id)
     settings = get_settings()
