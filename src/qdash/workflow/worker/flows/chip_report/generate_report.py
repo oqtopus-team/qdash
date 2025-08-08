@@ -603,7 +603,17 @@ def generate_chip_info_report(
     """Generate a report for chip information."""
     # Read regular properties
     props_path = f"{chip_info_dir}/props.yaml"
-    props = read_base_properties(filename=props_path)[chip_id]
+    from prefect import get_run_logger
+
+    logger = get_run_logger()
+    props = read_base_properties(filename=props_path)
+    print(f"Read properties from {props_path}")
+    print(f"props: {props.keys()}")
+    logger.info(f"props: {props.keys()}")
+    if chip_id not in props:
+        raise ValueError(f"Chip ID {chip_id} not found in properties.")
+    print(f"props: {props.keys()}")
+    props = props[chip_id]
 
     # Generate regular figures
     regular_files = generate_figures(props, chip_info_dir, chip_id=chip_id)

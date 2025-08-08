@@ -3,6 +3,7 @@ from prefect import flow
 from qdash.config import get_settings
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
+from qdash.workflow.core.session.factory import create_session
 from qdash.workflow.utils.slack import SlackContents, Status
 from qdash.workflow.utiltask.create_directory import (
     create_directory_task,
@@ -16,9 +17,7 @@ from qdash.workflow.worker.flows.push_props.io import ChipPropertyYAMLHandler
 
 
 @flow(name="chip-report", flow_run_name="Generate Chip Report")
-def chip_report(
-    username: str = "admin", source_path: str = "/app/config/qubex/64Qv1/params/props.yaml"
-) -> None:
+def chip_report(username: str = "admin", source_path: str = "") -> None:
     """Flow to generate and push chip report.
 
     Args:
@@ -37,9 +36,14 @@ def chip_report(
     create_directory_task.submit(chip_info_dir).result()
 
     chip = ChipDocument.get_current_chip(username=username)
-    source_path = source_path or f"/app/config/qubex/{chip.chip_id}/params/props.yaml"
-
-    props = get_chip_properties(chip, within_24hrs=False)
+    source_path = f"/app/config/qubex/{chip.chip_id}/params/props.yaml"
+    session = create_session(
+        backend="qubex",
+        config={
+            "chip_id": chip.chip_id,
+        },
+    )
+    props = get_chip_properties(chip, session=session, within_24hrs=False)
     handler = ChipPropertyYAMLHandler(source_path)
     base = handler.read()
     merged = merge_properties(base, props)
@@ -47,7 +51,7 @@ def chip_report(
     handler.write(merged, props_save_path)
 
     # 24時間以内のデータを抽出
-    props_24h = get_chip_properties(chip, within_24hrs=True)
+    props_24h = get_chip_properties(chip, session=session, within_24hrs=True)
     handler_24h = ChipPropertyYAMLHandler(source_path)
     base_24h = handler_24h.read()
     merged_24h = merge_properties(base_24h, props_24h)
