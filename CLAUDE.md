@@ -260,3 +260,27 @@ Key environment variables (see `.env.example`):
 - All Docker services are configured to work within a custom network
 - Authentication uses a simple X-Username header (development mode)
 - The Slack agent feature is newly implemented on the feat/slack-agent branch
+
+## Problem-Solving Process
+
+When encountering complex technical issues, especially those involving Python packaging, Git subdirectories, or build systems:
+
+1. **Use Advanced AI Consultation**: For complex problems that seem unsolvable, use `mcp__gpt__advanced_search` with detailed context
+   - Provide specific error messages and technical details
+   - Include relevant file structures and configurations
+   - Ask for root cause analysis and systematic solutions
+
+2. **Example Success Case - qdash_client GitHub Installation Issue**:
+   - **Problem**: `uv add "git+https://github.com/oqtopus-team/qdash.git#subdirectory=qdash_client"` appeared successful but installed no actual Python files
+   - **Investigation**: Used advanced AI to analyze package discovery patterns, wheel contents, and subdirectory installation mechanics  
+   - **Root Cause**: Package structure was incorrect for subdirectory Git installations - needed src layout
+   - **Solution**: Restructured to `qdash_client/src/qdash_client/` and updated `pyproject.toml` package discovery
+   - **Verification**: Built wheel locally, tested GitHub installation, confirmed all imports work
+
+3. **Key Techniques**:
+   - Build wheels locally and inspect contents (`unzip -l dist/*.whl`) to verify actual file inclusion
+   - Test installations in clean environments to avoid local conflicts  
+   - Use RECORD files in site-packages to understand what was actually installed
+   - Check for namespace conflicts between local development files and installed packages
+
+This systematic approach combining AI consultation with methodical debugging resolved a complex packaging issue that would have been difficult to solve through trial and error alone.
