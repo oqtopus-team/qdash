@@ -64,9 +64,7 @@ class TaskResultHistoryDocument(Document):
         indexes: ClassVar = [IndexModel([("task_id", ASCENDING), ("username")], unique=True)]
 
     @classmethod
-    def from_datamodel(
-        cls, task: BaseTaskResultModel, execution_model: ExecutionModel
-    ) -> "TaskResultHistoryDocument":
+    def from_datamodel(cls, task: BaseTaskResultModel, execution_model: ExecutionModel) -> "TaskResultHistoryDocument":
         return cls(
             username=execution_model.username,
             task_id=task.task_id,
@@ -93,9 +91,7 @@ class TaskResultHistoryDocument(Document):
         )
 
     @classmethod
-    def upsert_document(
-        cls, task: BaseTaskResultModel, execution_model: ExecutionModel
-    ) -> "TaskResultHistoryDocument":
+    def upsert_document(cls, task: BaseTaskResultModel, execution_model: ExecutionModel) -> "TaskResultHistoryDocument":
         doc = cls.find_one({"task_id": task.task_id}).run()
         if doc is None:
             doc = cls.from_datamodel(task=task, execution_model=execution_model)

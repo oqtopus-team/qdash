@@ -1,6 +1,5 @@
 import datetime
 from datetime import timedelta
-from zoneinfo import ZoneInfo
 
 import pendulum
 from prefect import flow
@@ -10,6 +9,7 @@ from qdash.datamodel.menu import MenuModel
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.menu import MenuDocument
+from zoneinfo import ZoneInfo
 
 settings = get_settings()
 env = settings.env

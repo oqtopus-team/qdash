@@ -58,9 +58,7 @@ headers = {"accept": "application/json", "X-Username": "admin", "Content-Type": 
 
 
 @task
-def generate_device_topology_request(
-    request: DeviceTopologyRequest, save_path: Path
-) -> DeviceTopologyRequest:
+def generate_device_topology_request(request: DeviceTopologyRequest, save_path: Path) -> DeviceTopologyRequest:
     """Generate and return the device topology request data."""
     logging.info("Generating device topology request data...")
     initialize()
@@ -85,9 +83,7 @@ def post_device_topology(request: DeviceTopologyRequest, save_path: Path) -> dic
     logging.info("Posting device topology data...")
 
     # Make POST request using hardcoded request_data
-    response = requests.post(
-        f"{API_URL}/device_topology", headers=headers, json=request.model_dump(), timeout=10
-    )
+    response = requests.post(f"{API_URL}/device_topology", headers=headers, json=request.model_dump(), timeout=10)
     response.raise_for_status()
     # Save response to file
     save_path = save_path / "device_topology.json"
@@ -107,9 +103,7 @@ def generate_topology_plot(topology_data: dict[str, Any], save_path: Path) -> No
     plot_headers["accept"] = "*/*"
 
     # Make POST request
-    response = requests.post(
-        f"{API_URL}/device_topology/plot", headers=plot_headers, json=topology_data, timeout=10
-    )
+    response = requests.post(f"{API_URL}/device_topology/plot", headers=plot_headers, json=topology_data, timeout=10)
     response.raise_for_status()
 
     save_path = save_path / "device_topology.png"

@@ -67,9 +67,7 @@ def build_workflow(
     global_previous_task_id = ""
     qubit_previous_task_id = {qubit: "" for qubit in qubits}
     coupling_previous_task_id = {qubit: "" for qubit in qubits}
-    task_instances = generate_task_instances(
-        task_names=task_names, task_details=task_details, backend=backend
-    )
+    task_instances = generate_task_instances(task_names=task_names, task_details=task_details, backend=backend)
     for name in task_names:
         if name in task_instances:
             this_task = task_instances[name]
@@ -84,16 +82,12 @@ def build_workflow(
                 global_previous_task_id = task.task_id
             elif this_task.is_qubit_task():
                 for qubit in qubits:
-                    task = QubitTaskModel(
-                        name=name, upstream_id=qubit_previous_task_id[qubit], qid=qubit
-                    )
+                    task = QubitTaskModel(name=name, upstream_id=qubit_previous_task_id[qubit], qid=qubit)
                     task_result.qubit_tasks.setdefault(qubit, []).append(task)
                     qubit_previous_task_id[qubit] = task.task_id
             elif this_task.is_coupling_task():
                 for qubit in qubits:
-                    task = CouplingTaskModel(
-                        name=name, upstream_id=coupling_previous_task_id[qubit], qid=qubit
-                    )
+                    task = CouplingTaskModel(name=name, upstream_id=coupling_previous_task_id[qubit], qid=qubit)
                     task_result.coupling_tasks.setdefault(qubit, []).append(task)
                     coupling_previous_task_id[qubit] = task.task_id
             else:
@@ -139,9 +133,7 @@ def cal_serial(
         for task_name in task_names:
             if task_name in task_instances:
                 task_type = task_instances[task_name].get_task_type()
-                if task_manager.this_task_is_completed(
-                    task_name=task_name, task_type=task_type, qid=qid
-                ):
+                if task_manager.this_task_is_completed(task_name=task_name, task_type=task_type, qid=qid):
                     logger.info(f"Task {task_name} is already completed")
                     continue
                 logger.info(f"Starting task: {task_name}")
@@ -171,9 +163,7 @@ def cal_serial(
         task_manager.save()
         # Update task result history
         executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
-        TaskResultHistoryDocument.upsert_document(
-            task=executed_task, execution_model=execution_manager.to_datamodel()
-        )
+        TaskResultHistoryDocument.upsert_document(task=executed_task, execution_model=execution_manager.to_datamodel())
         execution_manager = execution_manager.update_with_task_manager(task_manager)
         # 未実行タスクのスキップ処理
         task_manager.update_not_executed_tasks_to_skipped(task_type=task_type, qid=qid)
@@ -214,9 +204,7 @@ def cal_batch(
     """
     logger = get_run_logger()
     try:
-        task_instances = generate_task_instances(
-            task_names=task_names, task_details=menu.task_details
-        )
+        task_instances = generate_task_instances(task_names=task_names, task_details=menu.task_details)
         for task_name in task_names:
             if task_name in task_instances:
                 task_type = task_instances[task_name].get_task_type()
@@ -289,9 +277,7 @@ def setup_calibration(
 
     # Initialize task manager and validate task names
     validated_task_names = validate_task_name(task_names=task_names, username=menu.username)
-    task_manager = TaskManager(
-        username=menu.username, execution_id=execution_id, qids=qubits, calib_dir=calib_dir
-    )
+    task_manager = TaskManager(username=menu.username, execution_id=execution_id, qids=qubits, calib_dir=calib_dir)
 
     # Build and save workflow
     task_result = build_workflow(
@@ -513,9 +499,7 @@ async def dispatch(
                         "task_names": task_names,
                     }
                     parallel_deployments.append(
-                        run_deployment(
-                            f"serial-cal-flow/{env}-serial-cal-flow", parameters=parameters
-                        )
+                        run_deployment(f"serial-cal-flow/{env}-serial-cal-flow", parameters=parameters)
                     )
                 await asyncio.gather(*parallel_deployments)
     elif isinstance(schedule, ParallelNode):
@@ -530,9 +514,7 @@ async def dispatch(
                     "qubits": schedule_node.serial,
                     "task_names": task_names,
                 }
-                deployments.append(
-                    run_deployment(f"serial-cal-flow/{env}-serial-cal-flow", parameters=parameters)
-                )
+                deployments.append(run_deployment(f"serial-cal-flow/{env}-serial-cal-flow", parameters=parameters))
             if isinstance(schedule_node, BatchNode):
                 parameters = {
                     "menu": menu.model_dump(),
@@ -542,9 +524,7 @@ async def dispatch(
                     "qubits": schedule_node.batch,
                     "task_names": task_names,
                 }
-                deployments.append(
-                    run_deployment(f"batch-cal-flow/{env}-batch-cal-flow", parameters=parameters)
-                )
+                deployments.append(run_deployment(f"batch-cal-flow/{env}-batch-cal-flow", parameters=parameters))
         await asyncio.gather(*deployments)
     else:
         raise TypeError(f"Invalid schedule type: {type(schedule)}")
@@ -589,9 +569,7 @@ async def dispatch_cal_flow(
     logger.info(f"serial type:{isinstance(schedule,SerialNode)}")
     logger.info(f"parallel type:{isinstance(schedule,ParallelNode)}")
     logger.info(f"batch type:{isinstance(schedule,BatchNode)}")
-    await dispatch(
-        menu, calib_dir, successMap, execution_id, schedule=schedule, task_names=task_names
-    )
+    await dispatch(menu, calib_dir, successMap, execution_id, schedule=schedule, task_names=task_names)
     return successMap
 
 

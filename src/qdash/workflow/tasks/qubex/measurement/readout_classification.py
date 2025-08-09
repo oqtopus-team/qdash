@@ -44,9 +44,7 @@ class ReadoutClassification(BaseTask):
         exp = session.get_session()
         label = exp.get_qubit_label(int(qid))
         result = run_result.raw_result
-        self.output_parameters["average_readout_fidelity"].value = result[
-            "average_readout_fidelity"
-        ][label]
+        self.output_parameters["average_readout_fidelity"].value = result["average_readout_fidelity"][label]
         self.output_parameters["readout_fidelity_0"].value = result["readout_fidelties"][label][0]
         self.output_parameters["readout_fidelity_1"].value = result["readout_fidelties"][label][1]
         output_parameters = self.attach_execution_id(execution_id)
@@ -63,6 +61,4 @@ class ReadoutClassification(BaseTask):
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

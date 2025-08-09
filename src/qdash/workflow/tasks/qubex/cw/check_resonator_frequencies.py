@@ -33,9 +33,7 @@ class CheckResonatorFrequencies(BaseTask):
         )
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "coarse_resonator_frequency": OutputParameterModel(
-            unit="GHz", description="Coarse resonator frequency"
-        ),
+        "coarse_resonator_frequency": OutputParameterModel(unit="GHz", description="Coarse resonator frequency"),
     }
 
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002

@@ -30,21 +30,15 @@ class CheckBellState(BaseTask):
         output_parameters = self.attach_execution_id(execution_id)
         figures: list = [result["figure"]]
         raw_data: list = []
-        return PostProcessResult(
-            output_parameters=output_parameters, figures=figures, raw_data=raw_data
-        )
+        return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         exp = session.get_session()
-        control, target = (
-            exp.get_qubit_label(int(q)) for q in qid.split("-")
-        )  # e.g., "0-1" → "Q00","Q01"
+        control, target = (exp.get_qubit_label(int(q)) for q in qid.split("-"))  # e.g., "0-1" → "Q00","Q01"
         result = exp.measure_bell_state(control, target)
         exp.calib_note.save()
         return RunResult(raw_result=result)
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

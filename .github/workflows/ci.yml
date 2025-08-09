@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
     paths:
       - 'src/qdash/**'
+      - '!src/qdash/client/**'  # Exclude generated client code
       - 'tests/**'
       - 'pyproject.toml'
       - 'uv.lock'
@@ -13,6 +14,7 @@ on:
     branches: [main, develop]
     paths:
       - 'src/qdash/**'
+      - '!src/qdash/client/**'  # Exclude generated client code
       - 'tests/**'
       - 'pyproject.toml'
       - 'uv.lock'
@@ -43,7 +45,7 @@ jobs:
 
       - name: Run linting and format check
         run: |
-          task lint
+          task lint         # Excludes generated client code (see pyproject.toml)
           task lint-mypy
 
   test:

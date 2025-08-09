@@ -19,27 +19,17 @@ class CreateZX90(BaseTask):
     timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "cr_amplitude": OutputParameterModel(
-            unit="a.u.", value_type="float", description="Amplitude of the CR pulse."
-        ),
-        "cr_phase": OutputParameterModel(
-            unit="a.u.", value_type="float", description="Phase of the CR pulse."
-        ),
+        "cr_amplitude": OutputParameterModel(unit="a.u.", value_type="float", description="Amplitude of the CR pulse."),
+        "cr_phase": OutputParameterModel(unit="a.u.", value_type="float", description="Phase of the CR pulse."),
         "cancel_amplitude": OutputParameterModel(
             unit="a.u.", value_type="float", description="Amplitude of the cancel pulse."
         ),
-        "cancel_phase": OutputParameterModel(
-            unit="a.u.", value_type="float", description="Phase of the cancel pulse."
-        ),
-        "cancel_beta": OutputParameterModel(
-            unit="a.u.", value_type="float", description="Beta of the cancel pulse."
-        ),
+        "cancel_phase": OutputParameterModel(unit="a.u.", value_type="float", description="Phase of the cancel pulse."),
+        "cancel_beta": OutputParameterModel(unit="a.u.", value_type="float", description="Beta of the cancel pulse."),
         "rotary_amplitude": OutputParameterModel(
             unit="a.u.", value_type="float", description="Amplitude of the rotary pulse."
         ),
-        "zx_rotation_rate": OutputParameterModel(
-            unit="a.u.", value_type="float", description="ZX rotation rate."
-        ),
+        "zx_rotation_rate": OutputParameterModel(unit="a.u.", value_type="float", description="ZX rotation rate."),
     }
 
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
@@ -59,18 +49,12 @@ class CreateZX90(BaseTask):
         output_parameters = self.attach_execution_id(execution_id)
         figures: list = [result["n1"], result["n3"], result["fig"]]
         raw_data: list = []
-        return PostProcessResult(
-            output_parameters=output_parameters, figures=figures, raw_data=raw_data
-        )
+        return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         exp = session.get_session()
-        control, target = (
-            exp.get_qubit_label(int(q)) for q in qid.split("-")
-        )  # e.g., "0-1" → "Q00","Q01"
-        label = "-".join(
-            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
-        )  # e.g., "0-1" → "Q00-Q01"
+        control, target = (exp.get_qubit_label(int(q)) for q in qid.split("-"))  # e.g., "0-1" → "Q00","Q01"
+        label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
         raw_result = exp.calibrate_zx90(
             control,
             target,
@@ -97,6 +81,4 @@ class CreateZX90(BaseTask):
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

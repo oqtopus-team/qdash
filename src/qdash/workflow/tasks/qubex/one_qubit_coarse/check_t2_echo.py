@@ -73,6 +73,4 @@ class CheckT2Echo(BaseTask):
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

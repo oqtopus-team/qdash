@@ -170,9 +170,7 @@ async def get_chip_parameters(
                     include_param = True
                     if within_24hrs and "calibrated_at" in param_data:
                         try:
-                            calibrated_at = pendulum.parse(
-                                param_data["calibrated_at"], tz="Asia/Tokyo"
-                            )
+                            calibrated_at = pendulum.parse(param_data["calibrated_at"], tz="Asia/Tokyo")
                             include_param = calibrated_at >= cutoff_time
                         except Exception:
                             include_param = False
@@ -218,9 +216,7 @@ async def get_chip_parameters(
                     include_param = True
                     if within_24hrs and "calibrated_at" in param_data:
                         try:
-                            calibrated_at = pendulum.parse(
-                                param_data["calibrated_at"], tz="Asia/Tokyo"
-                            )
+                            calibrated_at = pendulum.parse(param_data["calibrated_at"], tz="Asia/Tokyo")
                             include_param = calibrated_at >= cutoff_time
                         except Exception:
                             include_param = False

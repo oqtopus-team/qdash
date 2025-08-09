@@ -87,8 +87,8 @@ class ExecutionManager(BaseModel):
             # Get collection
             collection = client.qubex[ExecutionHistoryDocument.Settings.name]
 
-            # Define array_filters for nested updates
-            array_filters = []
+            # Define array_filters for nested updates (currently unused)
+            # array_filters = []
 
             # First, ensure the document exists with initial structure
             collection.update_one(

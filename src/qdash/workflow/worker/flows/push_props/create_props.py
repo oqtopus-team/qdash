@@ -29,9 +29,7 @@ coupling_field_map = {
 }
 
 
-def merge_properties(
-    base_props: CommentedMap, chip_props: ChipProperties, chip_id: str = "64Qv1"
-) -> CommentedMap:
+def merge_properties(base_props: CommentedMap, chip_props: ChipProperties, chip_id: str = "64Qv1") -> CommentedMap:
     """Merge chip properties into the base properties map."""
 
     def update_if_different(section: str, key: str, value: float | str | None) -> None:
@@ -53,12 +51,7 @@ def merge_properties(
 
     for qid, qubit in chip_props.qubits.items():
         for field, value in qubit.model_dump(exclude_none=True).items():
-            if (
-                field == "x90_gate_fidelity"
-                and value > 1.0
-                or field == "x180_gate_fidelity"
-                and value > 1.0
-            ):
+            if field == "x90_gate_fidelity" and value > 1.0 or field == "x180_gate_fidelity" and value > 1.0:
                 update_if_different(field, qid, None)
             elif field == "qubit_frequency":
                 continue
@@ -73,9 +66,7 @@ def merge_properties(
     return base_props
 
 
-def get_chip_properties(
-    chip: ChipDocument, session: QubexSession, within_24hrs: bool = False
-) -> ChipProperties:
+def get_chip_properties(chip: ChipDocument, session: QubexSession, within_24hrs: bool = False) -> ChipProperties:
     """Extract chip properties from the ChipDocument."""
     props = ChipProperties()
     import re
@@ -96,16 +87,12 @@ def get_chip_properties(
     for cid, c in chip.couplings.items():
         source, target = cid.split("-")
         cid_str = f"{exp.get_qubit_label(int(source))}-{exp.get_qubit_label(int(target))}"
-        props.couplings[cid_str] = _process_data(
-            c.data, coupling_field_map, CouplingProperties, within_24hrs
-        )
+        props.couplings[cid_str] = _process_data(c.data, coupling_field_map, CouplingProperties, within_24hrs)
 
     return props
 
 
-def create_chip_properties(
-    username: str, source_path: str, target_path: str, chip_id: str = "64Qv1"
-) -> None:
+def create_chip_properties(username: str, source_path: str, target_path: str, chip_id: str = "64Qv1") -> None:
     """Create and write chip properties to a YAML file."""
     initialize()
     chip = ChipDocument.get_current_chip(username=username)

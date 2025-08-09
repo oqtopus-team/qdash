@@ -13,9 +13,7 @@ class ExecutionCounterDocument(Document):
     username: str
     chip_id: str
     index: int
-    system_info: SystemInfoModel = Field(
-        default_factory=SystemInfoModel, description="The system information"
-    )
+    system_info: SystemInfoModel = Field(default_factory=SystemInfoModel, description="The system information")
 
     class Settings:
         """Settings for the document."""

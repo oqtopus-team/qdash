@@ -31,9 +31,7 @@ class MenuDocument(Document):
     tasks: list[str] | None = Field(default=None, exclude=True)
     tags: list[str] | None = Field(default=None)
     task_details: dict[str, Any] | None = Field(default=None)
-    system_info: SystemInfoModel = Field(
-        default_factory=SystemInfoModel, description="The system information"
-    )
+    system_info: SystemInfoModel = Field(default_factory=SystemInfoModel, description="The system information")
 
     model_config = ConfigDict(
         from_attributes=True,

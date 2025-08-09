@@ -61,9 +61,7 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
         result = run_result.raw_result
         self.output_parameters["x90_gate_fidelity"].value = result[label]["gate_fidelity"]
         self.output_parameters["x90_gate_fidelity"].error = result[label]["gate_fidelity_err"]
-        self.output_parameters["x90_depolarizing_rate"].value = result[label]["rb_fit_result"][
-            "depolarizing_rate"
-        ]
+        self.output_parameters["x90_depolarizing_rate"].value = result[label]["rb_fit_result"]["depolarizing_rate"]
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result[label]["fig"]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
@@ -86,6 +84,4 @@ class X90InterleavedRandomizedBenchmarking(BaseTask):
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

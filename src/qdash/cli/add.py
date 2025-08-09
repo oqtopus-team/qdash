@@ -138,19 +138,17 @@ def update_active_output_parameters(username: str) -> list[ParameterModel]:
         for task_name, outputs in all_outputs.items()
     }
 
-    unique_parameter_names = {
-        param_name for outputs in converted_outputs.values() for param_name in outputs
-    }
+    unique_parameter_names = {param_name for outputs in converted_outputs.values() for param_name in outputs}
     return [
         ParameterModel(
             username=username,
             name=name,
-            unit=converted_outputs[
-                next(task for task in converted_outputs if name in converted_outputs[task])
-            ][name]["unit"],
-            description=converted_outputs[
-                next(task for task in converted_outputs if name in converted_outputs[task])
-            ][name]["description"],
+            unit=converted_outputs[next(task for task in converted_outputs if name in converted_outputs[task])][name][
+                "unit"
+            ],
+            description=converted_outputs[next(task for task in converted_outputs if name in converted_outputs[task])][
+                name
+            ]["description"],
         )
         for name in unique_parameter_names
     ]

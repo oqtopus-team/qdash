@@ -40,9 +40,7 @@ class TaskManager(BaseModel):
     calib_dir: str = ""
     controller_info: dict[str, dict] = {}
 
-    def __init__(
-        self, username: str, execution_id: str, qids: list[str] = [], calib_dir: str = "."
-    ) -> None:
+    def __init__(self, username: str, execution_id: str, qids: list[str] = [], calib_dir: str = ".") -> None:
         super().__init__(
             username=username,
             execution_id=execution_id,
@@ -72,18 +70,8 @@ class TaskManager(BaseModel):
 
     def _get_task_container(
         self, task_type: str, qid: str = ""
-    ) -> (
-        list[GlobalTaskModel]
-        | list[QubitTaskModel]
-        | list[CouplingTaskModel]
-        | list[SystemTaskModel]
-    ):
-        container: (
-            list[GlobalTaskModel]
-            | list[QubitTaskModel]
-            | list[CouplingTaskModel]
-            | list[SystemTaskModel]
-        )
+    ) -> list[GlobalTaskModel] | list[QubitTaskModel] | list[CouplingTaskModel] | list[SystemTaskModel]:
+        container: list[GlobalTaskModel] | list[QubitTaskModel] | list[CouplingTaskModel] | list[SystemTaskModel]
         if task_type == "system":
             return self.task_result.system_tasks
         if task_type == "global":
@@ -109,9 +97,7 @@ class TaskManager(BaseModel):
         error_message = f"Unknown task type: {task_type}"
         raise ValueError(error_message)
 
-    def get_task(
-        self, task_name: str, task_type: str = "global", qid: str = ""
-    ) -> BaseTaskResultModel:
+    def get_task(self, task_name: str, task_type: str = "global", qid: str = "") -> BaseTaskResultModel:
         container = self._get_task_container(task_type, qid)
         return self._find_task_in_container(container, task_name)
 
@@ -138,9 +124,7 @@ class TaskManager(BaseModel):
                 return
         raise ValueError(f"Task '{task_name}' not found in container.")
 
-    def start_all_qid_tasks(
-        self, task_name: str, task_type: str = "qubit", qids: list[str] = []
-    ) -> None:
+    def start_all_qid_tasks(self, task_name: str, task_type: str = "qubit", qids: list[str] = []) -> None:
         for qid in qids:
             self.start_task(task_name, task_type, qid)
 
@@ -155,9 +139,7 @@ class TaskManager(BaseModel):
                 return
         raise ValueError(f"Task '{task_name}' not found in container.")
 
-    def end_all_qid_tasks(
-        self, task_name: str, task_type: str = "qubit", qids: list[str] = []
-    ) -> None:
+    def end_all_qid_tasks(self, task_name: str, task_type: str = "qubit", qids: list[str] = []) -> None:
         for qid in qids:
             self.end_task(task_name, task_type, qid)
 
@@ -221,29 +203,21 @@ class TaskManager(BaseModel):
         self, task_name: str, message: str = "", task_type: str = "qubit", qids: list[str] = []
     ) -> None:
         for qid in qids:
-            self.update_task_status_to_running(
-                task_name=task_name, message=message, task_type=task_type, qid=qid
-            )
+            self.update_task_status_to_running(task_name=task_name, message=message, task_type=task_type, qid=qid)
 
     def update_all_qid_task_status_to_completed(
         self, task_name: str, message: str = "", task_type: str = "qubit", qids: list[str] = []
     ) -> None:
         for qid in qids:
-            self.update_task_status_to_completed(
-                task_name=task_name, message=message, task_type=task_type, qid=qid
-            )
+            self.update_task_status_to_completed(task_name=task_name, message=message, task_type=task_type, qid=qid)
 
     def update_all_qid_task_status_to_failed(
         self, task_name: str, message: str = "", task_type: str = "qubit", qids: list[str] = []
     ) -> None:
         for qid in qids:
-            self.update_task_status_to_failed(
-                task_name=task_name, message=message, task_type=task_type, qid=qid
-            )
+            self.update_task_status_to_failed(task_name=task_name, message=message, task_type=task_type, qid=qid)
 
-    def update_not_executed_tasks_to_skipped(
-        self, task_type: str = "global", qid: str = ""
-    ) -> None:
+    def update_not_executed_tasks_to_skipped(self, task_type: str = "global", qid: str = "") -> None:
         container = self._get_task_container(task_type, qid)
         for t in container:
             if t.status not in {TaskStatusModel.COMPLETED, TaskStatusModel.FAILED}:
@@ -292,9 +266,7 @@ class TaskManager(BaseModel):
             else:
                 raise ValueError(f"Unknown task type: {task_type}")
 
-    def put_note_to_task(
-        self, task_name: str, note: dict, task_type: str = "global", qid: str = ""
-    ) -> None:
+    def put_note_to_task(self, task_name: str, note: dict, task_type: str = "global", qid: str = "") -> None:
         container = self._get_task_container(task_type, qid)
 
         task = self._find_task_in_container(container, task_name)
@@ -405,9 +377,7 @@ class TaskManager(BaseModel):
         task.figure_path.append(str(savepath))
         self._write_figure(savepath=str(savepath), fig=figure)
 
-    def save_raw_data(
-        self, raw_data: list[ndarray], task_name: str, task_type: str = "global", qid: str = ""
-    ) -> None:
+    def save_raw_data(self, raw_data: list[ndarray], task_name: str, task_type: str = "global", qid: str = "") -> None:
         container = self._get_task_container(task_type, qid)
 
         task = self._find_task_in_container(container, task_name)
@@ -483,9 +453,7 @@ class TaskManager(BaseModel):
         task = self._find_task_in_container(container, task_name)
         return dict(task.output_parameters)
 
-    def this_task_is_completed(
-        self, task_name: str, task_type: str = "global", qid: str = ""
-    ) -> bool:
+    def this_task_is_completed(self, task_name: str, task_type: str = "global", qid: str = "") -> bool:
         """Check if the task is completed."""
         container = self._get_task_container(task_type, qid)
         task = self._find_task_in_container(container, task_name)
@@ -495,31 +463,19 @@ class TaskManager(BaseModel):
         return any(task.name == task_name for task in self.task_result.global_tasks)
 
     def _is_qubit_task(self, task_name: str) -> bool:
-        return any(
-            task_name in [task.name for task in tasks]
-            for tasks in self.task_result.qubit_tasks.values()
-        )
+        return any(task_name in [task.name for task in tasks] for tasks in self.task_result.qubit_tasks.values())
 
     def _is_coupling_task(self, task_name: str) -> bool:
-        return any(
-            task_name in [task.name for task in tasks]
-            for tasks in self.task_result.coupling_tasks.values()
-        )
+        return any(task_name in [task.name for task in tasks] for tasks in self.task_result.coupling_tasks.values())
 
     def _is_system_task(self, task_name: str) -> bool:
         return any(task.name == task_name for task in self.task_result.system_tasks)
 
     def has_only_qubit_or_global_tasks(self, task_names: list[str]) -> bool:
-        return all(
-            self._is_qubit_task(task_name) or self._is_global_task(task_name)
-            for task_name in task_names
-        )
+        return all(self._is_qubit_task(task_name) or self._is_global_task(task_name) for task_name in task_names)
 
     def has_only_coupling_or_global_tasks(self, task_names: list[str]) -> bool:
-        return all(
-            self._is_coupling_task(task_name) or self._is_global_task(task_name)
-            for task_name in task_names
-        )
+        return all(self._is_coupling_task(task_name) or self._is_global_task(task_name) for task_name in task_names)
 
     def has_only_system_tasks(self, task_names: list[str]) -> bool:
         return all(self._is_system_task(task_name) for task_name in task_names)
