@@ -35,7 +35,7 @@ def main() -> None:
 
     except ImportError as e:
         print(f"❌ Import failed: {e}")
-        print("Solution: run 'task generate-python-client'")
+        print("Solution: pip install git+https://github.com/oqtopus-team/qdash.git#subdirectory=qdash_client")
     except Exception as e:
         print(f"⚠️  Connection failed: {e}")
         print("This is expected if QDash server is not running")
