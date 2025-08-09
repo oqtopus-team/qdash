@@ -139,8 +139,8 @@ def generate_client(config: ClientConfig) -> None:
     if config.output_dir:
         output_dir = Path(config.output_dir)
     else:
-        # Generate into src/qdash/client instead of separate package
-        output_dir = project_root / "src" / "qdash" / "client"
+        # Generate into root level qdash_client package
+        output_dir = project_root / "qdash_client"
 
     print(f"🎯 Target output directory: {output_dir}")
 
@@ -161,7 +161,7 @@ def generate_client(config: ClientConfig) -> None:
             "--path",
             spec_file,
             "--output-path",
-            str(output_dir.parent),  # Generate in src/qdash/
+            str(project_root),  # Generate in project root
             "--config",
             str(config_file),
             "--overwrite",
@@ -182,6 +182,7 @@ def generate_client(config: ClientConfig) -> None:
             output_dir / "__init__.py",
             output_dir / "pyproject.toml",
             output_dir / "README.md",
+            output_dir / "py.typed",
         ]
 
         missing_files = [f for f in expected_files if not f.exists()]

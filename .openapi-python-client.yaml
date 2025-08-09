@@ -1,2 +1,6 @@
-package_name_override: "client"
+package_name_override: "qdash_client"
 class_name_override: "QDashClient"
+custom_templates: "templates/"
+post_hooks:
+  - "ruff format qdash_client/ || true"
+  - "ruff check --fix qdash_client/ || true"

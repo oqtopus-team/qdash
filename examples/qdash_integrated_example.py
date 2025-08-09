@@ -18,12 +18,12 @@ from typing import List
 
 try:
     # Modern integrated import - much cleaner!
-    from qdash.client import Client, AuthenticatedClient
-    from qdash.client.api.chip import list_chips, fetch_chip
+    from qdash.client import Client  # AuthenticatedClient unused
+    from qdash.client.api.chip import fetch_chip, list_chips
     from qdash.client.api.execution import fetch_execution_lock_status
-    from qdash.client.api.calibration import execute_calib
-    from qdash.client.models import ExecuteCalibRequest
     from qdash.client.errors import UnexpectedStatus
+    # from qdash.client.api.calibration import execute_calib  # unused
+    # from qdash.client.models import ExecuteCalibRequest  # unused
 
     # Alternative: Direct from qdash root (if properly configured)
     # from qdash import Client, AuthenticatedClient
@@ -134,7 +134,7 @@ def demo_integrated_client():
             first_chip = chips[0]
             print(f"\n🔍 Getting details for chip: {first_chip.name}")
             details = qm.get_chip_details(first_chip.name)
-            print(f"✅ Chip details:")
+            print("✅ Chip details:")
             print(f"   • Qubits: {len(details.qubits)}")
             print(f"   • Couplings: {len(details.couplings)}")
             print(f"   • ID: {details.id}")
@@ -157,9 +157,7 @@ async def demo_async_analysis():
         print("✅ Analysis completed:")
         for chip_name, result in results.items():
             if result["status"] == "success":
-                print(
-                    f"   • {chip_name}: {result['qubits']} qubits, {result['couplings']} couplings"
-                )
+                print(f"   • {chip_name}: {result['qubits']} qubits, {result['couplings']} couplings")
             else:
                 print(f"   • {chip_name}: ❌ {result.get('error', 'Unknown error')}")
 
@@ -209,14 +207,14 @@ async def main():
     await demo_async_analysis()
     demo_direct_api_access()
 
-    print(f"\n✨ Demo completed!")
-    print(f"\n📖 Key Integration Benefits:")
-    print(f"   • Clean imports: from qdash.client import Client")
-    print(f"   • Part of main qdash package")
-    print(f"   • No separate package to manage")
-    print(f"   • Integrated with quantum calibration workflows")
-    print(f"   • Type-safe attrs models")
-    print(f"   • Full async/await support")
+    print("\n✨ Demo completed!")
+    print("\n📖 Key Integration Benefits:")
+    print("   • Clean imports: from qdash.client import Client")
+    print("   • Part of main qdash package")
+    print("   • No separate package to manage")
+    print("   • Integrated with quantum calibration workflows")
+    print("   • Type-safe attrs models")
+    print("   • Full async/await support")
 
 
 if __name__ == "__main__":

@@ -206,10 +206,7 @@ def visualize_combined_schedule(
         G.add_node(qid)
 
     plt.figure(figsize=(10, 8))
-    node_colors = [
-        plt.cm.get_cmap("tab20")(qid_to_mux[qid] % 20) if qid in qid_to_mux else "gray"
-        for qid in G.nodes
-    ]
+    node_colors = [plt.cm.get_cmap("tab20")(qid_to_mux[qid] % 20) if qid in qid_to_mux else "gray" for qid in G.nodes]
 
     nx.draw(
         G,
@@ -222,8 +219,7 @@ def visualize_combined_schedule(
     nx.draw_networkx_edge_labels(G, pos=lattice_pos, edge_labels=edge_labels, font_size=8)
 
     step_handles = [
-        plt.Line2D([0], [0], color=cmap(i % 10), lw=2, label=f"Step {i+1}")
-        for i in range(len(schedule["serial"]))
+        plt.Line2D([0], [0], color=cmap(i % 10), lw=2, label=f"Step {i+1}") for i in range(len(schedule["serial"]))
     ]
     plt.legend(handles=step_handles, bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.title("Combined CR Schedule with Step Labels")
@@ -244,8 +240,7 @@ def visualize_each_step(
             G.add_node(qid)
 
         node_colors = [
-            plt.cm.get_cmap("tab20")(qid_to_mux[qid] % 20) if qid in qid_to_mux else "gray"
-            for qid in G.nodes
+            plt.cm.get_cmap("tab20")(qid_to_mux[qid] % 20) if qid in qid_to_mux else "gray" for qid in G.nodes
         ]
 
         plt.figure(figsize=(8, 6))
@@ -255,9 +250,7 @@ def visualize_each_step(
         plt.savefig(f"schedule/schedule_step_{i + 1}.png", dpi=300, bbox_inches="tight")
 
 
-def split_fast_slow_pairs(
-    cr_pairs: list[str], qid_to_mux: dict[str, int]
-) -> tuple[list[str], list[str]]:
+def split_fast_slow_pairs(cr_pairs: list[str], qid_to_mux: dict[str, int]) -> tuple[list[str], list[str]]:
     fast = []
     slow = []
     for pair in cr_pairs:
@@ -314,9 +307,7 @@ if __name__ == "__main__":
     qid_to_mux = build_qubit_to_mux_map(yaml_data["64Qv1"])
 
     fast_pairs, slow_pairs = split_fast_slow_pairs(cr_pairs, qid_to_mux)
-    grouped_fast = group_cr_pairs_by_conflict(
-        fast_pairs, qid_to_mux, mux_conflict_map, MAX_PARALLEL_OPS
-    )
+    grouped_fast = group_cr_pairs_by_conflict(fast_pairs, qid_to_mux, mux_conflict_map, MAX_PARALLEL_OPS)
     # grouped_slow = group_cr_pairs_by_conflict(
     #     slow_pairs, qid_to_mux, mux_conflict_map, MAX_PARALLEL_OPS
     # )
