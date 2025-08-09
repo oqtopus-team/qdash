@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "gpt": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/orangekame3/gpt-mcp.git",
+        "gpt-mcp"
+      ],
+      "env": {
+        "OPENAI_API_KEY": "your-api-key",
+        "OPENAI_MODEL": "gpt-5",
+        "SEARCH_CONTEXT_SIZE": "medium",
+        "REASONING_EFFORT": "medium",
+        "OPENAI_API_TIMEOUT": "60",
+        "OPENAI_MAX_RETRIES": "3"
+      }
+    },
+    "serena": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server"
+      ]
+    }
+  }
+}
