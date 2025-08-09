@@ -147,16 +147,55 @@ def generate_client(config: ClientConfig) -> None:
     # Fetch OpenAPI spec
     openapi_spec = fetch_openapi_spec(config.openapi_url)
 
-    # Backup existing .gitignore and pyproject.toml to prevent overwrite
-    gitignore_path = project_root / ".gitignore"
-    gitignore_backup = None
-    if gitignore_path.exists():
-        gitignore_backup = gitignore_path.read_text()
-
-    pyproject_path = project_root / "pyproject.toml"
-    pyproject_backup = None
-    if pyproject_path.exists():
-        pyproject_backup = pyproject_path.read_text()
+    # Backup existing important files to prevent overwrite
+    backups = {}
+    
+    # Read files to protect from .qdash-preserve file
+    files_to_protect = [
+        project_root / ".gitignore",
+        project_root / "pyproject.toml"
+    ]
+    
+    # Add files from preserve list
+    preserve_file = output_dir / ".qdash-preserve"
+    if preserve_file.exists():
+        try:
+            preserve_content = preserve_file.read_text(encoding='utf-8')
+            for line in preserve_content.split('
+'):
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    # Handle relative paths from qdash_client directory
+                    if line.startswith('../'):
+                        file_path = output_dir / line
+                    else:
+                        file_path = output_dir / line
+                    files_to_protect.append(file_path.resolve())
+            print(f"📋 Loaded {len(files_to_protect)-2} files from preserve list")
+        except Exception as e:
+            print(f"⚠️  Failed to read preserve file: {e}")
+    else:
+        # Fallback to hardcoded list
+        files_to_protect.extend([
+            output_dir / "src" / "qdash_client" / "qdash.py",
+            output_dir / "src" / "qdash_client" / "exceptions.py",
+            project_root / "examples" / "enhanced_client_demo.py",
+            project_root / "examples" / "automatic_api_demo.py",
+            project_root / "examples" / "usage_comparison.md"
+        ])
+    
+    print("🛡️  Backing up enhanced files...")
+    for file_path in files_to_protect:
+        if file_path.exists():
+            try:
+                backups[file_path] = file_path.read_text(encoding='utf-8')
+                print(f"   ✅ Backed up: {file_path.relative_to(project_root)}")
+            except Exception as e:
+                print(f"   ⚠️  Failed to backup {file_path}: {e}")
+    
+    # Legacy backup variables for compatibility
+    gitignore_backup = backups.get(project_root / ".gitignore")
+    pyproject_backup = backups.get(project_root / "pyproject.toml")
 
     # Write spec to temporary file
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -200,14 +239,18 @@ def generate_client(config: ClientConfig) -> None:
         if missing_files:
             print(f"⚠️  Some expected files are missing: {missing_files}")
 
-        # Restore original .gitignore and pyproject.toml if they were backed up
-        if gitignore_backup is not None:
-            gitignore_path.write_text(gitignore_backup)
-            print("🔄 Restored original .gitignore")
-
-        if pyproject_backup is not None:
-            pyproject_path.write_text(pyproject_backup)
-            print("🔄 Restored original pyproject.toml")
+        # Restore all backed up files
+        print("🔄 Restoring enhanced files...")
+        for file_path, content in backups.items():
+            try:
+                # Ensure parent directory exists
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.write_text(content, encoding='utf-8')
+                print(f"   ✅ Restored: {file_path.relative_to(project_root)}")
+            except Exception as e:
+                print(f"   ❌ Failed to restore {file_path}: {e}")
+                
+        print("✨ Enhanced client files preserved!")
 
         print("✅ Python client generated successfully!")
         print(f"📁 Location: {output_dir}")

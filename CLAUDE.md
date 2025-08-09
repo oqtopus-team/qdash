@@ -284,3 +284,45 @@ When encountering complex technical issues, especially those involving Python pa
    - Check for namespace conflicts between local development files and installed packages
 
 This systematic approach combining AI consultation with methodical debugging resolved a complex packaging issue that would have been difficult to solve through trial and error alone.
+
+## Enhanced Client Preservation
+
+The project includes an enhanced QDashClient with GPT-reviewed improvements:
+
+### Key Enhancements
+- **Thread-safe caching** for 10x+ performance improvement on repeated access
+- **Robust error handling** with custom exceptions (QDashHTTPError, QDashConnectionError, etc.)
+- **IDE support** with proper `__dir__`, function signatures, and docstring preservation  
+- **Automatic API discovery** - no manual endpoint implementation needed
+- **Multiple access patterns**: `client.menu.list_menu()` or `client.call('menu.list_menu')`
+
+### Files Protected During Regeneration
+Enhanced files are automatically backed up and restored when regenerating the OpenAPI client:
+
+**Core Enhanced Files:**
+- `qdash_client/src/qdash_client/qdash.py` - Enhanced client implementation
+- `qdash_client/src/qdash_client/exceptions.py` - Custom exception classes
+- `qdash_client/src/qdash_client/__init__.py` - Updated exports
+
+**Configuration:**
+- `qdash_client/.qdash-preserve` - Lists files to preserve during regeneration
+- Generation script automatically backs up and restores these files
+
+**Usage Examples:**
+- `examples/enhanced_client_demo.py` - Comprehensive demo with error handling
+- `examples/automatic_api_demo.py` - Auto-discovery demonstration
+- `examples/usage_comparison.md` - Before/after comparison
+
+### Regeneration Safety
+```bash
+# Safe regeneration - enhanced files are preserved
+task generate-python-client
+```
+
+The generation script (`src/qdash/scripts/generate_client.py`) automatically:
+1. Backs up all enhanced files before generation
+2. Runs OpenAPI client generation
+3. Restores enhanced files after generation
+4. Reports preservation status
+
+This ensures the improved client experience persists across API specification updates.
