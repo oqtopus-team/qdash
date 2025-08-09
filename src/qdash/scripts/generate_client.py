@@ -217,7 +217,7 @@ def generate_client(config: ClientConfig) -> None:
         print("   Option 1: Install standalone (recommended for client-only usage):")
         print(f"      pip install {output_dir}")
         print("      # Or from GitHub:")
-        print("      pip install git+https://github.com/oqtopus-team/qdash.git#subdirectory=src/qdash/client")
+        print("      pip install git+https://github.com/oqtopus-team/qdash.git#subdirectory=qdash_client")
         print()
         print("   Option 2: Use as part of qdash package:")
         print("      pip install git+https://github.com/oqtopus-team/qdash.git")
