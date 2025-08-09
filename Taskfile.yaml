@@ -69,18 +69,18 @@ tasks:
 
   fmt:
     cmds:
-      - uv run ruff format .  # Excludes generated client (see pyproject.toml)
+      - uv run ruff format . # Excludes generated client (see pyproject.toml)
       - npx prettier . --write
     desc: Format common code
 
   fmt-python:
     cmds:
-      - uv run ruff format .  # Excludes generated client (see pyproject.toml)
+      - uv run ruff format . # Excludes generated client (see pyproject.toml)
     desc: Format Python code only
 
   lint:
     cmds:
-      - uv run ruff check .  # Excludes generated client (see pyproject.toml)
+      - uv run ruff check . # Excludes generated client (see pyproject.toml)
       - uv run ruff format --check .
     desc: Run linting checks
 

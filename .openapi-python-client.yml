@@ -1,0 +1,2 @@
+package_name_override: "client"
+class_name_override: "QDashClient"
