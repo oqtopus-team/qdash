@@ -121,9 +121,7 @@ class ChipResponse(BaseModel):
     installed_at: str = ""
 
 
-@router.get(
-    "/chip", response_model=list[ChipResponse], summary="Fetch all chips", operation_id="listChips"
-)
+@router.get("/chip", response_model=list[ChipResponse], summary="Fetch all chips", operation_id="listChips")
 def list_chips(
     current_user: Annotated[User, Depends(get_optional_current_user)],
 ) -> list[ChipResponse]:
@@ -185,25 +183,17 @@ def fetch_chip_dates(
 
     """
     logger.debug(f"Fetching dates for chip {chip_id}, user: {current_user.username}")
-    counter_list = ExecutionCounterDocument.find(
-        {"chip_id": chip_id, "username": current_user.username}
-    ).run()
+    counter_list = ExecutionCounterDocument.find({"chip_id": chip_id, "username": current_user.username}).run()
     if not counter_list:
-        raise ValueError(
-            f"No execution counter found for chip {chip_id} and user {current_user.username}"
-        )
+        raise ValueError(f"No execution counter found for chip {chip_id} and user {current_user.username}")
     # Extract unique dates from the counter
     dates = [counter.date for counter in counter_list]
     # Return dates in a format matching the API schema
     return ChipDatesResponse(data=dates)
 
 
-@router.get(
-    "/chip/{chip_id}", response_model=ChipResponse, summary="Fetch a chip", operation_id="fetchChip"
-)
-def fetch_chip(
-    chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]
-) -> ChipResponse:
+@router.get("/chip/{chip_id}", response_model=ChipResponse, summary="Fetch a chip", operation_id="fetchChip")
+def fetch_chip(chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]) -> ChipResponse:
     """Fetch a chip by its ID.
 
     Parameters
@@ -381,9 +371,7 @@ def fetch_execution_by_chip_id(
         Detailed execution information
 
     """
-    logger.debug(
-        f"Fetching execution {execution_id} for chip {chip_id}, user: {current_user.username}"
-    )
+    logger.debug(f"Fetching execution {execution_id} for chip {chip_id}, user: {current_user.username}")
     execution = ExecutionHistoryDocument.find_one(
         {"execution_id": execution_id, "chip_id": chip_id, "username": current_user.username}
     ).run()
@@ -521,9 +509,7 @@ def fetch_mux_detail(
     operation_id="listMuxes",
     response_model_exclude_none=True,
 )
-def list_muxes(
-    chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]
-) -> ListMuxResponse:
+def list_muxes(chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]) -> ListMuxResponse:
     """Fetch the multiplexers.
 
     Parameters
@@ -621,9 +607,7 @@ def fetch_historical_qubit_task_grouped_by_chip(
         Historical task results for all qubits on the specified date
 
     """
-    logger.debug(
-        f"Fetching historical task results for chip {chip_id}, task {task_name}, date {recorded_date}"
-    )
+    logger.debug(f"Fetching historical task results for chip {chip_id}, task {task_name}, date {recorded_date}")
 
     # Get chip info
     chip = ChipHistoryDocument.find_one(
@@ -667,9 +651,7 @@ def fetch_historical_qubit_task_grouped_by_chip(
             calibrated_at = None
 
         fidelity_map[k] = (
-            value > QUBIT_FIDELITY_THRESHOLD
-            and calibrated_at is not None
-            and start_time <= calibrated_at <= end_time
+            value > QUBIT_FIDELITY_THRESHOLD and calibrated_at is not None and start_time <= calibrated_at <= end_time
         )
     # Organize results by qid
     task_results: dict[str, TaskResultHistoryDocument] = {}
@@ -813,9 +795,7 @@ def fetch_historical_coupling_task_grouped_by_chip(
         Historical task results for all qubits on the specified date
 
     """
-    logger.debug(
-        f"Fetching historical task results for chip {chip_id}, task {task_name}, date {recorded_date}"
-    )
+    logger.debug(f"Fetching historical task results for chip {chip_id}, task {task_name}, date {recorded_date}")
 
     # Get chip info
     chip = ChipHistoryDocument.find_one(
@@ -1115,6 +1095,4 @@ def fetch_timeseries_task_result_by_tag_and_parameter(
 
     """
     logger.debug(f"Fetching timeseries task result for tag {tag}, parameter {parameter}")
-    return _fetch_timeseries_data(
-        chip_id, tag, parameter, current_user, start_at=start_at, end_at=end_at
-    )
+    return _fetch_timeseries_data(chip_id, tag, parameter, current_user, start_at=start_at, end_at=end_at)

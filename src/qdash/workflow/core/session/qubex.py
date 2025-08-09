@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from typing import Any
 
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
@@ -42,9 +41,7 @@ class QubexSession(BaseSession):
             from qubex import Experiment
 
             if self._config.get("task_type") == "qubit":
-                qubits = [
-                    int(qid) for qid in self._config.get("qids", [])
-                ]  # e.g. : ["0", "1", "2"] → [0, 1, 2]
+                qubits = [int(qid) for qid in self._config.get("qids", [])]  # e.g. : ["0", "1", "2"] → [0, 1, 2]
             elif self._config.get("task_type") == "coupling":
                 qubits = sorted(
                     {int(q) for qid in self._config.get("qids", []) for q in qid.split("-")}
@@ -79,20 +76,13 @@ class QubexSession(BaseSession):
             raise RuntimeError(msg)
         return str(exp.calib_note)
 
-    def save_note(
-        self, username: str, calib_dir: str, execution_id: str, task_manager_id: str
-    ) -> None:
+    def save_note(self, username: str, calib_dir: str, execution_id: str, task_manager_id: str) -> None:
         """Save the calibration note to the experiment."""
         # Initialize calibration note
         note_path = Path(f"{calib_dir}/calib_note/{task_manager_id}.json")
         note_path.parent.mkdir(parents=True, exist_ok=True)
 
-        master_doc = (
-            CalibrationNoteDocument.find({"task_id": "master"})
-            .sort([("timestamp", -1)])
-            .limit(1)
-            .run()
-        )
+        master_doc = CalibrationNoteDocument.find({"task_id": "master"}).sort([("timestamp", -1)]).limit(1).run()
 
         if not master_doc:
             master_doc = CalibrationNoteDocument.upsert_note(
@@ -105,9 +95,7 @@ class QubexSession(BaseSession):
             master_doc = master_doc[0]
         note_path.write_text(json.dumps(master_doc.note, indent=2))
 
-    def update_note(
-        self, username: str, calib_dir: str, execution_id: str, task_manager_id: str
-    ) -> None:
+    def update_note(self, username: str, calib_dir: str, execution_id: str, task_manager_id: str) -> None:
         """Update the calibration note in the experiment."""
         calib_note = json.loads(self.get_note())
         task_doc = CalibrationNoteDocument.find_one(

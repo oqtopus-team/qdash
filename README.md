@@ -21,9 +21,32 @@ QDash is a web application that provides a user-friendly interface to manage and
 
 - **⚙️ Settings**: Configure calibration parameters and adjust workflow settings to meet specific requirements seamlessly.
 
+## Quick Start
+
+### Install Python Client
+
+```bash
+# Install QDash with Python client support
+pip install "git+https://github.com/oqtopus-team/qdash.git[client]"
+
+# Generate the client (requires running QDash API server)
+generate-python-client
+```
+
+### Use Python Client
+
+```python
+from qdash.client import Client
+
+# Create client and use QDash API
+client = Client(base_url="http://localhost:5715")
+# ... your quantum calibration workflows
+```
+
 ## Documentation
 
 - [Documentation Home](https://qdash.readthedocs.io/en/stable/)
+- [Python Client Guide](docs/python-client.md) - Auto-generated Python client for QDash API
 
 ## CITATION
 

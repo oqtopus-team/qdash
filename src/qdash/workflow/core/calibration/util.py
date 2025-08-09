@@ -40,9 +40,7 @@ def convert_output_parameters(username: str, outputs: dict[str, any]) -> dict[st
     """Convert the output parameters to the Parameter class."""
     converted = {}
     for param_name, output in outputs.items():
-        param = ParameterModel(
-            username=username, name=param_name, unit=output.unit, description=output.description
-        )  # type: ignore # noqa: PGH003
+        param = ParameterModel(username=username, name=param_name, unit=output.unit, description=output.description)  # type: ignore # noqa: PGH003
         converted[param_name] = param.model_dump()
     return converted
 
@@ -63,19 +61,17 @@ def update_active_output_parameters(username: str, backend: str) -> list[Paramet
         for task_name, outputs in all_outputs.items()
     }
 
-    unique_parameter_names = {
-        param_name for outputs in converted_outputs.values() for param_name in outputs
-    }
+    unique_parameter_names = {param_name for outputs in converted_outputs.values() for param_name in outputs}
     return [
         ParameterModel(
             username=username,
             name=name,
-            unit=converted_outputs[
-                next(task for task in converted_outputs if name in converted_outputs[task])
-            ][name]["unit"],
-            description=converted_outputs[
-                next(task for task in converted_outputs if name in converted_outputs[task])
-            ][name]["description"],
+            unit=converted_outputs[next(task for task in converted_outputs if name in converted_outputs[task])][name][
+                "unit"
+            ],
+            description=converted_outputs[next(task for task in converted_outputs if name in converted_outputs[task])][
+                name
+            ]["description"],
         )
         for name in unique_parameter_names
     ]
@@ -92,12 +88,8 @@ def update_active_tasks(username: str, backend: str) -> list[TaskModel]:
             name=cls.name,
             description=cls.__doc__,
             task_type=cls.task_type,
-            input_parameters={
-                name: param.model_dump() for name, param in cls.input_parameters.items()
-            },
-            output_parameters={
-                name: param.model_dump() for name, param in cls.output_parameters.items()
-            },
+            input_parameters={name: param.model_dump() for name, param in cls.input_parameters.items()},
+            output_parameters={name: param.model_dump() for name, param in cls.output_parameters.items()},
         )
         for cls in task_cls.values()
     ]

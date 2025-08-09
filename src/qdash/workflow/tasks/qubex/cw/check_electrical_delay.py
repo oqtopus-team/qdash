@@ -18,9 +18,7 @@ class CheckElectricalDelay(BaseTask):
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "electrical_delay": OutputParameterModel(
-            unit="ns", description="Electrical delay", value_type="float"
-        )
+        "electrical_delay": OutputParameterModel(unit="ns", description="Electrical delay", value_type="float")
     }
 
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002

@@ -59,9 +59,7 @@ class CustomSimulationResult(SimulationResult):
                 populations[f"|{basis}〉"].append(prob)
 
         sampled_times = self.get_times(n_samples=n_samples)
-        sampled_populations = {
-            key: downsample(np.asarray(value), n_samples) for key, value in populations.items()
-        }
+        sampled_populations = {key: downsample(np.asarray(value), n_samples) for key, value in populations.items()}
 
         fig = go.Figure()
         for key, value in sampled_populations.items():
@@ -162,6 +160,4 @@ class FakeRabi(BaseTask):
 
     def batch_run(self, session: FakeSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

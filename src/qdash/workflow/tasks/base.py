@@ -116,9 +116,7 @@ class BaseTask(ABC):
                 if name in self.input_parameters:
                     value = param_data.get("value")
                     if value is not None:
-                        value_type = param_data.get(
-                            "value_type", self.input_parameters[name].value_type
-                        )
+                        value_type = param_data.get("value_type", self.input_parameters[name].value_type)
                         converted_value = self._convert_value_to_type(value, value_type)
                         self.input_parameters[name].value = converted_value
 

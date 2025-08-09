@@ -57,9 +57,7 @@ def download_zip_file(path: str) -> FileResponse:
         if source_path.is_dir():
             # If it's a directory, zip its contents
             # make_archive returns the path to the created zip file
-            actual_zip_path = Path(
-                shutil.make_archive(str(temp_dir_path / source_path.name), "zip", source_path)
-            )
+            actual_zip_path = Path(shutil.make_archive(str(temp_dir_path / source_path.name), "zip", source_path))
         else:
             # If it's a file, create a zip containing just that file
             actual_zip_path = temp_dir_path / zip_filename

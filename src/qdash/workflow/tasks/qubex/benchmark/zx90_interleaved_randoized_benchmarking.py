@@ -59,24 +59,18 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         exp = session.get_session()
-        label = "-".join(
-            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
-        )  # e.g., "0-1" → "Q00-Q01"
+        label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
         result = run_result.raw_result
         self.output_parameters["zx90_gate_fidelity"].value = result[label]["gate_fidelity"]
         self.output_parameters["zx90_gate_fidelity"].error = result[label]["gate_fidelity_err"]
-        self.output_parameters["zx90_depolarizing_rate"].value = result[label]["rb_fit_result"][
-            "depolarizing_rate"
-        ]
+        self.output_parameters["zx90_depolarizing_rate"].value = result[label]["rb_fit_result"]["depolarizing_rate"]
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result[label]["fig"]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         exp = session.get_session()
-        label = "-".join(
-            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
-        )  # e.g., "0-1" → "Q00-Q01"
+        label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
         result = exp.interleaved_randomized_benchmarking(
             targets=label,
             interleaved_clifford="ZX90",
@@ -91,6 +85,4 @@ class ZX90InterleavedRandomizedBenchmarking(BaseTask):
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

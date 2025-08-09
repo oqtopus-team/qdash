@@ -19,9 +19,7 @@ class CreatePIPulse(BaseTask):
     backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "duration": InputParameterModel(
-            unit="ns", value_type="int", value=PI_DURATION, description="PI pulse length"
-        ),
+        "duration": InputParameterModel(unit="ns", value_type="int", value=PI_DURATION, description="PI pulse length"),
         "shots": InputParameterModel(
             unit="",
             value_type="int",
@@ -69,6 +67,4 @@ class CreatePIPulse(BaseTask):
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

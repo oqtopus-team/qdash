@@ -18,15 +18,9 @@ class CheckReflectionCoefficient(BaseTask):
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "fine_resonator_frequency": OutputParameterModel(
-            unit="GHz", description="Fine resonator frequency"
-        ),
-        "kappa_external": OutputParameterModel(
-            unit="MHz", description="External coupling rate (kappa_external)"
-        ),
-        "kappa_internal": OutputParameterModel(
-            unit="MHz", description="Internal coupling rate (kappa_internal)"
-        ),
+        "fine_resonator_frequency": OutputParameterModel(unit="GHz", description="Fine resonator frequency"),
+        "kappa_external": OutputParameterModel(unit="MHz", description="External coupling rate (kappa_external)"),
+        "kappa_internal": OutputParameterModel(unit="MHz", description="Internal coupling rate (kappa_internal)"),
     }
 
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002

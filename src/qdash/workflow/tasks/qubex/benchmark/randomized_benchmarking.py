@@ -59,9 +59,7 @@ class RandomizedBenchmarking(BaseTask):
         label = exp.get_qubit_label(int(qid))
         result = run_result.raw_result
         self.output_parameters["average_gate_fidelity"].value = result[label]["avg_gate_fidelity"]
-        self.output_parameters["average_gate_fidelity"].error = result[label][
-            "avg_gate_fidelity_err"
-        ]
+        self.output_parameters["average_gate_fidelity"].error = result[label]["avg_gate_fidelity_err"]
         self.output_parameters["depolarizing_rate"].value = result[label]["depolarizing_rate"]
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result[label]["fig"]]
@@ -83,6 +81,4 @@ class RandomizedBenchmarking(BaseTask):
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

@@ -45,9 +45,7 @@ class CheckRamsey(BaseTask):
         ),
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "ramsey_frequency": OutputParameterModel(
-            unit="MHz", description="Ramsey oscillation frequency"
-        ),
+        "ramsey_frequency": OutputParameterModel(unit="MHz", description="Ramsey oscillation frequency"),
         "bare_frequency": OutputParameterModel(unit="GHz", description="Qubit bare frequency"),
         "t2_star": OutputParameterModel(unit="μs", description="T2* time"),
     }
@@ -119,9 +117,7 @@ class CheckRamsey(BaseTask):
         label = exp.get_qubit_label(int(qid))
         result_x = run_result.raw_result["x"].data[label]
         result_y = run_result.raw_result["y"].data[label]
-        self.output_parameters["ramsey_frequency"].value = (
-            result_y.fit()["f"] * 1000
-        )  # convert to MHz
+        self.output_parameters["ramsey_frequency"].value = result_y.fit()["f"] * 1000  # convert to MHz
         self.output_parameters["ramsey_frequency"].error = result_y.fit()["f_err"] * 1000
         self.output_parameters["bare_frequency"].value = result_y.bare_freq
         self.output_parameters["t2_star"].value = result_y.t2 * 0.001  # convert to μs
@@ -133,9 +129,7 @@ class CheckRamsey(BaseTask):
             self.make_figure(result_x, result_y, label),
         ]
         raw_data = [result_y.data]
-        return PostProcessResult(
-            output_parameters=output_parameters, figures=figures, raw_data=raw_data
-        )
+        return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         """Run the task."""
@@ -166,6 +160,4 @@ class CheckRamsey(BaseTask):
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

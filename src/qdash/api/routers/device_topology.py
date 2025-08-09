@@ -245,9 +245,7 @@ def get_device_topology(
     logger.info(f"current user: {current_user.username}")
     qubits = []
     couplings = []
-    latest = (
-        CalibrationNoteDocument.find({"task_id": "master"}).sort([("timestamp", -1)]).limit(1).run()
-    )[0]
+    latest = (CalibrationNoteDocument.find({"task_id": "master"}).sort([("timestamp", -1)]).limit(1).run())[0]
     cr_params = latest.note["cr_params"]
     drag_hpi_params = latest.note["drag_hpi_params"]
     drag_pi_params = latest.note["drag_pi_params"]
@@ -270,13 +268,9 @@ def get_device_topology(
             x90_data, request.condition.qubit_fidelity.is_within_24h, fallback=0.25
         )
         # t1 = t1_data["value"] if is_within_24h(t1_data.get("calibrated_at")) else 100.0
-        t1 = get_value_within_24h_fallback(
-            t1_data, request.condition.qubit_fidelity.is_within_24h, fallback=100.0
-        )
+        t1 = get_value_within_24h_fallback(t1_data, request.condition.qubit_fidelity.is_within_24h, fallback=100.0)
         # t2 = t2_data["value"] if is_within_24h(t2_data.get("calibrated_at")) else 100.0
-        t2 = get_value_within_24h_fallback(
-            t2_data, request.condition.qubit_fidelity.is_within_24h, fallback=100.0
-        )
+        t2 = get_value_within_24h_fallback(t2_data, request.condition.qubit_fidelity.is_within_24h, fallback=100.0)
         drag_hpi_duration = drag_hpi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
         drag_pi_duration = drag_pi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
         # readout_fidelity_0 = (
@@ -340,9 +334,7 @@ def get_device_topology(
             control, target = split_q_string(cr_key)
             cr_duration = cr_value.get("duration", 20)
             # Get coupling fidelity data with timestamp check
-            coupling_data = chip_docs.couplings[f"{control}-{target}"].data.get(
-                "zx90_gate_fidelity", {}
-            )
+            coupling_data = chip_docs.couplings[f"{control}-{target}"].data.get("zx90_gate_fidelity", {})
             # zx90_gate_fidelity = (
             #     coupling_data["value"]
             #     if is_within_24h(coupling_data.get("calibrated_at"))
@@ -358,8 +350,7 @@ def get_device_topology(
                 # Normalize both the current coupling key and all excluded couplings
                 current_coupling = normalize_coupling_key(control, target)
                 excluded_couplings = {
-                    normalize_coupling_key(*coupling.split("-"))
-                    for coupling in request.exclude_couplings
+                    normalize_coupling_key(*coupling.split("-")) for coupling in request.exclude_couplings
                 }
 
                 if current_coupling not in excluded_couplings:
@@ -379,11 +370,7 @@ def get_device_topology(
     filtered_qubits = [
         qubit
         for qubit in qubits
-        if (
-            request.condition.qubit_fidelity.min
-            <= qubit.fidelity
-            <= request.condition.qubit_fidelity.max
-        )
+        if (request.condition.qubit_fidelity.min <= qubit.fidelity <= request.condition.qubit_fidelity.max)
     ]
 
     filtered_qubits = [
@@ -403,9 +390,7 @@ def get_device_topology(
         coupling
         for coupling in couplings
         if (
-            request.condition.coupling_fidelity.min
-            <= coupling.fidelity
-            <= request.condition.coupling_fidelity.max
+            request.condition.coupling_fidelity.min <= coupling.fidelity <= request.condition.coupling_fidelity.max
             and coupling.control in valid_qubit_ids
             and coupling.target in valid_qubit_ids
         )
@@ -489,10 +474,7 @@ def generate_device_plot(data: dict) -> bytes:
     nx.draw_networkx_edges(g, pos, width=3)
 
     # Add physical ID and fidelity labels in white
-    labels = {
-        node: f"Q{g.nodes[node]['physical_id']}\n{g.nodes[node]['fidelity']*100:.2f}%"
-        for node in g.nodes
-    }
+    labels = {node: f"Q{g.nodes[node]['physical_id']}\n{g.nodes[node]['fidelity']*100:.2f}%" for node in g.nodes}
     nx.draw_networkx_labels(g, pos, labels, font_size=12, font_weight="bold", font_color="white")
 
     # Add edge labels with adjusted position

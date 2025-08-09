@@ -43,9 +43,7 @@ class QubitDocument(Document):
         """Settings for the document."""
 
         name = "qubit"
-        indexes: ClassVar = [
-            IndexModel([("chip_id", ASCENDING), ("qid", ASCENDING), ("username")], unique=True)
-        ]
+        indexes: ClassVar = [IndexModel([("chip_id", ASCENDING), ("qid", ASCENDING), ("username")], unique=True)]
 
     @staticmethod
     def merge_calib_data(existing: dict, new: dict) -> dict:
@@ -80,9 +78,7 @@ class QubitDocument(Document):
                 new_param = new_data[metric]
                 new_value = new_param.value if hasattr(new_param, "value") else 0.0
                 # Initialize if metric doesn't exist in best_data or new value is better
-                current_value = (
-                    current_best[metric].get("value", 0.0) if metric in current_best else 0.0
-                )
+                current_value = current_best[metric].get("value", 0.0) if metric in current_best else 0.0
                 if metric not in current_best or new_value > current_value:
                     # Convert OutputParameterModel to dict for storage
                     current_best[metric] = {
@@ -98,9 +94,7 @@ class QubitDocument(Document):
         return current_best
 
     @classmethod
-    def update_calib_data(
-        cls, username: str, qid: str, chip_id: str, output_parameters: dict
-    ) -> "QubitDocument":
+    def update_calib_data(cls, username: str, qid: str, chip_id: str, output_parameters: dict) -> "QubitDocument":
         """Update the QubitDocument's calibration data with new values."""
         qubit_doc = cls.find_one({"username": username, "qid": qid, "chip_id": chip_id}).run()
         if qubit_doc is None:

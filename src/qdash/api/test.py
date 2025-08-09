@@ -1,7 +1,6 @@
 from qdash.db.init.initialize import initialize
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
-from qdash.workflow.core.calibration.util import qid_to_label
 
 initialize()
 

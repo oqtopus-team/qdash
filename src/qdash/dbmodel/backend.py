@@ -22,9 +22,7 @@ class BackendDocument(Document):
 
     username: str = Field(..., description="The username of the user who created the task")
     name: str = Field(..., description="The name of backend")
-    system_info: SystemInfoModel = Field(
-        default_factory=SystemInfoModel, description="The system information"
-    )
+    system_info: SystemInfoModel = Field(default_factory=SystemInfoModel, description="The system information")
 
     model_config = ConfigDict(
         from_attributes=True,

@@ -58,14 +58,10 @@ def migrate_history_dates() -> None:
                         new_date = date_obj.in_timezone("Asia/Tokyo").format("YYYYMMDD")
 
                     if new_date != recorded_date:
-                        console.print(
-                            f"[yellow]Converting date format: {recorded_date} -> {new_date}[/]"
-                        )
+                        console.print(f"[yellow]Converting date format: {recorded_date} -> {new_date}[/]")
                         doc.recorded_date = new_date
                         doc.save()
-                        console.print(
-                            f"[green]Successfully updated document with new date: {new_date}[/]"
-                        )
+                        console.print(f"[green]Successfully updated document with new date: {new_date}[/]")
                     else:
                         console.print(f"[blue]Date already in correct format: {recorded_date}[/]")
 
@@ -102,9 +98,7 @@ def migrate_v1_0_16_to_v1_0_17(
         menus = MenuDocument.find({"username": username}).run()
         for menu in menus:
             logging.info(f"Updated menu: {menu.username} - {menu.name} with chip ID: {chip_id}")
-            logging.info(
-                f"Migration from v1.0.16 to v1.0.17 completed successfully (username: {username})"
-            )
+            logging.info(f"Migration from v1.0.16 to v1.0.17 completed successfully (username: {username})")
             menu.chip_id = chip_id
             menu.save()
     except Exception as e:

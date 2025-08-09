@@ -337,9 +337,7 @@ async def fetch_all_calib_schedule(
     for flow in flows:
         time = flow.next_scheduled_start_time
         if time is not None:
-            next_scheduled_start_time = time.in_timezone("Asia/Tokyo").strftime(
-                "%Y-%m-%d %H:%M:%S%z"
-            )
+            next_scheduled_start_time = time.in_timezone("Asia/Tokyo").strftime("%Y-%m-%d %H:%M:%S%z")
             calib_schedules.append(
                 ScheduleCalibResponse(
                     menu_name=flow.parameters["menu"]["name"],
