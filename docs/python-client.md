@@ -128,7 +128,7 @@ if chips_response.status_code == 200:
 # Example: Get specific chip details
 if chips:
     chip_response = fetch_chip.sync_detailed(
-        client=client, 
+        client=client,
         chip_name=chips[0].name
     )
     if chip_response.status_code == 200:
@@ -156,30 +156,30 @@ from qdash.client.api.execution import fetch_execution_lock_status
 
 async def parallel_chip_analysis():
     """Example async workflow for parallel chip analysis."""
-    
+
     async with Client(base_url="http://localhost:5715") as client:
         # Check system status first
         lock_status = await fetch_execution_lock_status.asyncio_detailed(client=client)
         if lock_status.status_code == 200 and not lock_status.parsed.locked:
             print("System ready for calibration")
-        
+
         # Get all chips
         chips_response = await list_chips.asyncio_detailed(client=client)
         if chips_response.status_code != 200:
             raise Exception("Failed to fetch chips")
-        
+
         chips = chips_response.parsed
         print(f"Analyzing {len(chips)} chips in parallel...")
-        
+
         # Fetch details for multiple chips in parallel
         detail_tasks = [
             fetch_chip.asyncio_detailed(client=client, chip_name=chip.name)
             for chip in chips[:5]  # Limit to first 5
         ]
-        
+
         # Wait for all tasks to complete
         results = await asyncio.gather(*detail_tasks, return_exceptions=True)
-        
+
         # Process results
         for chip, result in zip(chips[:5], results):
             if isinstance(result, Exception):
@@ -204,9 +204,9 @@ try:
         base_url="http://localhost:5715",
         raise_on_unexpected_status=True  # Raise exceptions on non-2xx responses
     )
-    
+
     response = fetch_chip.sync_detailed(client=client, chip_name="nonexistent")
-    
+
 except UnexpectedStatus as e:
     print(f"API Error: {e.status_code} - {e.content}")
 except Exception as e:
@@ -285,12 +285,14 @@ modified_chip = evolve(chip, name="quantum_chip_2")
 ## Best Practices
 
 1. **Use context managers** for proper resource cleanup:
+
    ```python
    with Client(base_url="...") as client:
        # Your code here
    ```
 
 2. **Check status codes** before accessing parsed data:
+
    ```python
    response = api_call.sync_detailed(client=client)
    if response.status_code == 200:
@@ -298,11 +300,13 @@ modified_chip = evolve(chip, name="quantum_chip_2")
    ```
 
 3. **Use async for parallel operations** to improve performance:
+
    ```python
    results = await asyncio.gather(*[task1, task2, task3])
    ```
 
 4. **Configure timeouts** for production environments:
+
    ```python
    client = Client(base_url="...", timeout=httpx.Timeout(10.0))
    ```
@@ -314,11 +318,13 @@ modified_chip = evolve(chip, name="quantum_chip_2")
 ### Common Issues
 
 1. **Import errors**: Make sure the client is installed:
+
    ```bash
    pip install git+https://github.com/oqtopus-team/qdash.git#subdirectory=src/qdash/client
    ```
 
 2. **Connection errors**: Verify the API server is running:
+
    ```bash
    curl http://localhost:5715/docs
    ```

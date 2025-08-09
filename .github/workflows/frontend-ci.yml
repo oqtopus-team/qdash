@@ -4,13 +4,13 @@ on:
   push:
     branches: [main, develop]
     paths:
-      - 'ui/**'
-      - '.github/workflows/frontend-ci.yml'
+      - "ui/**"
+      - ".github/workflows/frontend-ci.yml"
   pull_request:
     branches: [main, develop]
     paths:
-      - 'ui/**'
-      - '.github/workflows/frontend-ci.yml'
+      - "ui/**"
+      - ".github/workflows/frontend-ci.yml"
 
 jobs:
   frontend-lint:

@@ -23,7 +23,6 @@ class ListParameterResponse:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-
         parameters = []
         for parameters_item_data in self.parameters:
             parameters_item = parameters_item_data.to_dict()

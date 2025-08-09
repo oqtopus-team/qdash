@@ -25,7 +25,6 @@ class LatestTaskGroupedByChipResponse:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-
         task_name = self.task_name
 
         result = self.result.to_dict()
