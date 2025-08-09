@@ -10,9 +10,9 @@ from typing import cast
 from typing import Union
 
 if TYPE_CHECKING:
-    from ..models.batch_node import BatchNode
-    from ..models.parallel_node import ParallelNode
     from ..models.serial_node import SerialNode
+    from ..models.parallel_node import ParallelNode
+    from ..models.batch_node import BatchNode
     from ..models.menu_model_task_details_type_0 import MenuModelTaskDetailsType0
 
 
@@ -59,8 +59,8 @@ class MenuModel:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.parallel_node import ParallelNode
         from ..models.serial_node import SerialNode
+        from ..models.parallel_node import ParallelNode
         from ..models.menu_model_task_details_type_0 import MenuModelTaskDetailsType0
 
         name = self.name
@@ -135,9 +135,9 @@ class MenuModel:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.batch_node import BatchNode
-        from ..models.parallel_node import ParallelNode
         from ..models.serial_node import SerialNode
+        from ..models.parallel_node import ParallelNode
+        from ..models.batch_node import BatchNode
         from ..models.menu_model_task_details_type_0 import MenuModelTaskDetailsType0
 
         d = dict(src_dict)

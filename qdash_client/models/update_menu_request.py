@@ -10,10 +10,10 @@ from typing import cast
 from typing import Union
 
 if TYPE_CHECKING:
-    from ..models.batch_node import BatchNode
-    from ..models.parallel_node import ParallelNode
-    from ..models.update_menu_request_task_details_type_0 import UpdateMenuRequestTaskDetailsType0
     from ..models.serial_node import SerialNode
+    from ..models.parallel_node import ParallelNode
+    from ..models.batch_node import BatchNode
+    from ..models.update_menu_request_task_details_type_0 import UpdateMenuRequestTaskDetailsType0
 
 
 T = TypeVar("T", bound="UpdateMenuRequest")
@@ -49,11 +49,11 @@ class UpdateMenuRequest:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.serial_node import SerialNode
         from ..models.parallel_node import ParallelNode
         from ..models.update_menu_request_task_details_type_0 import (
             UpdateMenuRequestTaskDetailsType0,
         )
-        from ..models.serial_node import SerialNode
 
         name = self.name
 
@@ -127,12 +127,12 @@ class UpdateMenuRequest:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.batch_node import BatchNode
+        from ..models.serial_node import SerialNode
         from ..models.parallel_node import ParallelNode
+        from ..models.batch_node import BatchNode
         from ..models.update_menu_request_task_details_type_0 import (
             UpdateMenuRequestTaskDetailsType0,
         )
-        from ..models.serial_node import SerialNode
 
         d = dict(src_dict)
         name = d.pop("name")

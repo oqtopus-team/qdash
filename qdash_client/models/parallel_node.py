@@ -9,8 +9,8 @@ from typing import cast
 from typing import Union
 
 if TYPE_CHECKING:
-    from ..models.batch_node import BatchNode
     from ..models.serial_node import SerialNode
+    from ..models.batch_node import BatchNode
 
 
 T = TypeVar("T", bound="ParallelNode")
@@ -28,8 +28,8 @@ class ParallelNode:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.batch_node import BatchNode
         from ..models.serial_node import SerialNode
+        from ..models.batch_node import BatchNode
 
         parallel = []
         for parallel_item_data in self.parallel:
@@ -56,8 +56,8 @@ class ParallelNode:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.batch_node import BatchNode
         from ..models.serial_node import SerialNode
+        from ..models.batch_node import BatchNode
 
         d = dict(src_dict)
         parallel = []

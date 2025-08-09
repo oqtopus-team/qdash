@@ -10,10 +10,10 @@ from typing import cast
 from typing import Union
 
 if TYPE_CHECKING:
-    from ..models.batch_node import BatchNode
     from ..models.create_menu_request_task_details_type_0 import CreateMenuRequestTaskDetailsType0
-    from ..models.parallel_node import ParallelNode
     from ..models.serial_node import SerialNode
+    from ..models.parallel_node import ParallelNode
+    from ..models.batch_node import BatchNode
 
 
 T = TypeVar("T", bound="CreateMenuRequest")
@@ -58,8 +58,8 @@ class CreateMenuRequest:
         from ..models.create_menu_request_task_details_type_0 import (
             CreateMenuRequestTaskDetailsType0,
         )
-        from ..models.parallel_node import ParallelNode
         from ..models.serial_node import SerialNode
+        from ..models.parallel_node import ParallelNode
 
         name = self.name
 
@@ -133,12 +133,12 @@ class CreateMenuRequest:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.batch_node import BatchNode
         from ..models.create_menu_request_task_details_type_0 import (
             CreateMenuRequestTaskDetailsType0,
         )
-        from ..models.parallel_node import ParallelNode
         from ..models.serial_node import SerialNode
+        from ..models.parallel_node import ParallelNode
+        from ..models.batch_node import BatchNode
 
         d = dict(src_dict)
         name = d.pop("name")

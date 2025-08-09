@@ -7,10 +7,10 @@ from attrs import field as _attrs_field
 
 
 if TYPE_CHECKING:
-    from ..models.meas_error import MeasError
-    from ..models.qubit_lifetime import QubitLifetime
-    from ..models.qubit_gate_duration import QubitGateDuration
     from ..models.position import Position
+    from ..models.qubit_lifetime import QubitLifetime
+    from ..models.meas_error import MeasError
+    from ..models.qubit_gate_duration import QubitGateDuration
 
 
 T = TypeVar("T", bound="Qubit")
@@ -73,10 +73,10 @@ class Qubit:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.meas_error import MeasError
-        from ..models.qubit_lifetime import QubitLifetime
-        from ..models.qubit_gate_duration import QubitGateDuration
         from ..models.position import Position
+        from ..models.qubit_lifetime import QubitLifetime
+        from ..models.meas_error import MeasError
+        from ..models.qubit_gate_duration import QubitGateDuration
 
         d = dict(src_dict)
         id = d.pop("id")

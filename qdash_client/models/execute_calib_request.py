@@ -10,9 +10,9 @@ from typing import cast
 from typing import Union
 
 if TYPE_CHECKING:
-    from ..models.batch_node import BatchNode
-    from ..models.parallel_node import ParallelNode
     from ..models.serial_node import SerialNode
+    from ..models.parallel_node import ParallelNode
+    from ..models.batch_node import BatchNode
     from ..models.execute_calib_request_task_details_type_0 import (
         ExecuteCalibRequestTaskDetailsType0,
     )
@@ -51,8 +51,8 @@ class ExecuteCalibRequest:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.parallel_node import ParallelNode
         from ..models.serial_node import SerialNode
+        from ..models.parallel_node import ParallelNode
         from ..models.execute_calib_request_task_details_type_0 import (
             ExecuteCalibRequestTaskDetailsType0,
         )
@@ -129,9 +129,9 @@ class ExecuteCalibRequest:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.batch_node import BatchNode
-        from ..models.parallel_node import ParallelNode
         from ..models.serial_node import SerialNode
+        from ..models.parallel_node import ParallelNode
+        from ..models.batch_node import BatchNode
         from ..models.execute_calib_request_task_details_type_0 import (
             ExecuteCalibRequestTaskDetailsType0,
         )
