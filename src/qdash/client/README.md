@@ -4,30 +4,60 @@ A Python client library for accessing QDash API, auto-generated from OpenAPI spe
 
 ## Installation
 
-### From GitHub
+### Option 1: Install client standalone (Recommended for client-only usage)
 
 ```bash
-# Install directly from GitHub
+# Install directly from the client subdirectory
 pip install git+https://github.com/oqtopus-team/qdash.git#subdirectory=src/qdash/client
 
-# Install from specific branch
-pip install git+https://github.com/oqtopus-team/qdash.git@develop#subdirectory=src/qdash/client
-
-# Install from specific tag/release
-pip install git+https://github.com/oqtopus-team/qdash.git@v0.1.0#subdirectory=src/qdash/client
+# Or if you have the repository cloned locally
+cd src/qdash/client
+pip install .
 ```
 
-### From PyPI (when published)
+### Option 2: Install as part of the full QDash package
 
 ```bash
+# Install the entire QDash package
+pip install git+https://github.com/oqtopus-team/qdash.git
+
+# The client will be available as qdash.client
+```
+
+### Option 3: From PyPI (when published)
+
+```bash
+# Future release - client only
 pip install qdash-client
+
+# Or full package
+pip install qdash
+```
+
+## Usage
+
+When installed standalone (qdash-client):
+```python
+from qdash_client import Client
+from qdash_client.api.chip import list_chips, fetch_chip
+```
+
+When installed as part of qdash package:
+```python
+from qdash.client import Client
+from qdash.client.api.chip import list_chips, fetch_chip
 ```
 
 ## Usage
 
 ```python
-from client import Client
-from client.api.chip import list_chips, fetch_chip
+# When installed as standalone package (qdash-client)
+from qdash_client import Client
+from qdash_client.api.chip import list_chips, fetch_chip
+
+# Or when installed as part of qdash
+# from qdash.client import Client
+# from qdash.client.api.chip import list_chips, fetch_chip
 
 # Create client instance
 client = Client(base_url="http://localhost:5715")

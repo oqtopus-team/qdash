@@ -179,7 +179,7 @@ def generate_client(config: ClientConfig) -> None:
 
         # Validate generated client structure
         expected_files = [
-            output_dir / f"{config.package_name}/__init__.py",
+            output_dir / "__init__.py",
             output_dir / "pyproject.toml",
             output_dir / "README.md",
         ]
@@ -192,11 +192,24 @@ def generate_client(config: ClientConfig) -> None:
         print(f"📁 Location: {output_dir}")
         print()
         print("🚀 To use the client:")
-        print(f"   1. Install: pip install -e {output_dir}")
-        print("   2. Import and use:")
-        print(f"      from {config.package_name} import Client")
-        print(f"      from {config.package_name}.api.chip import get_chips")
-        print("")
+        print()
+        print("   Option 1: Install standalone (recommended for client-only usage):")
+        print(f"      pip install {output_dir}")
+        print("      # Or from GitHub:")
+        print("      pip install git+https://github.com/oqtopus-team/qdash.git#subdirectory=src/qdash/client")
+        print()
+        print("   Option 2: Use as part of qdash package:")
+        print("      pip install git+https://github.com/oqtopus-team/qdash.git")
+        print()
+        print("   Import and use:")
+        print("      # Standalone installation:")
+        print("      from qdash_client import Client")
+        print("      from qdash_client.api.chip import get_chips")
+        print()
+        print("      # Or when installed with full qdash:")
+        print("      from qdash.client import Client")
+        print("      from qdash.client.api.chip import get_chips")
+        print()
         print(f"      client = Client(base_url='{config.api_url}')")
         print("      response = get_chips.sync_detailed(client=client)")
         print("      if response.status_code == 200:")
