@@ -4,3 +4,8 @@ custom_templates: "templates/"
 post_hooks:
   - "ruff format qdash_client/ || true"
   - "ruff check --fix qdash_client/ || true"
+overrides:
+  skip_validation: false
+  skip_helpers: false
+  skip_readme: false
+  skip_gitignore: true

@@ -146,6 +146,12 @@ def generate_client(config: ClientConfig) -> None:
 
     # Fetch OpenAPI spec
     openapi_spec = fetch_openapi_spec(config.openapi_url)
+    
+    # Backup existing .gitignore to prevent overwrite
+    gitignore_path = project_root / ".gitignore"
+    gitignore_backup = None
+    if gitignore_path.exists():
+        gitignore_backup = gitignore_path.read_text()
 
     # Write spec to temporary file
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -188,6 +194,11 @@ def generate_client(config: ClientConfig) -> None:
         missing_files = [f for f in expected_files if not f.exists()]
         if missing_files:
             print(f"⚠️  Some expected files are missing: {missing_files}")
+
+        # Restore original .gitignore if it was backed up
+        if gitignore_backup is not None:
+            gitignore_path.write_text(gitignore_backup)
+            print("🔄 Restored original .gitignore")
 
         print("✅ Python client generated successfully!")
         print(f"📁 Location: {output_dir}")
