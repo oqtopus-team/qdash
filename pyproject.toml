@@ -118,9 +118,9 @@ dev = [
     "pytest-mypy==0.10.3",
     "pytest-asyncio==0.24.0",
     "testcontainers[mongodb]==4.8.2",
-    "typer==0.14.0",
+    "typer>=0.12.0,<0.14.0",
     "go-task-bin>=3.41.0",
-    "openapi-python-client>=0.22.0,<0.23.0",
+    "openapi-python-client>=0.22.0",
 ]
 agent = [
     "aiohttp>=3.8.0,<4.0.0",
