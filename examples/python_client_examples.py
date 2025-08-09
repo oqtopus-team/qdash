@@ -20,7 +20,9 @@ try:
 except ImportError as e:
     print("❌ QDash client not found!")
     print("First generate the client: generate-python-client")
-    print("Or install QDash with client dependencies: pip install 'git+https://github.com/oqtopus-team/qdash.git[client]'")
+    print(
+        "Or install QDash with client dependencies: pip install 'git+https://github.com/oqtopus-team/qdash.git[client]'"
+    )
     print(f"Error details: {e}")
     exit(1)
 

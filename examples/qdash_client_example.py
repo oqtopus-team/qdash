@@ -23,7 +23,9 @@ try:
 except ImportError as e:
     print("❌ QDash client not found!")
     print("First generate the client: generate-python-client")
-    print("Or install QDash with client dependencies: pip install 'git+https://github.com/oqtopus-team/qdash.git[client]'")
+    print(
+        "Or install QDash with client dependencies: pip install 'git+https://github.com/oqtopus-team/qdash.git[client]'"
+    )
     print(f"Error details: {e}")
     exit(1)
 
@@ -41,7 +43,7 @@ def example_synchronous_usage():
         print("📡 Fetching all chips...")
         max_retries = 3
         chips_response = None
-        
+
         for attempt in range(max_retries):
             try:
                 chips_response = list_chips.sync_detailed(client=client)
@@ -51,18 +53,20 @@ def example_synchronous_usage():
                     if attempt < max_retries - 1:
                         print(f"⏳ API busy, retrying in {2 ** attempt} seconds...")
                         import time
-                        time.sleep(2 ** attempt)
+
+                        time.sleep(2**attempt)
                         continue
                 else:
                     print(f"❌ Error fetching chips: {chips_response.status_code}")
-                    if hasattr(chips_response, 'content'):
+                    if hasattr(chips_response, "content"):
                         print(f"   Response: {chips_response.content}")
                     return
             except Exception as e:
                 if attempt < max_retries - 1:
                     print(f"⏳ Connection failed, retrying in {2 ** attempt} seconds... ({e})")
                     import time
-                    time.sleep(2 ** attempt)
+
+                    time.sleep(2**attempt)
                 else:
                     raise
 

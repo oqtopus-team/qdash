@@ -18,7 +18,9 @@ try:
 except ImportError as e:
     print("❌ QDash client not found!")
     print("First generate the client: generate-python-client")
-    print("Or install QDash with client dependencies: pip install 'git+https://github.com/oqtopus-team/qdash.git[client]'")
+    print(
+        "Or install QDash with client dependencies: pip install 'git+https://github.com/oqtopus-team/qdash.git[client]'"
+    )
     print(f"Error details: {e}")
     exit(1)
 
@@ -30,7 +32,7 @@ class QDashClientConfig:
     def development_client() -> Client:
         """
         Development environment client configuration.
-        
+
         Features:
         - Local API server
         - Extended timeouts for debugging
@@ -46,13 +48,13 @@ class QDashClientConfig:
     def production_client(api_token: str, username: str) -> AuthenticatedClient:
         """
         Production environment client configuration.
-        
+
         Features:
         - HTTPS endpoint
         - Authentication required
         - Optimized timeouts
         - Custom headers for tracking
-        
+
         Args:
             api_token: Production API token
             username: Username for X-Username header
@@ -73,7 +75,7 @@ class QDashClientConfig:
     def testing_client() -> Client:
         """
         Testing environment client configuration.
-        
+
         Features:
         - Mock/test API endpoints
         - Short timeouts for fast tests
@@ -89,7 +91,7 @@ class QDashClientConfig:
     def staging_client(api_token: str) -> AuthenticatedClient:
         """
         Staging environment client configuration.
-        
+
         Features:
         - Staging API endpoint
         - Authentication with staging token
@@ -115,7 +117,7 @@ class QDashClientConfig:
     ) -> Client:
         """
         Custom client configuration for specific needs.
-        
+
         Args:
             base_url: API base URL
             timeout: Request timeout in seconds
@@ -124,10 +126,10 @@ class QDashClientConfig:
             username: Optional username for X-Username header
         """
         headers = custom_headers or {}
-        
+
         if username:
             headers["X-Username"] = username
-            
+
         if auth_token:
             return AuthenticatedClient(
                 base_url=base_url,
@@ -154,17 +156,17 @@ class ClientWithRetryLogic:
     async def request_with_retry(self, request_func, *args, **kwargs):
         """
         Execute a request with exponential backoff retry logic.
-        
+
         Args:
             request_func: The client method to call
             *args, **kwargs: Arguments to pass to the client method
         """
         last_exception = None
-        
+
         for attempt in range(self.max_retries):
             try:
                 response = await request_func(*args, **kwargs)
-                
+
                 # Handle different status codes
                 if response.status_code == 200:
                     return response
@@ -175,7 +177,7 @@ class ClientWithRetryLogic:
                     await asyncio.sleep(wait_time)
                 elif response.status_code in [503, 502, 504]:  # Service issues
                     if attempt < self.max_retries - 1:
-                        wait_time = (2 ** attempt) + 1  # Exponential backoff
+                        wait_time = (2**attempt) + 1  # Exponential backoff
                         self.logger.warning(f"Service unavailable, retrying in {wait_time}s")
                         await asyncio.sleep(wait_time)
                     else:
@@ -183,11 +185,11 @@ class ClientWithRetryLogic:
                 else:
                     # For other status codes, don't retry
                     return response
-                    
+
             except (ConnectionError, TimeoutError) as e:
                 last_exception = e
                 if attempt < self.max_retries - 1:
-                    wait_time = (2 ** attempt) + 1
+                    wait_time = (2**attempt) + 1
                     self.logger.warning(f"Connection failed, retrying in {wait_time}s: {e}")
                     await asyncio.sleep(wait_time)
                 else:
@@ -195,7 +197,7 @@ class ClientWithRetryLogic:
             except Exception as e:
                 self.logger.error(f"Unexpected error: {e}")
                 raise e
-        
+
         if last_exception:
             raise last_exception
 
@@ -215,16 +217,16 @@ class EnvironmentAwareClient:
             if not api_token:
                 raise ValueError("QDASH_API_TOKEN required for production")
             return QDashClientConfig.production_client(api_token, username)
-        
+
         elif self.environment == "staging":
             api_token = os.getenv("QDASH_STAGING_TOKEN")
             if not api_token:
                 raise ValueError("QDASH_STAGING_TOKEN required for staging")
             return QDashClientConfig.staging_client(api_token)
-        
+
         elif self.environment == "testing":
             return QDashClientConfig.testing_client()
-        
+
         else:  # development
             return QDashClientConfig.development_client()
 
@@ -236,23 +238,25 @@ class EnvironmentAwareClient:
 def load_config_from_file(config_path: str) -> Dict[str, Any]:
     """
     Load client configuration from a JSON or YAML file.
-    
+
     Args:
         config_path: Path to configuration file
-        
+
     Returns:
         Configuration dictionary
     """
     config_file = Path(config_path)
-    
+
     if not config_file.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
-    
-    if config_file.suffix.lower() == '.json':
+
+    if config_file.suffix.lower() == ".json":
         import json
+
         return json.load(config_file.open())
-    elif config_file.suffix.lower() in ['.yaml', '.yml']:
+    elif config_file.suffix.lower() in [".yaml", ".yml"]:
         import yaml
+
         return yaml.safe_load(config_file.open())
     else:
         raise ValueError(f"Unsupported config file format: {config_file.suffix}")
@@ -274,8 +278,7 @@ async def example_configuration_usage():
     try:
         # In real usage, these would come from secure environment variables
         prod_client = QDashClientConfig.production_client(
-            api_token="prod-token-123",
-            username="quantum-engineer"
+            api_token="prod-token-123", username="quantum-engineer"
         )
         print(f"Base URL: {prod_client.base_url}")
         print(f"Headers: {prod_client.headers}")
@@ -300,11 +303,11 @@ async def example_configuration_usage():
             "X-Custom-Header": "custom-value",
             "X-Lab-ID": "quantum-lab-1",
         },
-        username="custom-user"
+        username="custom-user",
     )
     print(f"Base URL: {custom_client.base_url}")
     print(f"Timeout: {custom_client.timeout}s")
-    if hasattr(custom_client, 'headers'):
+    if hasattr(custom_client, "headers"):
         print(f"Custom headers: {custom_client.headers}")
 
     # Example 5: Client with retry logic
@@ -325,9 +328,8 @@ async def example_configuration_usage():
 if __name__ == "__main__":
     # Set up logging
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
-    
+
     # Run examples
     asyncio.run(example_configuration_usage())

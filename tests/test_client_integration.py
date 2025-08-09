@@ -17,6 +17,7 @@ pytest_plugins = []
 try:
     from qdash.client import Client, AuthenticatedClient
     from qdash.client.errors import UnexpectedStatus
+
     CLIENT_AVAILABLE = True
 except ImportError:
     CLIENT_AVAILABLE = False
@@ -30,9 +31,7 @@ class TestClientIntegration:
     def client(self) -> Client:
         """Create a test client instance."""
         return Client(
-            base_url="http://localhost:5715",
-            timeout=10.0,
-            raise_on_unexpected_status=False
+            base_url="http://localhost:5715", timeout=10.0, raise_on_unexpected_status=False
         )
 
     @pytest.fixture
@@ -43,7 +42,7 @@ class TestClientIntegration:
             token="test-token",
             headers={"X-Username": "test-user"},
             timeout=10.0,
-            raise_on_unexpected_status=False
+            raise_on_unexpected_status=False,
         )
 
     def test_client_initialization(self, client: Client):
@@ -63,11 +62,12 @@ class TestClientIntegration:
         try:
             # Try to import health check endpoint if available
             from qdash.client.api.default import health_check
+
             response = health_check.sync_detailed(client=client)
-            
+
             # Should either succeed or return a known error
             assert response.status_code in [200, 404, 503]
-            
+
         except ImportError:
             # Health check endpoint may not exist, that's OK
             pytest.skip("Health check endpoint not available")
@@ -85,17 +85,18 @@ class TestClientIntegration:
     def test_error_handling_with_mock(self, client: Client):
         """Test client error handling with mocked responses."""
         # Mock a 404 response
-        with patch.object(client, '_client') as mock_httpx:
+        with patch.object(client, "_client") as mock_httpx:
             mock_response = MagicMock()
             mock_response.status_code = 404
             mock_response.content = b'{"error": "Not found"}'
             mock_response.headers = {}
-            
+
             mock_httpx.get.return_value = mock_response
-            
+
             # Test that we handle 404 appropriately
             try:
                 from qdash.client.api.chip import list_chips
+
                 response = list_chips.sync_detailed(client=client)
                 assert response.status_code == 404
             except ImportError:
@@ -104,10 +105,7 @@ class TestClientIntegration:
     def test_client_configuration_options(self):
         """Test various client configuration options."""
         # Test timeout configuration
-        client = Client(
-            base_url="http://localhost:5715",
-            timeout=30.0
-        )
+        client = Client(base_url="http://localhost:5715", timeout=30.0)
         assert client.timeout == 30.0
 
         # Test authenticated client configuration
@@ -115,7 +113,7 @@ class TestClientIntegration:
             base_url="http://localhost:5715",
             token="custom-token",
             headers={"Custom-Header": "custom-value"},
-            timeout=15.0
+            timeout=15.0,
         )
         assert auth_client.token == "custom-token"
         assert auth_client.headers["Custom-Header"] == "custom-value"
@@ -125,7 +123,7 @@ class TestClientIntegration:
         """Test retry logic for failed requests."""
         max_retries = 3
         retry_delays = [1, 2, 4]  # exponential backoff
-        
+
         # Simulate retry logic (this would be in actual usage code)
         for attempt in range(max_retries):
             try:
@@ -134,7 +132,7 @@ class TestClientIntegration:
                 assert attempt < max_retries
                 if attempt < max_retries - 1:
                     expected_delay = retry_delays[attempt]
-                    assert expected_delay == 2 ** attempt
+                    assert expected_delay == 2**attempt
                 break
             except Exception:
                 if attempt == max_retries - 1:
@@ -149,14 +147,10 @@ class TestClientIntegration:
             async def mock_request(delay: float) -> str:
                 await asyncio.sleep(delay)
                 return f"Result after {delay}s"
-            
+
             # Test concurrent execution
-            tasks = [
-                mock_request(0.1),
-                mock_request(0.2),
-                mock_request(0.1)
-            ]
-            
+            tasks = [mock_request(0.1), mock_request(0.2), mock_request(0.1)]
+
             results = await asyncio.gather(*tasks, return_exceptions=True)
             assert len(results) == 3
             assert all(isinstance(r, str) for r in results)
@@ -169,7 +163,7 @@ class TestClientErrorRecovery:
     def test_connection_error_handling(self):
         """Test handling of connection errors."""
         client = Client(base_url="http://invalid-host:9999", timeout=1.0)
-        
+
         # Test that connection errors are handled gracefully
         try:
             # This would be an actual API call that fails
@@ -195,12 +189,12 @@ class TestClientErrorRecovery:
         # Test exponential backoff pattern
         backoff_delays = []
         max_retries = 3
-        
+
         for attempt in range(max_retries):
             if attempt > 0:  # Only add delay after first attempt
                 delay = 2 ** (attempt - 1)  # 1, 2, 4 seconds
                 backoff_delays.append(delay)
-        
+
         expected_delays = [1, 2]  # First retry after 1s, second after 2s
         assert backoff_delays == expected_delays
 
@@ -209,10 +203,10 @@ class TestClientErrorRecovery:
         # Test rate limit detection and backoff
         rate_limit_status_codes = [429, 503]
         retry_after_values = ["1", "5", "10"]
-        
+
         for status_code in rate_limit_status_codes:
             assert status_code in [429, 503]
-        
+
         for retry_after in retry_after_values:
             delay = int(retry_after)
             assert delay > 0
