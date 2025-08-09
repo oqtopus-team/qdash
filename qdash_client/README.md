@@ -7,10 +7,14 @@ A Python client library for accessing QDash API, auto-generated from OpenAPI spe
 ### Option 1: Install client standalone (Recommended for client-only usage)
 
 ```bash
-# Install directly from the client subdirectory
-pip install git+https://github.com/oqtopus-team/qdash.git#subdirectory=qdash_client
+# First clone the repository and generate the client
+git clone https://github.com/oqtopus-team/qdash.git
+cd qdash
+task generate-python-client
+pip install ./qdash_client
 
-# Or if you have the repository cloned locally
+# Or if you already have the repository cloned
+task generate-python-client
 cd qdash_client
 pip install .
 ```
@@ -28,7 +32,7 @@ pip install git+https://github.com/oqtopus-team/qdash.git
 
 ```bash
 # Future release - client only
-pip install qdash_client
+pip install qdash-client
 
 # Or full package
 pip install qdash
@@ -37,7 +41,7 @@ pip install qdash
 ## Usage
 
 ```python
-# When installed as standalone package (qdash_client)
+# When installed as standalone package (qdash-client)
 from qdash_client import Client
 from qdash_client.api.chip import list_chips, fetch_chip
 
