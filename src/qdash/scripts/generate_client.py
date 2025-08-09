@@ -146,13 +146,13 @@ def generate_client(config: ClientConfig) -> None:
 
     # Fetch OpenAPI spec
     openapi_spec = fetch_openapi_spec(config.openapi_url)
-    
+
     # Backup existing .gitignore and pyproject.toml to prevent overwrite
     gitignore_path = project_root / ".gitignore"
     gitignore_backup = None
     if gitignore_path.exists():
         gitignore_backup = gitignore_path.read_text()
-    
+
     pyproject_path = project_root / "pyproject.toml"
     pyproject_backup = None
     if pyproject_path.exists():
@@ -204,7 +204,7 @@ def generate_client(config: ClientConfig) -> None:
         if gitignore_backup is not None:
             gitignore_path.write_text(gitignore_backup)
             print("🔄 Restored original .gitignore")
-        
+
         if pyproject_backup is not None:
             pyproject_path.write_text(pyproject_backup)
             print("🔄 Restored original pyproject.toml")

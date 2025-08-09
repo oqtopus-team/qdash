@@ -126,8 +126,12 @@ def test_create_chip_document(system_info: SystemInfoModel) -> None:
     assert len(retrieved_chip.qubits) == 2, "Should have 2 qubits"
     assert "Q0" in retrieved_chip.qubits, "Q0 should exist in qubits"
     assert "Q1" in retrieved_chip.qubits, "Q1 should exist in qubits"
-    assert retrieved_chip.qubits["Q0"].data["x_180_length"] == expected_q0_length, "Q0 x_180_length should match"
-    assert retrieved_chip.qubits["Q1"].data["x_180_length"] == expected_q1_length, "Q1 x_180_length should match"
+    assert (
+        retrieved_chip.qubits["Q0"].data["x_180_length"] == expected_q0_length
+    ), "Q0 x_180_length should match"
+    assert (
+        retrieved_chip.qubits["Q1"].data["x_180_length"] == expected_q1_length
+    ), "Q1 x_180_length should match"
     assert len(retrieved_chip.couplings) == 1, "Should have 1 coupling"
     assert "Q0-Q1" in retrieved_chip.couplings, "Q0-Q1 coupling should exist"
 
@@ -160,8 +164,12 @@ def test_update_qubit(system_info: SystemInfoModel) -> None:
     # Assert
     retrieved_chip = ChipDocument.find_one(ChipDocument.chip_id == chip_id).run()
     assert retrieved_chip is not None, f"Chip with id '{chip_id}' should exist"
-    assert retrieved_chip.qubits["Q0"].data["x_180_length"] == updated_q0_length, "Q0 should be updated"
-    assert retrieved_chip.qubits["Q1"].data["x_180_length"] == initial_q1_length, "Q1 should remain unchanged"
+    assert (
+        retrieved_chip.qubits["Q0"].data["x_180_length"] == updated_q0_length
+    ), "Q0 should be updated"
+    assert (
+        retrieved_chip.qubits["Q1"].data["x_180_length"] == initial_q1_length
+    ), "Q1 should remain unchanged"
 
 
 def test_update_nonexistent_qubit(system_info: SystemInfoModel) -> None:
@@ -180,7 +188,9 @@ def test_update_nonexistent_qubit(system_info: SystemInfoModel) -> None:
     chip.insert()
 
     # Act & Assert
-    with pytest.raises(ValueError, match=f"Qubit {nonexistent_qubit_id} not found in chip {chip_id}"):
+    with pytest.raises(
+        ValueError, match=f"Qubit {nonexistent_qubit_id} not found in chip {chip_id}"
+    ):
         chip.update_qubit(nonexistent_qubit_id, create_test_qubit(nonexistent_qubit_id))
 
 
@@ -208,7 +218,9 @@ def test_find_chip_by_username(system_info: SystemInfoModel) -> None:
     # Act & Assert
     user1_chips = ChipDocument.find(ChipDocument.username == username1).to_list()
     assert len(user1_chips) == 2, f"Should find 2 chips for {username1}"
-    assert all(chip.username == username1 for chip in user1_chips), f"All chips should belong to {username1}"
+    assert all(
+        chip.username == username1 for chip in user1_chips
+    ), f"All chips should belong to {username1}"
 
     chip_ids = {chip.chip_id for chip in user1_chips}
     assert "chip_user1_a" in chip_ids, "Should contain chip_user1_a"
