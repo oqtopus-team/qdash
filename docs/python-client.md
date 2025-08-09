@@ -19,15 +19,25 @@ QDash Python client is automatically generated from the OpenAPI specification us
 
 ## Installation
 
-### Option 1: Install from GitHub (Recommended for Users)
+### Option 1: Dedicated Client Package (Recommended)
 
-Install QDash with the Python client dependencies:
+⚠️ **QDash Python client has moved to a separate lightweight package!**
 
 ```bash
-# Install with client dependencies
-pip install "git+https://github.com/oqtopus-team/qdash.git[client]"
+# Install QDash Python client (lightweight, ~5MB)
+pip install qdash-client
 
-# Generate the client after installation
+# Generate client code (requires running QDash API server)  
+qdash-generate-client --api-url http://localhost:5715
+```
+
+### Option 2: Legacy Installation (Deprecated)
+
+The old method still works but includes unnecessary platform dependencies:
+
+```bash
+# ⚠️ Deprecated: Installs heavy platform dependencies (~200MB)
+pip install "git+https://github.com/oqtopus-team/qdash.git[client]"
 generate-python-client
 ```
 

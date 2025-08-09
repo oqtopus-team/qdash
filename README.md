@@ -23,24 +23,35 @@ QDash is a web application that provides a user-friendly interface to manage and
 
 ## Quick Start
 
-### Install Python Client
+### For API Client Users
+
+If you want to use QDash as a Python client library:
 
 ```bash
-# Install QDash with Python client support
-pip install "git+https://github.com/oqtopus-team/qdash.git[client]"
+# Install lightweight QDash Python client
+pip install qdash-client
 
-# Generate the client (requires running QDash API server)
-generate-python-client
+# Generate client code (requires running QDash API server)
+qdash-generate-client --api-url http://localhost:5715
+
+# Use the client
+python -c "
+from qdash_client import Client
+client = Client(base_url='http://localhost:5715')
+print('QDash client ready!')
+"
 ```
 
-### Use Python Client
+### For Platform Users
 
-```python
-from qdash.client import Client
+If you want to run the full QDash platform:
 
-# Create client and use QDash API
-client = Client(base_url="http://localhost:5715")
-# ... your quantum calibration workflows
+```bash
+# Install full QDash platform
+pip install git+https://github.com/oqtopus-team/qdash.git
+
+# Or with specific components
+pip install "git+https://github.com/oqtopus-team/qdash.git" --group api --group workflow
 ```
 
 ## Documentation
