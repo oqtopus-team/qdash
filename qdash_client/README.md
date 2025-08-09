@@ -78,7 +78,7 @@ from qdash_client.api.chip import list_chips
 
 async def main():
     client = Client(base_url="http://localhost:5715")
-    
+
     response = await list_chips.asyncio_detailed(client=client)
     if response.status_code == 200:
         chips = response.parsed
@@ -157,5 +157,6 @@ Apache License 2.0
 ## Support
 
 For issues and questions:
+
 - GitHub Issues: https://github.com/oqtopus-team/qdash/issues
 - Documentation: https://qdash.readthedocs.io/

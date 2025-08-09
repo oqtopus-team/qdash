@@ -19,8 +19,5 @@
     "deny": []
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "o3",
-    "serena"
-  ]
+  "enabledMcpjsonServers": ["o3", "serena"]
 }

@@ -12,7 +12,7 @@ def main():
     # Verbose initialization
     client = Client(
         base_url="http://localhost:2004",
-        headers={"X-Username":"orangekame3"}, 
+        headers={"X-Username":"orangekame3"},
         raise_on_unexpected_status=True
     )
     print("✅ Client created")
@@ -26,6 +26,7 @@ def main():
 ```
 
 **Issues:**
+
 - Verbose imports for each API endpoint
 - Manual header setup
 - Manual response parsing
@@ -38,7 +39,7 @@ def main():
 ```python
 def main():
     from qdash_client import QDashClient
-    
+
     print("✅ Enhanced QDashClient imported successfully")
 
     # Simple initialization with sensible defaults
@@ -56,7 +57,7 @@ def main():
     menus = client.get_menus()
     if menus:
         print(f"📄 Found {len(menus.menus)} menus")
-    
+
     chips = client.get_chips()
     if chips:
         print(f"💾 Found {len(chips)} chips")
@@ -67,6 +68,7 @@ def main():
 ```
 
 **Improvements:**
+
 - ✅ Single import
 - ✅ Sensible defaults
 - ✅ Automatic authentication headers
@@ -79,6 +81,7 @@ def main():
 ## Configuration Options
 
 ### Environment-based Configuration
+
 ```python
 import os
 from qdash_client import QDashClient
@@ -92,6 +95,7 @@ client = QDashClient(
 ```
 
 ### Advanced Usage
+
 ```python
 # Batch operations
 chips = client.get_chips()
@@ -108,24 +112,26 @@ parameters = client.get_parameters()
 ## Migration Guide
 
 1. **Replace imports:**
+
    ```python
    # Old
    from qdash_client import Client
    from qdash_client.api.menu import list_menu
-   
+
    # New
    from qdash_client import QDashClient
    ```
 
 2. **Simplify initialization:**
+
    ```python
    # Old
    client = Client(
        base_url="http://localhost:2004",
-       headers={"X-Username": "orangekame3"}, 
+       headers={"X-Username": "orangekame3"},
        raise_on_unexpected_status=True
    )
-   
+
    # New
    client = QDashClient(
        base_url="http://localhost:2004",
@@ -134,12 +140,13 @@ parameters = client.get_parameters()
    ```
 
 3. **Use convenience methods:**
+
    ```python
    # Old
    response = list_menu.sync_detailed(client=client)
    if response.status_code == 200:
        menus = response.parsed
-   
+
    # New
    menus = client.get_menus()
    ```
