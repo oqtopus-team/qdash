@@ -28,30 +28,18 @@ QDash is a web application that provides a user-friendly interface to manage and
 If you want to use QDash as a Python client library:
 
 ```bash
-# Install lightweight QDash Python client
-pip install qdash-client
-
-# Generate client code (requires running QDash API server)
-qdash-generate-client --api-url http://localhost:5715
+# Install QDash Python client only (lightweight, no server dependencies)
+pip install git+https://github.com/oqtopus-team/qdash.git#subdirectory=src/qdash/client
 
 # Use the client
-python -c "
-from qdash_client import Client
+from qdash.client import Client
+from qdash.client.api.chip import list_chips
+
 client = Client(base_url='http://localhost:5715')
-print('QDash client ready!')
-"
-```
-
-### For Platform Users
-
-If you want to run the full QDash platform:
-
-```bash
-# Install full QDash platform
-pip install git+https://github.com/oqtopus-team/qdash.git
-
-# Or with specific components
-pip install "git+https://github.com/oqtopus-team/qdash.git" --group api --group workflow
+response = list_chips.sync_detailed(client=client)
+if response.status_code == 200:
+    chips = response.parsed
+    print(f'Found {len(chips)} chips')
 ```
 
 ## Documentation

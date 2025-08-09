@@ -1,123 +1,123 @@
-# QDash Python Client
+# QDash Python Client Guide
 
-QDash Python client is automatically generated from the OpenAPI specification using `openapi-python-client` (1.6k⭐), providing full async/await support, attrs models, httpx integration, and type safety for quantum calibration workflows.
-
-## Prerequisites
-
-- QDash API server must be running
-- Python 3.10 or higher
+QDash provides an auto-generated Python client library for interacting with the QDash API. This client is generated from the OpenAPI specification and provides type-safe access to all API endpoints.
 
 ## Features
 
-✨ **Modern Python Stack:**
-- 🔥 **httpx** for async HTTP client with HTTP/2 support
-- 🎯 **Pydantic v2** models with runtime validation
-- ⚡ **Native async/await** support throughout
-- 🛡️ **Full type hints** for IDE support and static analysis
-- 🔄 **Both sync and async** client variants
-- 🎨 **Clean generated code** following modern Python practices
+- 🚀 **Auto-generated from OpenAPI**: Always up-to-date with the latest API
+- 🔒 **Type-safe**: Full type hints and runtime validation with attrs
+- ⚡ **Async/Sync Support**: Choose between synchronous and asynchronous operations
+- 🎯 **Developer-friendly**: Clean API with excellent IDE support
+- 📦 **Lightweight**: Minimal dependencies (httpx + attrs)
 
 ## Installation
 
-### Option 1: Dedicated Client Package (Recommended)
-
-⚠️ **QDash Python client has moved to a separate lightweight package!**
+### From GitHub (Recommended)
 
 ```bash
-# Install QDash Python client (lightweight, ~5MB)
-pip install qdash-client
+# Install client only (lightweight, no server dependencies)
+pip install git+https://github.com/oqtopus-team/qdash.git#subdirectory=src/qdash/client
 
-# Generate client code (requires running QDash API server)  
-qdash-generate-client --api-url http://localhost:5715
+# From specific branch
+pip install git+https://github.com/oqtopus-team/qdash.git@develop#subdirectory=src/qdash/client
+
+# From specific tag/release
+pip install git+https://github.com/oqtopus-team/qdash.git@v0.1.0#subdirectory=src/qdash/client
 ```
 
-### Option 2: Legacy Installation (Deprecated)
+### Generate from API Server
 
-The old method still works but includes unnecessary platform dependencies:
-
-```bash
-# ⚠️ Deprecated: Installs heavy platform dependencies (~200MB)
-pip install "git+https://github.com/oqtopus-team/qdash.git[client]"
-generate-python-client
-```
-
-### Option 2: Development Installation
-
-For development, install all dependencies:
+If you have a running QDash API server and want to regenerate the client:
 
 ```bash
-# Clone and install in development mode
-git clone https://github.com/oqtopus-team/qdash.git
-cd qdash
-uv sync --group dev
-```
-
-## Generate Modern Python Client
-
-### Using Task (Recommended)
-
-```bash
-# Make sure QDash API is running first
+# Using the built-in task (recommended)
 task generate-python-client
-```
 
-### Using Script Directly
-
-```bash
-# Make sure QDash API is running first
+# Or using the script directly
 uv run generate-python-client
 ```
 
-This will:
-1. Fetch the OpenAPI spec from the running QDash API server
-2. Generate a Python client using `openapi-python-client`
-3. Create both sync and async client variants with attrs models and httpx
-4. Integrate the client into `src/qdash/client/` for clean imports
+## Quick Start
 
-## Usage
-
-After generating the client, you can use it with full error handling and retry logic:
-
-### Environment Configuration
-
-Different environments require different configurations:
+### Basic Usage
 
 ```python
-import os
+from qdash.client import Client
+from qdash.client.api.chip import list_chips, fetch_chip
+from qdash.client.api.calibration import execute_calib
+from qdash.client.models import ExecuteCalibRequest
+
+# Create a client instance
+client = Client(base_url="http://localhost:5715")
+
+# Get all quantum chips
+response = list_chips.sync_detailed(client=client)
+if response.status_code == 200:
+    chips = response.parsed
+    for chip in chips:
+        print(f"Chip: {chip.name}, ID: {chip.id}")
+
+# Get specific chip details
+chip_response = fetch_chip.sync_detailed(client=client, chip_name="sample_chip")
+if chip_response.status_code == 200:
+    chip_detail = chip_response.parsed
+    print(f"Chip {chip_detail.name} has {len(chip_detail.qubits)} qubits")
+
+# Start a calibration
+calibration_request = ExecuteCalibRequest(
+    chip_name="sample_chip",
+    task_details=[]  # Add your task details here
+)
+result = execute_calib.sync_detailed(client=client, json_body=calibration_request)
+if result.status_code == 200:
+    print(f"Calibration started: {result.parsed}")
+```
+
+### Client Configuration
+
+```python
+import httpx
 from qdash.client import Client, AuthenticatedClient
 
-# Development
+# Development environment with custom settings
 dev_client = Client(
     base_url="http://localhost:5715",
-    timeout=30.0,
+    timeout=httpx.Timeout(30.0),
     raise_on_unexpected_status=True
 )
 
-# Production
+# Production with authentication
 prod_client = AuthenticatedClient(
-    base_url=os.getenv("QDASH_API_URL", "https://qdash.example.com"),
-    token=os.getenv("QDASH_API_TOKEN"),
-    headers={"X-Username": os.getenv("QDASH_USERNAME")},
-    timeout=15.0
+    base_url="https://qdash.example.com",
+    token="your-api-token",
+    headers={"X-Username": "your-username"},
+    timeout=httpx.Timeout(15.0)
+)
+
+# With custom httpx settings
+client = Client(
+    base_url="http://localhost:5715",
+    httpx_args={
+        "event_hooks": {
+            "request": [lambda req: print(f"Request: {req.method} {req.url}")],
+            "response": [lambda res: print(f"Response: {res.status_code}")]
+        }
+    }
 )
 ```
 
 ### Synchronous Usage
 
 ```python
-# Clean integrated imports - much better!
-from qdash.client import Client, AuthenticatedClient
+from qdash.client import Client
 from qdash.client.api.chip import list_chips, fetch_chip
 from qdash.client.api.calibration import execute_calib
 from qdash.client.models import ExecuteCalibRequest
 
-# Alternative: Import directly from qdash (when installed)
-# from qdash import Client, AuthenticatedClient
-
 # Create sync client instance
 client = Client(base_url="http://localhost:5715")
 
-# Example: Get chip information with attrs models
+# Example: Get chip information
 chips_response = list_chips.sync_detailed(client=client)
 if chips_response.status_code == 200:
     chips = chips_response.parsed
@@ -134,290 +134,211 @@ if chips:
     if chip_response.status_code == 200:
         chip_detail = chip_response.parsed
         print(f"Chip has {len(chip_detail.qubits)} qubits")
+        print(f"Couplings: {len(chip_detail.couplings)}")
 
-# Example: Execute calibration with type safety
+# Example: Execute calibration
 calibration_request = ExecuteCalibRequest(
-    # Request fields based on the actual API schema
     chip_name="my-chip",
-    task_details=[
-        # Task details based on schema
-    ]
+    task_details=[]
 )
 result = execute_calib.sync_detailed(client=client, json_body=calibration_request)
 if result.status_code == 200:
     print(f"Calibration started: {result.parsed}")
 ```
 
-### Asynchronous Usage (Recommended for Quantum Workflows)
+### Asynchronous Usage (Recommended for Parallel Operations)
 
 ```python
 import asyncio
-from qdash_client import AsyncApiClient
+from qdash.client import Client
+from qdash.client.api.chip import list_chips, fetch_chip
+from qdash.client.api.execution import fetch_execution_lock_status
 
-async def quantum_calibration_workflow():
-    """Example async workflow for quantum calibration."""
+async def parallel_chip_analysis():
+    """Example async workflow for parallel chip analysis."""
     
-    async with AsyncApiClient(base_url="http://localhost:5715") as client:
-        # Parallel operations for efficiency
-        chips, history = await asyncio.gather(
-            client.chip_get_chips_get(),
-            client.calibration_get_calibration_history_get(limit=5)
-        )
+    async with Client(base_url="http://localhost:5715") as client:
+        # Check system status first
+        lock_status = await fetch_execution_lock_status.asyncio_detailed(client=client)
+        if lock_status.status_code == 200 and not lock_status.parsed.locked:
+            print("System ready for calibration")
         
-        print(f"Managing {len(chips)} chips with {len(history.items)} recent calibrations")
+        # Get all chips
+        chips_response = await list_chips.asyncio_detailed(client=client)
+        if chips_response.status_code != 200:
+            raise Exception("Failed to fetch chips")
         
-        # Start multiple calibrations concurrently
-        calibration_tasks = []
-        for chip in chips[:3]:  # Limit to first 3 chips
-            calibration_request = {
-                "chip_id": chip.id,
-                "experiment_type": "t1_measurement", 
-                "parameters": {"measurement_count": 1000}
-            }
-            task = client.calibration_start_calibration_post(json_body=calibration_request)
-            calibration_tasks.append(task)
+        chips = chips_response.parsed
+        print(f"Analyzing {len(chips)} chips in parallel...")
         
-        # Wait for all calibrations to start
-        calibration_results = await asyncio.gather(*calibration_tasks)
+        # Fetch details for multiple chips in parallel
+        detail_tasks = [
+            fetch_chip.asyncio_detailed(client=client, chip_name=chip.name)
+            for chip in chips[:5]  # Limit to first 5
+        ]
         
-        # Monitor calibration progress
-        for result in calibration_results:
-            print(f"Started calibration {result.id} for chip {result.chip_id}")
-            
-            # Poll for completion using the status endpoint
-            while True:
-                status = await client.calibration_get_calibration_status_get(
-                    calibration_id=result.id
-                )
-                print(f"Calibration {result.id}: {status.status} ({status.progress}%)")
-                
-                if status.status in ["completed", "failed", "cancelled"]:
-                    break
-                    
-                await asyncio.sleep(1)
+        # Wait for all tasks to complete
+        results = await asyncio.gather(*detail_tasks, return_exceptions=True)
+        
+        # Process results
+        for chip, result in zip(chips[:5], results):
+            if isinstance(result, Exception):
+                print(f"Error fetching {chip.name}: {result}")
+            elif result.status_code == 200:
+                detail = result.parsed
+                print(f"{chip.name}: {len(detail.qubits)} qubits, {len(detail.couplings)} couplings")
 
 # Run the async workflow
-asyncio.run(quantum_calibration_workflow())
+asyncio.run(parallel_chip_analysis())
 ```
 
-### Advanced Usage with Context Management
+### Error Handling
 
 ```python
-from qdash_client import AsyncQDashClient
-from qdash_client.exceptions import QDashAPIError
+from qdash.client import Client
+from qdash.client.api.chip import fetch_chip
+from qdash.client.errors import UnexpectedStatus
 
-async def robust_calibration():
-    """Example with proper error handling and resource management."""
+try:
+    client = Client(
+        base_url="http://localhost:5715",
+        raise_on_unexpected_status=True  # Raise exceptions on non-2xx responses
+    )
     
-    try:
-        async with AsyncQDashClient(
-            base_url="http://localhost:5715",
-            timeout=30.0,  # Custom timeout
-            headers={"X-Username": "quantum-operator"}  # Custom headers
-        ) as client:
-            
-            # Type-safe parameter access
-            chip = await client.get_chip("my-chip-id")
-            current_frequency = chip.parameters.qubit_frequency
-            
-            # Update with Pydantic validation
-            updated_params = chip.parameters.model_copy(
-                update={"qubit_frequency": current_frequency + 1e6}
-            )
-            
-            await client.update_chip_parameters("my-chip-id", updated_params)
-            
-    except QDashAPIError as e:
-        print(f"API Error: {e.status_code} - {e.message}")
-        if e.details:
-            print(f"Details: {e.details}")
-    except Exception as e:
-        print(f"Unexpected error: {e}")
+    response = fetch_chip.sync_detailed(client=client, chip_name="nonexistent")
+    
+except UnexpectedStatus as e:
+    print(f"API Error: {e.status_code} - {e.content}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
 ```
 
-## Configuration
+## API Reference
 
-The client generation can be configured via environment variables:
+### Client Methods
 
-- `API_PORT`: QDash API port (default: 5715)
-- `API_HOST`: QDash API host (default: localhost)
-- `CLIENT_NAME`: Generated client class name (default: QDashClient)
-- `PACKAGE_NAME`: Generated package name (default: qdash_client)
-- `HTTP_CLIENT`: HTTP library to use (httpx, requests, aiohttp - default: httpx)
-- `CLIENT_OUTPUT_DIR`: Custom output directory
+Each API endpoint generates four methods:
 
-Example with custom configuration:
-```bash
-export API_PORT=8080
-export CLIENT_NAME=MyQuantumClient
-export HTTP_CLIENT=httpx
-task generate-python-client
-```
+1. **`sync`**: Synchronous call returning parsed data or None
+2. **`sync_detailed`**: Synchronous call returning Response object with status code
+3. **`asyncio`**: Asynchronous call returning parsed data or None
+4. **`asyncio_detailed`**: Asynchronous call returning Response object with status code
 
-## Quantum Computing Optimizations
+### Available API Modules
 
-The modern client is specifically optimized for quantum calibration workflows:
+- **`api.chip`**: Chip management and information
+- **`api.calibration`**: Calibration workflow execution
+- **`api.execution`**: Execution status and locks
+- **`api.menu`**: Menu and experiment configuration
+- **`api.settings`**: Application settings
+- **`api.auth`**: Authentication endpoints
+- **`api.parameter`**: Parameter configuration
+- **`api.tag`**: Tagging system
+- **`api.device_topology`**: Device topology management
+- **`api.backend`**: Backend operations
+- **`api.file`**: File operations
+- **`api.task`**: Task management
 
-### 1. **Concurrent Calibrations**
+### Response Objects
+
 ```python
-# Run multiple calibrations in parallel
-async def parallel_calibrations(chip_ids: list[str]):
-    async with AsyncQDashClient() as client:
-        tasks = [
-            client.start_calibration(chip_id, experiment_type="rabi")
-            for chip_id in chip_ids
-        ]
-        return await asyncio.gather(*tasks)
+from qdash.client.types import Response
+
+# Response object structure
+response = fetch_chip.sync_detailed(client=client, chip_name="chip1")
+response.status_code  # HTTP status code
+response.content      # Raw response content
+response.headers      # Response headers
+response.parsed       # Parsed model (if successful)
 ```
 
-### 2. **Real-time Monitoring**
-```python
-# Stream calibration progress with async generators
-async def monitor_calibration(calibration_id: str):
-    async with AsyncQDashClient() as client:
-        async for update in client.stream_calibration_progress(calibration_id):
-            yield update.progress, update.current_step
-            if update.status == "completed":
-                break
-```
+## Working with Models
 
-### 3. **Type-Safe Parameter Management**
-```python
-# Pydantic ensures parameter validation
-from qdash_client.models import RabiParameters
+All request and response models are generated with attrs and provide:
 
-rabi_params = RabiParameters(
-    frequency_start=5.0e9,  # Validated range
-    frequency_stop=5.5e9,
-    amplitude_start=0.01,
-    amplitude_stop=0.1,
-    num_points=100
+- Full type hints
+- Validation
+- Serialization/deserialization
+- Immutability by default
+
+```python
+from qdash.client.models import ChipResponse, ExecuteCalibRequest
+
+# Models are attrs classes
+chip = ChipResponse(
+    name="quantum_chip_1",
+    id="chip_001",
+    qubits=[...],
+    couplings=[...]
 )
-# Type error if invalid parameters!
+
+# Access attributes
+print(chip.name)
+print(len(chip.qubits))
+
+# Models are immutable by default
+# Use evolve to create modified copies
+from attrs import evolve
+modified_chip = evolve(chip, name="quantum_chip_2")
 ```
 
-## Regenerating the Client
+## Best Practices
 
-When the QDash API changes, regenerate the client:
+1. **Use context managers** for proper resource cleanup:
+   ```python
+   with Client(base_url="...") as client:
+       # Your code here
+   ```
 
-```bash
-task generate-python-client
-```
+2. **Check status codes** before accessing parsed data:
+   ```python
+   response = api_call.sync_detailed(client=client)
+   if response.status_code == 200:
+       data = response.parsed
+   ```
 
-The `--overwrite` flag is used by default to replace the existing client.
+3. **Use async for parallel operations** to improve performance:
+   ```python
+   results = await asyncio.gather(*[task1, task2, task3])
+   ```
 
-## Testing & Integration
+4. **Configure timeouts** for production environments:
+   ```python
+   client = Client(base_url="...", timeout=httpx.Timeout(10.0))
+   ```
 
-### Integration Tests
-
-Client integration tests verify functionality across different scenarios:
-
-```bash
-# Run all tests including client tests
-pytest tests/ -v
-
-# Run only client integration tests
-pytest tests/test_client_integration.py -v
-
-# Run integration tests (requires running API server)
-pytest tests/test_client_integration.py -m integration -v
-```
-
-### Error Recovery & Retry Logic
-
-The client examples include robust error recovery patterns with exponential backoff and proper exception handling.
-
-### CI Pipeline Integration
-
-- Generated code in `src/qdash/client/` excluded from linting/formatting
-- Dependencies pinned for stability (`httpx>=0.27.0,<0.28.0`, `attrs>=23.1.0,<25.0.0`)
-- Integration tests verify functionality across environments
-
-## Examples
-
-Comprehensive examples are available:
-- [`examples/qdash_client_example.py`](../examples/qdash_client_example.py) - Sync/async usage with error handling
-- [`examples/python_client_examples.py`](../examples/python_client_examples.py) - Advanced quantum workflows
-- [`examples/client_configurations.py`](../examples/client_configurations.py) - Environment-specific configurations
-- [`tests/test_client_integration.py`](../tests/test_client_integration.py) - Integration test patterns
-
-## Development
-
-The client generation script is located at:
-- `src/qdash/scripts/generate_client.py`
-
-Key features:
-- **Configuration management** with dataclasses
-- **Robust error handling** with retries and validation  
-- **Health checks** before generation
-- **Dependency version pinning**
-- **Environment-aware configurations**
-- **Comprehensive test coverage**
-
-## Performance
-
-The modern client provides significant performance improvements:
-
-- **HTTP/2 support** via httpx for multiplexing
-- **Connection pooling** for reduced latency
-- **Async I/O** prevents blocking during long calibrations
-- **Pydantic v2** with Rust-based validation for speed
-- **Type hints** enable optimizations in Python 3.11+
+5. **Handle errors gracefully** with proper exception handling
 
 ## Troubleshooting
 
-### "openapi-python-generator not found" error
-Install the modern generator:
-```bash
-uv sync --group dev  # or pip install openapi-python-generator
-```
+### Common Issues
 
-### "Connection refused" error
-Make sure the QDash API server is running:
-```bash
-uvicorn src.qdash.api.main:app --reload --port 5715
-```
+1. **Import errors**: Make sure the client is installed:
+   ```bash
+   pip install git+https://github.com/oqtopus-team/qdash.git#subdirectory=src/qdash/client
+   ```
 
-### Import errors after generation
-Install the generated client:
-```bash
-pip install -e ./qdash_client
-```
+2. **Connection errors**: Verify the API server is running:
+   ```bash
+   curl http://localhost:5715/docs
+   ```
 
-### Pydantic validation errors
-The modern client provides detailed validation errors:
-```python
-try:
-    client.create_calibration(invalid_data)
-except ValidationError as e:
-    print("Validation failed:", e.errors())
-```
+3. **Type errors**: The client uses strict typing. Check your IDE for type hints.
 
-### Type checking with mypy
-The generated client has full type coverage:
-```bash
-mypy your_quantum_script.py  # Should pass without errors
-```
+4. **Outdated client**: Regenerate the client after API changes:
+   ```bash
+   task generate-python-client
+   ```
 
-## Migration from Legacy Client
+## Contributing
 
-If migrating from the old `openapi-python-client` generated client:
+The client is auto-generated. To modify:
 
-### Before (Legacy)
-```python
-from qdash_client.api.chip import get_chips
-response = get_chips.sync_detailed(client=client)
-chips = response.parsed
-```
+1. Update the API endpoints in `src/qdash/api/`
+2. Regenerate the client: `task generate-python-client`
+3. Test your changes
+4. Submit a pull request
 
-### After (Modern)
-```python
-# Much cleaner!
-chips = client.get_chips()  # Direct return, full typing
-```
+## License
 
-The modern client eliminates the need for:
-- Manual response parsing
-- `sync_detailed` method calls  
-- Complex import patterns
-- Manual type casting
+Apache License 2.0 - See [LICENSE](https://github.com/oqtopus-team/qdash/blob/main/LICENSE) for details.
