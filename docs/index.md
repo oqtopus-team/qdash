@@ -16,6 +16,9 @@ hero:
     - theme: alt
       text: Quickstart
       link: /quick-start
+    - theme: alt
+      text: Python Client
+      link: /python-client
 
 features:
   - title: ⚡ Workflows

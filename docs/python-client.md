@@ -19,10 +19,28 @@ QDash Python client is automatically generated from the OpenAPI specification us
 
 ## Installation
 
-1. Install development dependencies (includes `openapi-python-client`):
-   ```bash
-   uv sync --group dev
-   ```
+### Option 1: Install from GitHub (Recommended for Users)
+
+Install QDash with the Python client dependencies:
+
+```bash
+# Install with client dependencies
+pip install "git+https://github.com/oqtopus-team/qdash.git[client]"
+
+# Generate the client after installation
+generate-python-client
+```
+
+### Option 2: Development Installation
+
+For development, install all dependencies:
+
+```bash
+# Clone and install in development mode
+git clone https://github.com/oqtopus-team/qdash.git
+cd qdash
+uv sync --group dev
+```
 
 ## Generate Modern Python Client
 
@@ -48,17 +66,31 @@ This will:
 
 ## Usage
 
-After generating the client:
+After generating the client, you can use it with full error handling and retry logic:
 
-1. **Option A**: Install the full qdash package:
-   ```bash
-   pip install -e .
-   ```
+### Environment Configuration
 
-2. **Option B**: Add to Python path (for development):
-   ```bash
-   export PYTHONPATH=/workspace/qdash/src:$PYTHONPATH
-   ```
+Different environments require different configurations:
+
+```python
+import os
+from qdash.client import Client, AuthenticatedClient
+
+# Development
+dev_client = Client(
+    base_url="http://localhost:5715",
+    timeout=30.0,
+    raise_on_unexpected_status=True
+)
+
+# Production
+prod_client = AuthenticatedClient(
+    base_url=os.getenv("QDASH_API_URL", "https://qdash.example.com"),
+    token=os.getenv("QDASH_API_TOKEN"),
+    headers={"X-Username": os.getenv("QDASH_USERNAME")},
+    timeout=15.0
+)
+```
 
 ### Synchronous Usage
 
@@ -264,17 +296,53 @@ task generate-python-client
 
 The `--overwrite` flag is used by default to replace the existing client.
 
+## Testing & Integration
+
+### Integration Tests
+
+Client integration tests verify functionality across different scenarios:
+
+```bash
+# Run all tests including client tests
+pytest tests/ -v
+
+# Run only client integration tests
+pytest tests/test_client_integration.py -v
+
+# Run integration tests (requires running API server)
+pytest tests/test_client_integration.py -m integration -v
+```
+
+### Error Recovery & Retry Logic
+
+The client examples include robust error recovery patterns with exponential backoff and proper exception handling.
+
+### CI Pipeline Integration
+
+- Generated code in `src/qdash/client/` excluded from linting/formatting
+- Dependencies pinned for stability (`httpx>=0.27.0,<0.28.0`, `attrs>=23.1.0,<25.0.0`)
+- Integration tests verify functionality across environments
+
+## Examples
+
+Comprehensive examples are available:
+- [`examples/qdash_client_example.py`](../examples/qdash_client_example.py) - Sync/async usage with error handling
+- [`examples/python_client_examples.py`](../examples/python_client_examples.py) - Advanced quantum workflows
+- [`examples/client_configurations.py`](../examples/client_configurations.py) - Environment-specific configurations
+- [`tests/test_client_integration.py`](../tests/test_client_integration.py) - Integration test patterns
+
 ## Development
 
-The modern client generation script is located at:
+The client generation script is located at:
 - `src/qdash/scripts/generate_client.py`
 
-Key improvements over the legacy client:
+Key features:
 - **Configuration management** with dataclasses
-- **Robust error handling** with retries and validation
+- **Robust error handling** with retries and validation  
 - **Health checks** before generation
-- **Dependency verification** 
-- **Modern Python patterns** throughout
+- **Dependency version pinning**
+- **Environment-aware configurations**
+- **Comprehensive test coverage**
 
 ## Performance
 

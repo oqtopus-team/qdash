@@ -11,13 +11,17 @@ import asyncio
 from datetime import datetime
 from typing import List, Dict, Any
 
-# Import the generated client (after running: task generate-python-client)
+# Import the generated client (after running: generate-python-client)
 try:
-    from qdash_client import AsyncApiClient, ApiClient
-    from qdash_client.models import *
-except ImportError:
-    print("❌ QDash client not found. Run 'task generate-python-client' first!")
-    print("   Then install with: pip install -e ./qdash_client")
+    from qdash.client import Client, AuthenticatedClient
+    from qdash.client.api import *
+    from qdash.client.models import *
+    from qdash.client.errors import UnexpectedStatus
+except ImportError as e:
+    print("❌ QDash client not found!")
+    print("First generate the client: generate-python-client")
+    print("Or install QDash with client dependencies: pip install 'git+https://github.com/oqtopus-team/qdash.git[client]'")
+    print(f"Error details: {e}")
     exit(1)
 
 

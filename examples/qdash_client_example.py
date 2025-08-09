@@ -14,16 +14,17 @@ from typing import Optional
 
 # Import the generated client
 try:
-    from qdash_client import Client, AuthenticatedClient
-    from qdash_client.api.chip import list_chips, fetch_chip
-    from qdash_client.api.calibration import execute_calib
-    from qdash_client.api.execution import fetch_execution_lock_status
-    from qdash_client.models import ExecuteCalibRequest
-    from qdash_client.errors import UnexpectedStatus
-except ImportError:
+    from qdash.client import Client, AuthenticatedClient
+    from qdash.client.api.chip import list_chips, fetch_chip
+    from qdash.client.api.calibration import execute_calib
+    from qdash.client.api.execution import fetch_execution_lock_status
+    from qdash.client.models import ExecuteCalibRequest
+    from qdash.client.errors import UnexpectedStatus
+except ImportError as e:
     print("❌ QDash client not found!")
-    print("First generate the client: task generate-python-client")
-    print("Then install it: pip install -e ./qdash_client")
+    print("First generate the client: generate-python-client")
+    print("Or install QDash with client dependencies: pip install 'git+https://github.com/oqtopus-team/qdash.git[client]'")
+    print(f"Error details: {e}")
     exit(1)
 
 
@@ -36,17 +37,42 @@ def example_synchronous_usage():
     client = Client(base_url="http://localhost:5715")
 
     try:
-        # Example 1: List all chips
+        # Example 1: List all chips with retry logic
         print("📡 Fetching all chips...")
-        chips_response = list_chips.sync_detailed(client=client)
+        max_retries = 3
+        chips_response = None
+        
+        for attempt in range(max_retries):
+            try:
+                chips_response = list_chips.sync_detailed(client=client)
+                if chips_response.status_code == 200:
+                    break
+                elif chips_response.status_code == 503:  # Service unavailable
+                    if attempt < max_retries - 1:
+                        print(f"⏳ API busy, retrying in {2 ** attempt} seconds...")
+                        import time
+                        time.sleep(2 ** attempt)
+                        continue
+                else:
+                    print(f"❌ Error fetching chips: {chips_response.status_code}")
+                    if hasattr(chips_response, 'content'):
+                        print(f"   Response: {chips_response.content}")
+                    return
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    print(f"⏳ Connection failed, retrying in {2 ** attempt} seconds... ({e})")
+                    import time
+                    time.sleep(2 ** attempt)
+                else:
+                    raise
 
-        if chips_response.status_code == 200:
+        if chips_response and chips_response.status_code == 200:
             chips = chips_response.parsed
             print(f"✅ Found {len(chips)} chips:")
             for chip in chips[:3]:  # Show first 3
                 print(f"   • {chip.name} (ID: {chip.id})")
         else:
-            print(f"❌ Error fetching chips: {chips_response.status_code}")
+            print(f"❌ Failed to fetch chips after {max_retries} attempts")
             return
 
         # Example 2: Get specific chip details
