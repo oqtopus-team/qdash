@@ -1,12 +1,9 @@
-"""QDash: Quantum calibration dashboard and Python client."""
+"""QDash: Quantum calibration platform with workflow management."""
 
 __version__ = "0.1.0"
 
-# Import client for easy access
-try:
-    from .client import AuthenticatedClient, Client
+# Core imports for platform functionality
+from .dbmodel import Chip
+from .datamodel import ChipModel
 
-    __all__ = ["Client", "AuthenticatedClient", "__version__"]
-except ImportError:
-    # Client not generated yet
-    __all__ = ["__version__"]
+__all__ = ["Chip", "ChipModel", "__version__"]
