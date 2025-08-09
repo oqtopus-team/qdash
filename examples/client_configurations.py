@@ -9,12 +9,13 @@ and use cases including production, development, testing, and advanced scenarios
 import os
 import asyncio
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 import logging
 
 try:
     from qdash.client import Client, AuthenticatedClient
     from qdash.client.errors import UnexpectedStatus
+    from httpx import Timeout
 except ImportError as e:
     print("❌ QDash client not found!")
     print("First generate the client: generate-python-client")
@@ -40,7 +41,7 @@ class QDashClientConfig:
         """
         return Client(
             base_url=os.getenv("QDASH_API_URL", "http://localhost:5715"),
-            timeout=30.0,  # Extended timeout for development
+            timeout=Timeout(30.0),  # Extended timeout for development
             raise_on_unexpected_status=True,  # Raise exceptions for debugging
         )
 
@@ -67,7 +68,7 @@ class QDashClientConfig:
                 "X-Client-Version": "1.0.0",
                 "X-Environment": "production",
             },
-            timeout=15.0,  # Production timeout
+            timeout=Timeout(15.0),  # Production timeout
             raise_on_unexpected_status=False,  # Handle errors gracefully
         )
 
@@ -83,7 +84,7 @@ class QDashClientConfig:
         """
         return Client(
             base_url=os.getenv("QDASH_TEST_URL", "http://localhost:5716"),
-            timeout=5.0,  # Short timeout for tests
+            timeout=Timeout(5.0),  # Short timeout for tests
             raise_on_unexpected_status=False,
         )
 
@@ -104,7 +105,7 @@ class QDashClientConfig:
                 "X-Environment": "staging",
                 "X-Client-Source": "python-client",
             },
-            timeout=20.0,
+            timeout=Timeout(20.0),
         )
 
     @staticmethod
@@ -114,7 +115,7 @@ class QDashClientConfig:
         custom_headers: Optional[Dict[str, str]] = None,
         auth_token: Optional[str] = None,
         username: Optional[str] = None,
-    ) -> Client:
+    ) -> Union[Client, AuthenticatedClient]:
         """
         Custom client configuration for specific needs.
 
@@ -135,12 +136,12 @@ class QDashClientConfig:
                 base_url=base_url,
                 token=auth_token,
                 headers=headers,
-                timeout=timeout,
+                timeout=Timeout(timeout),
             )
         else:
             return Client(
                 base_url=base_url,
-                timeout=timeout,
+                timeout=Timeout(timeout),
                 headers=headers,
             )
 
@@ -209,7 +210,7 @@ class EnvironmentAwareClient:
         self.environment = os.getenv("ENVIRONMENT", "development").lower()
         self.client = self._create_client()
 
-    def _create_client(self) -> Client:
+    def _create_client(self) -> Union[Client, AuthenticatedClient]:
         """Create appropriate client based on environment."""
         if self.environment == "production":
             api_token = os.getenv("QDASH_API_TOKEN")
@@ -230,7 +231,7 @@ class EnvironmentAwareClient:
         else:  # development
             return QDashClientConfig.development_client()
 
-    def get_client(self) -> Client:
+    def get_client(self) -> Union[Client, AuthenticatedClient]:
         """Get the configured client."""
         return self.client
 
@@ -255,7 +256,12 @@ def load_config_from_file(config_path: str) -> Dict[str, Any]:
 
         return json.load(config_file.open())
     elif config_file.suffix.lower() in [".yaml", ".yml"]:
-        import yaml
+        try:
+            import yaml  # type: ignore
+        except ImportError:
+            raise ImportError(
+                "PyYAML is required for YAML config files. Install with: pip install PyYAML"
+            )
 
         return yaml.safe_load(config_file.open())
     else:
