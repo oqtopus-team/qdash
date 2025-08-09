@@ -37,12 +37,12 @@ qdash = "qdash.cli:app"
 
 [tool.ruff]
 line-length = 100
-exclude = ["tools", "scripts"]
+exclude = ["tools", "scripts", "qdash_client"]
 lint.unfixable = ["F401"]
 # Temporarily use minimal rule set to get CI passing
 lint.select = [
     "E9",  # syntax errors only
-    "F63", # comparison issues  
+    "F63", # comparison issues
     "F7",  # syntax errors
     "F82", # undefined names
 ]

@@ -123,9 +123,7 @@ class Agent:
             "1qubit",
         ]
 
-        is_calibration_query = any(
-            keyword.lower() in user_input.lower() for keyword in calibration_keywords
-        )
+        is_calibration_query = any(keyword.lower() in user_input.lower() for keyword in calibration_keywords)
 
         web_search_keywords = [
             "search",
@@ -135,18 +133,12 @@ class Agent:
             "検索",
             "ニュース",
         ]
-        might_need_web_search = any(
-            keyword.lower() in user_input.lower() for keyword in web_search_keywords
-        )
+        might_need_web_search = any(keyword.lower() in user_input.lower() for keyword in web_search_keywords)
 
         # Remove "latest", "recent", "最新" from web search keywords since they are common in calibration queries
 
         # NEVER use web search for calibration-related queries
-        if (
-            might_need_web_search
-            and not is_calibration_query
-            and self.model in ["gpt-4.1", "gpt-4.1-mini", "o4-mini"]
-        ):
+        if might_need_web_search and not is_calibration_query and self.model in ["gpt-4.1", "gpt-4.1-mini", "o4-mini"]:
             # Use Responses API with built-in web search for supported models
             try:
                 logger.info(f"🌐 Using OpenAI built-in web search for model: {self.model}")
@@ -157,9 +149,7 @@ class Agent:
                 )
                 return response.output_text
             except Exception as e:
-                logger.warning(
-                    f"❌ OpenAI web search failed, falling back to function calling: {e}"
-                )
+                logger.warning(f"❌ OpenAI web search failed, falling back to function calling: {e}")
                 # Fall back to function calling approach
 
         # Original function calling approach
@@ -198,9 +188,7 @@ class Agent:
                 result = await self._execute_tool(tool_name, arguments)
 
                 # Record step
-                step_record = AgentStep(
-                    step_number=step + 1, action=tool_name, input=arguments, output=result
-                )
+                step_record = AgentStep(step_number=step + 1, action=tool_name, input=arguments, output=result)
                 self.steps.append(step_record)
 
                 # Progress callback

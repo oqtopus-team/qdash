@@ -50,9 +50,7 @@ def execute_dynamic_task_by_qid(
 
         # タスク実行状態の保存
         executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
-        TaskResultHistoryDocument.upsert_document(
-            task=executed_task, execution_model=execution_manager.to_datamodel()
-        )
+        TaskResultHistoryDocument.upsert_document(task=executed_task, execution_model=execution_manager.to_datamodel())
 
         # ExecutionManagerの更新
         execution_manager = execution_manager.update_with_task_manager(task_manager)
@@ -112,9 +110,7 @@ def execute_dynamic_task_by_qid(
         )
         task_manager.save()
         executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
-        TaskResultHistoryDocument.upsert_document(
-            task=executed_task, execution_model=execution_manager.to_datamodel()
-        )
+        TaskResultHistoryDocument.upsert_document(task=executed_task, execution_model=execution_manager.to_datamodel())
         execution_manager = execution_manager.update_with_task_manager(task_manager)
 
         # キャリブレーションデータの更新
@@ -152,9 +148,7 @@ def execute_dynamic_task_by_qid(
         execution_manager = execution_manager.update_with_task_manager(task_manager)
         # 最終状態の保存
         executed_task = task_manager.get_task(task_name=task_name, task_type=task_type, qid=qid)
-        TaskResultHistoryDocument.upsert_document(
-            task=executed_task, execution_model=execution_manager.to_datamodel()
-        )
+        TaskResultHistoryDocument.upsert_document(task=executed_task, execution_model=execution_manager.to_datamodel())
         chip_doc = ChipDocument.get_current_chip(username=task_manager.username)
         ChipHistoryDocument.create_history(chip_doc)
 

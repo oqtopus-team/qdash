@@ -34,23 +34,17 @@ class CheckZX90(BaseTask):
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         exp = session.get_session()
-        control, target = (
-            exp.get_qubit_label(int(q)) for q in qid.split("-")
-        )  # e.g., "0-1" → "Q00","Q01"
+        control, target = (exp.get_qubit_label(int(q)) for q in qid.split("-"))  # e.g., "0-1" → "Q00","Q01"
         result = run_result.raw_result
         figures = [
             result.data[control].plot(normalize=True, return_figure=True),
             result.data[target].plot(normalize=True, return_figure=True),
         ]
-        return PostProcessResult(
-            output_parameters=self.attach_execution_id(execution_id), figures=figures
-        )
+        return PostProcessResult(output_parameters=self.attach_execution_id(execution_id), figures=figures)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         exp = session.get_session()
-        control, target = (
-            exp.get_qubit_label(int(q)) for q in qid.split("-")
-        )  # e.g., "0-1" → "Q00","Q01"
+        control, target = (exp.get_qubit_label(int(q)) for q in qid.split("-"))  # e.g., "0-1" → "Q00","Q01"
         zx90_pulse = exp.zx90(control, target)
         result = exp.repeat_sequence(
             sequence=zx90_pulse,
@@ -61,6 +55,4 @@ class CheckZX90(BaseTask):
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

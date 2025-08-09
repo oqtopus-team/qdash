@@ -1,8 +1,5 @@
-import itertools
 import json
-from collections import defaultdict
 
-import networkx as nx
 from qdash.datamodel.qubit import QubitModel
 from qdash.db.init import initialize
 from qdash.dbmodel.chip import ChipDocument

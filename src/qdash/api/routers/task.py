@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -79,13 +79,9 @@ def fetch_all_tasks(
                 description=task.description,
                 task_type=task.task_type,
                 backend=task.backend,
-                input_parameters={
-                    name: InputParameterModel(**param)
-                    for name, param in task.input_parameters.items()
-                },
+                input_parameters={name: InputParameterModel(**param) for name, param in task.input_parameters.items()},
                 output_parameters={
-                    name: InputParameterModel(**param)
-                    for name, param in task.output_parameters.items()
+                    name: InputParameterModel(**param) for name, param in task.output_parameters.items()
                 },
             )
             for task in tasks

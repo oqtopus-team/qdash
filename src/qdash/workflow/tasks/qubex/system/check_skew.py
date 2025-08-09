@@ -37,9 +37,7 @@ class CheckSkew(BaseTask):
     ) -> PostProcessResult:
         result = run_result.raw_result
         figures: list = [result["fig"]]
-        return PostProcessResult(
-            output_parameters=self.attach_execution_id(execution_id), figures=figures
-        )
+        return PostProcessResult(output_parameters=self.attach_execution_id(execution_id), figures=figures)
 
     def load(self, filename: str) -> Any:
         with (Path.cwd() / Path(filename)).open() as file:
@@ -78,6 +76,4 @@ class CheckSkew(BaseTask):
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

@@ -1,0 +1,157 @@
+# QDash Python Client
+
+A Python client library for accessing QDash API, auto-generated from OpenAPI specification.
+
+## Installation
+
+### Option 1: Install client standalone (Recommended for client-only usage)
+
+```bash
+# Install directly from GitHub
+pip install git+https://github.com/oqtopus-team/qdash.git#subdirectory=qdash_client
+
+# Or if you have the repository cloned locally
+cd qdash_client
+pip install .
+```
+
+### Option 2: Install as part of the full QDash package
+
+```bash
+# Install the entire QDash package
+pip install git+https://github.com/oqtopus-team/qdash.git
+
+# The client will be available as qdash.client
+```
+
+### Option 3: From PyPI (when published)
+
+```bash
+# Future release - client only
+pip install qdash-client
+
+# Or full package
+pip install qdash
+```
+
+## Usage
+
+```python
+# When installed as standalone package (qdash-client)
+from qdash_client import Client
+from qdash_client.api.chip import list_chips, fetch_chip
+
+# Or when installed as part of qdash
+# from qdash.client import Client
+# from qdash.client.api.chip import list_chips, fetch_chip
+
+# Create client instance
+client = Client(base_url="http://localhost:5715")
+
+# Get all chips
+response = list_chips.sync_detailed(client=client)
+if response.status_code == 200:
+    chips = response.parsed
+    for chip in chips:
+        print(f"Chip: {chip.name}")
+
+# Get specific chip details
+chip_response = fetch_chip.sync_detailed(
+    client=client,
+    chip_name="sample_chip"
+)
+if chip_response.status_code == 200:
+    chip_detail = chip_response.parsed
+    print(f"Qubits: {len(chip_detail.qubits)}")
+```
+
+## Async Support
+
+```python
+import asyncio
+from qdash_client import Client
+from qdash_client.api.chip import list_chips
+
+async def main():
+    client = Client(base_url="http://localhost:5715")
+    
+    response = await list_chips.asyncio_detailed(client=client)
+    if response.status_code == 200:
+        chips = response.parsed
+        for chip in chips:
+            print(f"Chip: {chip.name}")
+
+asyncio.run(main())
+```
+
+## Authentication
+
+```python
+from qdash_client import Client
+
+# For development (X-Username header)
+client = Client(
+    base_url="http://localhost:5715",
+    headers={"X-Username": "your-username"}
+)
+
+# For production (when JWT is implemented)
+# client = AuthenticatedClient(
+#     base_url="https://api.qdash.example.com",
+#     token="your-jwt-token"
+# )
+```
+
+## Available API Endpoints
+
+- **Chip**: `list_chips`, `fetch_chip`, `create_chip`, `update_chip`
+- **Calibration**: `list_calibrations`, `create_calibration`, `get_calibration_status`
+- **Execution**: `list_executions`, `get_execution_detail`
+- **Parameter**: `get_parameters`, `update_parameters`
+- **File**: `upload_file`, `download_file`
+- **Menu**: `list_menus`, `get_menu_detail`
+
+## Error Handling
+
+```python
+from qdash_client import Client
+from qdash_client.api.chip import fetch_chip
+from qdash_client.types import Response
+
+client = Client(base_url="http://localhost:5715")
+
+response: Response = fetch_chip.sync_detailed(
+    client=client,
+    chip_name="nonexistent"
+)
+
+if response.status_code == 404:
+    print("Chip not found")
+elif response.status_code == 200:
+    chip = response.parsed
+    print(f"Found chip: {chip.name}")
+else:
+    print(f"Unexpected error: {response.status_code}")
+```
+
+## Development
+
+This client is auto-generated from the QDash OpenAPI specification. To regenerate:
+
+```bash
+# Using task runner
+task generate-python-client
+
+# Or directly
+python -m qdash.scripts.generate_client
+```
+
+## License
+
+Apache License 2.0
+
+## Support
+
+For issues and questions:
+- GitHub Issues: https://github.com/oqtopus-team/qdash/issues
+- Documentation: https://qdash.readthedocs.io/

@@ -13,7 +13,7 @@ anyio==4.8.0
     #   openai
 async-timeout==5.0.1 ; python_full_version < '3.11'
     # via aiohttp
-attrs==25.1.0
+attrs==24.3.0
     # via aiohttp
 bunnet==1.3.0
     # via qdash
@@ -41,7 +41,7 @@ h11==0.14.0
     # via httpcore
 httpcore==1.0.7
     # via httpx
-httpx==0.28.1
+httpx==0.27.2
     # via openai
 idna==3.10
     # via
@@ -90,6 +90,7 @@ slack-sdk==3.36.0
 sniffio==1.3.1
     # via
     #   anyio
+    #   httpx
     #   openai
 toml==0.10.2
     # via bunnet

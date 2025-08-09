@@ -42,9 +42,7 @@ class CreateDRAGHPIPulse(BaseTask):
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "drag_hpi_beta": OutputParameterModel(unit="a.u.", description="DRAG HPI pulse beta"),
-        "drag_hpi_amplitude": OutputParameterModel(
-            unit="a.u.", description="DRAG HPI pulse amplitude"
-        ),
+        "drag_hpi_amplitude": OutputParameterModel(unit="a.u.", description="DRAG HPI pulse amplitude"),
     }
 
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
@@ -80,6 +78,4 @@ class CreateDRAGHPIPulse(BaseTask):
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
         """Batch run is not implemented."""
-        raise NotImplementedError(
-            f"Batch run is not implemented for {self.name} task. Use run method instead."
-        )
+        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

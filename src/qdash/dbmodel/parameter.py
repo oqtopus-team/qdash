@@ -55,9 +55,7 @@ class ParameterDocument(Document):
         )
 
     @classmethod
-    def insert_parameters(
-        cls, parameters: list[ParameterModel], username: str
-    ) -> list["ParameterDocument"]:
+    def insert_parameters(cls, parameters: list[ParameterModel], username: str) -> list["ParameterDocument"]:
         inserted_documents = []
         for param in parameters:
             doc = cls.find_one(cls.name == param.name, cls.username == username).run()

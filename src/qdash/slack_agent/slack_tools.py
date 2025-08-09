@@ -12,9 +12,7 @@ class SlackTools:
     async def get_thread_history(self, channel_id: str, thread_ts: str) -> dict[str, Any]:
         """Get Slack thread history."""
         try:
-            result = await self.slack_client.conversations_replies(
-                channel=channel_id, ts=thread_ts, limit=50
-            )
+            result = await self.slack_client.conversations_replies(channel=channel_id, ts=thread_ts, limit=50)
 
             messages = [
                 {

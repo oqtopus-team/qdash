@@ -1,9 +1,8 @@
 import logging
-from typing import Annotated, cast
+from typing import cast
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from qdash.api.lib.auth import get_current_user, username_header
-from qdash.api.schemas.auth import User
 
 # ロガーの設定
 logger = logging.getLogger(__name__)

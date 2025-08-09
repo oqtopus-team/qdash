@@ -13,16 +13,20 @@ def _process_data(
         return result
 
     now = pendulum.now("Asia/Tokyo")
-    cutoff = now.subtract(hours=24)
+    cutoff = now.subtract(hours=12)
 
     for key, value in raw_data.items():
         calibrated_at = value.get("calibrated_at")
         is_recent = True
-        if within_24hrs and calibrated_at:
-            try:
-                calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
-                is_recent = calibrated_at_dt >= cutoff
-            except Exception:
+        if within_24hrs:
+            if calibrated_at:
+                try:
+                    calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
+                    is_recent = calibrated_at_dt >= cutoff
+                except Exception:
+                    is_recent = False
+            else:
+                # If within_24hrs is True but calibrated_at is missing, exclude the data
                 is_recent = False
 
         v = value.get("value") if is_recent else None

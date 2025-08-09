@@ -7,9 +7,7 @@ class ExecutionLockDocument(Document):
     """Document for the execution lock."""
 
     locked: bool = Field(default=False, description="Whether the execution is locked")
-    system_info: SystemInfoModel = Field(
-        default_factory=SystemInfoModel, description="The system information"
-    )
+    system_info: SystemInfoModel = Field(default_factory=SystemInfoModel, description="The system information")
 
     class Settings:
         """Settings for the document."""

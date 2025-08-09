@@ -1,8 +1,6 @@
 import json
 from collections import defaultdict
 
-import yaml
-
 # JSONファイルの読み込み
 with open("best_data.json") as f:
     data = json.load(f)

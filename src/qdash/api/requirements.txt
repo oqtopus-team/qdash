@@ -25,7 +25,9 @@ colorama==0.4.6 ; sys_platform == 'win32'
     # via
     #   click
     #   uvicorn
-contourpy==1.3.1
+contourpy==1.3.2 ; python_full_version < '3.11'
+    # via matplotlib
+contourpy==1.3.3 ; python_full_version >= '3.11'
     # via matplotlib
 cycler==0.12.1
     # via matplotlib
@@ -42,7 +44,7 @@ exceptiongroup==1.2.2 ; python_full_version < '3.11'
 fastapi==0.111.1
 fastapi-cli==0.0.7
     # via fastapi
-fonttools==4.56.0
+fonttools==4.59.0
     # via matplotlib
 gunicorn==22.0.0
 h11==0.14.0
@@ -53,14 +55,14 @@ httpcore==1.0.7
     # via httpx
 httptools==0.6.4
     # via uvicorn
-httpx==0.28.1
+httpx==0.27.2
     # via fastapi
 idna==3.10
     # via
     #   anyio
     #   email-validator
     #   httpx
-jinja2==3.1.5
+jinja2==3.1.6
     # via fastapi
 kiwisolver==1.4.8
     # via matplotlib
@@ -73,7 +75,8 @@ markupsafe==3.0.2
 matplotlib==3.8.0
 mdurl==0.1.2
     # via markdown-it-py
-networkx==3.4.2
+networkx==3.4.2 ; python_full_version < '3.11'
+networkx==3.5 ; python_full_version >= '3.11'
 numpy==1.26.0
     # via
     #   contourpy
@@ -86,7 +89,7 @@ packaging==24.2
 passlib==1.7.4
 pendulum==3.1.0
     # via qdash
-pillow==11.1.0
+pillow==11.3.0
     # via matplotlib
 pyasn1==0.4.8
     # via
@@ -105,7 +108,7 @@ pymongo==4.8.0
     # via
     #   bunnet
     #   qdash
-pyparsing==3.2.1
+pyparsing==3.2.3
     # via matplotlib
 python-dateutil==2.9.0.post0
     # via
@@ -133,7 +136,9 @@ six==1.17.0
     #   ecdsa
     #   python-dateutil
 sniffio==1.3.1
-    # via anyio
+    # via
+    #   anyio
+    #   httpx
 starlette==0.37.2
     # via fastapi
 toml==0.10.2

@@ -138,9 +138,7 @@ def main_flow(
     logger.info(f"tasks: {menu.tasks}")
     if "CheckSkew" in menu.tasks:
         logger.info("CheckSkew is in the tasks.")
-        success_map = dispatch_cal_flow(
-            menu, calib_dir, success_map, execution_id, task_names=["CheckSkew"]
-        )
+        success_map = dispatch_cal_flow(menu, calib_dir, success_map, execution_id, task_names=["CheckSkew"])
         execution_manager = execution_manager.reload()
         logger.info(f"execution manager: {execution_manager.task_results}")
         data = execution_manager.task_results
@@ -164,9 +162,7 @@ def main_flow(
         menu.tasks.remove("CheckSkew")
     try:
         if len(menu.tasks) != 0:
-            success_map = dispatch_cal_flow(
-                menu, calib_dir, success_map, execution_id, task_names=menu.tasks
-            )
+            success_map = dispatch_cal_flow(menu, calib_dir, success_map, execution_id, task_names=menu.tasks)
         execution_manager = execution_manager.reload().complete_execution()
         # Update ChipDocument and ChipHistoryDocument
         chip_doc = ChipDocument.get_current_chip(username=menu.username)

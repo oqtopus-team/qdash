@@ -21,6 +21,7 @@ export default withMermaid(
       nav: [
         { text: "Home", link: "/" },
         { text: "What is QDash", link: "/what-is-qdash" },
+        { text: "Python Client", link: "/python-client" },
       ],
 
       sidebar: [
@@ -30,6 +31,7 @@ export default withMermaid(
             { text: "What is QDash", link: "/what-is-qdash" },
             { text: "Quickstart", link: "/quick-start" },
             { text: "Architecture", link: "/architecture" },
+            { text: "Python Client", link: "/python-client" },
           ],
         },
         {
