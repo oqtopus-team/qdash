@@ -23,7 +23,6 @@ class ListTagResponse:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-
         tags = []
         for tags_item_data in self.tags:
             tags_item = tags_item_data.to_dict()

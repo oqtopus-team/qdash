@@ -31,7 +31,6 @@ class Condition:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-
         coupling_fidelity = self.coupling_fidelity.to_dict()
 
         qubit_fidelity = self.qubit_fidelity.to_dict()

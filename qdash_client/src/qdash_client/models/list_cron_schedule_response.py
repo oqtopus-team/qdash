@@ -23,7 +23,6 @@ class ListCronScheduleResponse:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-
         schedules = []
         for schedules_item_data in self.schedules:
             schedules_item = schedules_item_data.to_dict()

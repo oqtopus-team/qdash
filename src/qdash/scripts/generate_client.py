@@ -161,8 +161,7 @@ def generate_client(config: ClientConfig) -> None:
     if preserve_file.exists():
         try:
             preserve_content = preserve_file.read_text(encoding='utf-8')
-            for line in preserve_content.split('
-'):
+            for line in preserve_content.split('\n'):
                 line = line.strip()
                 if line and not line.startswith('#'):
                     # Handle relative paths from qdash_client directory

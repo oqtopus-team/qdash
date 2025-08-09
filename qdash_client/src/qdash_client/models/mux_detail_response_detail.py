@@ -20,7 +20,6 @@ class MuxDetailResponseDetail:
     )
 
     def to_dict(self) -> dict[str, Any]:
-
         field_dict: dict[str, Any] = {}
         for prop_name, prop in self.additional_properties.items():
             field_dict[prop_name] = prop.to_dict()
@@ -33,7 +32,6 @@ class MuxDetailResponseDetail:
 
         d = dict(src_dict)
         mux_detail_response_detail = cls()
-
 
         additional_properties = {}
         for prop_name, prop_dict in d.items():
