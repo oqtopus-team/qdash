@@ -22,7 +22,7 @@ tasks:
   generate-python-client:
     dotenv: [.env]
     cmds:
-      - uv run generate-python-client
+      - python -m qdash.scripts.generate_client
     desc: Generate Python client from OpenAPI spec
 
   docs:

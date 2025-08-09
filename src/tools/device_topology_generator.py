@@ -129,9 +129,7 @@ def post_device_topology() -> dict[str, Any]:
     logging.info("Posting device topology data...")
 
     # Make POST request using hardcoded request_data
-    response = requests.post(
-        f"{API_URL}/device_topology", headers=headers, json=request_data.model_dump(), timeout=10
-    )
+    response = requests.post(f"{API_URL}/device_topology", headers=headers, json=request_data.model_dump(), timeout=10)
     response.raise_for_status()
     # Save response to file
     with Path("./device_topology.json").open("w") as f:
@@ -149,9 +147,7 @@ def generate_topology_plot(topology_data: dict[str, Any]) -> None:
     plot_headers["accept"] = "*/*"
 
     # Make POST request
-    response = requests.post(
-        f"{API_URL}/device_topology/plot", headers=plot_headers, json=topology_data, timeout=10
-    )
+    response = requests.post(f"{API_URL}/device_topology/plot", headers=plot_headers, json=topology_data, timeout=10)
     response.raise_for_status()
 
     # Save plot to file

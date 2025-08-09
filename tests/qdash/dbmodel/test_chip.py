@@ -1,7 +1,6 @@
 """Test for chip dbmodel with Bunnet and MongoDB testcontainers."""
 
 from collections.abc import Generator
-from typing import cast
 
 import pytest
 from bunnet import init_bunnet

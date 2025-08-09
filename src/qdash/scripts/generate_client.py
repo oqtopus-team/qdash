@@ -139,13 +139,24 @@ def generate_client(config: ClientConfig) -> None:
     if config.output_dir:
         output_dir = Path(config.output_dir)
     else:
-        # Generate into src/qdash/client instead of separate package
-        output_dir = project_root / "src" / "qdash" / "client"
+        # Generate into root level qdash_client package
+        output_dir = project_root / "qdash_client"
 
     print(f"🎯 Target output directory: {output_dir}")
 
     # Fetch OpenAPI spec
     openapi_spec = fetch_openapi_spec(config.openapi_url)
+
+    # Backup existing .gitignore and pyproject.toml to prevent overwrite
+    gitignore_path = project_root / ".gitignore"
+    gitignore_backup = None
+    if gitignore_path.exists():
+        gitignore_backup = gitignore_path.read_text()
+
+    pyproject_path = project_root / "pyproject.toml"
+    pyproject_backup = None
+    if pyproject_path.exists():
+        pyproject_backup = pyproject_path.read_text()
 
     # Write spec to temporary file
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -161,7 +172,7 @@ def generate_client(config: ClientConfig) -> None:
             "--path",
             spec_file,
             "--output-path",
-            str(output_dir.parent),  # Generate in src/qdash/
+            str(project_root),  # Generate in project root
             "--config",
             str(config_file),
             "--overwrite",
@@ -182,11 +193,21 @@ def generate_client(config: ClientConfig) -> None:
             output_dir / "__init__.py",
             output_dir / "pyproject.toml",
             output_dir / "README.md",
+            output_dir / "py.typed",
         ]
 
         missing_files = [f for f in expected_files if not f.exists()]
         if missing_files:
             print(f"⚠️  Some expected files are missing: {missing_files}")
+
+        # Restore original .gitignore and pyproject.toml if they were backed up
+        if gitignore_backup is not None:
+            gitignore_path.write_text(gitignore_backup)
+            print("🔄 Restored original .gitignore")
+
+        if pyproject_backup is not None:
+            pyproject_path.write_text(pyproject_backup)
+            print("🔄 Restored original pyproject.toml")
 
         print("✅ Python client generated successfully!")
         print(f"📁 Location: {output_dir}")
