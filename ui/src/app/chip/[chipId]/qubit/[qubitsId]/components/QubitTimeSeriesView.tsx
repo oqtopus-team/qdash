@@ -22,16 +22,15 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
   const [selectedParameter, setSelectedParameter] = useState<ParameterKey>("t1");
   const [selectedTag, setSelectedTag] = useState<TagKey>("daily");
   
-  const REFRESH_INTERVAL = 30; // seconds
-
-  // Time range management with auto-refresh
+  // Time range management with manual refresh
   const {
     timeRange,
     updateStartAt,
     updateEndAt,
     toggleStartAtLock,
     toggleEndAtLock,
-  } = useTimeRange({ initialDays: 30, refreshIntervalSeconds: REFRESH_INTERVAL });
+    refreshTimeRange,
+  } = useTimeRange({ initialDays: 30 });
 
 
   // Fetch parameters and tags
@@ -51,7 +50,6 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
     parameter: selectedParameter,
     tag: selectedTag,
     timeRange,
-    refreshInterval: REFRESH_INTERVAL * 1000,
   });
 
   // CSV export functionality
@@ -59,6 +57,12 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
 
   const handleDownloadCSV = () => {
     exportTimeSeriesCSV(tableData, selectedParameter, chipId, selectedTag);
+  };
+
+  // Manual refresh handler
+  const handleRefresh = () => {
+    refreshTimeRange();
+    refetch();
   };
 
   // Plot layout configuration
@@ -107,26 +111,48 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
     <div className="space-y-8">
       {/* Parameter Selection Card */}
       <div className="card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
-        <div className="text-xs text-base-content/70 mb-2">
-          Auto refresh every {REFRESH_INTERVAL} seconds
-        </div>
-        <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-5 h-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M3 3v18h18"></path>
+              <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
+            </svg>
+            Time Series Configuration - Qubit {qubitId}
+          </h2>
+          <button
+            onClick={handleRefresh}
+            disabled={isLoading || isLoadingMeta}
+            className="btn btn-sm btn-outline gap-2"
+            title="Refresh data and time range"
           >
-            <path d="M3 3v18h18"></path>
-            <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
-          </svg>
-          Time Series Configuration - Qubit {qubitId}
-        </h2>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+              <path d="M3 21v-5h5" />
+            </svg>
+            Refresh
+          </button>
+        </div>
         
         <div className="grid grid-cols-2 gap-12">
           <ParameterSelector
