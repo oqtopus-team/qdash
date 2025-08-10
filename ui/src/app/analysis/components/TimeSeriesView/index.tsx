@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useFetchTimeseriesTaskResultByTagAndParameter } from "@/client/chip/chip";
 import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TagSelector } from "@/app/components/TagSelector";
@@ -13,14 +13,23 @@ import { DataTable } from "@/shared/components/DataTable";
 import { ErrorCard } from "@/shared/components/ErrorCard";
 import { useFetchAllParameters } from "@/client/parameter/parameter";
 import { useListAllTag } from "@/client/tag/tag";
+import { useListChips } from "@/client/chip/chip";
+import { useAnalysisUrlState } from "@/app/hooks/useUrlState";
 import { ParameterKey, TagKey } from "@/shared/types/analysis";
 import { Layout } from "plotly.js";
 
 
 export function TimeSeriesView() {
-  const [selectedChip, setSelectedChip] = useState<string>("");
-  const [selectedParameter, setSelectedParameter] = useState<ParameterKey>("t1");
-  const [selectedTag, setSelectedTag] = useState<TagKey>("daily");
+  // URL state management
+  const {
+    selectedChip,
+    selectedParameter,
+    selectedTag,
+    setSelectedChip,
+    setSelectedParameter,
+    setSelectedTag,
+    isInitialized,
+  } = useAnalysisUrlState();
   // Time range management with manual refresh
   const {
     timeRange,
@@ -32,17 +41,33 @@ export function TimeSeriesView() {
     getLockStatusDescription,
   } = useTimeRange({ initialDays: 7 });
 
+  // Fetch chips data for default selection
+  const { data: chipsResponse } = useListChips();
+  
   // Fetch parameters and tags
   const { data: parametersResponse, isLoading: isLoadingParameters } = useFetchAllParameters();
   const { data: tagsResponse, isLoading: isLoadingTags } = useListAllTag();
+
+  // Set default chip when URL is initialized and no chip is selected
+  useEffect(() => {
+    if (isInitialized && !selectedChip && chipsResponse?.data && chipsResponse.data.length > 0) {
+      // Sort chips by installation date and select the most recent one
+      const sortedChips = [...chipsResponse.data].sort((a, b) => {
+        const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
+        const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
+        return dateB - dateA;
+      });
+      setSelectedChip(sortedChips[0].chip_id);
+    }
+  }, [isInitialized, selectedChip, chipsResponse, setSelectedChip]);
 
   // Fetch time series data directly (Analysis page doesn't have qubitId)
   const { data: timeseriesResponse, isLoading: isLoadingTimeseries, error, refetch } =
     useFetchTimeseriesTaskResultByTagAndParameter(
       selectedChip,
-      selectedParameter,
+      selectedParameter as ParameterKey,
       {
-        tag: selectedTag,
+        tag: selectedTag as TagKey,
         start_at: timeRange.startAt,
         end_at: timeRange.endAt,
       },
@@ -184,7 +209,7 @@ export function TimeSeriesView() {
 
   // Handle CSV download
   const handleDownloadCSV = () => {
-    exportTimeSeriesCSV(tableData, selectedParameter, selectedChip, selectedTag);
+    exportTimeSeriesCSV(tableData, selectedParameter as ParameterKey, selectedChip, selectedTag as TagKey);
   };
 
   // Manual refresh handler

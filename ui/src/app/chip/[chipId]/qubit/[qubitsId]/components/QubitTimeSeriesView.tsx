@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { Layout } from "plotly.js";
 import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TagSelector } from "@/app/components/TagSelector";
 import { useTimeRange } from "@/shared/hooks/useTimeRange";
 import { useQubitTimeseries, useQubitParameters } from "../hooks/useQubitTimeseries";
 import { useCSVExport } from "@/shared/hooks/useCSVExport";
+import { useQubitTimeSeriesUrlState } from "@/app/hooks/useUrlState";
 import { TimeRangeControls } from "./TimeRangeControls";
 import { PlotCard } from "@/shared/components/PlotCard";
 import { DataTable } from "@/shared/components/DataTable";
@@ -19,8 +20,13 @@ interface QubitTimeSeriesViewProps {
 }
 
 export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProps) {
-  const [selectedParameter, setSelectedParameter] = useState<ParameterKey>("t1");
-  const [selectedTag, setSelectedTag] = useState<TagKey>("daily");
+  // URL state management for parameter and tag selection
+  const {
+    selectedParameter,
+    selectedTag,
+    setSelectedParameter,
+    setSelectedTag,
+  } = useQubitTimeSeriesUrlState();
   
   // Time range management with manual refresh
   const {
@@ -47,8 +53,8 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
   } = useQubitTimeseries({
     chipId,
     qubitId,
-    parameter: selectedParameter,
-    tag: selectedTag,
+    parameter: selectedParameter as ParameterKey,
+    tag: selectedTag as TagKey,
     timeRange,
   });
 
@@ -56,7 +62,7 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
   const { exportTimeSeriesCSV } = useCSVExport();
 
   const handleDownloadCSV = () => {
-    exportTimeSeriesCSV(tableData, selectedParameter, chipId, selectedTag);
+    exportTimeSeriesCSV(tableData, selectedParameter as ParameterKey, chipId, selectedTag as TagKey);
   };
 
   // Manual refresh handler

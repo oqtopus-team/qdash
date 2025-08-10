@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TagSelector } from "@/app/components/TagSelector";
 import { useTimeRange } from "@/shared/hooks/useTimeRange";
 import { useQubitCorrelation } from "../hooks/useQubitCorrelation";
 import { useQubitParameters } from "../hooks/useQubitTimeseries";
+import { useQubitCorrelationUrlState } from "@/app/hooks/useUrlState";
 import { PlotCard } from "@/shared/components/PlotCard";
 import { StatisticsCards } from "@/shared/components/StatisticsCards";
 import { CorrelationDataTable } from "./CorrelationDataTable";
@@ -18,9 +19,15 @@ interface QubitParameterCorrelationViewProps {
 }
 
 export function QubitParameterCorrelationView({ chipId, qubitId }: QubitParameterCorrelationViewProps) {
-  const [xAxis, setXAxis] = useState<ParameterKey>("t1");
-  const [yAxis, setYAxis] = useState<ParameterKey>("t2_echo");
-  const [selectedTag, setSelectedTag] = useState<TagKey>("daily");
+  // URL state management for parameter and tag selection
+  const {
+    xAxis,
+    yAxis,
+    selectedTag,
+    setXAxis,
+    setYAxis,
+    setSelectedTag,
+  } = useQubitCorrelationUrlState();
   
   // Time range management (30 days by default for correlation analysis)
   const { timeRange } = useTimeRange({ initialDays: 30 });
@@ -38,9 +45,9 @@ export function QubitParameterCorrelationView({ chipId, qubitId }: QubitParamete
   } = useQubitCorrelation({
     chipId,
     qubitId,
-    xParameter: xAxis,
-    yParameter: yAxis,
-    tag: selectedTag,
+    xParameter: xAxis as ParameterKey,
+    yParameter: yAxis as ParameterKey,
+    tag: selectedTag as TagKey,
     timeRange,
   });
 

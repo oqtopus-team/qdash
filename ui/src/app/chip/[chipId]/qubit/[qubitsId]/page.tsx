@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -35,13 +35,16 @@ function QubitDetailPageContent() {
     selectedChip,
     selectedDate,
     selectedTask,
+    qubitViewMode,
     setSelectedChip,
     setSelectedDate,
     setSelectedTask,
+    setQubitViewMode,
     isInitialized,
   } = useChipUrlState();
 
-  const [viewMode, setViewMode] = useState<"dashboard" | "timeseries" | "correlation" | "comparison">("dashboard");
+  const viewMode = qubitViewMode as "dashboard" | "timeseries" | "correlation" | "comparison";
+  const setViewMode = setQubitViewMode;
   
   const { data: chipData } = useFetchChip(chipId);
   const { data: tasks } = useFetchAllTasks();

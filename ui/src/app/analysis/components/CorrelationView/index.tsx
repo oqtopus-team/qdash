@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useFetchChip } from "@/client/chip/chip";
+import { useMemo, useEffect } from "react";
+import { useFetchChip, useListChips } from "@/client/chip/chip";
 import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { PlotCard } from "@/shared/components/PlotCard";
@@ -9,13 +9,38 @@ import { StatisticsCards } from "@/shared/components/StatisticsCards";
 import { DataTable } from "@/shared/components/DataTable";
 import { ErrorCard } from "@/shared/components/ErrorCard";
 import { useCorrelationData } from "@/shared/hooks/useCorrelationData";
+import { useCorrelationUrlState } from "@/app/hooks/useUrlState";
 import { ParameterKey } from "@/shared/types/analysis";
 
 
 export function CorrelationView() {
-  const [selectedChip, setSelectedChip] = useState<string>("");
-  const [xAxis, setXAxis] = useState<ParameterKey>("");
-  const [yAxis, setYAxis] = useState<ParameterKey>("");
+  // URL state management
+  const {
+    selectedChip,
+    xAxis,
+    yAxis,
+    setSelectedChip,
+    setXAxis,
+    setYAxis,
+    isInitialized,
+  } = useCorrelationUrlState();
+
+  // Fetch chips data for default selection
+  const { data: chipsResponse } = useListChips();
+
+  // Set default chip when URL is initialized and no chip is selected
+  useEffect(() => {
+    if (isInitialized && !selectedChip && chipsResponse?.data && chipsResponse.data.length > 0) {
+      // Sort chips by installation date and select the most recent one
+      const sortedChips = [...chipsResponse.data].sort((a, b) => {
+        const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
+        const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
+        return dateB - dateA;
+      });
+      setSelectedChip(sortedChips[0].chip_id);
+    }
+  }, [isInitialized, selectedChip, chipsResponse, setSelectedChip]);
+
   const { data: chipResponse, isLoading: isLoadingChip, error: chipError } = useFetchChip(selectedChip);
   const chipData = useMemo(() => chipResponse?.data, [chipResponse]);
 
@@ -28,8 +53,8 @@ export function CorrelationView() {
     error,
   } = useCorrelationData({
     chipData,
-    xParameter: xAxis,
-    yParameter: yAxis,
+    xParameter: xAxis as ParameterKey,
+    yParameter: yAxis as ParameterKey,
     enabled: Boolean(selectedChip && xAxis && yAxis),
   });
 
