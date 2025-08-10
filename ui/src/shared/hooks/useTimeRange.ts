@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { TimeRangeState } from '../types/analysis';
 
 interface UseTimeRangeOptions {
@@ -35,9 +35,17 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
     isEndAtLocked: false,
   }));
 
+  // Timer reference for cleanup tracking
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Auto-update times when not locked
   useEffect(() => {
-    const timer = setInterval(() => {
+    // Clear any existing timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    timerRef.current = setInterval(() => {
       setTimeRange(prev => ({
         ...prev,
         endAt: prev.isEndAtLocked ? prev.endAt : formatJSTDate(new Date()),
@@ -47,7 +55,12 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
       }));
     }, refreshIntervalSeconds * 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [formatJSTDate, initialDays, refreshIntervalSeconds]);
 
   // Update start time

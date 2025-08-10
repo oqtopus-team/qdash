@@ -104,8 +104,10 @@ export function useQubitCorrelation(options: UseQubitCorrelationOptions) {
     // Create correlation data points
     const correlatedData = commonTimes
       .map(time => {
-        const xPoint = xDataMap.get(time)!;
-        const yPoint = yDataMap.get(time)!;
+        const xPoint = xDataMap.get(time);
+        const yPoint = yDataMap.get(time);
+        
+        if (!xPoint || !yPoint) return null;
         
         const xValue = typeof xPoint.value === 'number' 
           ? xPoint.value 
@@ -124,6 +126,7 @@ export function useQubitCorrelation(options: UseQubitCorrelationOptions) {
           yDescription: yPoint.description || '',
         };
       })
+      .filter((point): point is NonNullable<typeof point> => point !== null)
       .sort((a, b) => a.time.localeCompare(b.time));
 
     return correlatedData;
@@ -133,18 +136,21 @@ export function useQubitCorrelation(options: UseQubitCorrelationOptions) {
   const plotData = useMemo(() => {
     if (!correlationData || correlationData.length === 0) return [];
 
-    // Create color gradient based on time progression
-    const colors = correlationData.map((_, index) => {
-      const ratio = correlationData.length > 1 ? index / (correlationData.length - 1) : 0;
-      const r = Math.floor(ratio * 255);
-      const b = Math.floor((1 - ratio) * 255);
-      return `rgb(${r}, 100, ${b})`;
-    });
+    // Create color gradient based on time progression - memoized calculation
+    const colors = useMemo(() => {
+      if (!correlationData?.length) return [];
+      return correlationData.map((_, index) => {
+        const ratio = correlationData.length > 1 ? index / (correlationData.length - 1) : 0;
+        const r = Math.floor(ratio * 255);
+        const b = Math.floor((1 - ratio) * 255);
+        return `rgb(${r}, 100, ${b})`;
+      });
+    }, [correlationData?.length]);
 
     return [{
       x: correlationData.map(d => d.x),
       y: correlationData.map(d => d.y),
-      mode: 'markers+lines' as const,
+      mode: 'lines+markers' as const,
       type: 'scatter' as const,
       name: `Qubit ${qubitId} Correlation`,
       line: { width: 2, color: 'rgba(59, 130, 246, 0.6)' },

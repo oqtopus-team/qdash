@@ -95,7 +95,7 @@ export function useCorrelationData(options: UseCorrelationDataOptions) {
     return correlationData.map((d) => ({
       x: [d.x],
       y: [d.y],
-      text: [d.qid],
+      text: [d.qid || ''],
       textposition: 'top center' as const,
       textfont: { size: 10 },
       mode: 'text+markers' as const,

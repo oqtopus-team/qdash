@@ -1,6 +1,6 @@
 import { ReactNode, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { PlotConfig } from '../types/analysis';
+import type { PlotData, Layout, Config } from 'plotly.js';
 
 const Plot = dynamic(() => import('react-plotly.js'), {
   ssr: false,
@@ -17,9 +17,9 @@ interface PlotCardProps {
   isLoading?: boolean;
   hasData?: boolean;
   emptyStateMessage?: string;
-  plotData: any[];
-  layout: any;
-  config?: Partial<PlotConfig>;
+  plotData: Partial<PlotData>[];
+  layout: Partial<Layout>;
+  config?: Partial<Config>;
   height?: string;
   className?: string;
   children?: ReactNode; // For additional content like controls
