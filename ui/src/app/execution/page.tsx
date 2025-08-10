@@ -10,6 +10,8 @@ import { ExecutionResponseSummary } from "@/schemas";
 import JsonView from "react18-json-view";
 import { FaExternalLinkAlt } from "react-icons/fa";
 import { ChipSelector } from "@/app/components/ChipSelector";
+import { DateSelector } from "@/app/components/DateSelector";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { ExecutionStats } from "./components/ExecutionStats";
 import { TaskFigure } from "@/app/components/TaskFigure";
 import { useExecutionUrlState } from "@/app/hooks/useUrlState";
@@ -18,6 +20,9 @@ function ExecutionPageContent() {
   // URL state management
   const { selectedChip, setSelectedChip, isInitialized } =
     useExecutionUrlState();
+
+  // Add date state for navigation
+  const [selectedDate, setSelectedDate] = useState<string>("latest");
 
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
     null,
@@ -31,6 +36,14 @@ function ExecutionPageContent() {
 
   // Track if we've already set the default chip to prevent race conditions
   const hasSetDefaultChip = useRef(false);
+
+  // Use custom hook for date navigation
+  const {
+    navigateToPreviousDay,
+    navigateToNextDay,
+    canNavigatePrevious,
+    canNavigateNext,
+  } = useDateNavigation(selectedChip || "", selectedDate, setSelectedDate);
 
   // Get list of chips to set default
   const { data: chipsData } = useListChips();
@@ -92,12 +105,25 @@ function ExecutionPageContent() {
     },
   );
 
-  // 実行データ取得時にカードデータをセット
+  // 実行データ取得時にカードデータをセット（日付でフィルタリング）
   useEffect(() => {
     if (executionData) {
-      setCardData(executionData.data);
+      let filteredData = executionData.data;
+      
+      // Filter by date if not "latest"
+      if (selectedDate !== "latest") {
+        filteredData = executionData.data.filter((exec) => {
+          const execDate = new Date(exec.start_at);
+          const execDateStr = `${execDate.getFullYear()}${String(
+            execDate.getMonth() + 1
+          ).padStart(2, "0")}${String(execDate.getDate()).padStart(2, "0")}`;
+          return execDateStr === selectedDate;
+        });
+      }
+      
+      setCardData(filteredData);
     }
-  }, [executionData]);
+  }, [executionData, selectedDate]);
 
   // チップ選択の変更ハンドラ
   const handleChipChange = (chipId: string) => {
@@ -155,11 +181,44 @@ function ExecutionPageContent() {
       <div className="px-10 pb-3">
         <h1 className="text-left text-3xl font-bold">Execution History</h1>
       </div>
-      <div className="px-10 pb-6">
-        <ChipSelector
-          selectedChip={selectedChip || ""}
-          onChipSelect={handleChipChange}
-        />
+      <div className="px-10 pb-6 flex gap-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex justify-center gap-1 opacity-0">
+            <button className="btn btn-xs btn-ghost invisible">←</button>
+            <button className="btn btn-xs btn-ghost invisible">→</button>
+          </div>
+          <ChipSelector
+            selectedChip={selectedChip || ""}
+            onChipSelect={handleChipChange}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <div className="flex justify-center gap-1">
+            <button
+              onClick={navigateToPreviousDay}
+              disabled={!canNavigatePrevious}
+              className="btn btn-xs btn-ghost"
+              title="Previous Day"
+            >
+              ←
+            </button>
+            <button
+              onClick={navigateToNextDay}
+              disabled={!canNavigateNext}
+              className="btn btn-xs btn-ghost"
+              title="Next Day"
+            >
+              →
+            </button>
+          </div>
+          <DateSelector
+            chipId={selectedChip || ""}
+            selectedDate={selectedDate}
+            onDateSelect={setSelectedDate}
+            disabled={!selectedChip}
+          />
+        </div>
       </div>
       {/* 統計情報の表示 */}
       <ExecutionStats
