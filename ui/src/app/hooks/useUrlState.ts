@@ -26,6 +26,26 @@ interface UseExecutionUrlStateResult {
   isInitialized: boolean;
 }
 
+interface UseAnalysisUrlStateResult {
+  selectedChip: string;
+  selectedParameter: string;
+  selectedTag: string;
+  setSelectedChip: (chip: string) => void;
+  setSelectedParameter: (parameter: string) => void;
+  setSelectedTag: (tag: string) => void;
+  isInitialized: boolean;
+}
+
+interface UseCorrelationUrlStateResult {
+  selectedChip: string;
+  xAxis: string;
+  yAxis: string;
+  setSelectedChip: (chip: string) => void;
+  setXAxis: (parameter: string) => void;
+  setYAxis: (parameter: string) => void;
+  isInitialized: boolean;
+}
+
 export function useChipUrlState(): UseChipUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -119,6 +139,124 @@ export function useExecutionUrlState(): UseExecutionUrlStateResult {
   return {
     selectedChip, // Return null as-is instead of converting to empty string
     setSelectedChip,
+    isInitialized,
+  };
+}
+
+export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // URL state management for analysis pages
+  const [selectedChip, setSelectedChipState] = useQueryState(
+    "chip",
+    parseAsString,
+  );
+
+  const [selectedParameter, setSelectedParameterState] = useQueryState(
+    "parameter",
+    parseAsString,
+  );
+
+  const [selectedTag, setSelectedTagState] = useQueryState(
+    "tag", 
+    parseAsString,
+  );
+
+  // Mark as initialized after first render
+  useEffect(() => {
+    setIsInitialized(true);
+  }, []);
+
+  // Wrapped setters to handle URL updates
+  const setSelectedChip = useCallback(
+    (chip: string) => {
+      setSelectedChipState(chip || null); // null removes the parameter from URL
+    },
+    [setSelectedChipState],
+  );
+
+  const setSelectedParameter = useCallback(
+    (parameter: string) => {
+      // Remove default parameter from URL (e.g., if "t1" is default)
+      setSelectedParameterState(parameter === "t1" ? null : parameter);
+    },
+    [setSelectedParameterState],
+  );
+
+  const setSelectedTag = useCallback(
+    (tag: string) => {
+      // Remove default tag from URL (e.g., if "daily" is default)
+      setSelectedTagState(tag === "daily" ? null : tag);
+    },
+    [setSelectedTagState],
+  );
+
+  return {
+    selectedChip: selectedChip ?? "",
+    selectedParameter: selectedParameter ?? "t1",
+    selectedTag: selectedTag ?? "daily",
+    setSelectedChip,
+    setSelectedParameter,
+    setSelectedTag,
+    isInitialized,
+  };
+}
+
+export function useCorrelationUrlState(): UseCorrelationUrlStateResult {
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // URL state management for correlation view
+  const [selectedChip, setSelectedChipState] = useQueryState(
+    "chip",
+    parseAsString,
+  );
+
+  const [xAxis, setXAxisState] = useQueryState(
+    "xAxis",
+    parseAsString,
+  );
+
+  const [yAxis, setYAxisState] = useQueryState(
+    "yAxis", 
+    parseAsString,
+  );
+
+  // Mark as initialized after first render
+  useEffect(() => {
+    setIsInitialized(true);
+  }, []);
+
+  // Wrapped setters to handle URL updates
+  const setSelectedChip = useCallback(
+    (chip: string) => {
+      setSelectedChipState(chip || null); // null removes the parameter from URL
+    },
+    [setSelectedChipState],
+  );
+
+  const setXAxis = useCallback(
+    (parameter: string) => {
+      // Remove default parameter from URL (e.g., if "t1" is default)
+      setXAxisState(parameter === "t1" ? null : parameter);
+    },
+    [setXAxisState],
+  );
+
+  const setYAxis = useCallback(
+    (parameter: string) => {
+      // Remove default parameter from URL (e.g., if "t2_echo" is default)
+      setYAxisState(parameter === "t2_echo" ? null : parameter);
+    },
+    [setYAxisState],
+  );
+
+  return {
+    selectedChip: selectedChip ?? "",
+    xAxis: xAxis ?? "t1",
+    yAxis: yAxis ?? "t2_echo",
+    setSelectedChip,
+    setXAxis,
+    setYAxis,
     isInitialized,
   };
 }

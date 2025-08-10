@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { TimeSeriesView } from "./components/TimeSeriesView";
 import { CorrelationView } from "./components/CorrelationView";
 
 type AnalyzeView = "correlation" | "timeseries";
 
-export default function AnalyzePage() {
+function AnalyzePageContent() {
   const [currentView, setCurrentView] = useState<AnalyzeView>("correlation");
 
   return (
@@ -52,5 +52,19 @@ export default function AnalyzePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AnalyzePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-full flex justify-center py-12">
+          <span className="loading loading-spinner loading-lg"></span>
+        </div>
+      }
+    >
+      <AnalyzePageContent />
+    </Suspense>
   );
 }
