@@ -3,9 +3,10 @@
 import { Suspense } from "react";
 import { TimeSeriesView } from "./components/TimeSeriesView";
 import { CorrelationView } from "./components/CorrelationView";
+import { CumulativeView } from "./components/CumulativeView";
 import { useAnalysisUrlState } from "@/app/hooks/useUrlState";
 
-type AnalyzeView = "correlation" | "timeseries";
+type AnalyzeView = "correlation" | "timeseries" | "cumulative";
 
 function AnalyzePageContent() {
   // URL state management for view type
@@ -49,12 +50,22 @@ function AnalyzePageContent() {
           >
             Time Series
           </button>
+          <button
+            className={`tab ${
+              currentView === "cumulative" ? "tab-active" : ""
+            }`}
+            onClick={() => setCurrentView("cumulative")}
+          >
+            Cumulative Plot
+          </button>
         </div>
 
         {currentView === "correlation" ? (
           <CorrelationView />
-        ) : (
+        ) : currentView === "timeseries" ? (
           <TimeSeriesView />
+        ) : (
+          <CumulativeView />
         )}
       </div>
     </div>
