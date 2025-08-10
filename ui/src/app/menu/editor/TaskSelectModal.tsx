@@ -31,14 +31,17 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
       (task: TaskResponse) => !selectedTasks.some((t) => t.name === task.name),
     ) ?? [];
 
-  // 初期化時に既存のタスクを選択状態にする
+  // 初期化時に既存のタスクを選択状態にする（元の順番を保持）
   useEffect(() => {
     if (tasksData?.data?.tasks) {
-      // Set selected tasks with a new array reference
-      const existingTasks = [...tasksData.data.tasks].filter(
-        (task: TaskResponse) => selectedTaskNames.includes(task.name),
-      );
-      setSelectedTasks(existingTasks);
+      // Map selectedTaskNames to TaskResponse objects while preserving order
+    const taskMap = new Map(
+      tasksData.data.tasks.map((task: TaskResponse) => [task.name, task])
+    );
+    const existingTasks = selectedTaskNames
+      .map((name) => taskMap.get(name))
+      .filter((task): task is TaskResponse => task !== undefined);
+    setSelectedTasks(existingTasks);
     }
   }, [tasksData, selectedTaskNames]);
 

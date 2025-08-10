@@ -22,7 +22,9 @@
         "--from",
         "git+https://github.com/oraios/serena",
         "serena",
-        "start-mcp-server"
+        "start-mcp-server",
+        "--enable-web-dashboard",
+        "false"
       ]
     }
   }

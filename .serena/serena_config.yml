@@ -16,3 +16,4 @@ gui_log_window: false
 # we have to live with this limitation for now.
 
 web_dashboard: false
+web_dashboard_on_launch: false

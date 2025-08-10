@@ -244,6 +244,33 @@ Key environment variables (see `.env.example`):
 4. Run tests and linting
 5. Submit a pull request to the `develop` branch
 
+## Claude Code Custom Commands
+
+The project includes custom slash commands for Claude Code:
+
+### Commit Commands
+- `/commit` - Analyze changes and suggest a commit message
+- `/suggest-commit` - Generate commit message suggestion without committing
+- `/auto-commit` - Automatically commit with generated message
+
+### Usage Examples
+```
+/commit
+# Analyzes changes and provides a commit message with the git command
+
+/suggest-commit  
+# Only suggests a message without committing
+
+/auto-commit
+# Analyzes and commits automatically
+```
+
+### Manual Scripts
+If you prefer running scripts manually:
+- `task commit` or `task ac` - Interactive auto-commit script
+- `python scripts/git-auto-commit.py` - Python version
+- `./scripts/auto-commit.sh` - Shell version (requires ANTHROPIC_API_KEY)
+
 ## Useful Links
 
 - [Documentation](https://qdash.readthedocs.io/)
