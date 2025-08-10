@@ -4,11 +4,9 @@ import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-import { keepPreviousData } from "@tanstack/react-query";
 import { BsArrowLeft, BsGraphUp, BsTable, BsEye } from "react-icons/bs";
 
 import { 
-  useFetchTimeseriesTaskResultByTagAndParameterAndQid,
   useFetchLatestQubitTaskGroupedByChip,
   useFetchHistoricalQubitTaskGroupedByChip,
   useFetchChip
@@ -21,6 +19,8 @@ import { TaskSelector } from "@/app/components/TaskSelector";
 import { TaskFigure } from "@/app/components/TaskFigure";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useChipUrlState } from "@/app/hooks/useUrlState";
+import { QubitTimeSeriesView } from "./components/QubitTimeSeriesView";
+import { QubitParameterCorrelationView } from "./components/QubitParameterCorrelationView";
 
 import type { Task, TaskResponse } from "@/schemas";
 
@@ -41,8 +41,7 @@ function QubitDetailPageContent() {
     isInitialized,
   } = useChipUrlState();
 
-  const [viewMode, setViewMode] = useState<"dashboard" | "timeseries" | "comparison">("dashboard");
-  const [selectedParameter, setSelectedParameter] = useState<string>("fidelity");
+  const [viewMode, setViewMode] = useState<"dashboard" | "timeseries" | "correlation" | "comparison">("dashboard");
   
   const { data: chipData } = useFetchChip(chipId);
   const { data: tasks } = useFetchAllTasks();
@@ -63,28 +62,6 @@ function QubitDetailPageContent() {
   } = useDateNavigation(chipId, selectedDate, setSelectedDate);
 
 
-  // Get timeseries data for the selected parameter
-  const {
-    data: timeseriesData,
-    isLoading: isLoadingTimeseries,
-    isError: isTimeseriesError,
-  } = useFetchTimeseriesTaskResultByTagAndParameterAndQid(
-    chipId,
-    selectedParameter,
-    qubitId,
-    { 
-      tag: "latest",
-      start_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-      end_at: new Date().toISOString()
-    },
-    {
-      query: {
-        placeholderData: keepPreviousData,
-        staleTime: 60000,
-        enabled: viewMode === "timeseries",
-      },
-    }
-  );
 
   // Get filtered tasks for qubit type
   const filteredTasks = tasks?.data?.tasks?.filter((task: TaskResponse) => 
@@ -95,7 +72,6 @@ function QubitDetailPageContent() {
   const { data: rabiData } = selectedDate === "latest" 
     ? useFetchLatestQubitTaskGroupedByChip(chipId, "CheckRabi", {
         query: {
-          placeholderData: keepPreviousData,
           staleTime: 30000,
         },
       })
@@ -105,7 +81,6 @@ function QubitDetailPageContent() {
         selectedDate === "latest" ? new Date().toISOString().split('T')[0] : selectedDate,
         {
           query: {
-            placeholderData: keepPreviousData,
             staleTime: 30000,
             enabled: selectedDate !== "latest",
           },
@@ -115,7 +90,6 @@ function QubitDetailPageContent() {
   const { data: ramseysData } = selectedDate === "latest"
     ? useFetchLatestQubitTaskGroupedByChip(chipId, "CheckRamseys", {
         query: {
-          placeholderData: keepPreviousData,
           staleTime: 30000,
         },
       })
@@ -125,7 +99,6 @@ function QubitDetailPageContent() {
         selectedDate === "latest" ? new Date().toISOString().split('T')[0] : selectedDate,
         {
           query: {
-            placeholderData: keepPreviousData,
             staleTime: 30000,
             enabled: selectedDate !== "latest",
           },
@@ -135,7 +108,6 @@ function QubitDetailPageContent() {
   const { data: t1Data } = selectedDate === "latest"
     ? useFetchLatestQubitTaskGroupedByChip(chipId, "CheckT1", {
         query: {
-          placeholderData: keepPreviousData,
           staleTime: 30000,
         },
       })
@@ -145,7 +117,6 @@ function QubitDetailPageContent() {
         selectedDate === "latest" ? new Date().toISOString().split('T')[0] : selectedDate,
         {
           query: {
-            placeholderData: keepPreviousData,
             staleTime: 30000,
             enabled: selectedDate !== "latest",
           },
@@ -167,7 +138,7 @@ function QubitDetailPageContent() {
   }, [isInitialized, selectedTask, filteredTasks, setSelectedTask]);
 
 
-  const isLoading = isLoadingTimeseries;
+  const isLoading = false;
 
   return (
     <div className="w-full px-6 py-6" style={{ width: "calc(100vw - 20rem)" }}>
@@ -202,6 +173,28 @@ function QubitDetailPageContent() {
               >
                 <BsGraphUp className="text-lg" />
                 <span className="ml-2">Time Series</span>
+              </button>
+              <button
+                className={`join-item btn btn-sm ${
+                  viewMode === "correlation" ? "btn-active" : ""
+                }`}
+                onClick={() => setViewMode("correlation")}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="text-lg w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="15" cy="10" r="1"></circle>
+                  <circle cx="12" cy="15" r="1"></circle>
+                  <circle cx="8" cy="9" r="1"></circle>
+                </svg>
+                <span className="ml-2">Correlation</span>
               </button>
               <button
                 className={`join-item btn btn-sm ${
@@ -271,24 +264,6 @@ function QubitDetailPageContent() {
               />
             </div>
 
-            {viewMode === "timeseries" && (
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-center gap-1 opacity-0">
-                  <button className="btn btn-xs btn-ghost invisible">←</button>
-                  <button className="btn btn-xs btn-ghost invisible">→</button>
-                </div>
-                <select 
-                  className="select select-bordered select-sm w-full max-w-xs"
-                  value={selectedParameter}
-                  onChange={(e) => setSelectedParameter(e.target.value)}
-                >
-                  <option value="fidelity">Fidelity</option>
-                  <option value="t1">T1 Time</option>
-                  <option value="t2">T2 Time</option>
-                  <option value="frequency">Frequency</option>
-                </select>
-              </div>
-            )}
           </div>
         </div>
 
@@ -409,38 +384,9 @@ function QubitDetailPageContent() {
               </div>
             </div>
           ) : viewMode === "timeseries" ? (
-            <div className="space-y-6">
-              <div className="card bg-base-100 shadow-xl">
-                <div className="card-body">
-                  <h2 className="card-title">
-                    Time Series: {selectedParameter} for Qubit {qubitId}
-                  </h2>
-                  {isTimeseriesError ? (
-                    <div className="alert alert-error">
-                      <span>Failed to load time series data</span>
-                    </div>
-                  ) : timeseriesData?.data ? (
-                    <div className="h-96 bg-base-200 rounded-xl p-4 flex justify-center items-center">
-                      <div className="text-center">
-                        <h3 className="text-lg font-semibold mb-4">Time Series Data</h3>
-                        <p className="text-base-content/70">
-                          Time series visualization for {selectedParameter} parameter
-                        </p>
-                        <div className="mt-4 p-4 bg-base-100 rounded">
-                          <pre className="text-xs overflow-auto max-h-32">
-                            {JSON.stringify(timeseriesData.data, null, 2)}
-                          </pre>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="alert alert-info">
-                      <span>No time series data available for this parameter</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <QubitTimeSeriesView chipId={chipId} qubitId={qubitId} />
+          ) : viewMode === "correlation" ? (
+            <QubitParameterCorrelationView chipId={chipId} qubitId={qubitId} />
           ) : (
             <div className="space-y-6">
               {/* Comparison View */}

@@ -1,113 +1,148 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import dynamic from "next/dynamic";
 import { useFetchChip } from "@/client/chip/chip";
 import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { ChipSelector } from "@/app/components/ChipSelector";
+import { PlotCard } from "@/shared/components/PlotCard";
+import { StatisticsCards } from "@/shared/components/StatisticsCards";
+import { DataTable } from "@/shared/components/DataTable";
+import { ErrorCard } from "@/shared/components/ErrorCard";
+import { useCorrelationData } from "@/shared/hooks/useCorrelationData";
+import { ParameterKey } from "@/shared/types/analysis";
 
-interface ParameterValue {
-  value: number;
-  unit: string;
-  description: string;
-  updated: string;
-}
-
-const Plot = dynamic(() => import("react-plotly.js"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-[500px]">
-      <div className="loading loading-spinner loading-lg text-primary"></div>
-    </div>
-  ),
-});
 
 export function CorrelationView() {
   const [selectedChip, setSelectedChip] = useState<string>("");
-  const [xAxis, setXAxis] = useState<string>("");
-  const [yAxis, setYAxis] = useState<string>("");
-  const { data: chipResponse } = useFetchChip(selectedChip);
+  const [xAxis, setXAxis] = useState<ParameterKey>("");
+  const [yAxis, setYAxis] = useState<ParameterKey>("");
+  const { data: chipResponse, isLoading: isLoadingChip, error: chipError } = useFetchChip(selectedChip);
   const chipData = useMemo(() => chipResponse?.data, [chipResponse]);
 
-  // Extract available parameters from qubit data
-  const availableParameters = useMemo(() => {
-    if (!chipData?.qubits) return [];
-    const params = new Set<string>(["qid"]);
+  // Use shared correlation data hook
+  const {
+    correlationData,
+    plotData,
+    statistics,
+    availableParameters,
+    error,
+  } = useCorrelationData({
+    chipData,
+    xParameter: xAxis,
+    yParameter: yAxis,
+    enabled: Boolean(selectedChip && xAxis && yAxis),
+  });
 
-    Object.entries(chipData.qubits).forEach(([_, qubit]: [string, any]) => {
-      if (qubit?.data) {
-        Object.keys(qubit.data).forEach((param) => {
-          if (param !== "qid") {
-            params.add(param);
-          }
-        });
-      }
-    });
+  // Error handling
+  if (chipError || error) {
+    return (
+      <ErrorCard
+        title="Correlation Data Error"
+        message={chipError?.message || error?.message || "Failed to load correlation data"}
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
 
-    return Array.from(params).sort();
-  }, [chipData]);
+  // Plot layout configuration
+  const layout = useMemo(() => ({
+    title: "",
+    autosize: true,
+    xaxis: {
+      title: {
+        text: `${xAxis} ${
+          correlationData?.[0]?.xUnit ? `(${correlationData[0].xUnit})` : ""
+        }`,
+        font: { size: 14 },
+      },
+      autorange: true,
+      rangemode: "normal" as const,
+      type: "linear" as const,
+      gridcolor: "rgba(128, 128, 128, 0.2)",
+      zerolinecolor: "rgba(128, 128, 128, 0.2)",
+      showgrid: true,
+      zeroline: true,
+      showline: true,
+      exponentformat: "e" as const,
+    },
+    yaxis: {
+      title: {
+        text: `${yAxis} ${
+          correlationData?.[0]?.yUnit ? `(${correlationData[0].yUnit})` : ""
+        }`,
+        font: { size: 14 },
+      },
+      autorange: true,
+      rangemode: "normal" as const,
+      type: "linear" as const,
+      gridcolor: "rgba(128, 128, 128, 0.2)",
+      zerolinecolor: "rgba(128, 128, 128, 0.2)",
+      showgrid: true,
+      zeroline: true,
+      showline: true,
+      exponentformat: "e" as const,
+    },
+    plot_bgcolor: "rgba(0,0,0,0)",
+    paper_bgcolor: "rgba(0,0,0,0)",
+    hovermode: "closest" as const,
+    margin: { t: 10, r: 140, b: 40, l: 60 },
+    showlegend: true,
+    legend: {
+      orientation: "v" as const,
+      yanchor: "top" as const,
+      y: 1,
+      xanchor: "left" as const,
+      x: 1.02,
+      bgcolor: "rgba(255,255,255,0.8)",
+      bordercolor: "rgba(0,0,0,0.1)",
+      borderwidth: 1,
+      itemsizing: "constant" as const,
+      font: { size: 10 },
+    },
+  }), [xAxis, yAxis, correlationData]);
 
-  // Get parameter value for a qubit
-  const getParameterValue = (qubit: any, param: string): ParameterValue => {
-    if (param === "qid") {
-      return {
-        value: Number(qubit.qid),
-        unit: "",
-        description: "Qubit ID",
-        updated: "",
-      };
-    }
+  // Table columns definition
+  const tableColumns = useMemo(() => {
+    const baseColumns = [
+      { key: 'qid', label: 'QID', sortable: true, className: 'text-center font-medium' },
+      { 
+        key: 'x', 
+        label: xAxis, 
+        sortable: false, 
+        className: 'text-center',
+        render: (value: number, row: any) => `${value.toFixed(4)} ${row.xUnit}`
+      },
+      { 
+        key: 'y', 
+        label: yAxis, 
+        sortable: false, 
+        className: 'text-center',
+        render: (value: number, row: any) => `${value.toFixed(4)} ${row.yUnit}`
+      },
+    ];
 
-    const paramData = qubit?.data?.[param];
-    if (!paramData) {
-      return {
-        value: 0,
-        unit: "",
-        description: "",
-        updated: "",
-      };
-    }
-    const value = paramData.value;
-    const unit = paramData.unit === "ns" ? "μs" : paramData.unit;
-
-    return {
-      value: paramData.unit === "ns" ? value / 1000 : value,
-      unit,
-      description: paramData.description,
-      updated: new Date(paramData.calibrated_at).toLocaleString(),
-    };
-  };
-
-  // Prepare plot data
-  const plotData = useMemo(() => {
-    if (!chipData?.qubits || !xAxis || !yAxis) return null;
-
-    const data = Object.entries(chipData.qubits)
-      .filter(([_, qubit]: [string, any]) => {
-        if (xAxis === "qid" && yAxis === "qid") return true;
-        if (xAxis === "qid") return qubit?.data && qubit.data[yAxis];
-        if (yAxis === "qid") return qubit?.data && qubit.data[xAxis];
-        return qubit?.data && qubit.data[xAxis] && qubit.data[yAxis];
-      })
-      .map(([qid, qubit]: [string, any]) => {
-        const xData = getParameterValue(qubit, xAxis);
-        const yData = getParameterValue(qubit, yAxis);
-
-        return {
-          qid,
-          x: xData.value,
-          xUnit: xData.unit,
-          xDescription: xData.description,
-          xUpdated: xData.updated,
-          y: yData.value,
-          yUnit: yData.unit,
-          yDescription: yData.description,
-          yUpdated: yData.updated,
-        };
+    // Add description columns for non-qid parameters
+    if (xAxis !== "qid") {
+      baseColumns.push({
+        key: 'xDescription',
+        label: 'Description (X)',
+        sortable: false,
+        className: 'text-center',
       });
+    }
+    if (yAxis !== "qid") {
+      baseColumns.push({
+        key: 'yDescription',
+        label: 'Description (Y)',
+        sortable: false,
+        className: 'text-center',
+      });
+    }
 
-    return data;
-  }, [chipData, xAxis, yAxis]);
+    return baseColumns;
+  }, [xAxis, yAxis]);
+
+  const isSameParameter = xAxis === yAxis;
 
   return (
     <div className="grid grid-cols-3 gap-8">
@@ -138,22 +173,44 @@ export function CorrelationView() {
             label="X-Axis Parameter"
             parameters={availableParameters}
             selectedParameter={xAxis}
-            onParameterSelect={setXAxis}
-            description={plotData?.[0]?.xDescription}
+            onParameterSelect={(param) => setXAxis(param as ParameterKey)}
+            description={correlationData?.[0]?.xDescription}
           />
           <ParameterSelector
             label="Y-Axis Parameter"
             parameters={availableParameters}
             selectedParameter={yAxis}
-            onParameterSelect={setYAxis}
-            description={plotData?.[0]?.yDescription}
+            onParameterSelect={(param) => setYAxis(param as ParameterKey)}
+            description={correlationData?.[0]?.yDescription}
           />
         </div>
       </div>
 
+      {/* Warning for same parameter */}
+      {isSameParameter && xAxis && yAxis && (
+        <div className="col-span-3 alert alert-warning" role="alert">
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            className="stroke-current shrink-0 h-6 w-6" 
+            fill="none" 
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth="2" 
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" 
+            />
+          </svg>
+          <span>Select different parameters for X and Y axes to see meaningful correlation</span>
+        </div>
+      )}
+
       {/* Plot Area */}
-      <div className="col-span-3 card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
-        <h2 className="text-2xl font-semibold mb-6 text-center flex items-center justify-center gap-2">
+      <PlotCard
+        title="Parameter Correlation Plot"
+        icon={
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="w-6 h-6"
@@ -169,345 +226,54 @@ export function CorrelationView() {
             <circle cx="12" cy="15" r="1"></circle>
             <circle cx="8" cy="9" r="1"></circle>
           </svg>
-          Parameter Correlation Plot
-        </h2>
-        <div
-          className="w-full max-w-4xl mx-auto bg-base-200/50 rounded-xl p-4"
-          style={{ height: "550px" }}
-        >
-          {plotData && plotData.length > 0 ? (
-            <Plot
-              data={plotData.map((d) => ({
-                x: [d.x],
-                y: [d.y],
-                text: [d.qid],
-                textposition: "top center",
-                textfont: { size: 10 },
-                mode: "text+markers",
-                type: "scatter",
-                name: `QID: ${d.qid}`,
-                marker:
-                  plotData.length > 20
-                    ? {
-                        size: 10,
-                        line: {
-                          color: "white",
-                          width: 1,
-                        },
-                        opacity: 0.8,
-                      }
-                    : {
-                        size: 12,
-                        line: {
-                          color: "white",
-                          width: 1,
-                        },
-                      },
-                hoverinfo: "text",
-                hovertext: [
-                  `QID: ${d.qid}<br>` +
-                    `${xAxis}: ${d.x.toFixed(4)} ${d.xUnit}<br>` +
-                    `${yAxis}: ${d.y.toFixed(4)} ${d.yUnit}<br>` +
-                    (d.xDescription
-                      ? `Description (X): ${d.xDescription}<br>`
-                      : "") +
-                    (d.yDescription
-                      ? `Description (Y): ${d.yDescription}<br>`
-                      : "") +
-                    (d.xUpdated ? `Updated (X): ${d.xUpdated}<br>` : "") +
-                    (d.yUpdated ? `Updated (Y): ${d.yUpdated}` : ""),
-                ],
-              }))}
-              layout={{
-                title: "",
-                autosize: true,
-                xaxis: {
-                  title: {
-                    text: `${xAxis} ${
-                      plotData[0]?.xUnit ? `(${plotData[0].xUnit})` : ""
-                    }`,
-                    font: {
-                      size: 14,
-                    },
-                  },
-                  autorange: true,
-                  rangemode: "normal",
-                  type: "linear",
-                  gridcolor: "rgba(128, 128, 128, 0.2)",
-                  zerolinecolor: "rgba(128, 128, 128, 0.2)",
-                  showgrid: true,
-                  zeroline: true,
-                  showline: true,
-                  exponentformat: "e",
-                },
-                yaxis: {
-                  title: {
-                    text: `${yAxis} ${
-                      plotData[0]?.yUnit ? `(${plotData[0].yUnit})` : ""
-                    }`,
-                    font: {
-                      size: 14,
-                    },
-                  },
-                  autorange: true,
-                  rangemode: "normal",
-                  type: "linear",
-                  gridcolor: "rgba(128, 128, 128, 0.2)",
-                  zerolinecolor: "rgba(128, 128, 128, 0.2)",
-                  showgrid: true,
-                  zeroline: true,
-                  showline: true,
-                  exponentformat: "e",
-                },
-                plot_bgcolor: "rgba(0,0,0,0)",
-                paper_bgcolor: "rgba(0,0,0,0)",
-                hovermode: "closest",
-                margin: { t: 10, r: 140, b: 40, l: 60 },
-                showlegend: true,
-                legend: {
-                  orientation: "v",
-                  yanchor: "top",
-                  y: 1,
-                  xanchor: "left",
-                  x: 1.02,
-                  bgcolor: "rgba(255,255,255,0.8)",
-                  bordercolor: "rgba(0,0,0,0.1)",
-                  borderwidth: 1,
-                  itemsizing: "constant",
-                  font: {
-                    size: 10,
-                  },
-                },
-              }}
-              config={{
-                displaylogo: false,
-                responsive: true,
-                toImageButtonOptions: {
-                  format: "svg",
-                  filename: "parameter_correlation",
-                  height: 600,
-                  width: 800,
-                  scale: 2,
-                },
-              }}
-              style={{ width: "100%", height: "100%" }}
-              useResizeHandler={true}
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full text-base-content/70">
-              <div className="text-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-12 h-12 mx-auto mb-4 opacity-50"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M3 3v18h18"></path>
-                  <circle cx="15" cy="10" r="1"></circle>
-                  <circle cx="12" cy="15" r="1"></circle>
-                  <circle cx="8" cy="9" r="1"></circle>
-                </svg>
-                <p className="text-lg">
-                  Select chip and parameters to visualize data
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+        }
+        isLoading={isLoadingChip}
+        hasData={!isSameParameter && plotData.length > 0}
+        emptyStateMessage={
+          isSameParameter 
+            ? "Select different parameters for X and Y axes"
+            : !selectedChip || !xAxis || !yAxis
+            ? "Select chip and parameters to visualize data"
+            : "No correlation data available for selected parameters"
+        }
+        plotData={plotData}
+        layout={layout}
+        config={{
+          toImageButtonOptions: {
+            format: "svg",
+            filename: "parameter_correlation",
+            height: 600,
+            width: 800,
+            scale: 2,
+          },
+        }}
+        className="col-span-3"
+      />
 
       {/* Statistics Summary */}
-      {plotData && plotData.length > 0 && (
-        <>
-          <div className="card bg-base-100 shadow-xl rounded-xl p-6 border border-base-300">
-            <h3 className="font-medium mb-4 flex items-center gap-2">
-              <span className="text-primary">X:</span> {xAxis} Statistics
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="stat bg-base-200 rounded-lg">
-                <div className="stat-title">Mean</div>
-                <div className="stat-value text-lg">
-                  {(
-                    plotData.reduce((acc, d) => acc + d.x, 0) / plotData.length
-                  ).toFixed(4)}
-                  {plotData[0].xUnit && (
-                    <span className="text-sm ml-1">{plotData[0].xUnit}</span>
-                  )}
-                </div>
-              </div>
-              <div className="stat bg-base-200 rounded-lg">
-                <div className="stat-title">Min / Max</div>
-                <div className="stat-value text-lg flex items-center gap-2">
-                  <span>
-                    {Math.min(...plotData.map((d) => d.x)).toFixed(4)}
-                  </span>
-                  <span className="text-base-content/50">/</span>
-                  <span>
-                    {Math.max(...plotData.map((d) => d.x)).toFixed(4)}
-                  </span>
-                  {plotData[0].xUnit && (
-                    <span className="text-sm ml-1">{plotData[0].xUnit}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card bg-base-100 shadow-xl rounded-xl p-6 border border-base-300">
-            <h3 className="font-medium mb-4 flex items-center gap-2">
-              <span className="text-secondary">Y:</span> {yAxis} Statistics
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="stat bg-base-200 rounded-lg">
-                <div className="stat-title">Mean</div>
-                <div className="stat-value text-lg">
-                  {(
-                    plotData.reduce((acc, d) => acc + d.y, 0) / plotData.length
-                  ).toFixed(4)}
-                  {plotData[0].yUnit && (
-                    <span className="text-sm ml-1">{plotData[0].yUnit}</span>
-                  )}
-                </div>
-              </div>
-              <div className="stat bg-base-200 rounded-lg">
-                <div className="stat-title">Min / Max</div>
-                <div className="stat-value text-lg flex items-center gap-2">
-                  <span>
-                    {Math.min(...plotData.map((d) => d.y)).toFixed(4)}
-                  </span>
-                  <span className="text-base-content/50">/</span>
-                  <span>
-                    {Math.max(...plotData.map((d) => d.y)).toFixed(4)}
-                  </span>
-                  {plotData[0].yUnit && (
-                    <span className="text-sm ml-1">{plotData[0].yUnit}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card bg-base-100 shadow-xl rounded-xl p-6 border border-base-300">
-            <h3 className="font-medium mb-4 flex items-center gap-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="16" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12.01" y2="8"></line>
-              </svg>
-              Additional Information
-            </h3>
-            <div className="stats stats-vertical shadow w-full">
-              <div className="stat bg-base-200 rounded-lg">
-                <div className="stat-title">Total Points</div>
-                <div className="stat-value text-lg">{plotData.length}</div>
-                <div className="stat-desc mt-2">
-                  <div className="badge badge-sm">Data points plotted</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
+      {statistics && !isSameParameter && correlationData.length > 0 && (
+        <StatisticsCards
+          statistics={statistics}
+          xParameter={xAxis}
+          yParameter={yAxis}
+          xUnit={correlationData[0]?.xUnit}
+          yUnit={correlationData[0]?.yUnit}
+        />
       )}
 
       {/* Data Table */}
-      <div className="col-span-3 card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-semibold">Data Table</h2>
-          <input
-            type="text"
-            placeholder="Filter by QID..."
-            className="input input-bordered w-64"
-            onChange={(e) => {
-              const table = document.querySelector("table");
-              const searchText = e.target.value.toLowerCase();
-
-              table?.querySelectorAll("tbody tr").forEach((row) => {
-                const qid = row.querySelector("td")?.textContent?.toLowerCase();
-                if (qid && row instanceof HTMLElement) {
-                  row.style.display = qid.includes(searchText) ? "" : "none";
-                }
-              });
-            }}
-          />
-        </div>
-        {plotData && plotData.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="table table-compact table-zebra w-full border border-base-300 bg-base-100">
-              <thead>
-                <tr>
-                  <th className="text-center bg-base-200">QID</th>
-                  <th className="text-center bg-base-200">{xAxis}</th>
-                  {xAxis !== "qid" && (
-                    <th className="text-center bg-base-200">Description (X)</th>
-                  )}
-                  {xAxis !== "qid" && (
-                    <th className="text-center bg-base-200">Updated (X)</th>
-                  )}
-                  <th className="text-center bg-base-200">{yAxis}</th>
-                  {yAxis !== "qid" && (
-                    <th className="text-center bg-base-200">Description (Y)</th>
-                  )}
-                  {yAxis !== "qid" && (
-                    <th className="text-center bg-base-200">Updated (Y)</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {chipData?.qubits &&
-                  Object.entries(chipData.qubits).map(([qid, _]) => {
-                    const data = plotData.find((d) => d.qid === qid);
-                    if (!data) return null;
-
-                    return (
-                      <tr key={data.qid}>
-                        <td className="text-center font-medium">{data.qid}</td>
-                        <td className="text-center">
-                          {data.x.toFixed(4)} {data.xUnit}
-                        </td>
-                        {xAxis !== "qid" && (
-                          <td className="text-center">{data.xDescription}</td>
-                        )}
-                        {xAxis !== "qid" && (
-                          <td className="text-center text-base-content/70">
-                            {data.xUpdated}
-                          </td>
-                        )}
-                        <td className="text-center">
-                          {data.y.toFixed(4)} {data.yUnit}
-                        </td>
-                        {yAxis !== "qid" && (
-                          <td className="text-center">{data.yDescription}</td>
-                        )}
-                        {yAxis !== "qid" && (
-                          <td className="text-center text-base-content/70">
-                            {data.yUpdated}
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-32 text-base-content/50">
-            Select parameters to view data table
-          </div>
-        )}
-      </div>
+      {correlationData.length > 0 && !isSameParameter && (
+        <DataTable
+          title="Correlation Data Table"
+          data={correlationData}
+          columns={tableColumns}
+          searchable={true}
+          searchPlaceholder="Filter by QID..."
+          searchKey="qid"
+          className="col-span-3"
+          emptyMessage="Select parameters to view correlation data"
+        />
+      )}
     </div>
   );
 }
