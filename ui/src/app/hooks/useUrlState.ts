@@ -13,10 +13,12 @@ interface UseChipUrlStateResult {
   selectedDate: string;
   selectedTask: string;
   viewMode: string;
+  qubitViewMode: string;
   setSelectedChip: (chip: string) => void;
   setSelectedDate: (date: string) => void;
   setSelectedTask: (task: string) => void;
   setViewMode: (mode: string) => void;
+  setQubitViewMode: (mode: string) => void;
   isInitialized: boolean; // Track if URL state has been initialized
 }
 
@@ -30,9 +32,11 @@ interface UseAnalysisUrlStateResult {
   selectedChip: string;
   selectedParameter: string;
   selectedTag: string;
+  analysisViewType: string;
   setSelectedChip: (chip: string) => void;
   setSelectedParameter: (parameter: string) => void;
   setSelectedTag: (tag: string) => void;
+  setAnalysisViewType: (type: string) => void;
   isInitialized: boolean;
 }
 
@@ -43,6 +47,24 @@ interface UseCorrelationUrlStateResult {
   setSelectedChip: (chip: string) => void;
   setXAxis: (parameter: string) => void;
   setYAxis: (parameter: string) => void;
+  isInitialized: boolean;
+}
+
+interface UseQubitTimeSeriesUrlStateResult {
+  selectedParameter: string;
+  selectedTag: string;
+  setSelectedParameter: (parameter: string) => void;
+  setSelectedTag: (tag: string) => void;
+  isInitialized: boolean;
+}
+
+interface UseQubitCorrelationUrlStateResult {
+  xAxis: string;
+  yAxis: string;
+  selectedTag: string;
+  setXAxis: (parameter: string) => void;
+  setYAxis: (parameter: string) => void;
+  setSelectedTag: (tag: string) => void;
   isInitialized: boolean;
 }
 
@@ -66,6 +88,8 @@ export function useChipUrlState(): UseChipUrlStateResult {
   );
 
   const [viewMode, setViewModeState] = useQueryState("view", parseAsString);
+
+  const [qubitViewMode, setQubitViewModeState] = useQueryState("qview", parseAsString);
 
   // Mark as initialized after first render
   useEffect(() => {
@@ -101,15 +125,25 @@ export function useChipUrlState(): UseChipUrlStateResult {
     [setViewModeState],
   );
 
+  const setQubitViewMode = useCallback(
+    (mode: string) => {
+      // Remove default qubit view mode from URL (e.g., if "dashboard" is default)
+      setQubitViewModeState(mode === "dashboard" ? null : mode);
+    },
+    [setQubitViewModeState],
+  );
+
   return {
     selectedChip: selectedChip ?? "",
     selectedDate: selectedDate ?? URL_DEFAULTS.DATE,
     selectedTask: selectedTask ?? URL_DEFAULTS.TASK,
     viewMode: viewMode ?? URL_DEFAULTS.VIEW,
+    qubitViewMode: qubitViewMode ?? "dashboard",
     setSelectedChip,
     setSelectedDate,
     setSelectedTask,
     setViewMode,
+    setQubitViewMode,
     isInitialized,
   };
 }
@@ -162,6 +196,11 @@ export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
     parseAsString,
   );
 
+  const [analysisViewType, setAnalysisViewTypeState] = useQueryState(
+    "aview",
+    parseAsString,
+  );
+
   // Mark as initialized after first render
   useEffect(() => {
     setIsInitialized(true);
@@ -177,27 +216,37 @@ export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
 
   const setSelectedParameter = useCallback(
     (parameter: string) => {
-      // Remove default parameter from URL (e.g., if "t1" is default)
-      setSelectedParameterState(parameter === "t1" ? null : parameter);
+      // Always include parameter in URL for complete state management
+      setSelectedParameterState(parameter);
     },
     [setSelectedParameterState],
   );
 
   const setSelectedTag = useCallback(
     (tag: string) => {
-      // Remove default tag from URL (e.g., if "daily" is default)
-      setSelectedTagState(tag === "daily" ? null : tag);
+      // Always include tag in URL for complete state management
+      setSelectedTagState(tag);
     },
     [setSelectedTagState],
+  );
+
+  const setAnalysisViewType = useCallback(
+    (type: string) => {
+      // Always include view type in URL for complete state management
+      setAnalysisViewTypeState(type);
+    },
+    [setAnalysisViewTypeState],
   );
 
   return {
     selectedChip: selectedChip ?? "",
     selectedParameter: selectedParameter ?? "t1",
     selectedTag: selectedTag ?? "daily",
+    analysisViewType: analysisViewType ?? "correlation",
     setSelectedChip,
     setSelectedParameter,
     setSelectedTag,
+    setAnalysisViewType,
     isInitialized,
   };
 }
@@ -236,16 +285,16 @@ export function useCorrelationUrlState(): UseCorrelationUrlStateResult {
 
   const setXAxis = useCallback(
     (parameter: string) => {
-      // Remove default parameter from URL (e.g., if "t1" is default)
-      setXAxisState(parameter === "t1" ? null : parameter);
+      // Always include parameter in URL for complete state management
+      setXAxisState(parameter);
     },
     [setXAxisState],
   );
 
   const setYAxis = useCallback(
     (parameter: string) => {
-      // Remove default parameter from URL (e.g., if "t2_echo" is default)
-      setYAxisState(parameter === "t2_echo" ? null : parameter);
+      // Always include parameter in URL for complete state management
+      setYAxisState(parameter);
     },
     [setYAxisState],
   );
@@ -257,6 +306,111 @@ export function useCorrelationUrlState(): UseCorrelationUrlStateResult {
     setSelectedChip,
     setXAxis,
     setYAxis,
+    isInitialized,
+  };
+}
+
+export function useQubitTimeSeriesUrlState(): UseQubitTimeSeriesUrlStateResult {
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // URL state management for qubit time series view
+  const [selectedParameter, setSelectedParameterState] = useQueryState(
+    "param",
+    parseAsString,
+  );
+
+  const [selectedTag, setSelectedTagState] = useQueryState(
+    "tag",
+    parseAsString,
+  );
+
+  // Mark as initialized after first render
+  useEffect(() => {
+    setIsInitialized(true);
+  }, []);
+
+  // Wrapped setters to handle URL updates
+  const setSelectedParameter = useCallback(
+    (parameter: string) => {
+      // Remove default parameter from URL (e.g., if "t1" is default)
+      setSelectedParameterState(parameter === "t1" ? null : parameter);
+    },
+    [setSelectedParameterState],
+  );
+
+  const setSelectedTag = useCallback(
+    (tag: string) => {
+      // Remove default tag from URL (e.g., if "daily" is default)
+      setSelectedTagState(tag === "daily" ? null : tag);
+    },
+    [setSelectedTagState],
+  );
+
+  return {
+    selectedParameter: selectedParameter ?? "t1",
+    selectedTag: selectedTag ?? "daily",
+    setSelectedParameter,
+    setSelectedTag,
+    isInitialized,
+  };
+}
+
+export function useQubitCorrelationUrlState(): UseQubitCorrelationUrlStateResult {
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // URL state management for qubit correlation view
+  const [xAxis, setXAxisState] = useQueryState(
+    "xParam",
+    parseAsString,
+  );
+
+  const [yAxis, setYAxisState] = useQueryState(
+    "yParam",
+    parseAsString,
+  );
+
+  const [selectedTag, setSelectedTagState] = useQueryState(
+    "tag",
+    parseAsString,
+  );
+
+  // Mark as initialized after first render
+  useEffect(() => {
+    setIsInitialized(true);
+  }, []);
+
+  // Wrapped setters to handle URL updates
+  const setXAxis = useCallback(
+    (parameter: string) => {
+      // Always include parameter in URL for complete state management
+      setXAxisState(parameter);
+    },
+    [setXAxisState],
+  );
+
+  const setYAxis = useCallback(
+    (parameter: string) => {
+      // Always include parameter in URL for complete state management
+      setYAxisState(parameter);
+    },
+    [setYAxisState],
+  );
+
+  const setSelectedTag = useCallback(
+    (tag: string) => {
+      // Always include tag in URL for complete state management
+      setSelectedTagState(tag);
+    },
+    [setSelectedTagState],
+  );
+
+  return {
+    xAxis: xAxis ?? "t1",
+    yAxis: yAxis ?? "t2_echo",
+    selectedTag: selectedTag ?? "daily",
+    setXAxis,
+    setYAxis,
+    setSelectedTag,
     isInitialized,
   };
 }

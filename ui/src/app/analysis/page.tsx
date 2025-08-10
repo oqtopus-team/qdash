@@ -1,13 +1,19 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { Suspense } from "react";
 import { TimeSeriesView } from "./components/TimeSeriesView";
 import { CorrelationView } from "./components/CorrelationView";
+import { useAnalysisUrlState } from "@/app/hooks/useUrlState";
 
 type AnalyzeView = "correlation" | "timeseries";
 
 function AnalyzePageContent() {
-  const [currentView, setCurrentView] = useState<AnalyzeView>("correlation");
+  // URL state management for view type
+  const { analysisViewType, setAnalysisViewType } = useAnalysisUrlState();
+  const currentView = (analysisViewType || "correlation") as AnalyzeView;
+  const setCurrentView = (view: string) => {
+    setAnalysisViewType(view);
+  };
 
   return (
     <div
