@@ -30,9 +30,9 @@ const PARAMETER_CONFIG: Record<string, {
   unit: string;
   displayUnit: string;
 }> = {
-  t1: { label: "T1 Coherence", higherIsBetter: true, unit: "s", displayUnit: "ms" },
-  t2_echo: { label: "T2 Echo", higherIsBetter: true, unit: "s", displayUnit: "ms" },
-  t2_star: { label: "T2 Star", higherIsBetter: true, unit: "s", displayUnit: "ms" },
+  t1: { label: "T1 Coherence", higherIsBetter: true, unit: "µs", displayUnit: "µs" },
+  t2_echo: { label: "T2 Echo", higherIsBetter: true, unit: "µs", displayUnit: "µs" },
+  t2_star: { label: "T2 Star", higherIsBetter: true, unit: "µs", displayUnit: "µs" },
   gate_fidelity: { label: "Gate Fidelity (Clifford RB)", higherIsBetter: true, unit: "fidelity", displayUnit: "fidelity" },
   x90_fidelity: { label: "X90 Gate Fidelity", higherIsBetter: true, unit: "fidelity", displayUnit: "fidelity" },
   x180_fidelity: { label: "X180 Gate Fidelity", higherIsBetter: true, unit: "fidelity", displayUnit: "fidelity" },
@@ -209,6 +209,21 @@ export function CumulativeView() {
 
   // Process data for cumulative distribution
   const { plotData, tableData, median, mean, percentile10, percentile90, yieldPercent, avgR2, avgError } = useMemo(() => {
+    // Debug logging for CumulativeView
+    console.log('CumulativeView Debug:', {
+      selectedChip,
+      selectedParameter,
+      selectedDate,
+      taskName,
+      taskType,
+      outputParamName,
+      hasTaskResponse: !!taskResponse,
+      hasData: !!taskResponse?.data,
+      hasResult: !!taskResponse?.data?.result,
+      resultKeys: taskResponse?.data?.result ? Object.keys(taskResponse.data.result) : [],
+      sampleResult: taskResponse?.data?.result ? Object.entries(taskResponse.data.result).slice(0, 2) : []
+    });
+
     if (!taskResponse?.data?.result) {
       return { plotData: [], tableData: [], median: null, mean: null, percentile10: null, percentile90: null, yieldPercent: null, avgR2: null, avgError: null };
     }
@@ -219,8 +234,40 @@ export function CumulativeView() {
     Object.entries(taskResponse.data.result).forEach(([qid, taskResult]) => {
       if (taskResult?.output_parameters) {
         const paramValue = taskResult.output_parameters[outputParamName];
+        
+        // Debug each parameter value
+        console.log(`CumulativeView Debug ${qid}:`, {
+          outputParamName,
+          paramValue,
+          valueType: typeof paramValue,
+          hasOutputParams: !!taskResult?.output_parameters,
+          outputParamKeys: Object.keys(taskResult.output_parameters)
+        });
+        
         if (paramValue !== null && paramValue !== undefined) {
-          let value = typeof paramValue === 'number' ? paramValue : Number(paramValue);
+          let value: number;
+          
+          // Handle different data structures
+          if (typeof paramValue === 'number') {
+            value = paramValue;
+          } else if (typeof paramValue === 'string') {
+            value = Number(paramValue);
+          } else if (typeof paramValue === 'object' && paramValue !== null) {
+            // Handle nested object with value property (e.g., {value: 123, error: 0.1})
+            if ('value' in paramValue && typeof paramValue.value === 'number') {
+              value = paramValue.value;
+            } else if ('mean' in paramValue && typeof paramValue.mean === 'number') {
+              value = paramValue.mean;
+            } else if ('result' in paramValue && typeof paramValue.result === 'number') {
+              value = paramValue.result;
+            } else {
+              console.warn(`Unknown object structure for ${selectedParameter}:`, paramValue);
+              return;
+            }
+          } else {
+            console.warn(`Cannot process value type for ${selectedParameter}:`, typeof paramValue);
+            return;
+          }
           
           // Extract error information if available
           let errorValue: number | undefined = undefined;
@@ -233,14 +280,7 @@ export function CumulativeView() {
           // Note: R² values are not available in the current API schema
           let r2Value: number | undefined = undefined;
           
-          // Convert units based on parameter configuration
-          const paramConfig = PARAMETER_CONFIG[selectedParameter];
-          if (paramConfig.unit === 's' && paramConfig.displayUnit === 'ms') {
-            value = value / 1000; // Convert ns to ms
-            if (errorValue !== undefined) {
-              errorValue = errorValue / 1000; // Convert error too
-            }
-          }
+          // No unit conversion needed - data is already in correct units
           // Note: We keep fidelities as-is (higher is better) for proper survival function
           
           // Data quality filter: reject if value is invalid
@@ -285,9 +325,9 @@ export function CumulativeView() {
     // Calculate yield based on parameter-specific thresholds (coherence-limited)
     // These thresholds are based on realistic quantum error correction requirements
     const thresholds = {
-      t1: 0.100, // 100μs - minimum for error correction protocols
-      t2_echo: 0.200, // 200μs - echo can extend T2 significantly  
-      t2_star: 0.050, // 50μs - dephasing limited
+      t1: 100, // 100µs - minimum for error correction protocols
+      t2_echo: 200, // 200µs - echo can extend T2 significantly  
+      t2_star: 50, // 50µs - dephasing limited
       gate_fidelity: 0.999, // 99.9% - threshold for QEC (surface code)
       x90_fidelity: 0.9999, // 99.99% - single qubit gates should be very high
       x180_fidelity: 0.9999, // 99.99% - single qubit gates should be very high

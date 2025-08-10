@@ -40,7 +40,7 @@ function AnalyzePageContent() {
             }`}
             onClick={() => setCurrentView("correlation")}
           >
-            Correlation Plot
+            Parameter Correlation
           </button>
           <button
             className={`tab ${
