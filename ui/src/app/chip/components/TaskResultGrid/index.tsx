@@ -2,14 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
-import { Task } from "@/schemas";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+
 import {
   useFetchLatestQubitTaskGroupedByChip,
   useFetchHistoricalQubitTaskGroupedByChip,
 } from "@/client/chip/chip";
-import { useDateNavigation } from "@/app/hooks/useDateNavigation";
+
 import { TaskFigure } from "@/app/components/TaskFigure";
-import dynamic from "next/dynamic";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
+
+import type { Task } from "@/schemas";
 
 const PlotlyRenderer = dynamic(
   () => import("@/app/components/PlotlyRenderer").then((mod) => mod.default),
@@ -39,6 +43,7 @@ export function TaskResultGrid({
   gridSize,
   onDateChange,
 }: TaskResultGridProps) {
+  const router = useRouter();
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
@@ -201,18 +206,18 @@ export function TaskResultGrid({
             ? task.figure_path[0]
             : task.figure_path || null;
           return (
-            <button
-              key={index}
-              onClick={() => {
-                if (figurePath) setSelectedTaskInfo({ qid, task, subIndex: 0 });
-                setViewMode("static");
-              }}
-              className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow relative ${
-                task.over_threshold
-                  ? "border-2 border-primary animate-pulse-light"
-                  : ""
-              }`}
-            >
+            <div key={index} className="relative group">
+              <button
+                onClick={() => {
+                  if (figurePath) setSelectedTaskInfo({ qid, task, subIndex: 0 });
+                  setViewMode("static");
+                }}
+                className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow relative w-full ${
+                  task.over_threshold
+                    ? "border-2 border-primary animate-pulse-light"
+                    : ""
+                }`}
+              >
               {task.figure_path && figurePath && (
                 <div className="absolute inset-0">
                   <TaskFigure
@@ -225,16 +230,26 @@ export function TaskResultGrid({
               <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
                 {qid}
               </div>
-              <div
-                className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
-                  task.status === "completed"
-                    ? "bg-success"
-                    : task.status === "failed"
-                      ? "bg-error"
-                      : "bg-warning"
-                }`}
-              />
-            </button>
+                <div
+                  className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
+                    task.status === "completed"
+                      ? "bg-success"
+                      : task.status === "failed"
+                        ? "bg-error"
+                        : "bg-warning"
+                  }`}
+                />
+              </button>
+              
+              {/* Detail Analysis Button */}
+              <button
+                onClick={() => router.push(`/chip/${chipId}/qubit/${qid}`)}
+                className="absolute top-1 right-1 btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                title="Detailed Analysis"
+              >
+                📊
+              </button>
+            </div>
           );
         })}
       </div>
@@ -270,6 +285,13 @@ export function TaskResultGrid({
                     </button>
                   </>
                 )}
+                <button
+                  onClick={() => router.push(`/chip/${chipId}/qubit/${selectedTaskInfo.qid}`)}
+                  className="btn btn-sm btn-primary"
+                  title="Detailed Analysis"
+                >
+                  📊 Detail View
+                </button>
                 <button
                   onClick={() => setSelectedTaskInfo(null)}
                   className="btn btn-sm btn-circle btn-ghost"
