@@ -20,7 +20,7 @@ import { TaskFigure } from "@/app/components/TaskFigure";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useChipUrlState } from "@/app/hooks/useUrlState";
 import { QubitTimeSeriesView } from "./components/QubitTimeSeriesView";
-import { QubitParameterCorrelationView } from "./components/QubitParameterCorrelationView";
+import { QubitRadarChart } from "./components/QubitRadarChart";
 
 import type { Task, TaskResponse } from "@/schemas";
 
@@ -43,7 +43,7 @@ function QubitDetailPageContent() {
     isInitialized,
   } = useChipUrlState();
 
-  const viewMode = qubitViewMode as "dashboard" | "timeseries" | "correlation" | "comparison";
+  const viewMode = qubitViewMode as "dashboard" | "timeseries" | "radar" | "comparison";
   const setViewMode = setQubitViewMode;
   
   const { data: chipData } = useFetchChip(chipId);
@@ -126,11 +126,69 @@ function QubitDetailPageContent() {
         }
       );
 
+  // Additional data for radar chart
+  const { data: t2EchoData } = selectedDate === "latest"
+    ? useFetchLatestQubitTaskGroupedByChip(chipId, "CheckT2Echo", {
+        query: {
+          staleTime: 30000,
+        },
+      })
+    : useFetchHistoricalQubitTaskGroupedByChip(
+        chipId,
+        "CheckT2Echo",
+        selectedDate === "latest" ? new Date().toISOString().split('T')[0] : selectedDate,
+        {
+          query: {
+            staleTime: 30000,
+            enabled: selectedDate !== "latest",
+          },
+        }
+      );
+
+  const { data: gateFidelityData } = selectedDate === "latest"
+    ? useFetchLatestQubitTaskGroupedByChip(chipId, "RandomizedBenchmarking", {
+        query: {
+          staleTime: 30000,
+        },
+      })
+    : useFetchHistoricalQubitTaskGroupedByChip(
+        chipId,
+        "RandomizedBenchmarking",
+        selectedDate === "latest" ? new Date().toISOString().split('T')[0] : selectedDate,
+        {
+          query: {
+            staleTime: 30000,
+            enabled: selectedDate !== "latest",
+          },
+        }
+      );
+
+  const { data: readoutFidelityData } = selectedDate === "latest"
+    ? useFetchLatestQubitTaskGroupedByChip(chipId, "ReadoutClassification", {
+        query: {
+          staleTime: 30000,
+        },
+      })
+    : useFetchHistoricalQubitTaskGroupedByChip(
+        chipId,
+        "ReadoutClassification",
+        selectedDate === "latest" ? new Date().toISOString().split('T')[0] : selectedDate,
+        {
+          query: {
+            staleTime: 30000,
+            enabled: selectedDate !== "latest",
+          },
+        }
+      );
+
   // Collect all task data
   const allTasksData: Record<string, Task | null> = {
     "CheckRabi": rabiData?.data?.result?.[qubitId] || null,
     "CheckRamseys": ramseysData?.data?.result?.[qubitId] || null,
     "CheckT1": t1Data?.data?.result?.[qubitId] || null,
+    "CheckT2Echo": t2EchoData?.data?.result?.[qubitId] || null,
+    "RandomizedBenchmarking": gateFidelityData?.data?.result?.[qubitId] || null,
+    "ReadoutClassification": readoutFidelityData?.data?.result?.[qubitId] || null,
   };
 
   // Set default task if none selected
@@ -179,9 +237,9 @@ function QubitDetailPageContent() {
               </button>
               <button
                 className={`join-item btn btn-sm ${
-                  viewMode === "correlation" ? "btn-active" : ""
+                  viewMode === "radar" ? "btn-active" : ""
                 }`}
-                onClick={() => setViewMode("correlation")}
+                onClick={() => setViewMode("radar")}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -193,11 +251,10 @@ function QubitDetailPageContent() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <circle cx="15" cy="10" r="1"></circle>
-                  <circle cx="12" cy="15" r="1"></circle>
-                  <circle cx="8" cy="9" r="1"></circle>
+                  <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon>
+                  <circle cx="12" cy="12" r="2"></circle>
                 </svg>
-                <span className="ml-2">Correlation</span>
+                <span className="ml-2">Radar</span>
               </button>
               <button
                 className={`join-item btn btn-sm ${
@@ -388,8 +445,12 @@ function QubitDetailPageContent() {
             </div>
           ) : viewMode === "timeseries" ? (
             <QubitTimeSeriesView chipId={chipId} qubitId={qubitId} />
-          ) : viewMode === "correlation" ? (
-            <QubitParameterCorrelationView chipId={chipId} qubitId={qubitId} />
+          ) : viewMode === "radar" ? (
+            <QubitRadarChart 
+              qubitId={qubitId} 
+              taskData={allTasksData} 
+              isLoading={isLoading}
+            />
           ) : (
             <div className="space-y-6">
               {/* Comparison View */}

@@ -58,15 +58,6 @@ interface UseQubitTimeSeriesUrlStateResult {
   isInitialized: boolean;
 }
 
-interface UseQubitCorrelationUrlStateResult {
-  xAxis: string;
-  yAxis: string;
-  selectedTag: string;
-  setXAxis: (parameter: string) => void;
-  setYAxis: (parameter: string) => void;
-  setSelectedTag: (tag: string) => void;
-  isInitialized: boolean;
-}
 
 export function useChipUrlState(): UseChipUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -355,62 +346,3 @@ export function useQubitTimeSeriesUrlState(): UseQubitTimeSeriesUrlStateResult {
   };
 }
 
-export function useQubitCorrelationUrlState(): UseQubitCorrelationUrlStateResult {
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // URL state management for qubit correlation view
-  const [xAxis, setXAxisState] = useQueryState(
-    "xParam",
-    parseAsString,
-  );
-
-  const [yAxis, setYAxisState] = useQueryState(
-    "yParam",
-    parseAsString,
-  );
-
-  const [selectedTag, setSelectedTagState] = useQueryState(
-    "tag",
-    parseAsString,
-  );
-
-  // Mark as initialized after first render
-  useEffect(() => {
-    setIsInitialized(true);
-  }, []);
-
-  // Wrapped setters to handle URL updates
-  const setXAxis = useCallback(
-    (parameter: string) => {
-      // Always include parameter in URL for complete state management
-      setXAxisState(parameter);
-    },
-    [setXAxisState],
-  );
-
-  const setYAxis = useCallback(
-    (parameter: string) => {
-      // Always include parameter in URL for complete state management
-      setYAxisState(parameter);
-    },
-    [setYAxisState],
-  );
-
-  const setSelectedTag = useCallback(
-    (tag: string) => {
-      // Always include tag in URL for complete state management
-      setSelectedTagState(tag);
-    },
-    [setSelectedTagState],
-  );
-
-  return {
-    xAxis: xAxis ?? "t1",
-    yAxis: yAxis ?? "t2_echo",
-    selectedTag: selectedTag ?? "daily",
-    setXAxis,
-    setYAxis,
-    setSelectedTag,
-    isInitialized,
-  };
-}
