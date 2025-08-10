@@ -3,13 +3,13 @@
 import { useState, useMemo } from "react";
 import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TagSelector } from "@/app/components/TagSelector";
-import { useTimeRangeControls } from "../hooks/useJSTTime";
+import { useTimeRange } from "@/shared/hooks/useTimeRange";
 import { useQubitCorrelation } from "../hooks/useQubitCorrelation";
 import { useQubitParameters } from "../hooks/useQubitTimeseries";
-import { PlotCard } from "./PlotCard";
-import { StatisticsCards } from "./StatisticsCards";
+import { PlotCard } from "@/shared/components/PlotCard";
+import { StatisticsCards } from "@/shared/components/StatisticsCards";
 import { CorrelationDataTable } from "./CorrelationDataTable";
-import { ErrorCard } from "./ErrorCard";
+import { ErrorCard } from "@/shared/components/ErrorCard";
 import { ParameterKey, TagKey } from "../types";
 
 interface QubitParameterCorrelationViewProps {
@@ -23,7 +23,7 @@ export function QubitParameterCorrelationView({ chipId, qubitId }: QubitParamete
   const [selectedTag, setSelectedTag] = useState<TagKey>("daily");
   
   // Time range management (30 days by default for correlation analysis)
-  const { timeRange } = useTimeRangeControls(30);
+  const { timeRange } = useTimeRange({ initialDays: 30 });
 
   // Fetch parameters and tags
   const { parameters, tags, isLoading: isLoadingMeta, error: metaError } = useQubitParameters();
@@ -203,7 +203,11 @@ export function QubitParameterCorrelationView({ chipId, qubitId }: QubitParamete
         layout={layout}
         config={{
           toImageButtonOptions: {
+            format: "svg",
             filename: `qubit_${qubitId}_correlation`,
+            height: 600,
+            width: 800,
+            scale: 2,
           },
         }}
       />
@@ -214,6 +218,8 @@ export function QubitParameterCorrelationView({ chipId, qubitId }: QubitParamete
           statistics={statistics}
           xParameter={xAxis}
           yParameter={yAxis}
+          xUnit={correlationData?.[0]?.xUnit}
+          yUnit={correlationData?.[0]?.yUnit}
         />
       )}
 

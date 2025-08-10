@@ -4,14 +4,13 @@ import { useState, useMemo } from "react";
 import { Layout } from "plotly.js";
 import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TagSelector } from "@/app/components/TagSelector";
-import { useTimeRangeControls } from "../hooks/useJSTTime";
-import { useAutoRefresh } from "../hooks/useAutoRefresh";
+import { useTimeRange } from "@/shared/hooks/useTimeRange";
 import { useQubitTimeseries, useQubitParameters } from "../hooks/useQubitTimeseries";
-import { useCSVExport } from "../hooks/useCSVExport";
+import { useCSVExport } from "@/shared/hooks/useCSVExport";
 import { TimeRangeControls } from "./TimeRangeControls";
-import { PlotCard } from "./PlotCard";
-import { DataTable } from "./DataTable";
-import { ErrorCard } from "./ErrorCard";
+import { PlotCard } from "@/shared/components/PlotCard";
+import { DataTable } from "@/shared/components/DataTable";
+import { ErrorCard } from "@/shared/components/ErrorCard";
 import { ParameterKey, TagKey } from "../types";
 
 interface QubitTimeSeriesViewProps {
@@ -32,20 +31,14 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
     updateEndAt,
     toggleStartAtLock,
     toggleEndAtLock,
-  } = useTimeRangeControls(30);
+  } = useTimeRange({ initialDays: 30, refreshIntervalSeconds: REFRESH_INTERVAL });
 
-  // Auto-refresh functionality
-  useAutoRefresh(timeRange, (updates) => {
-    if (updates.startAt) updateStartAt(updates.startAt);
-    if (updates.endAt) updateEndAt(updates.endAt);
-  }, { intervalSeconds: REFRESH_INTERVAL });
 
   // Fetch parameters and tags
   const { parameters, tags, isLoading: isLoadingMeta, error: metaError } = useQubitParameters();
 
   // Fetch time series data
   const {
-    data: timeseriesResponse,
     tableData,
     plotData,
     metadata,
@@ -62,16 +55,10 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
   });
 
   // CSV export functionality
-  const { downloadCSV, createTimeSeriesCSV } = useCSVExport();
+  const { exportTimeSeriesCSV } = useCSVExport();
 
   const handleDownloadCSV = () => {
-    const csvData = createTimeSeriesCSV(
-      timeseriesResponse,
-      qubitId,
-      selectedParameter,
-      selectedTag
-    );
-    downloadCSV(csvData);
+    exportTimeSeriesCSV(tableData, selectedParameter, chipId, selectedTag);
   };
 
   // Plot layout configuration
@@ -196,17 +183,63 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
         layout={layout}
         config={{
           toImageButtonOptions: {
+            format: "svg",
             filename: `qubit_${qubitId}_time_series`,
+            height: 600,
+            width: 800,
+            scale: 2,
           },
         }}
       />
 
       {/* Data Table */}
       <DataTable
-        data={tableData}
         title="Data Table"
-        qubitId={qubitId}
-        onDownloadCSV={tableData.length > 0 ? handleDownloadCSV : undefined}
+        data={tableData}
+        columns={[
+          { key: 'time', label: 'Time', sortable: true, className: 'text-left' },
+          { 
+            key: 'value', 
+            label: 'Value', 
+            sortable: false, 
+            className: 'text-center',
+            render: (value: any) => typeof value === 'number' ? value.toFixed(4) : String(value)
+          },
+          { 
+            key: 'error', 
+            label: 'Error', 
+            sortable: false, 
+            className: 'text-center',
+            render: (value: any) => value !== undefined ? `±${value.toFixed(4)}` : '-'
+          },
+          { key: 'unit', label: 'Unit', sortable: false, className: 'text-center' },
+        ]}
+        searchable={false}
+        actions={
+          <button
+            className="btn btn-sm btn-outline gap-2"
+            onClick={handleDownloadCSV}
+            disabled={tableData.length === 0}
+            title="Download all data as CSV"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Download CSV
+          </button>
+        }
+        emptyMessage={`No data available for Qubit ${qubitId}`}
       />
     </div>
   );
