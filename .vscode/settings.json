@@ -38,5 +38,6 @@
   "python.envFile": "${workspaceFolder}/.env",
   "terminal.integrated.env.linux": {
     "PYTHONPATH": "/workspace/qdash/src"
-  }
+  },
+  "workbench.panel.defaultLocation": "right"
 }

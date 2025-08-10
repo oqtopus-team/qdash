@@ -19,5 +19,13 @@
     "deny": []
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["o3", "serena"]
+  "enabledMcpjsonServers": [
+    "o3",
+    "gpt",
+    "serena"
+  ],
+  "statusLine": {
+    "type": "command",
+    "command": "bunx ccusage statusline"
+  }
 }

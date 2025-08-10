@@ -33,11 +33,14 @@ export default function TaskDetailList({
   selectedTask,
   onTaskSelect,
 }: TaskDetailListProps) {
+  // taskOrderが空の場合は、tasksのキーを使用して順序を保持
+  const displayOrder = taskOrder.length > 0 ? taskOrder : Object.keys(tasks);
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-1">
-          {taskOrder.map((taskName) => (
+          {displayOrder.map((taskName) => (
             <TaskItem
               key={taskName}
               id={taskName}

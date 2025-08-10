@@ -1,13 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense } from "react";
 import { TimeSeriesView } from "./components/TimeSeriesView";
 import { CorrelationView } from "./components/CorrelationView";
+import { CumulativeView } from "./components/CumulativeView";
+import { useAnalysisUrlState } from "@/app/hooks/useUrlState";
 
-type AnalyzeView = "correlation" | "timeseries";
+type AnalyzeView = "correlation" | "timeseries" | "cumulative";
 
-export default function AnalyzePage() {
-  const [currentView, setCurrentView] = useState<AnalyzeView>("correlation");
+function AnalyzePageContent() {
+  // URL state management for view type
+  const { analysisViewType, setAnalysisViewType } = useAnalysisUrlState();
+  const currentView = (analysisViewType || "correlation") as AnalyzeView;
+  const setCurrentView = (view: string) => {
+    setAnalysisViewType(view);
+  };
 
   return (
     <div
@@ -33,7 +40,7 @@ export default function AnalyzePage() {
             }`}
             onClick={() => setCurrentView("correlation")}
           >
-            Correlation Plot
+            Parameter Correlation
           </button>
           <button
             className={`tab ${
@@ -43,14 +50,38 @@ export default function AnalyzePage() {
           >
             Time Series
           </button>
+          <button
+            className={`tab ${
+              currentView === "cumulative" ? "tab-active" : ""
+            }`}
+            onClick={() => setCurrentView("cumulative")}
+          >
+            Cumulative Plot
+          </button>
         </div>
 
         {currentView === "correlation" ? (
           <CorrelationView />
-        ) : (
+        ) : currentView === "timeseries" ? (
           <TimeSeriesView />
+        ) : (
+          <CumulativeView />
         )}
       </div>
     </div>
+  );
+}
+
+export default function AnalyzePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-full flex justify-center py-12">
+          <span className="loading loading-spinner loading-lg"></span>
+        </div>
+      }
+    >
+      <AnalyzePageContent />
+    </Suspense>
   );
 }

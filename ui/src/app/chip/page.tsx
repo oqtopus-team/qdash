@@ -6,8 +6,11 @@ import { useListMuxes, useFetchChip, useListChips } from "@/client/chip/chip";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useChipUrlState } from "@/app/hooks/useUrlState";
 import { useFetchAllTasks } from "@/client/task/task";
+import { useRouter } from "next/navigation";
+
 import { BsGrid, BsListUl } from "react-icons/bs";
-import { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
+
+import type { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
 import { TaskResultGrid } from "./components/TaskResultGrid";
 import { CouplingGrid } from "./components/CouplingGrid";
 import { ChipSelector } from "@/app/components/ChipSelector";
@@ -22,6 +25,7 @@ interface SelectedTaskInfo {
 }
 
 function ChipPageContent() {
+  const router = useRouter();
   // URL state management
   const {
     selectedChip,
@@ -331,24 +335,56 @@ function ChipPageContent() {
 
           {/* Selection Controls */}
           <div className="flex gap-4">
-            <ChipSelector
-              selectedChip={selectedChip}
-              onChipSelect={setSelectedChip}
-            />
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-center gap-1 opacity-0">
+                <button className="btn btn-xs btn-ghost invisible">←</button>
+                <button className="btn btn-xs btn-ghost invisible">→</button>
+              </div>
+              <ChipSelector
+                selectedChip={selectedChip}
+                onChipSelect={setSelectedChip}
+              />
+            </div>
 
-            <DateSelector
-              chipId={selectedChip}
-              selectedDate={selectedDate}
-              onDateSelect={setSelectedDate}
-              disabled={!selectedChip}
-            />
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-center gap-1">
+                <button
+                  onClick={navigateToPreviousDay}
+                  disabled={!canNavigatePrevious}
+                  className="btn btn-xs btn-ghost"
+                  title="Previous Day"
+                >
+                  ←
+                </button>
+                <button
+                  onClick={navigateToNextDay}
+                  disabled={!canNavigateNext}
+                  className="btn btn-xs btn-ghost"
+                  title="Next Day"
+                >
+                  →
+                </button>
+              </div>
+              <DateSelector
+                chipId={selectedChip}
+                selectedDate={selectedDate}
+                onDateSelect={setSelectedDate}
+                disabled={!selectedChip}
+              />
+            </div>
 
-            <TaskSelector
-              tasks={filteredTasks}
-              selectedTask={selectedTask}
-              onTaskSelect={setSelectedTask}
-              disabled={viewMode === "mux"}
-            />
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-center gap-1 opacity-0">
+                <button className="btn btn-xs btn-ghost invisible">←</button>
+                <button className="btn btn-xs btn-ghost invisible">→</button>
+              </div>
+              <TaskSelector
+                tasks={filteredTasks}
+                selectedTask={selectedTask}
+                onTaskSelect={setSelectedTask}
+                disabled={viewMode === "mux"}
+              />
+            </div>
           </div>
         </div>
 
@@ -472,19 +508,19 @@ function ChipPageContent() {
                                     const figurePath = getFigurePath(task);
 
                                     return (
-                                      <button
-                                        key={qid}
-                                        onClick={() => {
-                                          if (figurePath) {
-                                            setSelectedTaskInfo({
-                                              path: figurePath,
-                                              qid,
-                                              task,
-                                            });
-                                          }
-                                        }}
-                                        className="card bg-base-100 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow relative"
-                                      >
+                                      <div key={qid} className="relative group">
+                                        <button
+                                          onClick={() => {
+                                            if (figurePath) {
+                                              setSelectedTaskInfo({
+                                                path: figurePath,
+                                                qid,
+                                                task,
+                                              });
+                                            }
+                                          }}
+                                          className="card bg-base-100 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow relative w-full"
+                                        >
                                         <div className="card-body p-2">
                                           <div className="text-sm font-medium mb-2">
                                             <div className="flex justify-between items-center mb-1">
@@ -518,7 +554,17 @@ function ChipPageContent() {
                                             </div>
                                           )}
                                         </div>
-                                      </button>
+                                        </button>
+                                        
+                                        {/* Detail Analysis Button */}
+                                        <button
+                                          onClick={() => router.push(`/chip/${selectedChip}/qubit/${qid}`)}
+                                          className="absolute top-2 right-2 btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                          title="Detailed Analysis"
+                                        >
+                                          📊
+                                        </button>
+                                      </div>
                                     );
                                   })}
                                 </div>
@@ -565,6 +611,15 @@ function ChipPageContent() {
                 >
                   →
                 </button>
+                {viewMode !== "2q" && (
+                  <button
+                    onClick={() => router.push(`/chip/${selectedChip}/qubit/${selectedTaskInfo.qid}`)}
+                    className="btn btn-sm btn-primary"
+                    title="Detailed Analysis"
+                  >
+                    📊 Detail View
+                  </button>
+                )}
                 <button
                   onClick={() => setSelectedTaskInfo(null)}
                   className="btn btn-sm btn-circle btn-ghost"
