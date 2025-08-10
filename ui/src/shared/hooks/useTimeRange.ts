@@ -1,19 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { TimeRangeState } from '../types/analysis';
 
 interface UseTimeRangeOptions {
   initialDays?: number;
-  refreshIntervalSeconds?: number;
 }
 
 /**
  * Custom hook for managing time ranges with JST timezone support
- * Extracted from qubit detail page for reuse across analysis components
+ * Manual refresh approach - no automatic updates to preserve user settings
  */
 export function useTimeRange(options: UseTimeRangeOptions = {}) {
   const { 
-    initialDays = 7, 
-    refreshIntervalSeconds = 30 
+    initialDays = 7
   } = options;
 
   // Format date with JST timezone
@@ -35,33 +33,16 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
     isEndAtLocked: false,
   }));
 
-  // Timer reference for cleanup tracking
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Auto-update times when not locked
-  useEffect(() => {
-    // Clear any existing timer
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-
-    timerRef.current = setInterval(() => {
-      setTimeRange(prev => ({
-        ...prev,
-        endAt: prev.isEndAtLocked ? prev.endAt : formatJSTDate(new Date()),
-        startAt: prev.isStartAtLocked || prev.isEndAtLocked 
-          ? prev.startAt 
-          : formatJSTDate(new Date(Date.now() - initialDays * 24 * 60 * 60 * 1000)),
-      }));
-    }, refreshIntervalSeconds * 1000);
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [formatJSTDate, initialDays, refreshIntervalSeconds]);
+  // Manual refresh function
+  const refreshTimeRange = useCallback(() => {
+    setTimeRange(prev => ({
+      ...prev,
+      endAt: prev.isEndAtLocked ? prev.endAt : formatJSTDate(new Date()),
+      startAt: prev.isStartAtLocked || prev.isEndAtLocked 
+        ? prev.startAt 
+        : formatJSTDate(new Date(Date.now() - initialDays * 24 * 60 * 60 * 1000)),
+    }));
+  }, [formatJSTDate, initialDays]);
 
   // Update start time
   const updateStartAt = useCallback((value: string) => {
@@ -88,12 +69,10 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
       return {
         ...prev,
         isStartAtLocked: newLocked,
-        startAt: newLocked 
-          ? prev.startAt 
-          : formatJSTDate(new Date(Date.now() - initialDays * 24 * 60 * 60 * 1000)),
+        // Don't auto-update when toggling - preserve current value
       };
     });
-  }, [formatJSTDate, initialDays]);
+  }, []);
 
   // Toggle end time lock
   const toggleEndAtLock = useCallback(() => {
@@ -102,26 +81,26 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
       return {
         ...prev,
         isEndAtLocked: newLocked,
-        endAt: newLocked ? prev.endAt : formatJSTDate(new Date()),
+        // Don't auto-update when toggling - preserve current value
       };
     });
-  }, [formatJSTDate]);
+  }, []);
 
   // Get lock status description
   const getLockStatusDescription = useCallback(() => {
     const { isStartAtLocked, isEndAtLocked } = timeRange;
     
     if (!isStartAtLocked && !isEndAtLocked) {
-      return `Both times auto-update every ${refreshIntervalSeconds} seconds`;
+      return "Both times will update when refreshed manually";
     }
     if (isStartAtLocked && isEndAtLocked) {
       return "Both times are fixed";
     }
     if (isStartAtLocked) {
-      return "Start time is fixed, end time auto-updates";
+      return "Start time is fixed, end time will update when refreshed";
     }
-    return "End time is fixed, start time auto-updates";
-  }, [timeRange, refreshIntervalSeconds]);
+    return "End time is fixed, start time will update when refreshed";
+  }, [timeRange]);
 
   return {
     timeRange,
@@ -129,6 +108,7 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
     updateEndAt,
     toggleStartAtLock,
     toggleEndAtLock,
+    refreshTimeRange,
     getLockStatusDescription,
     formatJSTDate,
   };

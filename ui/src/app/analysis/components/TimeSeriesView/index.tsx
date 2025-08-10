@@ -21,24 +21,23 @@ export function TimeSeriesView() {
   const [selectedChip, setSelectedChip] = useState<string>("");
   const [selectedParameter, setSelectedParameter] = useState<ParameterKey>("t1");
   const [selectedTag, setSelectedTag] = useState<TagKey>("daily");
-  const REFRESH_INTERVAL = 30; // 30 seconds fixed
-
-  // Time range management
+  // Time range management with manual refresh
   const {
     timeRange,
     updateStartAt,
     updateEndAt,
     toggleStartAtLock,
     toggleEndAtLock,
+    refreshTimeRange,
     getLockStatusDescription,
-  } = useTimeRange({ initialDays: 7, refreshIntervalSeconds: REFRESH_INTERVAL });
+  } = useTimeRange({ initialDays: 7 });
 
   // Fetch parameters and tags
   const { data: parametersResponse, isLoading: isLoadingParameters } = useFetchAllParameters();
   const { data: tagsResponse, isLoading: isLoadingTags } = useListAllTag();
 
   // Fetch time series data directly (Analysis page doesn't have qubitId)
-  const { data: timeseriesResponse, isLoading: isLoadingTimeseries, error } =
+  const { data: timeseriesResponse, isLoading: isLoadingTimeseries, error, refetch } =
     useFetchTimeseriesTaskResultByTagAndParameter(
       selectedChip,
       selectedParameter,
@@ -50,8 +49,7 @@ export function TimeSeriesView() {
       {
         query: {
           enabled: Boolean(selectedChip && selectedParameter && selectedTag),
-          refetchInterval: REFRESH_INTERVAL * 1000,
-          staleTime: REFRESH_INTERVAL * 1000 * 0.8,
+          staleTime: 30000, // Keep data fresh for 30 seconds
         },
       },
     );
@@ -189,6 +187,12 @@ export function TimeSeriesView() {
     exportTimeSeriesCSV(tableData, selectedParameter, selectedChip, selectedTag);
   };
 
+  // Manual refresh handler
+  const handleRefresh = () => {
+    refreshTimeRange();
+    refetch();
+  };
+
   // Error handling
   if (error) {
     return (
@@ -225,25 +229,47 @@ export function TimeSeriesView() {
     <div className="grid grid-cols-3 gap-8">
       {/* Parameter Selection Card */}
       <div className="col-span-3 card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
-        <div className="text-xs text-base-content/70 mb-2">
-          Auto refresh every {REFRESH_INTERVAL} seconds
-        </div>
-        <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-5 h-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 3v18h18"></path>
+              <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
+            </svg>
+            Parameter Selection
+          </h2>
+          <button
+            onClick={handleRefresh}
+            disabled={isLoadingTimeseries || isLoadingParameters || isLoadingTags}
+            className="btn btn-sm btn-outline gap-2"
+            title="Refresh data and time range"
           >
-            <path d="M3 3v18h18"></path>
-            <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
-          </svg>
-          Parameter Selection
-        </h2>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+              <path d="M3 21v-5h5" />
+            </svg>
+            Refresh
+          </button>
+        </div>
         <div className="grid grid-cols-3 gap-12">
           <ChipSelector
             selectedChip={selectedChip}

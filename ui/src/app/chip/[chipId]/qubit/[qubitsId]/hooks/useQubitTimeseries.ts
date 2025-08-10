@@ -11,7 +11,6 @@ interface UseQubitTimeseriesOptions {
   parameter: ParameterKey;
   tag: TagKey;
   timeRange: TimeRangeState;
-  refreshInterval?: number;
   enabled?: boolean;
 }
 
@@ -25,7 +24,6 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
     parameter,
     tag,
     timeRange,
-    refreshInterval = 30000,
     enabled = true,
   } = options;
 
@@ -47,8 +45,7 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
     {
       query: {
         enabled: Boolean(enabled && chipId && parameter && tag && qubitId),
-        refetchInterval: refreshInterval,
-        staleTime: refreshInterval * 0.8, // Set stale time to 80% of refresh interval
+        staleTime: 30000, // Keep data fresh for 30 seconds
       },
     },
   );
