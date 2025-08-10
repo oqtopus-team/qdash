@@ -331,24 +331,56 @@ function ChipPageContent() {
 
           {/* Selection Controls */}
           <div className="flex gap-4">
-            <ChipSelector
-              selectedChip={selectedChip}
-              onChipSelect={setSelectedChip}
-            />
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-center gap-1 opacity-0">
+                <button className="btn btn-xs btn-ghost invisible">←</button>
+                <button className="btn btn-xs btn-ghost invisible">→</button>
+              </div>
+              <ChipSelector
+                selectedChip={selectedChip}
+                onChipSelect={setSelectedChip}
+              />
+            </div>
 
-            <DateSelector
-              chipId={selectedChip}
-              selectedDate={selectedDate}
-              onDateSelect={setSelectedDate}
-              disabled={!selectedChip}
-            />
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-center gap-1">
+                <button
+                  onClick={navigateToPreviousDay}
+                  disabled={!canNavigatePrevious}
+                  className="btn btn-xs btn-ghost"
+                  title="Previous Day"
+                >
+                  ←
+                </button>
+                <button
+                  onClick={navigateToNextDay}
+                  disabled={!canNavigateNext}
+                  className="btn btn-xs btn-ghost"
+                  title="Next Day"
+                >
+                  →
+                </button>
+              </div>
+              <DateSelector
+                chipId={selectedChip}
+                selectedDate={selectedDate}
+                onDateSelect={setSelectedDate}
+                disabled={!selectedChip}
+              />
+            </div>
 
-            <TaskSelector
-              tasks={filteredTasks}
-              selectedTask={selectedTask}
-              onTaskSelect={setSelectedTask}
-              disabled={viewMode === "mux"}
-            />
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-center gap-1 opacity-0">
+                <button className="btn btn-xs btn-ghost invisible">←</button>
+                <button className="btn btn-xs btn-ghost invisible">→</button>
+              </div>
+              <TaskSelector
+                tasks={filteredTasks}
+                selectedTask={selectedTask}
+                onTaskSelect={setSelectedTask}
+                disabled={viewMode === "mux"}
+              />
+            </div>
           </div>
         </div>
 
