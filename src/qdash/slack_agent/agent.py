@@ -427,6 +427,167 @@ def format_chip_parameters_for_slack(parameters: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+# Global agent cache for thread-based context management
+_agent_cache: dict[str, Agent] = {}
+_agent_cache_lock = asyncio.Lock()
+
+
+def get_thread_key(channel_id: str, thread_ts: str | None, user_id: str) -> str:
+    """Generate a unique key for thread-based agent caching."""
+    if thread_ts:
+        return f"{channel_id}:{thread_ts}"
+    else:
+        # For direct messages without thread, use user-based key
+        return f"dm:{user_id}:{channel_id}"
+
+
+async def get_or_create_thread_agent(
+    channel_id: str, thread_ts: str | None, user_id: str, username: str = "admin"
+) -> Agent:
+    """Get or create a Strands agent for a specific Slack thread with context management."""
+    thread_key = get_thread_key(channel_id, thread_ts, user_id)
+
+    async with _agent_cache_lock:
+        if thread_key in _agent_cache:
+            logger.info(f"🔄 Reusing existing agent for thread: {thread_key}")
+            return _agent_cache[thread_key]
+
+        logger.info(f"🆕 Creating new agent for thread: {thread_key}")
+
+        # Create new agent with conversation management
+        model_config = get_current_model_config()
+
+        # System instructions optimized for thread context
+        system_prompt = f"""あなたはQDash量子キャリブレーションシステムのSlackアシスタントです。
+
+このスレッドでのユーザー: {username} (ID: {user_id})
+このスレッドの会話履歴を記憶し、コンテクストを保持してください。
+
+基本的な対応:
+- 日本語で自然に返答してください
+- 簡潔で親しみやすい口調で答えてください
+- 前回の会話内容を覚えて、継続性のある対話を心がけてください
+- 同じ質問を繰り返された場合は「先ほどお答えしましたが...」のように言及してください
+
+利用可能なツール:
+- get_chip_parameters_formatted: チップのフィデリティ統計とパラメータ取得
+- get_current_chip: 現在のチップID取得
+- get_current_time: 現在時刻取得
+- calculate: 数式計算
+- get_string_length: 文字列長取得
+
+使用方針:
+1. ユーザー名が言及された場合、ツールのusername引数に渡してください
+2. フィデリティやチップに関する質問: get_chip_parameters_formatted を使用
+3. "最新のchip id"に関する質問: get_current_chip を使用
+4. 単純な挨拶や雑談には、ツールを使わず自然に返答してください
+
+Model: {model_config.name}
+Thread: {thread_key}
+"""
+
+        # Prepare tools list
+        tools = [
+            get_current_time,
+            calculate,
+            get_string_length,
+            get_current_chip,
+            get_chip_parameters_formatted,
+            get_thread_history,
+        ]
+
+        # Configure conversation manager for thread context
+        from strands.agent.conversation_manager import SlidingWindowConversationManager
+
+        conversation_manager = SlidingWindowConversationManager(
+            window_size=20,  # Keep last 20 messages for good context
+            should_truncate_results=True,  # Truncate large tool results
+        )
+
+        # Initialize agent state with user information
+        initial_state = {
+            "user_id": user_id,
+            "username": username,
+            "channel_id": channel_id,
+            "thread_ts": thread_ts,
+            "created_at": pendulum.now("Asia/Tokyo").isoformat(),
+            "interaction_count": 0,
+        }
+
+        if STRANDS_AVAILABLE:
+            # Configure model based on provider
+            if model_config.provider == "openai":
+                # Get API key from settings or environment
+                settings = get_settings()
+                api_key = getattr(settings, "openai_api_key", None) or os.getenv("OPENAI_API_KEY")
+
+                # Create OpenAI model configuration
+                model_params = {
+                    "temperature": model_config.temperature,
+                    "max_completion_tokens": model_config.max_completion_tokens,
+                }
+
+                model = OpenAIModel(
+                    client_args={
+                        "api_key": api_key,
+                        "timeout": 30.0,
+                        "max_retries": 3,
+                    },
+                    model_id=model_config.name,
+                    params=model_params,
+                )
+
+                # Create Strands Agent with full context management
+                agent = Agent(
+                    model=model,
+                    system_prompt=system_prompt,
+                    tools=tools,
+                    conversation_manager=conversation_manager,
+                    state=initial_state,
+                )
+                logger.info(f"✅ Thread agent created with OpenAI model: {model_config.name}")
+            else:
+                # For other providers
+                agent = Agent(
+                    system_prompt=system_prompt,
+                    tools=tools,
+                    conversation_manager=conversation_manager,
+                    state=initial_state,
+                )
+                logger.info("✅ Thread agent created with default configuration")
+        else:
+            logger.error("❌ Strands SDK is not available")
+            raise ImportError("Strands Agents SDK is required")
+
+        # Cache the agent for this thread
+        _agent_cache[thread_key] = agent
+
+        # Clean up old cached agents (keep only last 50 threads)
+        if len(_agent_cache) > 50:
+            # Remove oldest entries
+            oldest_keys = list(_agent_cache.keys())[:-50]
+            for old_key in oldest_keys:
+                del _agent_cache[old_key]
+                logger.info(f"🗑️ Cleaned up old thread agent: {old_key}")
+
+        return agent
+
+
+async def update_agent_state(agent: Agent, interaction_type: str = "message"):
+    """Update agent state with interaction metadata."""
+    current_count = agent.state.get("interaction_count", 0)
+    agent.state.set("interaction_count", current_count + 1)
+    agent.state.set("last_interaction", pendulum.now("Asia/Tokyo").isoformat())
+    agent.state.set("last_interaction_type", interaction_type)
+
+
+def cleanup_agent_cache():
+    """Cleanup function for agent cache (can be called periodically)."""
+    global _agent_cache
+    logger.info(f"🧹 Cleaning up agent cache. Current size: {len(_agent_cache)}")
+    _agent_cache.clear()
+
+
 @tool
 @with_error_handling
 async def get_chip_parameters_formatted(
@@ -477,91 +638,9 @@ async def get_thread_history(channel_id: str, thread_ts: str) -> dict[str, Any]:
         return {"error": f"Failed to get thread history: {e!s}"}
 
 
-# Create the Strands agent with QDash tools
-def create_strands_agent():
-    """Create a Strands agent with QDash quantum tools."""
-    model_config = get_current_model_config()
-
-    # System instructions for the agent
-    system_prompt = f"""あなたはQDash量子キャリブレーションシステムのSlackアシスタントです。
-
-基本的な対応:
-- 日本語で自然に返答してください
-- 簡潔で親しみやすい口調で答えてください
-- 挨拶には普通に挨拶で返してください
-
-利用可能なツール:
-- get_chip_parameters_formatted: チップのフィデリティ統計とパラメータ取得
-- get_current_chip: 現在のチップID取得
-- get_current_time: 現在時刻取得
-- calculate: 数式計算
-- get_string_length: 文字列長取得
-
-使用方針:
-1. ユーザー名が言及された場合（例："orangekame3の"）、ツールに渡してください
-2. フィデリティやチップに関する質問: get_chip_parameters_formatted を使用
-3. "最新のchip id"に関する質問: get_current_chip を使用
-4. 単純な挨拶や雑談には、ツールを使わず自然に返答してください
-
-Model: {model_config.name}
-"""
-
-    # Prepare tools list
-    tools = [
-        get_current_time,
-        calculate,
-        get_string_length,
-        get_current_chip,
-        get_chip_parameters_formatted,
-        get_thread_history,
-    ]
-
-    if STRANDS_AVAILABLE:
-        # Configure model based on provider
-        if model_config.provider == "openai":
-            # Get API key from settings or environment
-            settings = get_settings()
-            # Secure API key loading - only from environment variables
-            api_key = getattr(settings, "openai_api_key", None) or os.getenv("OPENAI_API_KEY")
-
-            # Create OpenAI model configuration with supported parameters only
-            model_params = {
-                "temperature": model_config.temperature,
-                "max_completion_tokens": model_config.max_completion_tokens,
-            }
-
-            # Note: GPT-5 specific parameters (verbosity, reasoning) are not yet supported
-            # by the current OpenAI client library. Will be enabled when available.
-
-            model = OpenAIModel(
-                client_args={
-                    "api_key": api_key,
-                    "timeout": 30.0,  # 30 second timeout
-                    "max_retries": 3,  # More retries
-                },
-                model_id=model_config.name,
-                params=model_params,
-            )
-
-            # Create Strands Agent with proper configuration
-            agent = Agent(model=model, system_prompt=system_prompt, tools=tools)
-            logger.info(f"✅ Strands Agent initialized with OpenAI model: {model_config.name}")
-        else:
-            # For other providers, use default Agent (will use environment settings)
-            agent = Agent(system_prompt=system_prompt, tools=tools)
-            logger.info("✅ Strands Agent initialized with default configuration")
-    else:
-        # Fallback: Create a simple async wrapper for OpenAI
-        # Strands SDK is required for proper functionality
-        logger.error("❌ Strands SDK is not available. Please install it to use the agent.")
-        raise ImportError("Strands Agents SDK is required. Please install with: pip install strands-agents")
-
-    return agent
-
-
 @app.event("app_mention")
 async def handle_mention(event, say, client) -> None:
-    """Handle bot mention events using Strands agent."""
+    """Handle bot mention events using Strands agent with thread-based context management."""
     start_time = datetime.now()
 
     try:
@@ -572,22 +651,35 @@ async def handle_mention(event, say, client) -> None:
         # Log Slack event
         log_slack_event("app_mention", slack_event.channel, slack_event.user, clean_message)
 
-        # Create Strands agent
-        agent = create_strands_agent()
-
+        # Get or create thread-specific agent with conversation history
         thread_ts = slack_event.thread_ts or slack_event.ts
+        agent = await get_or_create_thread_agent(
+            channel_id=slack_event.channel,
+            thread_ts=slack_event.thread_ts,  # Can be None for new threads
+            user_id=slack_event.user,
+            username="admin",  # TODO: Extract real username from Slack
+        )
 
-        await say(text="🤔 Thinking...", thread_ts=thread_ts)
+        await say(text="🤔 考え中...", thread_ts=thread_ts)
 
         try:
-            # Execute agent with user message directly (no confusing context)
+            # Update agent state with current interaction
+            await update_agent_state(agent, "mention")
+
+            # Execute agent with user message - agent maintains conversation history
             user_message = clean_message
 
-            # Use invoke_async for Strands Agent
+            # Use invoke_async for Strands Agent - conversation history is maintained automatically
             result = await agent.invoke_async(user_message)
 
             # Extract the message content from the result (Strands AgentResult format)
-            response_text = str(result) if result else "No response generated"
+            response_text = str(result) if result else "返答を生成できませんでした"
+
+            # Log conversation context for debugging
+            interaction_count = agent.state.get("interaction_count", 0)
+            message_count = len(agent.messages) if hasattr(agent, "messages") else 0
+
+            logger.info(f"💬 Thread context: {interaction_count} interactions, {message_count} messages")
 
             # Send final result
             await say(text=response_text, thread_ts=thread_ts)
@@ -631,6 +723,14 @@ async def main() -> None:
         # Start periodic health check
         health_check_task = asyncio.create_task(setup_periodic_health_check())
 
+        # Start periodic agent cache cleanup (every hour)
+        async def periodic_cleanup():
+            while True:
+                await asyncio.sleep(3600)  # 1 hour
+                cleanup_agent_cache()
+
+        cleanup_task = asyncio.create_task(periodic_cleanup())
+
         # Start Socket Mode handler
         handler = AsyncSocketModeHandler(app, settings.slack_app_token)
 
@@ -646,6 +746,7 @@ async def main() -> None:
     except KeyboardInterrupt:
         logger.info("👋 Shutting down...")
         health_check_task.cancel()
+        cleanup_task.cancel()
 
     except Exception as e:
         logger.critical(f"Startup failed: {e}")
