@@ -486,7 +486,7 @@ QDashユーザー名: 各操作時に明示的に指定が必要
 利用可能なツール:
 - get_chip_parameters_formatted: チップのフィデリティ統計とパラメータ取得
 - get_current_chip: 現在のチップID取得
-- generate_chip_report: フルチップレポート(YAML+PDF)生成とSlack送信（現在のスレッドに送信）
+- generate_chip_report: フルチップレポート(YAML+PDF)生成とSlack送信（現在のスレッドに送信、カットオフ時間指定可能）
 
 - get_current_time: 現在時刻取得
 - calculate: 数式計算
@@ -501,9 +501,11 @@ QDashユーザー名: 各操作時に明示的に指定が必要
 
 **自然な表現の理解:**
 - 「orangekame3のレポートをください」→ orangekame3でチップレポート生成
+- 「orangekame3の過去48時間のレポートを生成して」→ orangekame3で48時間のチップレポート生成
 - 「johnのフィデリティを見たい」→ johnでチップパラメータ取得
 - 「aliceの現在のチップは？」→ aliceで現在チップID取得
-- 「admin でレポート作って」→ adminでチップレポート生成
+- 「admin でレポート作って」→ adminでチップレポート生成（cutoff_hours=24）
+- 「admin の12時間レポート作って」→ adminでチップレポート生成（cutoff_hours=12）
 
 **パターン認識:**
 1. **ユーザー名 + の + 操作**: 「{{ユーザー名}}の{{操作}}」形式を認識
@@ -518,13 +520,42 @@ QDashユーザー名: 各操作時に明示的に指定が必要
 - どちらか一方が不明確な場合のみ確認
 - 冗長な確認は避け、できるだけ自然で効率的な対話を心がける
 - extract_username_and_action関数でメッセージを解析し、自然な表現を理解する
+- この関数はユーザー名、アクション、時間指定（cutoff_hours）を抽出します
+
+**🚨 重要: レポート生成の即座実行**
+「orangekame3の過去48時間のレポートを生成して」のようなメッセージの場合:
+→ 他のツールを使わず、即座にgenerate_chip_report(username="orangekame3", cutoff_hours=48)を実行
+→ get_current_chipやget_chip_parametersは不要です
+
 4. フィデリティやチップに関する質問: get_chip_parameters_formatted を使用
 5. "最新のchip id"に関する質問: get_current_chip を使用
-6. "チップレポート"や"レポート生成"の依頼: generate_chip_report を使用
+6. "チップレポート"や"レポート生成"の依頼: 🚨 **即座に** generate_chip_report を使用
+   **絶対ルール**: ユーザー名とレポート依頼が明確な場合、他のツールを使わずに直接generate_chip_reportを実行
    **重要**: このスレッドのチャンネルID="{channel_id}", スレッドTS="{thread_ts if thread_ts else ''}"
+   
+   **時間指定の処理**:
+   - ユーザーメッセージから時間を抽出（例: "48時間", "12h", "過去24時間"など）
+   - 抽出した時間をcutoff_hoursパラメータに設定
+   - 時間指定がない場合はデフォルト24時間を使用
+   
    generate_chip_reportを呼ぶ際は必ずこれらの値を使用:
-   generate_chip_report(username="指定されたユーザー名", slack_channel="{channel_id}", slack_thread_ts="{thread_ts if thread_ts else ''}")
+   generate_chip_report(username="指定されたユーザー名", slack_channel="{channel_id}", slack_thread_ts="{thread_ts if thread_ts else ''}", cutoff_hours=48)
+   
+   **時間指定の理解:**
+   - 「過去48時間のレポート」「48時間のレポート」→ cutoff_hours=48
+   - 「12hのレポート」「12時間レポート」→ cutoff_hours=12  
+   - 時間指定がない場合はcutoff_hours=24（デフォルト）
+   - extract_username_and_action関数で時間も抽出してください
 7. 単純な挨拶や雑談には、ツールを使わず自然に返答してください
+
+**❌ 禁止事項:**
+- レポート生成依頼でget_current_chipを先に呼ぶこと
+- レポート生成前にフィデリティを確認すること  
+- 「現在のチップIDを取得する必要があります」のような余計な前置き
+
+**✅ 正しい処理:**
+「orangekame3の過去48時間のレポートを生成して」
+→ 即座に: generate_chip_report(username="orangekame3", cutoff_hours=48, slack_channel="{channel_id}", slack_thread_ts="{thread_ts}")
 
 Model: {model_config.name}
 Thread: {thread_key}
@@ -673,18 +704,34 @@ async def get_validated_qdash_username(user_id: str, specified_username: str | N
     return await require_explicit_username(specified_username)
 
 
-def extract_username_and_action(message: str) -> tuple[str | None, str | None]:
-    """Extract username and action from natural user messages.
+def extract_username_and_action(message: str) -> tuple[str | None, str | None, int | None]:
+    """Extract username, action, and cutoff hours from natural user messages.
 
     Args:
         message: User message text
 
     Returns:
-        Tuple of (username, action) or (None, None) if not found
+        Tuple of (username, action, cutoff_hours) or (None, None, None) if not found
     """
     import re
 
     message = message.lower().strip()
+    
+    # Extract cutoff hours from message
+    cutoff_hours = None
+    hour_patterns = [
+        r'過去(\d+)時間',
+        r'(\d+)時間',  
+        r'(\d+)h',
+        r'(\d+)hr',
+        r'(\d+)hrs'
+    ]
+    
+    for pattern in hour_patterns:
+        match = re.search(pattern, message)
+        if match:
+            cutoff_hours = int(match.group(1))
+            break
 
     # Pattern 1: "{username}の{action}" - Japanese possessive
     pattern1 = r"(\w+)の(レポート|フィデリティ|パラメータ|チップ)"
@@ -696,7 +743,7 @@ def extract_username_and_action(message: str) -> tuple[str | None, str | None]:
         # Map action words to actions
         action_map = {"レポート": "report", "フィデリティ": "fidelity", "パラメータ": "parameters", "チップ": "chip"}
         action = action_map.get(action_word)
-        return username, action
+        return username, action, cutoff_hours
 
     # Pattern 2: "{username} で {action}" - Japanese particle "de"
     pattern2 = r"(\w+)\s*で.*(レポート|フィデリティ|パラメータ|チップ)"
@@ -706,7 +753,7 @@ def extract_username_and_action(message: str) -> tuple[str | None, str | None]:
         action_word = match2.group(2)
         action_map = {"レポート": "report", "フィデリティ": "fidelity", "パラメータ": "parameters", "チップ": "chip"}
         action = action_map.get(action_word, "unknown")
-        return username, action
+        return username, action, cutoff_hours
 
     # Pattern 3: General report/レポート keywords
     if "レポート" in message or "report" in message:
@@ -719,13 +766,13 @@ def extract_username_and_action(message: str) -> tuple[str | None, str | None]:
         if potential_usernames:
             return potential_usernames[0], "report"
 
-    return None, None
+    return None, None, None
 
 
 @tool
 @with_error_handling
 async def generate_chip_report(
-    username: str = "admin", slack_channel: str = "", slack_thread_ts: str = ""
+    username: str = "admin", slack_channel: str = "", slack_thread_ts: str = "", cutoff_hours: int = 24
 ) -> dict[str, Any]:
     """Generate full chip report (YAML + PDF) using Prefect workflow and send to Slack.
 
@@ -733,6 +780,7 @@ async def generate_chip_report(
         username: Username for the operation (default: "admin")
         slack_channel: Slack channel ID to send results to
         slack_thread_ts: Slack thread timestamp to reply to
+        cutoff_hours: Time window in hours for recent data filtering (default: 24)
 
     Returns:
         Dictionary with flow run information
@@ -774,6 +822,7 @@ async def generate_chip_report(
                 "username": username,
                 "slack_channel": slack_channel,  # Always include, even if empty
                 "slack_thread_ts": slack_thread_ts,  # Always include, even if empty
+                "cutoff_hours": cutoff_hours,  # Time window for recent data
             }
 
             logger.info(f"Flow parameters being sent: {parameters}")
