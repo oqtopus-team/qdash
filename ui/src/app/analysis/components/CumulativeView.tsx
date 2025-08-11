@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useListChips, useFetchLatestQubitTaskGroupedByChip, useFetchLatestCouplingTaskGroupedByChip, useFetchHistoricalQubitTaskGroupedByChip, useFetchHistoricalCouplingTaskGroupedByChip } from "@/client/chip/chip";
+import {
+  useListChips,
+  useFetchLatestQubitTaskGroupedByChip,
+  useFetchLatestCouplingTaskGroupedByChip,
+  useFetchHistoricalQubitTaskGroupedByChip,
+  useFetchHistoricalCouplingTaskGroupedByChip,
+} from "@/client/chip/chip";
 import { PlotCard } from "@/shared/components/PlotCard";
 import { ErrorCard } from "@/shared/components/ErrorCard";
 import { DataTable } from "@/shared/components/DataTable";
@@ -12,38 +18,90 @@ import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import Select, { SingleValue } from "react-select";
 
 // Task names and types mapping
-const TASK_CONFIG: Record<string, { name: string; type: 'qubit' | 'coupling' }> = {
+const TASK_CONFIG: Record<
+  string,
+  { name: string; type: "qubit" | "coupling" }
+> = {
   t1: { name: "CheckT1", type: "qubit" },
-  t2_echo: { name: "CheckT2Echo", type: "qubit" }, 
+  t2_echo: { name: "CheckT2Echo", type: "qubit" },
   t2_star: { name: "CheckRamsey", type: "qubit" },
   gate_fidelity: { name: "RandomizedBenchmarking", type: "qubit" },
   x90_fidelity: { name: "X90InterleavedRandomizedBenchmarking", type: "qubit" },
-  x180_fidelity: { name: "X180InterleavedRandomizedBenchmarking", type: "qubit" },
-  zx90_fidelity: { name: "ZX90InterleavedRandomizedBenchmarking", type: "coupling" },
+  x180_fidelity: {
+    name: "X180InterleavedRandomizedBenchmarking",
+    type: "qubit",
+  },
+  zx90_fidelity: {
+    name: "ZX90InterleavedRandomizedBenchmarking",
+    type: "coupling",
+  },
   readout_fidelity: { name: "ReadoutClassification", type: "qubit" },
 };
 
 // Parameter configuration: labels and directionality
-const PARAMETER_CONFIG: Record<string, { 
-  label: string; 
-  higherIsBetter: boolean;
-  unit: string;
-  displayUnit: string;
-}> = {
-  t1: { label: "T1 Coherence", higherIsBetter: true, unit: "µs", displayUnit: "µs" },
-  t2_echo: { label: "T2 Echo", higherIsBetter: true, unit: "µs", displayUnit: "µs" },
-  t2_star: { label: "T2 Star", higherIsBetter: true, unit: "µs", displayUnit: "µs" },
-  gate_fidelity: { label: "Gate Fidelity (Clifford RB)", higherIsBetter: true, unit: "fidelity", displayUnit: "fidelity" },
-  x90_fidelity: { label: "X90 Gate Fidelity", higherIsBetter: true, unit: "fidelity", displayUnit: "fidelity" },
-  x180_fidelity: { label: "X180 Gate Fidelity", higherIsBetter: true, unit: "fidelity", displayUnit: "fidelity" },
-  zx90_fidelity: { label: "ZX90 Gate Fidelity (2Q)", higherIsBetter: true, unit: "fidelity", displayUnit: "fidelity" },
-  readout_fidelity: { label: "Readout Fidelity", higherIsBetter: true, unit: "fidelity", displayUnit: "fidelity" },
+const PARAMETER_CONFIG: Record<
+  string,
+  {
+    label: string;
+    higherIsBetter: boolean;
+    unit: string;
+    displayUnit: string;
+  }
+> = {
+  t1: {
+    label: "T1 Coherence",
+    higherIsBetter: true,
+    unit: "µs",
+    displayUnit: "µs",
+  },
+  t2_echo: {
+    label: "T2 Echo",
+    higherIsBetter: true,
+    unit: "µs",
+    displayUnit: "µs",
+  },
+  t2_star: {
+    label: "T2 Star",
+    higherIsBetter: true,
+    unit: "µs",
+    displayUnit: "µs",
+  },
+  gate_fidelity: {
+    label: "Gate Fidelity (Clifford RB)",
+    higherIsBetter: true,
+    unit: "fidelity",
+    displayUnit: "fidelity",
+  },
+  x90_fidelity: {
+    label: "X90 Gate Fidelity",
+    higherIsBetter: true,
+    unit: "fidelity",
+    displayUnit: "fidelity",
+  },
+  x180_fidelity: {
+    label: "X180 Gate Fidelity",
+    higherIsBetter: true,
+    unit: "fidelity",
+    displayUnit: "fidelity",
+  },
+  zx90_fidelity: {
+    label: "ZX90 Gate Fidelity (2Q)",
+    higherIsBetter: true,
+    unit: "fidelity",
+    displayUnit: "fidelity",
+  },
+  readout_fidelity: {
+    label: "Readout Fidelity",
+    higherIsBetter: true,
+    unit: "fidelity",
+    displayUnit: "fidelity",
+  },
 };
 
 // Output parameter names for each task
 const OUTPUT_PARAM_NAMES: Record<string, string> = {
   t1: "t1",
-  t2_echo: "t2_echo", 
+  t2_echo: "t2_echo",
   t2_star: "t2_star",
   gate_fidelity: "average_gate_fidelity",
   x90_fidelity: "x90_gate_fidelity",
@@ -69,9 +127,9 @@ export function CumulativeView() {
 
   // Available parameters for the cumulative distribution analysis
   // Map parameter keys to human-readable labels for the selector
-  const availableParameters = Object.keys(TASK_CONFIG).map(key => ({
+  const availableParameters = Object.keys(TASK_CONFIG).map((key) => ({
     value: key,
-    label: PARAMETER_CONFIG[key].label
+    label: PARAMETER_CONFIG[key].label,
   }));
 
   // Fetch chips data for default selection
@@ -109,17 +167,18 @@ export function CumulativeView() {
     data: latestQubitTaskResponse,
     isLoading: isLoadingLatestQubit,
     error: errorLatestQubit,
-  } = useFetchLatestQubitTaskGroupedByChip(
-    selectedChip,
-    taskName || "",
-    {
-      query: {
-        enabled: Boolean(selectedChip && taskName && taskType === 'qubit' && selectedDate === 'latest'),
-        refetchInterval: selectedDate === 'latest' ? 30000 : undefined,
-        staleTime: 25000,
-      },
-    }
-  );
+  } = useFetchLatestQubitTaskGroupedByChip(selectedChip, taskName || "", {
+    query: {
+      enabled: Boolean(
+        selectedChip &&
+          taskName &&
+          taskType === "qubit" &&
+          selectedDate === "latest",
+      ),
+      refetchInterval: selectedDate === "latest" ? 30000 : undefined,
+      staleTime: 25000,
+    },
+  });
 
   const {
     data: dateQubitTaskResponse,
@@ -131,10 +190,15 @@ export function CumulativeView() {
     selectedDate,
     {
       query: {
-        enabled: Boolean(selectedChip && taskName && taskType === 'qubit' && selectedDate !== 'latest'),
+        enabled: Boolean(
+          selectedChip &&
+            taskName &&
+            taskType === "qubit" &&
+            selectedDate !== "latest",
+        ),
         staleTime: 60000, // Historical data can be cached longer
       },
-    }
+    },
   );
 
   // Fetch calibration data for couplings (latest or date-specific)
@@ -142,17 +206,18 @@ export function CumulativeView() {
     data: latestCouplingTaskResponse,
     isLoading: isLoadingLatestCoupling,
     error: errorLatestCoupling,
-  } = useFetchLatestCouplingTaskGroupedByChip(
-    selectedChip,
-    taskName || "",
-    {
-      query: {
-        enabled: Boolean(selectedChip && taskName && taskType === 'coupling' && selectedDate === 'latest'),
-        refetchInterval: selectedDate === 'latest' ? 30000 : undefined,
-        staleTime: 25000,
-      },
-    }
-  );
+  } = useFetchLatestCouplingTaskGroupedByChip(selectedChip, taskName || "", {
+    query: {
+      enabled: Boolean(
+        selectedChip &&
+          taskName &&
+          taskType === "coupling" &&
+          selectedDate === "latest",
+      ),
+      refetchInterval: selectedDate === "latest" ? 30000 : undefined,
+      staleTime: 25000,
+    },
+  });
 
   const {
     data: dateCouplingTaskResponse,
@@ -164,37 +229,68 @@ export function CumulativeView() {
     selectedDate,
     {
       query: {
-        enabled: Boolean(selectedChip && taskName && taskType === 'coupling' && selectedDate !== 'latest'),
+        enabled: Boolean(
+          selectedChip &&
+            taskName &&
+            taskType === "coupling" &&
+            selectedDate !== "latest",
+        ),
         staleTime: 60000, // Historical data can be cached longer
       },
-    }
+    },
   );
 
   // Combine responses and states based on selected date
   const taskResponse = useMemo(() => {
-    if (selectedDate === 'latest') {
-      return taskType === 'qubit' ? latestQubitTaskResponse : latestCouplingTaskResponse;
+    if (selectedDate === "latest") {
+      return taskType === "qubit"
+        ? latestQubitTaskResponse
+        : latestCouplingTaskResponse;
     } else {
-      return taskType === 'qubit' ? dateQubitTaskResponse : dateCouplingTaskResponse;
+      return taskType === "qubit"
+        ? dateQubitTaskResponse
+        : dateCouplingTaskResponse;
     }
-  }, [selectedDate, taskType, latestQubitTaskResponse, latestCouplingTaskResponse, dateQubitTaskResponse, dateCouplingTaskResponse]);
+  }, [
+    selectedDate,
+    taskType,
+    latestQubitTaskResponse,
+    latestCouplingTaskResponse,
+    dateQubitTaskResponse,
+    dateCouplingTaskResponse,
+  ]);
 
   const isLoading = useMemo(() => {
-    if (selectedDate === 'latest') {
-      return taskType === 'qubit' ? isLoadingLatestQubit : isLoadingLatestCoupling;
+    if (selectedDate === "latest") {
+      return taskType === "qubit"
+        ? isLoadingLatestQubit
+        : isLoadingLatestCoupling;
     } else {
-      return taskType === 'qubit' ? isLoadingDateQubit : isLoadingDateCoupling;
+      return taskType === "qubit" ? isLoadingDateQubit : isLoadingDateCoupling;
     }
-  }, [selectedDate, taskType, isLoadingLatestQubit, isLoadingLatestCoupling, isLoadingDateQubit, isLoadingDateCoupling]);
+  }, [
+    selectedDate,
+    taskType,
+    isLoadingLatestQubit,
+    isLoadingLatestCoupling,
+    isLoadingDateQubit,
+    isLoadingDateCoupling,
+  ]);
 
   const error = useMemo(() => {
-    if (selectedDate === 'latest') {
-      return taskType === 'qubit' ? errorLatestQubit : errorLatestCoupling;
+    if (selectedDate === "latest") {
+      return taskType === "qubit" ? errorLatestQubit : errorLatestCoupling;
     } else {
-      return taskType === 'qubit' ? errorDateQubit : errorDateCoupling;
+      return taskType === "qubit" ? errorDateQubit : errorDateCoupling;
     }
-  }, [selectedDate, taskType, errorLatestQubit, errorLatestCoupling, errorDateQubit, errorDateCoupling]);
-
+  }, [
+    selectedDate,
+    taskType,
+    errorLatestQubit,
+    errorLatestCoupling,
+    errorDateQubit,
+    errorDateCoupling,
+  ]);
 
   // Show error if task name is not found
   if (!taskName && selectedParameter) {
@@ -208,9 +304,19 @@ export function CumulativeView() {
   }
 
   // Process data for cumulative distribution
-  const { plotData, tableData, median, mean, percentile10, percentile90, yieldPercent, avgR2, avgError } = useMemo(() => {
+  const {
+    plotData,
+    tableData,
+    median,
+    mean,
+    percentile10,
+    percentile90,
+    yieldPercent,
+    avgR2,
+    avgError,
+  } = useMemo(() => {
     // Debug logging for CumulativeView
-    console.log('CumulativeView Debug:', {
+    console.log("CumulativeView Debug:", {
       selectedChip,
       selectedParameter,
       selectedDate,
@@ -220,69 +326,102 @@ export function CumulativeView() {
       hasTaskResponse: !!taskResponse,
       hasData: !!taskResponse?.data,
       hasResult: !!taskResponse?.data?.result,
-      resultKeys: taskResponse?.data?.result ? Object.keys(taskResponse.data.result) : [],
-      sampleResult: taskResponse?.data?.result ? Object.entries(taskResponse.data.result).slice(0, 2) : []
+      resultKeys: taskResponse?.data?.result
+        ? Object.keys(taskResponse.data.result)
+        : [],
+      sampleResult: taskResponse?.data?.result
+        ? Object.entries(taskResponse.data.result).slice(0, 2)
+        : [],
     });
 
     if (!taskResponse?.data?.result) {
-      return { plotData: [], tableData: [], median: null, mean: null, percentile10: null, percentile90: null, yieldPercent: null, avgR2: null, avgError: null };
+      return {
+        plotData: [],
+        tableData: [],
+        median: null,
+        mean: null,
+        percentile10: null,
+        percentile90: null,
+        yieldPercent: null,
+        avgR2: null,
+        avgError: null,
+      };
     }
 
     // Collect all latest values from each qubit with error information
-    const allValues: { value: number; qid: string; error?: number; r2?: number }[] = [];
-    
+    const allValues: {
+      value: number;
+      qid: string;
+      error?: number;
+      r2?: number;
+    }[] = [];
+
     Object.entries(taskResponse.data.result).forEach(([qid, taskResult]) => {
       if (taskResult?.output_parameters) {
         const paramValue = taskResult.output_parameters[outputParamName];
-        
+
         // Debug each parameter value
         console.log(`CumulativeView Debug ${qid}:`, {
           outputParamName,
           paramValue,
           valueType: typeof paramValue,
           hasOutputParams: !!taskResult?.output_parameters,
-          outputParamKeys: Object.keys(taskResult.output_parameters)
+          outputParamKeys: Object.keys(taskResult.output_parameters),
         });
-        
+
         if (paramValue !== null && paramValue !== undefined) {
           let value: number;
-          
+
           // Handle different data structures
-          if (typeof paramValue === 'number') {
+          if (typeof paramValue === "number") {
             value = paramValue;
-          } else if (typeof paramValue === 'string') {
+          } else if (typeof paramValue === "string") {
             value = Number(paramValue);
-          } else if (typeof paramValue === 'object' && paramValue !== null) {
+          } else if (typeof paramValue === "object" && paramValue !== null) {
             // Handle nested object with value property (e.g., {value: 123, error: 0.1})
-            if ('value' in paramValue && typeof paramValue.value === 'number') {
+            if ("value" in paramValue && typeof paramValue.value === "number") {
               value = paramValue.value;
-            } else if ('mean' in paramValue && typeof paramValue.mean === 'number') {
+            } else if (
+              "mean" in paramValue &&
+              typeof paramValue.mean === "number"
+            ) {
               value = paramValue.mean;
-            } else if ('result' in paramValue && typeof paramValue.result === 'number') {
+            } else if (
+              "result" in paramValue &&
+              typeof paramValue.result === "number"
+            ) {
               value = paramValue.result;
             } else {
-              console.warn(`Unknown object structure for ${selectedParameter}:`, paramValue);
+              console.warn(
+                `Unknown object structure for ${selectedParameter}:`,
+                paramValue,
+              );
               return;
             }
           } else {
-            console.warn(`Cannot process value type for ${selectedParameter}:`, typeof paramValue);
+            console.warn(
+              `Cannot process value type for ${selectedParameter}:`,
+              typeof paramValue,
+            );
             return;
           }
-          
+
           // Extract error information if available
           let errorValue: number | undefined = undefined;
           const errorParamName = `${outputParamName}_err`;
-          if (taskResult.output_parameters[errorParamName] !== null && 
-              taskResult.output_parameters[errorParamName] !== undefined) {
+          if (
+            taskResult.output_parameters[errorParamName] !== null &&
+            taskResult.output_parameters[errorParamName] !== undefined
+          ) {
             errorValue = Number(taskResult.output_parameters[errorParamName]);
           }
-          
+
           // Note: R² values are not available in the current API schema
           let r2Value: number | undefined = undefined;
-          
+
           // No unit conversion needed - data is already in correct units
           // Note: We keep fidelities as-is (higher is better) for proper survival function
-          
+
           // Data quality filter: reject if value is invalid
           if (!isNaN(value) && value > 0) {
             allValues.push({ value, qid, error: errorValue, r2: r2Value });
@@ -292,12 +431,22 @@ export function CumulativeView() {
     });
 
     if (allValues.length === 0) {
-      return { plotData: [], tableData: [], median: null, mean: null, percentile10: null, percentile90: null, yieldPercent: null, avgR2: null, avgError: null };
+      return {
+        plotData: [],
+        tableData: [],
+        median: null,
+        mean: null,
+        percentile10: null,
+        percentile90: null,
+        yieldPercent: null,
+        avgR2: null,
+        avgError: null,
+      };
     }
 
     // Sort values for CDF calculation
     const sortedValues = [...allValues].sort((a, b) => a.value - b.value);
-    
+
     // Calculate CDF and survival function
     const cdfData: CumulativeDataPoint[] = sortedValues.map((item, index) => ({
       value: item.value,
@@ -309,24 +458,35 @@ export function CumulativeView() {
     }));
 
     // Calculate statistics
-    const valuesOnly = sortedValues.map(item => item.value);
+    const valuesOnly = sortedValues.map((item) => item.value);
     const medianValue = valuesOnly[Math.floor(valuesOnly.length / 2)];
-    const meanValue = valuesOnly.reduce((sum, val) => sum + val, 0) / valuesOnly.length;
+    const meanValue =
+      valuesOnly.reduce((sum, val) => sum + val, 0) / valuesOnly.length;
     const percentile10Value = valuesOnly[Math.floor(valuesOnly.length * 0.1)];
     const percentile90Value = valuesOnly[Math.floor(valuesOnly.length * 0.9)];
-    
+
     // Calculate average R² and error for quality metrics
-    const r2Values = sortedValues.filter(item => item.r2 !== undefined).map(item => item.r2!);
-    const avgR2Value = r2Values.length > 0 ? r2Values.reduce((sum, r2) => sum + r2, 0) / r2Values.length : null;
-    
-    const errorValues = sortedValues.filter(item => item.error !== undefined).map(item => item.error!);
-    const avgErrorValue = errorValues.length > 0 ? errorValues.reduce((sum, err) => sum + err, 0) / errorValues.length : null;
-    
+    const r2Values = sortedValues
+      .filter((item) => item.r2 !== undefined)
+      .map((item) => item.r2!);
+    const avgR2Value =
+      r2Values.length > 0
+        ? r2Values.reduce((sum, r2) => sum + r2, 0) / r2Values.length
+        : null;
+
+    const errorValues = sortedValues
+      .filter((item) => item.error !== undefined)
+      .map((item) => item.error!);
+    const avgErrorValue =
+      errorValues.length > 0
+        ? errorValues.reduce((sum, err) => sum + err, 0) / errorValues.length
+        : null;
+
     // Calculate yield based on parameter-specific thresholds (coherence-limited)
     // These thresholds are based on realistic quantum error correction requirements
     const thresholds = {
       t1: 100, // 100µs - minimum for error correction protocols
-      t2_echo: 200, // 200µs - echo can extend T2 significantly  
+      t2_echo: 200, // 200µs - echo can extend T2 significantly
       t2_star: 50, // 50µs - dephasing limited
       gate_fidelity: 0.999, // 99.9% - threshold for QEC (surface code)
       x90_fidelity: 0.9999, // 99.99% - single qubit gates should be very high
@@ -336,24 +496,28 @@ export function CumulativeView() {
     };
     const threshold = thresholds[selectedParameter as keyof typeof thresholds];
     const paramConfig = PARAMETER_CONFIG[selectedParameter];
-    const yieldCount = threshold ? valuesOnly.filter(v => 
-      paramConfig.higherIsBetter ? v >= threshold : v <= threshold
-    ).length : 0;
-    const yieldValue = threshold ? (yieldCount / valuesOnly.length) * 100 : null;
+    const yieldCount = threshold
+      ? valuesOnly.filter((v) =>
+          paramConfig.higherIsBetter ? v >= threshold : v <= threshold,
+        ).length
+      : 0;
+    const yieldValue = threshold
+      ? (yieldCount / valuesOnly.length) * 100
+      : null;
 
     // Use survival function for "higher is better" metrics, CDF for "lower is better"
     const useSurvival = paramConfig.higherIsBetter;
-    
-    // Create step plot data for Plotly  
+
+    // Create step plot data for Plotly
     const xValues: number[] = [];
     const yValues: number[] = [];
-    
+
     // Add starting point
     if (cdfData.length > 0) {
       xValues.push(cdfData[0].value);
       yValues.push(useSurvival ? 1 : 0);
     }
-    
+
     // Add steps
     cdfData.forEach((point) => {
       xValues.push(point.value);
@@ -363,64 +527,63 @@ export function CumulativeView() {
     const plotTrace = {
       x: xValues,
       y: yValues,
-      type: 'scatter' as const,
-      mode: 'lines' as const,
+      type: "scatter" as const,
+      mode: "lines" as const,
       line: {
-        shape: 'hv' as const, // Horizontal-vertical step
+        shape: "hv" as const, // Horizontal-vertical step
         width: 2,
-        color: '#3b82f6',
+        color: "#3b82f6",
       },
       name: PARAMETER_CONFIG[selectedParameter].label,
-      hovertemplate: 
-        'Value: %{x:.4f}<br>' +
-        (useSurvival ? 'P(X ≥ value): %{y:.2%}' : 'P(X ≤ value): %{y:.2%}') + '<br>' +
-        '<extra></extra>',
+      hovertemplate:
+        "Value: %{x:.4f}<br>" +
+        (useSurvival ? "P(X ≥ value): %{y:.2%}" : "P(X ≤ value): %{y:.2%}") +
+        "<br>" +
+        "<extra></extra>",
     };
 
     // Add median line
     const medianTrace = {
       x: [medianValue, medianValue],
       y: [0, 1],
-      type: 'scatter' as const,
-      mode: 'lines' as const,
+      type: "scatter" as const,
+      mode: "lines" as const,
       line: {
-        color: 'red',
+        color: "red",
         width: 2,
-        dash: 'dash' as const,
+        dash: "dash" as const,
       },
       name: `Median: ${medianValue.toFixed(4)}`,
-      hovertemplate: 
-        'Median: %{x:.4f}<br>' +
-        '<extra></extra>',
+      hovertemplate: "Median: %{x:.4f}<br>" + "<extra></extra>",
     };
 
     // Add percentile lines
     const p10Trace = {
       x: [percentile10Value, percentile10Value],
       y: [0, 1],
-      type: 'scatter' as const,
-      mode: 'lines' as const,
+      type: "scatter" as const,
+      mode: "lines" as const,
       line: {
-        color: 'orange',
+        color: "orange",
         width: 1,
-        dash: 'dot' as const,
+        dash: "dot" as const,
       },
       name: `P10: ${percentile10Value.toFixed(4)}`,
-      hovertemplate: '10th Percentile: %{x:.4f}<br><extra></extra>',
+      hovertemplate: "10th Percentile: %{x:.4f}<br><extra></extra>",
     };
 
     const p90Trace = {
       x: [percentile90Value, percentile90Value],
       y: [0, 1],
-      type: 'scatter' as const,
-      mode: 'lines' as const,
+      type: "scatter" as const,
+      mode: "lines" as const,
       line: {
-        color: 'orange',
+        color: "orange",
         width: 1,
-        dash: 'dot' as const,
+        dash: "dot" as const,
       },
       name: `P90: ${percentile90Value.toFixed(4)}`,
-      hovertemplate: '90th Percentile: %{x:.4f}<br><extra></extra>',
+      hovertemplate: "90th Percentile: %{x:.4f}<br><extra></extra>",
     };
 
     return {
@@ -438,81 +601,94 @@ export function CumulativeView() {
 
   // CSV Export
   const { exportToCSV } = useCSVExport();
-  
+
   const handleExportCSV = () => {
     if (tableData.length === 0) return;
-    
+
     const headers = [
-      'Entity_ID', 'Value', 'Error', 'CDF', 'Survival_Function', 
-      'R_squared', 'Parameter', 'Task', 'Entity_Type', 'Timestamp'
+      "Entity_ID",
+      "Value",
+      "Error",
+      "CDF",
+      "Survival_Function",
+      "R_squared",
+      "Parameter",
+      "Task",
+      "Entity_Type",
+      "Timestamp",
     ];
     const timestamp = new Date().toISOString();
-    const rows = tableData.map(row => [
+    const rows = tableData.map((row) => [
       row.qid,
       String(row.value.toFixed(6)),
-      row.error !== undefined ? String(row.error.toFixed(6)) : 'N/A',
+      row.error !== undefined ? String(row.error.toFixed(6)) : "N/A",
       String(row.cdf.toFixed(6)),
       String(row.survivalFunction.toFixed(6)),
-      row.r2 !== undefined ? String(row.r2.toFixed(6)) : 'N/A',
+      row.r2 !== undefined ? String(row.r2.toFixed(6)) : "N/A",
       selectedParameter,
       taskName,
-      taskType === 'coupling' ? 'coupling_pair' : 'qubit',
+      taskType === "coupling" ? "coupling_pair" : "qubit",
       timestamp,
     ]);
-    
-    const dateStr = selectedDate === 'latest' ? 'latest' : selectedDate;
-    const filename = `cumulative_${selectedParameter}_${selectedChip}_${dateStr}_${timestamp.slice(0, 19).replace(/[:-]/g, '')}.csv`;
-    
+
+    const dateStr = selectedDate === "latest" ? "latest" : selectedDate;
+    const filename = `cumulative_${selectedParameter}_${selectedChip}_${dateStr}_${timestamp.slice(0, 19).replace(/[:-]/g, "")}.csv`;
+
     exportToCSV({ filename, headers, data: rows });
   };
 
-  // Get parameter configuration for display  
+  // Get parameter configuration for display
   const currentParamConfig = PARAMETER_CONFIG[selectedParameter];
   const useSurvivalFunction = currentParamConfig.higherIsBetter;
 
   const layout = {
     title: {
-      text: `${useSurvivalFunction ? 'Survival Function' : 'Cumulative Distribution Function'} - ${currentParamConfig.label}`,
+      text: `${useSurvivalFunction ? "Survival Function" : "Cumulative Distribution Function"} - ${currentParamConfig.label}`,
       font: { size: 18 },
     },
     xaxis: {
-      title: `${currentParamConfig.label}${currentParamConfig.displayUnit !== 'fidelity' ? ` (${currentParamConfig.displayUnit})` : ''}`,
-      gridcolor: '#e5e7eb',
+      title: `${currentParamConfig.label}${currentParamConfig.displayUnit !== "fidelity" ? ` (${currentParamConfig.displayUnit})` : ""}`,
+      gridcolor: "#e5e7eb",
       showgrid: true,
       zeroline: false,
       // Use log scale for fidelity metrics when showing as error rates
-      ...(currentParamConfig.unit === 'fidelity' && !useSurvivalFunction && { type: 'log' as const }),
+      ...(currentParamConfig.unit === "fidelity" &&
+        !useSurvivalFunction && { type: "log" as const }),
     },
     yaxis: {
-      title: useSurvivalFunction ? 'P(X ≥ value)' : 'P(X ≤ value)',
-      gridcolor: '#e5e7eb',
+      title: useSurvivalFunction ? "P(X ≥ value)" : "P(X ≤ value)",
+      gridcolor: "#e5e7eb",
       showgrid: true,
       zeroline: false,
       range: [0, 1],
     },
-    hovermode: 'closest' as const,
+    hovermode: "closest" as const,
     showlegend: true,
     legend: {
       x: 0.02,
       y: 0.98,
-      bgcolor: 'rgba(255, 255, 255, 0.8)',
-      bordercolor: '#e5e7eb',
+      bgcolor: "rgba(255, 255, 255, 0.8)",
+      bordercolor: "#e5e7eb",
       borderwidth: 1,
     },
     margin: { t: 60, r: 50, b: 50, l: 80 },
-    plot_bgcolor: '#ffffff',
-    paper_bgcolor: '#ffffff',
-    annotations: taskResponse?.data ? [{
-      text: `Data snapshot: ${selectedDate === 'latest' ? 'Latest calibration' : `Date: ${formatDate(selectedDate)}`}<br>Sample size: ${Object.keys(taskResponse.data.result).length} ${taskType === 'coupling' ? 'coupling pairs' : 'qubits'}`,
-      showarrow: false,
-      xref: 'paper' as const,
-      yref: 'paper' as const,
-      x: 0.02,
-      y: -0.15,
-      xanchor: 'left' as const,
-      yanchor: 'top' as const,
-      font: { size: 11, color: '#666' }
-    }] : [],
+    plot_bgcolor: "#ffffff",
+    paper_bgcolor: "#ffffff",
+    annotations: taskResponse?.data
+      ? [
+          {
+            text: `Data snapshot: ${selectedDate === "latest" ? "Latest calibration" : `Date: ${formatDate(selectedDate)}`}<br>Sample size: ${Object.keys(taskResponse.data.result).length} ${taskType === "coupling" ? "coupling pairs" : "qubits"}`,
+            showarrow: false,
+            xref: "paper" as const,
+            yref: "paper" as const,
+            x: 0.02,
+            y: -0.15,
+            xanchor: "left" as const,
+            yanchor: "top" as const,
+            font: { size: 11, color: "#666" },
+          },
+        ]
+      : [],
   };
 
   if (error) {
@@ -580,15 +756,21 @@ export function CumulativeView() {
                 <span className="label-text font-semibold">Parameter</span>
                 {currentParamConfig.label && (
                   <span className="text-xs text-gray-500">
-                    {useSurvivalFunction ? 'Survival Function (P(X ≥ value))' : 'CDF (P(X ≤ value))'}
+                    {useSurvivalFunction
+                      ? "Survival Function (P(X ≥ value))"
+                      : "CDF (P(X ≤ value))"}
                   </span>
                 )}
               </div>
               <div className="h-10">
                 <Select<{ value: string; label: string }>
                   options={availableParameters}
-                  value={availableParameters.find(option => option.value === selectedParameter)}
-                  onChange={(option: SingleValue<{ value: string; label: string }>) => {
+                  value={availableParameters.find(
+                    (option) => option.value === selectedParameter,
+                  )}
+                  onChange={(
+                    option: SingleValue<{ value: string; label: string }>,
+                  ) => {
                     if (option) {
                       setSelectedParameter(option.value);
                     }
@@ -598,23 +780,23 @@ export function CumulativeView() {
                   styles={{
                     control: (base) => ({
                       ...base,
-                      minHeight: '40px',
-                      height: '40px',
-                      borderRadius: '0.5rem'
+                      minHeight: "40px",
+                      height: "40px",
+                      borderRadius: "0.5rem",
                     }),
                     valueContainer: (base) => ({
                       ...base,
-                      height: '40px',
-                      padding: '0 8px'
+                      height: "40px",
+                      padding: "0 8px",
                     }),
                     input: (base) => ({
                       ...base,
-                      margin: '0px',
-                      padding: '0px'
+                      margin: "0px",
+                      padding: "0px",
                     }),
                     indicatorsContainer: (base) => ({
                       ...base,
-                      height: '40px'
+                      height: "40px",
                     }),
                   }}
                 />
@@ -646,7 +828,9 @@ export function CumulativeView() {
                 <div className="stat-value text-info text-sm">
                   {Object.keys(taskResponse.data.result).length}
                 </div>
-                <div className="stat-desc">Total {taskType === 'coupling' ? 'pairs' : 'qubits'}</div>
+                <div className="stat-desc">
+                  Total {taskType === "coupling" ? "pairs" : "qubits"}
+                </div>
               </div>
               <div className="stat">
                 <div className="stat-title">N_valid</div>
@@ -658,7 +842,8 @@ export function CumulativeView() {
               <div className="stat">
                 <div className="stat-title">N_disabled</div>
                 <div className="stat-value text-warning text-sm">
-                  {Object.keys(taskResponse.data.result).length - tableData.length}
+                  {Object.keys(taskResponse.data.result).length -
+                    tableData.length}
                 </div>
                 <div className="stat-desc">Missing/invalid data</div>
               </div>
@@ -733,23 +918,35 @@ export function CumulativeView() {
             title="Data Points"
             data={tableData}
             columns={[
-              { key: 'qid', label: 'Qubit ID', sortable: true },
-              { 
-                key: 'value', 
-                label: 'Value', 
-                sortable: true, 
+              { key: "qid", label: "Qubit ID", sortable: true },
+              {
+                key: "value",
+                label: "Value",
+                sortable: true,
                 render: (v: number, row: CumulativeDataPoint) => {
-                  const errorStr = row.error !== undefined ? ` ± ${row.error.toFixed(6)}` : '';
+                  const errorStr =
+                    row.error !== undefined ? ` ± ${row.error.toFixed(6)}` : "";
                   return `${v.toFixed(6)}${errorStr}`;
-                }
+                },
               },
-              { key: 'cdf', label: 'CDF', sortable: true, render: (v: number) => (v * 100).toFixed(2) + '%' },
-              { key: 'survivalFunction', label: 'Survival', sortable: true, render: (v: number) => (v * 100).toFixed(2) + '%' },
-              { 
-                key: 'r2', 
-                label: 'R²', 
-                sortable: true, 
-                render: (v: number | undefined) => v !== undefined ? v.toFixed(3) : 'N/A'
+              {
+                key: "cdf",
+                label: "CDF",
+                sortable: true,
+                render: (v: number) => (v * 100).toFixed(2) + "%",
+              },
+              {
+                key: "survivalFunction",
+                label: "Survival",
+                sortable: true,
+                render: (v: number) => (v * 100).toFixed(2) + "%",
+              },
+              {
+                key: "r2",
+                label: "R²",
+                sortable: true,
+                render: (v: number | undefined) =>
+                  v !== undefined ? v.toFixed(3) : "N/A",
               },
             ]}
             pageSize={10}

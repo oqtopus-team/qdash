@@ -5,7 +5,10 @@ import { Layout } from "plotly.js";
 import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TagSelector } from "@/app/components/TagSelector";
 import { useTimeRange } from "@/shared/hooks/useTimeRange";
-import { useQubitTimeseries, useQubitParameters } from "../hooks/useQubitTimeseries";
+import {
+  useQubitTimeseries,
+  useQubitParameters,
+} from "../hooks/useQubitTimeseries";
 import { useCSVExport } from "@/shared/hooks/useCSVExport";
 import { useQubitTimeSeriesUrlState } from "@/app/hooks/useUrlState";
 import { TimeRangeControls } from "./TimeRangeControls";
@@ -19,7 +22,10 @@ interface QubitTimeSeriesViewProps {
   qubitId: string;
 }
 
-export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProps) {
+export function QubitTimeSeriesView({
+  chipId,
+  qubitId,
+}: QubitTimeSeriesViewProps) {
   // URL state management for parameter and tag selection
   const {
     selectedParameter,
@@ -27,7 +33,7 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
     setSelectedParameter,
     setSelectedTag,
   } = useQubitTimeSeriesUrlState();
-  
+
   // Time range management with manual refresh
   const {
     timeRange,
@@ -38,31 +44,34 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
     refreshTimeRange,
   } = useTimeRange({ initialDays: 30 });
 
-
   // Fetch parameters and tags
-  const { parameters, tags, isLoading: isLoadingMeta, error: metaError } = useQubitParameters();
+  const {
+    parameters,
+    tags,
+    isLoading: isLoadingMeta,
+    error: metaError,
+  } = useQubitParameters();
 
   // Fetch time series data
-  const {
-    tableData,
-    plotData,
-    metadata,
-    isLoading,
-    error,
-    refetch,
-  } = useQubitTimeseries({
-    chipId,
-    qubitId,
-    parameter: selectedParameter as ParameterKey,
-    tag: selectedTag as TagKey,
-    timeRange,
-  });
+  const { tableData, plotData, metadata, isLoading, error, refetch } =
+    useQubitTimeseries({
+      chipId,
+      qubitId,
+      parameter: selectedParameter as ParameterKey,
+      tag: selectedTag as TagKey,
+      timeRange,
+    });
 
   // CSV export functionality
   const { exportTimeSeriesCSV } = useCSVExport();
 
   const handleDownloadCSV = () => {
-    exportTimeSeriesCSV(tableData, selectedParameter as ParameterKey, chipId, selectedTag as TagKey);
+    exportTimeSeriesCSV(
+      tableData,
+      selectedParameter as ParameterKey,
+      chipId,
+      selectedTag as TagKey,
+    );
   };
 
   // Manual refresh handler
@@ -72,32 +81,35 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
   };
 
   // Plot layout configuration
-  const layout = useMemo<Partial<Layout>>(() => ({
-    title: {
-      text: `${selectedParameter} Time Series - Qubit ${qubitId}`,
-      font: { size: 20 },
-    },
-    xaxis: {
-      title: "Time",
-      type: "date",
-      tickformat: "%Y-%m-%d %H:%M",
-      gridcolor: "#eee",
-      zeroline: false,
-    },
-    yaxis: {
-      title: `${metadata.description} [${metadata.unit}]`,
-      type: "linear",
-      gridcolor: "#eee",
-      zeroline: false,
-      exponentformat: "e" as const,
-    },
-    showlegend: false,
-    autosize: true,
-    margin: { l: 80, r: 50, t: 60, b: 80 },
-    plot_bgcolor: "white",
-    paper_bgcolor: "white",
-    hovermode: "closest",
-  }), [selectedParameter, qubitId, metadata]);
+  const layout = useMemo<Partial<Layout>>(
+    () => ({
+      title: {
+        text: `${selectedParameter} Time Series - Qubit ${qubitId}`,
+        font: { size: 20 },
+      },
+      xaxis: {
+        title: "Time",
+        type: "date",
+        tickformat: "%Y-%m-%d %H:%M",
+        gridcolor: "#eee",
+        zeroline: false,
+      },
+      yaxis: {
+        title: `${metadata.description} [${metadata.unit}]`,
+        type: "linear",
+        gridcolor: "#eee",
+        zeroline: false,
+        exponentformat: "e" as const,
+      },
+      showlegend: false,
+      autosize: true,
+      margin: { l: 80, r: 50, t: 60, b: 80 },
+      plot_bgcolor: "white",
+      paper_bgcolor: "white",
+      hovermode: "closest",
+    }),
+    [selectedParameter, qubitId, metadata],
+  );
 
   // Error handling
   if (metaError || error) {
@@ -159,13 +171,15 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
             Refresh
           </button>
         </div>
-        
+
         <div className="grid grid-cols-2 gap-12">
           <ParameterSelector
             label="Parameter"
             parameters={parameters}
             selectedParameter={selectedParameter}
-            onParameterSelect={(param) => setSelectedParameter(param as ParameterKey)}
+            onParameterSelect={(param) =>
+              setSelectedParameter(param as ParameterKey)
+            }
             disabled={isLoadingMeta}
           />
           <TagSelector
@@ -175,7 +189,7 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
             disabled={isLoadingMeta}
           />
         </div>
-        
+
         <div className="mt-4">
           <TimeRangeControls
             timeRange={timeRange}
@@ -229,22 +243,34 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
         title="Data Table"
         data={tableData}
         columns={[
-          { key: 'time', label: 'Time', sortable: true, className: 'text-left' },
-          { 
-            key: 'value', 
-            label: 'Value', 
-            sortable: false, 
-            className: 'text-center',
-            render: (value: any) => typeof value === 'number' ? value.toFixed(4) : String(value)
+          {
+            key: "time",
+            label: "Time",
+            sortable: true,
+            className: "text-left",
           },
-          { 
-            key: 'error', 
-            label: 'Error', 
-            sortable: false, 
-            className: 'text-center',
-            render: (value: any) => value !== undefined ? `±${value.toFixed(4)}` : '-'
+          {
+            key: "value",
+            label: "Value",
+            sortable: false,
+            className: "text-center",
+            render: (value: any) =>
+              typeof value === "number" ? value.toFixed(4) : String(value),
           },
-          { key: 'unit', label: 'Unit', sortable: false, className: 'text-center' },
+          {
+            key: "error",
+            label: "Error",
+            sortable: false,
+            className: "text-center",
+            render: (value: any) =>
+              value !== undefined ? `±${value.toFixed(4)}` : "-",
+          },
+          {
+            key: "unit",
+            label: "Unit",
+            sortable: false,
+            className: "text-center",
+          },
         ]}
         searchable={false}
         actions={

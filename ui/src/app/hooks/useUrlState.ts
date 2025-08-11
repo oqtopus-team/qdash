@@ -58,7 +58,6 @@ interface UseQubitTimeSeriesUrlStateResult {
   isInitialized: boolean;
 }
 
-
 export function useChipUrlState(): UseChipUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -80,7 +79,10 @@ export function useChipUrlState(): UseChipUrlStateResult {
 
   const [viewMode, setViewModeState] = useQueryState("view", parseAsString);
 
-  const [qubitViewMode, setQubitViewModeState] = useQueryState("qview", parseAsString);
+  const [qubitViewMode, setQubitViewModeState] = useQueryState(
+    "qview",
+    parseAsString,
+  );
 
   // Mark as initialized after first render
   useEffect(() => {
@@ -183,7 +185,7 @@ export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
   );
 
   const [selectedTag, setSelectedTagState] = useQueryState(
-    "tag", 
+    "tag",
     parseAsString,
   );
 
@@ -251,15 +253,9 @@ export function useCorrelationUrlState(): UseCorrelationUrlStateResult {
     parseAsString,
   );
 
-  const [xAxis, setXAxisState] = useQueryState(
-    "xAxis",
-    parseAsString,
-  );
+  const [xAxis, setXAxisState] = useQueryState("xAxis", parseAsString);
 
-  const [yAxis, setYAxisState] = useQueryState(
-    "yAxis", 
-    parseAsString,
-  );
+  const [yAxis, setYAxisState] = useQueryState("yAxis", parseAsString);
 
   // Mark as initialized after first render
   useEffect(() => {
@@ -345,4 +341,3 @@ export function useQubitTimeSeriesUrlState(): UseQubitTimeSeriesUrlStateResult {
     isInitialized,
   };
 }
-

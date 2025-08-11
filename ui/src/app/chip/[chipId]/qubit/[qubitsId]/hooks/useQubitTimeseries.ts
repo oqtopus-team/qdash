@@ -1,8 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo } from "react";
 import { useFetchTimeseriesTaskResultByTagAndParameterAndQid } from "@/client/chip/chip";
 import { useFetchAllParameters } from "@/client/parameter/parameter";
 import { useListAllTag } from "@/client/tag/tag";
-import { ParameterKey, TagKey, TimeSeriesDataPoint, TimeRangeState } from '../types';
+import {
+  ParameterKey,
+  TagKey,
+  TimeSeriesDataPoint,
+  TimeRangeState,
+} from "../types";
 import { OutputParameterModel } from "@/schemas";
 
 interface UseQubitTimeseriesOptions {
@@ -59,10 +64,10 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
 
     return qubitData
       .map((point: OutputParameterModel) => ({
-        time: point.calibrated_at || '',
+        time: point.calibrated_at || "",
         value: point.value || 0,
         error: point.error,
-        unit: point.unit || 'a.u.',
+        unit: point.unit || "a.u.",
       }))
       .sort((a, b) => a.time.localeCompare(b.time)); // Use string comparison for ISO dates
   }, [timeseriesResponse?.data?.data, qubitId]);
@@ -75,48 +80,57 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
       const qubitData = timeseriesResponse.data.data[qubitId];
       if (!Array.isArray(qubitData)) return [];
 
-      const x = qubitData.map((point: OutputParameterModel) => point.calibrated_at || '');
+      const x = qubitData.map(
+        (point: OutputParameterModel) => point.calibrated_at || "",
+      );
       const y = qubitData.map((point: OutputParameterModel) => {
         const value = point.value;
-        if (typeof value === 'number') return value;
-        if (typeof value === 'string') {
+        if (typeof value === "number") return value;
+        if (typeof value === "string") {
           const parsed = Number(value);
           return isNaN(parsed) ? 0 : parsed;
         }
         return 0;
       });
-      const errorArray = qubitData.map((point: OutputParameterModel) => point.error || 0);
+      const errorArray = qubitData.map(
+        (point: OutputParameterModel) => point.error || 0,
+      );
 
-      return [{
-        x,
-        y,
-        error_y: {
-          type: 'data' as const,
-          array: errorArray as Plotly.Datum[],
-          visible: errorArray.some(e => e > 0),
+      return [
+        {
+          x,
+          y,
+          error_y: {
+            type: "data" as const,
+            array: errorArray as Plotly.Datum[],
+            visible: errorArray.some((e) => e > 0),
+          },
+          type: "scatter" as const,
+          mode: "lines+markers" as const,
+          name: `Qubit ${qubitId}`,
+          line: {
+            shape: "linear" as const,
+            width: 2,
+            color: "#3b82f6",
+          },
+          marker: {
+            size: 8,
+            symbol: "circle",
+            color: "#3b82f6",
+          },
+          hovertemplate:
+            "Time: %{x}<br>" +
+            "Value: %{y:.8f}" +
+            (errorArray.some((e) => e > 0)
+              ? "<br>Error: ±%{error_y.array:.8f}"
+              : "") +
+            "<br>Qubit: " +
+            qubitId +
+            "<extra></extra>",
         },
-        type: 'scatter' as const,
-        mode: 'lines+markers' as const,
-        name: `Qubit ${qubitId}`,
-        line: {
-          shape: 'linear' as const,
-          width: 2,
-          color: '#3b82f6',
-        },
-        marker: {
-          size: 8,
-          symbol: 'circle',
-          color: '#3b82f6',
-        },
-        hovertemplate:
-          'Time: %{x}<br>' +
-          'Value: %{y:.8f}' +
-          (errorArray.some(e => e > 0) ? '<br>Error: ±%{error_y.array:.8f}' : '') +
-          '<br>Qubit: ' + qubitId +
-          '<extra></extra>',
-      }];
+      ];
     } catch (error) {
-      console.error('Error processing plot data:', error);
+      console.error("Error processing plot data:", error);
       return [];
     }
   }, [timeseriesResponse?.data?.data, qubitId]);
@@ -125,13 +139,13 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
   const metadata = useMemo(() => {
     const qubitData = timeseriesResponse?.data?.data?.[qubitId];
     if (!Array.isArray(qubitData) || qubitData.length === 0) {
-      return { unit: 'Value', description: '' };
+      return { unit: "Value", description: "" };
     }
 
     const firstPoint = qubitData[0] as OutputParameterModel;
     return {
-      unit: firstPoint.unit || 'a.u.',
-      description: firstPoint.description || '',
+      unit: firstPoint.unit || "a.u.",
+      description: firstPoint.description || "",
     };
   }, [timeseriesResponse?.data?.data, qubitId]);
 

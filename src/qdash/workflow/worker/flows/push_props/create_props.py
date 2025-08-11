@@ -66,9 +66,22 @@ def merge_properties(base_props: CommentedMap, chip_props: ChipProperties, chip_
     return base_props
 
 
-def get_chip_properties(chip: ChipDocument, session: QubexSession, within_24hrs: bool = False) -> ChipProperties:
-    """Extract chip properties from the ChipDocument."""
+def get_chip_properties(
+    chip: ChipDocument, session: QubexSession, within_24hrs: bool = False, cutoff_hours: int = 24
+) -> tuple[ChipProperties, dict]:
+    """Extract chip properties from the ChipDocument.
+
+    Returns:
+        Tuple of (ChipProperties, stats_dict) where stats_dict contains data availability info
+    """
     props = ChipProperties()
+    stats = {
+        "total_qubits": 0,
+        "qubits_with_recent_data": 0,
+        "total_couplings": 0,
+        "couplings_with_recent_data": 0,
+        "cutoff_hours": cutoff_hours,
+    }
     import re
 
     match = re.search(r"\d+", session.config["chip_id"])
@@ -80,16 +93,28 @@ def get_chip_properties(chip: ChipDocument, session: QubexSession, within_24hrs:
         props.qubits[exp.get_qubit_label(i)] = QubitProperties()
 
     for qid, q in chip.qubits.items():
-        props.qubits[exp.get_qubit_label(int(qid))] = _process_data(
-            q.data, qubit_field_map, QubitProperties, within_24hrs
-        )
+        stats["total_qubits"] += 1
+        qubit_props = _process_data(q.data, qubit_field_map, QubitProperties, within_24hrs, cutoff_hours)
+        props.qubits[exp.get_qubit_label(int(qid))] = qubit_props
+
+        # Check if qubit has any recent data
+        if within_24hrs and any(getattr(qubit_props, field, None) is not None for field in qubit_field_map.values()):
+            stats["qubits_with_recent_data"] += 1
 
     for cid, c in chip.couplings.items():
         source, target = cid.split("-")
         cid_str = f"{exp.get_qubit_label(int(source))}-{exp.get_qubit_label(int(target))}"
-        props.couplings[cid_str] = _process_data(c.data, coupling_field_map, CouplingProperties, within_24hrs)
+        stats["total_couplings"] += 1
+        coupling_props = _process_data(c.data, coupling_field_map, CouplingProperties, within_24hrs, cutoff_hours)
+        props.couplings[cid_str] = coupling_props
 
-    return props
+        # Check if coupling has any recent data
+        if within_24hrs and any(
+            getattr(coupling_props, field, None) is not None for field in coupling_field_map.values()
+        ):
+            stats["couplings_with_recent_data"] += 1
+
+    return props, stats
 
 
 def create_chip_properties(username: str, source_path: str, target_path: str, chip_id: str = "64Qv1") -> None:
@@ -108,7 +133,7 @@ def create_chip_properties(username: str, source_path: str, target_path: str, ch
             "chip_id": chip_id,
         },
     )
-    props = get_chip_properties(chip, within_24hrs=False, session=session)
+    props, _ = get_chip_properties(chip, within_24hrs=False, session=session)
 
     handler = ChipPropertyYAMLHandler(source_path)
     base = handler.read()

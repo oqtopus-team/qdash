@@ -109,18 +109,18 @@ function ExecutionPageContent() {
   useEffect(() => {
     if (executionData) {
       let filteredData = executionData.data;
-      
+
       // Filter by date if not "latest"
       if (selectedDate !== "latest") {
         filteredData = executionData.data.filter((exec) => {
           const execDate = new Date(exec.start_at);
           const execDateStr = `${execDate.getFullYear()}${String(
-            execDate.getMonth() + 1
+            execDate.getMonth() + 1,
           ).padStart(2, "0")}${String(execDate.getDate()).padStart(2, "0")}`;
           return execDateStr === selectedDate;
         });
       }
-      
+
       setCardData(filteredData);
     }
   }, [executionData, selectedDate]);

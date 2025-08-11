@@ -1,8 +1,8 @@
-import { ReactNode, useMemo } from 'react';
-import dynamic from 'next/dynamic';
-import type { PlotData, Layout, Config } from 'plotly.js';
+import { ReactNode, useMemo } from "react";
+import dynamic from "next/dynamic";
+import type { PlotData, Layout, Config } from "plotly.js";
 
-const Plot = dynamic(() => import('react-plotly.js'), {
+const Plot = dynamic(() => import("react-plotly.js"), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-full">
@@ -33,33 +33,41 @@ export function PlotCard({
   icon,
   isLoading = false,
   hasData = true,
-  emptyStateMessage = 'No data available',
+  emptyStateMessage = "No data available",
   plotData,
   layout,
   config,
-  height = '550px',
-  className = '',
+  height = "550px",
+  className = "",
   children,
 }: PlotCardProps) {
-  const defaultConfig = useMemo(() => ({
-    displaylogo: false,
-    responsive: true,
-    toImageButtonOptions: {
-      format: 'svg' as const,
-      filename: 'plot_export',
-      height: 600,
-      width: 800,
-      scale: 2,
-    },
-  }), []);
+  const defaultConfig = useMemo(
+    () => ({
+      displaylogo: false,
+      responsive: true,
+      toImageButtonOptions: {
+        format: "svg" as const,
+        filename: "plot_export",
+        height: 600,
+        width: 800,
+        scale: 2,
+      },
+    }),
+    [],
+  );
 
-  const mergedConfig = useMemo(() => ({
-    ...defaultConfig,
-    ...config,
-  }), [defaultConfig, config]);
+  const mergedConfig = useMemo(
+    () => ({
+      ...defaultConfig,
+      ...config,
+    }),
+    [defaultConfig, config],
+  );
 
   return (
-    <div className={`card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300 ${className}`}>
+    <div
+      className={`card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300 ${className}`}
+    >
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-semibold flex items-center gap-2">
           {icon}
@@ -67,7 +75,7 @@ export function PlotCard({
         </h2>
         {children}
       </div>
-      
+
       <div
         className="w-full bg-base-200/50 rounded-xl p-4 relative"
         style={{ height }}
@@ -109,7 +117,7 @@ export function PlotCard({
             data={plotData}
             layout={layout}
             config={mergedConfig}
-            style={{ width: '100%', height: '100%' }}
+            style={{ width: "100%", height: "100%" }}
             useResizeHandler={true}
           />
         )}

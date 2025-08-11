@@ -35,13 +35,13 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
   useEffect(() => {
     if (tasksData?.data?.tasks) {
       // Map selectedTaskNames to TaskResponse objects while preserving order
-    const taskMap = new Map(
-      tasksData.data.tasks.map((task: TaskResponse) => [task.name, task])
-    );
-    const existingTasks = selectedTaskNames
-      .map((name) => taskMap.get(name))
-      .filter((task): task is TaskResponse => task !== undefined);
-    setSelectedTasks(existingTasks);
+      const taskMap = new Map(
+        tasksData.data.tasks.map((task: TaskResponse) => [task.name, task]),
+      );
+      const existingTasks = selectedTaskNames
+        .map((name) => taskMap.get(name))
+        .filter((task): task is TaskResponse => task !== undefined);
+      setSelectedTasks(existingTasks);
     }
   }, [tasksData, selectedTaskNames]);
 

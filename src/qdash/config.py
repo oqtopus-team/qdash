@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # Agent settings
     slack_app_token: str
     openai_api_key: str
-    openai_model: str = "o4-mini"
+    openai_model: str = "gpt-4o-mini"
     agent_max_steps: int = 10
     # Logging
     log_level: str = "INFO"

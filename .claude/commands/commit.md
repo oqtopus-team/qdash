@@ -1,6 +1,6 @@
 ---
 description: Generate a commit message based on current git changes
-allowed-tools: 
+allowed-tools:
   - Bash
 ---
 
@@ -16,10 +16,12 @@ First, analyze the changes:
 !git diff HEAD --stat
 
 Then provide:
+
 1. A suggested commit message
 2. The git command to commit with that message
 
 Focus on:
+
 - What files were changed
 - What the main purpose of the change is
 - Whether it's a fix, feature, or other type of change

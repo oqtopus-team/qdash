@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode } from "react";
 
 interface ErrorCardProps {
   title?: string;
@@ -12,14 +12,16 @@ interface ErrorCardProps {
  * Reusable error state component with consistent styling
  */
 export function ErrorCard({
-  title = 'Error',
+  title = "Error",
   message,
   onRetry,
   icon,
-  className = '',
+  className = "",
 }: ErrorCardProps) {
   return (
-    <div className={`card bg-base-100 shadow-xl rounded-xl p-8 border border-error/20 ${className}`}>
+    <div
+      className={`card bg-base-100 shadow-xl rounded-xl p-8 border border-error/20 ${className}`}
+    >
       <div className="flex flex-col items-center text-center space-y-4">
         {/* Error Icon */}
         {icon || (
@@ -39,17 +41,17 @@ export function ErrorCard({
             <line x1="9" y1="9" x2="15" y2="15"></line>
           </svg>
         )}
-        
+
         {/* Error Title */}
         <h3 className="text-xl font-semibold text-error">{title}</h3>
-        
+
         {/* Error Message */}
         <p className="text-base-content/70 max-w-md">{message}</p>
-        
+
         {/* Retry Button */}
         {onRetry && (
           <div className="card-actions">
-            <button 
+            <button
               className="btn btn-error btn-outline gap-2"
               onClick={onRetry}
               type="button"

@@ -1,6 +1,6 @@
 ---
 description: Suggest a commit message without committing
-allowed-tools: 
+allowed-tools:
   - Bash
 ---
 

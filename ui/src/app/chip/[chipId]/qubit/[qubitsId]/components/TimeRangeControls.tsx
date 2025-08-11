@@ -40,7 +40,9 @@ export function TimeRangeControls({
             onClick={onToggleStartAtLock}
             title={isStartAtLocked ? "Unlock start time" : "Lock start time"}
             disabled={disabled}
-            aria-label={isStartAtLocked ? "Unlock start time" : "Lock start time"}
+            aria-label={
+              isStartAtLocked ? "Unlock start time" : "Lock start time"
+            }
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

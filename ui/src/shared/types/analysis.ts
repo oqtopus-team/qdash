@@ -39,22 +39,18 @@ export interface TimeRangeState {
   isEndAtLocked: boolean;
 }
 
-export type ParameterKey = 
-  | "t1" 
-  | "t2_echo" 
-  | "t2_star" 
-  | "frequency" 
+export type ParameterKey =
+  | "t1"
+  | "t2_echo"
+  | "t2_star"
+  | "frequency"
   | "amplitude"
   | "phase"
   | "fidelity"
   | "gate_duration"
   | string; // Allow any string for backward compatibility
 
-export type TagKey = 
-  | "daily" 
-  | "weekly" 
-  | "monthly"
-  | string; // Allow any string for backward compatibility
+export type TagKey = "daily" | "weekly" | "monthly" | string; // Allow any string for backward compatibility
 
 export interface PlotConfig {
   displaylogo: boolean;
