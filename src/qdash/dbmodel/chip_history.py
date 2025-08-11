@@ -1,11 +1,11 @@
 import logging
-from typing import ClassVar, cast
+from typing import ClassVar
 
 import pendulum
 from bunnet import Document
-from bunnet.operators import Set
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
+from pymongo.errors import DuplicateKeyError
 from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
@@ -87,11 +87,8 @@ class ChipHistoryDocument(Document):
         """Create a history record from a ChipDocument using atomic upsert.
 
         This method performs an atomic upsert operation to handle concurrent writes.
-        It updates existing records or creates new ones based on chip_id, username,
-        and recorded_date (today's date).
-
-        Note: chip_id and username are not updated as they are part of the query criteria.
-        Only the following fields are updated: size, qubits, couplings, installed_at, system_info.
+        If a record already exists for today, it updates the existing record.
+        Otherwise, it creates a new record.
 
         Args:
             chip_doc: The ChipDocument to create history from
@@ -105,40 +102,42 @@ class ChipHistoryDocument(Document):
         today = pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD")
 
         try:
-            # Bunnet's upsert is atomic - updates if exists, inserts if not
-            result = (
-                cls.find_one(
-                    {
-                        "chip_id": chip_doc.chip_id,
-                        "username": chip_doc.username,
-                        "recorded_date": today,
-                    }
-                )
-                .upsert(
-                    Set(
-                        {
-                            # Only update mutable fields, not the query criteria
-                            "size": chip_doc.size,
-                            "qubits": chip_doc.qubits,
-                            "couplings": chip_doc.couplings,
-                            "installed_at": chip_doc.installed_at,
-                            "system_info": chip_doc.system_info,
-                        }
-                    ),
-                    on_insert=cls(
-                        chip_id=chip_doc.chip_id,
-                        username=chip_doc.username,
-                        size=chip_doc.size,
-                        qubits=chip_doc.qubits,
-                        couplings=chip_doc.couplings,
-                        installed_at=chip_doc.installed_at,
-                        system_info=chip_doc.system_info,
-                        recorded_date=today,
-                    ),
-                )
-                .run()
+            # Try to insert a new document
+            history_doc = cls(
+                chip_id=chip_doc.chip_id,
+                username=chip_doc.username,
+                size=chip_doc.size,
+                qubits=chip_doc.qubits,
+                couplings=chip_doc.couplings,
+                installed_at=chip_doc.installed_at,
+                system_info=chip_doc.system_info,
+                recorded_date=today,
             )
-            return cast("ChipHistoryDocument", result)
+            return history_doc.insert()
+
+        except DuplicateKeyError:
+            # If duplicate key error occurs, find and update the existing document
+            logger.info(f"History record already exists for chip {chip_doc.chip_id}, updating existing record")
+            existing_doc = cls.find_one(
+                {
+                    "chip_id": chip_doc.chip_id,
+                    "username": chip_doc.username,
+                    "recorded_date": today,
+                }
+            ).run()
+
+            if existing_doc:
+                # Update the existing document
+                existing_doc.size = chip_doc.size
+                existing_doc.qubits = chip_doc.qubits
+                existing_doc.couplings = chip_doc.couplings
+                existing_doc.installed_at = chip_doc.installed_at
+                existing_doc.system_info = chip_doc.system_info
+                return existing_doc.save()
+            else:
+                # This shouldn't happen, but handle it gracefully
+                raise RuntimeError("Document not found after DuplicateKeyError")
+
         except Exception as e:
             logger.error(f"Failed to create/update chip history: {e}")
             raise
