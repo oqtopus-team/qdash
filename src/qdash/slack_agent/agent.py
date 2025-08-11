@@ -575,7 +575,7 @@ Thread: {thread_key}
 
 async def update_agent_state(agent: Agent, interaction_type: str = "message"):
     """Update agent state with interaction metadata."""
-    current_count = agent.state.get("interaction_count", 0)
+    current_count = agent.state.get("interaction_count") or 0
     agent.state.set("interaction_count", current_count + 1)
     agent.state.set("last_interaction", pendulum.now("Asia/Tokyo").isoformat())
     agent.state.set("last_interaction_type", interaction_type)
@@ -676,7 +676,7 @@ async def handle_mention(event, say, client) -> None:
             response_text = str(result) if result else "返答を生成できませんでした"
 
             # Log conversation context for debugging
-            interaction_count = agent.state.get("interaction_count", 0)
+            interaction_count = agent.state.get("interaction_count") or 0
             message_count = len(agent.messages) if hasattr(agent, "messages") else 0
 
             logger.info(f"💬 Thread context: {interaction_count} interactions, {message_count} messages")
