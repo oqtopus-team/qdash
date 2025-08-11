@@ -3,6 +3,7 @@
 Get detailed deployment information from Prefect server.
 """
 import asyncio
+
 from prefect.client.orchestration import PrefectClient
 
 
@@ -33,7 +34,7 @@ async def get_deployment_details():
                 
                 # Test this format
                 try:
-                    test_dep = await client.read_deployment_by_name(correct_name)
+                    await client.read_deployment_by_name(correct_name)
                     print(f"  ✅ Format works: {correct_name}")
                 except Exception as e:
                     print(f"  ❌ Format failed: {e}")

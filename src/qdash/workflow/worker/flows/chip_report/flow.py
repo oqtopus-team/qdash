@@ -82,7 +82,7 @@ def chip_report(
 
     """
 
-    commit_id = "local" if os.getenv("CONFIG_REPO_URL") == "" else pull_github()
+    _ = "local" if os.getenv("CONFIG_REPO_URL") == "" else pull_github()
     initialize()
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
     chip_info_dir = f"/app/calib_data/{username}/{date_str}/chip_info"

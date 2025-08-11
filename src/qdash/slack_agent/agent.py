@@ -817,7 +817,7 @@ async def generate_chip_report(
         # Get the chip-report deployment
         try:
             # First, try to get all deployments for debugging
-            deployment = await client.read_deployment_by_name(f"chip-report/qiqb-dev-chip-report")
+            deployment = await client.read_deployment_by_name("chip-report/qiqb-dev-chip-report")
             parameters = {
                 "username": username,
                 "slack_channel": slack_channel,  # Always include, even if empty
