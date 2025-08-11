@@ -7,13 +7,14 @@ def _process_data(
     field_map: dict[str, str],
     model_cls: type[BaseModel],
     within_24hrs: bool = False,
+    cutoff_hours: int = 24,
 ) -> BaseModel:
     result = model_cls()
     if not raw_data:
         return result
 
     now = pendulum.now("Asia/Tokyo")
-    cutoff = now.subtract(hours=12)
+    cutoff = now.subtract(hours=cutoff_hours)
 
     for key, value in raw_data.items():
         calibrated_at = value.get("calibrated_at")

@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
-from qdash.dbmodel.chip import ChipDocument
 from qdash.workflow.core.session.base import BaseSession
 from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
 
@@ -34,10 +33,6 @@ class QubexSession(BaseSession):
 
     def connect(self) -> None:
         if self._exp is None:
-            chip = ChipDocument.get_current_chip(username=self._config.get("username", "admin"))
-            if chip is None:
-                msg = "No current chip found. Please select a chip before running calibration."
-                raise ValueError(msg)
             from qubex import Experiment
 
             if self._config.get("task_type") == "qubit":
@@ -50,9 +45,9 @@ class QubexSession(BaseSession):
                 # Default to all qubits if task_type is not specified
                 qubits = []
 
-            chip_id = chip.chip_id
+            chip_id = self._config.get("chip_id", "64Q")
             self._exp = Experiment(
-                chip_id=self._config.get("chip_id", chip_id),
+                chip_id=chip_id,
                 qubits=qubits,
                 config_dir=self._config.get("config_dir", f"/app/config/qubex/{chip_id}/config"),
                 params_dir=self._config.get("params_dir", f"/app/config/qubex/{chip_id}/params"),

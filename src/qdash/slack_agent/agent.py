@@ -431,14 +431,22 @@ def format_chip_parameters_for_slack(parameters: dict[str, Any]) -> str:
 _agent_cache: dict[str, Agent] = {}
 _agent_cache_lock = asyncio.Lock()
 
+# Current thread context for passing to tools
+_current_thread_context: dict[str, Any] = {}
+
 
 def get_thread_key(channel_id: str, thread_ts: str | None, user_id: str) -> str:
-    """Generate a unique key for thread-based agent caching."""
+    """Generate a unique key for thread-based agent caching with strict separation."""
     if thread_ts:
-        return f"{channel_id}:{thread_ts}"
+        # Thread-based conversations: each thread gets its own agent
+        return f"thread:{channel_id}:{thread_ts}"
     else:
-        # For direct messages without thread, use user-based key
-        return f"dm:{user_id}:{channel_id}"
+        # Non-threaded messages: each message gets completely isolated context
+        # Use timestamp to ensure no context bleeding between separate messages
+        import time
+
+        timestamp = int(time.time() * 1000)
+        return f"single:{channel_id}:{user_id}:{timestamp}"
 
 
 async def get_or_create_thread_agent(
@@ -449,10 +457,10 @@ async def get_or_create_thread_agent(
 
     async with _agent_cache_lock:
         if thread_key in _agent_cache:
-            logger.info(f"🔄 Reusing existing agent for thread: {thread_key}")
+            logger.info(f"🔄 Reusing existing agent for thread: {thread_key} (preserving context)")
             return _agent_cache[thread_key]
 
-        logger.info(f"🆕 Creating new agent for thread: {thread_key}")
+        logger.info(f"🆕 Creating new agent for thread: {thread_key} (fresh context)")
 
         # Create new agent with conversation management
         model_config = get_current_model_config()
@@ -460,8 +468,14 @@ async def get_or_create_thread_agent(
         # System instructions optimized for thread context
         system_prompt = f"""あなたはQDash量子キャリブレーションシステムのSlackアシスタントです。
 
-このスレッドでのユーザー: {username} (ID: {user_id})
-このスレッドの会話履歴を記憶し、コンテクストを保持してください。
+このスレッドでのSlackユーザー: (ID: {user_id})
+QDashユーザー名: 各操作時に明示的に指定が必要
+
+**重要なセッション管理:**
+- このエージェントは特定のSlackスレッド専用です（Thread Key: {thread_key}）
+- 他のスレッドやチャンネルでの会話は一切記憶していません
+- スレッドが変わると完全に新しいセッションとして動作します
+- このスレッド内でのみ会話履歴を記憶し、コンテクストを保持してください
 
 基本的な対応:
 - 日本語で自然に返答してください
@@ -472,15 +486,76 @@ async def get_or_create_thread_agent(
 利用可能なツール:
 - get_chip_parameters_formatted: チップのフィデリティ統計とパラメータ取得
 - get_current_chip: 現在のチップID取得
+- generate_chip_report: フルチップレポート(YAML+PDF)生成とSlack送信（現在のスレッドに送信、カットオフ時間指定可能）
+
 - get_current_time: 現在時刻取得
 - calculate: 数式計算
 - get_string_length: 文字列長取得
 
+ユーザー名の取り扱い:
+- QDashユーザー名は**必ず明示的に指定**してもらいます
+- Slackユーザー情報からの自動推測は行いません
+- ユーザー名が指定されていない場合、必ずユーザーに確認してください
+
 使用方針:
-1. ユーザー名が言及された場合、ツールのusername引数に渡してください
-2. フィデリティやチップに関する質問: get_chip_parameters_formatted を使用
-3. "最新のchip id"に関する質問: get_current_chip を使用
-4. 単純な挨拶や雑談には、ツールを使わず自然に返答してください
+
+**自然な表現の理解:**
+- 「orangekame3のレポートをください」→ orangekame3でチップレポート生成
+- 「orangekame3の過去48時間のレポートを生成して」→ orangekame3で48時間のチップレポート生成
+- 「johnのフィデリティを見たい」→ johnでチップパラメータ取得
+- 「aliceの現在のチップは？」→ aliceで現在チップID取得
+- 「admin でレポート作って」→ adminでチップレポート生成（cutoff_hours=24）
+- 「admin の12時間レポート作って」→ adminでチップレポート生成（cutoff_hours=12）
+
+**パターン認識:**
+1. **ユーザー名 + の + 操作**: 「{{ユーザー名}}の{{操作}}」形式を認識
+2. **操作キーワード**:
+   - レポート/チップレポート → generate_chip_report
+   - フィデリティ/パラメータ → get_chip_parameters_formatted
+   - チップID/現在のチップ → get_current_chip
+3. **ユーザー名抽出**: メッセージから英数字のユーザー名を識別
+
+**応答方針:**
+- 1回のメッセージでユーザー名と操作の両方が特定できる場合は即座に実行
+- どちらか一方が不明確な場合のみ確認
+- 冗長な確認は避け、できるだけ自然で効率的な対話を心がける
+- extract_username_and_action関数でメッセージを解析し、自然な表現を理解する
+- この関数はユーザー名、アクション、時間指定（cutoff_hours）を抽出します
+
+**🚨 重要: レポート生成の即座実行**
+「orangekame3の過去48時間のレポートを生成して」のようなメッセージの場合:
+→ 他のツールを使わず、即座にgenerate_chip_report(username="orangekame3", cutoff_hours=48)を実行
+→ get_current_chipやget_chip_parametersは不要です
+
+4. フィデリティやチップに関する質問: get_chip_parameters_formatted を使用
+5. "最新のchip id"に関する質問: get_current_chip を使用
+6. "チップレポート"や"レポート生成"の依頼: 🚨 **即座に** generate_chip_report を使用
+   **絶対ルール**: ユーザー名とレポート依頼が明確な場合、他のツールを使わずに直接generate_chip_reportを実行
+   **重要**: このスレッドのチャンネルID="{channel_id}", スレッドTS="{thread_ts if thread_ts else ''}"
+   
+   **時間指定の処理**:
+   - ユーザーメッセージから時間を抽出（例: "48時間", "12h", "過去24時間"など）
+   - 抽出した時間をcutoff_hoursパラメータに設定
+   - 時間指定がない場合はデフォルト24時間を使用
+   
+   generate_chip_reportを呼ぶ際は必ずこれらの値を使用:
+   generate_chip_report(username="指定されたユーザー名", slack_channel="{channel_id}", slack_thread_ts="{thread_ts if thread_ts else ''}", cutoff_hours=48)
+   
+   **時間指定の理解:**
+   - 「過去48時間のレポート」「48時間のレポート」→ cutoff_hours=48
+   - 「12hのレポート」「12時間レポート」→ cutoff_hours=12  
+   - 時間指定がない場合はcutoff_hours=24（デフォルト）
+   - extract_username_and_action関数で時間も抽出してください
+7. 単純な挨拶や雑談には、ツールを使わず自然に返答してください
+
+**❌ 禁止事項:**
+- レポート生成依頼でget_current_chipを先に呼ぶこと
+- レポート生成前にフィデリティを確認すること  
+- 「現在のチップIDを取得する必要があります」のような余計な前置き
+
+**✅ 正しい処理:**
+「orangekame3の過去48時間のレポートを生成して」
+→ 即座に: generate_chip_report(username="orangekame3", cutoff_hours=48, slack_channel="{channel_id}", slack_thread_ts="{thread_ts}")
 
 Model: {model_config.name}
 Thread: {thread_key}
@@ -494,6 +569,7 @@ Thread: {thread_key}
             get_current_chip,
             get_chip_parameters_formatted,
             get_thread_history,
+            generate_chip_report,
         ]
 
         # Configure conversation manager for thread context
@@ -563,13 +639,14 @@ Thread: {thread_key}
         # Cache the agent for this thread
         _agent_cache[thread_key] = agent
 
-        # Clean up old cached agents (keep only last 50 threads)
-        if len(_agent_cache) > 50:
-            # Remove oldest entries
-            oldest_keys = list(_agent_cache.keys())[:-50]
+        # Clean up old cached agents (keep only last 30 threads for better isolation)
+        if len(_agent_cache) > 30:
+            # Remove oldest entries to prevent memory buildup and ensure fresh contexts
+            oldest_keys = list(_agent_cache.keys())[:-30]
             for old_key in oldest_keys:
                 del _agent_cache[old_key]
                 logger.info(f"🗑️ Cleaned up old thread agent: {old_key}")
+            logger.info(f"📊 Agent cache size after cleanup: {len(_agent_cache)}")
 
         return agent
 
@@ -587,6 +664,191 @@ def cleanup_agent_cache():
     global _agent_cache
     logger.info(f"🧹 Cleaning up agent cache. Current size: {len(_agent_cache)}")
     _agent_cache.clear()
+
+
+async def require_explicit_username(specified_username: str | None = None) -> str:
+    """Always require explicit username specification.
+
+    Args:
+        specified_username: Username explicitly specified by user
+
+    Returns:
+        Validated QDash username
+
+    Raises:
+        ValueError: When no username is specified
+    """
+    if specified_username:
+        logger.info(f"Using explicitly specified username: {specified_username}")
+        return specified_username
+    else:
+        error_msg = """QDashユーザー名を明示的に指定してください。
+                    例：「ユーザー名 john でチップレポートを生成して」"""
+        logger.info(f"Username validation failed: {error_msg}")
+        raise ValueError(error_msg)
+
+
+async def get_validated_qdash_username(user_id: str, specified_username: str | None = None) -> str:
+    """Get validated QDash username - always requires explicit specification.
+
+    Args:
+        user_id: Slack user ID (not used for automatic mapping)
+        specified_username: Username explicitly specified by user
+
+    Returns:
+        Validated QDash username
+
+    Raises:
+        ValueError: When no username is specified
+    """
+    return await require_explicit_username(specified_username)
+
+
+def extract_username_and_action(message: str) -> tuple[str | None, str | None, int | None]:
+    """Extract username, action, and cutoff hours from natural user messages.
+
+    Args:
+        message: User message text
+
+    Returns:
+        Tuple of (username, action, cutoff_hours) or (None, None, None) if not found
+    """
+    import re
+
+    message = message.lower().strip()
+
+    # Extract cutoff hours from message
+    cutoff_hours = None
+    hour_patterns = [r"過去(\d+)時間", r"(\d+)時間", r"(\d+)h", r"(\d+)hr", r"(\d+)hrs"]
+
+    for pattern in hour_patterns:
+        match = re.search(pattern, message)
+        if match:
+            cutoff_hours = int(match.group(1))
+            break
+
+    # Pattern 1: "{username}の{action}" - Japanese possessive
+    pattern1 = r"(\w+)の(レポート|フィデリティ|パラメータ|チップ)"
+    match1 = re.search(pattern1, message)
+    if match1:
+        username = match1.group(1)
+        action_word = match1.group(2)
+
+        # Map action words to actions
+        action_map = {"レポート": "report", "フィデリティ": "fidelity", "パラメータ": "parameters", "チップ": "chip"}
+        action = action_map.get(action_word)
+        return username, action, cutoff_hours
+
+    # Pattern 2: "{username} で {action}" - Japanese particle "de"
+    pattern2 = r"(\w+)\s*で.*(レポート|フィデリティ|パラメータ|チップ)"
+    match2 = re.search(pattern2, message)
+    if match2:
+        username = match2.group(1)
+        action_word = match2.group(2)
+        action_map = {"レポート": "report", "フィデリティ": "fidelity", "パラメータ": "parameters", "チップ": "chip"}
+        action = action_map.get(action_word, "unknown")
+        return username, action, cutoff_hours
+
+    # Pattern 3: General report/レポート keywords
+    if "レポート" in message or "report" in message:
+        # Look for username patterns (alphanumeric sequences)
+        username_pattern = r"\b([a-zA-Z0-9_]+)\b"
+        usernames = re.findall(username_pattern, message)
+        # Filter out common words
+        excluded_words = {"で", "を", "の", "に", "と", "が", "は", "bot", "test", "qdash", "レポート", "report"}
+        potential_usernames = [u for u in usernames if u.lower() not in excluded_words and len(u) > 2]
+        if potential_usernames:
+            return potential_usernames[0], "report"
+
+    return None, None, None
+
+
+@tool
+@with_error_handling
+async def generate_chip_report(
+    username: str = "admin", slack_channel: str = "", slack_thread_ts: str = "", cutoff_hours: int = 24
+) -> dict[str, Any]:
+    """Generate full chip report (YAML + PDF) using Prefect workflow and send to Slack.
+
+    Args:
+        username: Username for the operation (default: "admin")
+        slack_channel: Slack channel ID to send results to
+        slack_thread_ts: Slack thread timestamp to reply to
+        cutoff_hours: Time window in hours for recent data filtering (default: 24)
+
+    Returns:
+        Dictionary with flow run information
+    """
+    try:
+        from prefect.client.orchestration import PrefectClient
+        from qdash.config import get_settings
+
+        settings = get_settings()
+
+        # Get Slack context from global thread context if not provided
+        global _current_thread_context
+        if not slack_channel:
+            slack_channel = _current_thread_context.get("channel_id", "")
+        if not slack_thread_ts:
+            slack_thread_ts = _current_thread_context.get("thread_ts", "")
+        logger.info(f"Using Slack context - channel: {slack_channel}, thread: {slack_thread_ts}")
+        logger.info(f"Global context: {_current_thread_context}")
+
+        logger.info(
+            f"Starting chip report generation for user: {username}, channel: {slack_channel}, thread: {slack_thread_ts}"
+        )
+
+        # Use the correct internal port for prefect-server
+        prefect_url = settings.prefect_api_url
+
+        # Fix the port issue: prefect-server runs on port 4200 internally
+        if "prefect-server:2003" in prefect_url:
+            prefect_url = prefect_url.replace("prefect-server:2003", "prefect-server:4200")
+            logger.info(f"Corrected Prefect URL to: {prefect_url}")
+
+        client = PrefectClient(api="http://prefect-server:4200/api")
+
+        # Get the chip-report deployment
+        try:
+            # First, try to get all deployments for debugging
+            deployment = await client.read_deployment_by_name("chip-report/qiqb-dev-chip-report")
+            parameters = {
+                "username": username,
+                "slack_channel": slack_channel,  # Always include, even if empty
+                "slack_thread_ts": slack_thread_ts,  # Always include, even if empty
+                "cutoff_hours": cutoff_hours,  # Time window for recent data
+            }
+
+            logger.info(f"Flow parameters being sent: {parameters}")
+            flow_run = await client.create_flow_run_from_deployment(deployment.id, parameters=parameters)
+        except Exception as e:
+            logger.error(f"Failed to find chip-report deployment: {e}")
+            raise ValueError(
+                "Deployment 'chip-report/qiqb-dev-chip-report' not found. Please check the deployment name."
+            )
+
+        logger.info(f"Started chip report flow run: {flow_run.id}")
+
+        return {
+            "status": "started",
+            "flow_run_id": str(flow_run.id),
+            "deployment_name": deployment.name,
+            "username": username,
+            "message": f"""チップレポート生成を開始しました (ユーザー: {username})
+フローID: {flow_run.id}
+
+レポートが完成するとSlackスレッドにYAMLとPDFファイルが送信されます。""",
+        }
+
+    except ImportError:
+        logger.error("Prefect client not available")
+        return {
+            "error": "Prefect client not available in this environment",
+            "suggestion": "Please ensure Prefect is installed and configured",
+        }
+    except Exception as e:
+        logger.error(f"Failed to generate chip report: {e}")
+        return {"error": f"Failed to generate chip report: {e!s}", "username": username}
 
 
 @tool
@@ -652,13 +914,30 @@ async def handle_mention(event, say, client) -> None:
         # Log Slack event
         log_slack_event("app_mention", slack_event.channel, slack_event.user, clean_message)
 
+        # Use a placeholder username for agent creation - actual username will be requested per tool
+        qdash_username = "未指定"
+
         # Get or create thread-specific agent with conversation history
+        # For replies, use the actual thread_ts; for new messages, use the message ts as the thread
         thread_ts = slack_event.thread_ts or slack_event.ts
+
+        # Set global thread context for tools to access
+        # Always use ts for the thread context (this is where replies should go)
+        global _current_thread_context
+        _current_thread_context = {
+            "channel_id": slack_event.channel,
+            "thread_ts": slack_event.ts,  # Always use the message ts for replies
+            "user_id": slack_event.user,
+        }
+        logger.info(
+            f"Set thread context: channel={slack_event.channel}, thread={slack_event.ts} (will reply to this message)"
+        )
+
         agent = await get_or_create_thread_agent(
             channel_id=slack_event.channel,
-            thread_ts=slack_event.thread_ts,  # Can be None for new threads
+            thread_ts=thread_ts,  # Use the actual thread_ts value
             user_id=slack_event.user,
-            username="admin",  # TODO: Extract real username from Slack
+            username=qdash_username,  # Use dynamically obtained username
         )
 
         await say(text="🤔 考え中...", thread_ts=thread_ts)
