@@ -259,16 +259,18 @@ Key environment variables (see `.env.example`):
 The project includes custom slash commands for Claude Code:
 
 ### Commit Commands
+
 - `/commit` - Analyze changes and suggest a commit message
 - `/suggest-commit` - Generate commit message suggestion without committing
 - `/auto-commit` - Automatically commit with generated message
 
 ### Usage Examples
+
 ```
 /commit
 # Analyzes changes and provides a commit message with the git command
 
-/suggest-commit  
+/suggest-commit
 # Only suggests a message without committing
 
 /auto-commit
@@ -276,7 +278,9 @@ The project includes custom slash commands for Claude Code:
 ```
 
 ### Manual Scripts
+
 If you prefer running scripts manually:
+
 - `task commit` or `task ac` - Interactive auto-commit script
 - `python scripts/git-auto-commit.py` - Python version
 - `./scripts/auto-commit.sh` - Shell version (requires ANTHROPIC_API_KEY)
@@ -358,16 +362,16 @@ The shared directory contains reusable hooks, components, and types that are con
 
 ```typescript
 // Using shared hooks
-import { useTimeRange } from '@/shared/hooks/useTimeRange';
-import { useCSVExport } from '@/shared/hooks/useCSVExport';
+import { useTimeRange } from "@/shared/hooks/useTimeRange";
+import { useCSVExport } from "@/shared/hooks/useCSVExport";
 
-// Using shared components  
-import { PlotCard } from '@/shared/components/PlotCard';
-import { DataTable } from '@/shared/components/DataTable';
-import { ErrorCard } from '@/shared/components/ErrorCard';
+// Using shared components
+import { PlotCard } from "@/shared/components/PlotCard";
+import { DataTable } from "@/shared/components/DataTable";
+import { ErrorCard } from "@/shared/components/ErrorCard";
 
 // Using shared types
-import { TimeSeriesDataPoint, ParameterKey } from '@/shared/types/analysis';
+import { TimeSeriesDataPoint, ParameterKey } from "@/shared/types/analysis";
 ```
 
 ### Component Features
@@ -389,6 +393,7 @@ import { TimeSeriesDataPoint, ParameterKey } from '@/shared/types/analysis';
 The project generates a Python client from the OpenAPI specification:
 
 ### Client Usage
+
 ```bash
 # Generate client
 task generate-python-client

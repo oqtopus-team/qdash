@@ -1,4 +1,4 @@
-import { StatisticalSummary } from '../types/analysis';
+import { StatisticalSummary } from "../types/analysis";
 
 interface StatisticsCardsProps {
   statistics: StatisticalSummary;
@@ -15,21 +15,22 @@ export function StatisticsCards({
   statistics,
   xParameter,
   yParameter,
-  xUnit = '',
-  yUnit = '',
+  xUnit = "",
+  yUnit = "",
 }: StatisticsCardsProps) {
   const getCorrelationStrength = (correlation: number) => {
     const abs = Math.abs(correlation);
-    if (abs >= 0.8) return { strength: 'Very Strong', color: 'text-success' };
-    if (abs >= 0.6) return { strength: 'Strong', color: 'text-success' };
-    if (abs >= 0.4) return { strength: 'Moderate', color: 'text-warning' };
-    if (abs >= 0.2) return { strength: 'Weak', color: 'text-warning' };
-    return { strength: 'Very Weak', color: 'text-error' };
+    if (abs >= 0.8) return { strength: "Very Strong", color: "text-success" };
+    if (abs >= 0.6) return { strength: "Strong", color: "text-success" };
+    if (abs >= 0.4) return { strength: "Moderate", color: "text-warning" };
+    if (abs >= 0.2) return { strength: "Weak", color: "text-warning" };
+    return { strength: "Very Weak", color: "text-error" };
   };
 
-  const correlationInfo = statistics.correlation !== undefined 
-    ? getCorrelationStrength(statistics.correlation)
-    : null;
+  const correlationInfo =
+    statistics.correlation !== undefined
+      ? getCorrelationStrength(statistics.correlation)
+      : null;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -126,8 +127,15 @@ export function StatisticsCards({
               </div>
               {correlationInfo && (
                 <div className="stat-desc mt-2">
-                  <div className={`badge badge-sm ${correlationInfo.color.includes('success') ? 'badge-success' : 
-                    correlationInfo.color.includes('warning') ? 'badge-warning' : 'badge-error'}`}>
+                  <div
+                    className={`badge badge-sm ${
+                      correlationInfo.color.includes("success")
+                        ? "badge-success"
+                        : correlationInfo.color.includes("warning")
+                          ? "badge-warning"
+                          : "badge-error"
+                    }`}
+                  >
                     {correlationInfo.strength}
                   </div>
                 </div>
@@ -136,9 +144,7 @@ export function StatisticsCards({
           )}
           <div className="stat bg-base-200 rounded-lg">
             <div className="stat-title">Data Points</div>
-            <div className="stat-value text-lg">
-              {statistics.dataPoints}
-            </div>
+            <div className="stat-value text-lg">{statistics.dataPoints}</div>
           </div>
           {statistics.correlation !== undefined && (
             <div className="stat bg-base-200 rounded-lg">

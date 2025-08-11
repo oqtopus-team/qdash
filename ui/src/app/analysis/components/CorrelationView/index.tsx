@@ -12,7 +12,6 @@ import { useCorrelationData } from "@/shared/hooks/useCorrelationData";
 import { useCorrelationUrlState } from "@/app/hooks/useUrlState";
 import { ParameterKey } from "@/shared/types/analysis";
 
-
 export function CorrelationView() {
   // URL state management
   const {
@@ -30,7 +29,12 @@ export function CorrelationView() {
 
   // Set default chip when URL is initialized and no chip is selected
   useEffect(() => {
-    if (isInitialized && !selectedChip && chipsResponse?.data && chipsResponse.data.length > 0) {
+    if (
+      isInitialized &&
+      !selectedChip &&
+      chipsResponse?.data &&
+      chipsResponse.data.length > 0
+    ) {
       // Sort chips by installation date and select the most recent one
       const sortedChips = [...chipsResponse.data].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
@@ -41,126 +45,137 @@ export function CorrelationView() {
     }
   }, [isInitialized, selectedChip, chipsResponse, setSelectedChip]);
 
-  const { data: chipResponse, isLoading: isLoadingChip, error: chipError } = useFetchChip(selectedChip);
+  const {
+    data: chipResponse,
+    isLoading: isLoadingChip,
+    error: chipError,
+  } = useFetchChip(selectedChip);
   const chipData = useMemo(() => chipResponse?.data, [chipResponse]);
 
   // Use shared correlation data hook
-  const {
-    correlationData,
-    plotData,
-    statistics,
-    availableParameters,
-    error,
-  } = useCorrelationData({
-    chipData,
-    xParameter: xAxis as ParameterKey,
-    yParameter: yAxis as ParameterKey,
-    enabled: Boolean(selectedChip && xAxis && yAxis),
-  });
+  const { correlationData, plotData, statistics, availableParameters, error } =
+    useCorrelationData({
+      chipData,
+      xParameter: xAxis as ParameterKey,
+      yParameter: yAxis as ParameterKey,
+      enabled: Boolean(selectedChip && xAxis && yAxis),
+    });
 
   // Error handling
   if (chipError || error) {
     return (
       <ErrorCard
         title="Correlation Data Error"
-        message={chipError?.message || error?.message || "Failed to load correlation data"}
+        message={
+          chipError?.message ||
+          error?.message ||
+          "Failed to load correlation data"
+        }
         onRetry={() => window.location.reload()}
       />
     );
   }
 
   // Plot layout configuration
-  const layout = useMemo(() => ({
-    title: "",
-    autosize: true,
-    xaxis: {
-      title: {
-        text: `${xAxis} ${
-          correlationData?.[0]?.xUnit ? `(${correlationData[0].xUnit})` : ""
-        }`,
-        font: { size: 14 },
+  const layout = useMemo(
+    () => ({
+      title: "",
+      autosize: true,
+      xaxis: {
+        title: {
+          text: `${xAxis} ${
+            correlationData?.[0]?.xUnit ? `(${correlationData[0].xUnit})` : ""
+          }`,
+          font: { size: 14 },
+        },
+        autorange: true,
+        rangemode: "normal" as const,
+        type: "linear" as const,
+        gridcolor: "rgba(128, 128, 128, 0.2)",
+        zerolinecolor: "rgba(128, 128, 128, 0.2)",
+        showgrid: true,
+        zeroline: true,
+        showline: true,
+        exponentformat: "e" as const,
       },
-      autorange: true,
-      rangemode: "normal" as const,
-      type: "linear" as const,
-      gridcolor: "rgba(128, 128, 128, 0.2)",
-      zerolinecolor: "rgba(128, 128, 128, 0.2)",
-      showgrid: true,
-      zeroline: true,
-      showline: true,
-      exponentformat: "e" as const,
-    },
-    yaxis: {
-      title: {
-        text: `${yAxis} ${
-          correlationData?.[0]?.yUnit ? `(${correlationData[0].yUnit})` : ""
-        }`,
-        font: { size: 14 },
+      yaxis: {
+        title: {
+          text: `${yAxis} ${
+            correlationData?.[0]?.yUnit ? `(${correlationData[0].yUnit})` : ""
+          }`,
+          font: { size: 14 },
+        },
+        autorange: true,
+        rangemode: "normal" as const,
+        type: "linear" as const,
+        gridcolor: "rgba(128, 128, 128, 0.2)",
+        zerolinecolor: "rgba(128, 128, 128, 0.2)",
+        showgrid: true,
+        zeroline: true,
+        showline: true,
+        exponentformat: "e" as const,
       },
-      autorange: true,
-      rangemode: "normal" as const,
-      type: "linear" as const,
-      gridcolor: "rgba(128, 128, 128, 0.2)",
-      zerolinecolor: "rgba(128, 128, 128, 0.2)",
-      showgrid: true,
-      zeroline: true,
-      showline: true,
-      exponentformat: "e" as const,
-    },
-    plot_bgcolor: "rgba(0,0,0,0)",
-    paper_bgcolor: "rgba(0,0,0,0)",
-    hovermode: "closest" as const,
-    margin: { t: 10, r: 140, b: 40, l: 60 },
-    showlegend: true,
-    legend: {
-      orientation: "v" as const,
-      yanchor: "top" as const,
-      y: 1,
-      xanchor: "left" as const,
-      x: 1.02,
-      bgcolor: "rgba(255,255,255,0.8)",
-      bordercolor: "rgba(0,0,0,0.1)",
-      borderwidth: 1,
-      itemsizing: "constant" as const,
-      font: { size: 10 },
-    },
-  }), [xAxis, yAxis, correlationData]);
+      plot_bgcolor: "rgba(0,0,0,0)",
+      paper_bgcolor: "rgba(0,0,0,0)",
+      hovermode: "closest" as const,
+      margin: { t: 10, r: 140, b: 40, l: 60 },
+      showlegend: true,
+      legend: {
+        orientation: "v" as const,
+        yanchor: "top" as const,
+        y: 1,
+        xanchor: "left" as const,
+        x: 1.02,
+        bgcolor: "rgba(255,255,255,0.8)",
+        bordercolor: "rgba(0,0,0,0.1)",
+        borderwidth: 1,
+        itemsizing: "constant" as const,
+        font: { size: 10 },
+      },
+    }),
+    [xAxis, yAxis, correlationData],
+  );
 
   // Table columns definition
   const tableColumns = useMemo(() => {
     const baseColumns = [
-      { key: 'qid', label: 'QID', sortable: true, className: 'text-center font-medium' },
-      { 
-        key: 'x', 
-        label: xAxis, 
-        sortable: false, 
-        className: 'text-center',
-        render: (value: number, row: any) => `${value.toFixed(4)} ${row.xUnit}`
+      {
+        key: "qid",
+        label: "QID",
+        sortable: true,
+        className: "text-center font-medium",
       },
-      { 
-        key: 'y', 
-        label: yAxis, 
-        sortable: false, 
-        className: 'text-center',
-        render: (value: number, row: any) => `${value.toFixed(4)} ${row.yUnit}`
+      {
+        key: "x",
+        label: xAxis,
+        sortable: false,
+        className: "text-center",
+        render: (value: number, row: any) => `${value.toFixed(4)} ${row.xUnit}`,
+      },
+      {
+        key: "y",
+        label: yAxis,
+        sortable: false,
+        className: "text-center",
+        render: (value: number, row: any) => `${value.toFixed(4)} ${row.yUnit}`,
       },
     ];
 
     // Add description columns for non-qid parameters
     if (xAxis !== "qid") {
       baseColumns.push({
-        key: 'xDescription',
-        label: 'Description (X)',
+        key: "xDescription",
+        label: "Description (X)",
         sortable: false,
-        className: 'text-center',
+        className: "text-center",
       });
     }
     if (yAxis !== "qid") {
       baseColumns.push({
-        key: 'yDescription',
-        label: 'Description (Y)',
+        key: "yDescription",
+        label: "Description (Y)",
         sortable: false,
-        className: 'text-center',
+        className: "text-center",
       });
     }
 
@@ -214,21 +229,24 @@ export function CorrelationView() {
       {/* Warning for same parameter */}
       {isSameParameter && xAxis && yAxis && (
         <div className="col-span-3 alert alert-warning" role="alert">
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            className="stroke-current shrink-0 h-6 w-6" 
-            fill="none" 
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="stroke-current shrink-0 h-6 w-6"
+            fill="none"
             viewBox="0 0 24 24"
             aria-hidden="true"
           >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth="2" 
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" 
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
             />
           </svg>
-          <span>Select different parameters for X and Y axes to see meaningful correlation</span>
+          <span>
+            Select different parameters for X and Y axes to see meaningful
+            correlation
+          </span>
         </div>
       )}
 
@@ -255,11 +273,11 @@ export function CorrelationView() {
         isLoading={isLoadingChip}
         hasData={!isSameParameter && plotData.length > 0}
         emptyStateMessage={
-          isSameParameter 
+          isSameParameter
             ? "Select different parameters for X and Y axes"
             : !selectedChip || !xAxis || !yAxis
-            ? "Select chip and parameters to visualize data"
-            : "No correlation data available for selected parameters"
+              ? "Select chip and parameters to visualize data"
+              : "No correlation data available for selected parameters"
         }
         plotData={plotData}
         layout={layout}

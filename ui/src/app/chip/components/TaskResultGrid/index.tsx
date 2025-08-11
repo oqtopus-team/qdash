@@ -209,7 +209,8 @@ export function TaskResultGrid({
             <div key={index} className="relative group">
               <button
                 onClick={() => {
-                  if (figurePath) setSelectedTaskInfo({ qid, task, subIndex: 0 });
+                  if (figurePath)
+                    setSelectedTaskInfo({ qid, task, subIndex: 0 });
                   setViewMode("static");
                 }}
                 className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow relative w-full ${
@@ -218,18 +219,18 @@ export function TaskResultGrid({
                     : ""
                 }`}
               >
-              {task.figure_path && figurePath && (
-                <div className="absolute inset-0">
-                  <TaskFigure
-                    path={figurePath}
-                    qid={qid}
-                    className="w-full h-full object-contain"
-                  />
+                {task.figure_path && figurePath && (
+                  <div className="absolute inset-0">
+                    <TaskFigure
+                      path={figurePath}
+                      qid={qid}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                )}
+                <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
+                  {qid}
                 </div>
-              )}
-              <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
-                {qid}
-              </div>
                 <div
                   className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
                     task.status === "completed"
@@ -240,7 +241,7 @@ export function TaskResultGrid({
                   }`}
                 />
               </button>
-              
+
               {/* Detail Analysis Button */}
               <button
                 onClick={() => router.push(`/chip/${chipId}/qubit/${qid}`)}
@@ -286,7 +287,9 @@ export function TaskResultGrid({
                   </>
                 )}
                 <button
-                  onClick={() => router.push(`/chip/${chipId}/qubit/${selectedTaskInfo.qid}`)}
+                  onClick={() =>
+                    router.push(`/chip/${chipId}/qubit/${selectedTaskInfo.qid}`)
+                  }
                   className="btn btn-sm btn-primary"
                   title="Detailed Analysis"
                 >

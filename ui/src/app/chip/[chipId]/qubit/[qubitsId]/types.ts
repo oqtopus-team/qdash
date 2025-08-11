@@ -1,8 +1,8 @@
 // Type definitions for qubit analysis components
 
-export type ParameterKey = 
-  | "t1" 
-  | "t2_echo" 
+export type ParameterKey =
+  | "t1"
+  | "t2_echo"
   | "t2_star"
   | "frequency"
   | "anharmonicity"
@@ -13,15 +13,15 @@ export type ParameterKey =
   | "pi_pulse_amplitude"
   | "pi_pulse_duration";
 
-export type TagKey = 
-  | "latest"
-  | "daily" 
-  | "weekly"
-  | "monthly";
+export type TagKey = "latest" | "daily" | "weekly" | "monthly";
 
 export type SortDirection = "asc" | "desc";
 
-export type ViewMode = "dashboard" | "timeseries" | "correlation" | "comparison";
+export type ViewMode =
+  | "dashboard"
+  | "timeseries"
+  | "correlation"
+  | "comparison";
 
 export interface TimeSeriesDataPoint {
   time: string;

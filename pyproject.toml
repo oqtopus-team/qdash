@@ -119,8 +119,9 @@ agent = [
     "aiohttp>=3.8.0,<4.0.0",
     "openai>=1.98.0",
     "slack-bolt>=1.18.0",
-    "pydantic-settings"
+    "pydantic-settings",
 ]
 
 [tool.uv.sources]
 qubex = { git = "https://github.com/amachino/qubex.git", tag = "v1.4.1b1" }
+strands-agents = { git = "https://github.com/strands-agents/sdk-python.git" }
