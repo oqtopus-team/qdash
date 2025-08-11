@@ -151,6 +151,7 @@ services:
     networks:
       - custom_net
 
+  # Primary Slack agent using Strands SDK
   agent:
     build:
       context: .
