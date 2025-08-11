@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { TimeRangeState } from '../types/analysis';
+import { useState, useCallback } from "react";
+import { TimeRangeState } from "../types/analysis";
 
 interface UseTimeRangeOptions {
   initialDays?: number;
@@ -10,9 +10,7 @@ interface UseTimeRangeOptions {
  * Manual refresh approach - no automatic updates to preserve user settings
  */
 export function useTimeRange(options: UseTimeRangeOptions = {}) {
-  const { 
-    initialDays = 7
-  } = options;
+  const { initialDays = 7 } = options;
 
   // Format date with JST timezone
   const formatJSTDate = useCallback((date: Date) => {
@@ -28,25 +26,30 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
 
   const [timeRange, setTimeRange] = useState<TimeRangeState>(() => ({
     endAt: formatJSTDate(new Date()),
-    startAt: formatJSTDate(new Date(Date.now() - initialDays * 24 * 60 * 60 * 1000)),
+    startAt: formatJSTDate(
+      new Date(Date.now() - initialDays * 24 * 60 * 60 * 1000),
+    ),
     isStartAtLocked: false,
     isEndAtLocked: false,
   }));
 
   // Manual refresh function
   const refreshTimeRange = useCallback(() => {
-    setTimeRange(prev => ({
+    setTimeRange((prev) => ({
       ...prev,
       endAt: prev.isEndAtLocked ? prev.endAt : formatJSTDate(new Date()),
-      startAt: prev.isStartAtLocked || prev.isEndAtLocked 
-        ? prev.startAt 
-        : formatJSTDate(new Date(Date.now() - initialDays * 24 * 60 * 60 * 1000)),
+      startAt:
+        prev.isStartAtLocked || prev.isEndAtLocked
+          ? prev.startAt
+          : formatJSTDate(
+              new Date(Date.now() - initialDays * 24 * 60 * 60 * 1000),
+            ),
     }));
   }, [formatJSTDate, initialDays]);
 
   // Update start time
   const updateStartAt = useCallback((value: string) => {
-    setTimeRange(prev => ({
+    setTimeRange((prev) => ({
       ...prev,
       startAt: value,
       isStartAtLocked: true,
@@ -55,7 +58,7 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
 
   // Update end time
   const updateEndAt = useCallback((value: string) => {
-    setTimeRange(prev => ({
+    setTimeRange((prev) => ({
       ...prev,
       endAt: value,
       isEndAtLocked: true,
@@ -64,7 +67,7 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
 
   // Toggle start time lock
   const toggleStartAtLock = useCallback(() => {
-    setTimeRange(prev => {
+    setTimeRange((prev) => {
       const newLocked = !prev.isStartAtLocked;
       return {
         ...prev,
@@ -76,7 +79,7 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
 
   // Toggle end time lock
   const toggleEndAtLock = useCallback(() => {
-    setTimeRange(prev => {
+    setTimeRange((prev) => {
       const newLocked = !prev.isEndAtLocked;
       return {
         ...prev,
@@ -89,7 +92,7 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
   // Get lock status description
   const getLockStatusDescription = useCallback(() => {
     const { isStartAtLocked, isEndAtLocked } = timeRange;
-    
+
     if (!isStartAtLocked && !isEndAtLocked) {
       return "Both times will update when refreshed manually";
     }

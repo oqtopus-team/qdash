@@ -18,7 +18,6 @@ import { useAnalysisUrlState } from "@/app/hooks/useUrlState";
 import { ParameterKey, TagKey } from "@/shared/types/analysis";
 import { Layout } from "plotly.js";
 
-
 export function TimeSeriesView() {
   // URL state management
   const {
@@ -43,14 +42,20 @@ export function TimeSeriesView() {
 
   // Fetch chips data for default selection
   const { data: chipsResponse } = useListChips();
-  
+
   // Fetch parameters and tags
-  const { data: parametersResponse, isLoading: isLoadingParameters } = useFetchAllParameters();
+  const { data: parametersResponse, isLoading: isLoadingParameters } =
+    useFetchAllParameters();
   const { data: tagsResponse, isLoading: isLoadingTags } = useListAllTag();
 
   // Set default chip when URL is initialized and no chip is selected
   useEffect(() => {
-    if (isInitialized && !selectedChip && chipsResponse?.data && chipsResponse.data.length > 0) {
+    if (
+      isInitialized &&
+      !selectedChip &&
+      chipsResponse?.data &&
+      chipsResponse.data.length > 0
+    ) {
       // Sort chips by installation date and select the most recent one
       const sortedChips = [...chipsResponse.data].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
@@ -62,45 +67,55 @@ export function TimeSeriesView() {
   }, [isInitialized, selectedChip, chipsResponse, setSelectedChip]);
 
   // Fetch time series data directly (Analysis page doesn't have qubitId)
-  const { data: timeseriesResponse, isLoading: isLoadingTimeseries, error, refetch } =
-    useFetchTimeseriesTaskResultByTagAndParameter(
-      selectedChip,
-      selectedParameter as ParameterKey,
-      {
-        tag: selectedTag as TagKey,
-        start_at: timeRange.startAt,
-        end_at: timeRange.endAt,
+  const {
+    data: timeseriesResponse,
+    isLoading: isLoadingTimeseries,
+    error,
+    refetch,
+  } = useFetchTimeseriesTaskResultByTagAndParameter(
+    selectedChip,
+    selectedParameter as ParameterKey,
+    {
+      tag: selectedTag as TagKey,
+      start_at: timeRange.startAt,
+      end_at: timeRange.endAt,
+    },
+    {
+      query: {
+        enabled: Boolean(selectedChip && selectedParameter && selectedTag),
+        staleTime: 30000, // Keep data fresh for 30 seconds
       },
-      {
-        query: {
-          enabled: Boolean(selectedChip && selectedParameter && selectedTag),
-          staleTime: 30000, // Keep data fresh for 30 seconds
-        },
-      },
-    );
+    },
+  );
 
   // Process data using shared processing logic
   const { tableData, plotData, metadata } = useMemo(() => {
     if (!timeseriesResponse?.data?.data) {
-      return { tableData: [], plotData: [], metadata: { unit: 'a.u.', description: '' } };
+      return {
+        tableData: [],
+        plotData: [],
+        metadata: { unit: "a.u.", description: "" },
+      };
     }
 
     // Table data processing
     const tableRows: any[] = [];
-    Object.entries(timeseriesResponse.data.data).forEach(([qid, dataPoints]) => {
-      if (Array.isArray(dataPoints)) {
-        dataPoints.forEach((point: any) => {
-          tableRows.push({
-            qid,
-            time: point.calibrated_at || '',
-            value: point.value || 0,
-            error: point.error,
-            unit: point.unit || 'a.u.',
+    Object.entries(timeseriesResponse.data.data).forEach(
+      ([qid, dataPoints]) => {
+        if (Array.isArray(dataPoints)) {
+          dataPoints.forEach((point: any) => {
+            tableRows.push({
+              qid,
+              time: point.calibrated_at || "",
+              value: point.value || 0,
+              error: point.error,
+              unit: point.unit || "a.u.",
+            });
           });
-        });
-      }
-    });
-    
+        }
+      },
+    );
+
     // Sort by QID and time
     const sortedTableData = tableRows.sort((a, b) => {
       const qidCompare = parseInt(a.qid) - parseInt(b.qid);
@@ -109,52 +124,65 @@ export function TimeSeriesView() {
     });
 
     // Plot data processing
-    const qidData: Record<string, { x: string[]; y: number[]; error: number[] }> = {};
-    
-    Object.entries(timeseriesResponse.data.data).forEach(([qid, dataPoints]) => {
-      if (Array.isArray(dataPoints)) {
-        qidData[qid] = {
-          x: dataPoints.map((point: any) => point.calibrated_at || ''),
-          y: dataPoints.map((point: any) => {
-            const value = point.value;
-            if (typeof value === 'number') return value;
-            if (typeof value === 'string') return Number(value) || 0;
-            return 0;
-          }),
-          error: dataPoints.map((point: any) => point.error || 0),
-        };
-      }
-    });
+    const qidData: Record<
+      string,
+      { x: string[]; y: number[]; error: number[] }
+    > = {};
+
+    Object.entries(timeseriesResponse.data.data).forEach(
+      ([qid, dataPoints]) => {
+        if (Array.isArray(dataPoints)) {
+          qidData[qid] = {
+            x: dataPoints.map((point: any) => point.calibrated_at || ""),
+            y: dataPoints.map((point: any) => {
+              const value = point.value;
+              if (typeof value === "number") return value;
+              if (typeof value === "string") return Number(value) || 0;
+              return 0;
+            }),
+            error: dataPoints.map((point: any) => point.error || 0),
+          };
+        }
+      },
+    );
 
     // Sort QIDs numerically and create traces
-    const sortedQids = Object.keys(qidData).sort((a, b) => parseInt(a) - parseInt(b));
+    const sortedQids = Object.keys(qidData).sort(
+      (a, b) => parseInt(a) - parseInt(b),
+    );
     const traces = sortedQids.map((qid) => ({
       x: qidData[qid].x,
       y: qidData[qid].y,
       error_y: {
-        type: 'data' as const,
+        type: "data" as const,
         array: qidData[qid].error as Plotly.Datum[],
         visible: true,
       },
-      type: 'scatter' as const,
-      mode: 'lines+markers' as const,
+      type: "scatter" as const,
+      mode: "lines+markers" as const,
       name: `QID: ${qid}`,
-      line: { shape: 'linear' as const, width: 2 },
-      marker: { size: 8, symbol: 'circle' },
+      line: { shape: "linear" as const, width: 2 },
+      marker: { size: 8, symbol: "circle" },
       hovertemplate:
-        'Time: %{x}<br>Value: %{y:.8f}' +
-        (qidData[qid].error[0] ? '<br>Error: ±%{error_y.array:.8f}' : '') +
-        '<br>QID: ' + qid + '<extra></extra>',
+        "Time: %{x}<br>Value: %{y:.8f}" +
+        (qidData[qid].error[0] ? "<br>Error: ±%{error_y.array:.8f}" : "") +
+        "<br>QID: " +
+        qid +
+        "<extra></extra>",
     }));
 
     // Extract metadata
     const firstEntry = Object.entries(timeseriesResponse.data.data)[0];
-    let metaInfo = { unit: 'a.u.', description: '' };
-    if (firstEntry && Array.isArray(firstEntry[1]) && firstEntry[1].length > 0) {
+    let metaInfo = { unit: "a.u.", description: "" };
+    if (
+      firstEntry &&
+      Array.isArray(firstEntry[1]) &&
+      firstEntry[1].length > 0
+    ) {
       const firstPoint = firstEntry[1][0] as any;
       metaInfo = {
-        unit: firstPoint.unit || 'a.u.',
-        description: firstPoint.description || '',
+        unit: firstPoint.unit || "a.u.",
+        description: firstPoint.description || "",
       };
     }
 
@@ -168,48 +196,55 @@ export function TimeSeriesView() {
   // CSV export functionality
   const { exportTimeSeriesCSV } = useCSVExport();
 
-
   // Plot layout configuration
-  const layout = useMemo<Partial<Layout>>(() => ({
-    title: {
-      text: `${selectedParameter} Time Series by QID`,
-      font: { size: 24 },
-    },
-    xaxis: {
-      title: "Time",
-      type: "date",
-      tickformat: "%Y-%m-%d %H:%M",
-      gridcolor: "#eee",
-      zeroline: false,
-    },
-    yaxis: {
-      title: `${metadata.description} [${metadata.unit}]`,
-      type: "linear",
-      gridcolor: "#eee",
-      zeroline: false,
-      exponentformat: "e" as const,
-    },
-    showlegend: true,
-    legend: {
-      x: 1.05,
-      y: 1,
-      xanchor: "left",
-      yanchor: "top",
-      bgcolor: "rgba(255, 255, 255, 0.8)",
-    },
-    autosize: true,
-    margin: { l: 80, r: 150, t: 100, b: 80 },
-    plot_bgcolor: "white",
-    paper_bgcolor: "white",
-    hovermode: "closest",
-  }), [selectedParameter, metadata]);
+  const layout = useMemo<Partial<Layout>>(
+    () => ({
+      title: {
+        text: `${selectedParameter} Time Series by QID`,
+        font: { size: 24 },
+      },
+      xaxis: {
+        title: "Time",
+        type: "date",
+        tickformat: "%Y-%m-%d %H:%M",
+        gridcolor: "#eee",
+        zeroline: false,
+      },
+      yaxis: {
+        title: `${metadata.description} [${metadata.unit}]`,
+        type: "linear",
+        gridcolor: "#eee",
+        zeroline: false,
+        exponentformat: "e" as const,
+      },
+      showlegend: true,
+      legend: {
+        x: 1.05,
+        y: 1,
+        xanchor: "left",
+        yanchor: "top",
+        bgcolor: "rgba(255, 255, 255, 0.8)",
+      },
+      autosize: true,
+      margin: { l: 80, r: 150, t: 100, b: 80 },
+      plot_bgcolor: "white",
+      paper_bgcolor: "white",
+      hovermode: "closest",
+    }),
+    [selectedParameter, metadata],
+  );
 
   const parameters = parametersResponse?.data?.parameters || [];
   const tags = tagsResponse?.data?.tags || [];
 
   // Handle CSV download
   const handleDownloadCSV = () => {
-    exportTimeSeriesCSV(tableData, selectedParameter as ParameterKey, selectedChip, selectedTag as TagKey);
+    exportTimeSeriesCSV(
+      tableData,
+      selectedParameter as ParameterKey,
+      selectedChip,
+      selectedTag as TagKey,
+    );
   };
 
   // Manual refresh handler
@@ -231,23 +266,25 @@ export function TimeSeriesView() {
 
   // Table columns definition
   const tableColumns = [
-    { key: 'qid', label: 'QID', sortable: true, className: 'text-left' },
-    { key: 'time', label: 'Time', sortable: true, className: 'text-left' },
-    { 
-      key: 'value', 
-      label: 'Value', 
-      sortable: false, 
-      className: 'text-center',
-      render: (value: any) => typeof value === 'number' ? value.toFixed(4) : String(value)
+    { key: "qid", label: "QID", sortable: true, className: "text-left" },
+    { key: "time", label: "Time", sortable: true, className: "text-left" },
+    {
+      key: "value",
+      label: "Value",
+      sortable: false,
+      className: "text-center",
+      render: (value: any) =>
+        typeof value === "number" ? value.toFixed(4) : String(value),
     },
-    { 
-      key: 'error', 
-      label: 'Error', 
-      sortable: false, 
-      className: 'text-center',
-      render: (value: any) => value !== undefined ? `±${value.toFixed(4)}` : '-'
+    {
+      key: "error",
+      label: "Error",
+      sortable: false,
+      className: "text-center",
+      render: (value: any) =>
+        value !== undefined ? `±${value.toFixed(4)}` : "-",
     },
-    { key: 'unit', label: 'Unit', sortable: false, className: 'text-center' },
+    { key: "unit", label: "Unit", sortable: false, className: "text-center" },
   ];
 
   return (
@@ -273,7 +310,9 @@ export function TimeSeriesView() {
           </h2>
           <button
             onClick={handleRefresh}
-            disabled={isLoadingTimeseries || isLoadingParameters || isLoadingTags}
+            disabled={
+              isLoadingTimeseries || isLoadingParameters || isLoadingTags
+            }
             className="btn btn-sm btn-outline gap-2"
             title="Refresh data and time range"
           >
@@ -332,7 +371,9 @@ export function TimeSeriesView() {
                 }`}
                 onClick={toggleStartAtLock}
                 title={
-                  timeRange.isStartAtLocked ? "Unlock start time" : "Lock start time"
+                  timeRange.isStartAtLocked
+                    ? "Unlock start time"
+                    : "Lock start time"
                 }
               >
                 <svg
@@ -374,7 +415,9 @@ export function TimeSeriesView() {
                   timeRange.isEndAtLocked ? "btn-primary" : "btn-ghost"
                 }`}
                 onClick={toggleEndAtLock}
-                title={timeRange.isEndAtLocked ? "Unlock end time" : "Lock end time"}
+                title={
+                  timeRange.isEndAtLocked ? "Unlock end time" : "Lock end time"
+                }
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -442,7 +485,12 @@ export function TimeSeriesView() {
           </svg>
         }
         isLoading={isLoadingTimeseries}
-        hasData={Boolean(selectedChip && selectedParameter && selectedTag && plotData.length > 0)}
+        hasData={Boolean(
+          selectedChip &&
+            selectedParameter &&
+            selectedTag &&
+            plotData.length > 0,
+        )}
         emptyStateMessage={
           !selectedChip || !selectedParameter || !selectedTag
             ? "Select chip and parameters to visualize data"

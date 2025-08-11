@@ -11,6 +11,7 @@
 3. **Clean Commit Messages**: Generate conventional commit messages without any AI-related attribution
 
 ## Example Format
+
 ```
 feat: add new feature
 

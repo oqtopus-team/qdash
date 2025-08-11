@@ -4,7 +4,6 @@ This is the full migration to Strands Agents SDK.
 """
 
 import asyncio
-import json
 import logging
 import os
 import statistics
@@ -32,13 +31,13 @@ from slack_bolt.async_app import AsyncApp
 try:
     from strands import Agent, tool
     from strands.models.openai import OpenAIModel
-    
+
     STRANDS_AVAILABLE = True
     print("✅ Strands Agents SDK imported successfully")
 except ImportError as e:
     print(f"❌ Strands Agents SDK not available: {e}")
     STRANDS_AVAILABLE = False
-    
+
     # Fallback tool decorator
     def tool(func):
         """Fallback tool decorator when Strands is not available."""
@@ -46,13 +45,13 @@ except ImportError as e:
         func._tool_name = func.__name__
         return func
 
+
 # Initialize database
 initialize()
 
 settings = get_settings()
 
 # Enhanced logging configuration
-import os
 
 log_dir = os.path.dirname(os.path.abspath(__file__))
 log_file = os.path.join(log_dir, "log", "agent.log")
@@ -482,8 +481,8 @@ async def get_thread_history(channel_id: str, thread_ts: str) -> dict[str, Any]:
 def create_strands_agent():
     """Create a Strands agent with QDash quantum tools."""
     model_config = get_current_model_config()
-    
-    # System instructions for the agent  
+
+    # System instructions for the agent
     system_prompt = f"""あなたはQDash量子キャリブレーションシステムのSlackアシスタントです。
 
 基本的な対応:
@@ -522,19 +521,17 @@ Model: {model_config.name}
         if model_config.provider == "openai":
             # Get API key from settings or environment
             settings = get_settings()
-            api_key = (getattr(settings, 'openai_api_key', None) or 
-                      model_config.api_key or 
-                      os.getenv("OPENAI_API_KEY"))
-            
+            api_key = getattr(settings, "openai_api_key", None) or model_config.api_key or os.getenv("OPENAI_API_KEY")
+
             # Create OpenAI model configuration with supported parameters only
             model_params = {
                 "temperature": model_config.temperature,
                 "max_completion_tokens": model_config.max_completion_tokens,
             }
-            
+
             # Note: GPT-5 specific parameters (verbosity, reasoning) are not yet supported
             # by the current OpenAI client library. Will be enabled when available.
-            
+
             model = OpenAIModel(
                 client_args={
                     "api_key": api_key,
@@ -542,35 +539,28 @@ Model: {model_config.name}
                     "max_retries": 3,  # More retries
                 },
                 model_id=model_config.name,
-                params=model_params
+                params=model_params,
             )
-            
+
             # Create Strands Agent with proper configuration
-            agent = Agent(
-                model=model,
-                system_prompt=system_prompt,
-                tools=tools
-            )
+            agent = Agent(model=model, system_prompt=system_prompt, tools=tools)
             logger.info(f"✅ Strands Agent initialized with OpenAI model: {model_config.name}")
         else:
             # For other providers, use default Agent (will use environment settings)
-            agent = Agent(
-                system_prompt=system_prompt,
-                tools=tools
-            )
-            logger.info(f"✅ Strands Agent initialized with default configuration")
+            agent = Agent(system_prompt=system_prompt, tools=tools)
+            logger.info("✅ Strands Agent initialized with default configuration")
     else:
         # Fallback: Create a simple async wrapper for OpenAI
         logger.warning("⚠️ Strands SDK not available, using fallback implementation")
         from openai import AsyncOpenAI
-        
+
         class FallbackAgent:
             def __init__(self):
                 self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
                 self.model = model_config.name
                 self.system_prompt = system_prompt
                 self.tools = {t.__name__: t for t in tools}
-            
+
             async def invoke_async(self, message: str):
                 """Simple async invocation without tool support."""
                 try:
@@ -578,22 +568,22 @@ Model: {model_config.name}
                         model=self.model,
                         messages=[
                             {"role": "system", "content": self.system_prompt},
-                            {"role": "user", "content": message}
+                            {"role": "user", "content": message},
                         ],
                         temperature=model_config.temperature,
-                        max_tokens=model_config.max_tokens
+                        max_tokens=model_config.max_tokens,
                     )
-                    
+
                     # Return a simple object with message content
                     class Result:
                         def __init__(self, content):
-                            self.message = type('Message', (), {'content': content})()
-                    
+                            self.message = type("Message", (), {"content": content})()
+
                     return Result(response.choices[0].message.content)
                 except Exception as e:
                     logger.error(f"Fallback agent error: {e}")
                     raise
-        
+
         agent = FallbackAgent()
         logger.info(f"⚠️ Fallback Agent initialized: {model_config.name}")
 
@@ -623,10 +613,10 @@ async def handle_mention(event, say, client) -> None:
         try:
             # Execute agent with user message directly (no confusing context)
             user_message = clean_message
-            
+
             # Use invoke_async for Strands Agent
             result = await agent.invoke_async(user_message)
-            
+
             # Extract the message content from the result (Strands AgentResult format)
             response_text = str(result) if result else "No response generated"
 

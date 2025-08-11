@@ -1,5 +1,9 @@
-import { useMemo } from 'react';
-import { CorrelationDataPoint, StatisticalSummary, ParameterKey } from '../types/analysis';
+import { useMemo } from "react";
+import {
+  CorrelationDataPoint,
+  StatisticalSummary,
+  ParameterKey,
+} from "../types/analysis";
 
 interface ParameterValue {
   value: number;
@@ -20,12 +24,7 @@ interface UseCorrelationDataOptions {
  * Supports both qubit detail page and analysis page correlation views
  */
 export function useCorrelationData(options: UseCorrelationDataOptions) {
-  const {
-    chipData,
-    xParameter,
-    yParameter,
-    enabled = true,
-  } = options;
+  const { chipData, xParameter, yParameter, enabled = true } = options;
 
   // Get parameter value for a qubit
   const getParameterValue = (qubit: any, param: string): ParameterValue => {
@@ -47,7 +46,7 @@ export function useCorrelationData(options: UseCorrelationDataOptions) {
         updated: "",
       };
     }
-    
+
     const value = paramData.value;
     const unit = paramData.unit === "ns" ? "μs" : paramData.unit;
 
@@ -95,27 +94,30 @@ export function useCorrelationData(options: UseCorrelationDataOptions) {
     return correlationData.map((d) => ({
       x: [d.x],
       y: [d.y],
-      text: [d.qid || ''],
-      textposition: 'top center' as const,
+      text: [d.qid || ""],
+      textposition: "top center" as const,
       textfont: { size: 10 },
-      mode: 'text+markers' as const,
-      type: 'scatter' as const,
+      mode: "text+markers" as const,
+      type: "scatter" as const,
       name: `QID: ${d.qid}`,
-      marker: correlationData.length > 20 ? {
-        size: 10,
-        line: { color: 'white', width: 1 },
-        opacity: 0.8,
-      } : {
-        size: 12,
-        line: { color: 'white', width: 1 },
-      },
-      hoverinfo: 'text' as const,
+      marker:
+        correlationData.length > 20
+          ? {
+              size: 10,
+              line: { color: "white", width: 1 },
+              opacity: 0.8,
+            }
+          : {
+              size: 12,
+              line: { color: "white", width: 1 },
+            },
+      hoverinfo: "text" as const,
       hovertext: [
         `QID: ${d.qid}<br>` +
-        `${xParameter}: ${d.x.toFixed(4)} ${d.xUnit}<br>` +
-        `${yParameter}: ${d.y.toFixed(4)} ${d.yUnit}<br>` +
-        (d.xDescription ? `Description (X): ${d.xDescription}<br>` : '') +
-        (d.yDescription ? `Description (Y): ${d.yDescription}<br>` : ''),
+          `${xParameter}: ${d.x.toFixed(4)} ${d.xUnit}<br>` +
+          `${yParameter}: ${d.y.toFixed(4)} ${d.yUnit}<br>` +
+          (d.xDescription ? `Description (X): ${d.xDescription}<br>` : "") +
+          (d.yDescription ? `Description (Y): ${d.yDescription}<br>` : ""),
       ],
     }));
   }, [correlationData, xParameter, yParameter]);
@@ -124,19 +126,28 @@ export function useCorrelationData(options: UseCorrelationDataOptions) {
   const statistics = useMemo((): StatisticalSummary | null => {
     if (correlationData.length < 2) return null;
 
-    const xValues = correlationData.map(d => d.x);
-    const yValues = correlationData.map(d => d.y);
+    const xValues = correlationData.map((d) => d.x);
+    const yValues = correlationData.map((d) => d.y);
     const n = xValues.length;
 
     // Calculate means
     const xMean = xValues.reduce((sum, x) => sum + x, 0) / n;
     const yMean = yValues.reduce((sum, y) => sum + y, 0) / n;
-    
+
     // Calculate correlation coefficient
-    const numerator = correlationData.reduce((sum, d) => sum + (d.x - xMean) * (d.y - yMean), 0);
-    const xVariance = xValues.reduce((sum, x) => sum + Math.pow(x - xMean, 2), 0);
-    const yVariance = yValues.reduce((sum, y) => sum + Math.pow(y - yMean, 2), 0);
-    
+    const numerator = correlationData.reduce(
+      (sum, d) => sum + (d.x - xMean) * (d.y - yMean),
+      0,
+    );
+    const xVariance = xValues.reduce(
+      (sum, x) => sum + Math.pow(x - xMean, 2),
+      0,
+    );
+    const yVariance = yValues.reduce(
+      (sum, y) => sum + Math.pow(y - yMean, 2),
+      0,
+    );
+
     const correlation = numerator / Math.sqrt(xVariance * yVariance);
 
     return {
@@ -156,12 +167,12 @@ export function useCorrelationData(options: UseCorrelationDataOptions) {
   // Get available parameters from chip data
   const availableParameters = useMemo(() => {
     if (!chipData?.qubits) return [];
-    const params = new Set<string>(['qid']);
+    const params = new Set<string>(["qid"]);
 
     Object.entries(chipData.qubits).forEach(([_, qubit]: [string, any]) => {
       if (qubit?.data) {
         Object.keys(qubit.data).forEach((param) => {
-          if (param !== 'qid') {
+          if (param !== "qid") {
             params.add(param);
           }
         });

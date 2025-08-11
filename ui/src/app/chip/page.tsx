@@ -521,44 +521,48 @@ function ChipPageContent() {
                                           }}
                                           className="card bg-base-100 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow relative w-full"
                                         >
-                                        <div className="card-body p-2">
-                                          <div className="text-sm font-medium mb-2">
-                                            <div className="flex justify-between items-center mb-1">
-                                              <span>QID: {qid}</span>
-                                              <div
-                                                className={`w-2 h-2 rounded-full ${
-                                                  task.status === "completed"
-                                                    ? "bg-success"
-                                                    : task.status === "failed"
-                                                      ? "bg-error"
-                                                      : "bg-warning"
-                                                }`}
-                                              />
+                                          <div className="card-body p-2">
+                                            <div className="text-sm font-medium mb-2">
+                                              <div className="flex justify-between items-center mb-1">
+                                                <span>QID: {qid}</span>
+                                                <div
+                                                  className={`w-2 h-2 rounded-full ${
+                                                    task.status === "completed"
+                                                      ? "bg-success"
+                                                      : task.status === "failed"
+                                                        ? "bg-error"
+                                                        : "bg-warning"
+                                                  }`}
+                                                />
+                                              </div>
+                                              {task.end_at && (
+                                                <div className="text-xs text-base-content/60">
+                                                  Updated:{" "}
+                                                  {formatRelativeTime(
+                                                    new Date(task.end_at),
+                                                  )}
+                                                </div>
+                                              )}
                                             </div>
-                                            {task.end_at && (
-                                              <div className="text-xs text-base-content/60">
-                                                Updated:{" "}
-                                                {formatRelativeTime(
-                                                  new Date(task.end_at),
-                                                )}
+                                            {task.figure_path && (
+                                              <div className="relative h-48 rounded-lg overflow-hidden">
+                                                <TaskFigure
+                                                  path={task.figure_path}
+                                                  qid={qid}
+                                                  className="w-full h-48 object-contain"
+                                                />
                                               </div>
                                             )}
                                           </div>
-                                          {task.figure_path && (
-                                            <div className="relative h-48 rounded-lg overflow-hidden">
-                                              <TaskFigure
-                                                path={task.figure_path}
-                                                qid={qid}
-                                                className="w-full h-48 object-contain"
-                                              />
-                                            </div>
-                                          )}
-                                        </div>
                                         </button>
-                                        
+
                                         {/* Detail Analysis Button */}
                                         <button
-                                          onClick={() => router.push(`/chip/${selectedChip}/qubit/${qid}`)}
+                                          onClick={() =>
+                                            router.push(
+                                              `/chip/${selectedChip}/qubit/${qid}`,
+                                            )
+                                          }
                                           className="absolute top-2 right-2 btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                                           title="Detailed Analysis"
                                         >
@@ -613,7 +617,11 @@ function ChipPageContent() {
                 </button>
                 {viewMode !== "2q" && (
                   <button
-                    onClick={() => router.push(`/chip/${selectedChip}/qubit/${selectedTaskInfo.qid}`)}
+                    onClick={() =>
+                      router.push(
+                        `/chip/${selectedChip}/qubit/${selectedTaskInfo.qid}`,
+                      )
+                    }
                     className="btn btn-sm btn-primary"
                     title="Detailed Analysis"
                   >

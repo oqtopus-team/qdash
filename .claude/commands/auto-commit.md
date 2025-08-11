@@ -1,6 +1,6 @@
 ---
 description: Automatically commit with generated message (no Claude signature)
-allowed-tools: 
+allowed-tools:
   - Bash
 ---
 
@@ -11,13 +11,15 @@ Analyzing changes...
 !git diff HEAD --stat
 
 Based on these changes, I'll:
+
 1. Generate an appropriate conventional commit message
 2. Stage all changes
 3. Commit with the generated message (without Claude signature)
 
 The commit will follow the format:
+
 - `feat(scope):` for new features
-- `fix(scope):` for bug fixes  
+- `fix(scope):` for bug fixes
 - `docs:` for documentation changes
 - `style:` for formatting changes
 - `refactor:` for code refactoring
