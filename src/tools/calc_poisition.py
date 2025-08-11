@@ -1,7 +1,7 @@
 """Qubit initialization module."""
 
 from qdash.datamodel.qubit import NodeInfoModel, PositionModel
-from qdash.db.init.initialize import initialize
+from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.qubit import QubitDocument
 
 

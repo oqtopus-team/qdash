@@ -1,7 +1,7 @@
 """Task initialization module."""
 
 from qdash.datamodel.task import TaskModel
-from qdash.db.init.initialize import initialize
+from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.task import TaskDocument
 from qdash.workflow.tasks.base import BaseTask
 

@@ -4,9 +4,9 @@ from typing import cast
 from qdash.datamodel.parameter import ParameterModel
 from qdash.db.init.chip import generate_coupling_data, generate_qubit_data
 from qdash.db.init.coupling import bi_direction, generate_coupling
-from qdash.db.init.initialize import initialize
 from qdash.db.init.qubit import generate_dummy_data  # qubit_lattice
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.menu import MenuDocument
 from qdash.workflow.tasks.base import BaseTask
 

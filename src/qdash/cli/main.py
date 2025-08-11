@@ -6,7 +6,7 @@ from qdash.db.init import (
     init_menu,
     init_task_document,
 )
-from qdash.db.init.initialize import initialize
+from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.parameter import ParameterDocument
 
 app = typer.Typer(
