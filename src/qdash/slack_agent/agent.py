@@ -532,25 +532,25 @@ QDashユーザー名: 各操作時に明示的に指定が必要
 6. "チップレポート"や"レポート生成"の依頼: 🚨 **即座に** generate_chip_report を使用
    **絶対ルール**: ユーザー名とレポート依頼が明確な場合、他のツールを使わずに直接generate_chip_reportを実行
    **重要**: このスレッドのチャンネルID="{channel_id}", スレッドTS="{thread_ts if thread_ts else ''}"
-   
+
    **時間指定の処理**:
    - ユーザーメッセージから時間を抽出（例: "48時間", "12h", "過去24時間"など）
    - 抽出した時間をcutoff_hoursパラメータに設定
    - 時間指定がない場合はデフォルト24時間を使用
-   
+
    generate_chip_reportを呼ぶ際は必ずこれらの値を使用:
    generate_chip_report(username="指定されたユーザー名", slack_channel="{channel_id}", slack_thread_ts="{thread_ts if thread_ts else ''}", cutoff_hours=48)
-   
+
    **時間指定の理解:**
    - 「過去48時間のレポート」「48時間のレポート」→ cutoff_hours=48
-   - 「12hのレポート」「12時間レポート」→ cutoff_hours=12  
+   - 「12hのレポート」「12時間レポート」→ cutoff_hours=12
    - 時間指定がない場合はcutoff_hours=24（デフォルト）
    - extract_username_and_action関数で時間も抽出してください
 7. 単純な挨拶や雑談には、ツールを使わず自然に返答してください
 
 **❌ 禁止事項:**
 - レポート生成依頼でget_current_chipを先に呼ぶこと
-- レポート生成前にフィデリティを確認すること  
+- レポート生成前にフィデリティを確認すること
 - 「現在のチップIDを取得する必要があります」のような余計な前置き
 
 **✅ 正しい処理:**
@@ -811,7 +811,9 @@ async def generate_chip_report(
         # Get the chip-report deployment
         try:
             # First, try to get all deployments for debugging
-            deployment = await client.read_deployment_by_name("chip-report/qiqb-dev-chip-report")
+            settings = get_settings()
+            env = settings.env
+            deployment = await client.read_deployment_by_name(f"chip-report/{env}-chip-report")
             parameters = {
                 "username": username,
                 "slack_channel": slack_channel,  # Always include, even if empty
