@@ -3,12 +3,12 @@
 from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
 from qdash.datamodel.qubit import NodeInfoModel, PositionModel, QubitModel
 from qdash.db.init.coupling import bi_direction, generate_coupling
-from qdash.db.init.initialize import initialize
 from qdash.db.init.qubit import (
     generate_dummy_data,  # qubit_lattice
     qubit_lattice,
 )
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.initialize import initialize
 
 CHIP_SIZE_64 = 64
 CHIP_SIZE_144 = 144

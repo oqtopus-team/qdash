@@ -1,6 +1,6 @@
 from qdash.datamodel.backend import BackendModel
-from qdash.db.init.initialize import initialize
 from qdash.dbmodel.backend import BackendDocument
+from qdash.dbmodel.initialize import initialize
 
 
 def init_backend_document(username: str, backend: str) -> None:

@@ -1,4 +1,4 @@
-from qdash.db.init import initialize
+from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.chip import ChipDocument
 
 initialize()

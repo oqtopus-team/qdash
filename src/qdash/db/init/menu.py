@@ -1,6 +1,6 @@
 """Menu initialization module."""
 
-from qdash.db.init.initialize import initialize
+from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.menu import MenuDocument
 
 
