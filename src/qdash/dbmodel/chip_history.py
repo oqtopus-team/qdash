@@ -114,7 +114,7 @@ class ChipHistoryDocument(Document):
                 recorded_date=today,
             )
             return history_doc.insert()
-            
+
         except DuplicateKeyError:
             # If duplicate key error occurs, find and update the existing document
             logger.info(f"History record already exists for chip {chip_doc.chip_id}, updating existing record")
@@ -125,7 +125,7 @@ class ChipHistoryDocument(Document):
                     "recorded_date": today,
                 }
             ).run()
-            
+
             if existing_doc:
                 # Update the existing document
                 existing_doc.size = chip_doc.size
@@ -137,7 +137,7 @@ class ChipHistoryDocument(Document):
             else:
                 # This shouldn't happen, but handle it gracefully
                 raise RuntimeError("Document not found after DuplicateKeyError")
-                
+
         except Exception as e:
             logger.error(f"Failed to create/update chip history: {e}")
             raise
