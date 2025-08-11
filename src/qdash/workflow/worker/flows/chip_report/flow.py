@@ -1,5 +1,6 @@
 import os
 
+import os
 import pendulum
 from prefect import flow, get_run_logger
 from qdash.config import get_settings
@@ -20,13 +21,15 @@ from qdash.workflow.worker.tasks.pull_github import pull_github
 
 
 @flow(name="chip-report", flow_run_name="Generate Chip Report")
-def chip_report(username: str = "admin", source_path: str = "") -> None:
+def chip_report(username: str = "admin", source_path: str = "", slack_channel: str = "", slack_thread_ts: str = "") -> None:
     """Flow to generate and push chip report.
 
     Args:
     ----
         username: Username for the operation.
         source_path: Path to the source YAML file.
+        slack_channel: Slack channel ID to send results to.
+        slack_thread_ts: Slack thread timestamp to reply to.
 
     Returns:
     -------
@@ -68,25 +71,37 @@ def chip_report(username: str = "admin", source_path: str = "") -> None:
     handler_24h.write(merged_24h, props_save_path_24h)
     generate_chip_info_report(chip_info_dir=chip_info_dir, chip_id=chip.chip_id)
     settings = get_settings()
+    
+    # Use provided slack channel/thread or fallback to settings
+    target_channel = slack_channel if slack_channel else settings.slack_channel_id
+    target_thread_ts = slack_thread_ts if slack_thread_ts else ""
+    
+    logger.info(f"Slack parameters - Channel: {target_channel}, Thread: {target_thread_ts}")
+    logger.info(f"Received params - slack_channel: {slack_channel}, slack_thread_ts: {slack_thread_ts}")
+    
     slack = SlackContents(
         status=Status.SUCCESS,
         title="🧪 For Experiment User",
         msg="Check the report.",
-        ts="",
+        ts=target_thread_ts,  # Use the provided thread ts (empty string creates new message)
         path="",
         header="For Experiment User",
-        channel=settings.slack_channel_id,
+        channel=target_channel,
         token=settings.slack_bot_token,
     )
-    ts = slack.send_slack()
+    # Send the first message and get ts for subsequent messages
+    sent_ts = slack.send_slack()
+    
+    # Use the thread_ts if provided, otherwise use the new message ts
+    ts = target_thread_ts if target_thread_ts else sent_ts
     slack = SlackContents(
         status=Status.SUCCESS,
         title="props.yaml",
         msg="props.yaml updated successfully.",
-        ts=ts,
+        ts=ts,  # Use the thread ts (either from input or from first message)
         path=props_save_path,
         header=f"file: {props_save_path}",
-        channel=settings.slack_channel_id,
+        channel=target_channel,
         token=settings.slack_bot_token,
     )
     slack.send_slack()
@@ -94,10 +109,11 @@ def chip_report(username: str = "admin", source_path: str = "") -> None:
         status=Status.SUCCESS,
         title="chip_info_report.pdf",
         msg="chip_info_report.pdf updated successfully.",
-        ts=ts,
+        ts=ts,  # Use the thread ts (either from input or from first message)
         path=f"{chip_info_dir}/chip_info_report.pdf",
         header=f"file: {chip_info_dir}/chip_info_report.pdf",
-        channel=settings.slack_channel_id,
+        channel=target_channel,
         token=settings.slack_bot_token,
     )
     slack.send_slack()
+    return merged

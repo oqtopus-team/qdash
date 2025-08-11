@@ -431,6 +431,9 @@ def format_chip_parameters_for_slack(parameters: dict[str, Any]) -> str:
 _agent_cache: dict[str, Agent] = {}
 _agent_cache_lock = asyncio.Lock()
 
+# Current thread context for passing to tools
+_current_thread_context: dict[str, Any] = {}
+
 
 def get_thread_key(channel_id: str, thread_ts: str | None, user_id: str) -> str:
     """Generate a unique key for thread-based agent caching with strict separation."""
@@ -441,6 +444,7 @@ def get_thread_key(channel_id: str, thread_ts: str | None, user_id: str) -> str:
         # Non-threaded messages: each message gets completely isolated context
         # Use timestamp to ensure no context bleeding between separate messages
         import time
+
         timestamp = int(time.time() * 1000)
         return f"single:{channel_id}:{user_id}:{timestamp}"
 
@@ -482,7 +486,8 @@ QDashユーザー名: 各操作時に明示的に指定が必要
 利用可能なツール:
 - get_chip_parameters_formatted: チップのフィデリティ統計とパラメータ取得
 - get_current_chip: 現在のチップID取得
-- generate_chip_report: フルチップレポート(YAML+PDF)生成とSlack送信
+- generate_chip_report: フルチップレポート(YAML+PDF)生成とSlack送信（現在のスレッドに送信）
+
 - get_current_time: 現在時刻取得
 - calculate: 数式計算
 - get_string_length: 文字列長取得
@@ -496,15 +501,15 @@ QDashユーザー名: 各操作時に明示的に指定が必要
 
 **自然な表現の理解:**
 - 「orangekame3のレポートをください」→ orangekame3でチップレポート生成
-- 「johnのフィデリティを見たい」→ johnでチップパラメータ取得  
+- 「johnのフィデリティを見たい」→ johnでチップパラメータ取得
 - 「aliceの現在のチップは？」→ aliceで現在チップID取得
 - 「admin でレポート作って」→ adminでチップレポート生成
 
 **パターン認識:**
 1. **ユーザー名 + の + 操作**: 「{{ユーザー名}}の{{操作}}」形式を認識
-2. **操作キーワード**: 
+2. **操作キーワード**:
    - レポート/チップレポート → generate_chip_report
-   - フィデリティ/パラメータ → get_chip_parameters_formatted  
+   - フィデリティ/パラメータ → get_chip_parameters_formatted
    - チップID/現在のチップ → get_current_chip
 3. **ユーザー名抽出**: メッセージから英数字のユーザー名を識別
 
@@ -516,6 +521,9 @@ QDashユーザー名: 各操作時に明示的に指定が必要
 4. フィデリティやチップに関する質問: get_chip_parameters_formatted を使用
 5. "最新のchip id"に関する質問: get_current_chip を使用
 6. "チップレポート"や"レポート生成"の依頼: generate_chip_report を使用
+   **重要**: このスレッドのチャンネルID="{channel_id}", スレッドTS="{thread_ts if thread_ts else ''}"
+   generate_chip_reportを呼ぶ際は必ずこれらの値を使用:
+   generate_chip_report(username="指定されたユーザー名", slack_channel="{channel_id}", slack_thread_ts="{thread_ts if thread_ts else ''}")
 7. 単純な挨拶や雑談には、ツールを使わず自然に返答してください
 
 Model: {model_config.name}
@@ -667,70 +675,64 @@ async def get_validated_qdash_username(user_id: str, specified_username: str | N
 
 def extract_username_and_action(message: str) -> tuple[str | None, str | None]:
     """Extract username and action from natural user messages.
-    
+
     Args:
         message: User message text
-        
+
     Returns:
         Tuple of (username, action) or (None, None) if not found
     """
     import re
-    
+
     message = message.lower().strip()
-    
+
     # Pattern 1: "{username}の{action}" - Japanese possessive
-    pattern1 = r'(\w+)の(レポート|フィデリティ|パラメータ|チップ)'
+    pattern1 = r"(\w+)の(レポート|フィデリティ|パラメータ|チップ)"
     match1 = re.search(pattern1, message)
     if match1:
         username = match1.group(1)
         action_word = match1.group(2)
-        
+
         # Map action words to actions
-        action_map = {
-            'レポート': 'report',
-            'フィデリティ': 'fidelity',
-            'パラメータ': 'parameters', 
-            'チップ': 'chip'
-        }
+        action_map = {"レポート": "report", "フィデリティ": "fidelity", "パラメータ": "parameters", "チップ": "chip"}
         action = action_map.get(action_word)
         return username, action
-    
+
     # Pattern 2: "{username} で {action}" - Japanese particle "de"
-    pattern2 = r'(\w+)\s*で.*(レポート|フィデリティ|パラメータ|チップ)'
+    pattern2 = r"(\w+)\s*で.*(レポート|フィデリティ|パラメータ|チップ)"
     match2 = re.search(pattern2, message)
     if match2:
         username = match2.group(1)
         action_word = match2.group(2)
-        action_map = {
-            'レポート': 'report',
-            'フィデリティ': 'fidelity',
-            'パラメータ': 'parameters', 
-            'チップ': 'chip'
-        }
-        action = action_map.get(action_word, 'unknown')
+        action_map = {"レポート": "report", "フィデリティ": "fidelity", "パラメータ": "parameters", "チップ": "chip"}
+        action = action_map.get(action_word, "unknown")
         return username, action
-    
+
     # Pattern 3: General report/レポート keywords
-    if 'レポート' in message or 'report' in message:
+    if "レポート" in message or "report" in message:
         # Look for username patterns (alphanumeric sequences)
-        username_pattern = r'\b([a-zA-Z0-9_]+)\b'
+        username_pattern = r"\b([a-zA-Z0-9_]+)\b"
         usernames = re.findall(username_pattern, message)
         # Filter out common words
-        excluded_words = {'で', 'を', 'の', 'に', 'と', 'が', 'は', 'bot', 'test', 'qdash', 'レポート', 'report'}
+        excluded_words = {"で", "を", "の", "に", "と", "が", "は", "bot", "test", "qdash", "レポート", "report"}
         potential_usernames = [u for u in usernames if u.lower() not in excluded_words and len(u) > 2]
         if potential_usernames:
-            return potential_usernames[0], 'report'
-    
+            return potential_usernames[0], "report"
+
     return None, None
 
 
 @tool
 @with_error_handling
-async def generate_chip_report(username: str = "admin") -> dict[str, Any]:
+async def generate_chip_report(
+    username: str = "admin", slack_channel: str = "", slack_thread_ts: str = ""
+) -> dict[str, Any]:
     """Generate full chip report (YAML + PDF) using Prefect workflow and send to Slack.
 
     Args:
         username: Username for the operation (default: "admin")
+        slack_channel: Slack channel ID to send results to
+        slack_thread_ts: Slack thread timestamp to reply to
 
     Returns:
         Dictionary with flow run information
@@ -740,7 +742,19 @@ async def generate_chip_report(username: str = "admin") -> dict[str, Any]:
         from qdash.config import get_settings
 
         settings = get_settings()
-        logger.info(f"Starting chip report generation for user: {username}")
+
+        # Get Slack context from global thread context if not provided
+        global _current_thread_context
+        if not slack_channel:
+            slack_channel = _current_thread_context.get("channel_id", "")
+        if not slack_thread_ts:
+            slack_thread_ts = _current_thread_context.get("thread_ts", "")
+        logger.info(f"Using Slack context - channel: {slack_channel}, thread: {slack_thread_ts}")
+        logger.info(f"Global context: {_current_thread_context}")
+
+        logger.info(
+            f"Starting chip report generation for user: {username}, channel: {slack_channel}, thread: {slack_thread_ts}"
+        )
 
         # Use the correct internal port for prefect-server
         prefect_url = settings.prefect_api_url
@@ -756,18 +770,21 @@ async def generate_chip_report(username: str = "admin") -> dict[str, Any]:
         try:
             # First, try to get all deployments for debugging
             deployment = await client.read_deployment_by_name(f"chip-report/qiqb-dev-chip-report")
-            flow_run = await client.create_flow_run_from_deployment(deployment.id, parameters={"username": username})
+            parameters = {
+                "username": username,
+                "slack_channel": slack_channel,  # Always include, even if empty
+                "slack_thread_ts": slack_thread_ts,  # Always include, even if empty
+            }
+
+            logger.info(f"Flow parameters being sent: {parameters}")
+            flow_run = await client.create_flow_run_from_deployment(deployment.id, parameters=parameters)
         except Exception as e:
             logger.error(f"Failed to find chip-report deployment: {e}")
             raise ValueError(
                 "Deployment 'chip-report/qiqb-dev-chip-report' not found. Please check the deployment name."
             )
 
-        # # Create and start flow run
-        # logger.info(f"Starting flow run for deployment: {deployment.name}")
-        # flow_run = await client.create_flow_run_from_deployment(deployment.id, parameters={"username": "admin"})
-
-        # logger.info(f"Started chip report flow run: {flow_run.id}")
+        logger.info(f"Started chip report flow run: {flow_run.id}")
 
         return {
             "status": "started",
@@ -777,7 +794,7 @@ async def generate_chip_report(username: str = "admin") -> dict[str, Any]:
             "message": f"""チップレポート生成を開始しました (ユーザー: {username})
 フローID: {flow_run.id}
 
-レポートが完成するとSlackチャンネルにYAMLとPDFファイルが送信されます。""",
+レポートが完成するとSlackスレッドにYAMLとPDFファイルが送信されます。""",
         }
 
     except ImportError:
@@ -789,6 +806,12 @@ async def generate_chip_report(username: str = "admin") -> dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to generate chip report: {e}")
         return {"error": f"Failed to generate chip report: {e!s}", "username": username}
+
+
+
+
+
+
 
 
 @tool
@@ -858,10 +881,24 @@ async def handle_mention(event, say, client) -> None:
         qdash_username = "未指定"
 
         # Get or create thread-specific agent with conversation history
+        # For replies, use the actual thread_ts; for new messages, use the message ts as the thread
         thread_ts = slack_event.thread_ts or slack_event.ts
+
+        # Set global thread context for tools to access
+        # Always use ts for the thread context (this is where replies should go)
+        global _current_thread_context
+        _current_thread_context = {
+            "channel_id": slack_event.channel,
+            "thread_ts": slack_event.ts,  # Always use the message ts for replies
+            "user_id": slack_event.user,
+        }
+        logger.info(
+            f"Set thread context: channel={slack_event.channel}, thread={slack_event.ts} (will reply to this message)"
+        )
+
         agent = await get_or_create_thread_agent(
             channel_id=slack_event.channel,
-            thread_ts=slack_event.thread_ts,  # Can be None for new threads
+            thread_ts=thread_ts,  # Use the actual thread_ts value
             user_id=slack_event.user,
             username=qdash_username,  # Use dynamically obtained username
         )
