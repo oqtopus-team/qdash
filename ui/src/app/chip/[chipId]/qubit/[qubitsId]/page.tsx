@@ -70,7 +70,7 @@ function QubitDetailPageContent() {
   // Get filtered tasks for qubit type
   const filteredTasks =
     tasks?.data?.tasks?.filter(
-      (task: TaskResponse) => task.task_type === "qubit",
+      (task: TaskResponse) => task.task_type === "qubit"
     ) || [];
 
   // Get data for common qubit tasks for dashboard
@@ -92,19 +92,19 @@ function QubitDetailPageContent() {
               staleTime: 30000,
               enabled: selectedDate !== "latest",
             },
-          },
+          }
         );
 
-  const { data: ramseysData } =
+  const { data: ramseyData } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskGroupedByChip(chipId, "CheckRamseys", {
+      ? useFetchLatestQubitTaskGroupedByChip(chipId, "CheckRamsey", {
           query: {
             staleTime: 30000,
           },
         })
       : useFetchHistoricalQubitTaskGroupedByChip(
           chipId,
-          "CheckRamseys",
+          "CheckRamsey",
           selectedDate === "latest"
             ? new Date().toISOString().split("T")[0]
             : selectedDate,
@@ -113,7 +113,7 @@ function QubitDetailPageContent() {
               staleTime: 30000,
               enabled: selectedDate !== "latest",
             },
-          },
+          }
         );
 
   const { data: t1Data } =
@@ -134,7 +134,7 @@ function QubitDetailPageContent() {
               staleTime: 30000,
               enabled: selectedDate !== "latest",
             },
-          },
+          }
         );
 
   // Additional data for radar chart
@@ -156,7 +156,7 @@ function QubitDetailPageContent() {
               staleTime: 30000,
               enabled: selectedDate !== "latest",
             },
-          },
+          }
         );
 
   const { data: gateFidelityData } =
@@ -177,7 +177,7 @@ function QubitDetailPageContent() {
               staleTime: 30000,
               enabled: selectedDate !== "latest",
             },
-          },
+          }
         );
 
   const { data: readoutFidelityData } =
@@ -198,13 +198,13 @@ function QubitDetailPageContent() {
               staleTime: 30000,
               enabled: selectedDate !== "latest",
             },
-          },
+          }
         );
 
   // Collect all task data
   const allTasksData: Record<string, Task | null> = {
     CheckRabi: rabiData?.data?.result?.[qubitId] || null,
-    CheckRamseys: ramseysData?.data?.result?.[qubitId] || null,
+    CheckRamsey: ramseyData?.data?.result?.[qubitId] || null,
     CheckT1: t1Data?.data?.result?.[qubitId] || null,
     CheckT2Echo: t2EchoData?.data?.result?.[qubitId] || null,
     RandomizedBenchmarking: gateFidelityData?.data?.result?.[qubitId] || null,
@@ -397,8 +397,8 @@ function QubitDetailPageContent() {
                             taskData?.status === "completed"
                               ? "badge-success"
                               : taskData?.status === "failed"
-                                ? "badge-error"
-                                : "badge-ghost"
+                              ? "badge-error"
+                              : "badge-ghost"
                           }`}
                         >
                           {taskData?.status || "No Data"}
@@ -534,8 +534,8 @@ function QubitDetailPageContent() {
                                     taskData?.status === "completed"
                                       ? "badge-success"
                                       : taskData?.status === "failed"
-                                        ? "badge-error"
-                                        : "badge-ghost"
+                                      ? "badge-error"
+                                      : "badge-ghost"
                                   }`}
                                 >
                                   {taskData?.status || "No Data"}
@@ -594,11 +594,11 @@ function QubitDetailPageContent() {
                                 {taskData?.end_at ? (
                                   <div className="text-sm">
                                     {new Date(
-                                      taskData.end_at,
+                                      taskData.end_at
                                     ).toLocaleDateString()}
                                     <div className="text-xs text-base-content/70">
                                       {new Date(
-                                        taskData.end_at,
+                                        taskData.end_at
                                       ).toLocaleTimeString()}
                                     </div>
                                   </div>
@@ -631,7 +631,7 @@ function QubitDetailPageContent() {
                                 </div>
                               </td>
                             </tr>
-                          ),
+                          )
                         )}
                       </tbody>
                     </table>
@@ -644,7 +644,7 @@ function QubitDetailPageContent() {
                       <div className="stat-value text-success">
                         {
                           Object.values(allTasksData).filter(
-                            (task) => task?.status === "completed",
+                            (task) => task?.status === "completed"
                           ).length
                         }
                       </div>
@@ -654,7 +654,7 @@ function QubitDetailPageContent() {
                       <div className="stat-value text-error">
                         {
                           Object.values(allTasksData).filter(
-                            (task) => task?.status === "failed",
+                            (task) => task?.status === "failed"
                           ).length
                         }
                       </div>
@@ -665,11 +665,11 @@ function QubitDetailPageContent() {
                         {Object.values(allTasksData).filter(Boolean).length > 0
                           ? Math.round(
                               (Object.values(allTasksData).filter(
-                                (task) => task?.status === "completed",
+                                (task) => task?.status === "completed"
                               ).length /
                                 Object.values(allTasksData).filter(Boolean)
                                   .length) *
-                                100,
+                                100
                             )
                           : 0}
                         %
