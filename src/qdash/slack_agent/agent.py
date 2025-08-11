@@ -517,9 +517,10 @@ Thread: {thread_key}
         if STRANDS_AVAILABLE:
             # Configure model based on provider
             if model_config.provider == "openai":
-                # Get API key from settings or environment
-                settings = get_settings()
-                api_key = getattr(settings, "openai_api_key", None) or os.getenv("OPENAI_API_KEY")
+                # Get API key from environment variable only (security requirement)
+                api_key = os.getenv("OPENAI_API_KEY")
+                if not api_key:
+                    raise ValueError("OPENAI_API_KEY environment variable is required for security")
 
                 # Create OpenAI model configuration
                 model_params = {

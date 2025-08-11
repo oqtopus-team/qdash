@@ -6,6 +6,7 @@ Handles model switching, feature flags, and runtime configuration.
 import json
 import logging
 import os
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -81,15 +82,33 @@ class ConfigurationManager:
     """Manages agent configuration with hot reloading."""
 
     def __init__(self, config_path: Optional[str] = None):
-        self.config_path = config_path or self._get_default_config_path()
+        self.config_path = self._validate_config_path(config_path or self._get_default_config_path())
         self._config: Optional[StrandsAgentConfiguration] = None
         self._last_modified: float = 0
+        self._last_check: float = 0  # Cache timing
         self._load_config()
 
     def _get_default_config_path(self) -> str:
         """Get default configuration file path."""
         base_dir = Path(__file__).parent
         return str(base_dir / "config.json")
+
+    def _validate_config_path(self, path: str) -> str:
+        """Validate and sanitize config path to prevent directory traversal."""
+        try:
+            normalized = os.path.normpath(os.path.abspath(path))
+
+            # Ensure path is within project directory for security
+            project_root = os.path.abspath(os.path.dirname(__file__))
+            if not normalized.startswith(project_root):
+                logger.warning(f"Config path outside project directory: {path}")
+                # Fall back to default path
+                return self._get_default_config_path()
+
+            return normalized
+        except Exception as e:
+            logger.error(f"Invalid config path '{path}': {e}")
+            return self._get_default_config_path()
 
     def _load_config(self) -> None:
         """Load configuration from file."""
@@ -160,9 +179,17 @@ class ConfigurationManager:
             ),
         )
 
-    def get_config(self) -> StrandsAgentConfiguration:
-        """Get current configuration (with hot reload check)."""
+    def get_config(self, force_reload: bool = False) -> StrandsAgentConfiguration:
+        """Get configuration with optional force reload and 30-second cache."""
+        current_time = time.time()
+
+        # Use cache if less than 30 seconds since last check and no force reload
+        if not force_reload and (current_time - self._last_check) < 30 and self._config is not None:
+            return self._config
+
+        # Load config and update cache timestamp
         self._load_config()
+        self._last_check = current_time
         return self._config
 
     def update_model(self, model_name: str, provider: str = "openai") -> None:

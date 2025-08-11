@@ -83,6 +83,12 @@ class MetricsCollector:
         self.metrics["errors"][error_type]["last_occurrence"] = datetime.now().isoformat()
         if details:
             self.metrics["errors"][error_type]["details"].append(details)
+            # Use sliding window to prevent unbounded memory growth
+            MAX_ERROR_DETAILS = 100
+            if len(self.metrics["errors"][error_type]["details"]) > MAX_ERROR_DETAILS:
+                self.metrics["errors"][error_type]["details"] = self.metrics["errors"][error_type]["details"][
+                    -50:
+                ]  # Keep last 50
 
     def record_user_interaction(self, success: bool, response_time_ms: float):
         """Record user interaction metrics with bounded memory usage."""
