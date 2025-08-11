@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
-
 from qdash.workflow.core.session.base import BaseSession
 from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
 

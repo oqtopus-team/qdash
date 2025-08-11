@@ -716,17 +716,11 @@ def extract_username_and_action(message: str) -> tuple[str | None, str | None, i
     import re
 
     message = message.lower().strip()
-    
+
     # Extract cutoff hours from message
     cutoff_hours = None
-    hour_patterns = [
-        r'過去(\d+)時間',
-        r'(\d+)時間',  
-        r'(\d+)h',
-        r'(\d+)hr',
-        r'(\d+)hrs'
-    ]
-    
+    hour_patterns = [r"過去(\d+)時間", r"(\d+)時間", r"(\d+)h", r"(\d+)hr", r"(\d+)hrs"]
+
     for pattern in hour_patterns:
         match = re.search(pattern, message)
         if match:
@@ -855,12 +849,6 @@ async def generate_chip_report(
     except Exception as e:
         logger.error(f"Failed to generate chip report: {e}")
         return {"error": f"Failed to generate chip report: {e!s}", "username": username}
-
-
-
-
-
-
 
 
 @tool

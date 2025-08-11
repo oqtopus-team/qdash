@@ -594,7 +594,7 @@ def generate_chip_info_report(
         if Path(props_path_recent).exists():
             cutoff_hours = hours
             break
-    
+
     props_path_recent = f"{chip_info_dir}/props_{cutoff_hours}h.yaml"
     if Path(props_path_recent).exists():
         props_all = read_base_properties(filename=props_path_recent)
