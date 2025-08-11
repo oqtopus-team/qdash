@@ -85,9 +85,14 @@ class MetricsCollector:
             self.metrics["errors"][error_type]["details"].append(details)
 
     def record_user_interaction(self, success: bool, response_time_ms: float):
-        """Record user interaction metrics."""
+        """Record user interaction metrics with bounded memory usage."""
         self.metrics["user_interactions"] += 1
+
+        # Use sliding window to prevent unbounded memory growth
         self.metrics["response_times"].append(response_time_ms)
+        # Keep only last 1000 response times (approximately 1000 interactions worth of data)
+        if len(self.metrics["response_times"]) > 1000:
+            self.metrics["response_times"] = self.metrics["response_times"][-1000:]
 
         if success:
             self.metrics["successful_responses"] += 1

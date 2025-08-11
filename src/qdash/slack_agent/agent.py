@@ -521,7 +521,8 @@ Model: {model_config.name}
         if model_config.provider == "openai":
             # Get API key from settings or environment
             settings = get_settings()
-            api_key = getattr(settings, "openai_api_key", None) or model_config.api_key or os.getenv("OPENAI_API_KEY")
+            # Secure API key loading - only from environment variables
+            api_key = getattr(settings, "openai_api_key", None) or os.getenv("OPENAI_API_KEY")
 
             # Create OpenAI model configuration with supported parameters only
             model_params = {
@@ -551,41 +552,9 @@ Model: {model_config.name}
             logger.info("✅ Strands Agent initialized with default configuration")
     else:
         # Fallback: Create a simple async wrapper for OpenAI
-        logger.warning("⚠️ Strands SDK not available, using fallback implementation")
-        from openai import AsyncOpenAI
-
-        class FallbackAgent:
-            def __init__(self):
-                self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-                self.model = model_config.name
-                self.system_prompt = system_prompt
-                self.tools = {t.__name__: t for t in tools}
-
-            async def invoke_async(self, message: str):
-                """Simple async invocation without tool support."""
-                try:
-                    response = await self.client.chat.completions.create(
-                        model=self.model,
-                        messages=[
-                            {"role": "system", "content": self.system_prompt},
-                            {"role": "user", "content": message},
-                        ],
-                        temperature=model_config.temperature,
-                        max_tokens=model_config.max_tokens,
-                    )
-
-                    # Return a simple object with message content
-                    class Result:
-                        def __init__(self, content):
-                            self.message = type("Message", (), {"content": content})()
-
-                    return Result(response.choices[0].message.content)
-                except Exception as e:
-                    logger.error(f"Fallback agent error: {e}")
-                    raise
-
-        agent = FallbackAgent()
-        logger.info(f"⚠️ Fallback Agent initialized: {model_config.name}")
+        # Strands SDK is required for proper functionality
+        logger.error("❌ Strands SDK is not available. Please install it to use the agent.")
+        raise ImportError("Strands Agents SDK is required. Please install with: pip install strands-agents")
 
     return agent
 

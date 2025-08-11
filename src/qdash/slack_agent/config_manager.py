@@ -25,7 +25,6 @@ class ModelConfig:
     temperature: float = 0.1
     timeout_seconds: int = 30
     fallback_model: Optional[str] = None
-    api_key: Optional[str] = None
     # GPT-5 specific parameters
     verbosity: Optional[str] = "medium"  # "low", "medium", "high"
     reasoning_effort: Optional[str] = "medium"  # "minimal", "low", "medium", "high"
@@ -142,7 +141,6 @@ class ConfigurationManager:
                 temperature=0.3,
                 timeout_seconds=30,
                 fallback_model="gpt-4o-mini",
-                api_key=getattr(settings, "openai_api_key", None),  # Use settings
                 # Note: verbosity and reasoning_effort not yet supported by current OpenAI client
             ),
             agent=AgentConfig(

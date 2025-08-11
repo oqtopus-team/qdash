@@ -5,8 +5,7 @@
     "max_completion_tokens": 4000,
     "temperature": 0.3,
     "timeout_seconds": 30,
-    "fallback_model": "gpt-4o-mini",
-    "api_key": null
+    "fallback_model": "gpt-4o-mini"
   },
   "agent": {
     "max_steps": 10,
