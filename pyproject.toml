@@ -120,7 +120,6 @@ agent = [
     "openai>=1.98.0",
     "slack-bolt>=1.18.0",
     "pydantic-settings",
-    "strands-agents",
 ]
 
 [tool.uv.sources]
