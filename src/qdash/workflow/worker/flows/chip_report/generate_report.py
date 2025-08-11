@@ -590,19 +590,19 @@ def generate_chip_info_report(
     # Read and generate 24hr properties if available
     props_path_24h = f"{chip_info_dir}/props_24h.yaml"
     if Path(props_path_24h).exists():
-        props_24h = read_base_properties(filename=props_path_24h)[chip_id]
-        logger.info(f"Generating 24hr figures for {chip_id}...")
-        logger.info(f"Properties: {props_24h}")
-        hrs24_files = generate_figures(props_24h, chip_info_dir, "_24h", chip_id=chip_id)
-
-        # Generate combined report
-        generate_rich_pdf_report(
-            regular_files + hrs24_files,
-            pdf_path=f"{chip_info_dir}/chip_info_report.pdf",
-        )
-    # else:
-    #     # Generate report with just regular files
-    #     generate_rich_pdf_report(
-    #         regular_files,
-    #         pdf_path=f"{chip_info_dir}/chip_info_report.pdf",
-    #     )
+        props_all = read_base_properties(filename=props_path_24h)
+        props_24h = props_all.get(chip_id)
+        if props_24h is not None:
+            logger.info(f"Generating 24hr figures for {chip_id}...")
+            logger.info(f"Properties: {props_24h}")
+            hrs24_files = generate_figures(props_24h, chip_info_dir, "_24h", chip_id=chip_id)
+            generate_rich_pdf_report(
+                regular_files + hrs24_files,
+                pdf_path=f"{chip_info_dir}/chip_info_report.pdf",
+            )
+        else:
+            logger.warning(f"No properties found for chip_id={chip_id}")
+            generate_rich_pdf_report(
+                regular_files,
+                pdf_path=f"{chip_info_dir}/chip_info_report.pdf",
+            )

@@ -1,5 +1,7 @@
+import os
+
 import pendulum
-from prefect import flow
+from prefect import flow, get_run_logger
 from qdash.config import get_settings
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
@@ -14,6 +16,7 @@ from qdash.workflow.worker.flows.push_props.create_props import (
     merge_properties,
 )
 from qdash.workflow.worker.flows.push_props.io import ChipPropertyYAMLHandler
+from qdash.workflow.worker.tasks.pull_github import pull_github
 
 
 @flow(name="chip-report", flow_run_name="Generate Chip Report")
@@ -30,12 +33,16 @@ def chip_report(username: str = "admin", source_path: str = "") -> None:
         None
 
     """
+
+    commit_id = "local" if os.getenv("CONFIG_REPO_URL") == "" else pull_github()
     initialize()
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
     chip_info_dir = f"/app/calib_data/{username}/{date_str}/chip_info"
     create_directory_task.submit(chip_info_dir).result()
 
     chip = ChipDocument.get_current_chip(username=username)
+    logger = get_run_logger()
+    logger.info(f"Current chip: {chip.chip_id}")
     source_path = f"/app/config/qubex/{chip.chip_id}/params/props.yaml"
     session = create_session(
         backend="qubex",

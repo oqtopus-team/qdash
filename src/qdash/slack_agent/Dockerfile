@@ -1,5 +1,5 @@
 # Dockerfile for Strands-based Slack Agent
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
@@ -23,8 +23,9 @@ RUN pip install \
     pydantic-settings \
     "bunnet>=1.3.0" \
     "pymongo>=4.8.0" \
-    "pendulum>=3.1.0" \
-    "numpy>=1.26.0"
+    pendulum \
+    "numpy>=1.26.0" \
+    "prefect==2.20.0"
 
 # Install Strands Agents SDK directly from GitHub
 RUN pip install git+https://github.com/strands-agents/sdk-python.git
