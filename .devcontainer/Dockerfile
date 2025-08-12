@@ -116,8 +116,13 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
     -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
     -x
 
-# Copy frontend dependencies (optional)
-# This speeds up the initial bun install
-COPY --from=frontend-deps /workspace/qdash/ui/node_modules /tmp/node_modules_cache
+# Setup node_modules cache directory
+# This will be used by postCreateCommand
+RUN mkdir -p /workspace/qdash/ui && \
+    touch /workspace/qdash/ui/.bunfig.toml
+
+# Copy frontend dependencies to correct location
+# This pre-populates node_modules before volume mount
+COPY --from=frontend-deps /workspace/qdash/ui/node_modules /workspace/qdash/ui/node_modules
 
 WORKDIR /workspace/qdash
