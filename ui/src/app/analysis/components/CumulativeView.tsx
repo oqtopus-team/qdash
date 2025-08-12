@@ -43,7 +43,7 @@ const TASK_CONFIG: Record<
   readout_fidelity: { name: "ReadoutClassification", type: "qubit" },
 };
 
-// Parameter configuration: labels and directionality
+// Parameter configuration: labels, directionality, and thresholds
 const PARAMETER_CONFIG: Record<
   string,
   {
@@ -51,6 +51,7 @@ const PARAMETER_CONFIG: Record<
     higherIsBetter: boolean;
     unit: string;
     displayUnit: string;
+    threshold?: number; // QEC threshold for yield calculation
   }
 > = {
   t1: {
@@ -58,54 +59,63 @@ const PARAMETER_CONFIG: Record<
     higherIsBetter: true,
     unit: "µs",
     displayUnit: "µs",
+    threshold: 100, // 100µs - minimum for error correction protocols
   },
   t2_echo: {
     label: "T2 Echo",
     higherIsBetter: true,
     unit: "µs",
     displayUnit: "µs",
+    threshold: 200, // 200µs - echo can extend T2 significantly
   },
   t2_star: {
     label: "T2*",
     higherIsBetter: true,
     unit: "µs",
     displayUnit: "µs",
+    threshold: 50, // 50µs - dephasing limited
   },
   gate_fidelity: {
     label: "Average Gate Fidelity",
     higherIsBetter: true, // Display as fidelity (higher is better)
     unit: "percentage",
     displayUnit: "%",
+    threshold: 0.99, // 99% fidelity - threshold for QEC (surface code)
   },
   x90_fidelity: {
     label: "X90 Gate Fidelity",
     higherIsBetter: true, // Display as fidelity
     unit: "percentage",
     displayUnit: "%",
+    threshold: 0.999, // 99.9% fidelity - single qubit gates should be very high
   },
   x180_fidelity: {
     label: "X180 Gate Fidelity",
     higherIsBetter: true, // Display as fidelity
     unit: "percentage",
     displayUnit: "%",
+    threshold: 0.999, // 99.9% fidelity - single qubit gates should be very high
   },
   zx90_fidelity: {
     label: "ZX90 Gate Fidelity (2Q)",
     higherIsBetter: true, // Display as fidelity
     unit: "percentage",
     displayUnit: "%",
+    threshold: 0.99, // 99% fidelity - two-qubit gates are typically lower
   },
   bell_state_fidelity: {
     label: "Bell State Fidelity (2Q)",
     higherIsBetter: true, // Display as fidelity
     unit: "percentage",
     displayUnit: "%",
+    threshold: 0.95, // 95% fidelity - bell state preparation is challenging
   },
   readout_fidelity: {
     label: "Readout Fidelity",
     higherIsBetter: true, // Display as fidelity
     unit: "percentage",
     displayUnit: "%",
+    threshold: 0.99, // 99% fidelity - readout should be high for QEC
   },
 };
 
@@ -226,7 +236,11 @@ export function CumulativeView() {
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;
       });
-      setSelectedChip(sortedChips[0].chip_id);
+      
+      // Additional safety check for array bounds
+      if (sortedChips.length > 0 && sortedChips[0]?.chip_id) {
+        setSelectedChip(sortedChips[0].chip_id);
+      }
     }
   }, [selectedChip, chipsResponse]);
 
@@ -973,19 +987,8 @@ export function CumulativeView() {
         : null;
 
     // Calculate yield based on parameter-specific thresholds (coherence-limited)
-    // These thresholds are based on realistic quantum error correction requirements
-    const thresholds = {
-      t1: 100, // 100µs - minimum for error correction protocols
-      t2_echo: 200, // 200µs - echo can extend T2 significantly
-      t2_star: 50, // 50µs - dephasing limited
-      gate_fidelity: 0.99, // 99% fidelity - threshold for QEC (surface code)
-      x90_fidelity: 0.999, // 99.9% fidelity - single qubit gates should be very high
-      x180_fidelity: 0.999, // 99.9% fidelity - single qubit gates should be very high
-      zx90_fidelity: 0.99, // 99% fidelity - two-qubit gates are typically lower
-      bell_state_fidelity: 0.95, // 95% fidelity - bell state preparation is challenging
-      readout_fidelity: 0.99, // 99% fidelity - readout should be high for QEC
-    };
-    const threshold = thresholds[parameterKey as keyof typeof thresholds];
+    // Use threshold from PARAMETER_CONFIG (now centralized)
+    const threshold = PARAMETER_CONFIG[parameterKey]?.threshold;
     const paramConfig = PARAMETER_CONFIG[parameterKey];
     const yieldCount = threshold
       ? valuesOnly.filter((v) =>
