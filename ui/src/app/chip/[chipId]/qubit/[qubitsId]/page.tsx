@@ -95,16 +95,16 @@ function QubitDetailPageContent() {
           },
         );
 
-  const { data: ramseysData } =
+  const { data: ramseyData } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskGroupedByChip(chipId, "CheckRamseys", {
+      ? useFetchLatestQubitTaskGroupedByChip(chipId, "CheckRamsey", {
           query: {
             staleTime: 30000,
           },
         })
       : useFetchHistoricalQubitTaskGroupedByChip(
           chipId,
-          "CheckRamseys",
+          "CheckRamsey",
           selectedDate === "latest"
             ? new Date().toISOString().split("T")[0]
             : selectedDate,
@@ -204,7 +204,7 @@ function QubitDetailPageContent() {
   // Collect all task data
   const allTasksData: Record<string, Task | null> = {
     CheckRabi: rabiData?.data?.result?.[qubitId] || null,
-    CheckRamseys: ramseysData?.data?.result?.[qubitId] || null,
+    CheckRamsey: ramseyData?.data?.result?.[qubitId] || null,
     CheckT1: t1Data?.data?.result?.[qubitId] || null,
     CheckT2Echo: t2EchoData?.data?.result?.[qubitId] || null,
     RandomizedBenchmarking: gateFidelityData?.data?.result?.[qubitId] || null,
