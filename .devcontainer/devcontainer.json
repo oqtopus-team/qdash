@@ -63,6 +63,9 @@
   "overrideCommand": false,
   "shutdownAction": "none",
 
+  // Run bun install after container creation
+  "postCreateCommand": "cd /workspace/qdash/ui && bun install",
+
   // Disable features (reduce build time)
   "features": {}
 }
