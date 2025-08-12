@@ -225,3 +225,4 @@ config
 src/tools/schedule/*
 .serena/cache/*
 .mcp.json
+.tmp/*
