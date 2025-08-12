@@ -37,7 +37,7 @@ const TASK_CONFIG: Record<
     type: "coupling",
   },
   bell_state_fidelity: {
-    name: "BellStateTomography",
+    name: "CheckBellStateTomography",
     type: "coupling",
   },
   readout_fidelity: { name: "ReadoutClassification", type: "qubit" },
@@ -148,16 +148,27 @@ export function CumulativeView() {
   // Group parameters by category for better organization
   const parameterGroups = {
     coherence: ["t1", "t2_echo", "t2_star"],
-    fidelity: ["gate_fidelity", "x90_fidelity", "x180_fidelity", "zx90_fidelity", "bell_state_fidelity", "readout_fidelity"]
+    fidelity: [
+      "gate_fidelity",
+      "x90_fidelity",
+      "x180_fidelity",
+      "zx90_fidelity",
+      "bell_state_fidelity",
+      "readout_fidelity",
+    ],
   };
 
   // Determine current parameter type to enforce mutual exclusivity
   const currentParameterType = useMemo(() => {
     if (selectedParameters.length === 0) return null;
-    
-    const hasCoherence = selectedParameters.some(p => parameterGroups.coherence.includes(p));
-    const hasFidelity = selectedParameters.some(p => parameterGroups.fidelity.includes(p));
-    
+
+    const hasCoherence = selectedParameters.some((p) =>
+      parameterGroups.coherence.includes(p)
+    );
+    const hasFidelity = selectedParameters.some((p) =>
+      parameterGroups.fidelity.includes(p)
+    );
+
     return hasCoherence ? "coherence" : hasFidelity ? "fidelity" : null;
   }, [selectedParameters, parameterGroups]);
 
@@ -181,15 +192,15 @@ export function CumulativeView() {
           options: parameterGroups.coherence.map((key) => ({
             value: key,
             label: PARAMETER_CONFIG[key].label,
-          }))
+          })),
         },
         {
-          label: "Gate Fidelities", 
+          label: "Gate Fidelities",
           options: parameterGroups.fidelity.map((key) => ({
             value: key,
             label: PARAMETER_CONFIG[key].label,
-          }))
-        }
+          })),
+        },
       ];
     }
   }, [currentParameterType, parameterGroups]);
@@ -229,7 +240,7 @@ export function CumulativeView() {
       enabled: Boolean(
         selectedChip &&
           selectedDate === "latest" &&
-          selectedParameters.includes("t1"),
+          selectedParameters.includes("t1")
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -249,11 +260,11 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("t1"),
+            selectedParameters.includes("t1")
         ),
         staleTime: 60000,
       },
-    },
+    }
   );
 
   // Fetch data for T2 Echo
@@ -266,7 +277,7 @@ export function CumulativeView() {
       enabled: Boolean(
         selectedChip &&
           selectedDate === "latest" &&
-          selectedParameters.includes("t2_echo"),
+          selectedParameters.includes("t2_echo")
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -286,11 +297,11 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("t2_echo"),
+            selectedParameters.includes("t2_echo")
         ),
         staleTime: 60000,
       },
-    },
+    }
   );
 
   // Fetch data for T2*
@@ -303,7 +314,7 @@ export function CumulativeView() {
       enabled: Boolean(
         selectedChip &&
           selectedDate === "latest" &&
-          selectedParameters.includes("t2_star"),
+          selectedParameters.includes("t2_star")
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -323,11 +334,11 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("t2_star"),
+            selectedParameters.includes("t2_star")
         ),
         staleTime: 60000,
       },
-    },
+    }
   );
 
   // Primary parameter for single parameter mode
@@ -348,7 +359,7 @@ export function CumulativeView() {
           taskName &&
           taskType === "qubit" &&
           selectedDate === "latest" &&
-          selectedParameters.some(p => parameterGroups.fidelity.includes(p)),
+          selectedParameters.some((p) => parameterGroups.fidelity.includes(p))
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -370,11 +381,11 @@ export function CumulativeView() {
             taskName &&
             taskType === "qubit" &&
             selectedDate !== "latest" &&
-            selectedParameters.some(p => parameterGroups.fidelity.includes(p)),
+            selectedParameters.some((p) => parameterGroups.fidelity.includes(p))
         ),
         staleTime: 60000,
       },
-    },
+    }
   );
 
   // Fetch data for Gate Fidelity parameters
@@ -382,217 +393,293 @@ export function CumulativeView() {
     data: gateFidelityLatestResponse,
     isLoading: gateFidelityLatestLoading,
     error: gateFidelityLatestError,
-  } = useFetchLatestQubitTaskGroupedByChip(selectedChip, "RandomizedBenchmarking", {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-          selectedDate === "latest" &&
-          selectedParameters.includes("gate_fidelity"),
-      ),
-      refetchInterval: selectedDate === "latest" ? 30000 : undefined,
-      staleTime: 25000,
-    },
-  });
+  } = useFetchLatestQubitTaskGroupedByChip(
+    selectedChip,
+    "RandomizedBenchmarking",
+    {
+      query: {
+        enabled: Boolean(
+          selectedChip &&
+            selectedDate === "latest" &&
+            selectedParameters.includes("gate_fidelity")
+        ),
+        refetchInterval: selectedDate === "latest" ? 30000 : undefined,
+        staleTime: 25000,
+      },
+    }
+  );
 
   const {
     data: gateFidelityHistoricalResponse,
     isLoading: gateFidelityHistoricalLoading,
     error: gateFidelityHistoricalError,
-  } = useFetchHistoricalQubitTaskGroupedByChip(selectedChip, "RandomizedBenchmarking", selectedDate, {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-          selectedDate !== "latest" &&
-          selectedParameters.includes("gate_fidelity"),
-      ),
-      staleTime: 60000,
-    },
-  });
+  } = useFetchHistoricalQubitTaskGroupedByChip(
+    selectedChip,
+    "RandomizedBenchmarking",
+    selectedDate,
+    {
+      query: {
+        enabled: Boolean(
+          selectedChip &&
+            selectedDate !== "latest" &&
+            selectedParameters.includes("gate_fidelity")
+        ),
+        staleTime: 60000,
+      },
+    }
+  );
 
   // Fetch data for X90 Fidelity
   const {
     data: x90FidelityLatestResponse,
     isLoading: x90FidelityLatestLoading,
     error: x90FidelityLatestError,
-  } = useFetchLatestQubitTaskGroupedByChip(selectedChip, "X90InterleavedRandomizedBenchmarking", {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-          selectedDate === "latest" &&
-          selectedParameters.includes("x90_fidelity"),
-      ),
-      refetchInterval: selectedDate === "latest" ? 30000 : undefined,
-      staleTime: 25000,
-    },
-  });
+  } = useFetchLatestQubitTaskGroupedByChip(
+    selectedChip,
+    "X90InterleavedRandomizedBenchmarking",
+    {
+      query: {
+        enabled: Boolean(
+          selectedChip &&
+            selectedDate === "latest" &&
+            selectedParameters.includes("x90_fidelity")
+        ),
+        refetchInterval: selectedDate === "latest" ? 30000 : undefined,
+        staleTime: 25000,
+      },
+    }
+  );
 
   const {
     data: x90FidelityHistoricalResponse,
     isLoading: x90FidelityHistoricalLoading,
     error: x90FidelityHistoricalError,
-  } = useFetchHistoricalQubitTaskGroupedByChip(selectedChip, "X90InterleavedRandomizedBenchmarking", selectedDate, {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-          selectedDate !== "latest" &&
-          selectedParameters.includes("x90_fidelity"),
-      ),
-      staleTime: 60000,
-    },
-  });
+  } = useFetchHistoricalQubitTaskGroupedByChip(
+    selectedChip,
+    "X90InterleavedRandomizedBenchmarking",
+    selectedDate,
+    {
+      query: {
+        enabled: Boolean(
+          selectedChip &&
+            selectedDate !== "latest" &&
+            selectedParameters.includes("x90_fidelity")
+        ),
+        staleTime: 60000,
+      },
+    }
+  );
 
   // Fetch data for X180 Fidelity
   const {
     data: x180FidelityLatestResponse,
     isLoading: x180FidelityLatestLoading,
     error: x180FidelityLatestError,
-  } = useFetchLatestQubitTaskGroupedByChip(selectedChip, "X180InterleavedRandomizedBenchmarking", {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-          selectedDate === "latest" &&
-          selectedParameters.includes("x180_fidelity"),
-      ),
-      refetchInterval: selectedDate === "latest" ? 30000 : undefined,
-      staleTime: 25000,
-    },
-  });
+  } = useFetchLatestQubitTaskGroupedByChip(
+    selectedChip,
+    "X180InterleavedRandomizedBenchmarking",
+    {
+      query: {
+        enabled: Boolean(
+          selectedChip &&
+            selectedDate === "latest" &&
+            selectedParameters.includes("x180_fidelity")
+        ),
+        refetchInterval: selectedDate === "latest" ? 30000 : undefined,
+        staleTime: 25000,
+      },
+    }
+  );
 
   const {
     data: x180FidelityHistoricalResponse,
     isLoading: x180FidelityHistoricalLoading,
     error: x180FidelityHistoricalError,
-  } = useFetchHistoricalQubitTaskGroupedByChip(selectedChip, "X180InterleavedRandomizedBenchmarking", selectedDate, {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-          selectedDate !== "latest" &&
-          selectedParameters.includes("x180_fidelity"),
-      ),
-      staleTime: 60000,
-    },
-  });
+  } = useFetchHistoricalQubitTaskGroupedByChip(
+    selectedChip,
+    "X180InterleavedRandomizedBenchmarking",
+    selectedDate,
+    {
+      query: {
+        enabled: Boolean(
+          selectedChip &&
+            selectedDate !== "latest" &&
+            selectedParameters.includes("x180_fidelity")
+        ),
+        staleTime: 60000,
+      },
+    }
+  );
 
   // Fetch data for Readout Fidelity
   const {
     data: readoutFidelityLatestResponse,
     isLoading: readoutFidelityLatestLoading,
     error: readoutFidelityLatestError,
-  } = useFetchLatestQubitTaskGroupedByChip(selectedChip, "ReadoutClassification", {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-          selectedDate === "latest" &&
-          selectedParameters.includes("readout_fidelity"),
-      ),
-      refetchInterval: selectedDate === "latest" ? 30000 : undefined,
-      staleTime: 25000,
-    },
-  });
+  } = useFetchLatestQubitTaskGroupedByChip(
+    selectedChip,
+    "ReadoutClassification",
+    {
+      query: {
+        enabled: Boolean(
+          selectedChip &&
+            selectedDate === "latest" &&
+            selectedParameters.includes("readout_fidelity")
+        ),
+        refetchInterval: selectedDate === "latest" ? 30000 : undefined,
+        staleTime: 25000,
+      },
+    }
+  );
 
   const {
     data: readoutFidelityHistoricalResponse,
     isLoading: readoutFidelityHistoricalLoading,
     error: readoutFidelityHistoricalError,
-  } = useFetchHistoricalQubitTaskGroupedByChip(selectedChip, "ReadoutClassification", selectedDate, {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-          selectedDate !== "latest" &&
-          selectedParameters.includes("readout_fidelity"),
-      ),
-      staleTime: 60000,
-    },
-  });
+  } = useFetchHistoricalQubitTaskGroupedByChip(
+    selectedChip,
+    "ReadoutClassification",
+    selectedDate,
+    {
+      query: {
+        enabled: Boolean(
+          selectedChip &&
+            selectedDate !== "latest" &&
+            selectedParameters.includes("readout_fidelity")
+        ),
+        staleTime: 60000,
+      },
+    }
+  );
 
   // ZX90 Gate Fidelity (coupling task)
   const {
     data: zx90FidelityLatestResponse,
     isLoading: zx90FidelityLatestLoading,
     error: zx90FidelityLatestError,
-  } = useFetchLatestCouplingTaskGroupedByChip(selectedChip, "ZX90InterleavedRandomizedBenchmarking", {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-        selectedDate === "latest" &&
-        selectedParameters.includes("zx90_fidelity"),
-      ),
-      refetchInterval: selectedDate === "latest" ? 30000 : undefined,
-      staleTime: 25000,
-    },
-  });
+  } = useFetchLatestCouplingTaskGroupedByChip(
+    selectedChip,
+    "ZX90InterleavedRandomizedBenchmarking",
+    {
+      query: {
+        enabled: Boolean(
+          selectedChip &&
+            selectedDate === "latest" &&
+            selectedParameters.includes("zx90_fidelity")
+        ),
+        refetchInterval: selectedDate === "latest" ? 30000 : undefined,
+        staleTime: 25000,
+      },
+    }
+  );
 
   const {
     data: zx90FidelityHistoricalResponse,
     isLoading: zx90FidelityHistoricalLoading,
     error: zx90FidelityHistoricalError,
-  } = useFetchHistoricalCouplingTaskGroupedByChip(selectedChip, "ZX90InterleavedRandomizedBenchmarking", selectedDate, {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-        selectedDate !== "latest" &&
-        selectedParameters.includes("zx90_fidelity"),
-      ),
-      staleTime: 60000,
-    },
-  });
+  } = useFetchHistoricalCouplingTaskGroupedByChip(
+    selectedChip,
+    "ZX90InterleavedRandomizedBenchmarking",
+    selectedDate,
+    {
+      query: {
+        enabled: Boolean(
+          selectedChip &&
+            selectedDate !== "latest" &&
+            selectedParameters.includes("zx90_fidelity")
+        ),
+        staleTime: 60000,
+      },
+    }
+  );
 
   // Bell State Fidelity (coupling task)
   const {
     data: bellStateFidelityLatestResponse,
     isLoading: bellStateFidelityLatestLoading,
     error: bellStateFidelityLatestError,
-  } = useFetchLatestCouplingTaskGroupedByChip(selectedChip, "BellStateTomography", {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-        selectedDate === "latest" &&
-        selectedParameters.includes("bell_state_fidelity"),
-      ),
-      refetchInterval: selectedDate === "latest" ? 30000 : undefined,
-      staleTime: 25000,
-    },
-  });
+  } = useFetchLatestCouplingTaskGroupedByChip(
+    selectedChip,
+    "BellStateTomography",
+    {
+      query: {
+        enabled: Boolean(
+          selectedChip &&
+            selectedDate === "latest" &&
+            selectedParameters.includes("bell_state_fidelity")
+        ),
+        refetchInterval: selectedDate === "latest" ? 30000 : undefined,
+        staleTime: 25000,
+      },
+    }
+  );
 
   const {
     data: bellStateFidelityHistoricalResponse,
     isLoading: bellStateFidelityHistoricalLoading,
     error: bellStateFidelityHistoricalError,
-  } = useFetchHistoricalCouplingTaskGroupedByChip(selectedChip, "BellStateTomography", selectedDate, {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-        selectedDate !== "latest" &&
-        selectedParameters.includes("bell_state_fidelity"),
-      ),
-      staleTime: 60000,
-    },
-  });
+  } = useFetchHistoricalCouplingTaskGroupedByChip(
+    selectedChip,
+    "BellStateTomography",
+    selectedDate,
+    {
+      query: {
+        enabled: Boolean(
+          selectedChip &&
+            selectedDate !== "latest" &&
+            selectedParameters.includes("bell_state_fidelity")
+        ),
+        staleTime: 60000,
+      },
+    }
+  );
 
   // Combine loading states
   const isLoading = useMemo(() => {
-    const needsCoherenceData = selectedParameters.some(p => parameterGroups.coherence.includes(p));
-    const needsFidelityData = selectedParameters.some(p => parameterGroups.fidelity.includes(p));
-    
+    const needsCoherenceData = selectedParameters.some((p) =>
+      parameterGroups.coherence.includes(p)
+    );
+    const needsFidelityData = selectedParameters.some((p) =>
+      parameterGroups.fidelity.includes(p)
+    );
+
     let isLoadingCoherence = false;
     let isLoadingFidelity = false;
-    
+
     if (needsCoherenceData) {
       if (selectedDate === "latest") {
-        isLoadingCoherence = t1LatestLoading || t2EchoLatestLoading || t2StarLatestLoading;
+        isLoadingCoherence =
+          t1LatestLoading || t2EchoLatestLoading || t2StarLatestLoading;
       } else {
-        isLoadingCoherence = t1HistoricalLoading || t2EchoHistoricalLoading || t2StarHistoricalLoading;
+        isLoadingCoherence =
+          t1HistoricalLoading ||
+          t2EchoHistoricalLoading ||
+          t2StarHistoricalLoading;
       }
     }
-    
+
     if (needsFidelityData) {
       if (selectedDate === "latest") {
-        isLoadingFidelity = primaryLatestLoading || gateFidelityLatestLoading || x90FidelityLatestLoading || x180FidelityLatestLoading || zx90FidelityLatestLoading || bellStateFidelityLatestLoading || readoutFidelityLatestLoading;
+        isLoadingFidelity =
+          primaryLatestLoading ||
+          gateFidelityLatestLoading ||
+          x90FidelityLatestLoading ||
+          x180FidelityLatestLoading ||
+          zx90FidelityLatestLoading ||
+          bellStateFidelityLatestLoading ||
+          readoutFidelityLatestLoading;
       } else {
-        isLoadingFidelity = primaryHistoricalLoading || gateFidelityHistoricalLoading || x90FidelityHistoricalLoading || x180FidelityHistoricalLoading || zx90FidelityHistoricalLoading || bellStateFidelityHistoricalLoading || readoutFidelityHistoricalLoading;
+        isLoadingFidelity =
+          primaryHistoricalLoading ||
+          gateFidelityHistoricalLoading ||
+          x90FidelityHistoricalLoading ||
+          x180FidelityHistoricalLoading ||
+          zx90FidelityHistoricalLoading ||
+          bellStateFidelityHistoricalLoading ||
+          readoutFidelityHistoricalLoading;
       }
     }
-    
+
     return isLoadingCoherence || isLoadingFidelity;
   }, [
     selectedParameters,
@@ -619,28 +706,48 @@ export function CumulativeView() {
 
   // Combine error states
   const error = useMemo(() => {
-    const needsCoherenceData = selectedParameters.some(p => parameterGroups.coherence.includes(p));
-    const needsFidelityData = selectedParameters.some(p => parameterGroups.fidelity.includes(p));
-    
+    const needsCoherenceData = selectedParameters.some((p) =>
+      parameterGroups.coherence.includes(p)
+    );
+    const needsFidelityData = selectedParameters.some((p) =>
+      parameterGroups.fidelity.includes(p)
+    );
+
     let coherenceError = null;
     let fidelityError = null;
-    
+
     if (needsCoherenceData) {
       if (selectedDate === "latest") {
-        coherenceError = t1LatestError || t2EchoLatestError || t2StarLatestError;
+        coherenceError =
+          t1LatestError || t2EchoLatestError || t2StarLatestError;
       } else {
-        coherenceError = t1HistoricalError || t2EchoHistoricalError || t2StarHistoricalError;
+        coherenceError =
+          t1HistoricalError || t2EchoHistoricalError || t2StarHistoricalError;
       }
     }
-    
+
     if (needsFidelityData) {
       if (selectedDate === "latest") {
-        fidelityError = primaryLatestError || gateFidelityLatestError || x90FidelityLatestError || x180FidelityLatestError || zx90FidelityLatestError || bellStateFidelityLatestError || readoutFidelityLatestError;
+        fidelityError =
+          primaryLatestError ||
+          gateFidelityLatestError ||
+          x90FidelityLatestError ||
+          x180FidelityLatestError ||
+          zx90FidelityLatestError ||
+          bellStateFidelityLatestError ||
+          readoutFidelityLatestError;
       } else {
-        fidelityError = primaryHistoricalError || gateFidelityHistoricalError || x90FidelityHistoricalError || x180FidelityHistoricalError || zx90FidelityHistoricalError || bellStateFidelityHistoricalError || readoutFidelityHistoricalError;
+        fidelityError =
+          primaryHistoricalError ||
+          gateFidelityHistoricalError ||
+          x90FidelityHistoricalError ||
+          x180FidelityHistoricalError ||
+          zx90FidelityHistoricalError ||
+          bellStateFidelityHistoricalError ||
+          readoutFidelityHistoricalError;
       }
     }
-    
+
     return coherenceError || fidelityError;
   }, [
     selectedParameters,
@@ -665,11 +772,48 @@ export function CumulativeView() {
     readoutFidelityHistoricalError,
   ]);
 
-  // Helper function to process data for a single parameter
-  function processParameterData(
+  // Safe wrapper for parameter data processing with error handling
+  function safeProcessParameterData(
     taskResult: any,
     parameterKey: string,
-    outputParamName: string,
+    outputParamName: string
+  ) {
+    try {
+      return processParameterDataInternal(
+        taskResult,
+        parameterKey,
+        outputParamName
+      );
+    } catch (error) {
+      console.error(
+        `Error processing parameter data for ${parameterKey}:`,
+        error
+      );
+      // Return empty data structure to prevent crashes
+      return {
+        plotData: [],
+        tableData: [],
+        statistics: {
+          median: 0,
+          mean: 0,
+          percentile10: 0,
+          percentile90: 0,
+          count: 0,
+          validCount: 0,
+          totalCount: 0,
+          yield: 0,
+          r2: { mean: 0, count: 0 },
+          error: { mean: 0, count: 0 },
+        },
+      };
+    }
+  }
+
+  // Helper function to process data for a single parameter (internal implementation)
+  function processParameterDataInternal(
+    taskResult: any,
+    parameterKey: string,
+    outputParamName: string
   ) {
     if (!taskResult) {
       return {
@@ -723,14 +867,14 @@ export function CumulativeView() {
             } else {
               console.warn(
                 `Unknown object structure for ${parameterKey}:`,
-                paramValue,
+                paramValue
               );
               return;
             }
           } else {
             console.warn(
               `Cannot process value type for ${parameterKey}:`,
-              typeof paramValue,
+              typeof paramValue
             );
             return;
           }
@@ -788,11 +932,28 @@ export function CumulativeView() {
 
     // Calculate statistics
     const valuesOnly = sortedValues.map((item) => item.value);
-    const medianValue = valuesOnly[Math.floor(valuesOnly.length / 2)];
+    // Proper median calculation for both odd and even length arrays
+    const medianValue =
+      valuesOnly.length % 2 === 1
+        ? valuesOnly[Math.floor(valuesOnly.length / 2)]
+        : (valuesOnly[Math.floor(valuesOnly.length / 2) - 1] +
+            valuesOnly[Math.floor(valuesOnly.length / 2)]) /
+          2;
     const meanValue =
       valuesOnly.reduce((sum, val) => sum + val, 0) / valuesOnly.length;
-    const percentile10Value = valuesOnly[Math.floor(valuesOnly.length * 0.1)];
-    const percentile90Value = valuesOnly[Math.floor(valuesOnly.length * 0.9)];
+    // Proper percentile calculation with interpolation
+    const getPercentile = (values: number[], p: number): number => {
+      if (values.length === 0) return 0;
+      if (values.length === 1) return values[0];
+      const index = (values.length - 1) * p;
+      const lower = Math.floor(index);
+      const upper = Math.ceil(index);
+      const weight = index - lower;
+      return values[lower] * (1 - weight) + values[upper] * weight;
+    };
+
+    const percentile10Value = getPercentile(valuesOnly, 0.1);
+    const percentile90Value = getPercentile(valuesOnly, 0.9);
 
     // Calculate average R² and error for quality metrics
     const r2Values = sortedValues
@@ -828,7 +989,7 @@ export function CumulativeView() {
     const paramConfig = PARAMETER_CONFIG[parameterKey];
     const yieldCount = threshold
       ? valuesOnly.filter((v) =>
-          paramConfig.higherIsBetter ? v >= threshold : v <= threshold,
+          paramConfig.higherIsBetter ? v >= threshold : v <= threshold
         ).length
       : 0;
     const yieldValue = threshold
@@ -848,7 +1009,7 @@ export function CumulativeView() {
         xValues.push(point.value);
         yValues.push(0);
       }
-      
+
       // Step up to the CDF value at this point
       xValues.push(point.value);
       yValues.push(point.cdf);
@@ -933,18 +1094,20 @@ export function CumulativeView() {
   const processedDataByParameter = useMemo(() => {
     const results: Record<string, any> = {};
 
-    // Check which parameters need loading  
-    const needsCoherenceData = selectedParameters.some(p => parameterGroups.coherence.includes(p));
+    // Check which parameters need loading
+    const needsCoherenceData = selectedParameters.some((p) =>
+      parameterGroups.coherence.includes(p)
+    );
     if (needsCoherenceData) {
       // Process T1 data
       if (selectedParameters.includes("t1")) {
         const t1Response =
           selectedDate === "latest" ? t1LatestResponse : t1HistoricalResponse;
         if (t1Response?.data?.result) {
-          results["t1"] = processParameterData(
+          results["t1"] = safeProcessParameterData(
             t1Response.data.result,
             "t1",
-            OUTPUT_PARAM_NAMES["t1"],
+            OUTPUT_PARAM_NAMES["t1"]
           );
         }
       }
@@ -956,10 +1119,10 @@ export function CumulativeView() {
             ? t2EchoLatestResponse
             : t2EchoHistoricalResponse;
         if (t2EchoResponse?.data?.result) {
-          results["t2_echo"] = processParameterData(
+          results["t2_echo"] = safeProcessParameterData(
             t2EchoResponse.data.result,
             "t2_echo",
-            OUTPUT_PARAM_NAMES["t2_echo"],
+            OUTPUT_PARAM_NAMES["t2_echo"]
           );
         }
       }
@@ -971,86 +1134,106 @@ export function CumulativeView() {
             ? t2StarLatestResponse
             : t2StarHistoricalResponse;
         if (t2StarResponse?.data?.result) {
-          results["t2_star"] = processParameterData(
+          results["t2_star"] = safeProcessParameterData(
             t2StarResponse.data.result,
             "t2_star",
-            OUTPUT_PARAM_NAMES["t2_star"],
+            OUTPUT_PARAM_NAMES["t2_star"]
           );
         }
       }
     }
-    
+
     // Process gate fidelity parameters if selected
-    const hasFidelityParams = selectedParameters.some(p => parameterGroups.fidelity.includes(p));
+    const hasFidelityParams = selectedParameters.some((p) =>
+      parameterGroups.fidelity.includes(p)
+    );
     if (hasFidelityParams) {
       // Process Gate Fidelity
       if (selectedParameters.includes("gate_fidelity")) {
-        const gateFidelityResponse = selectedDate === "latest" ? gateFidelityLatestResponse : gateFidelityHistoricalResponse;
+        const gateFidelityResponse =
+          selectedDate === "latest"
+            ? gateFidelityLatestResponse
+            : gateFidelityHistoricalResponse;
         if (gateFidelityResponse?.data?.result) {
-          results["gate_fidelity"] = processParameterData(
+          results["gate_fidelity"] = safeProcessParameterData(
             gateFidelityResponse.data.result,
             "gate_fidelity",
-            OUTPUT_PARAM_NAMES["gate_fidelity"],
+            OUTPUT_PARAM_NAMES["gate_fidelity"]
           );
         }
       }
-      
+
       // Process X90 Fidelity
       if (selectedParameters.includes("x90_fidelity")) {
-        const x90FidelityResponse = selectedDate === "latest" ? x90FidelityLatestResponse : x90FidelityHistoricalResponse;
+        const x90FidelityResponse =
+          selectedDate === "latest"
+            ? x90FidelityLatestResponse
+            : x90FidelityHistoricalResponse;
         if (x90FidelityResponse?.data?.result) {
-          results["x90_fidelity"] = processParameterData(
+          results["x90_fidelity"] = safeProcessParameterData(
             x90FidelityResponse.data.result,
             "x90_fidelity",
-            OUTPUT_PARAM_NAMES["x90_fidelity"],
+            OUTPUT_PARAM_NAMES["x90_fidelity"]
           );
         }
       }
-      
+
       // Process X180 Fidelity
       if (selectedParameters.includes("x180_fidelity")) {
-        const x180FidelityResponse = selectedDate === "latest" ? x180FidelityLatestResponse : x180FidelityHistoricalResponse;
+        const x180FidelityResponse =
+          selectedDate === "latest"
+            ? x180FidelityLatestResponse
+            : x180FidelityHistoricalResponse;
         if (x180FidelityResponse?.data?.result) {
-          results["x180_fidelity"] = processParameterData(
+          results["x180_fidelity"] = safeProcessParameterData(
             x180FidelityResponse.data.result,
             "x180_fidelity",
-            OUTPUT_PARAM_NAMES["x180_fidelity"],
+            OUTPUT_PARAM_NAMES["x180_fidelity"]
           );
         }
       }
-      
+
       // Process Readout Fidelity
       if (selectedParameters.includes("readout_fidelity")) {
-        const readoutFidelityResponse = selectedDate === "latest" ? readoutFidelityLatestResponse : readoutFidelityHistoricalResponse;
+        const readoutFidelityResponse =
+          selectedDate === "latest"
+            ? readoutFidelityLatestResponse
+            : readoutFidelityHistoricalResponse;
         if (readoutFidelityResponse?.data?.result) {
-          results["readout_fidelity"] = processParameterData(
+          results["readout_fidelity"] = safeProcessParameterData(
             readoutFidelityResponse.data.result,
             "readout_fidelity",
-            OUTPUT_PARAM_NAMES["readout_fidelity"],
+            OUTPUT_PARAM_NAMES["readout_fidelity"]
           );
         }
       }
-      
+
       // Process ZX90 Fidelity (coupling task)
       if (selectedParameters.includes("zx90_fidelity")) {
-        const zx90FidelityResponse = selectedDate === "latest" ? zx90FidelityLatestResponse : zx90FidelityHistoricalResponse;
+        const zx90FidelityResponse =
+          selectedDate === "latest"
+            ? zx90FidelityLatestResponse
+            : zx90FidelityHistoricalResponse;
         if (zx90FidelityResponse?.data?.result) {
-          results["zx90_fidelity"] = processParameterData(
+          results["zx90_fidelity"] = safeProcessParameterData(
             zx90FidelityResponse.data.result,
             "zx90_fidelity",
-            OUTPUT_PARAM_NAMES["zx90_fidelity"],
+            OUTPUT_PARAM_NAMES["zx90_fidelity"]
           );
         }
       }
-      
+
       // Process Bell State Fidelity (coupling task)
       if (selectedParameters.includes("bell_state_fidelity")) {
-        const bellStateFidelityResponse = selectedDate === "latest" ? bellStateFidelityLatestResponse : bellStateFidelityHistoricalResponse;
+        const bellStateFidelityResponse =
+          selectedDate === "latest"
+            ? bellStateFidelityLatestResponse
+            : bellStateFidelityHistoricalResponse;
         if (bellStateFidelityResponse?.data?.result) {
-          results["bell_state_fidelity"] = processParameterData(
+          results["bell_state_fidelity"] = safeProcessParameterData(
             bellStateFidelityResponse.data.result,
             "bell_state_fidelity",
-            OUTPUT_PARAM_NAMES["bell_state_fidelity"],
+            OUTPUT_PARAM_NAMES["bell_state_fidelity"]
           );
         }
       }
@@ -1090,7 +1273,7 @@ export function CumulativeView() {
     }
 
     const convertedData: Record<string, any> = {};
-    
+
     Object.entries(processedDataByParameter).forEach(([param, data]) => {
       if (parameterGroups.fidelity.includes(param) && data) {
         let conversionFactor;
@@ -1104,16 +1287,55 @@ export function CumulativeView() {
 
         const convertedPlotData = data.plotData?.map((trace: any) => {
           if (showAsErrorRate) {
-            // For error rate mode: reverse only X axis
-            // Original: fidelity ascending (low -> high), CDF ascending 0->1
-            // After conversion: error rate descending (high -> low)
-            // Reverse X only: error rate ascending (low -> high), keep CDF ascending 0->1
-            const convertedX = trace.x?.map(conversionFactor);
-            
+            // Check if this is a vertical line trace (median, percentile lines)
+            // Vertical lines have x = [value, value] and y = [0, 1]
+            if (
+              trace.x &&
+              trace.x.length === 2 &&
+              trace.x[0] === trace.x[1] &&
+              trace.y &&
+              trace.y.length === 2 &&
+              trace.y[0] === 0 &&
+              trace.y[1] === 1
+            ) {
+              // This is a vertical line - just convert the X values
+              return {
+                ...trace,
+                x: [conversionFactor(trace.x[0]), conversionFactor(trace.x[0])],
+                y: [0, 1], // Keep vertical line intact
+              };
+            }
+
+            // For CDF traces, we need to properly recalculate the CDF
+            // because converting fidelity->error rate changes the value ordering
+            if (!trace.x || !trace.y || trace.x.length !== trace.y.length) {
+              return trace;
+            }
+
+            // Create paired data with converted X values
+            const pairedData = trace.x.map((x: number, i: number) => ({
+              originalX: x,
+              convertedX: conversionFactor(x),
+              y: trace.y[i],
+            }));
+
+            // Sort by converted X values (error rates) in ascending order
+            const sortedData = pairedData.sort(
+              (a: any, b: any) => a.convertedX - b.convertedX
+            );
+
+            // Recalculate CDF values for the new ordering
+            const recalculatedData = sortedData.map(
+              (item: any, index: number) => ({
+                ...item,
+                newY: (index + 1) / sortedData.length, // Proper CDF calculation
+              })
+            );
+
             return {
               ...trace,
-              x: convertedX?.slice().reverse(), // Reverse to get ascending error rate order  
-              y: trace.y, // Keep original CDF direction (0->1)
+              x: recalculatedData.map((item: any) => item.convertedX),
+              y: recalculatedData.map((item: any) => item.newY),
             };
           } else {
             return {
@@ -1128,14 +1350,63 @@ export function CumulativeView() {
           value: conversionFactor(item.value),
         }));
 
+        // For error rate mode, we need to recalculate statistics from the converted data
+        let convertedStatistics = {};
+        if (showAsErrorRate && data.tableData?.length > 0) {
+          // Get all converted values and recalculate statistics
+          const convertedValues = data.tableData
+            .map((item: any) => conversionFactor(item.value))
+            .sort((a: number, b: number) => a - b);
+
+          // Recalculate median
+          const convertedMedian =
+            convertedValues.length % 2 === 1
+              ? convertedValues[Math.floor(convertedValues.length / 2)]
+              : (convertedValues[Math.floor(convertedValues.length / 2) - 1] +
+                  convertedValues[Math.floor(convertedValues.length / 2)]) /
+                2;
+
+          // Recalculate mean
+          const convertedMean =
+            convertedValues.reduce((sum: number, val: number) => sum + val, 0) /
+            convertedValues.length;
+
+          // Recalculate percentiles with proper interpolation
+          const getPercentile = (values: number[], p: number): number => {
+            if (values.length === 0) return 0;
+            if (values.length === 1) return values[0];
+            const index = (values.length - 1) * p;
+            const lower = Math.floor(index);
+            const upper = Math.ceil(index);
+            const weight = index - lower;
+            return values[lower] * (1 - weight) + values[upper] * weight;
+          };
+
+          convertedStatistics = {
+            median: convertedMedian,
+            mean: convertedMean,
+            percentile10: getPercentile(convertedValues, 0.1),
+            percentile90: getPercentile(convertedValues, 0.9),
+          };
+        } else {
+          // For fidelity mode, just convert the existing statistics
+          convertedStatistics = {
+            median: data.median ? conversionFactor(data.median) : null,
+            mean: data.mean ? conversionFactor(data.mean) : null,
+            percentile10: data.percentile10
+              ? conversionFactor(data.percentile10)
+              : null,
+            percentile90: data.percentile90
+              ? conversionFactor(data.percentile90)
+              : null,
+          };
+        }
+
         convertedData[param] = {
           ...data,
           plotData: convertedPlotData,
           tableData: convertedTableData,
-          median: data.median ? conversionFactor(data.median) : null,
-          mean: data.mean ? conversionFactor(data.mean) : null,
-          percentile10: data.percentile10 ? conversionFactor(data.percentile10) : null,
-          percentile90: data.percentile90 ? conversionFactor(data.percentile90) : null,
+          ...convertedStatistics,
         };
       } else {
         convertedData[param] = data;
@@ -1143,7 +1414,12 @@ export function CumulativeView() {
     });
 
     return convertedData;
-  }, [processedDataByParameter, showAsErrorRate, currentParameterType, parameterGroups]);
+  }, [
+    processedDataByParameter,
+    showAsErrorRate,
+    currentParameterType,
+    parameterGroups,
+  ]);
 
   // Get data for the primary parameter (for backwards compatibility)
   const primaryData = displayDataByParameter[primaryParameter] || {
@@ -1193,32 +1469,33 @@ export function CumulativeView() {
     ]);
 
     const dateStr = selectedDate === "latest" ? "latest" : selectedDate;
-    const filename = `cumulative_${primaryParameter}_${selectedChip}_${dateStr}_${timestamp.slice(0, 19).replace(/[:-]/g, "")}.csv`;
+    const filename = `cumulative_${primaryParameter}_${selectedChip}_${dateStr}_${timestamp
+      .slice(0, 19)
+      .replace(/[:-]/g, "")}.csv`;
 
     exportToCSV({ filename, headers, data: rows });
   };
-
 
   // Create combined plot data when multiple parameters are selected
   const combinedPlotData = useMemo(() => {
     if (selectedParameters.length > 1) {
       // Color palette for multiple parameters
       const colors = {
-        t1: "#3b82f6",           // blue
-        t2_echo: "#f97316",       // orange  
-        t2_star: "#10b981",       // green
+        t1: "#3b82f6", // blue
+        t2_echo: "#f97316", // orange
+        t2_star: "#10b981", // green
         gate_fidelity: "#ef4444", // red
-        x90_fidelity: "#8b5cf6",  // violet
+        x90_fidelity: "#8b5cf6", // violet
         x180_fidelity: "#f59e0b", // amber
         zx90_fidelity: "#84cc16", // lime
         bell_state_fidelity: "#ec4899", // pink
-        readout_fidelity: "#06b6d4" // cyan
+        readout_fidelity: "#06b6d4", // cyan
       };
-      
+
       return selectedParameters.flatMap((param) => {
         const data = displayDataByParameter[param];
         if (!data || !data.plotData || data.plotData.length === 0) return [];
-        
+
         // Modify colors for each trace
         return data.plotData.map((trace: any, idx: number) => {
           if (idx === 0) {
@@ -1233,11 +1510,11 @@ export function CumulativeView() {
             };
           } else if (idx === 1) {
             // Median line
-            const unit = parameterGroups.coherence.includes(param) 
-              ? " µs" 
+            const unit = parameterGroups.coherence.includes(param)
+              ? " µs"
               : parameterGroups.fidelity.includes(param) && !showAsErrorRate
-                ? "%" 
-                : "";
+              ? "%"
+              : "";
             return {
               ...trace,
               line: {
@@ -1245,7 +1522,13 @@ export function CumulativeView() {
                 color: colors[param as keyof typeof colors] || "#6b7280",
                 dash: "dash",
               },
-              name: `${PARAMETER_CONFIG[param].label} median: ${showAsErrorRate && parameterGroups.fidelity.includes(param) ? data.median?.toExponential(1) : data.median?.toFixed(parameterGroups.coherence.includes(param) ? 2 : 2)}${unit}`,
+              name: `${PARAMETER_CONFIG[param].label} median: ${
+                showAsErrorRate && parameterGroups.fidelity.includes(param)
+                  ? data.median?.toExponential(1)
+                  : data.median?.toFixed(
+                      parameterGroups.coherence.includes(param) ? 2 : 2
+                    )
+              }${unit}`,
               showlegend: true,
             };
           } else {
@@ -1260,37 +1543,46 @@ export function CumulativeView() {
   }, [selectedParameters, displayDataByParameter, plotData, parameterGroups]);
 
   // Determine plot characteristics based on selected parameters
-  const hasCoherenceParams = selectedParameters.some(p => parameterGroups.coherence.includes(p));
-  const hasFidelityParams = selectedParameters.some(p => parameterGroups.fidelity.includes(p));
+  const hasCoherenceParams = selectedParameters.some((p) =>
+    parameterGroups.coherence.includes(p)
+  );
+  const hasFidelityParams = selectedParameters.some((p) =>
+    parameterGroups.fidelity.includes(p)
+  );
   const isMixedParams = hasCoherenceParams && hasFidelityParams;
-  
+
   const layout = {
     title: {
-      text: isMixedParams 
+      text: isMixedParams
         ? `Cumulative Distribution - Selected Parameters`
-        : hasCoherenceParams 
-          ? "Cumulative Distribution - Coherence Times"
-          : hasFidelityParams
-            ? "Cumulative Distribution - Gate Fidelities"
-            : "Cumulative Distribution",
+        : hasCoherenceParams
+        ? "Cumulative Distribution - Coherence Times"
+        : hasFidelityParams
+        ? "Cumulative Distribution - Gate Fidelities"
+        : "Cumulative Distribution",
       font: { size: 18 },
     },
     xaxis: {
       title: isMixedParams
         ? "Parameter Value"
         : hasCoherenceParams
-          ? "Coherence Time (µs)"
-          : hasFidelityParams
-            ? (showAsErrorRate ? "Gate Error Rate (%)" : "Gate Fidelity (%)")
-            : "Value",
+        ? "Coherence Time (µs)"
+        : hasFidelityParams
+        ? showAsErrorRate
+          ? "Gate Error Rate (%)"
+          : "Gate Fidelity (%)"
+        : "Value",
       gridcolor: "#e5e7eb",
       showgrid: true,
       zeroline: false,
       type: hasFidelityParams ? ("log" as const) : ("linear" as const),
-      tickformat: hasFidelityParams 
-        ? (showAsErrorRate ? ".1e" : ".2f") 
+      tickformat: hasFidelityParams
+        ? showAsErrorRate
+          ? ".1e"
+          : ".2f"
         : undefined,
-      exponentformat: hasFidelityParams && showAsErrorRate ? ("power" as const) : undefined,
+      exponentformat:
+        hasFidelityParams && showAsErrorRate ? ("power" as const) : undefined,
       nticks: hasFidelityParams ? 6 : undefined, // Reduce number of ticks to prevent overlap
     },
     yaxis: {
@@ -1315,7 +1607,13 @@ export function CumulativeView() {
     annotations: displayDataByParameter[primaryParameter]?.tableData
       ? [
           {
-            text: `Data snapshot: ${selectedDate === "latest" ? "Latest calibration" : `Date: ${formatDate(selectedDate)}`}<br>Sample size: ${displayDataByParameter[primaryParameter].tableData.length} qubits`,
+            text: `Data snapshot: ${
+              selectedDate === "latest"
+                ? "Latest calibration"
+                : `Date: ${formatDate(selectedDate)}`
+            }<br>Sample size: ${
+              displayDataByParameter[primaryParameter].tableData.length
+            } qubits`,
             showarrow: false,
             xref: "paper" as const,
             yref: "paper" as const,
@@ -1411,16 +1709,21 @@ export function CumulativeView() {
                   options={availableParameters}
                   value={(() => {
                     // Handle different structures based on parameter type
-                    if (currentParameterType && Array.isArray(availableParameters)) {
+                    if (
+                      currentParameterType &&
+                      Array.isArray(availableParameters)
+                    ) {
                       // Single type selected - flat array
                       return availableParameters.filter((option: any) =>
                         selectedParameters.includes(option.value)
                       );
                     } else if (Array.isArray(availableParameters)) {
                       // No type selected yet - grouped array
-                      return availableParameters.flatMap((group: any) => group.options || []).filter((option: any) =>
-                        selectedParameters.includes(option.value)
-                      );
+                      return availableParameters
+                        .flatMap((group: any) => group.options || [])
+                        .filter((option: any) =>
+                          selectedParameters.includes(option.value)
+                        );
                     }
                     return [];
                   })()}
@@ -1462,7 +1765,9 @@ export function CumulativeView() {
             {currentParameterType === "fidelity" && (
               <div className="form-control min-w-48">
                 <div className="flex justify-between items-center h-8">
-                  <span className="label-text font-semibold">Display Format</span>
+                  <span className="label-text font-semibold">
+                    Display Format
+                  </span>
                 </div>
                 <div className="h-10 flex items-center">
                   <label className="cursor-pointer label flex items-center gap-2">
@@ -1505,28 +1810,32 @@ export function CumulativeView() {
 
                 const colors = {
                   t1: "text-blue-600",
-                  t2_echo: "text-orange-600", 
+                  t2_echo: "text-orange-600",
                   t2_star: "text-green-600",
                   gate_fidelity: "text-red-600",
                   x90_fidelity: "text-violet-600",
                   x180_fidelity: "text-amber-600",
                   zx90_fidelity: "text-lime-600",
                   bell_state_fidelity: "text-pink-600",
-                  readout_fidelity: "text-cyan-600"
+                  readout_fidelity: "text-cyan-600",
                 };
 
-                const unit = parameterGroups.coherence.includes(param) 
-                  ? " µs" 
+                const unit = parameterGroups.coherence.includes(param)
+                  ? " µs"
                   : parameterGroups.fidelity.includes(param) && !showAsErrorRate
-                    ? "%" 
-                    : "";
-                const colorClass = colors[param as keyof typeof colors] || "text-gray-600";
-                
+                  ? "%"
+                  : "";
+                const colorClass =
+                  colors[param as keyof typeof colors] || "text-gray-600";
+
                 // Format numbers based on display mode
                 const formatValue = (value: number) => {
                   if (parameterGroups.coherence.includes(param)) {
                     return value.toFixed(2);
-                  } else if (parameterGroups.fidelity.includes(param) && showAsErrorRate) {
+                  } else if (
+                    parameterGroups.fidelity.includes(param) &&
+                    showAsErrorRate
+                  ) {
                     return value.toExponential(1); // Scientific notation for error rates
                   } else {
                     return value.toFixed(2);
@@ -1534,7 +1843,10 @@ export function CumulativeView() {
                 };
 
                 return (
-                  <div key={param} className="stats shadow grid-cols-2 lg:grid-cols-6 xl:grid-cols-7">
+                  <div
+                    key={param}
+                    className="stats shadow grid-cols-2 lg:grid-cols-6 xl:grid-cols-7"
+                  >
                     <div className="stat">
                       <div className="stat-title">Parameter</div>
                       <div className={`stat-value text-sm ${colorClass}`}>
@@ -1550,25 +1862,29 @@ export function CumulativeView() {
                     <div className="stat">
                       <div className="stat-title">Median</div>
                       <div className="stat-value text-primary text-sm">
-                        {formatValue(data.median)}{unit}
+                        {formatValue(data.median)}
+                        {unit}
                       </div>
                     </div>
                     <div className="stat">
                       <div className="stat-title">Mean</div>
                       <div className="stat-value text-secondary text-sm">
-                        {formatValue(data.mean)}{unit}
+                        {formatValue(data.mean)}
+                        {unit}
                       </div>
                     </div>
                     <div className="stat">
                       <div className="stat-title">10th %ile</div>
                       <div className="stat-value text-accent text-sm">
-                        {formatValue(data.percentile10!)}{unit}
+                        {formatValue(data.percentile10!)}
+                        {unit}
                       </div>
                     </div>
                     <div className="stat">
                       <div className="stat-title">90th %ile</div>
                       <div className="stat-value text-accent text-sm">
-                        {formatValue(data.percentile90!)}{unit}
+                        {formatValue(data.percentile90!)}
+                        {unit}
                       </div>
                     </div>
                     {data.yieldPercent !== null && (
