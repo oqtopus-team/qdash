@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import numpy as np
 import plotly.graph_objs as go
@@ -18,6 +18,9 @@ class ReadoutClassification(BaseTask):
     name: str = "ReadoutClassification"
     backend: str = "qubex"
     task_type: str = "qubit"
+
+    # High resolution for accurate threshold detection
+    GRID_RESOLUTION: int = 2001
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "average_readout_fidelity": OutputParameterModel(
@@ -34,31 +37,45 @@ class ReadoutClassification(BaseTask):
         ),
     }
 
-    def plot_section_from_result(self, session: QubexSession, result, qid: str, bins=60):
+    def plot_section_from_result(
+        self, session: QubexSession, result: dict[str, Any], qid: str, bins: int = 60
+    ) -> go.Figure:
         exp = session.get_session()
         label = exp.get_qubit_label(int(qid))
         clf = result["classifiers"][label]
         z0 = result["data"][label][label][0]
         z1 = result["data"][label][label][1]
 
-        # 判別軸（c0→c1）と中点 m
+        # Discrimination axis (c0→c1) and midpoint m
         c0, c1 = clf.centers[0], clf.centers[1]
+
+        # Validate that classifier centers are different
+        if abs(c1 - c0) == 0:
+            raise ValueError("Classifier centers are identical, cannot compute discrimination axis")
+
         u = (c1 - c0) / abs(c1 - c0)
         m = 0.5 * (c0 + c1)
 
-        # 射影関数（断面）
-        proj = lambda z: np.real((z - m) * np.conj(u))
+        # Projection function (cross-section)
+        def proj(z):
+            """Project complex data onto discrimination axis."""
+            return np.real((z - m) * np.conj(u))
+
         t0, t1 = proj(z0), proj(z1)
+
+        # Validate that data arrays are not empty
+        if len(t0) == 0 or len(t1) == 0:
+            raise ValueError("No data points available for visualization")
         mu0, mu1 = proj(np.array([c0]))[0], proj(np.array([c1]))[0]
         lo, hi = float(min(t0.min(), t1.min())), float(max(t0.max(), t1.max()))
         mid = 0.5 * (mu0 + mu1)
 
-        # 1Dグリッド → IQへ戻して predict → ラベルが切り替わる点を境界とする
-        t_grid = np.linspace(lo, hi, 2001)
+        # Grid points and threshold candidates: project back to IQ and predict, find label switching points
+        t_grid = np.linspace(lo, hi, self.GRID_RESOLUTION)
         grid_points = m + t_grid * u  # complex
         preds = clf.predict(grid_points)
 
-        # 変化点（しきい値候補）。複数あれば中点に最も近いものを採用
+        # Find change points (threshold candidates). If multiple, choose the one closest to midpoint
         change_idx = np.where(np.diff(preds) != 0)[0]
         thr = None
         if len(change_idx):
