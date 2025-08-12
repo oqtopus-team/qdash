@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useMemo, useEffect } from "react";
 import {
   useListChips,
   useFetchLatestQubitTaskGroupedByChip,
   useFetchHistoricalQubitTaskGroupedByChip,
+  useFetchLatestCouplingTaskGroupedByChip,
+  useFetchHistoricalCouplingTaskGroupedByChip,
 } from "@/client/chip/chip";
 import { PlotCard } from "@/shared/components/PlotCard";
 import { ErrorCard } from "@/shared/components/ErrorCard";
@@ -13,6 +15,7 @@ import { useCSVExport } from "@/shared/hooks/useCSVExport";
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { DateSelector } from "@/app/components/DateSelector";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
+import { useCumulativeUrlState } from "@/app/hooks/useUrlState";
 import Select from "react-select";
 
 // Task names and types mapping
@@ -31,6 +34,10 @@ const TASK_CONFIG: Record<
   },
   zx90_fidelity: {
     name: "ZX90InterleavedRandomizedBenchmarking",
+    type: "coupling",
+  },
+  bell_state_fidelity: {
+    name: "BellStateTomography",
     type: "coupling",
   },
   readout_fidelity: { name: "ReadoutClassification", type: "qubit" },
@@ -83,10 +90,16 @@ const PARAMETER_CONFIG: Record<
     displayUnit: "%",
   },
   zx90_fidelity: {
-    label: "ZX90 Gate Error (2Q)",
-    higherIsBetter: false, // Changed: display as error
-    unit: "error",
-    displayUnit: "",
+    label: "ZX90 Gate Fidelity (2Q)",
+    higherIsBetter: true, // Display as fidelity
+    unit: "percentage",
+    displayUnit: "%",
+  },
+  bell_state_fidelity: {
+    label: "Bell State Fidelity (2Q)",
+    higherIsBetter: true, // Display as fidelity
+    unit: "percentage",
+    displayUnit: "%",
   },
   readout_fidelity: {
     label: "Readout Fidelity",
@@ -105,6 +118,7 @@ const OUTPUT_PARAM_NAMES: Record<string, string> = {
   x90_fidelity: "x90_gate_fidelity",
   x180_fidelity: "x180_gate_fidelity",
   zx90_fidelity: "zx90_gate_fidelity",
+  bell_state_fidelity: "bell_state_fidelity",
   readout_fidelity: "average_readout_fidelity",
 };
 
@@ -118,20 +132,23 @@ interface CumulativeDataPoint {
 }
 
 export function CumulativeView() {
-  // State management
-  const [selectedChip, setSelectedChip] = useState<string>("");
-  const [selectedParameters, setSelectedParameters] = useState<string[]>([
-    "t1",
-    "t2_echo",
-    "t2_star",
-  ]);
-  const [selectedDate, setSelectedDate] = useState<string>("latest");
-  const [showAsErrorRate, setShowAsErrorRate] = useState<boolean>(false);
+  // URL state management
+  const {
+    selectedChip,
+    selectedDate,
+    selectedParameters,
+    showAsErrorRate,
+    setSelectedChip,
+    setSelectedDate,
+    setSelectedParameters,
+    setShowAsErrorRate,
+    isInitialized,
+  } = useCumulativeUrlState();
 
   // Group parameters by category for better organization
   const parameterGroups = {
     coherence: ["t1", "t2_echo", "t2_star"],
-    fidelity: ["gate_fidelity", "x90_fidelity", "x180_fidelity", "readout_fidelity"]
+    fidelity: ["gate_fidelity", "x90_fidelity", "x180_fidelity", "zx90_fidelity", "bell_state_fidelity", "readout_fidelity"]
   };
 
   // Determine current parameter type to enforce mutual exclusivity
@@ -488,6 +505,70 @@ export function CumulativeView() {
     },
   });
 
+  // ZX90 Gate Fidelity (coupling task)
+  const {
+    data: zx90FidelityLatestResponse,
+    isLoading: zx90FidelityLatestLoading,
+    error: zx90FidelityLatestError,
+  } = useFetchLatestCouplingTaskGroupedByChip(selectedChip, "ZX90InterleavedRandomizedBenchmarking", {
+    query: {
+      enabled: Boolean(
+        selectedChip &&
+        selectedDate === "latest" &&
+        selectedParameters.includes("zx90_fidelity"),
+      ),
+      refetchInterval: selectedDate === "latest" ? 30000 : undefined,
+      staleTime: 25000,
+    },
+  });
+
+  const {
+    data: zx90FidelityHistoricalResponse,
+    isLoading: zx90FidelityHistoricalLoading,
+    error: zx90FidelityHistoricalError,
+  } = useFetchHistoricalCouplingTaskGroupedByChip(selectedChip, "ZX90InterleavedRandomizedBenchmarking", selectedDate, {
+    query: {
+      enabled: Boolean(
+        selectedChip &&
+        selectedDate !== "latest" &&
+        selectedParameters.includes("zx90_fidelity"),
+      ),
+      staleTime: 60000,
+    },
+  });
+
+  // Bell State Fidelity (coupling task)
+  const {
+    data: bellStateFidelityLatestResponse,
+    isLoading: bellStateFidelityLatestLoading,
+    error: bellStateFidelityLatestError,
+  } = useFetchLatestCouplingTaskGroupedByChip(selectedChip, "BellStateTomography", {
+    query: {
+      enabled: Boolean(
+        selectedChip &&
+        selectedDate === "latest" &&
+        selectedParameters.includes("bell_state_fidelity"),
+      ),
+      refetchInterval: selectedDate === "latest" ? 30000 : undefined,
+      staleTime: 25000,
+    },
+  });
+
+  const {
+    data: bellStateFidelityHistoricalResponse,
+    isLoading: bellStateFidelityHistoricalLoading,
+    error: bellStateFidelityHistoricalError,
+  } = useFetchHistoricalCouplingTaskGroupedByChip(selectedChip, "BellStateTomography", selectedDate, {
+    query: {
+      enabled: Boolean(
+        selectedChip &&
+        selectedDate !== "latest" &&
+        selectedParameters.includes("bell_state_fidelity"),
+      ),
+      staleTime: 60000,
+    },
+  });
+
   // Combine loading states
   const isLoading = useMemo(() => {
     const needsCoherenceData = selectedParameters.some(p => parameterGroups.coherence.includes(p));
@@ -506,9 +587,9 @@ export function CumulativeView() {
     
     if (needsFidelityData) {
       if (selectedDate === "latest") {
-        isLoadingFidelity = primaryLatestLoading || gateFidelityLatestLoading || x90FidelityLatestLoading || x180FidelityLatestLoading || readoutFidelityLatestLoading;
+        isLoadingFidelity = primaryLatestLoading || gateFidelityLatestLoading || x90FidelityLatestLoading || x180FidelityLatestLoading || zx90FidelityLatestLoading || bellStateFidelityLatestLoading || readoutFidelityLatestLoading;
       } else {
-        isLoadingFidelity = primaryHistoricalLoading || gateFidelityHistoricalLoading || x90FidelityHistoricalLoading || x180FidelityHistoricalLoading || readoutFidelityHistoricalLoading;
+        isLoadingFidelity = primaryHistoricalLoading || gateFidelityHistoricalLoading || x90FidelityHistoricalLoading || x180FidelityHistoricalLoading || zx90FidelityHistoricalLoading || bellStateFidelityHistoricalLoading || readoutFidelityHistoricalLoading;
       }
     }
     
@@ -525,10 +606,14 @@ export function CumulativeView() {
     gateFidelityLatestLoading,
     x90FidelityLatestLoading,
     x180FidelityLatestLoading,
+    zx90FidelityLatestLoading,
+    bellStateFidelityLatestLoading,
     readoutFidelityLatestLoading,
     gateFidelityHistoricalLoading,
     x90FidelityHistoricalLoading,
     x180FidelityHistoricalLoading,
+    zx90FidelityHistoricalLoading,
+    bellStateFidelityHistoricalLoading,
     readoutFidelityHistoricalLoading,
   ]);
 
@@ -550,9 +635,9 @@ export function CumulativeView() {
     
     if (needsFidelityData) {
       if (selectedDate === "latest") {
-        fidelityError = primaryLatestError || gateFidelityLatestError || x90FidelityLatestError || x180FidelityLatestError || readoutFidelityLatestError;
+        fidelityError = primaryLatestError || gateFidelityLatestError || x90FidelityLatestError || x180FidelityLatestError || zx90FidelityLatestError || bellStateFidelityLatestError || readoutFidelityLatestError;
       } else {
-        fidelityError = primaryHistoricalError || gateFidelityHistoricalError || x90FidelityHistoricalError || x180FidelityHistoricalError || readoutFidelityHistoricalError;
+        fidelityError = primaryHistoricalError || gateFidelityHistoricalError || x90FidelityHistoricalError || x180FidelityHistoricalError || zx90FidelityHistoricalError || bellStateFidelityHistoricalError || readoutFidelityHistoricalError;
       }
     }
     
@@ -569,10 +654,14 @@ export function CumulativeView() {
     gateFidelityLatestError,
     x90FidelityLatestError,
     x180FidelityLatestError,
+    zx90FidelityLatestError,
+    bellStateFidelityLatestError,
     readoutFidelityLatestError,
     gateFidelityHistoricalError,
     x90FidelityHistoricalError,
     x180FidelityHistoricalError,
+    zx90FidelityHistoricalError,
+    bellStateFidelityHistoricalError,
     readoutFidelityHistoricalError,
   ]);
 
@@ -732,6 +821,7 @@ export function CumulativeView() {
       x90_fidelity: 0.999, // 99.9% fidelity - single qubit gates should be very high
       x180_fidelity: 0.999, // 99.9% fidelity - single qubit gates should be very high
       zx90_fidelity: 0.99, // 99% fidelity - two-qubit gates are typically lower
+      bell_state_fidelity: 0.95, // 95% fidelity - bell state preparation is challenging
       readout_fidelity: 0.99, // 99% fidelity - readout should be high for QEC
     };
     const threshold = thresholds[parameterKey as keyof typeof thresholds];
@@ -940,6 +1030,30 @@ export function CumulativeView() {
           );
         }
       }
+      
+      // Process ZX90 Fidelity (coupling task)
+      if (selectedParameters.includes("zx90_fidelity")) {
+        const zx90FidelityResponse = selectedDate === "latest" ? zx90FidelityLatestResponse : zx90FidelityHistoricalResponse;
+        if (zx90FidelityResponse?.data?.result) {
+          results["zx90_fidelity"] = processParameterData(
+            zx90FidelityResponse.data.result,
+            "zx90_fidelity",
+            OUTPUT_PARAM_NAMES["zx90_fidelity"],
+          );
+        }
+      }
+      
+      // Process Bell State Fidelity (coupling task)
+      if (selectedParameters.includes("bell_state_fidelity")) {
+        const bellStateFidelityResponse = selectedDate === "latest" ? bellStateFidelityLatestResponse : bellStateFidelityHistoricalResponse;
+        if (bellStateFidelityResponse?.data?.result) {
+          results["bell_state_fidelity"] = processParameterData(
+            bellStateFidelityResponse.data.result,
+            "bell_state_fidelity",
+            OUTPUT_PARAM_NAMES["bell_state_fidelity"],
+          );
+        }
+      }
     }
 
     return results;
@@ -960,6 +1074,10 @@ export function CumulativeView() {
     x180FidelityHistoricalResponse,
     readoutFidelityLatestResponse,
     readoutFidelityHistoricalResponse,
+    zx90FidelityLatestResponse,
+    zx90FidelityHistoricalResponse,
+    bellStateFidelityLatestResponse,
+    bellStateFidelityHistoricalResponse,
     primaryLatestResponse,
     primaryHistoricalResponse,
     primaryParameter,
@@ -1092,6 +1210,8 @@ export function CumulativeView() {
         gate_fidelity: "#ef4444", // red
         x90_fidelity: "#8b5cf6",  // violet
         x180_fidelity: "#f59e0b", // amber
+        zx90_fidelity: "#84cc16", // lime
+        bell_state_fidelity: "#ec4899", // pink
         readout_fidelity: "#06b6d4" // cyan
       };
       
@@ -1216,6 +1336,15 @@ export function CumulativeView() {
         message={error.message || "An unexpected error occurred"}
         onRetry={() => window.location.reload()}
       />
+    );
+  }
+
+  // Don't render until URL state is initialized to prevent hydration mismatches
+  if (!isInitialized) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
     );
   }
 
@@ -1381,6 +1510,8 @@ export function CumulativeView() {
                   gate_fidelity: "text-red-600",
                   x90_fidelity: "text-violet-600",
                   x180_fidelity: "text-amber-600",
+                  zx90_fidelity: "text-lime-600",
+                  bell_state_fidelity: "text-pink-600",
                   readout_fidelity: "text-cyan-600"
                 };
 
