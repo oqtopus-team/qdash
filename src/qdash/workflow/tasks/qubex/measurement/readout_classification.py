@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
 import numpy as np
 import plotly.graph_objs as go
