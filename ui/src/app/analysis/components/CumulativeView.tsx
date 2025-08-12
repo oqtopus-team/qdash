@@ -600,7 +600,7 @@ export function CumulativeView() {
     error: bellStateFidelityLatestError,
   } = useFetchLatestCouplingTaskGroupedByChip(
     selectedChip,
-    "BellStateTomography",
+    "CheckBellStateTomography",
     {
       query: {
         enabled: Boolean(
@@ -620,7 +620,7 @@ export function CumulativeView() {
     error: bellStateFidelityHistoricalError,
   } = useFetchHistoricalCouplingTaskGroupedByChip(
     selectedChip,
-    "BellStateTomography",
+    "CheckBellStateTomography",
     selectedDate,
     {
       query: {
