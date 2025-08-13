@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useCallback } from "react";
 import {
   useListChips,
   useFetchLatestQubitTaskGroupedByChip,
@@ -27,8 +27,6 @@ import {
   convertThresholdForDisplay,
   convertDisplayToThreshold,
   formatThresholdValue,
-  isCoherenceParameter,
-  isFidelityParameter,
 } from "@/shared/config/analysis";
 import { naturalSortQIDs } from "@/shared/utils/qid";
 
@@ -112,14 +110,14 @@ export function HistogramView() {
     {
       label: "Coherence Times",
       options: PARAMETER_GROUPS.coherence.map((key) => ({
-        value: key,
+        value: key as string,
         label: PARAMETER_CONFIG[key].label,
       })),
     },
     {
       label: "Gate Fidelities",
       options: PARAMETER_GROUPS.fidelity.map((key) => ({
-        value: key,
+        value: key as string,
         label: PARAMETER_CONFIG[key].label,
       })),
     },
@@ -267,22 +265,10 @@ export function HistogramView() {
     historicalCouplingResponse,
   ]);
 
-  // Process data for histogram
-  const processedData = useMemo(() => {
+  // Extract and transform raw data
+  const histogramData = useMemo(() => {
     if (!response?.data?.result) {
-      return {
-        histogramData: [],
-        tableData: [],
-        statistics: {
-          mean: 0,
-          median: 0,
-          stdDev: 0,
-          min: 0,
-          max: 0,
-          count: 0,
-          yieldPercent: 0,
-        },
-      };
+      return [];
     }
 
     const outputParamName = OUTPUT_PARAM_NAMES[selectedParameter];
@@ -354,13 +340,28 @@ export function HistogramView() {
 
     // Sort by QID for consistent ordering using robust natural sort
     allValues.sort((a, b) => naturalSortQIDs(a.qid, b.qid));
+    return allValues;
+  }, [response, selectedParameter, showAsErrorRate]);
 
-    // Calculate statistics
-    const values = allValues.map((item) => item.value);
+  // Calculate basic statistics
+  const basicStatistics = useMemo(() => {
+    if (histogramData.length === 0) {
+      return {
+        mean: 0,
+        median: 0,
+        stdDev: 0,
+        min: 0,
+        max: 0,
+        count: 0,
+      };
+    }
+
+    const values = histogramData.map((item) => item.value);
     const mean =
       values.length > 0
         ? values.reduce((sum, val) => sum + val, 0) / values.length
         : 0;
+    
     const sortedValues = [...values].sort((a, b) => a - b);
     const median =
       sortedValues.length > 0
@@ -371,7 +372,6 @@ export function HistogramView() {
             2
         : 0;
 
-    // Calculate standard deviation
     const stdDev =
       values.length > 0
         ? Math.sqrt(
@@ -380,12 +380,28 @@ export function HistogramView() {
           )
         : 0;
 
-    // Calculate yield using custom threshold or default
+    return {
+      mean,
+      median,
+      stdDev,
+      min: sortedValues[0] || 0,
+      max: sortedValues[sortedValues.length - 1] || 0,
+      count: values.length,
+    };
+  }, [histogramData]);
+
+  // Calculate yield percentage
+  const yieldStatistics = useMemo(() => {
+    if (histogramData.length === 0) {
+      return { yieldPercent: 0 };
+    }
+
     const defaultThreshold = PARAMETER_CONFIG[selectedParameter]?.threshold;
     const activeThreshold = customThreshold ?? defaultThreshold;
     let yieldCount = 0;
 
     if (activeThreshold) {
+      const values = histogramData.map((item) => item.value);
       const isCoherence = ["t1", "t2_echo", "t2_star"].includes(
         selectedParameter,
       );
@@ -406,22 +422,22 @@ export function HistogramView() {
     }
 
     const yieldPercent =
-      values.length > 0 ? (yieldCount / values.length) * 100 : 0;
+      histogramData.length > 0 ? (yieldCount / histogramData.length) * 100 : 0;
 
+    return { yieldPercent };
+  }, [histogramData, selectedParameter, showAsErrorRate, customThreshold]);
+
+  // Combine all data for components that need the complete structure
+  const processedData = useMemo(() => {
     return {
-      histogramData: allValues,
-      tableData: allValues,
+      histogramData,
+      tableData: histogramData,
       statistics: {
-        mean,
-        median,
-        stdDev,
-        min: sortedValues[0] || 0,
-        max: sortedValues[sortedValues.length - 1] || 0,
-        count: values.length,
-        yieldPercent,
+        ...basicStatistics,
+        ...yieldStatistics,
       },
     };
-  }, [response, selectedParameter, showAsErrorRate]);
+  }, [histogramData, basicStatistics, yieldStatistics]);
 
   // Create Plotly traces
   const plotData = useMemo(() => {
@@ -735,7 +751,7 @@ export function HistogramView() {
                   options={parameterOptions}
                   value={parameterOptions
                     .flatMap((group) => group.options)
-                    .find((option) => option.value === selectedParameter)}
+                    .find((option) => option.value === selectedParameter) || null}
                   onChange={(option) => {
                     if (option) {
                       setSelectedParameter(option.value);

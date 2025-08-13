@@ -18,119 +18,12 @@ import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useCDFUrlState } from "@/app/hooks/useUrlState";
 import Select from "react-select";
 
-// Task names and types mapping
-const TASK_CONFIG: Record<
-  string,
-  { name: string; type: "qubit" | "coupling" }
-> = {
-  t1: { name: "CheckT1", type: "qubit" },
-  t2_echo: { name: "CheckT2Echo", type: "qubit" },
-  t2_star: { name: "CheckRamsey", type: "qubit" },
-  gate_fidelity: { name: "RandomizedBenchmarking", type: "qubit" },
-  x90_fidelity: { name: "X90InterleavedRandomizedBenchmarking", type: "qubit" },
-  x180_fidelity: {
-    name: "X180InterleavedRandomizedBenchmarking",
-    type: "qubit",
-  },
-  zx90_fidelity: {
-    name: "ZX90InterleavedRandomizedBenchmarking",
-    type: "coupling",
-  },
-  bell_state_fidelity: {
-    name: "CheckBellStateTomography",
-    type: "coupling",
-  },
-  readout_fidelity: { name: "ReadoutClassification", type: "qubit" },
-};
-
-// Parameter configuration: labels, directionality, and thresholds
-const PARAMETER_CONFIG: Record<
-  string,
-  {
-    label: string;
-    higherIsBetter: boolean;
-    unit: string;
-    displayUnit: string;
-    threshold?: number; // QEC threshold for yield calculation
-  }
-> = {
-  t1: {
-    label: "T1",
-    higherIsBetter: true,
-    unit: "µs",
-    displayUnit: "µs",
-    threshold: 100, // 100µs - minimum for error correction protocols
-  },
-  t2_echo: {
-    label: "T2 Echo",
-    higherIsBetter: true,
-    unit: "µs",
-    displayUnit: "µs",
-    threshold: 200, // 200µs - echo can extend T2 significantly
-  },
-  t2_star: {
-    label: "T2*",
-    higherIsBetter: true,
-    unit: "µs",
-    displayUnit: "µs",
-    threshold: 50, // 50µs - dephasing limited
-  },
-  gate_fidelity: {
-    label: "Average Gate Fidelity",
-    higherIsBetter: true, // Display as fidelity (higher is better)
-    unit: "percentage",
-    displayUnit: "%",
-    threshold: 0.99, // 99% fidelity - threshold for QEC (surface code)
-  },
-  x90_fidelity: {
-    label: "X90 Gate Fidelity",
-    higherIsBetter: true, // Display as fidelity
-    unit: "percentage",
-    displayUnit: "%",
-    threshold: 0.999, // 99.9% fidelity - single qubit gates should be very high
-  },
-  x180_fidelity: {
-    label: "X180 Gate Fidelity",
-    higherIsBetter: true, // Display as fidelity
-    unit: "percentage",
-    displayUnit: "%",
-    threshold: 0.999, // 99.9% fidelity - single qubit gates should be very high
-  },
-  zx90_fidelity: {
-    label: "ZX90 Gate Fidelity (2Q)",
-    higherIsBetter: true, // Display as fidelity
-    unit: "percentage",
-    displayUnit: "%",
-    threshold: 0.99, // 99% fidelity - two-qubit gates are typically lower
-  },
-  bell_state_fidelity: {
-    label: "Bell State Fidelity (2Q)",
-    higherIsBetter: true, // Display as fidelity
-    unit: "percentage",
-    displayUnit: "%",
-    threshold: 0.95, // 95% fidelity - bell state preparation is challenging
-  },
-  readout_fidelity: {
-    label: "Readout Fidelity",
-    higherIsBetter: true, // Display as fidelity
-    unit: "percentage",
-    displayUnit: "%",
-    threshold: 0.99, // 99% fidelity - readout should be high for QEC
-  },
-};
-
-// Output parameter names for each task
-const OUTPUT_PARAM_NAMES: Record<string, string> = {
-  t1: "t1",
-  t2_echo: "t2_echo",
-  t2_star: "t2_star",
-  gate_fidelity: "average_gate_fidelity",
-  x90_fidelity: "x90_gate_fidelity",
-  x180_fidelity: "x180_gate_fidelity",
-  zx90_fidelity: "zx90_gate_fidelity",
-  bell_state_fidelity: "bell_state_fidelity",
-  readout_fidelity: "average_readout_fidelity",
-};
+import {
+  TASK_CONFIG,
+  PARAMETER_CONFIG,
+  OUTPUT_PARAM_NAMES,
+  PARAMETER_GROUPS,
+} from "@/shared/config/analysis";
 
 interface CumulativeDataPoint {
   value: number;
@@ -155,42 +48,31 @@ export function CDFView() {
     isInitialized,
   } = useCDFUrlState();
 
-  // Group parameters by category for better organization
-  const parameterGroups = {
-    coherence: ["t1", "t2_echo", "t2_star"],
-    fidelity: [
-      "gate_fidelity",
-      "x90_fidelity",
-      "x180_fidelity",
-      "zx90_fidelity",
-      "bell_state_fidelity",
-      "readout_fidelity",
-    ],
-  };
+  // Use shared parameter groups for better organization
 
   // Determine current parameter type to enforce mutual exclusivity
   const currentParameterType = useMemo(() => {
     if (selectedParameters.length === 0) return null;
 
     const hasCoherence = selectedParameters.some((p) =>
-      parameterGroups.coherence.includes(p),
+      PARAMETER_GROUPS.coherence.includes(p as any),
     );
     const hasFidelity = selectedParameters.some((p) =>
-      parameterGroups.fidelity.includes(p),
+      PARAMETER_GROUPS.fidelity.includes(p as any),
     );
 
     return hasCoherence ? "coherence" : hasFidelity ? "fidelity" : null;
-  }, [selectedParameters, parameterGroups]);
+  }, [selectedParameters]);
 
   // Available parameters based on current selection (mutually exclusive)
   const availableParameters = useMemo(() => {
     if (currentParameterType === "coherence") {
-      return parameterGroups.coherence.map((key) => ({
+      return PARAMETER_GROUPS.coherence.map((key) => ({
         value: key,
         label: PARAMETER_CONFIG[key].label,
       }));
     } else if (currentParameterType === "fidelity") {
-      return parameterGroups.fidelity.map((key) => ({
+      return PARAMETER_GROUPS.fidelity.map((key) => ({
         value: key,
         label: PARAMETER_CONFIG[key].label,
       }));
@@ -199,21 +81,21 @@ export function CDFView() {
       return [
         {
           label: "Coherence Times",
-          options: parameterGroups.coherence.map((key) => ({
+          options: PARAMETER_GROUPS.coherence.map((key) => ({
             value: key,
             label: PARAMETER_CONFIG[key].label,
           })),
         },
         {
           label: "Gate Fidelities",
-          options: parameterGroups.fidelity.map((key) => ({
+          options: PARAMETER_GROUPS.fidelity.map((key) => ({
             value: key,
             label: PARAMETER_CONFIG[key].label,
           })),
         },
       ];
     }
-  }, [currentParameterType, parameterGroups]);
+  }, [currentParameterType]);
 
   // Fetch chips data for default selection
   const { data: chipsResponse } = useListChips();
@@ -373,7 +255,7 @@ export function CDFView() {
           taskName &&
           taskType === "qubit" &&
           selectedDate === "latest" &&
-          selectedParameters.some((p) => parameterGroups.fidelity.includes(p)),
+          selectedParameters.some((p) => PARAMETER_GROUPS.fidelity.includes(p as any)),
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -396,7 +278,7 @@ export function CDFView() {
             taskType === "qubit" &&
             selectedDate !== "latest" &&
             selectedParameters.some((p) =>
-              parameterGroups.fidelity.includes(p),
+              PARAMETER_GROUPS.fidelity.includes(p as any),
             ),
         ),
         staleTime: 60000,
@@ -653,10 +535,10 @@ export function CDFView() {
   // Combine loading states
   const isLoading = useMemo(() => {
     const needsCoherenceData = selectedParameters.some((p) =>
-      parameterGroups.coherence.includes(p),
+      PARAMETER_GROUPS.coherence.includes(p as any),
     );
     const needsFidelityData = selectedParameters.some((p) =>
-      parameterGroups.fidelity.includes(p),
+      PARAMETER_GROUPS.fidelity.includes(p as any),
     );
 
     let isLoadingCoherence = false;
@@ -723,10 +605,10 @@ export function CDFView() {
   // Combine error states
   const error = useMemo(() => {
     const needsCoherenceData = selectedParameters.some((p) =>
-      parameterGroups.coherence.includes(p),
+      PARAMETER_GROUPS.coherence.includes(p as any),
     );
     const needsFidelityData = selectedParameters.some((p) =>
-      parameterGroups.fidelity.includes(p),
+      PARAMETER_GROUPS.fidelity.includes(p as any),
     );
 
     let coherenceError = null;
@@ -1089,7 +971,7 @@ export function CDFView() {
 
     // Check which parameters need loading
     const needsCoherenceData = selectedParameters.some((p) =>
-      parameterGroups.coherence.includes(p),
+      PARAMETER_GROUPS.coherence.includes(p as any),
     );
     if (needsCoherenceData) {
       // Process T1 data
@@ -1138,7 +1020,7 @@ export function CDFView() {
 
     // Process gate fidelity parameters if selected
     const hasFidelityParams = selectedParameters.some((p) =>
-      parameterGroups.fidelity.includes(p),
+      PARAMETER_GROUPS.fidelity.includes(p as any),
     );
     if (hasFidelityParams) {
       // Process Gate Fidelity
@@ -1268,7 +1150,7 @@ export function CDFView() {
     const convertedData: Record<string, any> = {};
 
     Object.entries(processedDataByParameter).forEach(([param, data]) => {
-      if (parameterGroups.fidelity.includes(param) && data) {
+      if (PARAMETER_GROUPS.fidelity.includes(param as any) && data) {
         let conversionFactor;
         if (showAsErrorRate) {
           // Convert fidelity to error rate percentage: (1 - fidelity) * 100
@@ -1411,7 +1293,7 @@ export function CDFView() {
     processedDataByParameter,
     showAsErrorRate,
     currentParameterType,
-    parameterGroups,
+    PARAMETER_GROUPS,
   ]);
 
   // Get data for the primary parameter (for backwards compatibility)
@@ -1503,9 +1385,9 @@ export function CDFView() {
             };
           } else if (idx === 1) {
             // Median line
-            const unit = parameterGroups.coherence.includes(param)
+            const unit = PARAMETER_GROUPS.coherence.includes(param as any)
               ? " µs"
-              : parameterGroups.fidelity.includes(param) && !showAsErrorRate
+              : PARAMETER_GROUPS.fidelity.includes(param as any) && !showAsErrorRate
                 ? "%"
                 : "";
             return {
@@ -1516,10 +1398,10 @@ export function CDFView() {
                 dash: "dash",
               },
               name: `${PARAMETER_CONFIG[param].label} median: ${
-                showAsErrorRate && parameterGroups.fidelity.includes(param)
+                showAsErrorRate && PARAMETER_GROUPS.fidelity.includes(param as any)
                   ? data.median?.toExponential(1)
                   : data.median?.toFixed(
-                      parameterGroups.coherence.includes(param) ? 2 : 2,
+                      PARAMETER_GROUPS.coherence.includes(param as any) ? 2 : 2,
                     )
               }${unit}`,
               showlegend: true,
@@ -1533,14 +1415,14 @@ export function CDFView() {
 
     // For single parameter, use the primary parameter data
     return plotData;
-  }, [selectedParameters, displayDataByParameter, plotData, parameterGroups]);
+  }, [selectedParameters, displayDataByParameter, plotData, PARAMETER_GROUPS]);
 
   // Determine plot characteristics based on selected parameters
   const hasCoherenceParams = selectedParameters.some((p) =>
-    parameterGroups.coherence.includes(p),
+    PARAMETER_GROUPS.coherence.includes(p as any),
   );
   const hasFidelityParams = selectedParameters.some((p) =>
-    parameterGroups.fidelity.includes(p),
+    PARAMETER_GROUPS.fidelity.includes(p as any),
   );
   const isMixedParams = hasCoherenceParams && hasFidelityParams;
 
@@ -1813,9 +1695,9 @@ export function CDFView() {
                   readout_fidelity: "text-cyan-600",
                 };
 
-                const unit = parameterGroups.coherence.includes(param)
+                const unit = PARAMETER_GROUPS.coherence.includes(param as any)
                   ? " µs"
-                  : parameterGroups.fidelity.includes(param) && !showAsErrorRate
+                  : PARAMETER_GROUPS.fidelity.includes(param as any) && !showAsErrorRate
                     ? "%"
                     : "";
                 const colorClass =
@@ -1823,10 +1705,10 @@ export function CDFView() {
 
                 // Format numbers based on display mode
                 const formatValue = (value: number) => {
-                  if (parameterGroups.coherence.includes(param)) {
+                  if (PARAMETER_GROUPS.coherence.includes(param as any)) {
                     return value.toFixed(2);
                   } else if (
-                    parameterGroups.fidelity.includes(param) &&
+                    PARAMETER_GROUPS.fidelity.includes(param as any) &&
                     showAsErrorRate
                   ) {
                     return value.toExponential(1); // Scientific notation for error rates
