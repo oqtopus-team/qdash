@@ -268,8 +268,8 @@ def extract_fidelity_values(data: Dict[str, Any], parameter_name: str) -> Dict[s
                     else:
                         value = float(param_value)
 
-        # Validate fidelity values (should be between 0 and 1)
-        if value is not None and not np.isnan(value) and 0 <= value <= 1:
+        # Include all numeric values for outlier detection
+        if value is not None and not np.isnan(value):
             extracted[qid] = value
 
     return extracted
