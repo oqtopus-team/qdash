@@ -129,9 +129,9 @@ export const THRESHOLD_RANGES: Record<
   string,
   { min: number; max: number; step: number }
 > = {
-  t1: { min: 50, max: 200, step: 1 },
-  t2_echo: { min: 100, max: 400, step: 1 },
-  t2_star: { min: 25, max: 100, step: 1 },
+  t1: { min: 25, max: 200, step: 1 },
+  t2_echo: { min: 50, max: 400, step: 1 },
+  t2_star: { min: 15, max: 100, step: 1 },
   // Fidelity parameters (as raw values, converted in UI)
   gate_fidelity: { min: 0.9, max: 0.999, step: 0.001 },
   x90_fidelity: { min: 0.9, max: 0.999, step: 0.001 },
@@ -165,7 +165,7 @@ export function isFidelityParameter(parameter: string): boolean {
 
 export function getParameterRange(
   parameter: string,
-  showAsErrorRate: boolean = false,
+  showAsErrorRate: boolean = false
 ) {
   if (isCoherenceParameter(parameter)) {
     return THRESHOLD_RANGES[parameter];
@@ -181,7 +181,7 @@ export function getParameterRange(
 export function convertThresholdForDisplay(
   parameter: string,
   threshold: number,
-  showAsErrorRate: boolean = false,
+  showAsErrorRate: boolean = false
 ): number {
   if (isCoherenceParameter(parameter)) {
     return threshold;
@@ -197,7 +197,7 @@ export function convertThresholdForDisplay(
 export function convertDisplayToThreshold(
   parameter: string,
   displayValue: number,
-  showAsErrorRate: boolean = false,
+  showAsErrorRate: boolean = false
 ): number {
   if (isCoherenceParameter(parameter)) {
     return displayValue;
@@ -213,7 +213,7 @@ export function convertDisplayToThreshold(
 export function formatThresholdValue(
   parameter: string,
   threshold: number,
-  showAsErrorRate: boolean = false,
+  showAsErrorRate: boolean = false
 ): string {
   const config = PARAMETER_CONFIG[parameter];
   if (!config) return String(threshold);
