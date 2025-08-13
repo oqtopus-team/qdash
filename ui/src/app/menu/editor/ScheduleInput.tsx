@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
-import type { CreateMenuRequestSchedule } from "@/schemas/createMenuRequestSchedule";
-import type { SerialNode } from "@/schemas/serialNode";
-import type { ParallelNode } from "@/schemas/parallelNode";
+
 import type { BatchNode } from "@/schemas/batchNode";
+import type { CreateMenuRequestSchedule } from "@/schemas/createMenuRequestSchedule";
+import type { ParallelNode } from "@/schemas/parallelNode";
+import type { SerialNode } from "@/schemas/serialNode";
 
 type Block = {
   type: "serial" | "batch";

@@ -1,16 +1,18 @@
 "use client";
 
 import { useMemo, useEffect } from "react";
-import { useFetchChip, useListChips } from "@/client/chip/chip";
-import { ParameterSelector } from "@/app/components/ParameterSelector";
+
+import type { ParameterKey } from "@/shared/types/analysis";
+
 import { ChipSelector } from "@/app/components/ChipSelector";
-import { PlotCard } from "@/shared/components/PlotCard";
-import { StatisticsCards } from "@/shared/components/StatisticsCards";
+import { ParameterSelector } from "@/app/components/ParameterSelector";
+import { useCorrelationUrlState } from "@/app/hooks/useUrlState";
+import { useFetchChip, useListChips } from "@/client/chip/chip";
 import { DataTable } from "@/shared/components/DataTable";
 import { ErrorCard } from "@/shared/components/ErrorCard";
+import { PlotCard } from "@/shared/components/PlotCard";
+import { StatisticsCards } from "@/shared/components/StatisticsCards";
 import { useCorrelationData } from "@/shared/hooks/useCorrelationData";
-import { useCorrelationUrlState } from "@/app/hooks/useUrlState";
-import { ParameterKey } from "@/shared/types/analysis";
 
 export function CorrelationView() {
   // URL state management

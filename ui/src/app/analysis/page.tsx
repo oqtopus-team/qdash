@@ -1,10 +1,12 @@
 "use client";
 
 import { Suspense } from "react";
-import { TimeSeriesView } from "./components/TimeSeriesView";
-import { CorrelationView } from "./components/CorrelationView";
+
 import { CDFView } from "./components/CDFView";
+import { CorrelationView } from "./components/CorrelationView";
 import { HistogramView } from "./components/HistogramView";
+import { TimeSeriesView } from "./components/TimeSeriesView";
+
 import { useAnalysisUrlState } from "@/app/hooks/useUrlState";
 
 type AnalyzeView = "timeseries" | "histogram" | "cdf" | "correlation";

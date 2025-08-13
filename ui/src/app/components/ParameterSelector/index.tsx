@@ -1,6 +1,8 @@
 "use client";
 
-import Select, { SingleValue } from "react-select";
+import Select from "react-select";
+
+import type { SingleValue } from "react-select";
 
 interface ParameterOption {
   value: string;

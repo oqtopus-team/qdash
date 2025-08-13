@@ -6,18 +6,10 @@
  * OpenAPI spec version: 0.0.1
  */
 import { useQuery } from "@tanstack/react-query";
-import type {
-  DataTag,
-  DefinedInitialDataOptions,
-  DefinedUseQueryResult,
-  QueryClient,
-  QueryFunction,
-  QueryKey,
-  UndefinedInitialDataOptions,
-  UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
 
+import { customInstance } from "../../lib/custom-instance";
+
+import type { ErrorType } from "../../lib/custom-instance";
 import type {
   ChipDatesResponse,
   ChipResponse,
@@ -31,9 +23,17 @@ import type {
   MuxDetailResponse,
   TimeSeriesData,
 } from "../../schemas";
-
-import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType } from "../../lib/custom-instance";
+import type {
+  DataTag,
+  DefinedInitialDataOptions,
+  DefinedUseQueryResult,
+  QueryClient,
+  QueryFunction,
+  QueryKey,
+  UndefinedInitialDataOptions,
+  UseQueryOptions,
+  UseQueryResult,
+} from "@tanstack/react-query";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 

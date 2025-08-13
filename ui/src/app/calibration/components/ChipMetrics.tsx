@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Select, { SingleValue } from "react-select";
-import { GraphCanvas, NodePositionArgs } from "reagraph";
+
+import Select from "react-select";
+import { GraphCanvas } from "reagraph";
+
 // import { ColorRepresentation } from "three";
-import { useListChips, useFetchChip } from "@/client/chip/chip";
 import type { ChipResponse } from "@/schemas";
+import type { SingleValue } from "react-select";
+import type { NodePositionArgs } from "reagraph";
+
+import { useListChips, useFetchChip } from "@/client/chip/chip";
 
 // type ThemeColor = number | string;
 

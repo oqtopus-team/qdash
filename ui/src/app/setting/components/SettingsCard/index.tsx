@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+
 import { useFetchConfig } from "@/client/settings/settings";
 
 interface Settings {

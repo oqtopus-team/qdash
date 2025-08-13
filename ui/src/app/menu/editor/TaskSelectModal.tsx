@@ -1,15 +1,20 @@
-import { DndContext, DragEndEvent } from "@dnd-kit/core";
-import { useFetchAllTasks } from "@/client/task/task";
+import { useState, useEffect } from "react";
+
+import { DndContext } from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import SortableTaskItem from "./SortableTaskItem";
-import { TaskResponse } from "@/schemas";
-import { useState, useEffect } from "react";
 import { BsPlus } from "react-icons/bs";
+
 import AvailableTasksList from "./AvailableTasksList";
 import DroppableTaskList from "./DroppableTaskList";
+import SortableTaskItem from "./SortableTaskItem";
+
+import type { TaskResponse } from "@/schemas";
+import type { DragEndEvent } from "@dnd-kit/core";
+
+import { useFetchAllTasks } from "@/client/task/task";
 
 interface TaskSelectModalProps {
   onClose: () => void;

@@ -1,15 +1,18 @@
 "use client";
 
-import { useFetchAllTasks } from "@/client/task/task";
-import { TaskResponse } from "@/schemas";
 import { useState } from "react";
+
 import { BsGrid, BsListUl, BsX } from "react-icons/bs";
-import { BackendSelector } from "@/app/components/BackendSelector";
 import {
   BsInfoCircle,
   BsArrowDownSquare,
   BsArrowUpSquare,
 } from "react-icons/bs";
+
+import type { TaskResponse } from "@/schemas";
+
+import { BackendSelector } from "@/app/components/BackendSelector";
+import { useFetchAllTasks } from "@/client/task/task";
 
 type ViewMode = "grid" | "list";
 

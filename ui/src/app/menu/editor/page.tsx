@@ -1,16 +1,9 @@
 "use client";
 
-import { Suspense } from "react";
-import {
-  useListMenu,
-  useUpdateMenu,
-  useDeleteMenu,
-  useCreateMenu,
-} from "@/client/menu/menu";
-import { useFetchExecutionLockStatus } from "@/client/execution/execution";
-import { GetMenuResponse, TaskResponse } from "@/schemas";
-import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { Suspense } from "react";
+
 import Editor from "@monaco-editor/react";
 import {
   BsPlus,
@@ -22,12 +15,23 @@ import {
   BsCopy,
   BsPencil,
 } from "react-icons/bs";
-import TaskDetailList from "./TaskDetailList";
-import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
-import { DeleteConfirmModal } from "./DeleteConfirmModal";
+
 import { CreateFromTemplateModal } from "./CreateFromTemplateModal";
-import { Toast } from "@/app/setting/components/Toast";
+import { DeleteConfirmModal } from "./DeleteConfirmModal";
+import { ExecuteConfirmModal } from "./ExecuteConfirmModal";
+import TaskDetailList from "./TaskDetailList";
 import TaskSelectModal from "./TaskSelectModal";
+
+import type { GetMenuResponse, TaskResponse } from "@/schemas";
+
+import { Toast } from "@/app/setting/components/Toast";
+import { useFetchExecutionLockStatus } from "@/client/execution/execution";
+import {
+  useListMenu,
+  useUpdateMenu,
+  useDeleteMenu,
+  useCreateMenu,
+} from "@/client/menu/menu";
 
 function MenuEditor() {
   const searchParams = useSearchParams();

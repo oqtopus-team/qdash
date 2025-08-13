@@ -1,20 +1,22 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import {
   createContext,
   useCallback,
   useContext,
   useState,
   useEffect,
-  ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
+
+import type { User } from "../../schemas";
+
 import {
   useAuthReadUsersMe,
   useAuthLogin,
   useAuthLogout,
 } from "@/client/auth/auth";
-import type { User } from "../../schemas";
 
 interface AuthContextType {
   user: User | null;

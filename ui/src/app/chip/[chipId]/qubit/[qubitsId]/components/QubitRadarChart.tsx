@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { PlotCard } from "@/shared/components/PlotCard";
+
 import { ErrorCard } from "@/shared/components/ErrorCard";
+import { PlotCard } from "@/shared/components/PlotCard";
 
 interface QubitParameter {
   name: string;

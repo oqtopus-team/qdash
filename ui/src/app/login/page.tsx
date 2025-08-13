@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "../contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function LoginPage() {
   const [userName, setUserName] = useState("");

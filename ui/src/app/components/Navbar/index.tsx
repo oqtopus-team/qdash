@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useCallback, useRef } from "react";
+
+import type { User } from "@/schemas";
+
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useAuthLogout } from "@/client/auth/auth";
-import type { User } from "@/schemas";
 
 function MenuIcon() {
   return (

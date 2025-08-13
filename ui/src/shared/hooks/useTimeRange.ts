@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import { TimeRangeState } from "../types/analysis";
+
+import type { TimeRangeState } from "../types/analysis";
 
 interface UseTimeRangeOptions {
   initialDays?: number;

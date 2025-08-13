@@ -5,10 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { Position } from "./position";
 import type { MeasError } from "./measError";
-import type { QubitLifetime } from "./qubitLifetime";
+import type { Position } from "./position";
 import type { QubitGateDuration } from "./qubitGateDuration";
+import type { QubitLifetime } from "./qubitLifetime";
 
 /**
  * Qubit information.

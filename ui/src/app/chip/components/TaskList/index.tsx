@@ -1,7 +1,9 @@
 "use client";
 
-import { Task } from "@/schemas";
 import { useState } from "react";
+
+import type { Task } from "@/schemas";
+
 import { TaskFigure } from "@/app/components/TaskFigure";
 
 interface TaskListProps {

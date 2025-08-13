@@ -1,7 +1,8 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { TaskResponse } from "@/schemas";
 import { BsTrash } from "react-icons/bs";
+
+import type { TaskResponse } from "@/schemas";
 
 interface SortableTaskItemProps {
   task: TaskResponse;

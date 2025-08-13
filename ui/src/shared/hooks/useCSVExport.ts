@@ -1,5 +1,6 @@
 import { useCallback } from "react";
-import {
+
+import type {
   TimeSeriesDataPoint,
   CorrelationDataPoint,
   CSVExportOptions,

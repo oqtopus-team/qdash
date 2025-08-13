@@ -1,7 +1,8 @@
 "use client";
 
 import { BsPlus } from "react-icons/bs";
-import { GetMenuResponse } from "@/schemas";
+
+import type { GetMenuResponse } from "@/schemas";
 
 export function DeleteConfirmModal({
   selectedMenu,

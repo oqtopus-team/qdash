@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { keepPreviousData } from "@tanstack/react-query";
-import { Task } from "@/schemas";
 import dynamic from "next/dynamic";
+import { useState, useEffect, useCallback } from "react";
+
+import { keepPreviousData } from "@tanstack/react-query";
+
+import type { Task } from "@/schemas";
+
 import { TaskFigure } from "@/app/components/TaskFigure";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import {
   useFetchLatestCouplingTaskGroupedByChip,
   useFetchHistoricalCouplingTaskGroupedByChip,
 } from "@/client/chip/chip";
-import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 
 const PlotlyRenderer = dynamic(
   () => import("@/app/components/PlotlyRenderer").then((mod) => mod.default),

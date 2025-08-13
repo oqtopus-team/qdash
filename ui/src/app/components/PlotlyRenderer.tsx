@@ -1,7 +1,8 @@
 "use client";
 
-import Plot from "react-plotly.js";
 import { useEffect, useState } from "react";
+
+import Plot from "react-plotly.js";
 
 export default function PlotlyRenderer({
   fullPath,

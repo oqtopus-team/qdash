@@ -1,6 +1,13 @@
 "use client";
 
 import { useMemo, useEffect } from "react";
+
+import Select from "react-select";
+
+import { ChipSelector } from "@/app/components/ChipSelector";
+import { DateSelector } from "@/app/components/DateSelector";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
+import { useCDFUrlState } from "@/app/hooks/useUrlState";
 import {
   useListChips,
   useFetchLatestQubitTaskGroupedByChip,
@@ -8,22 +15,16 @@ import {
   useFetchLatestCouplingTaskGroupedByChip,
   useFetchHistoricalCouplingTaskGroupedByChip,
 } from "@/client/chip/chip";
-import { PlotCard } from "@/shared/components/PlotCard";
-import { ErrorCard } from "@/shared/components/ErrorCard";
 import { DataTable } from "@/shared/components/DataTable";
-import { useCSVExport } from "@/shared/hooks/useCSVExport";
-import { ChipSelector } from "@/app/components/ChipSelector";
-import { DateSelector } from "@/app/components/DateSelector";
-import { useDateNavigation } from "@/app/hooks/useDateNavigation";
-import { useCDFUrlState } from "@/app/hooks/useUrlState";
-import Select from "react-select";
-
+import { ErrorCard } from "@/shared/components/ErrorCard";
+import { PlotCard } from "@/shared/components/PlotCard";
 import {
   TASK_CONFIG,
   PARAMETER_CONFIG,
   OUTPUT_PARAM_NAMES,
   PARAMETER_GROUPS,
 } from "@/shared/config/analysis";
+import { useCSVExport } from "@/shared/hooks/useCSVExport";
 
 interface CumulativeDataPoint {
   value: number;
@@ -255,7 +256,9 @@ export function CDFView() {
           taskName &&
           taskType === "qubit" &&
           selectedDate === "latest" &&
-          selectedParameters.some((p) => PARAMETER_GROUPS.fidelity.includes(p as any)),
+          selectedParameters.some((p) =>
+            PARAMETER_GROUPS.fidelity.includes(p as any),
+          ),
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -1387,7 +1390,8 @@ export function CDFView() {
             // Median line
             const unit = PARAMETER_GROUPS.coherence.includes(param as any)
               ? " µs"
-              : PARAMETER_GROUPS.fidelity.includes(param as any) && !showAsErrorRate
+              : PARAMETER_GROUPS.fidelity.includes(param as any) &&
+                  !showAsErrorRate
                 ? "%"
                 : "";
             return {
@@ -1398,7 +1402,8 @@ export function CDFView() {
                 dash: "dash",
               },
               name: `${PARAMETER_CONFIG[param].label} median: ${
-                showAsErrorRate && PARAMETER_GROUPS.fidelity.includes(param as any)
+                showAsErrorRate &&
+                PARAMETER_GROUPS.fidelity.includes(param as any)
                   ? data.median?.toExponential(1)
                   : data.median?.toFixed(
                       PARAMETER_GROUPS.coherence.includes(param as any) ? 2 : 2,
@@ -1697,7 +1702,8 @@ export function CDFView() {
 
                 const unit = PARAMETER_GROUPS.coherence.includes(param as any)
                   ? " µs"
-                  : PARAMETER_GROUPS.fidelity.includes(param as any) && !showAsErrorRate
+                  : PARAMETER_GROUPS.fidelity.includes(param as any) &&
+                      !showAsErrorRate
                     ? "%"
                     : "";
                 const colorClass =

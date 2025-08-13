@@ -1,5 +1,7 @@
-import { ReactNode, useMemo } from "react";
 import dynamic from "next/dynamic";
+import type { ReactNode } from "react";
+import { useMemo } from "react";
+
 import type { PlotData, Layout, Config } from "plotly.js";
 
 const Plot = dynamic(() => import("react-plotly.js"), {

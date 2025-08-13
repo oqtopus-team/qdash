@@ -1,7 +1,7 @@
 import "./globals.css";
-import Providers from "./providers";
-import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
+import Sidebar from "./components/Sidebar";
+import Providers from "./providers";
 
 export const metadata = {
   title: "QDash",

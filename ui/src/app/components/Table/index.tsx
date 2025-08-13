@@ -1,14 +1,16 @@
 "use client";
 
+import { useState } from "react";
+
 import {
-  ColumnDef,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { useState } from "react";
+
+import type { ColumnDef } from "@tanstack/react-table";
 
 interface TableProps<T> {
   data: T[];

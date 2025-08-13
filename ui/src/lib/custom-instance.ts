@@ -1,9 +1,6 @@
-import Axios, {
-  AxiosError,
-  AxiosRequestConfig,
-  AxiosResponse,
-  AxiosHeaders,
-} from "axios";
+import Axios, { AxiosHeaders } from "axios";
+
+import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 
 export const AXIOS_INSTANCE = Axios.create();
 
