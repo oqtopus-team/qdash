@@ -165,7 +165,7 @@ export function isFidelityParameter(parameter: string): boolean {
 
 export function getParameterRange(
   parameter: string,
-  showAsErrorRate: boolean = false
+  showAsErrorRate: boolean = false,
 ) {
   if (isCoherenceParameter(parameter)) {
     return THRESHOLD_RANGES[parameter];
@@ -181,7 +181,7 @@ export function getParameterRange(
 export function convertThresholdForDisplay(
   parameter: string,
   threshold: number,
-  showAsErrorRate: boolean = false
+  showAsErrorRate: boolean = false,
 ): number {
   if (isCoherenceParameter(parameter)) {
     return threshold;
@@ -197,7 +197,7 @@ export function convertThresholdForDisplay(
 export function convertDisplayToThreshold(
   parameter: string,
   displayValue: number,
-  showAsErrorRate: boolean = false
+  showAsErrorRate: boolean = false,
 ): number {
   if (isCoherenceParameter(parameter)) {
     return displayValue;
@@ -213,7 +213,7 @@ export function convertDisplayToThreshold(
 export function formatThresholdValue(
   parameter: string,
   threshold: number,
-  showAsErrorRate: boolean = false
+  showAsErrorRate: boolean = false,
 ): string {
   const config = PARAMETER_CONFIG[parameter];
   if (!config) return String(threshold);
