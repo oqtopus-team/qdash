@@ -15,122 +15,15 @@ import { useCSVExport } from "@/shared/hooks/useCSVExport";
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { DateSelector } from "@/app/components/DateSelector";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
-import { useCumulativeUrlState } from "@/app/hooks/useUrlState";
+import { useCDFUrlState } from "@/app/hooks/useUrlState";
 import Select from "react-select";
 
-// Task names and types mapping
-const TASK_CONFIG: Record<
-  string,
-  { name: string; type: "qubit" | "coupling" }
-> = {
-  t1: { name: "CheckT1", type: "qubit" },
-  t2_echo: { name: "CheckT2Echo", type: "qubit" },
-  t2_star: { name: "CheckRamsey", type: "qubit" },
-  gate_fidelity: { name: "RandomizedBenchmarking", type: "qubit" },
-  x90_fidelity: { name: "X90InterleavedRandomizedBenchmarking", type: "qubit" },
-  x180_fidelity: {
-    name: "X180InterleavedRandomizedBenchmarking",
-    type: "qubit",
-  },
-  zx90_fidelity: {
-    name: "ZX90InterleavedRandomizedBenchmarking",
-    type: "coupling",
-  },
-  bell_state_fidelity: {
-    name: "CheckBellStateTomography",
-    type: "coupling",
-  },
-  readout_fidelity: { name: "ReadoutClassification", type: "qubit" },
-};
-
-// Parameter configuration: labels, directionality, and thresholds
-const PARAMETER_CONFIG: Record<
-  string,
-  {
-    label: string;
-    higherIsBetter: boolean;
-    unit: string;
-    displayUnit: string;
-    threshold?: number; // QEC threshold for yield calculation
-  }
-> = {
-  t1: {
-    label: "T1",
-    higherIsBetter: true,
-    unit: "µs",
-    displayUnit: "µs",
-    threshold: 100, // 100µs - minimum for error correction protocols
-  },
-  t2_echo: {
-    label: "T2 Echo",
-    higherIsBetter: true,
-    unit: "µs",
-    displayUnit: "µs",
-    threshold: 200, // 200µs - echo can extend T2 significantly
-  },
-  t2_star: {
-    label: "T2*",
-    higherIsBetter: true,
-    unit: "µs",
-    displayUnit: "µs",
-    threshold: 50, // 50µs - dephasing limited
-  },
-  gate_fidelity: {
-    label: "Average Gate Fidelity",
-    higherIsBetter: true, // Display as fidelity (higher is better)
-    unit: "percentage",
-    displayUnit: "%",
-    threshold: 0.99, // 99% fidelity - threshold for QEC (surface code)
-  },
-  x90_fidelity: {
-    label: "X90 Gate Fidelity",
-    higherIsBetter: true, // Display as fidelity
-    unit: "percentage",
-    displayUnit: "%",
-    threshold: 0.999, // 99.9% fidelity - single qubit gates should be very high
-  },
-  x180_fidelity: {
-    label: "X180 Gate Fidelity",
-    higherIsBetter: true, // Display as fidelity
-    unit: "percentage",
-    displayUnit: "%",
-    threshold: 0.999, // 99.9% fidelity - single qubit gates should be very high
-  },
-  zx90_fidelity: {
-    label: "ZX90 Gate Fidelity (2Q)",
-    higherIsBetter: true, // Display as fidelity
-    unit: "percentage",
-    displayUnit: "%",
-    threshold: 0.99, // 99% fidelity - two-qubit gates are typically lower
-  },
-  bell_state_fidelity: {
-    label: "Bell State Fidelity (2Q)",
-    higherIsBetter: true, // Display as fidelity
-    unit: "percentage",
-    displayUnit: "%",
-    threshold: 0.95, // 95% fidelity - bell state preparation is challenging
-  },
-  readout_fidelity: {
-    label: "Readout Fidelity",
-    higherIsBetter: true, // Display as fidelity
-    unit: "percentage",
-    displayUnit: "%",
-    threshold: 0.99, // 99% fidelity - readout should be high for QEC
-  },
-};
-
-// Output parameter names for each task
-const OUTPUT_PARAM_NAMES: Record<string, string> = {
-  t1: "t1",
-  t2_echo: "t2_echo",
-  t2_star: "t2_star",
-  gate_fidelity: "average_gate_fidelity",
-  x90_fidelity: "x90_gate_fidelity",
-  x180_fidelity: "x180_gate_fidelity",
-  zx90_fidelity: "zx90_gate_fidelity",
-  bell_state_fidelity: "bell_state_fidelity",
-  readout_fidelity: "average_readout_fidelity",
-};
+import {
+  TASK_CONFIG,
+  PARAMETER_CONFIG,
+  OUTPUT_PARAM_NAMES,
+  PARAMETER_GROUPS,
+} from "@/shared/config/analysis";
 
 interface CumulativeDataPoint {
   value: number;
@@ -141,7 +34,7 @@ interface CumulativeDataPoint {
   r2?: number; // R-squared for fit quality (RB tasks)
 }
 
-export function CumulativeView() {
+export function CDFView() {
   // URL state management
   const {
     selectedChip,
@@ -153,44 +46,33 @@ export function CumulativeView() {
     setSelectedParameters,
     setShowAsErrorRate,
     isInitialized,
-  } = useCumulativeUrlState();
+  } = useCDFUrlState();
 
-  // Group parameters by category for better organization
-  const parameterGroups = {
-    coherence: ["t1", "t2_echo", "t2_star"],
-    fidelity: [
-      "gate_fidelity",
-      "x90_fidelity",
-      "x180_fidelity",
-      "zx90_fidelity",
-      "bell_state_fidelity",
-      "readout_fidelity",
-    ],
-  };
+  // Use shared parameter groups for better organization
 
   // Determine current parameter type to enforce mutual exclusivity
   const currentParameterType = useMemo(() => {
     if (selectedParameters.length === 0) return null;
 
     const hasCoherence = selectedParameters.some((p) =>
-      parameterGroups.coherence.includes(p)
+      PARAMETER_GROUPS.coherence.includes(p as any),
     );
     const hasFidelity = selectedParameters.some((p) =>
-      parameterGroups.fidelity.includes(p)
+      PARAMETER_GROUPS.fidelity.includes(p as any),
     );
 
     return hasCoherence ? "coherence" : hasFidelity ? "fidelity" : null;
-  }, [selectedParameters, parameterGroups]);
+  }, [selectedParameters]);
 
   // Available parameters based on current selection (mutually exclusive)
   const availableParameters = useMemo(() => {
     if (currentParameterType === "coherence") {
-      return parameterGroups.coherence.map((key) => ({
+      return PARAMETER_GROUPS.coherence.map((key) => ({
         value: key,
         label: PARAMETER_CONFIG[key].label,
       }));
     } else if (currentParameterType === "fidelity") {
-      return parameterGroups.fidelity.map((key) => ({
+      return PARAMETER_GROUPS.fidelity.map((key) => ({
         value: key,
         label: PARAMETER_CONFIG[key].label,
       }));
@@ -199,21 +81,21 @@ export function CumulativeView() {
       return [
         {
           label: "Coherence Times",
-          options: parameterGroups.coherence.map((key) => ({
+          options: PARAMETER_GROUPS.coherence.map((key) => ({
             value: key,
             label: PARAMETER_CONFIG[key].label,
           })),
         },
         {
           label: "Gate Fidelities",
-          options: parameterGroups.fidelity.map((key) => ({
+          options: PARAMETER_GROUPS.fidelity.map((key) => ({
             value: key,
             label: PARAMETER_CONFIG[key].label,
           })),
         },
       ];
     }
-  }, [currentParameterType, parameterGroups]);
+  }, [currentParameterType]);
 
   // Fetch chips data for default selection
   const { data: chipsResponse } = useListChips();
@@ -236,7 +118,7 @@ export function CumulativeView() {
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;
       });
-      
+
       // Additional safety check for array bounds
       if (sortedChips.length > 0 && sortedChips[0]?.chip_id) {
         setSelectedChip(sortedChips[0].chip_id);
@@ -254,7 +136,7 @@ export function CumulativeView() {
       enabled: Boolean(
         selectedChip &&
           selectedDate === "latest" &&
-          selectedParameters.includes("t1")
+          selectedParameters.includes("t1"),
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -274,11 +156,11 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("t1")
+            selectedParameters.includes("t1"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Fetch data for T2 Echo
@@ -291,7 +173,7 @@ export function CumulativeView() {
       enabled: Boolean(
         selectedChip &&
           selectedDate === "latest" &&
-          selectedParameters.includes("t2_echo")
+          selectedParameters.includes("t2_echo"),
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -311,11 +193,11 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("t2_echo")
+            selectedParameters.includes("t2_echo"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Fetch data for T2*
@@ -328,7 +210,7 @@ export function CumulativeView() {
       enabled: Boolean(
         selectedChip &&
           selectedDate === "latest" &&
-          selectedParameters.includes("t2_star")
+          selectedParameters.includes("t2_star"),
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -348,11 +230,11 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("t2_star")
+            selectedParameters.includes("t2_star"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Primary parameter for single parameter mode
@@ -373,7 +255,7 @@ export function CumulativeView() {
           taskName &&
           taskType === "qubit" &&
           selectedDate === "latest" &&
-          selectedParameters.some((p) => parameterGroups.fidelity.includes(p))
+          selectedParameters.some((p) => PARAMETER_GROUPS.fidelity.includes(p as any)),
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -395,11 +277,13 @@ export function CumulativeView() {
             taskName &&
             taskType === "qubit" &&
             selectedDate !== "latest" &&
-            selectedParameters.some((p) => parameterGroups.fidelity.includes(p))
+            selectedParameters.some((p) =>
+              PARAMETER_GROUPS.fidelity.includes(p as any),
+            ),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Fetch data for Gate Fidelity parameters
@@ -415,12 +299,12 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate === "latest" &&
-            selectedParameters.includes("gate_fidelity")
+            selectedParameters.includes("gate_fidelity"),
         ),
         refetchInterval: selectedDate === "latest" ? 30000 : undefined,
         staleTime: 25000,
       },
-    }
+    },
   );
 
   const {
@@ -436,11 +320,11 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("gate_fidelity")
+            selectedParameters.includes("gate_fidelity"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Fetch data for X90 Fidelity
@@ -456,12 +340,12 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate === "latest" &&
-            selectedParameters.includes("x90_fidelity")
+            selectedParameters.includes("x90_fidelity"),
         ),
         refetchInterval: selectedDate === "latest" ? 30000 : undefined,
         staleTime: 25000,
       },
-    }
+    },
   );
 
   const {
@@ -477,11 +361,11 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("x90_fidelity")
+            selectedParameters.includes("x90_fidelity"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Fetch data for X180 Fidelity
@@ -497,12 +381,12 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate === "latest" &&
-            selectedParameters.includes("x180_fidelity")
+            selectedParameters.includes("x180_fidelity"),
         ),
         refetchInterval: selectedDate === "latest" ? 30000 : undefined,
         staleTime: 25000,
       },
-    }
+    },
   );
 
   const {
@@ -518,11 +402,11 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("x180_fidelity")
+            selectedParameters.includes("x180_fidelity"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Fetch data for Readout Fidelity
@@ -538,12 +422,12 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate === "latest" &&
-            selectedParameters.includes("readout_fidelity")
+            selectedParameters.includes("readout_fidelity"),
         ),
         refetchInterval: selectedDate === "latest" ? 30000 : undefined,
         staleTime: 25000,
       },
-    }
+    },
   );
 
   const {
@@ -559,11 +443,11 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("readout_fidelity")
+            selectedParameters.includes("readout_fidelity"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // ZX90 Gate Fidelity (coupling task)
@@ -579,12 +463,12 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate === "latest" &&
-            selectedParameters.includes("zx90_fidelity")
+            selectedParameters.includes("zx90_fidelity"),
         ),
         refetchInterval: selectedDate === "latest" ? 30000 : undefined,
         staleTime: 25000,
       },
-    }
+    },
   );
 
   const {
@@ -600,11 +484,11 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("zx90_fidelity")
+            selectedParameters.includes("zx90_fidelity"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Bell State Fidelity (coupling task)
@@ -620,12 +504,12 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate === "latest" &&
-            selectedParameters.includes("bell_state_fidelity")
+            selectedParameters.includes("bell_state_fidelity"),
         ),
         refetchInterval: selectedDate === "latest" ? 30000 : undefined,
         staleTime: 25000,
       },
-    }
+    },
   );
 
   const {
@@ -641,20 +525,20 @@ export function CumulativeView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("bell_state_fidelity")
+            selectedParameters.includes("bell_state_fidelity"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Combine loading states
   const isLoading = useMemo(() => {
     const needsCoherenceData = selectedParameters.some((p) =>
-      parameterGroups.coherence.includes(p)
+      PARAMETER_GROUPS.coherence.includes(p as any),
     );
     const needsFidelityData = selectedParameters.some((p) =>
-      parameterGroups.fidelity.includes(p)
+      PARAMETER_GROUPS.fidelity.includes(p as any),
     );
 
     let isLoadingCoherence = false;
@@ -721,10 +605,10 @@ export function CumulativeView() {
   // Combine error states
   const error = useMemo(() => {
     const needsCoherenceData = selectedParameters.some((p) =>
-      parameterGroups.coherence.includes(p)
+      PARAMETER_GROUPS.coherence.includes(p as any),
     );
     const needsFidelityData = selectedParameters.some((p) =>
-      parameterGroups.fidelity.includes(p)
+      PARAMETER_GROUPS.fidelity.includes(p as any),
     );
 
     let coherenceError = null;
@@ -790,18 +674,18 @@ export function CumulativeView() {
   function safeProcessParameterData(
     taskResult: any,
     parameterKey: string,
-    outputParamName: string
+    outputParamName: string,
   ) {
     try {
       return processParameterDataInternal(
         taskResult,
         parameterKey,
-        outputParamName
+        outputParamName,
       );
     } catch (error) {
       console.error(
         `Error processing parameter data for ${parameterKey}:`,
-        error
+        error,
       );
       // Return empty data structure to prevent crashes
       return {
@@ -815,7 +699,6 @@ export function CumulativeView() {
           count: 0,
           validCount: 0,
           totalCount: 0,
-          yield: 0,
           r2: { mean: 0, count: 0 },
           error: { mean: 0, count: 0 },
         },
@@ -827,7 +710,7 @@ export function CumulativeView() {
   function processParameterDataInternal(
     taskResult: any,
     parameterKey: string,
-    outputParamName: string
+    outputParamName: string,
   ) {
     if (!taskResult) {
       return {
@@ -881,14 +764,14 @@ export function CumulativeView() {
             } else {
               console.warn(
                 `Unknown object structure for ${parameterKey}:`,
-                paramValue
+                paramValue,
               );
               return;
             }
           } else {
             console.warn(
               `Cannot process value type for ${parameterKey}:`,
-              typeof paramValue
+              typeof paramValue,
             );
             return;
           }
@@ -986,18 +869,8 @@ export function CumulativeView() {
         ? errorValues.reduce((sum, err) => sum + err, 0) / errorValues.length
         : null;
 
-    // Calculate yield based on parameter-specific thresholds (coherence-limited)
-    // Use threshold from PARAMETER_CONFIG (now centralized)
-    const threshold = PARAMETER_CONFIG[parameterKey]?.threshold;
-    const paramConfig = PARAMETER_CONFIG[parameterKey];
-    const yieldCount = threshold
-      ? valuesOnly.filter((v) =>
-          paramConfig.higherIsBetter ? v >= threshold : v <= threshold
-        ).length
-      : 0;
-    const yieldValue = threshold
-      ? (yieldCount / valuesOnly.length) * 100
-      : null;
+    // CDF focuses on distribution analysis, not threshold-based yield
+    // Remove yield calculation as it's not core to CDF analysis
 
     // Always use CDF (ascending from 0 to 1) for consistency
     // Create step plot data for Plotly
@@ -1087,7 +960,6 @@ export function CumulativeView() {
       mean: meanValue,
       percentile10: percentile10Value,
       percentile90: percentile90Value,
-      yieldPercent: yieldValue,
       avgR2: avgR2Value,
       avgError: avgErrorValue,
     };
@@ -1099,7 +971,7 @@ export function CumulativeView() {
 
     // Check which parameters need loading
     const needsCoherenceData = selectedParameters.some((p) =>
-      parameterGroups.coherence.includes(p)
+      PARAMETER_GROUPS.coherence.includes(p as any),
     );
     if (needsCoherenceData) {
       // Process T1 data
@@ -1110,7 +982,7 @@ export function CumulativeView() {
           results["t1"] = safeProcessParameterData(
             t1Response.data.result,
             "t1",
-            OUTPUT_PARAM_NAMES["t1"]
+            OUTPUT_PARAM_NAMES["t1"],
           );
         }
       }
@@ -1125,7 +997,7 @@ export function CumulativeView() {
           results["t2_echo"] = safeProcessParameterData(
             t2EchoResponse.data.result,
             "t2_echo",
-            OUTPUT_PARAM_NAMES["t2_echo"]
+            OUTPUT_PARAM_NAMES["t2_echo"],
           );
         }
       }
@@ -1140,7 +1012,7 @@ export function CumulativeView() {
           results["t2_star"] = safeProcessParameterData(
             t2StarResponse.data.result,
             "t2_star",
-            OUTPUT_PARAM_NAMES["t2_star"]
+            OUTPUT_PARAM_NAMES["t2_star"],
           );
         }
       }
@@ -1148,7 +1020,7 @@ export function CumulativeView() {
 
     // Process gate fidelity parameters if selected
     const hasFidelityParams = selectedParameters.some((p) =>
-      parameterGroups.fidelity.includes(p)
+      PARAMETER_GROUPS.fidelity.includes(p as any),
     );
     if (hasFidelityParams) {
       // Process Gate Fidelity
@@ -1161,7 +1033,7 @@ export function CumulativeView() {
           results["gate_fidelity"] = safeProcessParameterData(
             gateFidelityResponse.data.result,
             "gate_fidelity",
-            OUTPUT_PARAM_NAMES["gate_fidelity"]
+            OUTPUT_PARAM_NAMES["gate_fidelity"],
           );
         }
       }
@@ -1176,7 +1048,7 @@ export function CumulativeView() {
           results["x90_fidelity"] = safeProcessParameterData(
             x90FidelityResponse.data.result,
             "x90_fidelity",
-            OUTPUT_PARAM_NAMES["x90_fidelity"]
+            OUTPUT_PARAM_NAMES["x90_fidelity"],
           );
         }
       }
@@ -1191,7 +1063,7 @@ export function CumulativeView() {
           results["x180_fidelity"] = safeProcessParameterData(
             x180FidelityResponse.data.result,
             "x180_fidelity",
-            OUTPUT_PARAM_NAMES["x180_fidelity"]
+            OUTPUT_PARAM_NAMES["x180_fidelity"],
           );
         }
       }
@@ -1206,7 +1078,7 @@ export function CumulativeView() {
           results["readout_fidelity"] = safeProcessParameterData(
             readoutFidelityResponse.data.result,
             "readout_fidelity",
-            OUTPUT_PARAM_NAMES["readout_fidelity"]
+            OUTPUT_PARAM_NAMES["readout_fidelity"],
           );
         }
       }
@@ -1221,7 +1093,7 @@ export function CumulativeView() {
           results["zx90_fidelity"] = safeProcessParameterData(
             zx90FidelityResponse.data.result,
             "zx90_fidelity",
-            OUTPUT_PARAM_NAMES["zx90_fidelity"]
+            OUTPUT_PARAM_NAMES["zx90_fidelity"],
           );
         }
       }
@@ -1236,7 +1108,7 @@ export function CumulativeView() {
           results["bell_state_fidelity"] = safeProcessParameterData(
             bellStateFidelityResponse.data.result,
             "bell_state_fidelity",
-            OUTPUT_PARAM_NAMES["bell_state_fidelity"]
+            OUTPUT_PARAM_NAMES["bell_state_fidelity"],
           );
         }
       }
@@ -1278,7 +1150,7 @@ export function CumulativeView() {
     const convertedData: Record<string, any> = {};
 
     Object.entries(processedDataByParameter).forEach(([param, data]) => {
-      if (parameterGroups.fidelity.includes(param) && data) {
+      if (PARAMETER_GROUPS.fidelity.includes(param as any) && data) {
         let conversionFactor;
         if (showAsErrorRate) {
           // Convert fidelity to error rate percentage: (1 - fidelity) * 100
@@ -1324,7 +1196,7 @@ export function CumulativeView() {
 
             // Sort by converted X values (error rates) in ascending order
             const sortedData = pairedData.sort(
-              (a: any, b: any) => a.convertedX - b.convertedX
+              (a: any, b: any) => a.convertedX - b.convertedX,
             );
 
             // Recalculate CDF values for the new ordering
@@ -1332,7 +1204,7 @@ export function CumulativeView() {
               (item: any, index: number) => ({
                 ...item,
                 newY: (index + 1) / sortedData.length, // Proper CDF calculation
-              })
+              }),
             );
 
             return {
@@ -1421,7 +1293,7 @@ export function CumulativeView() {
     processedDataByParameter,
     showAsErrorRate,
     currentParameterType,
-    parameterGroups,
+    PARAMETER_GROUPS,
   ]);
 
   // Get data for the primary parameter (for backwards compatibility)
@@ -1513,11 +1385,11 @@ export function CumulativeView() {
             };
           } else if (idx === 1) {
             // Median line
-            const unit = parameterGroups.coherence.includes(param)
+            const unit = PARAMETER_GROUPS.coherence.includes(param as any)
               ? " µs"
-              : parameterGroups.fidelity.includes(param) && !showAsErrorRate
-              ? "%"
-              : "";
+              : PARAMETER_GROUPS.fidelity.includes(param as any) && !showAsErrorRate
+                ? "%"
+                : "";
             return {
               ...trace,
               line: {
@@ -1526,10 +1398,10 @@ export function CumulativeView() {
                 dash: "dash",
               },
               name: `${PARAMETER_CONFIG[param].label} median: ${
-                showAsErrorRate && parameterGroups.fidelity.includes(param)
+                showAsErrorRate && PARAMETER_GROUPS.fidelity.includes(param as any)
                   ? data.median?.toExponential(1)
                   : data.median?.toFixed(
-                      parameterGroups.coherence.includes(param) ? 2 : 2
+                      PARAMETER_GROUPS.coherence.includes(param as any) ? 2 : 2,
                     )
               }${unit}`,
               showlegend: true,
@@ -1543,14 +1415,14 @@ export function CumulativeView() {
 
     // For single parameter, use the primary parameter data
     return plotData;
-  }, [selectedParameters, displayDataByParameter, plotData, parameterGroups]);
+  }, [selectedParameters, displayDataByParameter, plotData, PARAMETER_GROUPS]);
 
   // Determine plot characteristics based on selected parameters
   const hasCoherenceParams = selectedParameters.some((p) =>
-    parameterGroups.coherence.includes(p)
+    PARAMETER_GROUPS.coherence.includes(p as any),
   );
   const hasFidelityParams = selectedParameters.some((p) =>
-    parameterGroups.fidelity.includes(p)
+    PARAMETER_GROUPS.fidelity.includes(p as any),
   );
   const isMixedParams = hasCoherenceParams && hasFidelityParams;
 
@@ -1559,22 +1431,22 @@ export function CumulativeView() {
       text: isMixedParams
         ? `Cumulative Distribution - Selected Parameters`
         : hasCoherenceParams
-        ? "Cumulative Distribution - Coherence Times"
-        : hasFidelityParams
-        ? "Cumulative Distribution - Gate Fidelities"
-        : "Cumulative Distribution",
+          ? "Cumulative Distribution - Coherence Times"
+          : hasFidelityParams
+            ? "Cumulative Distribution - Gate Fidelities"
+            : "Cumulative Distribution",
       font: { size: 18 },
     },
     xaxis: {
       title: isMixedParams
         ? "Parameter Value"
         : hasCoherenceParams
-        ? "Coherence Time (µs)"
-        : hasFidelityParams
-        ? showAsErrorRate
-          ? "Gate Error Rate (%)"
-          : "Gate Fidelity (%)"
-        : "Value",
+          ? "Coherence Time (µs)"
+          : hasFidelityParams
+            ? showAsErrorRate
+              ? "Gate Error Rate (%)"
+              : "Gate Fidelity (%)"
+            : "Value",
       gridcolor: "#e5e7eb",
       showgrid: true,
       zeroline: false,
@@ -1718,14 +1590,14 @@ export function CumulativeView() {
                     ) {
                       // Single type selected - flat array
                       return availableParameters.filter((option: any) =>
-                        selectedParameters.includes(option.value)
+                        selectedParameters.includes(option.value),
                       );
                     } else if (Array.isArray(availableParameters)) {
                       // No type selected yet - grouped array
                       return availableParameters
                         .flatMap((group: any) => group.options || [])
                         .filter((option: any) =>
-                          selectedParameters.includes(option.value)
+                          selectedParameters.includes(option.value),
                         );
                     }
                     return [];
@@ -1823,20 +1695,20 @@ export function CumulativeView() {
                   readout_fidelity: "text-cyan-600",
                 };
 
-                const unit = parameterGroups.coherence.includes(param)
+                const unit = PARAMETER_GROUPS.coherence.includes(param as any)
                   ? " µs"
-                  : parameterGroups.fidelity.includes(param) && !showAsErrorRate
-                  ? "%"
-                  : "";
+                  : PARAMETER_GROUPS.fidelity.includes(param as any) && !showAsErrorRate
+                    ? "%"
+                    : "";
                 const colorClass =
                   colors[param as keyof typeof colors] || "text-gray-600";
 
                 // Format numbers based on display mode
                 const formatValue = (value: number) => {
-                  if (parameterGroups.coherence.includes(param)) {
+                  if (PARAMETER_GROUPS.coherence.includes(param as any)) {
                     return value.toFixed(2);
                   } else if (
-                    parameterGroups.fidelity.includes(param) &&
+                    PARAMETER_GROUPS.fidelity.includes(param as any) &&
                     showAsErrorRate
                   ) {
                     return value.toExponential(1); // Scientific notation for error rates
@@ -1890,15 +1762,6 @@ export function CumulativeView() {
                         {unit}
                       </div>
                     </div>
-                    {data.yieldPercent !== null && (
-                      <div className="stat">
-                        <div className="stat-title">Yield</div>
-                        <div className="stat-value text-success text-sm">
-                          {data.yieldPercent.toFixed(1)}%
-                        </div>
-                        <div className="stat-desc">Above threshold</div>
-                      </div>
-                    )}
                   </div>
                 );
               })}

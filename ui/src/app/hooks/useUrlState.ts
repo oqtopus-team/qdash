@@ -1,4 +1,10 @@
-import { useQueryState, parseAsString, parseAsArrayOf, parseAsBoolean } from "nuqs";
+import {
+  useQueryState,
+  parseAsString,
+  parseAsArrayOf,
+  parseAsBoolean,
+  parseAsFloat,
+} from "nuqs";
 import { useCallback, useState, useEffect } from "react";
 
 // Default values for URL parameters - used to determine when to remove params from URL
@@ -6,7 +12,7 @@ const URL_DEFAULTS = {
   DATE: "latest",
   TASK: "CheckRabi",
   VIEW: "1q",
-  CUMULATIVE_PARAMETERS: ["t1", "t2_echo", "t2_star"],
+  CDF_PARAMETERS: ["t1", "t2_echo", "t2_star"],
   SHOW_ERROR_RATE: false,
 } as const;
 
@@ -60,7 +66,7 @@ interface UseQubitTimeSeriesUrlStateResult {
   isInitialized: boolean;
 }
 
-interface UseCumulativeUrlStateResult {
+interface UseCDFUrlStateResult {
   selectedChip: string;
   selectedDate: string;
   selectedParameters: string[];
@@ -69,6 +75,20 @@ interface UseCumulativeUrlStateResult {
   setSelectedDate: (date: string) => void;
   setSelectedParameters: (parameters: string[]) => void;
   setShowAsErrorRate: (show: boolean) => void;
+  isInitialized: boolean;
+}
+
+interface UseHistogramUrlStateResult {
+  selectedChip: string;
+  selectedDate: string;
+  selectedParameter: string;
+  showAsErrorRate: boolean;
+  customThreshold: number | null;
+  setSelectedChip: (chip: string) => void;
+  setSelectedDate: (date: string) => void;
+  setSelectedParameter: (parameter: string) => void;
+  setShowAsErrorRate: (show: boolean) => void;
+  setCustomThreshold: (threshold: number | null) => void;
   isInitialized: boolean;
 }
 
@@ -249,7 +269,7 @@ export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
     selectedChip: selectedChip ?? "",
     selectedParameter: selectedParameter ?? "t1",
     selectedTag: selectedTag ?? "daily",
-    analysisViewType: analysisViewType ?? "correlation",
+    analysisViewType: analysisViewType ?? "timeseries",
     setSelectedChip,
     setSelectedParameter,
     setSelectedTag,
@@ -356,10 +376,10 @@ export function useQubitTimeSeriesUrlState(): UseQubitTimeSeriesUrlStateResult {
   };
 }
 
-export function useCumulativeUrlState(): UseCumulativeUrlStateResult {
+export function useCDFUrlState(): UseCDFUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // URL state management for cumulative distribution view
+  // URL state management for CDF view
   const [selectedChip, setSelectedChipState] = useQueryState(
     "chip",
     parseAsString,
@@ -409,7 +429,7 @@ export function useCumulativeUrlState(): UseCumulativeUrlStateResult {
   const setSelectedParameters = useCallback(
     (parameters: string[]) => {
       // Remove default parameters from URL to keep it clean
-      if (arraysEqual(parameters, [...URL_DEFAULTS.CUMULATIVE_PARAMETERS])) {
+      if (arraysEqual(parameters, [...URL_DEFAULTS.CDF_PARAMETERS])) {
         setSelectedParametersState(null);
       } else {
         setSelectedParametersState(parameters);
@@ -420,7 +440,9 @@ export function useCumulativeUrlState(): UseCumulativeUrlStateResult {
 
   const setShowAsErrorRate = useCallback(
     (show: boolean) => {
-      setShowAsErrorRateState(show === URL_DEFAULTS.SHOW_ERROR_RATE ? null : show); // Remove default from URL
+      setShowAsErrorRateState(
+        show === URL_DEFAULTS.SHOW_ERROR_RATE ? null : show,
+      ); // Remove default from URL
     },
     [setShowAsErrorRateState],
   );
@@ -428,12 +450,100 @@ export function useCumulativeUrlState(): UseCumulativeUrlStateResult {
   return {
     selectedChip: selectedChip ?? "",
     selectedDate: selectedDate ?? URL_DEFAULTS.DATE,
-    selectedParameters: selectedParameters ?? [...URL_DEFAULTS.CUMULATIVE_PARAMETERS],
+    selectedParameters: selectedParameters ?? [...URL_DEFAULTS.CDF_PARAMETERS],
     showAsErrorRate: showAsErrorRate ?? URL_DEFAULTS.SHOW_ERROR_RATE,
     setSelectedChip,
     setSelectedDate,
     setSelectedParameters,
     setShowAsErrorRate,
+    isInitialized,
+  };
+}
+
+export function useHistogramUrlState(): UseHistogramUrlStateResult {
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // URL state management
+  const [selectedChip, setSelectedChipState] = useQueryState(
+    "chip",
+    parseAsString,
+  );
+
+  const [selectedDate, setSelectedDateState] = useQueryState(
+    "date",
+    parseAsString,
+  );
+
+  const [selectedParameter, setSelectedParameterState] = useQueryState(
+    "param",
+    parseAsString,
+  );
+
+  const [showAsErrorRate, setShowAsErrorRateState] = useQueryState(
+    "errorRate",
+    parseAsBoolean,
+  );
+
+  const [customThreshold, setCustomThresholdState] = useQueryState(
+    "threshold",
+    parseAsFloat,
+  );
+
+  // Initialize state on mount
+  useEffect(() => {
+    setIsInitialized(true);
+  }, []);
+
+  const setSelectedChip = useCallback(
+    (chip: string) => {
+      setSelectedChipState(chip || null);
+    },
+    [setSelectedChipState],
+  );
+
+  const setSelectedDate = useCallback(
+    (date: string) => {
+      setSelectedDateState(date === URL_DEFAULTS.DATE ? null : date);
+    },
+    [setSelectedDateState],
+  );
+
+  const setSelectedParameter = useCallback(
+    (parameter: string) => {
+      setSelectedParameterState(parameter === "t1" ? null : parameter); // t1 as default
+      // Clear custom threshold when parameter changes
+      setCustomThresholdState(null);
+    },
+    [setSelectedParameterState, setCustomThresholdState],
+  );
+
+  const setShowAsErrorRate = useCallback(
+    (show: boolean) => {
+      setShowAsErrorRateState(
+        show === URL_DEFAULTS.SHOW_ERROR_RATE ? null : show,
+      );
+    },
+    [setShowAsErrorRateState],
+  );
+
+  const setCustomThreshold = useCallback(
+    (threshold: number | null) => {
+      setCustomThresholdState(threshold);
+    },
+    [setCustomThresholdState],
+  );
+
+  return {
+    selectedChip: selectedChip ?? "",
+    selectedDate: selectedDate ?? URL_DEFAULTS.DATE,
+    selectedParameter: selectedParameter ?? "t1",
+    showAsErrorRate: showAsErrorRate ?? URL_DEFAULTS.SHOW_ERROR_RATE,
+    customThreshold: customThreshold ?? null,
+    setSelectedChip,
+    setSelectedDate,
+    setSelectedParameter,
+    setShowAsErrorRate,
+    setCustomThreshold,
     isInitialized,
   };
 }
