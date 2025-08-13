@@ -7,11 +7,10 @@ This module provides base and specialized outlier detectors for quantum calibrat
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 import scipy.stats as stats
-from scipy.spatial.distance import mahalanobis
 
 logger = logging.getLogger(__name__)
 
@@ -184,9 +183,9 @@ class OutlierDetector(ABC):
         violations = []
 
         if np.any(values < min_bound):
-            violations.append(f"Negative values")
+            violations.append(f"Values below {min_bound}")
         if np.any(values > max_bound):
-            violations.append(f"Values above {max_bound}μs")
+            violations.append(f"Values above {max_bound}")
 
         return outlier_mask, violations
 
@@ -252,6 +251,30 @@ def extract_coherence_time_values(data: Dict[str, Any], parameter_name: str) -> 
     return extracted
 
 
+def extract_fidelity_values(data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+    """Extract fidelity values from task results."""
+    extracted = {}
+
+    for qid, task_result in data.items():
+        value = None
+
+        # Handle different data structures
+        if isinstance(task_result, dict):
+            if "output_parameters" in task_result:
+                param_value = task_result["output_parameters"].get(parameter_name)
+                if param_value is not None:
+                    if isinstance(param_value, dict):
+                        value = float(param_value.get("value", param_value.get("mean", 0)))
+                    else:
+                        value = float(param_value)
+
+        # Validate fidelity values (should be between 0 and 1)
+        if value is not None and not np.isnan(value) and 0 <= value <= 1:
+            extracted[qid] = value
+
+    return extracted
+
+
 class T2StarOutlierDetector(OutlierDetector):
     """Detector for T2* (Ramsey) measurements."""
 
@@ -282,6 +305,16 @@ class T1OutlierDetector(OutlierDetector):
         return extract_coherence_time_values(data, parameter_name)
 
 
+class GateFidelityOutlierDetector(OutlierDetector):
+    """Detector for gate fidelity measurements."""
+
+    def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
+        return (0.0, 1.0)  # 0 to 1 (100%)
+
+    def extract_parameter_values(self, data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+        return extract_fidelity_values(data, parameter_name)
+
+
 # Factory function to get appropriate detector
 def get_outlier_detector(task_name: str) -> Optional[OutlierDetector]:
     """
@@ -293,7 +326,7 @@ def get_outlier_detector(task_name: str) -> Optional[OutlierDetector]:
     Returns:
         Appropriate OutlierDetector instance or None
     """
-    detector_mapping = {
+    detector_mapping: Dict[str, Type[OutlierDetector]] = {
         "CheckRamsey": T2StarOutlierDetector,
         "Ramsey": T2StarOutlierDetector,
         "T2Star": T2StarOutlierDetector,
@@ -301,6 +334,12 @@ def get_outlier_detector(task_name: str) -> Optional[OutlierDetector]:
         "T2Echo": T2EchoOutlierDetector,
         "CheckT1": T1OutlierDetector,
         "T1": T1OutlierDetector,
+        "X90InterleavedRandomizedBenchmarking": GateFidelityOutlierDetector,
+        "X180InterleavedRandomizedBenchmarking": GateFidelityOutlierDetector,
+        "ZX90InterleavedRandomizedBenchmarking": GateFidelityOutlierDetector,
+        "RandomizedBenchmarking": GateFidelityOutlierDetector,
+        "ReadoutClassification": GateFidelityOutlierDetector,
+        "CheckBellStateTomography": GateFidelityOutlierDetector,
     }
 
     detector_class = detector_mapping.get(task_name)
@@ -342,6 +381,12 @@ def filter_task_results_for_outliers(
         "T2Echo": "t2_echo",
         "CheckT1": "t1",
         "T1": "t1",
+        "X90InterleavedRandomizedBenchmarking": "x90_gate_fidelity",
+        "X180InterleavedRandomizedBenchmarking": "x180_gate_fidelity",
+        "ZX90InterleavedRandomizedBenchmarking": "zx90_gate_fidelity",
+        "RandomizedBenchmarking": "average_gate_fidelity",
+        "ReadoutClassification": "average_readout_fidelity",
+        "CheckBellStateTomography": "bell_state_fidelity",
     }
 
     parameter_name = parameter_mapping.get(task_name)
