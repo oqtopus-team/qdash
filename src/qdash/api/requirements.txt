@@ -82,6 +82,7 @@ numpy==1.26.0
     #   contourpy
     #   matplotlib
     #   qdash
+    #   scipy
 packaging==24.2
     # via
     #   gunicorn
@@ -129,6 +130,8 @@ rich-toolkit==0.13.2
     # via fastapi-cli
 rsa==4.9
     # via python-jose
+scipy==1.15.3 ; python_full_version < '3.11'
+scipy==1.16.1 ; python_full_version >= '3.11'
 shellingham==1.5.4
     # via typer
 six==1.17.0
