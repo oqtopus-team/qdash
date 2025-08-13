@@ -1,4 +1,10 @@
-import { useQueryState, parseAsString, parseAsArrayOf, parseAsBoolean, parseAsFloat } from "nuqs";
+import {
+  useQueryState,
+  parseAsString,
+  parseAsArrayOf,
+  parseAsBoolean,
+  parseAsFloat,
+} from "nuqs";
 import { useCallback, useState, useEffect } from "react";
 
 // Default values for URL parameters - used to determine when to remove params from URL
@@ -394,7 +400,6 @@ export function useCDFUrlState(): UseCDFUrlStateResult {
     parseAsBoolean,
   );
 
-
   // Mark as initialized after first render
   useEffect(() => {
     setIsInitialized(true);
@@ -435,7 +440,9 @@ export function useCDFUrlState(): UseCDFUrlStateResult {
 
   const setShowAsErrorRate = useCallback(
     (show: boolean) => {
-      setShowAsErrorRateState(show === URL_DEFAULTS.SHOW_ERROR_RATE ? null : show); // Remove default from URL
+      setShowAsErrorRateState(
+        show === URL_DEFAULTS.SHOW_ERROR_RATE ? null : show,
+      ); // Remove default from URL
     },
     [setShowAsErrorRateState],
   );
@@ -512,7 +519,9 @@ export function useHistogramUrlState(): UseHistogramUrlStateResult {
 
   const setShowAsErrorRate = useCallback(
     (show: boolean) => {
-      setShowAsErrorRateState(show === URL_DEFAULTS.SHOW_ERROR_RATE ? null : show);
+      setShowAsErrorRateState(
+        show === URL_DEFAULTS.SHOW_ERROR_RATE ? null : show,
+      );
     },
     [setShowAsErrorRateState],
   );

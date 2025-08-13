@@ -44,17 +44,13 @@ function AnalyzePageContent() {
             Time Series
           </button>
           <button
-            className={`tab ${
-              currentView === "histogram" ? "tab-active" : ""
-            }`}
+            className={`tab ${currentView === "histogram" ? "tab-active" : ""}`}
             onClick={() => setCurrentView("histogram")}
           >
             Histogram
           </button>
           <button
-            className={`tab ${
-              currentView === "cdf" ? "tab-active" : ""
-            }`}
+            className={`tab ${currentView === "cdf" ? "tab-active" : ""}`}
             onClick={() => setCurrentView("cdf")}
           >
             CDF

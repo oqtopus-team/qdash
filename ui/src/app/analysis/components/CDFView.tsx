@@ -173,10 +173,10 @@ export function CDFView() {
     if (selectedParameters.length === 0) return null;
 
     const hasCoherence = selectedParameters.some((p) =>
-      parameterGroups.coherence.includes(p)
+      parameterGroups.coherence.includes(p),
     );
     const hasFidelity = selectedParameters.some((p) =>
-      parameterGroups.fidelity.includes(p)
+      parameterGroups.fidelity.includes(p),
     );
 
     return hasCoherence ? "coherence" : hasFidelity ? "fidelity" : null;
@@ -236,7 +236,7 @@ export function CDFView() {
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;
       });
-      
+
       // Additional safety check for array bounds
       if (sortedChips.length > 0 && sortedChips[0]?.chip_id) {
         setSelectedChip(sortedChips[0].chip_id);
@@ -254,7 +254,7 @@ export function CDFView() {
       enabled: Boolean(
         selectedChip &&
           selectedDate === "latest" &&
-          selectedParameters.includes("t1")
+          selectedParameters.includes("t1"),
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -274,11 +274,11 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("t1")
+            selectedParameters.includes("t1"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Fetch data for T2 Echo
@@ -291,7 +291,7 @@ export function CDFView() {
       enabled: Boolean(
         selectedChip &&
           selectedDate === "latest" &&
-          selectedParameters.includes("t2_echo")
+          selectedParameters.includes("t2_echo"),
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -311,11 +311,11 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("t2_echo")
+            selectedParameters.includes("t2_echo"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Fetch data for T2*
@@ -328,7 +328,7 @@ export function CDFView() {
       enabled: Boolean(
         selectedChip &&
           selectedDate === "latest" &&
-          selectedParameters.includes("t2_star")
+          selectedParameters.includes("t2_star"),
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -348,11 +348,11 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("t2_star")
+            selectedParameters.includes("t2_star"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Primary parameter for single parameter mode
@@ -373,7 +373,7 @@ export function CDFView() {
           taskName &&
           taskType === "qubit" &&
           selectedDate === "latest" &&
-          selectedParameters.some((p) => parameterGroups.fidelity.includes(p))
+          selectedParameters.some((p) => parameterGroups.fidelity.includes(p)),
       ),
       refetchInterval: selectedDate === "latest" ? 30000 : undefined,
       staleTime: 25000,
@@ -395,11 +395,13 @@ export function CDFView() {
             taskName &&
             taskType === "qubit" &&
             selectedDate !== "latest" &&
-            selectedParameters.some((p) => parameterGroups.fidelity.includes(p))
+            selectedParameters.some((p) =>
+              parameterGroups.fidelity.includes(p),
+            ),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Fetch data for Gate Fidelity parameters
@@ -415,12 +417,12 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate === "latest" &&
-            selectedParameters.includes("gate_fidelity")
+            selectedParameters.includes("gate_fidelity"),
         ),
         refetchInterval: selectedDate === "latest" ? 30000 : undefined,
         staleTime: 25000,
       },
-    }
+    },
   );
 
   const {
@@ -436,11 +438,11 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("gate_fidelity")
+            selectedParameters.includes("gate_fidelity"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Fetch data for X90 Fidelity
@@ -456,12 +458,12 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate === "latest" &&
-            selectedParameters.includes("x90_fidelity")
+            selectedParameters.includes("x90_fidelity"),
         ),
         refetchInterval: selectedDate === "latest" ? 30000 : undefined,
         staleTime: 25000,
       },
-    }
+    },
   );
 
   const {
@@ -477,11 +479,11 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("x90_fidelity")
+            selectedParameters.includes("x90_fidelity"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Fetch data for X180 Fidelity
@@ -497,12 +499,12 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate === "latest" &&
-            selectedParameters.includes("x180_fidelity")
+            selectedParameters.includes("x180_fidelity"),
         ),
         refetchInterval: selectedDate === "latest" ? 30000 : undefined,
         staleTime: 25000,
       },
-    }
+    },
   );
 
   const {
@@ -518,11 +520,11 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("x180_fidelity")
+            selectedParameters.includes("x180_fidelity"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Fetch data for Readout Fidelity
@@ -538,12 +540,12 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate === "latest" &&
-            selectedParameters.includes("readout_fidelity")
+            selectedParameters.includes("readout_fidelity"),
         ),
         refetchInterval: selectedDate === "latest" ? 30000 : undefined,
         staleTime: 25000,
       },
-    }
+    },
   );
 
   const {
@@ -559,11 +561,11 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("readout_fidelity")
+            selectedParameters.includes("readout_fidelity"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // ZX90 Gate Fidelity (coupling task)
@@ -579,12 +581,12 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate === "latest" &&
-            selectedParameters.includes("zx90_fidelity")
+            selectedParameters.includes("zx90_fidelity"),
         ),
         refetchInterval: selectedDate === "latest" ? 30000 : undefined,
         staleTime: 25000,
       },
-    }
+    },
   );
 
   const {
@@ -600,11 +602,11 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("zx90_fidelity")
+            selectedParameters.includes("zx90_fidelity"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Bell State Fidelity (coupling task)
@@ -620,12 +622,12 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate === "latest" &&
-            selectedParameters.includes("bell_state_fidelity")
+            selectedParameters.includes("bell_state_fidelity"),
         ),
         refetchInterval: selectedDate === "latest" ? 30000 : undefined,
         staleTime: 25000,
       },
-    }
+    },
   );
 
   const {
@@ -641,20 +643,20 @@ export function CDFView() {
         enabled: Boolean(
           selectedChip &&
             selectedDate !== "latest" &&
-            selectedParameters.includes("bell_state_fidelity")
+            selectedParameters.includes("bell_state_fidelity"),
         ),
         staleTime: 60000,
       },
-    }
+    },
   );
 
   // Combine loading states
   const isLoading = useMemo(() => {
     const needsCoherenceData = selectedParameters.some((p) =>
-      parameterGroups.coherence.includes(p)
+      parameterGroups.coherence.includes(p),
     );
     const needsFidelityData = selectedParameters.some((p) =>
-      parameterGroups.fidelity.includes(p)
+      parameterGroups.fidelity.includes(p),
     );
 
     let isLoadingCoherence = false;
@@ -721,10 +723,10 @@ export function CDFView() {
   // Combine error states
   const error = useMemo(() => {
     const needsCoherenceData = selectedParameters.some((p) =>
-      parameterGroups.coherence.includes(p)
+      parameterGroups.coherence.includes(p),
     );
     const needsFidelityData = selectedParameters.some((p) =>
-      parameterGroups.fidelity.includes(p)
+      parameterGroups.fidelity.includes(p),
     );
 
     let coherenceError = null;
@@ -790,18 +792,18 @@ export function CDFView() {
   function safeProcessParameterData(
     taskResult: any,
     parameterKey: string,
-    outputParamName: string
+    outputParamName: string,
   ) {
     try {
       return processParameterDataInternal(
         taskResult,
         parameterKey,
-        outputParamName
+        outputParamName,
       );
     } catch (error) {
       console.error(
         `Error processing parameter data for ${parameterKey}:`,
-        error
+        error,
       );
       // Return empty data structure to prevent crashes
       return {
@@ -826,7 +828,7 @@ export function CDFView() {
   function processParameterDataInternal(
     taskResult: any,
     parameterKey: string,
-    outputParamName: string
+    outputParamName: string,
   ) {
     if (!taskResult) {
       return {
@@ -880,14 +882,14 @@ export function CDFView() {
             } else {
               console.warn(
                 `Unknown object structure for ${parameterKey}:`,
-                paramValue
+                paramValue,
               );
               return;
             }
           } else {
             console.warn(
               `Cannot process value type for ${parameterKey}:`,
-              typeof paramValue
+              typeof paramValue,
             );
             return;
           }
@@ -1087,7 +1089,7 @@ export function CDFView() {
 
     // Check which parameters need loading
     const needsCoherenceData = selectedParameters.some((p) =>
-      parameterGroups.coherence.includes(p)
+      parameterGroups.coherence.includes(p),
     );
     if (needsCoherenceData) {
       // Process T1 data
@@ -1098,7 +1100,7 @@ export function CDFView() {
           results["t1"] = safeProcessParameterData(
             t1Response.data.result,
             "t1",
-            OUTPUT_PARAM_NAMES["t1"]
+            OUTPUT_PARAM_NAMES["t1"],
           );
         }
       }
@@ -1113,7 +1115,7 @@ export function CDFView() {
           results["t2_echo"] = safeProcessParameterData(
             t2EchoResponse.data.result,
             "t2_echo",
-            OUTPUT_PARAM_NAMES["t2_echo"]
+            OUTPUT_PARAM_NAMES["t2_echo"],
           );
         }
       }
@@ -1128,7 +1130,7 @@ export function CDFView() {
           results["t2_star"] = safeProcessParameterData(
             t2StarResponse.data.result,
             "t2_star",
-            OUTPUT_PARAM_NAMES["t2_star"]
+            OUTPUT_PARAM_NAMES["t2_star"],
           );
         }
       }
@@ -1136,7 +1138,7 @@ export function CDFView() {
 
     // Process gate fidelity parameters if selected
     const hasFidelityParams = selectedParameters.some((p) =>
-      parameterGroups.fidelity.includes(p)
+      parameterGroups.fidelity.includes(p),
     );
     if (hasFidelityParams) {
       // Process Gate Fidelity
@@ -1149,7 +1151,7 @@ export function CDFView() {
           results["gate_fidelity"] = safeProcessParameterData(
             gateFidelityResponse.data.result,
             "gate_fidelity",
-            OUTPUT_PARAM_NAMES["gate_fidelity"]
+            OUTPUT_PARAM_NAMES["gate_fidelity"],
           );
         }
       }
@@ -1164,7 +1166,7 @@ export function CDFView() {
           results["x90_fidelity"] = safeProcessParameterData(
             x90FidelityResponse.data.result,
             "x90_fidelity",
-            OUTPUT_PARAM_NAMES["x90_fidelity"]
+            OUTPUT_PARAM_NAMES["x90_fidelity"],
           );
         }
       }
@@ -1179,7 +1181,7 @@ export function CDFView() {
           results["x180_fidelity"] = safeProcessParameterData(
             x180FidelityResponse.data.result,
             "x180_fidelity",
-            OUTPUT_PARAM_NAMES["x180_fidelity"]
+            OUTPUT_PARAM_NAMES["x180_fidelity"],
           );
         }
       }
@@ -1194,7 +1196,7 @@ export function CDFView() {
           results["readout_fidelity"] = safeProcessParameterData(
             readoutFidelityResponse.data.result,
             "readout_fidelity",
-            OUTPUT_PARAM_NAMES["readout_fidelity"]
+            OUTPUT_PARAM_NAMES["readout_fidelity"],
           );
         }
       }
@@ -1209,7 +1211,7 @@ export function CDFView() {
           results["zx90_fidelity"] = safeProcessParameterData(
             zx90FidelityResponse.data.result,
             "zx90_fidelity",
-            OUTPUT_PARAM_NAMES["zx90_fidelity"]
+            OUTPUT_PARAM_NAMES["zx90_fidelity"],
           );
         }
       }
@@ -1224,7 +1226,7 @@ export function CDFView() {
           results["bell_state_fidelity"] = safeProcessParameterData(
             bellStateFidelityResponse.data.result,
             "bell_state_fidelity",
-            OUTPUT_PARAM_NAMES["bell_state_fidelity"]
+            OUTPUT_PARAM_NAMES["bell_state_fidelity"],
           );
         }
       }
@@ -1312,7 +1314,7 @@ export function CDFView() {
 
             // Sort by converted X values (error rates) in ascending order
             const sortedData = pairedData.sort(
-              (a: any, b: any) => a.convertedX - b.convertedX
+              (a: any, b: any) => a.convertedX - b.convertedX,
             );
 
             // Recalculate CDF values for the new ordering
@@ -1320,7 +1322,7 @@ export function CDFView() {
               (item: any, index: number) => ({
                 ...item,
                 newY: (index + 1) / sortedData.length, // Proper CDF calculation
-              })
+              }),
             );
 
             return {
@@ -1504,8 +1506,8 @@ export function CDFView() {
             const unit = parameterGroups.coherence.includes(param)
               ? " µs"
               : parameterGroups.fidelity.includes(param) && !showAsErrorRate
-              ? "%"
-              : "";
+                ? "%"
+                : "";
             return {
               ...trace,
               line: {
@@ -1517,7 +1519,7 @@ export function CDFView() {
                 showAsErrorRate && parameterGroups.fidelity.includes(param)
                   ? data.median?.toExponential(1)
                   : data.median?.toFixed(
-                      parameterGroups.coherence.includes(param) ? 2 : 2
+                      parameterGroups.coherence.includes(param) ? 2 : 2,
                     )
               }${unit}`,
               showlegend: true,
@@ -1535,10 +1537,10 @@ export function CDFView() {
 
   // Determine plot characteristics based on selected parameters
   const hasCoherenceParams = selectedParameters.some((p) =>
-    parameterGroups.coherence.includes(p)
+    parameterGroups.coherence.includes(p),
   );
   const hasFidelityParams = selectedParameters.some((p) =>
-    parameterGroups.fidelity.includes(p)
+    parameterGroups.fidelity.includes(p),
   );
   const isMixedParams = hasCoherenceParams && hasFidelityParams;
 
@@ -1547,22 +1549,22 @@ export function CDFView() {
       text: isMixedParams
         ? `Cumulative Distribution - Selected Parameters`
         : hasCoherenceParams
-        ? "Cumulative Distribution - Coherence Times"
-        : hasFidelityParams
-        ? "Cumulative Distribution - Gate Fidelities"
-        : "Cumulative Distribution",
+          ? "Cumulative Distribution - Coherence Times"
+          : hasFidelityParams
+            ? "Cumulative Distribution - Gate Fidelities"
+            : "Cumulative Distribution",
       font: { size: 18 },
     },
     xaxis: {
       title: isMixedParams
         ? "Parameter Value"
         : hasCoherenceParams
-        ? "Coherence Time (µs)"
-        : hasFidelityParams
-        ? showAsErrorRate
-          ? "Gate Error Rate (%)"
-          : "Gate Fidelity (%)"
-        : "Value",
+          ? "Coherence Time (µs)"
+          : hasFidelityParams
+            ? showAsErrorRate
+              ? "Gate Error Rate (%)"
+              : "Gate Fidelity (%)"
+            : "Value",
       gridcolor: "#e5e7eb",
       showgrid: true,
       zeroline: false,
@@ -1706,14 +1708,14 @@ export function CDFView() {
                     ) {
                       // Single type selected - flat array
                       return availableParameters.filter((option: any) =>
-                        selectedParameters.includes(option.value)
+                        selectedParameters.includes(option.value),
                       );
                     } else if (Array.isArray(availableParameters)) {
                       // No type selected yet - grouped array
                       return availableParameters
                         .flatMap((group: any) => group.options || [])
                         .filter((option: any) =>
-                          selectedParameters.includes(option.value)
+                          selectedParameters.includes(option.value),
                         );
                     }
                     return [];
@@ -1814,8 +1816,8 @@ export function CDFView() {
                 const unit = parameterGroups.coherence.includes(param)
                   ? " µs"
                   : parameterGroups.fidelity.includes(param) && !showAsErrorRate
-                  ? "%"
-                  : "";
+                    ? "%"
+                    : "";
                 const colorClass =
                   colors[param as keyof typeof colors] || "text-gray-600";
 
