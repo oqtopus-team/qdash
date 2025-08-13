@@ -1,4 +1,5 @@
-import { useState, useMemo, ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useState, useMemo } from "react";
 
 interface Column {
   key: string;

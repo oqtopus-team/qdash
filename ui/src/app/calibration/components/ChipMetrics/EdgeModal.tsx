@@ -2,7 +2,7 @@
 
 import React from "react";
 
-import { OutputParameterModel } from "@/schemas/outputParameterModel";
+import type { OutputParameterModel } from "@/schemas/outputParameterModel";
 
 interface ParameterData extends OutputParameterModel {
   value_type?: string;

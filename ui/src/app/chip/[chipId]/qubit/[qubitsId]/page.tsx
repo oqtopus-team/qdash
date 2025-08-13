@@ -1,28 +1,28 @@
 "use client";
 
-import React, { useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import React, { useEffect, Suspense } from "react";
 
 import { BsArrowLeft, BsGraphUp, BsTable, BsEye } from "react-icons/bs";
 
+import { QubitRadarChart } from "./components/QubitRadarChart";
+import { QubitTimeSeriesView } from "./components/QubitTimeSeriesView";
+
+import type { Task, TaskResponse } from "@/schemas";
+
+import { ChipSelector } from "@/app/components/ChipSelector";
+import { DateSelector } from "@/app/components/DateSelector";
+import { TaskFigure } from "@/app/components/TaskFigure";
+import { TaskSelector } from "@/app/components/TaskSelector";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
+import { useChipUrlState } from "@/app/hooks/useUrlState";
 import {
   useFetchLatestQubitTaskGroupedByChip,
   useFetchHistoricalQubitTaskGroupedByChip,
   useFetchChip,
 } from "@/client/chip/chip";
 import { useFetchAllTasks } from "@/client/task/task";
-
-import { ChipSelector } from "@/app/components/ChipSelector";
-import { DateSelector } from "@/app/components/DateSelector";
-import { TaskSelector } from "@/app/components/TaskSelector";
-import { TaskFigure } from "@/app/components/TaskFigure";
-import { useDateNavigation } from "@/app/hooks/useDateNavigation";
-import { useChipUrlState } from "@/app/hooks/useUrlState";
-import { QubitTimeSeriesView } from "./components/QubitTimeSeriesView";
-import { QubitRadarChart } from "./components/QubitRadarChart";
-
-import type { Task, TaskResponse } from "@/schemas";
 
 function QubitDetailPageContent() {
   const params = useParams();

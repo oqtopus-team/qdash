@@ -1,22 +1,24 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
-import { keepPreviousData } from "@tanstack/react-query";
-import { useListMuxes, useFetchChip, useListChips } from "@/client/chip/chip";
-import { useDateNavigation } from "@/app/hooks/useDateNavigation";
-import { useChipUrlState } from "@/app/hooks/useUrlState";
-import { useFetchAllTasks } from "@/client/task/task";
 import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react";
 
+import { keepPreviousData } from "@tanstack/react-query";
 import { BsGrid, BsListUl } from "react-icons/bs";
 
-import type { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
-import { TaskResultGrid } from "./components/TaskResultGrid";
 import { CouplingGrid } from "./components/CouplingGrid";
+import { TaskResultGrid } from "./components/TaskResultGrid";
+
+import type { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
+
 import { ChipSelector } from "@/app/components/ChipSelector";
-import { TaskSelector } from "@/app/components/TaskSelector";
 import { DateSelector } from "@/app/components/DateSelector";
 import { TaskFigure } from "@/app/components/TaskFigure";
+import { TaskSelector } from "@/app/components/TaskSelector";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
+import { useChipUrlState } from "@/app/hooks/useUrlState";
+import { useListMuxes, useFetchChip, useListChips } from "@/client/chip/chip";
+import { useFetchAllTasks } from "@/client/task/task";
 
 interface SelectedTaskInfo {
   path: string;

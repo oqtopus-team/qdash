@@ -1,14 +1,16 @@
 import { useMemo } from "react";
-import { useFetchTimeseriesTaskResultByTagAndParameterAndQid } from "@/client/chip/chip";
-import { useFetchAllParameters } from "@/client/parameter/parameter";
-import { useListAllTag } from "@/client/tag/tag";
-import {
+
+import type {
   ParameterKey,
   TagKey,
   TimeSeriesDataPoint,
   TimeRangeState,
 } from "../types";
-import { OutputParameterModel } from "@/schemas";
+import type { OutputParameterModel } from "@/schemas";
+
+import { useFetchTimeseriesTaskResultByTagAndParameterAndQid } from "@/client/chip/chip";
+import { useFetchAllParameters } from "@/client/parameter/parameter";
+import { useListAllTag } from "@/client/tag/tag";
 
 interface UseQubitTimeseriesOptions {
   chipId: string;

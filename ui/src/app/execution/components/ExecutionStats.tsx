@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { ExecutionResponseSummary } from "@/schemas";
+
+import type { ExecutionResponseSummary } from "@/schemas";
 
 interface ExecutionStatsProps {
   executions: ExecutionResponseSummary[];

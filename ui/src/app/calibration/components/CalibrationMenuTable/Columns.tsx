@@ -3,8 +3,10 @@
 import { createColumnHelper } from "@tanstack/react-table";
 import { FaTrash } from "react-icons/fa";
 import { FaRegCirclePlay } from "react-icons/fa6";
-import type { MenuModel } from "@/schemas";
+
 import { SchedulePreview } from "./SchedulePreview";
+
+import type { MenuModel } from "@/schemas";
 
 const columnHelper = createColumnHelper<MenuModel>();
 

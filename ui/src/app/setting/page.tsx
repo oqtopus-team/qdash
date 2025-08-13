@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useTheme } from "@/app/providers/theme-provider";
+
 import { SettingsCard } from "./components/SettingsCard";
+
+import { useTheme } from "@/app/providers/theme-provider";
 
 const themes = [
   "oqtopus",

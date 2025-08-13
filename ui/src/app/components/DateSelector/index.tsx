@@ -1,8 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
+
+import Select from "react-select";
+
+import type { SingleValue } from "react-select";
+
 import { useFetchChipDates } from "@/client/chip/chip";
-import Select, { SingleValue } from "react-select";
 
 interface DateOption {
   value: string;

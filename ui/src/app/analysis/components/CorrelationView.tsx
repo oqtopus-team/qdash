@@ -1,17 +1,19 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+
+import Select from "react-select";
+
+import { ChipSelector } from "@/app/components/ChipSelector";
+import { DateSelector } from "@/app/components/DateSelector";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import {
   useListChips,
   useFetchLatestQubitTaskGroupedByChip,
   useFetchHistoricalQubitTaskGroupedByChip,
 } from "@/client/chip/chip";
-import { useCSVExport } from "@/shared/hooks/useCSVExport";
-import { ChipSelector } from "@/app/components/ChipSelector";
-import { DateSelector } from "@/app/components/DateSelector";
-import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { PlotCard } from "@/shared/components/PlotCard";
-import Select from "react-select";
+import { useCSVExport } from "@/shared/hooks/useCSVExport";
 
 // Task names and types mapping (same as CumulativeView)
 const TASK_CONFIG: Record<

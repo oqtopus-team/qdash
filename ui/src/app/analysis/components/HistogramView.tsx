@@ -1,6 +1,13 @@
 "use client";
 
 import { useMemo, useEffect, useCallback } from "react";
+
+import Select from "react-select";
+
+import { ChipSelector } from "@/app/components/ChipSelector";
+import { DateSelector } from "@/app/components/DateSelector";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
+import { useHistogramUrlState } from "@/app/hooks/useUrlState";
 import {
   useListChips,
   useFetchLatestQubitTaskGroupedByChip,
@@ -8,16 +15,9 @@ import {
   useFetchLatestCouplingTaskGroupedByChip,
   useFetchHistoricalCouplingTaskGroupedByChip,
 } from "@/client/chip/chip";
-import { PlotCard } from "@/shared/components/PlotCard";
-import { ErrorCard } from "@/shared/components/ErrorCard";
 import { DataTable } from "@/shared/components/DataTable";
-import { useCSVExport } from "@/shared/hooks/useCSVExport";
-import { ChipSelector } from "@/app/components/ChipSelector";
-import { DateSelector } from "@/app/components/DateSelector";
-import { useDateNavigation } from "@/app/hooks/useDateNavigation";
-import { useHistogramUrlState } from "@/app/hooks/useUrlState";
-import Select from "react-select";
-
+import { ErrorCard } from "@/shared/components/ErrorCard";
+import { PlotCard } from "@/shared/components/PlotCard";
 import {
   TASK_CONFIG,
   PARAMETER_CONFIG,
@@ -28,6 +28,7 @@ import {
   convertDisplayToThreshold,
   formatThresholdValue,
 } from "@/shared/config/analysis";
+import { useCSVExport } from "@/shared/hooks/useCSVExport";
 import { naturalSortQIDs } from "@/shared/utils/qid";
 
 interface HistogramDataPoint {
@@ -361,7 +362,7 @@ export function HistogramView() {
       values.length > 0
         ? values.reduce((sum, val) => sum + val, 0) / values.length
         : 0;
-    
+
     const sortedValues = [...values].sort((a, b) => a - b);
     const median =
       sortedValues.length > 0
@@ -749,9 +750,12 @@ export function HistogramView() {
               <div className="h-10">
                 <Select
                   options={parameterOptions}
-                  value={parameterOptions
-                    .flatMap((group) => group.options)
-                    .find((option) => option.value === selectedParameter) || null}
+                  value={
+                    parameterOptions
+                      .flatMap((group) => group.options)
+                      .find((option) => option.value === selectedParameter) ||
+                    null
+                  }
                   onChange={(option) => {
                     if (option) {
                       setSelectedParameter(option.value);
