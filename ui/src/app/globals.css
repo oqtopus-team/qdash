@@ -1,5 +1,112 @@
 @import "tailwindcss";
 @plugin "daisyui";
+
+/* Dashboard focus styles for hiding non-essential elements */
+.dashboard-focus-timeseries .col-span-3:first-of-type {
+  display: none; /* Hide parameter selection card */
+}
+.dashboard-focus-timeseries .col-span-3:last-of-type {
+  display: none; /* Hide data table */
+}
+.dashboard-focus-timeseries .col-span-3:nth-of-type(2) {
+  grid-column: span 1; /* Make plot take available width */
+}
+
+/* Improve plot sizing for dashboard */
+.dashboard-focus-timeseries .plotly-graph-div,
+.dashboard-focus-histogram .plotly-graph-div,
+.dashboard-focus-cdf .plotly-graph-div {
+  height: 350px !important;
+}
+
+/* Adjust margins for dashboard plots */
+.dashboard-focus-timeseries .js-plotly-plot,
+.dashboard-focus-histogram .js-plotly-plot,
+.dashboard-focus-cdf .js-plotly-plot {
+  margin: 0 !important;
+}
+
+/* Ensure plot containers take full available space */
+.dashboard-focus-timeseries,
+.dashboard-focus-histogram,
+.dashboard-focus-cdf {
+  height: 100%;
+}
+
+.dashboard-focus-timeseries > div,
+.dashboard-focus-histogram > div,
+.dashboard-focus-cdf > div {
+  height: 100%;
+}
+
+.dashboard-focus-histogram .grid-cols-12 > .col-span-4:first-child {
+  display: none; /* Hide parameter selection */
+}
+.dashboard-focus-histogram .grid-cols-12 > .col-span-8 {
+  grid-column: span 12; /* Make plot take full width */
+}
+.dashboard-focus-histogram .card.bg-base-100.shadow-md {
+  display: none; /* Hide data table */
+}
+
+.dashboard-focus-cdf .grid-cols-12 > .col-span-4:first-child {
+  display: none; /* Hide parameter selection */
+}
+.dashboard-focus-cdf .grid-cols-12 > .col-span-8 {
+  grid-column: span 12; /* Make plot take full width */
+}
+.dashboard-focus-cdf .card.bg-base-100.shadow-md {
+  display: none; /* Hide data table */
+}
+
+/* Dashboard focus styles for chip page */
+.dashboard-focus-chip {
+  /* Reduce padding for dashboard view */
+  padding: 1rem;
+}
+
+.dashboard-focus-chip > div {
+  /* Reduce space between sections */
+  gap: 1rem;
+}
+
+/* Hide or minimize certain elements for dashboard view */
+.dashboard-focus-chip .space-y-6 {
+  /* Reduce spacing */
+  gap: 1rem;
+}
+
+.dashboard-focus-chip h1 {
+  /* Smaller title for dashboard */
+  font-size: 1.5rem;
+}
+
+/* Optimize content area for dashboard */
+.dashboard-focus-chip .pt-4 {
+  padding-top: 0.5rem;
+}
+
+/* Dashboard focus styles for execution page */
+.dashboard-focus-execution {
+  /* Reduce padding for dashboard view */
+  padding: 1rem;
+}
+
+.dashboard-focus-execution .px-10 {
+  /* Reduce horizontal padding */
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.dashboard-focus-execution h1 {
+  /* Smaller title for dashboard */
+  font-size: 1.5rem;
+}
+
+/* Hide execution stats section in dashboard view */
+.dashboard-focus-execution .pb-6:has(.flex.gap-4) {
+  display: none;
+}
 @plugin "daisyui/theme" {
   name: "oqtopus";
   default: true; /* set as default */

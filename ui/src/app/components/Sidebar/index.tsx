@@ -12,6 +12,7 @@ import { GiGinkgoLeaf } from "react-icons/gi";
 import { GoWorkflow } from "react-icons/go";
 import { IoMdSettings } from "react-icons/io";
 import { IoAnalytics } from "react-icons/io5";
+import { MdDashboard } from "react-icons/md";
 
 function Sidebar() {
   const pathname = usePathname();
@@ -41,6 +42,19 @@ function Sidebar() {
               />
             </Link>
           </div>
+          <li>
+            <Link
+              href="/dashboard"
+              className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
+                isActive("/dashboard")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
+              }`}
+            >
+              <MdDashboard />
+              <span className="ml-2">Dashboard</span>
+            </Link>
+          </li>
           <li>
             <Link
               href="/chip"
