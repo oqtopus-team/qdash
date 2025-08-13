@@ -16,7 +16,8 @@ class ResponseProcessor:
     """Service for processing API responses with optional outlier filtering."""
     
     def __init__(self):
-        self.outlier_enabled_tasks = {"CheckRamsey"}  # T2* tasks
+        # Tasks are now determined by the detector factory
+        pass
     
     def process_task_response(
         self, 
@@ -35,7 +36,7 @@ class ResponseProcessor:
         Returns:
             Processed response object
         """
-        if not enable_outlier_filtering or task_name not in self.outlier_enabled_tasks:
+        if not enable_outlier_filtering:
             return response
         
         if not hasattr(response, 'result') or not response.result:
@@ -50,8 +51,6 @@ class ResponseProcessor:
     
     def _apply_outlier_filtering(self, results: Dict[str, Any], task_name: str) -> Dict[str, Any]:
         """Apply outlier filtering to task results."""
-        logger.info(f"Applying automatic outlier filtering for {task_name}")
-        
         # Convert Task objects to dict for outlier detection
         task_dict = {}
         for qid, task in results.items():
@@ -61,7 +60,7 @@ class ResponseProcessor:
         if not task_dict:
             return results
         
-        # Apply outlier detection
+        # Apply outlier detection using new inheritance-based design
         filtered_task_dict, outlier_result = filter_task_results_for_outliers(
             task_dict, 
             task_name, 
@@ -69,7 +68,12 @@ class ResponseProcessor:
             method="combined"
         )
         
-        if outlier_result and outlier_result.outlier_count > 0:
+        # If no outlier detection was applied (task not supported), return original
+        if outlier_result is None:
+            return results
+        
+        if outlier_result.outlier_count > 0:
+            logger.info(f"Applying automatic outlier filtering for {task_name}")
             # Remove outliers from results - silent data correction
             filtered_results = results.copy()
             for outlier_qid in outlier_result.outlier_qids:
