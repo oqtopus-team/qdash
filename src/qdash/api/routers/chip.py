@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, field_validator
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
 from qdash.api.schemas.auth import User
+from qdash.api.services.outlier_detection import filter_task_results_for_outliers
 from qdash.datamodel.task import OutputParameterModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
@@ -640,7 +641,7 @@ def fetch_historical_qubit_task_grouped_by_chip(
         .run()
     )
     fidelity_map = {}
-    for k, v in chip.couplings.items():
+    for k, v in chip.qubits.items():
         fidelity_data = v.data.get("x90_gate_fidelity", {})
         value = fidelity_data.get("value", 0.0)
         calibrated_at_str = fidelity_data.get("calibrated_at")
@@ -686,21 +687,47 @@ def fetch_historical_qubit_task_grouped_by_chip(
             task_result = Task(name=task_name)
         results[qid] = task_result
 
+    # Apply automatic defensive outlier filtering for T2* tasks
+    if task_name == "CheckRamsey":  # T2* task - apply automatic filtering
+        logger.info(f"Applying automatic outlier filtering for historical {task_name}")
+        
+        # Convert Task objects to dict for outlier detection
+        task_dict = {}
+        for qid, task in results.items():
+            if task.output_parameters:
+                task_dict[qid] = {"output_parameters": task.output_parameters}
+        
+        filtered_task_dict, outlier_result = filter_task_results_for_outliers(
+            task_dict, 
+            task_name, 
+            enable_filtering=True,
+            method="combined"  # Use combined method by default
+        )
+        
+        if outlier_result and outlier_result.outlier_count > 0:
+            # Remove outliers from results - silent data correction
+            for outlier_qid in outlier_result.outlier_qids:
+                if outlier_qid in results:
+                    logger.info(f"Automatically filtered historical outlier QID: {outlier_qid} (silent data correction)")
+                    del results[outlier_qid]
+
     return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
 
 
 @router.get(
     "/chip/{chip_id}/task/qubit/{task_name}",
-    summary="Fetch the multiplexers",
+    summary="Fetch latest qubit task results with optional outlier filtering",
     operation_id="fetchLatestQubitTaskGroupedByChip",
     response_model=LatestTaskGroupedByChipResponse,
     response_model_exclude_none=True,
 )
 def fetch_latest_qubit_task_grouped_by_chip(
-    chip_id: str, task_name: str, current_user: Annotated[User, Depends(get_current_active_user)]
+    chip_id: str, 
+    task_name: str, 
+    current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> LatestTaskGroupedByChipResponse:
-    """Fetch the multiplexers."""
-    logger.debug(f"Fetching muxes for chip {chip_id}, user: {current_user.username}")
+    """Fetch latest qubit task results with optional defensive outlier filtering."""
+    logger.debug(f"Fetching qubit tasks for chip {chip_id}, user: {current_user.username}")
 
     # Get chip info
     chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
@@ -759,6 +786,30 @@ def fetch_latest_qubit_task_grouped_by_chip(
         else:
             task_result = Task(name=task_name)
         results[qid] = task_result
+
+    # Apply automatic defensive outlier filtering for T2* tasks
+    if task_name == "CheckRamsey":  # T2* task - apply automatic filtering
+        logger.info(f"Applying automatic outlier filtering for {task_name}")
+        
+        # Convert Task objects to dict for outlier detection
+        task_dict = {}
+        for qid, task in results.items():
+            if task.output_parameters:
+                task_dict[qid] = {"output_parameters": task.output_parameters}
+        
+        filtered_task_dict, outlier_result = filter_task_results_for_outliers(
+            task_dict, 
+            task_name, 
+            enable_filtering=True,
+            method="combined"  # Use combined method by default
+        )
+        
+        if outlier_result and outlier_result.outlier_count > 0:
+            # Remove outliers from results - silent data correction
+            for outlier_qid in outlier_result.outlier_qids:
+                if outlier_qid in results:
+                    logger.info(f"Automatically filtered outlier QID: {outlier_qid} (silent data correction)")
+                    del results[outlier_qid]
 
     return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
 
@@ -952,6 +1003,30 @@ def fetch_latest_coupling_task_grouped_by_chip(
         else:
             task_result = Task(name=task_name, default_view=False)
         results[qid] = task_result
+
+    # Apply automatic defensive outlier filtering for T2* tasks
+    if task_name == "CheckRamsey":  # T2* task - apply automatic filtering
+        logger.info(f"Applying automatic outlier filtering for historical {task_name}")
+        
+        # Convert Task objects to dict for outlier detection
+        task_dict = {}
+        for qid, task in results.items():
+            if task.output_parameters:
+                task_dict[qid] = {"output_parameters": task.output_parameters}
+        
+        filtered_task_dict, outlier_result = filter_task_results_for_outliers(
+            task_dict, 
+            task_name, 
+            enable_filtering=True,
+            method="combined"  # Use combined method by default
+        )
+        
+        if outlier_result and outlier_result.outlier_count > 0:
+            # Remove outliers from results - silent data correction
+            for outlier_qid in outlier_result.outlier_qids:
+                if outlier_qid in results:
+                    logger.info(f"Automatically filtered historical outlier QID: {outlier_qid} (silent data correction)")
+                    del results[outlier_qid]
 
     return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
 
