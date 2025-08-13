@@ -1,11 +1,12 @@
 import { useMemo } from "react";
-import {
+
+import type {
   TimeSeriesDataPoint,
   TimeRangeState,
   ParameterKey,
   TagKey,
 } from "../types/analysis";
-import { OutputParameterModel } from "@/schemas";
+import type { OutputParameterModel } from "@/schemas";
 
 interface UseTimeseriesDataOptions {
   chipId: string;

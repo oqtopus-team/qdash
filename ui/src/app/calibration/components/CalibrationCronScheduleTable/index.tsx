@@ -5,17 +5,19 @@ import { useEffect, useState } from "react";
 import { getColumns } from "./Columns";
 import { EditScheduleModal } from "./EditScheduleModal";
 import { MenuPreviewModal } from "./MenuPreviewModal";
+
 import type {
   MenuModel,
   ScheduleCronCalibResponse,
   GetMenuResponse,
 } from "@/schemas";
+
+import { Table } from "@/app/components/Table";
 import {
   useListCronSchedules,
   useScheduleCronCalib,
 } from "@/client/calibration/calibration";
 import { useListMenu } from "@/client/menu/menu";
-import { Table } from "@/app/components/Table";
 
 export function CalibrationCronScheduleTable() {
   const [cronSchedules, setCronSchedules] = useState<

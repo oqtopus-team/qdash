@@ -1,6 +1,5 @@
 "use client";
 
-import { useFetchExecutionByChipId } from "@/client/chip/chip";
 import {
   FaExternalLinkAlt,
   FaDownload,
@@ -8,10 +7,14 @@ import {
   FaClock,
 } from "react-icons/fa";
 import JsonView from "react18-json-view";
-import { ExecutionResponseDetail } from "@/schemas";
+
 import ExecutionDAG from "./ExecutionDAG";
+
+import type { ExecutionResponseDetail } from "@/schemas";
+
 import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 import { TaskFigure } from "@/app/components/TaskFigure";
+import { useFetchExecutionByChipId } from "@/client/chip/chip";
 
 interface ExecutionDetailClientProps {
   chip_id: string;

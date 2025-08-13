@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
+
+import { TaskFigure } from "./TaskFigure";
+
+import type { Task } from "@/schemas";
+
 import {
   useFetchLatestQubitTaskGroupedByChip,
   useFetchHistoricalQubitTaskGroupedByChip,
 } from "@/client/chip/chip";
-import { Task } from "@/schemas";
-import { TaskFigure } from "./TaskFigure";
-import { useState } from "react";
 
 interface TaskResultGridProps {
   chipId: string;

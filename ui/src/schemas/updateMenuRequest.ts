@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { UpdateMenuRequestSchedule } from "./updateMenuRequestSchedule";
-import type { UpdateMenuRequestTasks } from "./updateMenuRequestTasks";
-import type { UpdateMenuRequestTaskDetails } from "./updateMenuRequestTaskDetails";
 import type { UpdateMenuRequestTags } from "./updateMenuRequestTags";
+import type { UpdateMenuRequestTaskDetails } from "./updateMenuRequestTaskDetails";
+import type { UpdateMenuRequestTasks } from "./updateMenuRequestTasks";
 
 /**
  * UpdateMenuRequest is a Pydantic model for updating a menu item.

@@ -1,7 +1,9 @@
 "use client";
 
-import Select, { SingleValue } from "react-select";
-import { Tag } from "@/schemas/tag";
+import Select from "react-select";
+
+import type { Tag } from "@/schemas/tag";
+import type { SingleValue } from "react-select";
 
 interface TagOption {
   value: string;

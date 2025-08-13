@@ -1,16 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { FaScrewdriverWrench } from "react-icons/fa6";
 import { BsListTask, BsMenuButton } from "react-icons/bs";
-import { GoWorkflow } from "react-icons/go";
-import { FaBolt } from "react-icons/fa6";
-import { IoMdSettings } from "react-icons/io";
-import { GiGinkgoLeaf } from "react-icons/gi";
 import { BsCpu } from "react-icons/bs";
+import { FaScrewdriverWrench } from "react-icons/fa6";
+import { FaBolt } from "react-icons/fa6";
+import { GiGinkgoLeaf } from "react-icons/gi";
+import { GoWorkflow } from "react-icons/go";
+import { IoMdSettings } from "react-icons/io";
 import { IoAnalytics } from "react-icons/io5";
 
 function Sidebar() {

@@ -1,7 +1,9 @@
 "use client";
 
-import Select, { SingleValue } from "react-select";
-import { TaskResponse } from "@/schemas";
+import Select from "react-select";
+
+import type { TaskResponse } from "@/schemas";
+import type { SingleValue } from "react-select";
 
 interface TaskOption {
   value: string;

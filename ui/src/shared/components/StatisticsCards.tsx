@@ -1,4 +1,4 @@
-import { StatisticalSummary } from "../types/analysis";
+import type { StatisticalSummary } from "../types/analysis";
 
 interface StatisticsCardsProps {
   statistics: StatisticalSummary;

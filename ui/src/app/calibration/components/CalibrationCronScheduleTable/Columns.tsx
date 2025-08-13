@@ -2,6 +2,7 @@
 
 import { createColumnHelper } from "@tanstack/react-table";
 import { FaEdit } from "react-icons/fa";
+
 import type { MenuModel, ScheduleCronCalibResponse } from "@/schemas";
 
 const columnHelper = createColumnHelper<ScheduleCronCalibResponse>();

@@ -1,3 +1,5 @@
+import { useCallback, useState, useEffect } from "react";
+
 import {
   useQueryState,
   parseAsString,
@@ -5,7 +7,6 @@ import {
   parseAsBoolean,
   parseAsFloat,
 } from "nuqs";
-import { useCallback, useState, useEffect } from "react";
 
 // Default values for URL parameters - used to determine when to remove params from URL
 const URL_DEFAULTS = {

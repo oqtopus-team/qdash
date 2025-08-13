@@ -1,24 +1,24 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import dagre from "dagre";
+import React from "react";
+
 import {
   ReactFlow,
   Background,
   Controls,
-  Node,
-  Edge,
-  NodeProps,
   Handle,
   Position,
-  NodeTypes,
   ReactFlowProvider,
   Panel,
   MarkerType,
 } from "@xyflow/react";
-import React from "react";
-import { TaskFigure } from "@/app/components/TaskFigure";
+import dagre from "dagre";
 import JsonView from "react18-json-view";
+
+import type { Node, Edge, NodeProps, NodeTypes } from "@xyflow/react";
+
+import { TaskFigure } from "@/app/components/TaskFigure";
 import "@xyflow/react/dist/style.css";
 
 interface TaskNode {

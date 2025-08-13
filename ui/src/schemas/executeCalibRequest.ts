@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ExecuteCalibRequestSchedule } from "./executeCalibRequestSchedule";
-import type { ExecuteCalibRequestTasks } from "./executeCalibRequestTasks";
-import type { ExecuteCalibRequestTaskDetails } from "./executeCalibRequestTaskDetails";
 import type { ExecuteCalibRequestTags } from "./executeCalibRequestTags";
+import type { ExecuteCalibRequestTaskDetails } from "./executeCalibRequestTaskDetails";
+import type { ExecuteCalibRequestTasks } from "./executeCalibRequestTasks";
 
 /**
  * ExecuteCalibRequest is a subclass of MenuModel.

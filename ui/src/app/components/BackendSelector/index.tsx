@@ -1,8 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
+
+import Select from "react-select";
+
+import type { SingleValue } from "react-select";
+
 import { useFetchAllBackends } from "@/client/backend/backend";
-import Select, { SingleValue } from "react-select";
 
 interface BackendOption {
   value: string;

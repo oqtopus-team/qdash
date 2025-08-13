@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import {
+
+import type {
   CorrelationDataPoint,
   StatisticalSummary,
   ParameterKey,

@@ -1,7 +1,8 @@
 "use client";
 
-import { Task, MuxDetailResponseDetail } from "@/schemas";
 import { TaskList } from "../TaskList";
+
+import type { Task, MuxDetailResponseDetail } from "@/schemas";
 
 interface MuxCardProps {
   muxId: string;

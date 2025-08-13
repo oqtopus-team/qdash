@@ -1,22 +1,24 @@
 "use client";
 
 import { useMemo, useEffect } from "react";
-import { useFetchTimeseriesTaskResultByTagAndParameter } from "@/client/chip/chip";
-import { ParameterSelector } from "@/app/components/ParameterSelector";
-import { TagSelector } from "@/app/components/TagSelector";
+
+import type { ParameterKey, TagKey } from "@/shared/types/analysis";
+import type { Layout } from "plotly.js";
+
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { DateTimePicker } from "@/app/components/DateTimePicker";
-import { useTimeRange } from "@/shared/hooks/useTimeRange";
-import { useCSVExport } from "@/shared/hooks/useCSVExport";
-import { PlotCard } from "@/shared/components/PlotCard";
-import { DataTable } from "@/shared/components/DataTable";
-import { ErrorCard } from "@/shared/components/ErrorCard";
-import { useFetchAllParameters } from "@/client/parameter/parameter";
-import { useListAllTag } from "@/client/tag/tag";
-import { useListChips } from "@/client/chip/chip";
+import { ParameterSelector } from "@/app/components/ParameterSelector";
+import { TagSelector } from "@/app/components/TagSelector";
 import { useAnalysisUrlState } from "@/app/hooks/useUrlState";
-import { ParameterKey, TagKey } from "@/shared/types/analysis";
-import { Layout } from "plotly.js";
+import { useFetchTimeseriesTaskResultByTagAndParameter } from "@/client/chip/chip";
+import { useListChips } from "@/client/chip/chip";
+import { useFetchAllParameters } from "@/client/parameter/parameter";
+import { DataTable } from "@/shared/components/DataTable";
+import { PlotCard } from "@/shared/components/PlotCard";
+import { useCSVExport } from "@/shared/hooks/useCSVExport";
+import { useTimeRange } from "@/shared/hooks/useTimeRange";
+import { ErrorCard } from "@/shared/components/ErrorCard";
+import { useListAllTag } from "@/client/tag/tag";
 
 export function TimeSeriesView() {
   // URL state management

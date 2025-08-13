@@ -1,20 +1,24 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, Suspense } from "react";
+
+import { FaExternalLinkAlt } from "react-icons/fa";
+import JsonView from "react18-json-view";
+
+import { ExecutionStats } from "./components/ExecutionStats";
+
+import type { ExecutionResponseSummary } from "@/schemas";
+
+import { ChipSelector } from "@/app/components/ChipSelector";
+import { DateSelector } from "@/app/components/DateSelector";
+import { TaskFigure } from "@/app/components/TaskFigure";
+import { useDateNavigation } from "@/app/hooks/useDateNavigation";
+import { useExecutionUrlState } from "@/app/hooks/useUrlState";
 import {
   useListExecutionsByChipId,
   useFetchExecutionByChipId,
   useListChips,
 } from "@/client/chip/chip";
-import { ExecutionResponseSummary } from "@/schemas";
-import JsonView from "react18-json-view";
-import { FaExternalLinkAlt } from "react-icons/fa";
-import { ChipSelector } from "@/app/components/ChipSelector";
-import { DateSelector } from "@/app/components/DateSelector";
-import { useDateNavigation } from "@/app/hooks/useDateNavigation";
-import { ExecutionStats } from "./components/ExecutionStats";
-import { TaskFigure } from "@/app/components/TaskFigure";
-import { useExecutionUrlState } from "@/app/hooks/useUrlState";
 
 function ExecutionPageContent() {
   // URL state management

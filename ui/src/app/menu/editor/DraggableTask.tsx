@@ -1,7 +1,8 @@
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { TaskResponse } from "@/schemas";
 import { BsArrowRight } from "react-icons/bs";
+
+import type { TaskResponse } from "@/schemas";
 
 interface DraggableTaskProps {
   task: TaskResponse;

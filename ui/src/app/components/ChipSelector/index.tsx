@@ -1,8 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
+
+import Select from "react-select";
+
+import type { SingleValue } from "react-select";
+
 import { useListChips } from "@/client/chip/chip";
-import Select, { SingleValue } from "react-select";
 
 interface ChipOption {
   value: string;

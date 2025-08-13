@@ -1,5 +1,6 @@
+import type { TimeRangeState } from "../types";
+
 import { DateTimePicker } from "@/app/components/DateTimePicker";
-import { TimeRangeState } from "../types";
 
 interface TimeRangeControlsProps {
   timeRange: TimeRangeState;

@@ -1,21 +1,25 @@
 "use client";
 
 import { useMemo } from "react";
-import { Layout } from "plotly.js";
-import { ParameterSelector } from "@/app/components/ParameterSelector";
-import { TagSelector } from "@/app/components/TagSelector";
-import { useTimeRange } from "@/shared/hooks/useTimeRange";
+
 import {
   useQubitTimeseries,
   useQubitParameters,
 } from "../hooks/useQubitTimeseries";
-import { useCSVExport } from "@/shared/hooks/useCSVExport";
-import { useQubitTimeSeriesUrlState } from "@/app/hooks/useUrlState";
+
 import { TimeRangeControls } from "./TimeRangeControls";
-import { PlotCard } from "@/shared/components/PlotCard";
+
+import type { ParameterKey, TagKey } from "../types";
+import type { Layout } from "plotly.js";
+
+import { ParameterSelector } from "@/app/components/ParameterSelector";
+import { TagSelector } from "@/app/components/TagSelector";
+import { useQubitTimeSeriesUrlState } from "@/app/hooks/useUrlState";
 import { DataTable } from "@/shared/components/DataTable";
 import { ErrorCard } from "@/shared/components/ErrorCard";
-import { ParameterKey, TagKey } from "../types";
+import { PlotCard } from "@/shared/components/PlotCard";
+import { useCSVExport } from "@/shared/hooks/useCSVExport";
+import { useTimeRange } from "@/shared/hooks/useTimeRange";
 
 interface QubitTimeSeriesViewProps {
   chipId: string;

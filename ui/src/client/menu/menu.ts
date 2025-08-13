@@ -6,6 +6,21 @@
  * OpenAPI spec version: 0.0.1
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
+
+import { customInstance } from "../../lib/custom-instance";
+
+import type { ErrorType, BodyType } from "../../lib/custom-instance";
+import type {
+  CreateMenuRequest,
+  CreateMenuResponse,
+  DeleteMenuResponse,
+  Detail,
+  GetMenuResponse,
+  HTTPValidationError,
+  ListMenuResponse,
+  UpdateMenuRequest,
+  UpdateMenuResponse,
+} from "../../schemas";
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -20,21 +35,6 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
-
-import type {
-  CreateMenuRequest,
-  CreateMenuResponse,
-  DeleteMenuResponse,
-  Detail,
-  GetMenuResponse,
-  HTTPValidationError,
-  ListMenuResponse,
-  UpdateMenuRequest,
-  UpdateMenuResponse,
-} from "../../schemas";
-
-import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType, BodyType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 

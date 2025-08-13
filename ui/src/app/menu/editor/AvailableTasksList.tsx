@@ -1,5 +1,6 @@
-import { TaskResponse } from "@/schemas";
 import DraggableTask from "./DraggableTask";
+
+import type { TaskResponse } from "@/schemas";
 
 interface AvailableTasksListProps {
   tasks: TaskResponse[];

@@ -1,8 +1,10 @@
 "use client";
 
 import { BsPlus } from "react-icons/bs";
-import type { MenuModel } from "@/schemas";
+
 import { ScheduleDisplay } from "./ScheduleDisplay";
+
+import type { MenuModel } from "@/schemas";
 
 interface MenuConfirmModalProps {
   menu: MenuModel;
