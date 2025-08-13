@@ -699,9 +699,7 @@ def fetch_historical_qubit_task_grouped_by_chip(
     response_model_exclude_none=True,
 )
 def fetch_latest_qubit_task_grouped_by_chip(
-    chip_id: str, 
-    task_name: str, 
-    current_user: Annotated[User, Depends(get_current_active_user)]
+    chip_id: str, task_name: str, current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> LatestTaskGroupedByChipResponse:
     """Fetch latest qubit task results with optional defensive outlier filtering."""
     logger.debug(f"Fetching qubit tasks for chip {chip_id}, user: {current_user.username}")

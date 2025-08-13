@@ -17,9 +17,7 @@
   "paths": {
     "/api/calibration/note": {
       "get": {
-        "tags": [
-          "calibration"
-        ],
+        "tags": ["calibration"],
         "summary": "Fetches all the cron schedules.",
         "description": "Get the calibration note.",
         "operationId": "listCronSchedules",
@@ -39,9 +37,7 @@
     },
     "/api/calibration/cron-schedule": {
       "get": {
-        "tags": [
-          "calibration"
-        ],
+        "tags": ["calibration"],
         "summary": "Fetches all the cron schedules.",
         "description": "List all the cron schedules.",
         "operationId": "listCronSchedules",
@@ -59,9 +55,7 @@
         }
       },
       "post": {
-        "tags": [
-          "calibration"
-        ],
+        "tags": ["calibration"],
         "summary": "Schedules a calibration with cron.",
         "description": "Schedule a calibration.",
         "operationId": "scheduleCronCalib",
@@ -101,9 +95,7 @@
     },
     "/api/calibration": {
       "post": {
-        "tags": [
-          "calibration"
-        ],
+        "tags": ["calibration"],
         "summary": "Executes a calibration by creating a flow run from a deployment.",
         "description": "Create a flow run from a deployment.",
         "operationId": "execute_calib",
@@ -143,9 +135,7 @@
     },
     "/api/calibration/schedule": {
       "get": {
-        "tags": [
-          "calibration"
-        ],
+        "tags": ["calibration"],
         "summary": "Fetches all the calibration schedules.",
         "description": "Fetch all the calibration schedules.",
         "operationId": "fetch_all_calib_schedule",
@@ -167,9 +157,7 @@
         }
       },
       "post": {
-        "tags": [
-          "calibration"
-        ],
+        "tags": ["calibration"],
         "summary": "Schedules a calibration.",
         "description": "Schedule a calibration.",
         "operationId": "schedule_calib",
@@ -209,9 +197,7 @@
     },
     "/api/calibration/schedule/{flow_run_id}": {
       "delete": {
-        "tags": [
-          "calibration"
-        ],
+        "tags": ["calibration"],
         "summary": "Deletes a calibration schedule.",
         "description": "Delete a calibration schedule.",
         "operationId": "delete_calib_schedule",
@@ -250,9 +236,7 @@
     },
     "/api/menu": {
       "get": {
-        "tags": [
-          "menu"
-        ],
+        "tags": ["menu"],
         "summary": "Retrieve a list of menu items.",
         "description": "Retrieve a list of menu items.\n\nReturns\n-------\n    ListMenuResponse: A response containing the list of menu items.",
         "operationId": "list_menu",
@@ -270,9 +254,7 @@
         }
       },
       "post": {
-        "tags": [
-          "menu"
-        ],
+        "tags": ["menu"],
         "summary": "Create a new menu item.",
         "description": "Create a new menu item.\n\nArgs:\n----\n    request (CreateMenuRequest): The request object containing the menu item details.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    CreateMenuResponse: The response object containing the name of the created menu item.",
         "operationId": "create_menu",
@@ -312,9 +294,7 @@
     },
     "/api/menu/preset": {
       "get": {
-        "tags": [
-          "menu"
-        ],
+        "tags": ["menu"],
         "summary": "Retrieve a list of preset menu items.",
         "description": "Retrieve a list of preset menu items.\n\nReturns\n-------\n    ListMenuResponse: A response containing the list of preset menu items.",
         "operationId": "listPreset",
@@ -344,9 +324,7 @@
     },
     "/api/menu/{name}": {
       "get": {
-        "tags": [
-          "menu"
-        ],
+        "tags": ["menu"],
         "summary": "Retrieve a menu by its name.",
         "description": "Retrieve a menu by its name.\n\nArgs:\n----\n    name (str): The name of the menu.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    GetMenuResponse: The response containing the menu details.\n\nRaises:\n------\n    InternalServerError: If there is an error retrieving the menu.\n    NotFoundErrorResponse: If the menu is not found.",
         "operationId": "get_menu_by_name",
@@ -395,9 +373,7 @@
         }
       },
       "put": {
-        "tags": [
-          "menu"
-        ],
+        "tags": ["menu"],
         "summary": "Update a menu with the given name.",
         "description": "Update a menu with the given name.\n\nArgs:\n----\n    name (str): The name of the menu to update.\n    req (UpdateMenuRequest): The request object containing the updated menu data.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    Union[UpdateMenuResponse, NotFoundErrorResponse]: The response object indicating the success of the update or an error if the menu is not found.",
         "operationId": "update_menu",
@@ -456,9 +432,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "menu"
-        ],
+        "tags": ["menu"],
         "summary": "Delete a menu by its name.",
         "description": "Delete a menu by its name.\n\nArgs:\n----\n    name (str): The name of the menu to be deleted.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    DeleteMenuResponse | NotFoundErrorResponse: The response indicating the success or failure of the deletion.",
         "operationId": "delete_menu",
@@ -509,9 +483,7 @@
     },
     "/api/settings": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Get settings",
         "description": "Get settings from the server",
         "operationId": "fetch_config",
@@ -531,9 +503,7 @@
     },
     "/api/executions/figure": {
       "get": {
-        "tags": [
-          "execution"
-        ],
+        "tags": ["execution"],
         "summary": "Fetches a calibration figure by its path",
         "description": "Fetch a calibration figure by its path.",
         "operationId": "fetchFigureByPath",
@@ -577,9 +547,7 @@
     },
     "/api/executions/lock_status": {
       "get": {
-        "tags": [
-          "execution"
-        ],
+        "tags": ["execution"],
         "summary": "Fetches the status of a calibration.",
         "description": "Fetch the status of the execution lock.",
         "operationId": "fetchExecutionLockStatus",
@@ -599,9 +567,7 @@
     },
     "/api/chip": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch all chips",
         "description": "Fetch all chips.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nlist[ChipResponse]\n    List of available chips",
         "operationId": "listChips",
@@ -630,9 +596,7 @@
     },
     "/api/chip/{chip_id}/dates": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch available dates for a chip",
         "description": "Fetch available dates for a chip from execution counter.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nlist[str]\n    List of available dates in ISO format",
         "operationId": "fetchChipDates",
@@ -673,9 +637,7 @@
     },
     "/api/chip/{chip_id}": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch a chip",
         "description": "Fetch a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Chip information",
         "operationId": "fetchChip",
@@ -716,9 +678,7 @@
     },
     "/api/chip/{chip_id}/execution": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch executions",
         "description": "Fetch all executions for a given chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch executions for\ncurrent_user : str\n    Current user ID from authentication\n\nReturns\n-------\nlist[ExecutionResponseSummary]\n    List of executions for the chip",
         "operationId": "listExecutionsByChipId",
@@ -763,9 +723,7 @@
     },
     "/api/chip/{chip_id}/execution/{execution_id}": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch an execution by its ID",
         "description": "Return the execution detail by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nexecution_id : str\n    ID of the execution to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
         "operationId": "fetchExecutionByChipId",
@@ -815,9 +773,7 @@
     },
     "/api/chip/{chip_id}/mux/{mux_id}": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch the multiplexer details",
         "description": "Fetch the multiplexer details.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmux_id : int\n    ID of the multiplexer\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nMuxDetailResponse\n    Multiplexer details",
         "operationId": "fetchMuxDetails",
@@ -867,9 +823,7 @@
     },
     "/api/chip/{chip_id}/mux": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch the multiplexers",
         "description": "Fetch the multiplexers.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListMuxResponse\n    Multiplexdetails",
         "operationId": "listMuxes",
@@ -910,9 +864,7 @@
     },
     "/api/chip/{chip_id}/task/qubit/{task_name}/history/{recorded_date}": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch historical task results",
         "description": "Fetch historical task results for a specific date.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ntask_name : str\n    Name of the task to fetch\nrecorded_date : str\n    Date to fetch history for (ISO format YYYY-MM-DD)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskGroupedByChipResponse\n    Historical task results for all qubits on the specified date",
         "operationId": "fetchHistoricalQubitTaskGroupedByChip",
@@ -971,9 +923,7 @@
     },
     "/api/chip/{chip_id}/task/qubit/{task_name}": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch latest qubit task results with optional outlier filtering",
         "description": "Fetch latest qubit task results with optional defensive outlier filtering.",
         "operationId": "fetchLatestQubitTaskGroupedByChip",
@@ -1023,9 +973,7 @@
     },
     "/api/chip/{chip_id}/task/coupling/{task_name}/history/{recorded_date}": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch historical task results",
         "description": "Fetch historical task results for a specific date.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ntask_name : str\n    Name of the task to fetch\nrecorded_date : str\n    Date to fetch history for (ISO format YYYY-MM-DD)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskGroupedByChipResponse\n    Historical task results for all qubits on the specified date",
         "operationId": "fetchHistoricalCouplingTaskGroupedByChip",
@@ -1084,9 +1032,7 @@
     },
     "/api/chip/{chip_id}/task/coupling/{task_name}": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch the multiplexers",
         "description": "Fetch the multiplexers.",
         "operationId": "fetchLatestCouplingTaskGroupedByChip",
@@ -1136,9 +1082,7 @@
     },
     "/api/chip/{chip_id}/parameter/{parameter}/qid/{qid}": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch the timeseries task result by tag and parameter for a specific qid",
         "description": "Fetch the timeseries task result by tag and parameter for a specific qid.\n\nReturns\n-------\n    TimeSeriesData: Time series data for the specified qid.",
         "operationId": "fetchTimeseriesTaskResultByTagAndParameterAndQid",
@@ -1224,9 +1168,7 @@
     },
     "/api/chip/{chip_id}/parameter/{parameter}": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Fetch the timeseries task result by tag and parameter for all qids",
         "description": "Fetch the timeseries task result by tag and parameter for all qids.\n\nReturns\n-------\n    TimeSeriesData: Time series data for all qids.",
         "operationId": "fetchTimeseriesTaskResultByTagAndParameter",
@@ -1303,9 +1245,7 @@
     },
     "/api/file/raw_data": {
       "get": {
-        "tags": [
-          "file"
-        ],
+        "tags": ["file"],
         "summary": "download file",
         "description": "Download a file.",
         "operationId": "downloadFile",
@@ -1339,9 +1279,7 @@
     },
     "/api/file/zip": {
       "get": {
-        "tags": [
-          "file"
-        ],
+        "tags": ["file"],
         "summary": "download file or directory as zip",
         "description": "Download a file or directory as zip.",
         "operationId": "downloadZipFile",
@@ -1375,10 +1313,7 @@
     },
     "/api/auth/login": {
       "post": {
-        "tags": [
-          "auth",
-          "authentication"
-        ],
+        "tags": ["auth", "authentication"],
         "summary": "Login",
         "description": "Login endpoint to authenticate user and return username.",
         "operationId": "auth-login",
@@ -1425,10 +1360,7 @@
     },
     "/api/auth/register": {
       "post": {
-        "tags": [
-          "auth",
-          "authentication"
-        ],
+        "tags": ["auth", "authentication"],
         "summary": "Register User",
         "description": "Register a new user.",
         "operationId": "auth-register_user",
@@ -1471,10 +1403,7 @@
     },
     "/api/auth/me": {
       "get": {
-        "tags": [
-          "auth",
-          "authentication"
-        ],
+        "tags": ["auth", "authentication"],
         "summary": "Read Users Me",
         "description": "Get current user information.",
         "operationId": "auth-read_users_me",
@@ -1497,10 +1426,7 @@
     },
     "/api/auth/logout": {
       "post": {
-        "tags": [
-          "auth",
-          "authentication"
-        ],
+        "tags": ["auth", "authentication"],
         "summary": "Logout",
         "description": "Logout endpoint.\n\nThis endpoint doesn't need to do anything on the backend since the username is managed client-side.\nThe client will remove the username from cookies.",
         "operationId": "auth-logout",
@@ -1527,9 +1453,7 @@
     },
     "/api/tasks": {
       "get": {
-        "tags": [
-          "task"
-        ],
+        "tags": ["task"],
         "summary": "Fetch all tasks",
         "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n    backend (Optional[str]): Optional backend name to filter tasks by.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
         "operationId": "fetch_all_tasks",
@@ -1579,9 +1503,7 @@
     },
     "/api/parameter": {
       "get": {
-        "tags": [
-          "parameter"
-        ],
+        "tags": ["parameter"],
         "summary": "Fetch all parameters",
         "description": "Fetch all parameters.\n\nArgs:\n----\n    current_user (User): The current user.\n\nReturns: ListParameterResponse\n-------",
         "operationId": "fetchAllParameters",
@@ -1601,9 +1523,7 @@
     },
     "/api/tag": {
       "get": {
-        "tags": [
-          "tag"
-        ],
+        "tags": ["tag"],
         "summary": "list all tag",
         "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n\nReturns:\n-------\n    ListTaskResponse: The list of tasks.",
         "operationId": "listAllTag",
@@ -1623,9 +1543,7 @@
     },
     "/api/device_topology": {
       "post": {
-        "tags": [
-          "device_topology"
-        ],
+        "tags": ["device_topology"],
         "summary": "Get the device topology",
         "description": "Get the device topology.",
         "operationId": "getDeviceTopology",
@@ -1665,9 +1583,7 @@
     },
     "/api/device_topology/plot": {
       "post": {
-        "tags": [
-          "device_topology"
-        ],
+        "tags": ["device_topology"],
         "summary": "Get the device topology plot",
         "description": "Get the device topology as a PNG image.",
         "operationId": "getDeviceTopologyPlot",
@@ -1700,9 +1616,7 @@
     },
     "/api/backend": {
       "get": {
-        "tags": [
-          "backend"
-        ],
+        "tags": ["backend"],
         "summary": "Get all backends",
         "description": "Retrieve a list of all registered backends",
         "operationId": "fetchAllBackends",
@@ -1744,10 +1658,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "username"
-        ],
+        "required": ["name", "username"],
         "title": "BackendResponseModel",
         "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
       },
@@ -1762,9 +1673,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "batch"
-        ],
+        "required": ["batch"],
         "title": "BatchNode",
         "description": "Batch node model."
       },
@@ -1780,10 +1689,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "username",
-          "password"
-        ],
+        "required": ["username", "password"],
         "title": "Body_auth-login"
       },
       "CalibrationNoteResponse": {
@@ -1832,9 +1738,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "data"
-        ],
+        "required": ["data"],
         "title": "ChipDatesResponse",
         "description": "Response model for chip dates."
       },
@@ -1868,9 +1772,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "chip_id"
-        ],
+        "required": ["chip_id"],
         "title": "ChipResponse",
         "description": "Chip is a Pydantic model that represents a chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    name (str): The name of the chip."
       },
@@ -1892,11 +1794,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "coupling_fidelity",
-          "qubit_fidelity",
-          "readout_fidelity"
-        ],
+        "required": ["coupling_fidelity", "qubit_fidelity", "readout_fidelity"],
         "title": "Condition",
         "description": "Condition for filtering device topology."
       },
@@ -1919,12 +1817,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "control",
-          "target",
-          "fidelity",
-          "gate_duration"
-        ],
+        "required": ["control", "target", "fidelity", "gate_duration"],
         "title": "Coupling",
         "description": "Coupling information."
       },
@@ -1936,9 +1829,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "rzx90"
-        ],
+        "required": ["rzx90"],
         "title": "CouplingGateDuration",
         "description": "Gate duration of the coupling."
       },
@@ -2026,13 +1917,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "chip_id",
-          "username",
-          "description",
-          "schedule"
-        ],
+        "required": ["name", "chip_id", "username", "description", "schedule"],
         "title": "CreateMenuRequest",
         "description": "CreateMenuRequest is a Pydantic model for creating a menu item.",
         "example": {
@@ -2041,15 +1926,8 @@
           "description": "This is a sample menu item.",
           "name": "CheckOneQubit",
           "notify_bool": false,
-          "qids": [
-            [
-              "28",
-              "29"
-            ]
-          ],
-          "tags": [
-            "debug"
-          ],
+          "qids": [["28", "29"]],
+          "tags": ["debug"],
           "tasks": [
             "CheckStatus",
             "DumpBox",
@@ -2073,9 +1951,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "title": "CreateMenuResponse",
         "description": "CreateMenuResponse is a Pydantic model for the create menu response."
       },
@@ -2087,9 +1963,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "title": "DeleteMenuResponse",
         "description": "DeleteMenuResponse is a Pydantic model for the delete menu response."
       },
@@ -2101,9 +1975,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "detail"
-        ],
+        "required": ["detail"],
         "title": "Detail",
         "description": "A simple message response.\n\nArgs:\n----\n    BaseModel: The base class for Pydantic models.\n\nAttributes:\n----------\n    message (str): The message to return."
       },
@@ -2165,14 +2037,7 @@
             },
             "type": "array",
             "title": "Qubits",
-            "default": [
-              "0",
-              "1",
-              "2",
-              "3",
-              "4",
-              "5"
-            ]
+            "default": ["0", "1", "2", "3", "4", "5"]
           },
           "exclude_couplings": {
             "items": {
@@ -2274,13 +2139,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "chip_id",
-          "username",
-          "description",
-          "schedule"
-        ],
+        "required": ["name", "chip_id", "username", "description", "schedule"],
         "title": "ExecuteCalibRequest",
         "description": "ExecuteCalibRequest is a subclass of MenuModel.",
         "examples": [
@@ -2290,14 +2149,8 @@
             "description": "check one qubit characteristics short",
             "name": "CheckRabi",
             "notify_bool": false,
-            "qids": [
-              [
-                "28"
-              ]
-            ],
-            "tags": [
-              "debug"
-            ],
+            "qids": [["28"]],
+            "tags": ["debug"],
             "task_details": {
               "CheckRabi": {
                 "description": "Task to check the Rabi oscillation.",
@@ -2317,11 +2170,7 @@
                   "time_range": {
                     "description": "Time range for Rabi oscillation",
                     "unit": "ns",
-                    "value": [
-                      0,
-                      201,
-                      4
-                    ],
+                    "value": [0, 201, 4],
                     "value_type": "range"
                   }
                 },
@@ -2340,9 +2189,7 @@
                 "username": "admin"
               }
             },
-            "tasks": [
-              "CheckRabi"
-            ],
+            "tasks": ["CheckRabi"],
             "username": "admin"
           }
         ]
@@ -2359,10 +2206,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "flow_run_url",
-          "qdash_ui_url"
-        ],
+        "required": ["flow_run_url", "qdash_ui_url"],
         "title": "ExecuteCalibResponse",
         "description": "ExecuteCalibResponse is a subclass of BaseModel."
       },
@@ -2374,9 +2218,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "lock"
-        ],
+        "required": ["lock"],
         "title": "ExecutionLockStatusResponse",
         "description": "Response model for the fetch_execution_lock_status endpoint."
       },
@@ -2498,10 +2340,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "min",
-          "max"
-        ],
+        "required": ["min", "max"],
         "title": "FidelityCondition",
         "description": "Condition for fidelity filtering."
       },
@@ -2589,13 +2428,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "chip_id",
-          "username",
-          "description",
-          "schedule"
-        ],
+        "required": ["name", "chip_id", "username", "description", "schedule"],
         "title": "GetMenuResponse",
         "description": "GetMenuResponse is a Pydantic model for the get menu response."
       },
@@ -2677,10 +2510,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "task_name",
-          "result"
-        ],
+        "required": ["task_name", "result"],
         "title": "LatestTaskGroupedByChipResponse",
         "description": "ChipTaskResponse is a Pydantic model that represents the response for fetching the tasks of a chip."
       },
@@ -2695,9 +2525,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "schedules"
-        ],
+        "required": ["schedules"],
         "title": "ListCronScheduleResponse",
         "description": "ListCronScheduleResponse is a subclass of BaseModel."
       },
@@ -2712,9 +2540,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "menus"
-        ],
+        "required": ["menus"],
         "title": "ListMenuResponse",
         "description": "ListMenuResponse is a Pydantic model that represents a menu item."
       },
@@ -2729,9 +2555,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "muxes"
-        ],
+        "required": ["muxes"],
         "title": "ListMuxResponse",
         "description": "ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers."
       },
@@ -2746,9 +2570,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "parameters"
-        ],
+        "required": ["parameters"],
         "title": "ListParameterResponse",
         "description": "Response model for a list of parameters."
       },
@@ -2763,9 +2585,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "tags"
-        ],
+        "required": ["tags"],
         "title": "ListTagResponse",
         "description": "Response model for a list of tasks."
       },
@@ -2780,9 +2600,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "tasks"
-        ],
+        "required": ["tasks"],
         "title": "ListTaskResponse",
         "description": "Response model for a list of tasks."
       },
@@ -2894,13 +2712,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "chip_id",
-          "username",
-          "description",
-          "schedule"
-        ],
+        "required": ["name", "chip_id", "username", "description", "schedule"],
         "title": "MenuModel",
         "description": "Menu model.\n\nAttributes\n----------\n    name (str): The name of the menu.\n    username (str): The username of the user who created\n    description (str): Detailed description of the menu.\n    cal_plan (list[list[int]]): The calibration plan.\n    notify_bool (bool): The notification boolean.\n    tasks (list[str]): The tasks.\n    tags (list[str]): The tags."
       },
@@ -2922,10 +2734,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "mux_id",
-          "detail"
-        ],
+        "required": ["mux_id", "detail"],
         "title": "MuxDetailResponse",
         "description": "MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details."
       },
@@ -3058,9 +2867,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "parallel"
-        ],
+        "required": ["parallel"],
         "title": "ParallelNode",
         "description": "Parallel node model."
       },
@@ -3090,10 +2897,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "username",
-          "name"
-        ],
+        "required": ["username", "name"],
         "title": "ParameterModel",
         "description": "Data model for a parameter.\n\nAttributes\n----------\n    name (str): The name of the parameter.\n    unit (str): The unit of the parameter.\n    description (str): Detailed description of the parameter."
       },
@@ -3109,10 +2913,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "x",
-          "y"
-        ],
+        "required": ["x", "y"],
         "title": "Position",
         "description": "Position of the qubit on the device."
       },
@@ -3172,11 +2973,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "rz",
-          "sx",
-          "x"
-        ],
+        "required": ["rz", "sx", "x"],
         "title": "QubitGateDuration",
         "description": "Gate duration of the qubit."
       },
@@ -3192,10 +2989,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "t1",
-          "t2"
-        ],
+        "required": ["t1", "t2"],
         "title": "QubitLifetime",
         "description": "Qubit lifetime of the qubit."
       },
@@ -3211,10 +3005,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "menu_name",
-          "scheduled"
-        ],
+        "required": ["menu_name", "scheduled"],
         "title": "ScheduleCalibRequest",
         "description": "ScheduleCalibRequest is a subclass of BaseModel."
       },
@@ -3282,11 +3073,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "scheduler_name",
-          "menu_name",
-          "cron"
-        ],
+        "required": ["scheduler_name", "menu_name", "cron"],
         "title": "ScheduleCronCalibRequest",
         "description": "ScheduleCronCalibRequest is a subclass of BaseModel."
       },
@@ -3311,11 +3098,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "scheduler_name",
-          "menu_name",
-          "cron"
-        ],
+        "required": ["scheduler_name", "menu_name", "cron"],
         "title": "ScheduleCronCalibResponse",
         "description": "ScheduleCronCalibResponse is a subclass of BaseModel."
       },
@@ -3343,9 +3126,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "serial"
-        ],
+        "required": ["serial"],
         "title": "SerialNode",
         "description": "Serial node model."
       },
@@ -3472,9 +3253,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "title": "Tag",
         "description": "Response model for a task."
       },
@@ -3838,13 +3617,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "chip_id",
-          "username",
-          "description",
-          "schedule"
-        ],
+        "required": ["name", "chip_id", "username", "description", "schedule"],
         "title": "UpdateMenuRequest",
         "description": "UpdateMenuRequest is a Pydantic model for updating a menu item."
       },
@@ -3856,9 +3629,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "title": "UpdateMenuResponse",
         "description": "UpdateMenuResponse is a Pydantic model for the update menu response."
       },
@@ -3892,9 +3663,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "username"
-        ],
+        "required": ["username"],
         "title": "User",
         "description": "User model for authentication and user management."
       },
@@ -3921,10 +3690,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "username",
-          "password"
-        ],
+        "required": ["username", "password"],
         "title": "UserCreate",
         "description": "User creation model for registration."
       },
@@ -3954,11 +3720,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
+        "required": ["loc", "msg", "type"],
         "title": "ValidationError"
       }
     },
