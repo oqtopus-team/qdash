@@ -51,7 +51,7 @@ class CheckSkew(BaseTask):
         from qubex import Experiment
 
         exp = Experiment(
-            chip_id="64Q",
+            chip_id=chip_id,
             muxes=self.input_parameters["muxes"].get_value(),
             config_dir=f"/app/config/qubex/{chip_id}/config",
             params_dir=f"/app/config/qubex/{chip_id}/params",
