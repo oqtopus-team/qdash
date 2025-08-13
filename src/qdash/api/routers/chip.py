@@ -883,7 +883,8 @@ def fetch_historical_coupling_task_grouped_by_chip(
             task_result = Task(name=task_name, default_view=False)
         results[qid] = task_result
 
-    return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+    response = LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+    return response_processor.process_task_response(response, task_name)
 
 
 @router.get(
@@ -958,7 +959,8 @@ def fetch_latest_coupling_task_grouped_by_chip(
             task_result = Task(name=task_name, default_view=False)
         results[qid] = task_result
 
-    return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+    response = LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+    return response_processor.process_task_response(response, task_name)
 
 
 class TimeSeriesProjection(BaseModel):

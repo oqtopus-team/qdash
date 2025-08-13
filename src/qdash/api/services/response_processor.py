@@ -74,15 +74,42 @@ class ResponseProcessor:
         
         if outlier_result.outlier_count > 0:
             logger.info(f"Applying automatic outlier filtering for {task_name}")
-            # Remove outliers from results - silent data correction
+            # Set outlier parameter values to None instead of removing data
             filtered_results = results.copy()
+            
+            # Get parameter name for this task
+            parameter_name = self._get_parameter_name_for_task(task_name)
+            
             for outlier_qid in outlier_result.outlier_qids:
-                if outlier_qid in filtered_results:
-                    logger.info(f"Automatically filtered outlier QID: {outlier_qid} (silent data correction)")
-                    del filtered_results[outlier_qid]
+                if outlier_qid in filtered_results and parameter_name:
+                    task = filtered_results[outlier_qid]
+                    if hasattr(task, 'output_parameters') and task.output_parameters:
+                        if parameter_name in task.output_parameters:
+                            # Set the outlier parameter value to None
+                            task.output_parameters[parameter_name] = None
+                            logger.info(f"Set outlier parameter {parameter_name} to None for QID: {outlier_qid}")
             return filtered_results
         
         return results
+    
+    def _get_parameter_name_for_task(self, task_name: str) -> str:
+        """Get the parameter name for a given task."""
+        parameter_mapping = {
+            "CheckRamsey": "t2_star",
+            "Ramsey": "t2_star",
+            "T2Star": "t2_star",
+            "CheckT2Echo": "t2_echo",
+            "T2Echo": "t2_echo",
+            "CheckT1": "t1",
+            "T1": "t1",
+            "X90InterleavedRandomizedBenchmarking": "x90_gate_fidelity",
+            "X180InterleavedRandomizedBenchmarking": "x180_gate_fidelity",
+            "ZX90InterleavedRandomizedBenchmarking": "zx90_gate_fidelity",
+            "RandomizedBenchmarking": "average_gate_fidelity",
+            "ReadoutClassification": "average_readout_fidelity",
+            "CheckBellStateTomography": "bell_state_fidelity",
+        }
+        return parameter_mapping.get(task_name, "")
 
 
 # Global instance for use across routers
