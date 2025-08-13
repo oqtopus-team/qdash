@@ -221,7 +221,7 @@ src/qdash/workflow/.system_note.json
 src/qdash/workflow/*.json
 src/qdash/workflow/.calibration/*.json
 src/qdash/workflow/.classifier/*/*
-config
+/config
 src/tools/schedule/*
 .serena/cache/*
 .mcp.json
