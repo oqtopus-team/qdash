@@ -924,8 +924,8 @@
     "/api/chip/{chip_id}/task/qubit/{task_name}": {
       "get": {
         "tags": ["chip"],
-        "summary": "Fetch the multiplexers",
-        "description": "Fetch the multiplexers.",
+        "summary": "Fetch latest qubit task results with optional outlier filtering",
+        "description": "Fetch latest qubit task results with optional defensive outlier filtering.",
         "operationId": "fetchLatestQubitTaskGroupedByChip",
         "parameters": [
           {
@@ -2497,6 +2497,16 @@
             },
             "type": "object",
             "title": "Result"
+          },
+          "outlier_detection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutlierDetectionMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -2727,6 +2737,62 @@
         "required": ["mux_id", "detail"],
         "title": "MuxDetailResponse",
         "description": "MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details."
+      },
+      "OutlierDetectionMetadata": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameters"
+          },
+          "original_count": {
+            "type": "integer",
+            "title": "Original Count"
+          },
+          "filtered_count": {
+            "type": "integer",
+            "title": "Filtered Count"
+          },
+          "outlier_count": {
+            "type": "integer",
+            "title": "Outlier Count"
+          },
+          "outlier_qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Outlier Qids"
+          },
+          "physical_violations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Physical Violations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "method",
+          "parameters",
+          "original_count",
+          "filtered_count",
+          "outlier_count",
+          "outlier_qids",
+          "physical_violations"
+        ],
+        "title": "OutlierDetectionMetadata",
+        "description": "Metadata about outlier detection applied to the data."
       },
       "OutputParameterModel": {
         "properties": {
@@ -3136,6 +3202,29 @@
             "type": "integer",
             "title": "Ui Port",
             "default": 5714
+          },
+          "slack_app_token": {
+            "type": "string",
+            "title": "Slack App Token"
+          },
+          "openai_api_key": {
+            "type": "string",
+            "title": "Openai Api Key"
+          },
+          "openai_model": {
+            "type": "string",
+            "title": "Openai Model",
+            "default": "gpt-4o-mini"
+          },
+          "agent_max_steps": {
+            "type": "integer",
+            "title": "Agent Max Steps",
+            "default": 10
+          },
+          "log_level": {
+            "type": "string",
+            "title": "Log Level",
+            "default": "INFO"
           }
         },
         "additionalProperties": false,
@@ -3149,7 +3238,9 @@
           "postgres_data_path",
           "mongo_data_path",
           "calib_data_path",
-          "qpu_data_path"
+          "qpu_data_path",
+          "slack_app_token",
+          "openai_api_key"
         ],
         "title": "Settings",
         "description": "Settings for the QDash application."

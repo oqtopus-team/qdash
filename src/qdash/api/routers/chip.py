@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, field_validator
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
 from qdash.api.schemas.auth import User
+from qdash.api.services.response_processor import response_processor
 from qdash.datamodel.task import OutputParameterModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
@@ -640,7 +641,7 @@ def fetch_historical_qubit_task_grouped_by_chip(
         .run()
     )
     fidelity_map = {}
-    for k, v in chip.couplings.items():
+    for k, v in chip.qubits.items():
         fidelity_data = v.data.get("x90_gate_fidelity", {})
         value = fidelity_data.get("value", 0.0)
         calibrated_at_str = fidelity_data.get("calibrated_at")
@@ -686,12 +687,13 @@ def fetch_historical_qubit_task_grouped_by_chip(
             task_result = Task(name=task_name)
         results[qid] = task_result
 
-    return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+    response = LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+    return response_processor.process_task_response(response, task_name)
 
 
 @router.get(
     "/chip/{chip_id}/task/qubit/{task_name}",
-    summary="Fetch the multiplexers",
+    summary="Fetch latest qubit task results with optional outlier filtering",
     operation_id="fetchLatestQubitTaskGroupedByChip",
     response_model=LatestTaskGroupedByChipResponse,
     response_model_exclude_none=True,
@@ -699,8 +701,8 @@ def fetch_historical_qubit_task_grouped_by_chip(
 def fetch_latest_qubit_task_grouped_by_chip(
     chip_id: str, task_name: str, current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> LatestTaskGroupedByChipResponse:
-    """Fetch the multiplexers."""
-    logger.debug(f"Fetching muxes for chip {chip_id}, user: {current_user.username}")
+    """Fetch latest qubit task results with optional defensive outlier filtering."""
+    logger.debug(f"Fetching qubit tasks for chip {chip_id}, user: {current_user.username}")
 
     # Get chip info
     chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
@@ -760,7 +762,8 @@ def fetch_latest_qubit_task_grouped_by_chip(
             task_result = Task(name=task_name)
         results[qid] = task_result
 
-    return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+    response = LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+    return response_processor.process_task_response(response, task_name)
 
 
 @router.get(
@@ -878,7 +881,8 @@ def fetch_historical_coupling_task_grouped_by_chip(
             task_result = Task(name=task_name, default_view=False)
         results[qid] = task_result
 
-    return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+    response = LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+    return response_processor.process_task_response(response, task_name)
 
 
 @router.get(
@@ -953,7 +957,8 @@ def fetch_latest_coupling_task_grouped_by_chip(
             task_result = Task(name=task_name, default_view=False)
         results[qid] = task_result
 
-    return LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+    response = LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
+    return response_processor.process_task_response(response, task_name)
 
 
 class TimeSeriesProjection(BaseModel):

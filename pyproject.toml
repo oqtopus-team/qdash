@@ -90,6 +90,7 @@ api = [
     "numpy>=1.26.0,<1.27.0",
     "matplotlib>=3.8.0",
     "networkx>=3.4.2",
+    "scipy>=1.15.3",
 ]
 workflow = [
     "pymongo==4.8.0",

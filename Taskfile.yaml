@@ -13,10 +13,9 @@ tasks:
     dir: ui
     dotenv: [.env]
     cmds:
-      - curl $NEXT_PUBLIC_API_URL/openapi.json | jq > ../docs/oas/openapi.json
+      - curl http://api:$API_PORT/openapi.json | jq > ../docs/oas/openapi.json
       - bunx orval --config ./orval.config.cjs
-      - bunx prettier . --write
-      - bunx eslint . --fix -c eslint.config.js
+      - task fmt-ui
     desc: Generate the TypeScript client
 
   generate-python-client:
