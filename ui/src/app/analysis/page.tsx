@@ -3,15 +3,16 @@
 import { Suspense } from "react";
 import { TimeSeriesView } from "./components/TimeSeriesView";
 import { CorrelationView } from "./components/CorrelationView";
-import { CumulativeView } from "./components/CumulativeView";
+import { CDFView } from "./components/CDFView";
+import { HistogramView } from "./components/HistogramView";
 import { useAnalysisUrlState } from "@/app/hooks/useUrlState";
 
-type AnalyzeView = "correlation" | "timeseries" | "cumulative";
+type AnalyzeView = "timeseries" | "histogram" | "cdf" | "correlation";
 
 function AnalyzePageContent() {
   // URL state management for view type
   const { analysisViewType, setAnalysisViewType } = useAnalysisUrlState();
-  const currentView = (analysisViewType || "correlation") as AnalyzeView;
+  const currentView = (analysisViewType || "timeseries") as AnalyzeView;
   const setCurrentView = (view: string) => {
     setAnalysisViewType(view);
   };
@@ -36,14 +37,6 @@ function AnalyzePageContent() {
         <div className="tabs tabs-boxed w-fit gap-2 p-2">
           <button
             className={`tab ${
-              currentView === "correlation" ? "tab-active" : ""
-            }`}
-            onClick={() => setCurrentView("correlation")}
-          >
-            Parameter Correlation
-          </button>
-          <button
-            className={`tab ${
               currentView === "timeseries" ? "tab-active" : ""
             }`}
             onClick={() => setCurrentView("timeseries")}
@@ -52,20 +45,38 @@ function AnalyzePageContent() {
           </button>
           <button
             className={`tab ${
-              currentView === "cumulative" ? "tab-active" : ""
+              currentView === "histogram" ? "tab-active" : ""
             }`}
-            onClick={() => setCurrentView("cumulative")}
+            onClick={() => setCurrentView("histogram")}
           >
-            Cumulative Plot
+            Histogram
+          </button>
+          <button
+            className={`tab ${
+              currentView === "cdf" ? "tab-active" : ""
+            }`}
+            onClick={() => setCurrentView("cdf")}
+          >
+            CDF
+          </button>
+          <button
+            className={`tab ${
+              currentView === "correlation" ? "tab-active" : ""
+            }`}
+            onClick={() => setCurrentView("correlation")}
+          >
+            Parameter Correlation
           </button>
         </div>
 
-        {currentView === "correlation" ? (
-          <CorrelationView />
-        ) : currentView === "timeseries" ? (
+        {currentView === "timeseries" ? (
           <TimeSeriesView />
+        ) : currentView === "histogram" ? (
+          <HistogramView />
+        ) : currentView === "cdf" ? (
+          <CDFView />
         ) : (
-          <CumulativeView />
+          <CorrelationView />
         )}
       </div>
     </div>

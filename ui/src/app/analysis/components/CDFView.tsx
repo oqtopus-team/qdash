@@ -15,7 +15,7 @@ import { useCSVExport } from "@/shared/hooks/useCSVExport";
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { DateSelector } from "@/app/components/DateSelector";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
-import { useCumulativeUrlState } from "@/app/hooks/useUrlState";
+import { useCDFUrlState } from "@/app/hooks/useUrlState";
 import Select from "react-select";
 
 // Task names and types mapping
@@ -141,7 +141,7 @@ interface CumulativeDataPoint {
   r2?: number; // R-squared for fit quality (RB tasks)
 }
 
-export function CumulativeView() {
+export function CDFView() {
   // URL state management
   const {
     selectedChip,
@@ -153,7 +153,7 @@ export function CumulativeView() {
     setSelectedParameters,
     setShowAsErrorRate,
     isInitialized,
-  } = useCumulativeUrlState();
+  } = useCDFUrlState();
 
   // Group parameters by category for better organization
   const parameterGroups = {
@@ -815,7 +815,6 @@ export function CumulativeView() {
           count: 0,
           validCount: 0,
           totalCount: 0,
-          yield: 0,
           r2: { mean: 0, count: 0 },
           error: { mean: 0, count: 0 },
         },
@@ -986,18 +985,8 @@ export function CumulativeView() {
         ? errorValues.reduce((sum, err) => sum + err, 0) / errorValues.length
         : null;
 
-    // Calculate yield based on parameter-specific thresholds (coherence-limited)
-    // Use threshold from PARAMETER_CONFIG (now centralized)
-    const threshold = PARAMETER_CONFIG[parameterKey]?.threshold;
-    const paramConfig = PARAMETER_CONFIG[parameterKey];
-    const yieldCount = threshold
-      ? valuesOnly.filter((v) =>
-          paramConfig.higherIsBetter ? v >= threshold : v <= threshold
-        ).length
-      : 0;
-    const yieldValue = threshold
-      ? (yieldCount / valuesOnly.length) * 100
-      : null;
+    // CDF focuses on distribution analysis, not threshold-based yield
+    // Remove yield calculation as it's not core to CDF analysis
 
     // Always use CDF (ascending from 0 to 1) for consistency
     // Create step plot data for Plotly
@@ -1087,7 +1076,6 @@ export function CumulativeView() {
       mean: meanValue,
       percentile10: percentile10Value,
       percentile90: percentile90Value,
-      yieldPercent: yieldValue,
       avgR2: avgR2Value,
       avgError: avgErrorValue,
     };
@@ -1890,15 +1878,6 @@ export function CumulativeView() {
                         {unit}
                       </div>
                     </div>
-                    {data.yieldPercent !== null && (
-                      <div className="stat">
-                        <div className="stat-title">Yield</div>
-                        <div className="stat-value text-success text-sm">
-                          {data.yieldPercent.toFixed(1)}%
-                        </div>
-                        <div className="stat-desc">Above threshold</div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
