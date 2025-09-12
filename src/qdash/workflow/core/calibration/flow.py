@@ -204,7 +204,9 @@ def cal_batch(
     """
     logger = get_run_logger()
     try:
-        task_instances = generate_task_instances(task_names=task_names, task_details=menu.task_details)
+        task_instances = generate_task_instances(
+            task_names=task_names, task_details=menu.task_details, backend=session.name
+        )
         for task_name in task_names:
             if task_name in task_instances:
                 task_type = task_instances[task_name].get_task_type()
