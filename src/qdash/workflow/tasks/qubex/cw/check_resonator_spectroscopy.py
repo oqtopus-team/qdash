@@ -55,9 +55,17 @@ class CheckResonatorSpectroscopy(BaseTask):
         """Run the task."""
         exp = session.get_session()
         label = exp.get_qubit_label(int(qid))
+        read_box = exp.experiment_system.get_readout_box_for_qubit(label)
+        import numpy as np
+        from qubex.backend import BoxType
+
+        if read_box.type == BoxType.QUEL1SE_R8:
+            frequency_range = np.arange(5.75, 6.75, 0.002)
+        else:
+            frequency_range = self.input_parameters["frequency_range"].get_value()
         result = exp.resonator_spectroscopy(
             target=label,
-            frequency_range=self.input_parameters["frequency_range"].get_value(),
+            frequency_range=frequency_range,
             power_range=self.input_parameters["power_range"].get_value(),
             shots=self.input_parameters["shots"].get_value(),
         )
