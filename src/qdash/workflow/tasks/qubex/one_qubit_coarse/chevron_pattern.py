@@ -81,25 +81,25 @@ class ChevronPattern(BaseTask):
         labels = [exp.get_qubit_label(int(qid))]
         from qubex.experiment.rabi_param import RabiParam
 
-        rabi_param = RabiParam(
-            **{
-                "amplitude": 0.018757924680085324,
-                "angle": 0.2550564567234854,
-                "distance": -0.013257740996778011,
-                "frequency": 0.012516133217763476,
-                "noise": 0.00035153969656676054,
-                "offset": 0.0009658521547125462,
-                "phase": -0.02116097291450829,
-                "r2": 0.99857055386212,
-                "reference_phase": 2.403657416868579,
-                "target": "Q004",
-            }
-        )
+        # rabi_param = RabiParam(
+        #     **{
+        #         "amplitude": 0.018757924680085324,
+        #         "angle": 0.2550564567234854,
+        #         "distance": -0.013257740996778011,
+        #         "frequency": 0.012516133217763476,
+        #         "noise": 0.00035153969656676054,
+        #         "offset": 0.0009658521547125462,
+        #         "phase": -0.02116097291450829,
+        #         "r2": 0.99857055386212,
+        #         "reference_phase": 2.403657416868579,
+        #         "target": "Q004",
+        #     }
+        # )
         result = exp.chevron_pattern(
             targets=labels,
             detuning_range=np.linspace(-0.10, 0.10, 81),
             time_range=np.arange(0, 201, 4),
-            rabi_params={labels[0]: rabi_param},
+            # rabi_params={labels[0]: rabi_param},
         )
         exp.calib_note.save()
         return RunResult(raw_result=result)
