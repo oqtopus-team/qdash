@@ -46,7 +46,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("appearance");
 
   return (
-    <div className="w-full px-6" style={{ width: "calc(100vw - 20rem)" }}>
+    <div className="w-full px-6">
       <h1 className="text-left text-3xl font-bold pb-6">Settings</h1>
       <div className="w-full gap-8">
         <div className="tabs tabs-boxed mb-6">

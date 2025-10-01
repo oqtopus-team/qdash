@@ -298,7 +298,7 @@ export function ChipPageContent() {
     }) || [];
 
   return (
-    <div className="w-full px-6 py-6" style={{ width: "calc(100vw - 20rem)" }}>
+    <div className="w-full px-6 py-6">
       <div className="space-y-6">
         {/* Header Section */}
         <div className="flex flex-col gap-6">
