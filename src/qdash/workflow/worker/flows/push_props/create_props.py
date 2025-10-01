@@ -13,7 +13,7 @@ from ruamel.yaml.comments import CommentedMap
 
 qubit_field_map = {
     "bare_frequency": "qubit_frequency",
-    "resonator_frequency": "resonator_frequency",
+    # "resonator_frequency": "resonator_frequency",
     "t1": "t1",
     "t2_echo": "t2_echo",
     "t2_star": "t2_star",

@@ -16,6 +16,7 @@ class CheckQubitSpectroscopy(BaseTask):
     name: str = "CheckQubitSpectroscopy"
     backend: str = "qubex"
     task_type: str = "qubit"
+    timeout: int = 60 * 120
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 
