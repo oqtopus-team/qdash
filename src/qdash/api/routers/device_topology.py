@@ -98,7 +98,7 @@ def search_coupling_data_by_control_qid(cr_params: dict, search_term: str) -> di
 def qid_to_label(qid: str) -> str:
     """Convert a numeric qid string to a label with at least two digits. e.g. '0' -> 'Q00'."""
     if re.fullmatch(r"\d+", qid):
-        return "Q" + qid.zfill(3)
+        return "Q" + qid.zfill(2)
     error_message = "Invalid qid format."
     raise ValueError(error_message)
 
@@ -334,7 +334,7 @@ def get_device_topology(
             control, target = split_q_string(cr_key)
             cr_duration = cr_value.get("duration", 20)
             # Get coupling fidelity data with timestamp check
-            coupling_data = chip_docs.couplings[f"{control}-{target}"].data.get("zx90_gate_fidelity", {})
+            coupling_data = chip_docs.couplings[f"{control}-{target}"].data.get("bell_state_fidelity", {})
             # zx90_gate_fidelity = (
             #     coupling_data["value"]
             #     if is_within_24h(coupling_data.get("calibrated_at"))
