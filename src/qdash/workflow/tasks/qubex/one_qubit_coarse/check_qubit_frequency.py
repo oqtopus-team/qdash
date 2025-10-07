@@ -46,7 +46,7 @@ class CheckQubitFrequency(BaseTask):
         ),
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "qubit_frequency": OutputParameterModel(unit="GHz", description="Qubit frequency"),
+        "bare_frequency": OutputParameterModel(unit="GHz", description="Qubit frequency"),
     }
 
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
@@ -58,7 +58,7 @@ class CheckQubitFrequency(BaseTask):
         exp = session.get_session()
         label = exp.get_qubit_label(int(qid))
         result = run_result.raw_result
-        self.output_parameters["qubit_frequency"].value = result[label]
+        self.output_parameters["bare_frequency"].value = result[label]
         output_parameters = self.attach_execution_id(execution_id)
         figures: list[go.Figure] = []
         return PostProcessResult(output_parameters=output_parameters, figures=figures)

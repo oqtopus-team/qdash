@@ -13,6 +13,7 @@ from ruamel.yaml.comments import CommentedMap
 
 qubit_field_map = {
     "bare_frequency": "qubit_frequency",
+    # "resonator_frequency": "resonator_frequency",
     "t1": "t1",
     "t2_echo": "t2_echo",
     "t2_star": "t2_star",
@@ -53,8 +54,8 @@ def merge_properties(base_props: CommentedMap, chip_props: ChipProperties, chip_
         for field, value in qubit.model_dump(exclude_none=True).items():
             if field == "x90_gate_fidelity" and value > 1.0 or field == "x180_gate_fidelity" and value > 1.0:
                 update_if_different(field, qid, None)
-            elif field == "qubit_frequency":
-                continue
+            # elif field == "qubit_frequency":
+            #     continue
             else:
                 update_if_different(field, qid, value)
     for cid, coupling in chip_props.couplings.items():

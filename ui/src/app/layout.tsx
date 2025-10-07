@@ -2,6 +2,7 @@ import "./globals.css";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import Providers from "./providers";
+import { SidebarProvider } from "./contexts/SidebarContext";
 
 export const metadata = {
   title: "QDash",
@@ -20,16 +21,17 @@ export default function RootLayout({
     <html lang="en">
       <body suppressHydrationWarning>
         <Providers>
-          <div className="drawer lg:drawer-open">
-            <input id="drawer" type="checkbox" className="drawer-toggle" />
-            <div className="drawer-content flex flex-col">
-              <Navbar />
-              <main className="flex-1 overflow-y-auto bg-base-100">
-                {children}
-              </main>
+          <SidebarProvider>
+            <div className="flex w-full">
+              <Sidebar />
+              <div className="flex-1 flex flex-col min-h-screen w-0">
+                <Navbar />
+                <main className="flex-1 overflow-y-auto bg-base-100">
+                  {children}
+                </main>
+              </div>
             </div>
-            <Sidebar />
-          </div>
+          </SidebarProvider>
         </Providers>
       </body>
     </html>

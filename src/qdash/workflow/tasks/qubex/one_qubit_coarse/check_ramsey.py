@@ -117,18 +117,18 @@ class CheckRamsey(BaseTask):
         label = exp.get_qubit_label(int(qid))
         result_x = run_result.raw_result["x"].data[label]
         result_y = run_result.raw_result["y"].data[label]
-        self.output_parameters["ramsey_frequency"].value = result_y.fit()["f"] * 1000  # convert to MHz
-        self.output_parameters["ramsey_frequency"].error = result_y.fit()["f_err"] * 1000
-        self.output_parameters["bare_frequency"].value = result_y.bare_freq
-        self.output_parameters["t2_star"].value = result_y.t2 * 0.001  # convert to μs
-        self.output_parameters["t2_star"].error = result_y.fit()["tau_err"] * 0.001  # convert to μs
+        self.output_parameters["ramsey_frequency"].value = result_x.fit()["f"] * 1000  # convert to MHz
+        self.output_parameters["ramsey_frequency"].error = result_x.fit()["f_err"] * 1000
+        self.output_parameters["bare_frequency"].value = result_x.bare_freq
+        self.output_parameters["t2_star"].value = result_x.t2 * 0.001  # convert to μs
+        self.output_parameters["t2_star"].error = result_x.fit()["tau_err"] * 0.001  # convert to μs
         output_parameters = self.attach_execution_id(execution_id)
         figures = [
             result_x.fit()["fig"],
             result_y.fit()["fig"],
             self.make_figure(result_x, result_y, label),
         ]
-        raw_data = [result_y.data]
+        raw_data = [result_x.data]
         return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
@@ -155,7 +155,7 @@ class CheckRamsey(BaseTask):
         )
         exp.calib_note.save()
         result = {"x": result_x, "y": result_y}
-        r2 = result_y.data[label].r2 if result_y.data else None
+        r2 = result_x.data[label].r2 if result_x.data else None
         return RunResult(raw_result=result, r2={qid: r2})
 
     def batch_run(self, session: QubexSession, qid: str) -> RunResult:
