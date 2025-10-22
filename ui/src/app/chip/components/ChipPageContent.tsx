@@ -205,11 +205,15 @@ export function ChipPageContent() {
     };
   }, [muxData?.data, selectedTaskInfo?.qid]);
 
-  // Get all QIDs from mux detail
-  const getQids = (detail: MuxDetailResponseDetail): string[] => {
-    const qids = new Set<string>();
-    Object.keys(detail).forEach((qid) => qids.add(qid));
-    return Array.from(qids).sort((a, b) => Number(a) - Number(b));
+  // Get all QIDs for this mux (always 4 qids based on mux number)
+  const getQidsForMux = (muxNum: number): string[] => {
+    const startQid = muxNum * 4;
+    return [
+      String(startQid),
+      String(startQid + 1),
+      String(startQid + 2),
+      String(startQid + 3),
+    ];
   };
 
   // Group tasks by name for each mux
@@ -455,7 +459,8 @@ export function ChipPageContent() {
                     ? "No updates"
                     : formatRelativeTime(updateInfo.time);
                 const isExpanded = expandedMuxes[muxId];
-                const qids = getQids(muxDetail.detail);
+                const qids = getQidsForMux(muxDetail.mux_id);
+                const taskGroups = getTaskGroups(muxDetail.detail);
 
                 return (
                   <div
@@ -478,6 +483,9 @@ export function ChipPageContent() {
                             New
                           </div>
                         )}
+                        <div className="badge badge-ghost gap-2 rounded-lg">
+                          {Object.keys(taskGroups).length} Tasks
+                        </div>
                       </div>
                       <div
                         className={`text-sm ${
@@ -493,7 +501,7 @@ export function ChipPageContent() {
                       <div className="p-4 border-t">
                         {/* Task Results Grid */}
                         <div className="space-y-6">
-                          {Object.entries(getTaskGroups(muxDetail.detail)).map(
+                          {Object.entries(taskGroups).map(
                             ([taskName, qidResults]) => (
                               <div
                                 key={taskName}
@@ -505,7 +513,27 @@ export function ChipPageContent() {
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                   {qids.map((qid) => {
                                     const task = qidResults[qid];
-                                    if (!task) return null;
+
+                                    // Show placeholder if task doesn't exist
+                                    if (!task) {
+                                      return (
+                                        <div
+                                          key={qid}
+                                          className="card bg-base-200/30 shadow-sm rounded-xl overflow-hidden border border-dashed border-base-content/20"
+                                        >
+                                          <div className="card-body p-2">
+                                            <div className="text-sm font-medium mb-2">
+                                              <div className="flex justify-between items-center mb-1">
+                                                <span className="text-base-content/40">QID: {qid}</span>
+                                              </div>
+                                            </div>
+                                            <div className="text-xs text-base-content/30 italic text-center py-4">
+                                              No result
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
 
                                     const figurePath = getFigurePath(task);
 
