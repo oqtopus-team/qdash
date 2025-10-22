@@ -343,7 +343,9 @@ export function ExecutionPageContent() {
                       onClick={() => handleTaskClick(idx)}
                     >
                       <h4 className="text-lg font-semibold text-left">
-                        {detailTask.name}
+                        {detailTask.qid
+                          ? `${detailTask.qid}-${detailTask.name}`
+                          : detailTask.name}
                       </h4>
                       <p className="text-left">
                         Start at:{" "}
