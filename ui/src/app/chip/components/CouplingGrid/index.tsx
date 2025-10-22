@@ -123,12 +123,19 @@ export function CouplingGrid({
   useEffect(() => {
     const updateSize = () => {
       const vw = window.innerWidth;
-      setCellSize(Math.max(Math.floor((vw * 0.75) / gridSize - 12), 30));
+      // Use more screen width (95% instead of 75%) and account for padding
+      // Subtract padding/margins: px-4 (2rem) on parent container
+      const availableWidth = vw * 0.95 - 32; // 32px = 2rem padding
+      const effectiveGridSize = zoomMode === 'region' ? regionSize : gridSize;
+      const gap = 8; // gap between cells
+      const totalGap = gap * (effectiveGridSize - 1);
+      const calculatedSize = Math.floor((availableWidth - totalGap) / effectiveGridSize);
+      setCellSize(Math.max(calculatedSize, 30));
     };
     updateSize();
     window.addEventListener("resize", updateSize);
     return () => window.removeEventListener("resize", updateSize);
-  }, [gridSize]);
+  }, [gridSize, zoomMode, regionSize]);
 
   const {
     data: taskResponse,
@@ -302,9 +309,9 @@ export function CouplingGrid({
       )}
 
       {/* Grid Container */}
-      <div className="relative w-full overflow-x-auto">
+      <div className="relative w-full overflow-x-auto flex justify-center">
         <div
-          className="relative inline-block"
+          className="relative"
           style={{
             width: displayGridSize * (displayCellSize + 8),
             height: displayGridSize * (displayCellSize + 8),
