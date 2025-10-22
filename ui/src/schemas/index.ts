@@ -98,6 +98,8 @@ export * from "./task";
 export * from "./taskElapsedTime";
 export * from "./taskEndAt";
 export * from "./taskFigurePath";
+export * from "./taskHistoryResponse";
+export * from "./taskHistoryResponseData";
 export * from "./taskInputParameters";
 export * from "./taskInputParametersAnyOf";
 export * from "./taskJsonFigurePath";

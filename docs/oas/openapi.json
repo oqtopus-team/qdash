@@ -969,7 +969,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/qubit/{task_name}": {
+    "/api/chip/{chip_id}/task/qubit/{task_name}/latest": {
       "get": {
         "tags": [
           "chip"
@@ -1004,6 +1004,72 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LatestTaskGroupedByChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chip/{chip_id}/task/qubit/{qid}/task/{task_name}": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Fetch Qubit Task History",
+        "description": "Fetch latest qubit task results with optional defensive outlier filtering.",
+        "operationId": "fetchQubitTaskHistory",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskHistoryResponse"
                 }
               }
             }
@@ -1082,7 +1148,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/coupling/{task_name}": {
+    "/api/chip/{chip_id}/task/coupling/{task_name}/latest": {
       "get": {
         "tags": [
           "chip"
@@ -3618,6 +3684,27 @@
         "type": "object",
         "title": "Task",
         "description": "Task is a Pydantic model that represents a task."
+      },
+      "TaskHistoryResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "data": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Task"
+            },
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "data"
+        ],
+        "title": "TaskHistoryResponse"
       },
       "TaskResponse": {
         "properties": {
