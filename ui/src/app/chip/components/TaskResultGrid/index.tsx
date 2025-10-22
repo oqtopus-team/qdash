@@ -41,6 +41,15 @@ export function TaskResultGrid({
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
 
+  // Region selection state
+  const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
+  const [zoomMode, setZoomMode] = useState<'full' | 'region'>('full');
+  const [selectedRegion, setSelectedRegion] = useState<{row: number, col: number} | null>(null);
+  const [hoveredRegion, setHoveredRegion] = useState<{row: number, col: number} | null>(null);
+
+  const regionSize = 4; // 4×4 qubits per region
+  const numRegions = Math.floor(gridSize / regionSize);
+
   // Use custom hook for date navigation
   const {
     navigateToPreviousDay: originalNavigateToPreviousDay,
@@ -161,20 +170,65 @@ export function TaskResultGrid({
   const getTaskResult = (qid: string): Task | null =>
     taskResponse?.data?.result?.[qid] || null;
 
+  // Calculate displayed grid size based on zoom mode
+  const displayGridSize = zoomMode === 'region' ? regionSize : gridSize;
+  const displayGridStart = selectedRegion
+    ? { row: selectedRegion.row * regionSize, col: selectedRegion.col * regionSize }
+    : { row: 0, col: 0 };
+
   return (
-    <div className="space-y-6">
-      <div
-        className={`grid gap-2 p-4 bg-base-200/50 rounded-xl`}
-        style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}
-      >
-        {Array.from({ length: gridSize * gridSize }).map((_, index) => {
-          const row = Math.floor(index / gridSize);
-          const col = index % gridSize;
-          const qid = Object.keys(gridPositions).find(
-            (key) =>
-              gridPositions[key].row === row && gridPositions[key].col === col,
-          );
-          if (!qid)
+    <div className="space-y-4">
+      {/* Zoom mode toggle - only show in full view mode */}
+      {zoomMode === 'full' && (
+        <div className="flex items-center gap-2 px-4">
+          <label className="text-sm font-medium">Region Zoom:</label>
+          <input
+            type="checkbox"
+            checked={regionSelectionEnabled}
+            onChange={(e) => setRegionSelectionEnabled(e.target.checked)}
+            className="toggle toggle-sm toggle-primary"
+          />
+          <span className="text-xs text-base-content/70">
+            {regionSelectionEnabled ? 'Enabled - Click a region to zoom' : 'Disabled'}
+          </span>
+        </div>
+      )}
+
+      {/* Back button when in region mode */}
+      {zoomMode === 'region' && selectedRegion && (
+        <div className="flex items-center gap-4 px-4">
+          <button
+            onClick={() => {
+              setZoomMode('full');
+              setSelectedRegion(null);
+            }}
+            className="btn btn-sm btn-ghost"
+          >
+            ← Back to Full View
+          </button>
+          <span className="text-sm text-base-content/70">
+            Region {selectedRegion.row + 1},{selectedRegion.col + 1} (Qubits {displayGridStart.row * gridSize + displayGridStart.col} - {(displayGridStart.row + regionSize - 1) * gridSize + displayGridStart.col + regionSize - 1})
+          </span>
+        </div>
+      )}
+
+      {/* Grid Container */}
+      <div className="relative">
+        <div
+          className={`grid gap-2 p-4 bg-base-200/50 rounded-xl`}
+          style={{ gridTemplateColumns: `repeat(${displayGridSize}, minmax(0, 1fr))` }}
+        >
+          {Array.from({ length: displayGridSize * displayGridSize }).map((_, index) => {
+            const localRow = Math.floor(index / displayGridSize);
+            const localCol = index % displayGridSize;
+            const actualRow = displayGridStart.row + localRow;
+            const actualCol = displayGridStart.col + localCol;
+
+            const qid = Object.keys(gridPositions).find(
+              (key) =>
+                gridPositions[key].row === actualRow && gridPositions[key].col === actualCol,
+            );
+            if (!qid)
             return (
               <div
                 key={index}
@@ -243,7 +297,44 @@ export function TaskResultGrid({
               </button>
             </div>
           );
-        })}
+          })}
+        </div>
+
+        {/* Region selection overlay - only when enabled and in full view mode */}
+        {zoomMode === 'full' && regionSelectionEnabled && (
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="relative w-full h-full p-4">
+              <div
+                className="grid gap-2 w-full h-full"
+                style={{ gridTemplateColumns: `repeat(${numRegions}, 1fr)` }}
+              >
+                {Array.from({ length: numRegions * numRegions }).map((_, index) => {
+                  const regionRow = Math.floor(index / numRegions);
+                  const regionCol = index % numRegions;
+                  const isHovered = hoveredRegion?.row === regionRow && hoveredRegion?.col === regionCol;
+
+                  return (
+                    <button
+                      key={index}
+                      className={`pointer-events-auto transition-all duration-200 rounded-lg ${
+                        isHovered
+                          ? 'bg-primary/20 border-2 border-primary'
+                          : 'bg-transparent border-2 border-transparent hover:border-primary/50'
+                      }`}
+                      onMouseEnter={() => setHoveredRegion({ row: regionRow, col: regionCol })}
+                      onMouseLeave={() => setHoveredRegion(null)}
+                      onClick={() => {
+                        setSelectedRegion({ row: regionRow, col: regionCol });
+                        setZoomMode('region');
+                      }}
+                      title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <TaskDetailModal
