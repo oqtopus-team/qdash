@@ -6,7 +6,6 @@ from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.tasks.qubex.base import QubexTask
@@ -22,23 +21,6 @@ class ChevronPattern(QubexTask):
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "bare_frequency": OutputParameterModel(unit="GHz", description="Qubit bare frequency"),
     }
-
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
-        exp = self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
-        self.input_parameters["readout_amplitude"] = InputParameterModel(
-            unit="a.u.",
-            description="Readout Frequency",
-            value=exp.experiment_system.control_params.get_readout_amplitude(label),
-            value_type="float",
-        )
-        self.input_parameters["readout_frequency"] = InputParameterModel(
-            unit="GHz",
-            description="Readout Amplitude",
-            value=exp.experiment_system.quantum_system.get_resonator(exp.get_resonator_label(int(qid))).frequency,
-            value_type="float",
-        )
-        return PreProcessResult(input_parameters=self.input_parameters)
 
     def make_figure(self, result: Any, label: str) -> go.Figure:
         """Create a figure for the results."""

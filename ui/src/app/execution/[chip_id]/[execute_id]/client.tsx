@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   FaExternalLinkAlt,
   FaDownload,
   FaCalendarAlt,
   FaClock,
 } from "react-icons/fa";
-import JsonView from "react18-json-view";
 
 import ExecutionDAG from "./ExecutionDAG";
 
@@ -14,6 +15,7 @@ import type { ExecutionResponseDetail } from "@/schemas";
 
 import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 import { TaskFigure } from "@/app/components/TaskFigure";
+import PlotlyRenderer from "@/app/components/PlotlyRenderer";
 import { useFetchExecutionByChipId } from "@/client/chip/chip";
 
 interface ExecutionDetailClientProps {
@@ -25,6 +27,14 @@ export default function ExecutionDetailClient({
   chip_id,
   execute_id,
 }: ExecutionDetailClientProps) {
+  const [expandedFigure, setExpandedFigure] = useState<{
+    path: string;
+    jsonPath?: string;
+    qid: string;
+    index: number;
+  } | null>(null);
+  const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
+
   const calculateDetailedDuration = (start: string, end: string) => {
     const startDate = new Date(start);
     const endDate = new Date(end);
@@ -319,6 +329,25 @@ export default function ExecutionDetailClient({
                                   qid={task.qid || ""}
                                   className="w-full h-auto max-h-[60vh] object-contain rounded border"
                                 />
+                                {task.json_figure_path &&
+                                  task.json_figure_path[i] && (
+                                    <div className="mt-2 flex justify-center">
+                                      <button
+                                        className="btn btn-xs btn-primary"
+                                        onClick={() => {
+                                          setExpandedFigure({
+                                            path,
+                                            jsonPath: task.json_figure_path[i],
+                                            qid: task.qid || "",
+                                            index: i,
+                                          });
+                                          setViewMode("interactive");
+                                        }}
+                                      >
+                                        Interactive View
+                                      </button>
+                                    </div>
+                                  )}
                               </div>
                             ))
                           ) : task.figure_path ? (
@@ -331,6 +360,25 @@ export default function ExecutionDetailClient({
                                 qid={task.qid || ""}
                                 className="w-full h-auto max-h-[60vh] object-contain rounded border"
                               />
+                              {task.json_figure_path &&
+                                task.json_figure_path[0] && (
+                                  <div className="mt-2 flex justify-center">
+                                    <button
+                                      className="btn btn-xs btn-primary"
+                                      onClick={() => {
+                                        setExpandedFigure({
+                                          path: task.figure_path,
+                                          jsonPath: task.json_figure_path[0],
+                                          qid: task.qid || "",
+                                          index: 0,
+                                        });
+                                        setViewMode("interactive");
+                                      }}
+                                    >
+                                      Interactive View
+                                    </button>
+                                  </div>
+                                )}
                             </div>
                           ) : null}
                         </div>
@@ -346,12 +394,49 @@ export default function ExecutionDetailClient({
                             </h4>
                           </summary>
                           <div className="px-2 pb-2">
-                            <JsonView
-                              src={task.input_parameters}
-                              theme="vscode"
-                              collapsed={3}
-                              style={{ fontSize: "0.875rem" }}
-                            />
+                            {task.input_parameters &&
+                            Object.keys(task.input_parameters).length > 0 ? (
+                              <div className="overflow-x-auto">
+                                <table className="table table-zebra table-sm">
+                                  <thead>
+                                    <tr>
+                                      <th>Parameter</th>
+                                      <th>Value</th>
+                                      <th>Unit</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {Object.entries(task.input_parameters).map(
+                                      ([key, value]: [string, any]) => {
+                                        const paramValue =
+                                          typeof value === "object" &&
+                                          value !== null &&
+                                          "value" in value
+                                            ? value
+                                            : { value };
+                                        return (
+                                          <tr key={key}>
+                                            <td className="font-medium">{key}</td>
+                                            <td className="font-mono">
+                                              {typeof paramValue.value === "number"
+                                                ? paramValue.value.toFixed(6)
+                                                : typeof paramValue.value === "object"
+                                                  ? JSON.stringify(paramValue.value)
+                                                  : String(paramValue.value)}
+                                            </td>
+                                            <td>{paramValue.unit || "-"}</td>
+                                          </tr>
+                                        );
+                                      },
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-base-content/60 p-2">
+                                No input parameters
+                              </div>
+                            )}
                           </div>
                         </details>
 
@@ -363,12 +448,49 @@ export default function ExecutionDetailClient({
                             </h4>
                           </summary>
                           <div className="px-2 pb-2">
-                            <JsonView
-                              src={task.output_parameters}
-                              theme="vscode"
-                              collapsed={3}
-                              style={{ fontSize: "0.875rem" }}
-                            />
+                            {task.output_parameters &&
+                            Object.keys(task.output_parameters).length > 0 ? (
+                              <div className="overflow-x-auto">
+                                <table className="table table-zebra table-sm">
+                                  <thead>
+                                    <tr>
+                                      <th>Parameter</th>
+                                      <th>Value</th>
+                                      <th>Unit</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {Object.entries(task.output_parameters).map(
+                                      ([key, value]: [string, any]) => {
+                                        const paramValue =
+                                          typeof value === "object" &&
+                                          value !== null &&
+                                          "value" in value
+                                            ? value
+                                            : { value };
+                                        return (
+                                          <tr key={key}>
+                                            <td className="font-medium">{key}</td>
+                                            <td className="font-mono">
+                                              {typeof paramValue.value === "number"
+                                                ? paramValue.value.toFixed(6)
+                                                : typeof paramValue.value === "object"
+                                                  ? JSON.stringify(paramValue.value)
+                                                  : String(paramValue.value)}
+                                            </td>
+                                            <td>{paramValue.unit || "-"}</td>
+                                          </tr>
+                                        );
+                                      },
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-base-content/60 p-2">
+                                No output parameters
+                              </div>
+                            )}
                           </div>
                         </details>
                       </div>
@@ -380,6 +502,85 @@ export default function ExecutionDetailClient({
           </div>
         </div>
       </div>
+
+      {/* Figure Expansion Modal */}
+      {expandedFigure && (
+        <dialog className="modal modal-open">
+          <div className="modal-box max-w-5xl w-11/12 max-h-[90vh] p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-lg">
+                Figure {expandedFigure.index + 1}
+              </h3>
+              <button
+                onClick={() => {
+                  setExpandedFigure(null);
+                  setViewMode("static");
+                }}
+                className="btn btn-sm btn-circle btn-ghost"
+              >
+                ✕
+              </button>
+            </div>
+
+            {viewMode === "static" ? (
+              <>
+                <div className="bg-white rounded-lg p-4 flex items-center justify-center max-h-[75vh]">
+                  <TaskFigure
+                    path={expandedFigure.path}
+                    qid={expandedFigure.qid}
+                    className="w-full h-full object-contain max-h-[70vh]"
+                  />
+                </div>
+                {expandedFigure.jsonPath && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={() => setViewMode("interactive")}
+                    >
+                      Interactive View
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="w-full h-[70vh] bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
+                  <div className="w-full h-full flex justify-center items-center">
+                    <div className="w-fit h-fit m-auto">
+                      <PlotlyRenderer
+                        className="w-full h-full"
+                        fullPath={`${
+                          process.env.NEXT_PUBLIC_API_URL
+                        }/api/executions/figure?path=${encodeURIComponent(
+                          expandedFigure.jsonPath || "",
+                        )}`}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-center">
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => setViewMode("static")}
+                  >
+                    Back to Static View
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button
+              onClick={() => {
+                setExpandedFigure(null);
+                setViewMode("static");
+              }}
+            >
+              close
+            </button>
+          </form>
+        </dialog>
+      )}
     </div>
   );
 }

@@ -5,9 +5,7 @@ from plotly.subplots import make_subplots
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.tasks.qubex.base import QubexTask
@@ -27,9 +25,6 @@ class CheckBellStateTomography(QubexTask):
             value_type="float",
         ),
     }
-
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
-        return PreProcessResult(input_parameters=self.input_parameters)
 
     def make_figure(self, result: dict, label: str) -> go.Figure:
         """Create a figure from the result."""

@@ -1,6 +1,11 @@
 from typing import TYPE_CHECKING, Literal
 
-from qdash.workflow.tasks.base import BaseTask, RunResult
+from qdash.datamodel.task import InputParameterModel
+from qdash.workflow.tasks.base import (
+    BaseTask,
+    PreProcessResult,
+    RunResult,
+)
 
 if TYPE_CHECKING:
     from qdash.workflow.core.session.qubex import QubexSession
@@ -16,6 +21,35 @@ class QubexTask(BaseTask):
     backend: str = "qubex"
     # name is empty to prevent registration in BaseTask.registry
     # Only concrete subclasses with a name should be registered
+
+    def preprocess(self, session: "QubexSession", qid: str) -> PreProcessResult:
+        exp = self.get_experiment(session)
+        label = self.get_qubit_label(session, qid)
+        self.input_parameters["readout_amplitude"] = InputParameterModel(
+            unit="a.u.",
+            description="Readout Amplitude",
+            value=exp.experiment_system.control_params.get_readout_amplitude(label),
+            value_type="float",
+        )
+        self.input_parameters["readout_frequency"] = InputParameterModel(
+            unit="GHz",
+            description="Readout Frequency",
+            value=exp.experiment_system.quantum_system.get_resonator(exp.get_resonator_label(int(qid))).frequency,
+            value_type="float",
+        )
+        self.input_parameters["control_amplitude"] = InputParameterModel(
+            unit="a.u.",
+            description="Qubit Control Amplitude",
+            value=exp.experiment_system.control_params.get_control_amplitude(label),
+            value_type="float",
+        )
+        self.input_parameters["qubit_frequency"] = InputParameterModel(
+            unit="GHz",
+            description="Qubit Frequency",
+            value=exp.experiment_system.quantum_system.get_qubit(label).frequency,
+            value_type="float",
+        )
+        return PreProcessResult(input_parameters=self.input_parameters)
 
     def batch_run(self, session: "QubexSession", qids: list[str]) -> RunResult:
         """Default implementation for batch run.

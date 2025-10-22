@@ -13,6 +13,7 @@ import {
 import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
+import PlotlyRenderer from "@/app/components/PlotlyRenderer";
 import { useFetchQubitTaskHistory } from "@/client/chip/chip";
 
 interface TaskHistoryViewerProps {
@@ -38,6 +39,7 @@ export function TaskHistoryViewer({
     null,
   );
   const [modalTaskId, setModalTaskId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
 
   const { data, isLoading, error } = useFetchQubitTaskHistory(
     chipId,
@@ -323,8 +325,7 @@ export function TaskHistoryViewer({
                       {selectedTask.figure_path.map((path, idx) => (
                         <div
                           key={idx}
-                          className="bg-base-200 rounded-lg p-4 overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
-                          onClick={() => setExpandedFigureIdx(idx)}
+                          className="bg-base-200 rounded-lg p-4 overflow-hidden"
                         >
                           <div className="text-sm text-base-content/60 mb-2">
                             Figure {idx + 1}
@@ -336,6 +337,20 @@ export function TaskHistoryViewer({
                               className="w-full h-auto max-h-[500px] object-contain"
                             />
                           </div>
+                          {selectedTask.json_figure_path &&
+                            selectedTask.json_figure_path[idx] && (
+                              <div className="mt-2 flex justify-center">
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  onClick={() => {
+                                    setExpandedFigureIdx(idx);
+                                    setViewMode("interactive");
+                                  }}
+                                >
+                                  Interactive View
+                                </button>
+                              </div>
+                            )}
                         </div>
                       ))}
                     </div>
@@ -395,10 +410,45 @@ export function TaskHistoryViewer({
                   <h4 className="text-lg font-semibold mb-3">
                     Input Parameters
                   </h4>
-                  <div className="bg-base-200 rounded-lg p-4">
-                    <pre className="text-xs overflow-x-auto">
-                      {JSON.stringify(selectedTask.input_parameters, null, 2)}
-                    </pre>
+                  <div className="overflow-x-auto">
+                    <table className="table table-zebra table-sm">
+                      <thead>
+                        <tr>
+                          <th>Parameter</th>
+                          <th>Value</th>
+                          <th>Unit</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(selectedTask.input_parameters).map(
+                          ([key, value]) => {
+                            const paramValue = (
+                              typeof value === "object" &&
+                              value !== null &&
+                              "value" in value
+                                ? value
+                                : { value }
+                            ) as {
+                              value: number | string | object;
+                              unit?: string;
+                            };
+                            return (
+                              <tr key={key}>
+                                <td className="font-medium">{key}</td>
+                                <td className="font-mono">
+                                  {typeof paramValue.value === "number"
+                                    ? paramValue.value.toFixed(6)
+                                    : typeof paramValue.value === "object"
+                                      ? JSON.stringify(paramValue.value)
+                                      : String(paramValue.value)}
+                                </td>
+                                <td>{paramValue.unit || "-"}</td>
+                              </tr>
+                            );
+                          },
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
@@ -586,6 +636,20 @@ export function TaskHistoryViewer({
                           className="w-full h-auto max-h-[400px] object-contain"
                         />
                       </div>
+                      {modalTask.json_figure_path &&
+                        modalTask.json_figure_path[idx] && (
+                          <div className="mt-2 flex justify-center">
+                            <button
+                              className="btn btn-xs btn-primary"
+                              onClick={() => {
+                                setExpandedFigureIdx(idx);
+                                setViewMode("interactive");
+                              }}
+                            >
+                              Interactive View
+                            </button>
+                          </div>
+                        )}
                     </div>
                   ))}
                 </div>
@@ -641,10 +705,45 @@ export function TaskHistoryViewer({
             {modalTask.input_parameters && (
               <div className="mb-6">
                 <h4 className="text-lg font-semibold mb-3">Input Parameters</h4>
-                <div className="bg-base-200 rounded-lg p-4">
-                  <pre className="text-xs overflow-x-auto">
-                    {JSON.stringify(modalTask.input_parameters, null, 2)}
-                  </pre>
+                <div className="overflow-x-auto">
+                  <table className="table table-zebra table-sm">
+                    <thead>
+                      <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                        <th>Unit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(modalTask.input_parameters).map(
+                        ([key, value]) => {
+                          const paramValue = (
+                            typeof value === "object" &&
+                            value !== null &&
+                            "value" in value
+                              ? value
+                              : { value }
+                          ) as {
+                            value: number | string | object;
+                            unit?: string;
+                          };
+                          return (
+                            <tr key={key}>
+                              <td className="font-medium">{key}</td>
+                              <td className="font-mono">
+                                {typeof paramValue.value === "number"
+                                  ? paramValue.value.toFixed(6)
+                                  : typeof paramValue.value === "object"
+                                    ? JSON.stringify(paramValue.value)
+                                    : String(paramValue.value)}
+                              </td>
+                              <td>{paramValue.unit || "-"}</td>
+                            </tr>
+                          );
+                        },
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -698,23 +797,76 @@ export function TaskHistoryViewer({
                     </button>
                   )}
                   <button
-                    onClick={() => setExpandedFigureIdx(null)}
+                    onClick={() => {
+                      setExpandedFigureIdx(null);
+                      setViewMode("static");
+                    }}
                     className="btn btn-sm btn-circle btn-ghost"
                   >
                     ✕
                   </button>
                 </div>
               </div>
-              <div className="bg-white rounded-lg p-4 flex items-center justify-center max-h-[75vh]">
-                <TaskFigure
-                  path={selectedTask.figure_path[expandedFigureIdx]}
-                  qid={qubitId}
-                  className="w-full h-full object-contain max-h-[70vh]"
-                />
-              </div>
+
+              {viewMode === "static" ? (
+                <>
+                  <div className="bg-white rounded-lg p-4 flex items-center justify-center max-h-[75vh]">
+                    <TaskFigure
+                      path={selectedTask.figure_path[expandedFigureIdx]}
+                      qid={qubitId}
+                      className="w-full h-full object-contain max-h-[70vh]"
+                    />
+                  </div>
+                  {selectedTask.json_figure_path &&
+                    selectedTask.json_figure_path[expandedFigureIdx] && (
+                      <div className="mt-4 flex justify-center">
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => setViewMode("interactive")}
+                        >
+                          Interactive View
+                        </button>
+                      </div>
+                    )}
+                </>
+              ) : (
+                <>
+                  <div className="w-full h-[70vh] bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
+                    <div className="w-full h-full flex justify-center items-center">
+                      <div className="w-fit h-fit m-auto">
+                        <PlotlyRenderer
+                          className="w-full h-full"
+                          fullPath={`${
+                            process.env.NEXT_PUBLIC_API_URL
+                          }/api/executions/figure?path=${encodeURIComponent(
+                            selectedTask.json_figure_path?.[
+                              expandedFigureIdx
+                            ] || "",
+                          )}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => setViewMode("static")}
+                    >
+                      Back to Static View
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
             <form method="dialog" className="modal-backdrop">
-              <button onClick={() => setExpandedFigureIdx(null)}>close</button>
+              <button
+                onClick={() => {
+                  setExpandedFigureIdx(null);
+                  setViewMode("static");
+                }}
+              >
+                close
+              </button>
             </form>
           </dialog>
         )}
