@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.tasks.base import BaseTask, RunResult
@@ -16,6 +16,7 @@ class FakeTask(BaseTask):
     """
 
     backend: str = "fake"
+    task_type: Literal["global", "qubit", "coupling", "system"]  # Must be defined in subclass
 
     def batch_run(self, session: "FakeSession", qids: list[str]) -> RunResult:
         """Default implementation for batch run.
