@@ -692,7 +692,7 @@ def fetch_historical_qubit_task_grouped_by_chip(
 
 
 @router.get(
-    "/chip/{chip_id}/task/qubit/{task_name}",
+    "/chip/{chip_id}/task/qubit/{task_name}/latest",
     summary="Fetch latest qubit task results with optional outlier filtering",
     operation_id="fetchLatestQubitTaskGroupedByChip",
     response_model=LatestTaskGroupedByChipResponse,
@@ -886,7 +886,7 @@ def fetch_historical_coupling_task_grouped_by_chip(
 
 
 @router.get(
-    "/chip/{chip_id}/task/coupling/{task_name}",
+    "/chip/{chip_id}/task/coupling/{task_name}/latest",
     summary="Fetch the multiplexers",
     operation_id="fetchLatestCouplingTaskGroupedByChip",
     response_model=LatestTaskGroupedByChipResponse,
