@@ -628,6 +628,8 @@ export function ChipPageContent() {
         canNavigatePrevious={canNavigatePrevious}
         canNavigateNext={canNavigateNext}
         formatDate={formatDate}
+        taskName={selectedTaskInfo?.task?.name}
+        variant="detailed"
       />
     </div>
   );
