@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import Annotated, Any
 
 import pendulum
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict
+from pymongo import ASCENDING, DESCENDING
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
 from qdash.api.schemas.auth import User
 from qdash.api.services.response_processor import response_processor
@@ -16,10 +17,6 @@ from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-if TYPE_CHECKING:
-    from pydantic.validators import FieldValidationInfo
-from pymongo import ASCENDING, DESCENDING
 
 router = APIRouter()
 
@@ -75,14 +72,6 @@ class Task(BaseModel):
     task_type: str | None = None
     default_view: bool = True
     over_threshold: bool = False
-
-    @field_validator("name", mode="before")
-    def modify_name(cls, v: str, info: FieldValidationInfo) -> str:  # noqa: N805
-        data = info.data
-        qid = data.get("qid")
-        if qid:
-            return f"{qid}-{v}"
-        return v
 
 
 class ExecutionResponseDetail(BaseModel):
