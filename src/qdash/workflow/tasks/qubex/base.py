@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from qdash.workflow.tasks.base import BaseTask, RunResult
 
@@ -14,6 +14,7 @@ class QubexTask(BaseTask):
     """
 
     backend: str = "qubex"
+    task_type: Literal["global", "qubit", "coupling", "system"]  # Must be defined in subclass
 
     def batch_run(self, session: "QubexSession", qids: list[str]) -> RunResult:
         """Default implementation for batch run.
