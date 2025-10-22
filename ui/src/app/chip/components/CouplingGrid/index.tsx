@@ -16,7 +16,7 @@ import {
 
 const PlotlyRenderer = dynamic(
   () => import("@/app/components/PlotlyRenderer").then((mod) => mod.default),
-  { ssr: false },
+  { ssr: false }
 );
 
 interface CouplingGridProps {
@@ -82,9 +82,15 @@ export function CouplingGrid({
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
-  const [zoomMode, setZoomMode] = useState<'full' | 'region'>('full');
-  const [selectedRegion, setSelectedRegion] = useState<{row: number, col: number} | null>(null);
-  const [hoveredRegion, setHoveredRegion] = useState<{row: number, col: number} | null>(null);
+  const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
+  const [selectedRegion, setSelectedRegion] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
+  const [hoveredRegion, setHoveredRegion] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
 
   const regionSize = 4; // 4×4 qubits per region
   const numRegions = Math.floor(gridSize / regionSize);
@@ -126,10 +132,12 @@ export function CouplingGrid({
       // Use more screen width (95% instead of 75%) and account for padding
       // Subtract padding/margins: px-4 (2rem) on parent container
       const availableWidth = vw * 0.95 - 32; // 32px = 2rem padding
-      const effectiveGridSize = zoomMode === 'region' ? regionSize : gridSize;
+      const effectiveGridSize = zoomMode === "region" ? regionSize : gridSize;
       const gap = 8; // gap between cells
       const totalGap = gap * (effectiveGridSize - 1);
-      const calculatedSize = Math.floor((availableWidth - totalGap) / effectiveGridSize);
+      const calculatedSize = Math.floor(
+        (availableWidth - totalGap) / effectiveGridSize
+      );
       setCellSize(Math.max(calculatedSize, 30));
     };
     updateSize();
@@ -157,7 +165,7 @@ export function CouplingGrid({
             placeholderData: keepPreviousData,
             staleTime: 30000, // 30 seconds
           },
-        },
+        }
       );
 
   // Reset modal only when date changes externally (not from modal navigation)
@@ -179,7 +187,7 @@ export function CouplingGrid({
       timeoutId = setTimeout(() => {
         const normalizedResultMap: Record<string, ExtendedTask[]> = {};
         for (const [couplingId, task] of Object.entries(
-          taskResponse.data.result,
+          taskResponse.data.result
         )) {
           const [a, b] = couplingId.split("-").map(Number);
           const normKey = a < b ? `${a}-${b}` : `${b}-${a}`;
@@ -189,7 +197,7 @@ export function CouplingGrid({
             couplingId,
           } as ExtendedTask);
           normalizedResultMap[normKey].sort(
-            (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0),
+            (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0)
           );
         }
 
@@ -225,7 +233,7 @@ export function CouplingGrid({
         couplingId,
       } as ExtendedTask);
       normalizedResultMap[normKey].sort(
-        (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0),
+        (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0)
       );
     }
   }
@@ -240,15 +248,18 @@ export function CouplingGrid({
     return <div className="alert alert-error">Failed to load data</div>;
 
   // Calculate displayed area based on zoom mode
-  const displayCellSize = zoomMode === 'region' ? cellSize * 2 : cellSize;
-  const displayGridSize = zoomMode === 'region' ? regionSize : gridSize;
+  const displayCellSize = zoomMode === "region" ? cellSize * 0.8 : cellSize;
+  const displayGridSize = zoomMode === "region" ? regionSize : gridSize;
   const displayGridStart = selectedRegion
-    ? { row: selectedRegion.row * regionSize, col: selectedRegion.col * regionSize }
+    ? {
+        row: selectedRegion.row * regionSize,
+        col: selectedRegion.col * regionSize,
+      }
     : { row: 0, col: 0 };
 
   // Helper function to check if a qubit is in the displayed region
   const isQubitInRegion = (qid: number): boolean => {
-    if (zoomMode === 'full') return true;
+    if (zoomMode === "full") return true;
 
     const muxIndex = Math.floor(qid / 4);
     const localIndex = qid % 4;
@@ -275,7 +286,7 @@ export function CouplingGrid({
   return (
     <div className="space-y-4 px-4">
       {/* Zoom mode toggle - only show in full view mode */}
-      {zoomMode === 'full' && (
+      {zoomMode === "full" && (
         <div className="flex items-center gap-2 px-4">
           <label className="text-sm font-medium">Region Zoom:</label>
           <input
@@ -285,17 +296,19 @@ export function CouplingGrid({
             className="toggle toggle-sm toggle-primary"
           />
           <span className="text-xs text-base-content/70">
-            {regionSelectionEnabled ? 'Enabled - Click a region to zoom' : 'Disabled'}
+            {regionSelectionEnabled
+              ? "Enabled - Click a region to zoom"
+              : "Disabled"}
           </span>
         </div>
       )}
 
       {/* Back button when in region mode */}
-      {zoomMode === 'region' && selectedRegion && (
+      {zoomMode === "region" && selectedRegion && (
         <div className="flex items-center gap-4 px-4">
           <button
             onClick={() => {
-              setZoomMode('full');
+              setZoomMode("full");
               setSelectedRegion(null);
             }}
             className="btn btn-sm btn-ghost"
@@ -321,34 +334,43 @@ export function CouplingGrid({
             .filter((_, qid) => isQubitInRegion(qid))
             .map((_, idx) => {
               // Find actual qid from filtered index
-              const allQids = Array.from({ length: gridSize === 8 ? 64 : 144 }).map((_, i) => i);
-              const filteredQids = allQids.filter(qid => isQubitInRegion(qid));
+              const allQids = Array.from({
+                length: gridSize === 8 ? 64 : 144,
+              }).map((_, i) => i);
+              const filteredQids = allQids.filter((qid) =>
+                isQubitInRegion(qid)
+              );
               const qid = filteredQids[idx];
-            const muxIndex = Math.floor(qid / 4);
-            const localIndex = qid % 4;
-            const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE));
-            const muxCol = muxIndex % (gridSize / MUX_SIZE);
-            const localRow = Math.floor(localIndex / 2);
-            const localCol = localIndex % 2;
-            const row = muxRow * MUX_SIZE + localRow;
-            const col = muxCol * MUX_SIZE + localCol;
+              const muxIndex = Math.floor(qid / 4);
+              const localIndex = qid % 4;
+              const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE));
+              const muxCol = muxIndex % (gridSize / MUX_SIZE);
+              const localRow = Math.floor(localIndex / 2);
+              const localCol = localIndex % 2;
+              const row = muxRow * MUX_SIZE + localRow;
+              const col = muxCol * MUX_SIZE + localCol;
 
-            // Adjust position for region mode
-            const displayRow = row - displayGridStart.row;
-            const displayCol = col - displayGridStart.col;
-            const x = displayCol * (displayCellSize + 8);
-            const y = displayRow * (displayCellSize + 8);
+              // Adjust position for region mode
+              const displayRow = row - displayGridStart.row;
+              const displayCol = col - displayGridStart.col;
+              const x = displayCol * (displayCellSize + 8);
+              const y = displayRow * (displayCellSize + 8);
 
-            return (
-              <div
-                key={qid}
-                className="absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30"
-                style={{ top: y, left: x, width: displayCellSize, height: displayCellSize }}
-              >
-                {qid}
-              </div>
-            );
-          })}
+              return (
+                <div
+                  key={qid}
+                  className="absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30"
+                  style={{
+                    top: y,
+                    left: x,
+                    width: displayCellSize,
+                    height: displayCellSize,
+                  }}
+                >
+                  {qid}
+                </div>
+              );
+            })}
 
           {Object.entries(normalizedResultMap)
             .filter(([normKey]) => {
@@ -364,7 +386,7 @@ export function CouplingGrid({
               const { row1, col1, row2, col2 } = getCouplingPosition(
                 qid1,
                 qid2,
-                gridSize,
+                gridSize
               );
 
               // Adjust position for region mode
@@ -372,78 +394,90 @@ export function CouplingGrid({
               const displayCol1 = col1 - displayGridStart.col;
               const displayRow2 = row2 - displayGridStart.row;
               const displayCol2 = col2 - displayGridStart.col;
-              const centerX = ((displayCol1 + displayCol2) / 2) * (displayCellSize + 8) + displayCellSize / 2;
-              const centerY = ((displayRow1 + displayRow2) / 2) * (displayCellSize + 8) + displayCellSize / 2;
-            return (
-              <button
-                key={normKey}
-                onClick={() => {
-                  if (figurePath) {
-                    setSelectedTaskInfo({
-                      path: figurePath,
-                      couplingId: normKey,
-                      taskList,
-                      index: 0,
-                      subIndex: 0,
-                    });
-                    setViewMode("static");
-                  }
-                }}
-                style={{
-                  position: "absolute",
-                  top: centerY,
-                  left: centerX,
-                  width: displayCellSize * 0.6,
-                  height: displayCellSize * 0.6,
-                  transform: "translate(-50%, -50%)",
-                }}
-                className={`rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow ${
-                  task.over_threshold
-                    ? "border-2 border-primary animate-pulse-light"
-                    : ""
-                }`}
-              >
-                {figurePath && (
-                  <TaskFigure
-                    path={figurePath}
-                    qid={String(task.couplingId)}
-                    className="w-full h-full object-contain"
-                  />
-                )}
-              </button>
-            );
-          })}
+              const centerX =
+                ((displayCol1 + displayCol2) / 2) * (displayCellSize + 8) +
+                displayCellSize / 2;
+              const centerY =
+                ((displayRow1 + displayRow2) / 2) * (displayCellSize + 8) +
+                displayCellSize / 2;
+              return (
+                <button
+                  key={normKey}
+                  onClick={() => {
+                    if (figurePath) {
+                      setSelectedTaskInfo({
+                        path: figurePath,
+                        couplingId: normKey,
+                        taskList,
+                        index: 0,
+                        subIndex: 0,
+                      });
+                      setViewMode("static");
+                    }
+                  }}
+                  style={{
+                    position: "absolute",
+                    top: centerY,
+                    left: centerX,
+                    width: displayCellSize * 0.6,
+                    height: displayCellSize * 0.6,
+                    transform: "translate(-50%, -50%)",
+                  }}
+                  className={`rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow ${
+                    task.over_threshold
+                      ? "border-2 border-primary animate-pulse-light"
+                      : ""
+                  }`}
+                >
+                  {figurePath && (
+                    <TaskFigure
+                      path={figurePath}
+                      qid={String(task.couplingId)}
+                      className="w-full h-full object-contain"
+                    />
+                  )}
+                </button>
+              );
+            })}
 
           {/* Region selection overlay - only when enabled and in full view mode */}
-          {zoomMode === 'full' && regionSelectionEnabled && (
+          {zoomMode === "full" && regionSelectionEnabled && (
             <div className="absolute inset-0 pointer-events-none">
               <div
                 className="grid gap-2 w-full h-full"
                 style={{ gridTemplateColumns: `repeat(${numRegions}, 1fr)` }}
               >
-                {Array.from({ length: numRegions * numRegions }).map((_, index) => {
-                  const regionRow = Math.floor(index / numRegions);
-                  const regionCol = index % numRegions;
-                  const isHovered = hoveredRegion?.row === regionRow && hoveredRegion?.col === regionCol;
+                {Array.from({ length: numRegions * numRegions }).map(
+                  (_, index) => {
+                    const regionRow = Math.floor(index / numRegions);
+                    const regionCol = index % numRegions;
+                    const isHovered =
+                      hoveredRegion?.row === regionRow &&
+                      hoveredRegion?.col === regionCol;
 
-                  return (
-                    <button
-                      key={index}
-                      className={`pointer-events-auto transition-all duration-200 rounded-lg ${
-                        isHovered
-                          ? 'bg-primary/20 border-2 border-primary'
-                          : 'bg-transparent border-2 border-transparent hover:border-primary/50'
-                      }`}
-                      onMouseEnter={() => setHoveredRegion({ row: regionRow, col: regionCol })}
-                      onMouseLeave={() => setHoveredRegion(null)}
-                      onClick={() => {
-                        setSelectedRegion({ row: regionRow, col: regionCol });
-                        setZoomMode('region');
-                      }}
-                      title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-                    />
-                  );
-                })}
+                    return (
+                      <button
+                        key={index}
+                        className={`pointer-events-auto transition-all duration-200 rounded-lg ${
+                          isHovered
+                            ? "bg-primary/20 border-2 border-primary"
+                            : "bg-transparent border-2 border-transparent hover:border-primary/50"
+                        }`}
+                        onMouseEnter={() =>
+                          setHoveredRegion({ row: regionRow, col: regionCol })
+                        }
+                        onMouseLeave={() => setHoveredRegion(null)}
+                        onClick={() => {
+                          setSelectedRegion({ row: regionRow, col: regionCol });
+                          setZoomMode("region");
+                        }}
+                        title={`Zoom to region (${regionRow + 1}, ${
+                          regionCol + 1
+                        })`}
+                      />
+                    );
+                  }
+                )}
               </div>
             </div>
           )}
@@ -500,8 +534,8 @@ export function CouplingGrid({
                     const figures = Array.isArray(selectedTask.figure_path)
                       ? selectedTask.figure_path
                       : selectedTask.figure_path
-                        ? [selectedTask.figure_path]
-                        : [];
+                      ? [selectedTask.figure_path]
+                      : [];
                     const currentSubIndex = selectedTaskInfo.subIndex ?? 0;
                     const currentFigure = figures[currentSubIndex];
                     return (
@@ -526,7 +560,7 @@ export function CouplingGrid({
                                             figures.length) %
                                           figures.length,
                                       }
-                                    : null,
+                                    : null
                                 )
                               }
                             >
@@ -546,7 +580,7 @@ export function CouplingGrid({
                                           ((prev.subIndex ?? 0) + 1) %
                                           figures.length,
                                       }
-                                    : null,
+                                    : null
                                 )
                               }
                             >
@@ -578,7 +612,7 @@ export function CouplingGrid({
                                 index: (prev.index + 1) % prev.taskList.length,
                                 subIndex: 0,
                               }
-                            : null,
+                            : null
                         )
                       }
                     >
@@ -593,9 +627,9 @@ export function CouplingGrid({
                           .status === "completed"
                           ? "badge-success"
                           : selectedTaskInfo.taskList[selectedTaskInfo.index]
-                                .status === "failed"
-                            ? "badge-error"
-                            : "badge-warning"
+                              .status === "failed"
+                          ? "badge-error"
+                          : "badge-warning"
                       }`}
                     >
                       {selectedTaskInfo.taskList[selectedTaskInfo.index].status}
@@ -672,7 +706,7 @@ export function CouplingGrid({
                           process.env.NEXT_PUBLIC_API_URL
                         }/api/executions/figure?path=${encodeURIComponent(
                           selectedTaskInfo.taskList[selectedTaskInfo.index]
-                            .json_figure_path?.[0] || "",
+                            .json_figure_path?.[0] || ""
                         )}`}
                       />
                     </div>
@@ -690,8 +724,8 @@ export function CouplingGrid({
                   const figures = Array.isArray(path)
                     ? path
                     : path
-                      ? [path]
-                      : [];
+                    ? [path]
+                    : [];
                   const currentSubIndex = selectedTaskInfo.subIndex ?? 0;
                   const currentFigure = figures[currentSubIndex];
 
@@ -705,7 +739,7 @@ export function CouplingGrid({
                               fullPath={`${
                                 process.env.NEXT_PUBLIC_API_URL
                               }/api/executions/figure?path=${encodeURIComponent(
-                                currentFigure || "",
+                                currentFigure || ""
                               )}`}
                             />
                           </div>
@@ -727,7 +761,7 @@ export function CouplingGrid({
                                           figures.length) %
                                         figures.length,
                                     }
-                                  : null,
+                                  : null
                               )
                             }
                           >
@@ -747,7 +781,7 @@ export function CouplingGrid({
                                         ((prev.subIndex ?? 0) + 1) %
                                         figures.length,
                                     }
-                                  : null,
+                                  : null
                               )
                             }
                           >
