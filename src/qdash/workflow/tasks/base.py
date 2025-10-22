@@ -55,7 +55,11 @@ class BaseTask(ABC):
         if backend is None:
             raise ValueError(f"{cls.__name__} に backend を定義してください")
         task_name = getattr(cls, "name", cls.__name__)
-        BaseTask.registry.setdefault(backend, {})[task_name] = cls
+        
+        # Skip registration for intermediate base classes (those with empty name)
+        # Only concrete task implementations should be registered
+        if task_name:
+            BaseTask.registry.setdefault(backend, {})[task_name] = cls
 
     def __init__(self, params: dict[str, Any] | None = None) -> None:
         """Initialize task with parameters.

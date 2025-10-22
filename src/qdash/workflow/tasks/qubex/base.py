@@ -14,7 +14,8 @@ class QubexTask(BaseTask):
     """
 
     backend: str = "qubex"
-    task_type: Literal["global", "qubit", "coupling", "system"]  # Must be defined in subclass
+    # name is empty to prevent registration in BaseTask.registry
+    # Only concrete subclasses with a name should be registered
 
     def batch_run(self, session: "QubexSession", qids: list[str]) -> RunResult:
         """Default implementation for batch run.
