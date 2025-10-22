@@ -102,8 +102,8 @@ class ReadoutClassification(QubexTask):
         label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
         self.output_parameters["average_readout_fidelity"].value = result["average_readout_fidelity"][label]
-        self.output_parameters["readout_fidelity_0"].value = result["readout_fidelties"][label][0]
-        self.output_parameters["readout_fidelity_1"].value = result["readout_fidelties"][label][1]
+        self.output_parameters["readout_fidelity_0"].value = result["readout_fidelities"][label][0]
+        self.output_parameters["readout_fidelity_1"].value = result["readout_fidelities"][label][1]
         output_parameters = self.attach_execution_id(execution_id)
 
         figures: list[go.Figure] = [self.plot_section_from_result(session, result, qid)]
