@@ -38,7 +38,7 @@ class ReadoutClassification(QubexTask):
     def plot_section_from_result(
         self, session: QubexSession, result: dict[str, Any], qid: str, bins: int = 60
     ) -> go.Figure:
-        exp = self.get_experiment(session)
+        self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
         clf = result["classifiers"][label]
         z0 = result["data"][label][label][0]
@@ -98,7 +98,7 @@ class ReadoutClassification(QubexTask):
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        exp = self.get_experiment(session)
+        self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
         self.output_parameters["average_readout_fidelity"].value = result["average_readout_fidelity"][label]

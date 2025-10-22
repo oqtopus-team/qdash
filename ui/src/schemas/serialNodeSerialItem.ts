@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { BatchNode } from "./batchNode";
-import type { ParallelNode } from "./parallelNode";
 import type { SerialNode } from "./serialNode";
+import type { ParallelNode } from "./parallelNode";
+import type { BatchNode } from "./batchNode";
 
 export type SerialNodeSerialItem =
   | SerialNode

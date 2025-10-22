@@ -29,7 +29,7 @@ class ChevronPattern(QubexTask):
         time_range = result["time_range"]
         frequencies = result["frequencies"]
 
-        rabi_rates = result["rabi_rates"]
+        result["rabi_rates"]
         chevron_data = result["chevron_data"]
 
         fig = go.Figure()
@@ -45,7 +45,7 @@ class ChevronPattern(QubexTask):
             title=dict(
                 text=f"Chevron pattern : {label}",
                 subtitle=dict(
-                    text=f"control_amplitude=",
+                    text="control_amplitude=",
                     font=dict(
                         size=13,
                         family="monospace",
@@ -64,7 +64,7 @@ class ChevronPattern(QubexTask):
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        exp = self.get_experiment(session)
+        self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
         self.output_parameters["bare_frequency"].value = result["resonant_frequencies"][label]
@@ -75,7 +75,6 @@ class ChevronPattern(QubexTask):
     def run(self, session: QubexSession, qid: str) -> RunResult:
         exp = self.get_experiment(session)
         labels = [exp.get_qubit_label(int(qid))]
-        from qubex.experiment.rabi_param import RabiParam
 
         # rabi_param = RabiParam(
         #     **{

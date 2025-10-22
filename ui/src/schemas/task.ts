@@ -5,21 +5,21 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskElapsedTime } from "./taskElapsedTime";
-import type { TaskEndAt } from "./taskEndAt";
-import type { TaskFigurePath } from "./taskFigurePath";
-import type { TaskInputParameters } from "./taskInputParameters";
-import type { TaskJsonFigurePath } from "./taskJsonFigurePath";
-import type { TaskMessage } from "./taskMessage";
-import type { TaskNote } from "./taskNote";
-import type { TaskOutputParameterNames } from "./taskOutputParameterNames";
-import type { TaskOutputParameters } from "./taskOutputParameters";
+import type { TaskTaskId } from "./taskTaskId";
 import type { TaskQid } from "./taskQid";
+import type { TaskUpstreamId } from "./taskUpstreamId";
+import type { TaskMessage } from "./taskMessage";
+import type { TaskInputParameters } from "./taskInputParameters";
+import type { TaskOutputParameters } from "./taskOutputParameters";
+import type { TaskOutputParameterNames } from "./taskOutputParameterNames";
+import type { TaskNote } from "./taskNote";
+import type { TaskFigurePath } from "./taskFigurePath";
+import type { TaskJsonFigurePath } from "./taskJsonFigurePath";
 import type { TaskRawDataPath } from "./taskRawDataPath";
 import type { TaskStartAt } from "./taskStartAt";
-import type { TaskTaskId } from "./taskTaskId";
+import type { TaskEndAt } from "./taskEndAt";
+import type { TaskElapsedTime } from "./taskElapsedTime";
 import type { TaskTaskType } from "./taskTaskType";
-import type { TaskUpstreamId } from "./taskUpstreamId";
 
 /**
  * Task is a Pydantic model that represents a task.

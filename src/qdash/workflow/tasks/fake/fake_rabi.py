@@ -6,7 +6,6 @@ import numpy.typing as npt
 import plotly.graph_objects as go
 import qubex as qx
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-
 from qdash.workflow.core.session.fake import FakeSession
 from qdash.workflow.tasks.base import (
     PostProcessResult,

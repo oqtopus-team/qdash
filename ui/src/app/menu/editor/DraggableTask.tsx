@@ -1,6 +1,4 @@
-import { useDraggable } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
-import { BsArrowRight } from "react-icons/bs";
+import { BsPlusCircle } from "react-icons/bs";
 
 import type { TaskResponse } from "@/schemas";
 
@@ -10,27 +8,8 @@ interface DraggableTaskProps {
 }
 
 export default function DraggableTask({ task, onClick }: DraggableTaskProps) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: task.name,
-    data: task,
-  });
-
-  const style = transform
-    ? {
-        transform: CSS.Translate.toString(transform),
-        zIndex: 50, // ドラッグ中は高いz-indexを設定
-      }
-    : undefined;
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="p-3 rounded-lg border border-base-300 hover:border-primary cursor-pointer transition-colors group touch-none bg-base-100"
-      onClick={onClick}
-    >
+    <div className="p-3 rounded-lg border border-base-300 hover:border-primary transition-colors group bg-base-100">
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -45,9 +24,16 @@ export default function DraggableTask({ task, onClick }: DraggableTaskProps) {
             </p>
           )}
         </div>
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-          <BsArrowRight className="text-xl text-primary" />
-        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick?.();
+          }}
+          className="btn btn-primary btn-sm btn-circle transition-colors shrink-0"
+          title="Add task"
+        >
+          <BsPlusCircle className="text-lg" />
+        </button>
       </div>
     </div>
   );

@@ -43,7 +43,7 @@ class CheckT2Echo(QubexTask):
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        exp = self.get_experiment(session)
+        self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
         self.output_parameters["t2_echo"].value = result.data[label].t2 * 0.001  # convert to μs

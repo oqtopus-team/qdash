@@ -55,7 +55,7 @@ class BaseTask(ABC):
         if backend is None:
             raise ValueError(f"{cls.__name__} に backend を定義してください")
         task_name = getattr(cls, "name", cls.__name__)
-        
+
         # Skip registration for intermediate base classes (those with empty name)
         # Only concrete task implementations should be registered
         if task_name:

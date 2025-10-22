@@ -16,7 +16,7 @@ import {
 
 const PlotlyRenderer = dynamic(
   () => import("@/app/components/PlotlyRenderer").then((mod) => mod.default),
-  { ssr: false }
+  { ssr: false },
 );
 
 interface CouplingGridProps {
@@ -136,7 +136,7 @@ export function CouplingGrid({
       const gap = 8; // gap between cells
       const totalGap = gap * (effectiveGridSize - 1);
       const calculatedSize = Math.floor(
-        (availableWidth - totalGap) / effectiveGridSize
+        (availableWidth - totalGap) / effectiveGridSize,
       );
       setCellSize(Math.max(calculatedSize, 30));
     };
@@ -165,7 +165,7 @@ export function CouplingGrid({
             placeholderData: keepPreviousData,
             staleTime: 30000, // 30 seconds
           },
-        }
+        },
       );
 
   // Reset modal only when date changes externally (not from modal navigation)
@@ -187,7 +187,7 @@ export function CouplingGrid({
       timeoutId = setTimeout(() => {
         const normalizedResultMap: Record<string, ExtendedTask[]> = {};
         for (const [couplingId, task] of Object.entries(
-          taskResponse.data.result
+          taskResponse.data.result,
         )) {
           const [a, b] = couplingId.split("-").map(Number);
           const normKey = a < b ? `${a}-${b}` : `${b}-${a}`;
@@ -197,7 +197,7 @@ export function CouplingGrid({
             couplingId,
           } as ExtendedTask);
           normalizedResultMap[normKey].sort(
-            (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0)
+            (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0),
           );
         }
 
@@ -233,7 +233,7 @@ export function CouplingGrid({
         couplingId,
       } as ExtendedTask);
       normalizedResultMap[normKey].sort(
-        (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0)
+        (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0),
       );
     }
   }
@@ -338,7 +338,7 @@ export function CouplingGrid({
                 length: gridSize === 8 ? 64 : 144,
               }).map((_, i) => i);
               const filteredQids = allQids.filter((qid) =>
-                isQubitInRegion(qid)
+                isQubitInRegion(qid),
               );
               const qid = filteredQids[idx];
               const muxIndex = Math.floor(qid / 4);
@@ -386,7 +386,7 @@ export function CouplingGrid({
               const { row1, col1, row2, col2 } = getCouplingPosition(
                 qid1,
                 qid2,
-                gridSize
+                gridSize,
               );
 
               // Adjust position for region mode
@@ -476,7 +476,7 @@ export function CouplingGrid({
                         })`}
                       />
                     );
-                  }
+                  },
                 )}
               </div>
             </div>
@@ -534,8 +534,8 @@ export function CouplingGrid({
                     const figures = Array.isArray(selectedTask.figure_path)
                       ? selectedTask.figure_path
                       : selectedTask.figure_path
-                      ? [selectedTask.figure_path]
-                      : [];
+                        ? [selectedTask.figure_path]
+                        : [];
                     const currentSubIndex = selectedTaskInfo.subIndex ?? 0;
                     const currentFigure = figures[currentSubIndex];
                     return (
@@ -560,7 +560,7 @@ export function CouplingGrid({
                                             figures.length) %
                                           figures.length,
                                       }
-                                    : null
+                                    : null,
                                 )
                               }
                             >
@@ -580,7 +580,7 @@ export function CouplingGrid({
                                           ((prev.subIndex ?? 0) + 1) %
                                           figures.length,
                                       }
-                                    : null
+                                    : null,
                                 )
                               }
                             >
@@ -612,7 +612,7 @@ export function CouplingGrid({
                                 index: (prev.index + 1) % prev.taskList.length,
                                 subIndex: 0,
                               }
-                            : null
+                            : null,
                         )
                       }
                     >
@@ -627,9 +627,9 @@ export function CouplingGrid({
                           .status === "completed"
                           ? "badge-success"
                           : selectedTaskInfo.taskList[selectedTaskInfo.index]
-                              .status === "failed"
-                          ? "badge-error"
-                          : "badge-warning"
+                                .status === "failed"
+                            ? "badge-error"
+                            : "badge-warning"
                       }`}
                     >
                       {selectedTaskInfo.taskList[selectedTaskInfo.index].status}
@@ -706,7 +706,7 @@ export function CouplingGrid({
                           process.env.NEXT_PUBLIC_API_URL
                         }/api/executions/figure?path=${encodeURIComponent(
                           selectedTaskInfo.taskList[selectedTaskInfo.index]
-                            .json_figure_path?.[0] || ""
+                            .json_figure_path?.[0] || "",
                         )}`}
                       />
                     </div>
@@ -724,8 +724,8 @@ export function CouplingGrid({
                   const figures = Array.isArray(path)
                     ? path
                     : path
-                    ? [path]
-                    : [];
+                      ? [path]
+                      : [];
                   const currentSubIndex = selectedTaskInfo.subIndex ?? 0;
                   const currentFigure = figures[currentSubIndex];
 
@@ -739,7 +739,7 @@ export function CouplingGrid({
                               fullPath={`${
                                 process.env.NEXT_PUBLIC_API_URL
                               }/api/executions/figure?path=${encodeURIComponent(
-                                currentFigure || ""
+                                currentFigure || "",
                               )}`}
                             />
                           </div>
@@ -761,7 +761,7 @@ export function CouplingGrid({
                                           figures.length) %
                                         figures.length,
                                     }
-                                  : null
+                                  : null,
                               )
                             }
                           >
@@ -781,7 +781,7 @@ export function CouplingGrid({
                                         ((prev.subIndex ?? 0) + 1) %
                                         figures.length,
                                     }
-                                  : null
+                                  : null,
                               )
                             }
                           >

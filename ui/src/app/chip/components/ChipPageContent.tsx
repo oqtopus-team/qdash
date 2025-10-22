@@ -524,7 +524,9 @@ export function ChipPageContent() {
                                           <div className="card-body p-2">
                                             <div className="text-sm font-medium mb-2">
                                               <div className="flex justify-between items-center mb-1">
-                                                <span className="text-base-content/40">QID: {qid}</span>
+                                                <span className="text-base-content/40">
+                                                  QID: {qid}
+                                                </span>
                                               </div>
                                             </div>
                                             <div className="text-xs text-base-content/30 italic text-center py-4">

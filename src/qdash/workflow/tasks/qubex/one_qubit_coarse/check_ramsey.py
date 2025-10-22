@@ -107,7 +107,7 @@ class CheckRamsey(QubexTask):
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         """Process the results of the task."""
-        exp = self.get_experiment(session)
+        self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
         result_x = run_result.raw_result["x"].data[label]
         result_y = run_result.raw_result["y"].data[label]

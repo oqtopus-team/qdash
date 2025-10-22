@@ -264,7 +264,8 @@ export function TaskDetailModal({
                             className="btn btn-xs"
                             onClick={() =>
                               setSubIndex(
-                                (subIndex - 1 + figures.length) % figures.length,
+                                (subIndex - 1 + figures.length) %
+                                  figures.length,
                               )
                             }
                           >
@@ -330,13 +331,18 @@ export function TaskDetailModal({
                                     : { value }
                                 ) as { value: number | string; unit?: string };
                                 return (
-                                  <div key={key} className="flex justify-between">
+                                  <div
+                                    key={key}
+                                    className="flex justify-between"
+                                  >
                                     <span className="font-medium">{key}:</span>
                                     <span>
                                       {typeof paramValue.value === "number"
                                         ? paramValue.value.toFixed(precision)
                                         : String(paramValue.value)}
-                                      {paramValue.unit ? ` ${paramValue.unit}` : ""}
+                                      {paramValue.unit
+                                        ? ` ${paramValue.unit}`
+                                        : ""}
                                     </span>
                                   </div>
                                 );
