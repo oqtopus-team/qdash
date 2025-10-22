@@ -124,5 +124,5 @@ agent = [
 ]
 
 [tool.uv.sources]
-qubex = { git = "https://github.com/amachino/qubex.git", tag = "v1.4.1b1" }
+qubex = { git = "https://github.com/amachino/qubex.git", tag = "v1.4.3a3" }
 strands-agents = { git = "https://github.com/strands-agents/sdk-python.git" }
