@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserFullName } from "./userFullName";
 import type { UserDisabled } from "./userDisabled";
+import type { UserFullName } from "./userFullName";
 
 /**
  * User model for authentication and user management.

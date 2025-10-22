@@ -4,18 +4,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { useSidebar } from "@/app/contexts/SidebarContext";
-
 import { BsListTask, BsMenuButton } from "react-icons/bs";
 import { BsCpu } from "react-icons/bs";
 import { FaScrewdriverWrench } from "react-icons/fa6";
 import { FaBolt } from "react-icons/fa6";
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { GiGinkgoLeaf } from "react-icons/gi";
 import { GoWorkflow } from "react-icons/go";
 import { IoMdSettings } from "react-icons/io";
 import { IoAnalytics } from "react-icons/io5";
 import { MdDashboard } from "react-icons/md";
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+
+import { useSidebar } from "@/app/contexts/SidebarContext";
 
 function Sidebar() {
   const pathname = usePathname();

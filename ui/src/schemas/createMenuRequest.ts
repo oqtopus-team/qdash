@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { CreateMenuRequestSchedule } from "./createMenuRequestSchedule";
-import type { CreateMenuRequestTasks } from "./createMenuRequestTasks";
-import type { CreateMenuRequestTaskDetails } from "./createMenuRequestTaskDetails";
 import type { CreateMenuRequestTags } from "./createMenuRequestTags";
+import type { CreateMenuRequestTaskDetails } from "./createMenuRequestTaskDetails";
+import type { CreateMenuRequestTasks } from "./createMenuRequestTasks";
 
 /**
  * CreateMenuRequest is a Pydantic model for creating a menu item.

@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ChipResponseQubits } from "./chipResponseQubits";
 import type { ChipResponseCouplings } from "./chipResponseCouplings";
+import type { ChipResponseQubits } from "./chipResponseQubits";
 
 /**
  * Chip is a Pydantic model that represents a chip.

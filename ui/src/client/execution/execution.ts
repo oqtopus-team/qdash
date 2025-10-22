@@ -6,6 +6,16 @@
  * OpenAPI spec version: 0.0.1
  */
 import { useQuery } from "@tanstack/react-query";
+
+import { customInstance } from "../../lib/custom-instance";
+
+import type { ErrorType } from "../../lib/custom-instance";
+import type {
+  Detail,
+  ExecutionLockStatusResponse,
+  FetchFigureByPathParams,
+  HTTPValidationError,
+} from "../../schemas";
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -17,16 +27,6 @@ import type {
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
-
-import type {
-  Detail,
-  ExecutionLockStatusResponse,
-  FetchFigureByPathParams,
-  HTTPValidationError,
-} from "../../schemas";
-
-import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 

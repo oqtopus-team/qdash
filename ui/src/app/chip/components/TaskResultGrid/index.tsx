@@ -248,7 +248,7 @@ export function TaskResultGrid({
                 className="absolute top-1 right-1 btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                 title="Detailed Analysis"
               >
-                📊
+                Detail
               </button>
             </div>
           );
@@ -293,7 +293,7 @@ export function TaskResultGrid({
                   className="btn btn-sm btn-primary"
                   title="Detailed Analysis"
                 >
-                  📊 Detail View
+                  Detail View
                 </button>
                 <button
                   onClick={() => setSelectedTaskInfo(null)}
