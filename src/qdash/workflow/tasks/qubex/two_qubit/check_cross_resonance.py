@@ -5,9 +5,7 @@ import plotly.graph_objects as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.tasks.qubex.base import QubexTask
@@ -33,9 +31,6 @@ class CheckCrossResonance(QubexTask):
         ),
         "zx_rotation_rate": OutputParameterModel(unit="a.u.", value_type="float", description="ZX rotation rate."),
     }
-
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
-        return PreProcessResult(input_parameters=self.input_parameters)
 
     def _plot_coeffs_history(self, coeffs_history: dict, label: str) -> go.Figure:
         fig = go.Figure()

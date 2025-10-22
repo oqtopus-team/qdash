@@ -4,7 +4,6 @@ from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.tasks.qubex.base import QubexTask
@@ -34,10 +33,6 @@ class CheckResonatorFrequencies(QubexTask):
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "coarse_resonator_frequency": OutputParameterModel(unit="GHz", description="Coarse resonator frequency"),
     }
-
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
-        """Preprocess the task."""
-        return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str

@@ -6,7 +6,6 @@ from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.tasks.qubex.base import QubexTask
@@ -26,10 +25,6 @@ class CheckReadoutAmplitude(QubexTask):
         )
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
-
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
-        """Preprocess the task."""
-        return PreProcessResult(input_parameters=self.input_parameters)
 
     def make_figure(self, signal: dict, noise: dict, snr: dict, label: str) -> go.Figure:
         fig = make_subplots(rows=3, cols=1, shared_xaxes=True)

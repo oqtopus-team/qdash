@@ -5,7 +5,6 @@ from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.tasks.qubex.base import QubexTask
@@ -48,10 +47,6 @@ class CheckRamsey(QubexTask):
         "bare_frequency": OutputParameterModel(unit="GHz", description="Qubit bare frequency"),
         "t2_star": OutputParameterModel(unit="μs", description="T2* time"),
     }
-
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
-        """Preprocess the task."""
-        return PreProcessResult(input_parameters=self.input_parameters)
 
     def make_figure(self, result_x: Any, result_y: Any, label: str) -> go.Figure:
         """Create a figure for the results."""

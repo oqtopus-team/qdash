@@ -5,7 +5,6 @@ from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.tasks.qubex.base import QubexTask
@@ -40,9 +39,6 @@ class CheckT1(QubexTask):
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "t1": OutputParameterModel(unit="μs", description="T1 time"),
     }
-
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
-        return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
