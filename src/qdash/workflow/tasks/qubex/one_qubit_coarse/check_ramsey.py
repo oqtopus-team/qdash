@@ -4,19 +4,18 @@ import plotly.graph_objects as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    BaseTask,
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
+from qdash.workflow.tasks.qubex.base import QubexTask
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 
-class CheckRamsey(BaseTask):
+class CheckRamsey(QubexTask):
     """Task to check the Rabi oscillation."""
 
     name: str = "CheckRamsey"
-    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "detuning": InputParameterModel(
@@ -113,8 +112,8 @@ class CheckRamsey(BaseTask):
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         """Process the results of the task."""
-        exp = session.get_session()
-        label = exp.get_qubit_label(int(qid))
+        exp = self.get_experiment(session)
+        label = self.get_qubit_label(session, qid)
         result_x = run_result.raw_result["x"].data[label]
         result_y = run_result.raw_result["y"].data[label]
         self.output_parameters["ramsey_frequency"].value = result_x.fit()["f"] * 1000  # convert to MHz
@@ -133,8 +132,8 @@ class CheckRamsey(BaseTask):
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         """Run the task."""
-        exp = session.get_session()
-        label = exp.get_qubit_label(int(qid))
+        exp = self.get_experiment(session)
+        label = self.get_qubit_label(session, qid)
         result_y = exp.ramsey_experiment(
             time_range=self.input_parameters["time_range"].get_value(),
             shots=self.input_parameters["shots"].get_value(),
@@ -153,11 +152,7 @@ class CheckRamsey(BaseTask):
             spectator_state="0",
             targets=label,
         )
-        exp.calib_note.save()
+        self.save_calibration(session)
         result = {"x": result_x, "y": result_y}
         r2 = result_x.data[label].r2 if result_x.data else None
         return RunResult(raw_result=result, r2={qid: r2})
-
-    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
-        """Batch run is not implemented."""
-        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

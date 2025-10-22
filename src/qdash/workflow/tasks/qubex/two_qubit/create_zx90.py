@@ -3,18 +3,18 @@ from typing import ClassVar
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    BaseTask,
+    
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
+from qdash.workflow.tasks.qubex.base import QubexTask
 
 
-class CreateZX90(BaseTask):
+class CreateZX90(QubexTask):
     """Task to create ZX90 gate."""
 
     name: str = "CreateZX90"
-    backend: str = "qubex"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
@@ -52,7 +52,7 @@ class CreateZX90(BaseTask):
         return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        exp = session.get_session()
+        exp = self.get_experiment(session)
         control, target = (exp.get_qubit_label(int(q)) for q in qid.split("-"))  # e.g., "0-1" → "Q00","Q01"
         label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
         raw_result = exp.calibrate_zx90(
@@ -76,9 +76,5 @@ class CreateZX90(BaseTask):
             "fig": raw_result["fig"],
         }
 
-        exp.calib_note.save()
+        self.save_calibration(session)
         return RunResult(raw_result=result)
-
-    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
-        """Batch run is not implemented."""
-        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

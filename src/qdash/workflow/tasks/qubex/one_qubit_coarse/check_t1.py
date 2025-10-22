@@ -4,19 +4,18 @@ import numpy as np
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    BaseTask,
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
+from qdash.workflow.tasks.qubex.base import QubexTask
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 
-class CheckT1(BaseTask):
+class CheckT1(QubexTask):
     """Task to check the T1 time."""
 
     name: str = "CheckT1"
-    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "time_range": InputParameterModel(
@@ -48,8 +47,8 @@ class CheckT1(BaseTask):
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        exp = session.get_session()
-        label = exp.get_qubit_label(int(qid))
+        exp = self.get_experiment(session)
+        label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
         self.output_parameters["t1"].value = result.data[label].t1 * 0.001  # convert to μs
         self.output_parameters["t1"].error = result.data[label].t1_err * 0.001  # convert to μs
@@ -58,7 +57,7 @@ class CheckT1(BaseTask):
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        exp = session.get_session()
+        exp = self.get_experiment(session)
         labels = [exp.get_qubit_label(int(qid))]
         result = exp.t1_experiment(
             time_range=self.input_parameters["time_range"].get_value(),
@@ -66,10 +65,6 @@ class CheckT1(BaseTask):
             interval=self.input_parameters["interval"].get_value(),
             targets=labels,
         )
-        exp.calib_note.save()
+        self.save_calibration(session)
         r2 = result.data[exp.get_qubit_label(int(qid))].r2
         return RunResult(raw_result=result, r2={qid: r2})
-
-    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
-        """Batch run is not implemented."""
-        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")
