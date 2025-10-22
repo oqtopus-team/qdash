@@ -1,4 +1,5 @@
 from qdash.workflow.tasks.active_protocols import generate_task_instances
+from qdash.workflow.tasks.qubex.base import QubexTask
 from qdash.workflow.tasks.qubex.benchmark.randomized_benchmarking import RandomizedBenchmarking
 from qdash.workflow.tasks.qubex.benchmark.x90_interleaved_randomized_benchmarking import (
     X90InterleavedRandomizedBenchmarking,
@@ -53,6 +54,7 @@ from qdash.workflow.tasks.qubex.two_qubit.check_zx90 import CheckZX90
 from qdash.workflow.tasks.qubex.two_qubit.create_zx90 import CreateZX90
 
 __all__ = [
+    "QubexTask",
     "CheckNoise",
     "CheckStatus",
     "Configure",

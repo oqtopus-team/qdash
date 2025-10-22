@@ -5,18 +5,18 @@ import plotly.graph_objects as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    BaseTask,
+    
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
+from qdash.workflow.tasks.qubex.base import QubexTask
 
 
-class CheckCrossResonance(BaseTask):
+class CheckCrossResonance(QubexTask):
     """Task to check the cross resonance pulse."""
 
     name: str = "CheckCrossResonance"
-    backend: str = "qubex"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
@@ -59,7 +59,7 @@ class CheckCrossResonance(BaseTask):
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        exp = session.get_session()
+        exp = self.get_experiment(session)
         label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
         result = run_result.raw_result
         self.output_parameters["cr_amplitude"].value = result["cr_amplitude"]
@@ -77,7 +77,7 @@ class CheckCrossResonance(BaseTask):
         return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        exp = session.get_session()
+        exp = self.get_experiment(session)
         label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
         control, target = (exp.get_qubit_label(int(q)) for q in qid.split("-"))  # e.g., "0-1" → "Q00","Q01"
 
@@ -99,9 +99,5 @@ class CheckCrossResonance(BaseTask):
             "zx_rotation_rate": fit_result["zx_rotation_rate"],
             "coeffs_history": raw_result["coeffs_history"],
         }
-        exp.calib_note.save()
+        self.save_calibration(session)
         return RunResult(raw_result=result)
-
-    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
-        """Batch run is not implemented."""
-        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

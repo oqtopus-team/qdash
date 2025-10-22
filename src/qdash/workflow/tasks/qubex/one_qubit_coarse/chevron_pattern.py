@@ -5,18 +5,17 @@ import plotly.graph_objects as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    BaseTask,
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
+from qdash.workflow.tasks.qubex.base import QubexTask
 
 
-class ChevronPattern(BaseTask):
+class ChevronPattern(QubexTask):
     """Task to check the chevron pattern."""
 
     name: str = "ChevronPattern"
-    backend: str = "qubex"
     task_type: str = "qubit"
     timeout: int = 60 * 240
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
@@ -25,7 +24,21 @@ class ChevronPattern(BaseTask):
     }
 
     def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
-        pass
+        exp = self.get_experiment(session)
+        label = self.get_qubit_label(session, qid)
+        self.input_parameters["readout_amplitude"] = InputParameterModel(
+            unit="a.u.",
+            description="Readout Frequency",
+            value=exp.experiment_system.control_params.get_readout_amplitude(label),
+            value_type="float",
+        )
+        self.input_parameters["readout_frequency"] = InputParameterModel(
+            unit="GHz",
+            description="Readout Amplitude",
+            value=exp.experiment_system.quantum_system.get_resonator(exp.get_resonator_label(int(qid))).frequency,
+            value_type="float",
+        )
+        return PreProcessResult(input_parameters=self.input_parameters)
 
     def make_figure(self, result: Any, label: str) -> go.Figure:
         """Create a figure for the results."""
@@ -69,8 +82,8 @@ class ChevronPattern(BaseTask):
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        exp = session.get_session()
-        label = exp.get_qubit_label(int(qid))
+        exp = self.get_experiment(session)
+        label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
         self.output_parameters["bare_frequency"].value = result["resonant_frequencies"][label]
         output_parameters = self.attach_execution_id(execution_id)
@@ -78,7 +91,7 @@ class ChevronPattern(BaseTask):
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        exp = session.get_session()
+        exp = self.get_experiment(session)
         labels = [exp.get_qubit_label(int(qid))]
         from qubex.experiment.rabi_param import RabiParam
 
@@ -102,9 +115,5 @@ class ChevronPattern(BaseTask):
             time_range=np.arange(0, 201, 4),
             # rabi_params={labels[0]: rabi_param},
         )
-        exp.calib_note.save()
+        self.save_calibration(session)
         return RunResult(raw_result=result)
-
-    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
-        """Batch run is not implemented."""
-        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

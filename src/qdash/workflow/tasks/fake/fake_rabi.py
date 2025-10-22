@@ -6,14 +6,14 @@ import numpy.typing as npt
 import plotly.graph_objects as go
 import qubex as qx
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.calibration.util import qid_to_label
+
 from qdash.workflow.core.session.fake import FakeSession
 from qdash.workflow.tasks.base import (
-    BaseTask,
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
+from qdash.workflow.tasks.fake.base import FakeTask
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 from qubex.simulator import Control, QuantumSimulator, QuantumSystem, SimulationResult, Transmon
 
@@ -79,11 +79,10 @@ class CustomSimulationResult(SimulationResult):
         return fig
 
 
-class FakeRabi(BaseTask):
+class FakeRabi(FakeTask):
     """Task to check the Fake Rabi oscillation."""
 
     name: str = "FakeRabi"
-    backend: str = "fake"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "time_range": InputParameterModel(
@@ -121,7 +120,7 @@ class FakeRabi(BaseTask):
 
     def run(self, session: FakeSession, qid: str) -> RunResult:
         """Run the task."""
-        label = qid_to_label(qid)
+        label = self.get_label(qid)
         qubit = Transmon(
             label=label,
             dimension=2,
@@ -157,7 +156,3 @@ class FakeRabi(BaseTask):
             unitaries=result.unitaries,
         )
         return RunResult(raw_result=result)
-
-    def batch_run(self, session: FakeSession, qid: str) -> RunResult:
-        """Batch run is not implemented."""
-        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

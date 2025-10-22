@@ -3,20 +3,19 @@ from typing import ClassVar
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    BaseTask,
     PostProcessResult,
     PreProcessResult,
     RunResult,
 )
+from qdash.workflow.tasks.qubex.base import QubexTask
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
-class RandomizedBenchmarking(BaseTask):
+class RandomizedBenchmarking(QubexTask):
     """Task to perform randomized benchmarking."""
 
     name: str = "RandomizedBenchmarking"
-    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "n_trials": InputParameterModel(
@@ -55,8 +54,8 @@ class RandomizedBenchmarking(BaseTask):
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        exp = session.get_session()
-        label = exp.get_qubit_label(int(qid))
+        exp = self.get_experiment(session)
+        label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
         self.output_parameters["average_gate_fidelity"].value = result[label]["avg_gate_fidelity"]
         self.output_parameters["average_gate_fidelity"].error = result[label]["avg_gate_fidelity_err"]
@@ -66,8 +65,8 @@ class RandomizedBenchmarking(BaseTask):
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        exp = session.get_session()
-        label = exp.get_qubit_label(int(qid))
+        exp = self.get_experiment(session)
+        label = self.get_qubit_label(session, qid)
         result = exp.randomized_benchmarking(
             targets=label,
             n_trials=self.input_parameters["n_trials"].get_value(),
@@ -75,10 +74,6 @@ class RandomizedBenchmarking(BaseTask):
             shots=self.input_parameters["shots"].get_value(),
             interval=self.input_parameters["interval"].get_value(),
         )
-        exp.calib_note.save()
+        self.save_calibration(session)
         r2 = result[label]["r2"]
         return RunResult(raw_result=result, r2={qid: r2})
-
-    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
-        """Batch run is not implemented."""
-        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")
