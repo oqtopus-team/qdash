@@ -8,11 +8,7 @@ import {
   FaCalendarAlt,
   FaClock,
 } from "react-icons/fa";
-import {
-  BsCheckCircle,
-  BsXCircle,
-  BsClock,
-} from "react-icons/bs";
+import { BsCheckCircle, BsXCircle, BsClock } from "react-icons/bs";
 
 import ExecutionDAG from "./ExecutionDAG";
 
@@ -136,7 +132,9 @@ export default function ExecutionDetailClient({
       // Only update if the current selection is not in the filtered list
       const currentTaskInFilteredList =
         selectedTaskIndex !== null &&
-        filtered.some((task: any) => execution.task[selectedTaskIndex] === task);
+        filtered.some(
+          (task: any) => execution.task[selectedTaskIndex] === task,
+        );
 
       if (!currentTaskInFilteredList) {
         setSelectedTaskIndex(firstFilteredTaskIndex);
@@ -477,7 +475,9 @@ export default function ExecutionDetailClient({
                 <div className="card bg-base-100 shadow-xl h-full">
                   <div className="card-body p-6 overflow-y-auto">
                     <div className="flex items-center justify-between mb-6">
-                      <h3 className="card-title text-xl">{selectedTask.name}</h3>
+                      <h3 className="card-title text-xl">
+                        {selectedTask.name}
+                      </h3>
                       {getStatusBadge(selectedTask.status)}
                     </div>
 
@@ -496,7 +496,9 @@ export default function ExecutionDetailClient({
                         <div className="text-sm text-base-content/60 mb-1">
                           Qubit ID
                         </div>
-                        <div className="font-medium">{selectedTask.qid || "N/A"}</div>
+                        <div className="font-medium">
+                          {selectedTask.qid || "N/A"}
+                        </div>
                       </div>
 
                       <div>
@@ -549,7 +551,9 @@ export default function ExecutionDetailClient({
                                   <button
                                     onClick={() => {
                                       const link = document.createElement("a");
-                                      const normalizedPath = path.startsWith("/")
+                                      const normalizedPath = path.startsWith(
+                                        "/",
+                                      )
                                         ? path
                                         : `/${path}`;
                                       const apiUrl =
@@ -617,7 +621,9 @@ export default function ExecutionDetailClient({
                                           setExpandedFigure({
                                             path,
                                             jsonPath:
-                                              selectedTask.json_figure_path?.[idx] || "",
+                                              selectedTask.json_figure_path?.[
+                                                idx
+                                              ] || "",
                                             qid: selectedTask.qid || "",
                                             index: idx,
                                           });
@@ -650,27 +656,27 @@ export default function ExecutionDetailClient({
                               </tr>
                             </thead>
                             <tbody>
-                              {Object.entries(selectedTask.output_parameters).map(
-                                ([key, value]: [string, any]) => {
-                                  const paramValue =
-                                    typeof value === "object" &&
-                                    value !== null &&
-                                    "value" in value
-                                      ? value
-                                      : { value };
-                                  return (
-                                    <tr key={key}>
-                                      <td className="font-medium">{key}</td>
-                                      <td className="font-mono">
-                                        {typeof paramValue.value === "number"
-                                          ? paramValue.value.toFixed(6)
-                                          : String(paramValue.value)}
-                                      </td>
-                                      <td>{paramValue.unit || "-"}</td>
-                                    </tr>
-                                  );
-                                },
-                              )}
+                              {Object.entries(
+                                selectedTask.output_parameters,
+                              ).map(([key, value]: [string, any]) => {
+                                const paramValue =
+                                  typeof value === "object" &&
+                                  value !== null &&
+                                  "value" in value
+                                    ? value
+                                    : { value };
+                                return (
+                                  <tr key={key}>
+                                    <td className="font-medium">{key}</td>
+                                    <td className="font-mono">
+                                      {typeof paramValue.value === "number"
+                                        ? paramValue.value.toFixed(6)
+                                        : String(paramValue.value)}
+                                    </td>
+                                    <td>{paramValue.unit || "-"}</td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -693,29 +699,29 @@ export default function ExecutionDetailClient({
                               </tr>
                             </thead>
                             <tbody>
-                              {Object.entries(selectedTask.input_parameters).map(
-                                ([key, value]: [string, any]) => {
-                                  const paramValue =
-                                    typeof value === "object" &&
-                                    value !== null &&
-                                    "value" in value
-                                      ? value
-                                      : { value };
-                                  return (
-                                    <tr key={key}>
-                                      <td className="font-medium">{key}</td>
-                                      <td className="font-mono">
-                                        {typeof paramValue.value === "number"
-                                          ? paramValue.value.toFixed(6)
-                                          : typeof paramValue.value === "object"
-                                            ? JSON.stringify(paramValue.value)
-                                            : String(paramValue.value)}
-                                      </td>
-                                      <td>{paramValue.unit || "-"}</td>
-                                    </tr>
-                                  );
-                                },
-                              )}
+                              {Object.entries(
+                                selectedTask.input_parameters,
+                              ).map(([key, value]: [string, any]) => {
+                                const paramValue =
+                                  typeof value === "object" &&
+                                  value !== null &&
+                                  "value" in value
+                                    ? value
+                                    : { value };
+                                return (
+                                  <tr key={key}>
+                                    <td className="font-medium">{key}</td>
+                                    <td className="font-mono">
+                                      {typeof paramValue.value === "number"
+                                        ? paramValue.value.toFixed(6)
+                                        : typeof paramValue.value === "object"
+                                          ? JSON.stringify(paramValue.value)
+                                          : String(paramValue.value)}
+                                    </td>
+                                    <td>{paramValue.unit || "-"}</td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>

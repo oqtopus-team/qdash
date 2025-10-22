@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { MenuModelSchedule } from "./menuModelSchedule";
-import type { MenuModelTags } from "./menuModelTags";
-import type { MenuModelTaskDetails } from "./menuModelTaskDetails";
 import type { MenuModelTasks } from "./menuModelTasks";
+import type { MenuModelTaskDetails } from "./menuModelTaskDetails";
+import type { MenuModelTags } from "./menuModelTags";
 
 /**
  * Menu model.

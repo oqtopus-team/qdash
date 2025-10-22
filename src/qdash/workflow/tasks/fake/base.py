@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from qdash.workflow.core.calibration.util import qid_to_label
 from qdash.workflow.tasks.base import BaseTask, RunResult

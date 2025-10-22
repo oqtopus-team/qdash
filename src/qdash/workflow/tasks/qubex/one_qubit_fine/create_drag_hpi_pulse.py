@@ -46,7 +46,7 @@ class CreateDRAGHPIPulse(QubexTask):
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        exp = self.get_experiment(session)
+        self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
         self.output_parameters["drag_hpi_beta"].value = result["beta"][label]

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from qdash.datamodel.task import InputParameterModel
 from qdash.workflow.tasks.base import (

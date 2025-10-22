@@ -44,7 +44,7 @@ class CheckQubit(QubexTask):
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         """Process the results of the task."""
-        exp = self.get_experiment(session)
+        self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
         self.output_parameters["rabi_amplitude"].value = result.rabi_params[label].amplitude

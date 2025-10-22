@@ -51,7 +51,7 @@ class CheckReflectionCoefficient(QubexTask):
         labels = [self.get_qubit_label(session, qid) for qid in qids]
         results = {}
         initialize()
-        chip = ChipDocument.get_current_chip(username="admin")
+        ChipDocument.get_current_chip(username="admin")
         for label, qid in zip(labels, qids):
             result = exp.measure_reflection_coefficient(
                 target=label,  # center_frequency=chip.qubits[qid].data["coarse_resonator_frequency"]["value"]

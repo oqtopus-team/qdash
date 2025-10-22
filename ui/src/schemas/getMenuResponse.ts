@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { GetMenuResponseSchedule } from "./getMenuResponseSchedule";
-import type { GetMenuResponseTags } from "./getMenuResponseTags";
-import type { GetMenuResponseTaskDetails } from "./getMenuResponseTaskDetails";
 import type { GetMenuResponseTasks } from "./getMenuResponseTasks";
+import type { GetMenuResponseTaskDetails } from "./getMenuResponseTaskDetails";
+import type { GetMenuResponseTags } from "./getMenuResponseTags";
 
 /**
  * GetMenuResponse is a Pydantic model for the get menu response.

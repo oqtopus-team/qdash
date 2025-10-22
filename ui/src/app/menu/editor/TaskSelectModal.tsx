@@ -8,7 +8,6 @@ import {
 import { BsPlus } from "react-icons/bs";
 
 import AvailableTasksList from "./AvailableTasksList";
-import DroppableTaskList from "./DroppableTaskList";
 import SortableTaskItem from "./SortableTaskItem";
 
 import type { TaskResponse } from "@/schemas";
@@ -52,26 +51,17 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || !active.data.current) return;
+    if (!over || active.id === over.id) return;
 
-    // If dragging from available tasks to task list
-    if (over.id === "task-list" && "task_type" in active.data.current) {
-      const task = active.data.current as TaskResponse;
-      if (!selectedTasks.find((t) => t.name === task.name)) {
-        setSelectedTasks([...selectedTasks, task]);
-      }
-    }
-    // If reordering within selected tasks
-    else if (active.id !== over.id) {
-      const oldIndex = selectedTasks.findIndex((t) => t.name === active.id);
-      const newIndex = selectedTasks.findIndex((t) => t.name === over.id);
+    // Reordering within selected tasks only
+    const oldIndex = selectedTasks.findIndex((t) => t.name === active.id);
+    const newIndex = selectedTasks.findIndex((t) => t.name === over.id);
 
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newTasks = [...selectedTasks];
-        const [movedTask] = newTasks.splice(oldIndex, 1);
-        newTasks.splice(newIndex, 0, movedTask);
-        setSelectedTasks(newTasks);
-      }
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newTasks = [...selectedTasks];
+      const [movedTask] = newTasks.splice(oldIndex, 1);
+      newTasks.splice(newIndex, 0, movedTask);
+      setSelectedTasks(newTasks);
     }
   };
 
@@ -135,10 +125,7 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
                   {selectedTasks.length} tasks
                 </span>
               </div>
-              <DroppableTaskList
-                id="task-list"
-                className="flex-1 overflow-y-auto"
-              >
+              <div className="flex-1 overflow-y-auto">
                 <div className="space-y-2">
                   <SortableContext
                     items={selectedTasks.map((task) => task.name)}
@@ -173,11 +160,11 @@ const TaskSelectModal: React.FC<TaskSelectModalProps> = ({
                       No tasks selected
                     </h3>
                     <p className="mt-1 text-sm text-base-content/70">
-                      Drag tasks from the left or click to add them
+                      Click the + button to add tasks
                     </p>
                   </div>
                 )}
-              </DroppableTaskList>
+              </div>
             </div>
           </div>
         </div>

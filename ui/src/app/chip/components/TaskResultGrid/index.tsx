@@ -43,9 +43,15 @@ export function TaskResultGrid({
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
-  const [zoomMode, setZoomMode] = useState<'full' | 'region'>('full');
-  const [selectedRegion, setSelectedRegion] = useState<{row: number, col: number} | null>(null);
-  const [hoveredRegion, setHoveredRegion] = useState<{row: number, col: number} | null>(null);
+  const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
+  const [selectedRegion, setSelectedRegion] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
+  const [hoveredRegion, setHoveredRegion] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
 
   const regionSize = 4; // 4×4 qubits per region
   const numRegions = Math.floor(gridSize / regionSize);
@@ -171,15 +177,18 @@ export function TaskResultGrid({
     taskResponse?.data?.result?.[qid] || null;
 
   // Calculate displayed grid size based on zoom mode
-  const displayGridSize = zoomMode === 'region' ? regionSize : gridSize;
+  const displayGridSize = zoomMode === "region" ? regionSize : gridSize;
   const displayGridStart = selectedRegion
-    ? { row: selectedRegion.row * regionSize, col: selectedRegion.col * regionSize }
+    ? {
+        row: selectedRegion.row * regionSize,
+        col: selectedRegion.col * regionSize,
+      }
     : { row: 0, col: 0 };
 
   return (
     <div className="space-y-4">
       {/* Zoom mode toggle - only show in full view mode */}
-      {zoomMode === 'full' && (
+      {zoomMode === "full" && (
         <div className="flex items-center gap-2 px-4">
           <label className="text-sm font-medium">Region Zoom:</label>
           <input
@@ -189,17 +198,19 @@ export function TaskResultGrid({
             className="toggle toggle-sm toggle-primary"
           />
           <span className="text-xs text-base-content/70">
-            {regionSelectionEnabled ? 'Enabled - Click a region to zoom' : 'Disabled'}
+            {regionSelectionEnabled
+              ? "Enabled - Click a region to zoom"
+              : "Disabled"}
           </span>
         </div>
       )}
 
       {/* Back button when in region mode */}
-      {zoomMode === 'region' && selectedRegion && (
+      {zoomMode === "region" && selectedRegion && (
         <div className="flex items-center gap-4 px-4">
           <button
             onClick={() => {
-              setZoomMode('full');
+              setZoomMode("full");
               setSelectedRegion(null);
             }}
             className="btn btn-sm btn-ghost"
@@ -207,7 +218,13 @@ export function TaskResultGrid({
             ← Back to Full View
           </button>
           <span className="text-sm text-base-content/70">
-            Region {selectedRegion.row + 1},{selectedRegion.col + 1} (Qubits {displayGridStart.row * gridSize + displayGridStart.col} - {(displayGridStart.row + regionSize - 1) * gridSize + displayGridStart.col + regionSize - 1})
+            Region {selectedRegion.row + 1},{selectedRegion.col + 1} (Qubits{" "}
+            {displayGridStart.row * gridSize + displayGridStart.col} -{" "}
+            {(displayGridStart.row + regionSize - 1) * gridSize +
+              displayGridStart.col +
+              regionSize -
+              1}
+            )
           </span>
         </div>
       )}
@@ -216,121 +233,132 @@ export function TaskResultGrid({
       <div className="relative">
         <div
           className={`grid gap-2 p-4 bg-base-200/50 rounded-xl`}
-          style={{ gridTemplateColumns: `repeat(${displayGridSize}, minmax(0, 1fr))` }}
+          style={{
+            gridTemplateColumns: `repeat(${displayGridSize}, minmax(0, 1fr))`,
+          }}
         >
-          {Array.from({ length: displayGridSize * displayGridSize }).map((_, index) => {
-            const localRow = Math.floor(index / displayGridSize);
-            const localCol = index % displayGridSize;
-            const actualRow = displayGridStart.row + localRow;
-            const actualCol = displayGridStart.col + localCol;
+          {Array.from({ length: displayGridSize * displayGridSize }).map(
+            (_, index) => {
+              const localRow = Math.floor(index / displayGridSize);
+              const localCol = index % displayGridSize;
+              const actualRow = displayGridStart.row + localRow;
+              const actualCol = displayGridStart.col + localCol;
 
-            const qid = Object.keys(gridPositions).find(
-              (key) =>
-                gridPositions[key].row === actualRow && gridPositions[key].col === actualCol,
-            );
-            if (!qid)
-            return (
-              <div
-                key={index}
-                className="aspect-square bg-base-300/50 rounded-lg"
-              />
-            );
+              const qid = Object.keys(gridPositions).find(
+                (key) =>
+                  gridPositions[key].row === actualRow &&
+                  gridPositions[key].col === actualCol,
+              );
+              if (!qid)
+                return (
+                  <div
+                    key={index}
+                    className="aspect-square bg-base-300/50 rounded-lg"
+                  />
+                );
 
-          const task = getTaskResult(qid);
-          if (!task)
-            return (
-              <div
-                key={index}
-                className="aspect-square bg-base-300 rounded-lg flex items-center justify-center"
-              >
-                <div className="text-sm font-medium text-base-content/50">
-                  {qid}
-                </div>
-              </div>
-            );
-
-          const figurePath = Array.isArray(task.figure_path)
-            ? task.figure_path[0]
-            : task.figure_path || null;
-          return (
-            <div key={index} className="relative group">
-              <button
-                onClick={() => {
-                  if (figurePath) setSelectedTaskInfo({ qid, task });
-                }}
-                className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow relative w-full ${
-                  task.over_threshold
-                    ? "border-2 border-primary animate-pulse-light"
-                    : ""
-                }`}
-              >
-                {task.figure_path && figurePath && (
-                  <div className="absolute inset-0">
-                    <TaskFigure
-                      path={figurePath}
-                      qid={qid}
-                      className="w-full h-full object-contain"
-                    />
+              const task = getTaskResult(qid);
+              if (!task)
+                return (
+                  <div
+                    key={index}
+                    className="aspect-square bg-base-300 rounded-lg flex items-center justify-center"
+                  >
+                    <div className="text-sm font-medium text-base-content/50">
+                      {qid}
+                    </div>
                   </div>
-                )}
-                <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
-                  {qid}
-                </div>
-                <div
-                  className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
-                    task.status === "completed"
-                      ? "bg-success"
-                      : task.status === "failed"
-                        ? "bg-error"
-                        : "bg-warning"
-                  }`}
-                />
-              </button>
+                );
 
-              {/* Detail Analysis Button */}
-              <button
-                onClick={() => router.push(`/chip/${chipId}/qubit/${qid}`)}
-                className="absolute top-1 right-1 btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                title="Detailed Analysis"
-              >
-                Detail
-              </button>
-            </div>
-          );
-          })}
+              const figurePath = Array.isArray(task.figure_path)
+                ? task.figure_path[0]
+                : task.figure_path || null;
+              return (
+                <div key={index} className="relative group">
+                  <button
+                    onClick={() => {
+                      if (figurePath) setSelectedTaskInfo({ qid, task });
+                    }}
+                    className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow relative w-full ${
+                      task.over_threshold
+                        ? "border-2 border-primary animate-pulse-light"
+                        : ""
+                    }`}
+                  >
+                    {task.figure_path && figurePath && (
+                      <div className="absolute inset-0">
+                        <TaskFigure
+                          path={figurePath}
+                          qid={qid}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    )}
+                    <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
+                      {qid}
+                    </div>
+                    <div
+                      className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
+                        task.status === "completed"
+                          ? "bg-success"
+                          : task.status === "failed"
+                            ? "bg-error"
+                            : "bg-warning"
+                      }`}
+                    />
+                  </button>
+
+                  {/* Detail Analysis Button */}
+                  <button
+                    onClick={() => router.push(`/chip/${chipId}/qubit/${qid}`)}
+                    className="absolute top-1 right-1 btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    title="Detailed Analysis"
+                  >
+                    Detail
+                  </button>
+                </div>
+              );
+            },
+          )}
         </div>
 
         {/* Region selection overlay - only when enabled and in full view mode */}
-        {zoomMode === 'full' && regionSelectionEnabled && (
+        {zoomMode === "full" && regionSelectionEnabled && (
           <div className="absolute inset-0 pointer-events-none">
             <div className="relative w-full h-full p-4">
               <div
                 className="grid gap-2 w-full h-full"
                 style={{ gridTemplateColumns: `repeat(${numRegions}, 1fr)` }}
               >
-                {Array.from({ length: numRegions * numRegions }).map((_, index) => {
-                  const regionRow = Math.floor(index / numRegions);
-                  const regionCol = index % numRegions;
-                  const isHovered = hoveredRegion?.row === regionRow && hoveredRegion?.col === regionCol;
+                {Array.from({ length: numRegions * numRegions }).map(
+                  (_, index) => {
+                    const regionRow = Math.floor(index / numRegions);
+                    const regionCol = index % numRegions;
+                    const isHovered =
+                      hoveredRegion?.row === regionRow &&
+                      hoveredRegion?.col === regionCol;
 
-                  return (
-                    <button
-                      key={index}
-                      className={`pointer-events-auto transition-all duration-200 rounded-lg ${
-                        isHovered
-                          ? 'bg-primary/20 border-2 border-primary'
-                          : 'bg-transparent border-2 border-transparent hover:border-primary/50'
-                      }`}
-                      onMouseEnter={() => setHoveredRegion({ row: regionRow, col: regionCol })}
-                      onMouseLeave={() => setHoveredRegion(null)}
-                      onClick={() => {
-                        setSelectedRegion({ row: regionRow, col: regionCol });
-                        setZoomMode('region');
-                      }}
-                      title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-                    />
-                  );
-                })}
+                    return (
+                      <button
+                        key={index}
+                        className={`pointer-events-auto transition-all duration-200 rounded-lg ${
+                          isHovered
+                            ? "bg-primary/20 border-2 border-primary"
+                            : "bg-transparent border-2 border-transparent hover:border-primary/50"
+                        }`}
+                        onMouseEnter={() =>
+                          setHoveredRegion({ row: regionRow, col: regionCol })
+                        }
+                        onMouseLeave={() => setHoveredRegion(null)}
+                        onClick={() => {
+                          setSelectedRegion({ row: regionRow, col: regionCol });
+                          setZoomMode("region");
+                        }}
+                        title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
+                      />
+                    );
+                  },
+                )}
               </div>
             </div>
           </div>
