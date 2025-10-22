@@ -14,6 +14,7 @@ from qdash.workflow.tasks.qubex.box_setup.check_status import CheckStatus
 from qdash.workflow.tasks.qubex.box_setup.configure import Configure
 from qdash.workflow.tasks.qubex.box_setup.dump_box import DumpBox
 from qdash.workflow.tasks.qubex.box_setup.link_up import LinkUp
+from qdash.workflow.tasks.qubex.box_setup.readout_configure import ReadoutConfigure
 from qdash.workflow.tasks.qubex.cw.check_qubit_frequencies import CheckQubitFrequencies
 from qdash.workflow.tasks.qubex.cw.check_qubit_spectroscopy import CheckQubitSpectroscopy
 from qdash.workflow.tasks.qubex.cw.check_readout_amplitude import CheckReadoutAmplitude
@@ -55,6 +56,7 @@ __all__ = [
     "CheckNoise",
     "CheckStatus",
     "Configure",
+    "ReadoutConfigure",
     "DumpBox",
     "LinkUp",
     "ReadoutClassification",
