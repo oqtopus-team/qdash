@@ -5,10 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { TaskHistoryResponseData } from "./taskHistoryResponseData";
 
-/**
- * UpdateMenuResponse is a Pydantic model for the update menu response.
- */
-export interface UpdateMenuResponse {
+export interface TaskHistoryResponse {
   name: string;
+  data: TaskHistoryResponseData;
 }

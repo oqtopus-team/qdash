@@ -692,7 +692,7 @@ def fetch_historical_qubit_task_grouped_by_chip(
 
 
 @router.get(
-    "/chip/{chip_id}/task/qubit/{task_name}",
+    "/chip/{chip_id}/task/qubit/{task_name}/latest",
     summary="Fetch latest qubit task results with optional outlier filtering",
     operation_id="fetchLatestQubitTaskGroupedByChip",
     response_model=LatestTaskGroupedByChipResponse,
@@ -764,6 +764,67 @@ def fetch_latest_qubit_task_grouped_by_chip(
 
     response = LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
     return response_processor.process_task_response(response, task_name)
+
+
+class TaskHistoryResponse(BaseModel):
+    name: str
+    data: dict[str, Task]
+
+
+@router.get(
+    "/chip/{chip_id}/task/qubit/{qid}/task/{task_name}",
+    summary="Fetch Qubit Task History",
+    operation_id="fetchQubitTaskHistory",
+    response_model=TaskHistoryResponse,
+    response_model_exclude_none=True,
+)
+def fetch_qubit_task_history(
+    chip_id: str, qid: str, task_name: str, current_user: Annotated[User, Depends(get_optional_current_user)]
+) -> TaskHistoryResponse:
+    """Fetch latest qubit task results with optional defensive outlier filtering."""
+    logger.debug(f"Fetching qubit tasks for chip {chip_id}, user: {current_user.username}")
+
+    # Get chip info
+    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    if chip is None:
+        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+    # Fetch all task results in one query
+    all_results = (
+        TaskResultHistoryDocument.find(
+            {
+                "username": current_user.username,
+                "chip_id": chip_id,
+                "name": task_name,
+                "qid": qid,
+            }
+        )
+        .sort([("end_at", DESCENDING)])
+        .run()
+    )
+
+    # Organize results by qid
+    data = {}
+    for result in all_results:
+        data[result.task_id] = Task(
+            task_id=result.task_id,
+            name=result.name,
+            status=result.status,
+            message=result.message,
+            input_parameters=result.input_parameters,
+            output_parameters=result.output_parameters,
+            output_parameter_names=result.output_parameter_names,
+            note=result.note,
+            figure_path=result.figure_path,
+            json_figure_path=result.json_figure_path,
+            raw_data_path=result.raw_data_path,
+            start_at=result.start_at,
+            end_at=result.end_at,
+            elapsed_time=result.elapsed_time,
+            task_type=result.task_type,
+            over_threshold=False,
+        )
+
+    return TaskHistoryResponse(name=task_name, data=data)
 
 
 @router.get(
@@ -886,7 +947,7 @@ def fetch_historical_coupling_task_grouped_by_chip(
 
 
 @router.get(
-    "/chip/{chip_id}/task/coupling/{task_name}",
+    "/chip/{chip_id}/task/coupling/{task_name}/latest",
     summary="Fetch the multiplexers",
     operation_id="fetchLatestCouplingTaskGroupedByChip",
     response_model=LatestTaskGroupedByChipResponse,
