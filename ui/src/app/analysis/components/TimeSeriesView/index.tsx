@@ -13,12 +13,12 @@ import { useAnalysisUrlState } from "@/app/hooks/useUrlState";
 import { useFetchTimeseriesTaskResultByTagAndParameter } from "@/client/chip/chip";
 import { useListChips } from "@/client/chip/chip";
 import { useFetchAllParameters } from "@/client/parameter/parameter";
+import { useListAllTag } from "@/client/tag/tag";
 import { DataTable } from "@/shared/components/DataTable";
+import { ErrorCard } from "@/shared/components/ErrorCard";
 import { PlotCard } from "@/shared/components/PlotCard";
 import { useCSVExport } from "@/shared/hooks/useCSVExport";
 import { useTimeRange } from "@/shared/hooks/useTimeRange";
-import { ErrorCard } from "@/shared/components/ErrorCard";
-import { useListAllTag } from "@/client/tag/tag";
 
 export function TimeSeriesView() {
   // URL state management

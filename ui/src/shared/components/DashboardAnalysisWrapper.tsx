@@ -1,11 +1,13 @@
 import { IoBarChart, IoTrendingUp, IoStatsChart } from "react-icons/io5";
+
 import {
   EmbeddedAnalysisView,
   CompactAnalysisView,
 } from "./EmbeddedAnalysisView";
-import { TimeSeriesView } from "@/app/analysis/components/TimeSeriesView";
-import { HistogramView } from "@/app/analysis/components/HistogramView";
+
 import { CDFView } from "@/app/analysis/components/CDFView";
+import { HistogramView } from "@/app/analysis/components/HistogramView";
+import { TimeSeriesView } from "@/app/analysis/components/TimeSeriesView";
 
 /**
  * Dashboard wrapper for TimeSeriesView

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+
 import { ChipPageContent } from "./components/ChipPageContent";
 
 export default function ChipPage() {
