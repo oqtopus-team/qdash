@@ -19,9 +19,9 @@ import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useChipUrlState } from "@/app/hooks/useUrlState";
 import { useListMuxes, useFetchChip, useListChips } from "@/client/chip/chip";
 import { useFetchAllTasks } from "@/client/task/task";
+import { TaskDetailModal } from "@/shared/components/TaskDetailModal";
 
 interface SelectedTaskInfo {
-  path: string;
   qid: string;
   task: Task;
 }
@@ -205,11 +205,15 @@ export function ChipPageContent() {
     };
   }, [muxData?.data, selectedTaskInfo?.qid]);
 
-  // Get all QIDs from mux detail
-  const getQids = (detail: MuxDetailResponseDetail): string[] => {
-    const qids = new Set<string>();
-    Object.keys(detail).forEach((qid) => qids.add(qid));
-    return Array.from(qids).sort((a, b) => Number(a) - Number(b));
+  // Get all QIDs for this mux (always 4 qids based on mux number)
+  const getQidsForMux = (muxNum: number): string[] => {
+    const startQid = muxNum * 4;
+    return [
+      String(startQid),
+      String(startQid + 1),
+      String(startQid + 2),
+      String(startQid + 3),
+    ];
   };
 
   // Group tasks by name for each mux
@@ -455,7 +459,8 @@ export function ChipPageContent() {
                     ? "No updates"
                     : formatRelativeTime(updateInfo.time);
                 const isExpanded = expandedMuxes[muxId];
-                const qids = getQids(muxDetail.detail);
+                const qids = getQidsForMux(muxDetail.mux_id);
+                const taskGroups = getTaskGroups(muxDetail.detail);
 
                 return (
                   <div
@@ -478,6 +483,9 @@ export function ChipPageContent() {
                             New
                           </div>
                         )}
+                        <div className="badge badge-ghost gap-2 rounded-lg">
+                          {Object.keys(taskGroups).length} Tasks
+                        </div>
                       </div>
                       <div
                         className={`text-sm ${
@@ -493,7 +501,7 @@ export function ChipPageContent() {
                       <div className="p-4 border-t">
                         {/* Task Results Grid */}
                         <div className="space-y-6">
-                          {Object.entries(getTaskGroups(muxDetail.detail)).map(
+                          {Object.entries(taskGroups).map(
                             ([taskName, qidResults]) => (
                               <div
                                 key={taskName}
@@ -505,7 +513,27 @@ export function ChipPageContent() {
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                   {qids.map((qid) => {
                                     const task = qidResults[qid];
-                                    if (!task) return null;
+
+                                    // Show placeholder if task doesn't exist
+                                    if (!task) {
+                                      return (
+                                        <div
+                                          key={qid}
+                                          className="card bg-base-200/30 shadow-sm rounded-xl overflow-hidden border border-dashed border-base-content/20"
+                                        >
+                                          <div className="card-body p-2">
+                                            <div className="text-sm font-medium mb-2">
+                                              <div className="flex justify-between items-center mb-1">
+                                                <span className="text-base-content/40">QID: {qid}</span>
+                                              </div>
+                                            </div>
+                                            <div className="text-xs text-base-content/30 italic text-center py-4">
+                                              No result
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
 
                                     const figurePath = getFigurePath(task);
 
@@ -515,7 +543,6 @@ export function ChipPageContent() {
                                           onClick={() => {
                                             if (figurePath) {
                                               setSelectedTaskInfo({
-                                                path: figurePath,
                                                 qid,
                                                 task,
                                               });
@@ -589,121 +616,21 @@ export function ChipPageContent() {
       </div>
 
       {/* Task Result Modal */}
-      {selectedTaskInfo && (
-        <dialog className="modal modal-open">
-          <div className="modal-box max-w-4xl bg-base-100">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg">
-                Result for {viewMode === "2q" ? "Coupling" : "QID"}{" "}
-                {selectedTaskInfo.qid}
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={navigateToPreviousDay}
-                  disabled={!canNavigatePrevious}
-                  className="btn btn-sm btn-ghost"
-                  title="Previous Day"
-                >
-                  ←
-                </button>
-                <span className="text-sm text-base-content/70 px-2">
-                  {formatDate(selectedDate)}
-                </span>
-                <button
-                  onClick={navigateToNextDay}
-                  disabled={!canNavigateNext}
-                  className="btn btn-sm btn-ghost"
-                  title="Next Day"
-                >
-                  →
-                </button>
-                {viewMode !== "2q" && (
-                  <button
-                    onClick={() =>
-                      router.push(
-                        `/chip/${selectedChip}/qubit/${selectedTaskInfo.qid}`,
-                      )
-                    }
-                    className="btn btn-sm btn-primary"
-                    title="Detailed Analysis"
-                  >
-                    Detail View
-                  </button>
-                )}
-                <button
-                  onClick={() => setSelectedTaskInfo(null)}
-                  className="btn btn-sm btn-circle btn-ghost"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-8">
-              <div className="aspect-square bg-base-200/50 rounded-xl p-4">
-                <TaskFigure
-                  path={selectedTaskInfo.path}
-                  qid={selectedTaskInfo.qid}
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <div className="space-y-6">
-                <div className="card bg-base-200 p-4 rounded-xl">
-                  <h4 className="font-medium mb-2">Status</h4>
-                  <div
-                    className={`badge ${
-                      selectedTaskInfo.task.status === "completed"
-                        ? "badge-success"
-                        : selectedTaskInfo.task.status === "failed"
-                          ? "badge-error"
-                          : "badge-warning"
-                    }`}
-                  >
-                    {selectedTaskInfo.task.status}
-                  </div>
-                </div>
-                {selectedTaskInfo.task.output_parameters && (
-                  <div className="card bg-base-200 p-4 rounded-xl">
-                    <h4 className="font-medium mb-2">Parameters</h4>
-                    <div className="space-y-2">
-                      {Object.entries(
-                        selectedTaskInfo.task.output_parameters,
-                      ).map(([key, value]) => {
-                        const paramValue = (
-                          typeof value === "object" &&
-                          value !== null &&
-                          "value" in value
-                            ? value
-                            : { value }
-                        ) as { value: number | string; unit?: string };
-                        return (
-                          <div key={key} className="flex justify-between">
-                            <span className="font-medium">{key}:</span>
-                            <span>
-                              {typeof paramValue.value === "number"
-                                ? paramValue.value.toFixed(4)
-                                : String(paramValue.value)}
-                              {paramValue.unit ? ` ${paramValue.unit}` : ""}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                {selectedTaskInfo.task.message && (
-                  <div className="card bg-base-200 p-4 rounded-xl">
-                    <h4 className="font-medium mb-2">Message</h4>
-                    <p className="text-sm">{selectedTaskInfo.task.message}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          <form method="dialog" className="modal-backdrop">
-            <button onClick={() => setSelectedTaskInfo(null)}>close</button>
-          </form>
-        </dialog>
-      )}
+      <TaskDetailModal
+        isOpen={!!selectedTaskInfo}
+        task={selectedTaskInfo?.task || null}
+        qid={selectedTaskInfo?.qid || ""}
+        onClose={() => setSelectedTaskInfo(null)}
+        chipId={selectedChip}
+        selectedDate={selectedDate}
+        onNavigatePrevious={navigateToPreviousDay}
+        onNavigateNext={navigateToNextDay}
+        canNavigatePrevious={canNavigatePrevious}
+        canNavigateNext={canNavigateNext}
+        formatDate={formatDate}
+        taskName={selectedTaskInfo?.task?.name}
+        variant="detailed"
+      />
     </div>
   );
 }

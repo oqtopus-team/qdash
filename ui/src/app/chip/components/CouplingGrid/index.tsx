@@ -462,6 +462,19 @@ export function CouplingGrid({
                     </div>
                   </div>
                   {(() => {
+                    const endAt =
+                      selectedTaskInfo.taskList[selectedTaskInfo.index].end_at;
+                    if (!endAt) return null;
+                    return (
+                      <div className="card bg-base-200 p-4 rounded-xl">
+                        <h4 className="font-medium mb-2">Calibrated At</h4>
+                        <p className="text-sm">
+                          {new Date(endAt).toLocaleString()}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                  {(() => {
                     const outputParams =
                       selectedTaskInfo.taskList[selectedTaskInfo.index]
                         .output_parameters;
