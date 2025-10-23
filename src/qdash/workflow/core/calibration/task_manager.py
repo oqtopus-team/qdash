@@ -1,7 +1,7 @@
 import json
 import uuid
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import pendulum
@@ -18,6 +18,12 @@ from qdash.datamodel.task import (
     TaskResultModel,
     TaskStatusModel,
 )
+from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+if TYPE_CHECKING:
+    from qdash.workflow.core.calibration.execution_manager import ExecutionManager
+    from qdash.workflow.core.session.base import BaseSession
+    from qdash.workflow.tasks.base import BaseTask
 
 
 class TaskManager(BaseModel):
@@ -479,3 +485,256 @@ class TaskManager(BaseModel):
 
     def has_only_system_tasks(self, task_names: list[str]) -> bool:
         return all(self._is_system_task(task_name) for task_name in task_names)
+
+    def execute_task(
+        self,
+        task_instance: "BaseTask",
+        session: "BaseSession",
+        execution_manager: "ExecutionManager",
+        qid: str,
+    ) -> tuple["ExecutionManager", "TaskManager"]:
+        """Execute task with integrated save processing.
+
+        Args:
+        ----
+            task_instance: Task instance
+            session: Session object
+            execution_manager: Execution manager
+            qid: Qubit ID
+
+        Returns:
+        -------
+            tuple[ExecutionManager, TaskManager]: Updated execution manager and task manager
+
+        """
+        task_name = task_instance.get_name()
+        task_type = task_instance.get_task_type()
+
+        try:
+            # 1. Start task
+            self.start_task(task_name, task_type, qid)
+
+            # Save task execution state
+            executed_task = self.get_task(task_name=task_name, task_type=task_type, qid=qid)
+            TaskResultHistoryDocument.upsert_document(
+                task=executed_task, execution_model=execution_manager.to_datamodel()
+            )
+
+            # Update execution manager
+            execution_manager = execution_manager.update_with_task_manager(self)
+
+            # 2. Preprocess (using existing BaseTask.preprocess)
+            preprocess_result = task_instance.preprocess(session, qid)
+            if preprocess_result is not None:
+                self.put_input_parameters(task_name, preprocess_result.input_parameters, task_type=task_type, qid=qid)
+                self.save()
+                execution_manager = execution_manager.update_with_task_manager(self)
+
+            # 3. Run (using existing BaseTask.run)
+            run_result = task_instance.run(session, qid)
+
+            if run_result is not None:
+                # 4. Postprocess (using existing BaseTask.postprocess)
+                postprocess_result = task_instance.postprocess(session, execution_manager.execution_id, run_result, qid)
+
+                if postprocess_result is not None:
+                    # 5. Integrated save processing (TaskManager is responsible)
+                    self._save_all_results(
+                        task_instance, execution_manager, postprocess_result, qid, run_result, session
+                    )
+
+            # 6. Complete task
+            self.update_task_status_to_completed(
+                task_name, message=f"{task_name} is completed", task_type=task_type, qid=qid
+            )
+            self.save()
+
+            # Save completed state to database
+            executed_task = self.get_task(task_name=task_name, task_type=task_type, qid=qid)
+            TaskResultHistoryDocument.upsert_document(
+                task=executed_task, execution_model=execution_manager.to_datamodel()
+            )
+            execution_manager = execution_manager.update_with_task_manager(self)
+
+        except Exception as e:
+            # Error handling
+            self._handle_task_error(task_instance, execution_manager, qid, str(e))
+            raise
+
+        finally:
+            # Finalization
+            self.end_task(task_name, task_type, qid)
+            self.save()
+            execution_manager = execution_manager.update_with_task_manager(self)
+
+            # Save final state
+            executed_task = self.get_task(task_name=task_name, task_type=task_type, qid=qid)
+            TaskResultHistoryDocument.upsert_document(
+                task=executed_task, execution_model=execution_manager.to_datamodel()
+            )
+
+            # Create chip history
+            from qdash.dbmodel.chip import ChipDocument
+            from qdash.dbmodel.chip_history import ChipHistoryDocument
+
+            chip_doc = ChipDocument.get_current_chip(username=self.username)
+            ChipHistoryDocument.create_history(chip_doc)
+
+        return execution_manager, self
+
+    def _save_all_results(
+        self,
+        task_instance: "BaseTask",
+        execution_manager: "ExecutionManager",
+        postprocess_result: Any,
+        qid: str,
+        run_result: Any,
+        session: "BaseSession",
+    ) -> None:
+        """Integrated save processing (TaskManager is responsible).
+
+        Args:
+        ----
+            task_instance: Task instance
+            execution_manager: Execution manager
+            postprocess_result: Postprocess result
+            qid: Qubit ID
+            run_result: Run result
+            session: Session object
+
+        """
+        task_name = task_instance.get_name()
+        task_type = task_instance.get_task_type()
+
+        # 1. Save output parameters
+        if postprocess_result.output_parameters:
+            self.put_output_parameters(task_name, postprocess_result.output_parameters, task_type=task_type, qid=qid)
+
+        # 2. Save figures (using existing method)
+        if postprocess_result.figures:
+            self.save_figures(postprocess_result.figures, task_name, task_type=task_type, qid=qid)
+
+        # 3. Save raw data (using existing method)
+        if postprocess_result.raw_data:
+            self.save_raw_data(postprocess_result.raw_data, task_name, task_type=task_type, qid=qid)
+
+        # 4. Save task manager state
+        self.save()
+
+        # 5. R2 check
+        if run_result.has_r2() and run_result.r2[qid] < task_instance.r2_threshold:
+            raise ValueError(f"{task_instance.name} R² value too low: {run_result.r2[qid]:.4f}")
+
+        # 6. Backend-specific save processing
+        self._save_backend_specific(task_instance, execution_manager, qid, session)
+
+    def _save_backend_specific(
+        self, task_instance: "BaseTask", execution_manager: "ExecutionManager", qid: str, session: "BaseSession"
+    ) -> None:
+        """Backend-specific save processing.
+
+        Args:
+        ----
+            task_instance: Task instance
+            execution_manager: Execution manager
+            qid: Qubit ID
+            session: Session object
+
+        """
+        if task_instance.backend == "qubex":
+            self._save_qubex_specific(task_instance, execution_manager, qid, session)
+        elif task_instance.backend == "fake":
+            self._save_fake_specific(task_instance, execution_manager, qid, session)
+
+    def _save_qubex_specific(
+        self,
+        task_instance: "BaseTask",
+        execution_manager: "ExecutionManager",
+        qid: str,
+        session: "BaseSession",
+    ) -> None:
+        """Qubex-specific save processing.
+
+        Args:
+        ----
+            task_instance: Task instance
+            execution_manager: Execution manager
+            qid: Qubit ID
+            session: Session object
+
+        """
+        from qdash.dbmodel.coupling import CouplingDocument
+        from qdash.dbmodel.qubit import QubitDocument
+
+        task_name = task_instance.get_name()
+        task_type = task_instance.get_task_type()
+
+        # 1. Save calibration note
+        if session.name == "qubex":
+            session.update_note(
+                username=self.username,
+                calib_dir=self.calib_dir,
+                execution_id=execution_manager.execution_id,
+                task_manager_id=self.id,
+            )
+
+        # 2. Update parameters
+        output_parameters = self.get_output_parameter_by_task_name(task_name, task_type=task_type, qid=qid)
+
+        if output_parameters:
+            if task_instance.is_qubit_task():
+                QubitDocument.update_calib_data(
+                    username=self.username,
+                    qid=qid,
+                    chip_id=execution_manager.chip_id,
+                    output_parameters=output_parameters,
+                )
+            elif task_instance.is_coupling_task():
+                CouplingDocument.update_calib_data(
+                    username=self.username,
+                    qid=qid,
+                    chip_id=execution_manager.chip_id,
+                    output_parameters=output_parameters,
+                )
+
+    def _save_fake_specific(
+        self,
+        task_instance: "BaseTask",
+        execution_manager: "ExecutionManager",
+        qid: str,
+        session: "BaseSession",
+    ) -> None:
+        """Fake-specific save processing.
+
+        Args:
+        ----
+            task_instance: Task instance
+            execution_manager: Execution manager
+            qid: Qubit ID
+            session: Session object
+
+        """
+        # Simulation metadata save, etc. (implement as needed)
+        pass
+
+    def _handle_task_error(
+        self, task_instance: "BaseTask", execution_manager: "ExecutionManager", qid: str, error_msg: str
+    ) -> None:
+        """Error handling.
+
+        Args:
+        ----
+            task_instance: Task instance
+            execution_manager: Execution manager
+            qid: Qubit ID
+            error_msg: Error message
+
+        """
+        task_name = task_instance.get_name()
+        task_type = task_instance.get_task_type()
+
+        self.update_task_status_to_failed(task_name, message=error_msg, task_type=task_type, qid=qid)
+
+        # Save error state to database
+        task_result = self.get_task(task_name, task_type=task_type, qid=qid)
+        TaskResultHistoryDocument.upsert_document(task_result, execution_manager.to_datamodel())
