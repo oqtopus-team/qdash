@@ -4,6 +4,7 @@ from datetime import datetime
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
+from pymongo import DESCENDING
 
 
 class FlowDocument(Document):
@@ -78,7 +79,7 @@ class FlowDocument(Document):
             List of FlowDocument objects
 
         """
-        return list(cls.find({"username": username}).sort([("updated_at", -1)]).run())
+        return list(cls.find({"username": username}, sort=[("updated_at", DESCENDING)]).run())  # type: ignore[list-item]
 
     @classmethod
     def delete_by_user_and_name(cls, username: str, name: str) -> bool:
