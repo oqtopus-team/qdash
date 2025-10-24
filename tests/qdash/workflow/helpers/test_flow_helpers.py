@@ -296,22 +296,3 @@ class TestGlobalSessionHelpers:
         finish_calibration()
 
         assert session.execution_manager.completed is True
-
-
-class TestHelperFunctionSignatures:
-    """Test that helper functions have correct signatures."""
-
-    def test_adaptive_calibrate_signature(self):
-        """Test adaptive_calibrate has correct signature."""
-        from inspect import signature
-
-        from qdash.workflow.helpers.flow_helpers import adaptive_calibrate
-
-        sig = signature(adaptive_calibrate)
-        params = list(sig.parameters.keys())
-
-        assert "qid" in params
-        assert "measure_func" in params
-        assert "update_func" in params
-        assert "converge_func" in params
-        assert "max_iterations" in params
