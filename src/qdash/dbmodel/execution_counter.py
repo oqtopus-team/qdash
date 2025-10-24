@@ -34,6 +34,9 @@ class ExecutionCounterDocument(Document):
     def get_next_index(cls, date: str, username: str, chip_id: str) -> int:
         """Get the next index for the given date, username and chip_id combination.
 
+        Uses atomic findAndModify to prevent race conditions in concurrent executions.
+        Index starts from 0 on the first call for a given date/username/chip_id combination.
+
         Args:
         ----
             date: The date to get the next index for
@@ -42,14 +45,44 @@ class ExecutionCounterDocument(Document):
 
         Returns:
         -------
-            The next index
+            The next index (0 on first call, then 1, 2, 3...)
 
         """
-        doc = cls.find_one({"date": date, "username": username, "chip_id": chip_id}).run()
-        if doc is None:
-            doc = cls(date=date, username=username, chip_id=chip_id, index=0)
-            doc.save()
-            return 0
-        doc.index += 1
-        doc.save()
-        return doc.index
+        import time
+
+        from pymongo import ReturnDocument
+        from pymongo.errors import DuplicateKeyError
+
+        max_retries = 5
+        for attempt in range(max_retries):
+            # First, try to find existing document
+            doc = cls.find_one({"date": date, "username": username, "chip_id": chip_id}).run()
+
+            if doc is None:
+                # Try to create initial document with index 0
+                try:
+                    doc = cls(date=date, username=username, chip_id=chip_id, index=0)
+                    doc.insert()
+                    return 0
+                except DuplicateKeyError:
+                    # Another process created it concurrently
+                    # Wait a bit and retry the whole operation
+                    time.sleep(0.01 * (attempt + 1))
+                    continue
+
+            # Document exists - use atomic increment
+            result = cls.get_motor_collection().find_one_and_update(
+                {"date": date, "username": username, "chip_id": chip_id},
+                {"$inc": {"index": 1}},
+                return_document=ReturnDocument.AFTER,
+            )
+
+            if result is not None:
+                return result["index"]
+
+            # Result was None, retry
+            time.sleep(0.01 * (attempt + 1))
+
+        # All retries failed
+        msg = f"Failed to get next index after {max_retries} attempts"
+        raise RuntimeError(msg)

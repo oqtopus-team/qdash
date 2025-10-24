@@ -119,6 +119,45 @@ class TaskManager(BaseModel):
                 return
         raise ValueError(f"Task '{task_name}' not found in container.")
 
+    def _ensure_task_exists(self, task_name: str, task_type: str = "global", qid: str = "") -> None:
+        """Ensure task exists in task_result, add if not present."""
+        from qdash.datamodel.task import (
+            CouplingTaskModel,
+            GlobalTaskModel,
+            QubitTaskModel,
+            SystemTaskModel,
+        )
+
+        container = self._get_task_container(task_type, qid)
+        # Check if task already exists
+        for t in container:
+            if t.name == task_name:
+                return  # Task already exists
+
+        # Get upstream task ID from Prefect context
+        upstream_id = self._get_upstream_task_id()
+
+        # Task doesn't exist, add it
+        if task_type == "qubit":
+            task = QubitTaskModel(name=task_name, upstream_id=upstream_id, qid=qid)
+            self.task_result.qubit_tasks.setdefault(qid, []).append(task)
+        elif task_type == "coupling":
+            task = CouplingTaskModel(name=task_name, upstream_id=upstream_id, qid=qid)
+            self.task_result.coupling_tasks.setdefault(qid, []).append(task)
+        elif task_type == "global":
+            task = GlobalTaskModel(name=task_name, upstream_id=upstream_id)
+            self.task_result.global_tasks.append(task)
+        elif task_type == "system":
+            task = SystemTaskModel(name=task_name, upstream_id=upstream_id)
+            self.task_result.system_tasks.append(task)
+
+    def _get_upstream_task_id(self) -> str:
+        """Get upstream task ID (QDash task_id, not Prefect ID)."""
+        # Check if upstream_task_id was explicitly set
+        if hasattr(self, "_upstream_task_id"):
+            return self._upstream_task_id
+        return ""
+
     def start_task(self, task_name: str, task_type: str = "global", qid: str = "") -> None:
         container = self._get_task_container(task_type, qid)
         for t in container:
@@ -511,6 +550,9 @@ class TaskManager(BaseModel):
         task_type = task_instance.get_task_type()
 
         try:
+            # 0. Ensure task exists in task_result before execution
+            self._ensure_task_exists(task_name, task_type, qid)
+
             # 1. Start task
             self.start_task(task_name, task_type, qid)
 
