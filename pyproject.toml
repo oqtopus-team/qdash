@@ -91,11 +91,14 @@ api = [
     "matplotlib>=3.8.0",
     "networkx>=3.4.2",
     "scipy>=1.15.3",
+    "httpx>=0.27.0",  # For deployment service communication
 ]
 workflow = [
     "pymongo==4.8.0",
     "bunnet==1.3.0",
     "slack-sdk==3.36.0",
+    "fastapi==0.111.1",  # For deployment service
+    "uvicorn[standard]==0.34.0",  # For deployment service
     "python-dotenv==1.0.1",
     "numpy>=1.26.0,<1.27.0",
     "matplotlib>=3.8.0,<4.0.0",

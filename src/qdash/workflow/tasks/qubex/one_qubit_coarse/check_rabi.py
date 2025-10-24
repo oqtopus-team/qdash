@@ -4,6 +4,7 @@ from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.core.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     PostProcessResult,
+    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.tasks.qubex.base import QubexTask
@@ -17,6 +18,7 @@ class CheckRabi(QubexTask):
     name: str = "CheckRabi"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
+        "detune_frequency": InputParameterModel(unit="MHz", value_type="float", description="Detune Frequency"),
         "time_range": InputParameterModel(
             unit="ns",
             value_type="range",
@@ -47,6 +49,15 @@ class CheckRabi(QubexTask):
         "rabi_reference_phase": OutputParameterModel(unit="a.u.", description="Rabi reference phase"),
     }
 
+    def preprocess(self, session, qid):
+        super().preprocess(session, qid)
+
+        # Only set to 0 if no value was explicitly provided via task_details
+        if self.input_parameters["detune_frequency"].value is None:
+            self.input_parameters["detune_frequency"].value = 0
+
+        return PreProcessResult(input_parameters=self.input_parameters)
+
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
@@ -75,6 +86,10 @@ class CheckRabi(QubexTask):
         exp = self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
         result = exp.obtain_rabi_params(
+            frequencies={
+                label: self.input_parameters["detune_frequency"].get_value() * 1e-3
+                + exp.experiment_system.quantum_system.get_qubit(label).frequency
+            },
             time_range=self.input_parameters["time_range"].get_value(),
             shots=self.input_parameters["shots"].get_value(),
             interval=self.input_parameters["interval"].get_value(),

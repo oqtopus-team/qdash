@@ -14,6 +14,7 @@ import { GoWorkflow } from "react-icons/go";
 import { IoMdSettings } from "react-icons/io";
 import { IoAnalytics } from "react-icons/io5";
 import { MdDashboard } from "react-icons/md";
+import { FaCode } from "react-icons/fa";
 
 import { useSidebar } from "@/app/contexts/SidebarContext";
 
@@ -109,6 +110,20 @@ function Sidebar() {
           >
             <BsMenuButton />
             {isOpen && <span className="ml-2">Menu Editor</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/flow"
+            className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
+              pathname.startsWith("/flow")
+                ? "bg-neutral text-neutral-content"
+                : "text-base-content"
+            }`}
+            title="Flow Editor"
+          >
+            <FaCode />
+            {isOpen && <span className="ml-2">Flow Editor</span>}
           </Link>
         </li>
         <li>

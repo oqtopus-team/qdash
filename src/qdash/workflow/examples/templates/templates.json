@@ -1,0 +1,58 @@
+[
+  {
+    "id": "simple",
+    "name": "Simple Flow",
+    "description": "Basic single-qubit calibration flow",
+    "category": "basic",
+    "filename": "simple_flow.py",
+    "function_name": "my_custom_flow"
+  },
+  {
+    "id": "parallel",
+    "name": "Parallel Calibration",
+    "description": "Execute tasks in parallel across multiple qubits (task-first order)",
+    "category": "parallel",
+    "filename": "parallel_flow.py",
+    "function_name": "parallel_calibration_flow"
+  },
+  {
+    "id": "sequential",
+    "name": "Sequential Calibration",
+    "description": "Execute all tasks sequentially for each qubit (qubit-first order)",
+    "category": "sequential",
+    "filename": "sequential_flow.py",
+    "function_name": "sequential_calibration_flow"
+  },
+  {
+    "id": "custom_parallel",
+    "name": "Custom Parallel Flow",
+    "description": "Execute qubit groups in parallel using schedule nodes (e.g., 32→33 and 36→38 in parallel)",
+    "category": "parallel",
+    "filename": "custom_parallel_flow.py",
+    "function_name": "custom_parallel_flow"
+  },
+  {
+    "id": "adaptive",
+    "name": "Adaptive Calibration",
+    "description": "Calibration with convergence detection and iteration limit",
+    "category": "advanced",
+    "filename": "adaptive_flow.py",
+    "function_name": "adaptive_calibration_flow"
+  },
+  {
+    "id": "schedule",
+    "name": "Custom Schedule Flow",
+    "description": "Use SerialNode/ParallelNode/BatchNode for complex orchestration",
+    "category": "advanced",
+    "filename": "schedule_flow.py",
+    "function_name": "schedule_based_flow"
+  },
+  {
+    "id": "iterative",
+    "name": "Iterative Parallel Flow",
+    "description": "Repeat parallel group calibration N times (e.g., Group1 || Group2, repeated 3 times)",
+    "category": "advanced",
+    "filename": "iterative_flow.py",
+    "function_name": "iterative_flow"
+  }
+]
