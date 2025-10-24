@@ -132,63 +132,72 @@ def iterative_flow(
     logger.info(f"Max iterations: {max_iterations}")
     logger.info("Groups will run in parallel within each iteration")
 
-    # Initialize session
-    init_calibration(username, chip_id, all_qids)
+    try:
+        # Initialize session
+        init_calibration(username, chip_id, all_qids)
 
-    # TODO: Edit the tasks you want to run
-    tasks = ["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"]
+        # TODO: Edit the tasks you want to run
+        tasks = ["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"]
 
-    # TODO: Define task_details for each iteration (optional)
-    # You can customize input parameters for each iteration
-    # Example: Change CheckRabi's detune_frequency for each iteration
-    task_details_per_iteration = [
-        None,  # Iteration 1: Use default parameters (detune_frequency=0)
-        {
-            "CheckRabi": {
-                "input_parameters": {
-                    "detune_frequency": {"value": 5.0}  # Iteration 2: detune_frequency=5.0 MHz
+        # TODO: Define task_details for each iteration (optional)
+        # You can customize input parameters for each iteration
+        # Example: Change CheckRabi's detune_frequency for each iteration
+        task_details_per_iteration = [
+            None,  # Iteration 1: Use default parameters (detune_frequency=0)
+            {
+                "CheckRabi": {
+                    "input_parameters": {
+                        "detune_frequency": {"value": 5.0}  # Iteration 2: detune_frequency=5.0 MHz
+                    }
                 }
-            }
-        },
-        {
-            "CheckRabi": {
-                "input_parameters": {
-                    "detune_frequency": {"value": 10.0}  # Iteration 3: detune_frequency=10.0 MHz
+            },
+            {
+                "CheckRabi": {
+                    "input_parameters": {
+                        "detune_frequency": {"value": 10.0}  # Iteration 3: detune_frequency=10.0 MHz
+                    }
                 }
-            }
-        },
-    ]
+            },
+        ]
 
-    # Store results from all iterations
-    all_iterations_results = []
+        # Store results from all iterations
+        all_iterations_results = []
 
-    # Execute multiple iterations
-    for iteration in range(max_iterations):
-        logger.info("=" * 60)
-        logger.info(f"Starting iteration {iteration + 1}/{max_iterations}")
-        logger.info("=" * 60)
+        # Execute multiple iterations
+        for iteration in range(max_iterations):
+            logger.info("=" * 60)
+            logger.info(f"Starting iteration {iteration + 1}/{max_iterations}")
+            logger.info("=" * 60)
 
-        # Get task_details for this iteration (if defined)
-        task_details = task_details_per_iteration[iteration] if iteration < len(task_details_per_iteration) else None
+            # Get task_details for this iteration (if defined)
+            task_details = (
+                task_details_per_iteration[iteration] if iteration < len(task_details_per_iteration) else None
+            )
 
-        # Submit both groups for parallel execution
-        logger.info("Submitting groups for parallel execution...")
-        future1 = calibrate_group.submit(
-            qids=group1, tasks=tasks, group_name="Group1", iteration=iteration, task_details=task_details
-        )
-        future2 = calibrate_group.submit(
-            qids=group2, tasks=tasks, group_name="Group2", iteration=iteration, task_details=task_details
-        )
+            # Submit both groups for parallel execution
+            logger.info("Submitting groups for parallel execution...")
+            future1 = calibrate_group.submit(
+                qids=group1, tasks=tasks, group_name="Group1", iteration=iteration, task_details=task_details
+            )
+            future2 = calibrate_group.submit(
+                qids=group2, tasks=tasks, group_name="Group2", iteration=iteration, task_details=task_details
+            )
 
-        # Wait for completion
-        logger.info("Waiting for groups to complete...")
-        results1 = future1.result()
-        results2 = future2.result()
+            # Wait for completion
+            logger.info("Waiting for groups to complete...")
+            results1 = future1.result()
+            results2 = future2.result()
 
-        # Combine results for this iteration
-        iteration_results = {**results1, **results2}
-        all_iterations_results.append(iteration_results)
+            # Combine results for this iteration
+            iteration_results = {**results1, **results2}
+            all_iterations_results.append(iteration_results)
 
-    finish_calibration()
+        finish_calibration()
 
-    return all_iterations_results
+        return all_iterations_results
+
+    except Exception as e:
+        logger.error(f"Iterative calibration failed: {e}")
+        session = get_session()
+        session.fail_calibration(str(e))
+        raise

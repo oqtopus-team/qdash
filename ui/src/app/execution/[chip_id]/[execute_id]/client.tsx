@@ -7,8 +7,10 @@ import {
   FaDownload,
   FaCalendarAlt,
   FaClock,
+  FaArrowLeft,
 } from "react-icons/fa";
 import { BsCheckCircle, BsXCircle, BsClock } from "react-icons/bs";
+import Link from "next/link";
 
 import ExecutionDAG from "./ExecutionDAG";
 
@@ -278,6 +280,12 @@ export default function ExecutionDetailClient({
   return (
     <div className="w-full px-4 py-6" style={{ width: "calc(100vw - 20rem)" }}>
       <div className="space-y-6">
+        {/* Back navigation */}
+        <Link href="/execution" className="btn btn-ghost btn-sm gap-2 w-fit">
+          <FaArrowLeft />
+          Back to Executions
+        </Link>
+
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold">{execution.name}</h1>

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import React, { useEffect, Suspense } from "react";
 
-import { BsArrowLeft, BsGraphUp, BsEye, BsClock } from "react-icons/bs";
+import { BsGraphUp, BsEye, BsClock } from "react-icons/bs";
+import { FaArrowLeft } from "react-icons/fa";
 
 import { QubitRadarChart } from "./components/QubitRadarChart";
 import { QubitTimeSeriesView } from "./components/QubitTimeSeriesView";
@@ -224,18 +225,18 @@ function QubitDetailPageContent() {
   return (
     <div className="w-full px-6 py-6" style={{ width: "calc(100vw - 20rem)" }}>
       <div className="space-y-6">
+        {/* Back navigation */}
+        <Link href="/chip" className="btn btn-ghost btn-sm gap-2 w-fit">
+          <FaArrowLeft />
+          Back to Chip View
+        </Link>
+
         {/* Header Section */}
         <div className="flex flex-col gap-6">
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <Link href="/chip" className="btn btn-ghost btn-sm">
-                <BsArrowLeft className="text-lg" />
-                Back to Chip View
-              </Link>
-              <h1 className="text-2xl font-bold">
-                Qubit {qubitId} Analysis - {chipData?.data?.chip_id || chipId}
-              </h1>
-            </div>
+            <h1 className="text-2xl font-bold">
+              Qubit {qubitId} Analysis - {chipData?.data?.chip_id || chipId}
+            </h1>
             <div className="join rounded-lg overflow-hidden">
               <button
                 className={`join-item btn btn-sm ${

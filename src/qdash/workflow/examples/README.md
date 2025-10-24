@@ -179,11 +179,6 @@ See the [Python Flow Helper Documentation](../helpers/) for complete API details
 - `adaptive_calibrate()` - Single qubit closed-loop helper
 - Use `parallel_map()` for parallel adaptive calibration with custom convergence logic
 
-**Deprecated (Backward Compatibility):**
-
-- `calibrate_qubits_parallel()` - Alias for `task_first` (NOT truly parallel)
-- `calibrate_qubits_serial()` - Alias for `qubit_first`
-
 ### Execution Modes Explained
 
 #### `calibrate_qubits_task_first(qids, tasks)` (Sequential)

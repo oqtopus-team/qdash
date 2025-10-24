@@ -3,9 +3,7 @@
 from qdash.workflow.helpers.flow_helpers import (
     FlowSession,
     adaptive_calibrate,
-    calibrate_qubits_parallel,
     calibrate_qubits_qubit_first,
-    calibrate_qubits_serial,
     calibrate_qubits_task_first,
     execute_schedule,
     finish_calibration,
@@ -31,7 +29,4 @@ __all__ = [
     "execute_schedule",  # Custom orchestration using SerialNode/ParallelNode/BatchNode
     # === Adaptive Calibration ===
     "adaptive_calibrate",  # Single qubit closed-loop helper
-    # === Deprecated (Backward Compatibility) ===
-    "calibrate_qubits_parallel",  # DEPRECATED: Alias for task_first (NOT truly parallel)
-    "calibrate_qubits_serial",  # DEPRECATED: Alias for qubit_first
 ]

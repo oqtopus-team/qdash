@@ -1,7 +1,51 @@
-"""Simple calibration flow template."""
+"""Simple sequential calibration flow template.
+
+This is the simplest example - tasks are executed sequentially for each qubit.
+Each qubit is processed independently - if one fails, the next qubit continues.
+For parallel execution, see custom_parallel_flow.py instead.
+"""
 
 from prefect import flow, get_run_logger
-from qdash.workflow.helpers import calibrate_qubits_parallel, finish_calibration, init_calibration
+from qdash.workflow.helpers import finish_calibration, get_session, init_calibration
+
+
+def calibrate_single_qubit(qid: str, tasks: list[str]) -> dict:
+    """Execute tasks for a single qubit with error handling.
+
+    If a task fails, remaining tasks for this qubit are skipped.
+
+    Args:
+    ----
+        qid: Qubit ID to calibrate
+        tasks: List of task names to execute
+
+    Returns:
+    -------
+        Results for this qubit (includes error information if failed)
+
+    """
+    logger = get_run_logger()
+    session = get_session()
+    result = {}
+
+    try:
+        logger.info(f"Calibrating qubit {qid}...")
+
+        for task_name in tasks:
+            logger.info(f"  Executing {task_name}...")
+            task_result = session.execute_task(task_name, qid)
+            result[task_name] = task_result
+
+        logger.info(f"  ✓ Qubit {qid} completed successfully")
+        result["status"] = "success"
+
+    except Exception as e:
+        logger.error(f"  ✗ Failed to calibrate qubit {qid}: {e}")
+        logger.warning(f"  Skipping remaining tasks for qubit {qid}")
+        result["status"] = "failed"
+        result["error"] = str(e)
+
+    return result
 
 
 @flow
@@ -11,35 +55,54 @@ def my_custom_flow(
     qids: list[str] | None = None,
     flow_name: str | None = None,  # Automatically injected by API
 ):
-    """Simple calibration flow for demonstration.
+    """Simple sequential calibration flow for demonstration.
+
+    This flow executes tasks sequentially:
+    - For each qubit, execute all tasks in order
+    - Qubits are also processed sequentially
+
+    For parallel execution across qubits, see custom_parallel_flow.py.
 
     Note: username and chip_id are automatically provided from UI properties.
-    You only need to specify qids (qubit IDs) if you want to override the default.
 
     Args:
     ----
         username: User name for calibration (from UI)
         chip_id: Target chip ID (from UI)
         qids: List of qubit IDs to calibrate (e.g., ["32", "38"])
+        flow_name: Flow name (automatically injected by API)
 
     """
     logger = get_run_logger()
 
     if qids is None:
-        qids = ["32"]  # TODO: Change to your qubit IDs
+        qids = ["32", "33"]  # TODO: Change to your qubit IDs
 
     logger.info(f"Starting calibration for user={username}, chip_id={chip_id}, qids={qids}")
 
-    # Initialize calibration session
-    init_calibration(username, chip_id, qids, flow_name=flow_name)
+    try:
+        # Initialize calibration session
+        init_calibration(username, chip_id, qids, flow_name=flow_name)
 
-    # TODO: Edit the tasks you want to run
-    # Available tasks: CheckRabi, CreateHPIPulse, CheckHPIPulse, etc.
-    logger.info("Executing tasks in parallel...")
-    results = calibrate_qubits_parallel(qids=qids, tasks=["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"])
+        # TODO: Edit the tasks you want to run
+        # Available tasks: CheckRabi, CreateHPIPulse, CheckHPIPulse, etc.
+        tasks = ["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"]
 
-    # Finish calibration
-    finish_calibration()
+        # Execute tasks sequentially for each qubit
+        # If one qubit fails, continue with the next qubit
+        results = {}
 
-    logger.info("Calibration completed successfully")
-    return results
+        for qid in qids:
+            result = calibrate_single_qubit(qid, tasks)
+            results[qid] = result
+
+        # Finish calibration
+        finish_calibration()
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Calibration failed: {e}")
+        session = get_session()
+        session.fail_calibration(str(e))
+        raise

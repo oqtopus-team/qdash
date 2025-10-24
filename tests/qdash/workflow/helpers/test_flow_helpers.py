@@ -301,32 +301,6 @@ class TestGlobalSessionHelpers:
 class TestHelperFunctionSignatures:
     """Test that helper functions have correct signatures."""
 
-    def test_calibrate_qubits_parallel_signature(self):
-        """Test calibrate_qubits_parallel has correct signature."""
-        from inspect import signature
-
-        from qdash.workflow.helpers.flow_helpers import calibrate_qubits_parallel
-
-        sig = signature(calibrate_qubits_parallel)
-        params = list(sig.parameters.keys())
-
-        assert "qids" in params
-        assert "tasks" in params
-        assert "task_details" in params
-
-    def test_calibrate_qubits_serial_signature(self):
-        """Test calibrate_qubits_serial has correct signature."""
-        from inspect import signature
-
-        from qdash.workflow.helpers.flow_helpers import calibrate_qubits_serial
-
-        sig = signature(calibrate_qubits_serial)
-        params = list(sig.parameters.keys())
-
-        assert "qids" in params
-        assert "tasks" in params
-        assert "task_details" in params
-
     def test_adaptive_calibrate_signature(self):
         """Test adaptive_calibrate has correct signature."""
         from inspect import signature

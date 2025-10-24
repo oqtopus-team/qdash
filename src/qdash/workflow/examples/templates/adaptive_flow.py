@@ -1,7 +1,7 @@
 """Adaptive calibration flow template with convergence detection."""
 
 from prefect import flow, get_run_logger
-from qdash.workflow.helpers import adaptive_calibrate, finish_calibration, init_calibration
+from qdash.workflow.helpers import adaptive_calibrate, finish_calibration, get_session, init_calibration
 
 
 @flow
@@ -38,19 +38,26 @@ def adaptive_calibration_flow(
         f"max_iterations={max_iterations}, threshold={convergence_threshold}"
     )
 
-    init_calibration(username, chip_id, qids, flow_name=flow_name)
+    try:
+        init_calibration(username, chip_id, qids, flow_name=flow_name)
 
-    # TODO: Edit the tasks and convergence parameters
-    # Execute adaptive calibration with convergence check
-    logger.info("Executing adaptive calibration with convergence detection...")
-    results = adaptive_calibrate(
-        qids=qids,
-        tasks=["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"],
-        max_iterations=max_iterations,
-        convergence_threshold=convergence_threshold,
-    )
+        # TODO: Edit the tasks and convergence parameters
+        # Execute adaptive calibration with convergence check
+        logger.info("Executing adaptive calibration with convergence detection...")
+        results = adaptive_calibrate(
+            qids=qids,
+            tasks=["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"],
+            max_iterations=max_iterations,
+            convergence_threshold=convergence_threshold,
+        )
 
-    finish_calibration()
+        finish_calibration()
 
-    logger.info("Adaptive calibration completed successfully")
-    return results
+        logger.info("Adaptive calibration completed successfully")
+        return results
+
+    except Exception as e:
+        logger.error(f"Adaptive calibration failed: {e}")
+        session = get_session()
+        session.fail_calibration(str(e))
+        raise
