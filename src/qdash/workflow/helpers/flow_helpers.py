@@ -655,28 +655,6 @@ def calibrate_qubits_task_first(
     return results
 
 
-def calibrate_qubits_parallel(
-    qids: list[str],
-    tasks: list[str],
-    task_details: dict[str, Any] | None = None,
-) -> dict[str, dict[str, Any]]:
-    """Alias for calibrate_qubits_task_first for backward compatibility.
-
-    .. deprecated::
-        Despite the name, this executes tasks SEQUENTIALLY.
-        For true parallel execution, use :func:`calibrate_parallel` instead.
-
-    Note:
-        This function is an alias for calibrate_qubits_task_first() and
-        executes tasks sequentially. The name "parallel" is misleading and
-        kept only for backward compatibility.
-
-        Use calibrate_parallel() from parallel_helpers for true parallel execution.
-
-    """
-    return calibrate_qubits_task_first(qids, tasks, task_details)
-
-
 def calibrate_qubits_qubit_first(
     qids: list[str],
     tasks: list[str],
@@ -727,24 +705,6 @@ def calibrate_qubits_qubit_first(
             results[qid].update(task_result)
 
     return results
-
-
-def calibrate_qubits_serial(
-    qids: list[str],
-    tasks: list[str],
-    task_details: dict[str, Any] | None = None,
-) -> dict[str, dict[str, Any]]:
-    """Alias for calibrate_qubits_qubit_first for backward compatibility.
-
-    Note:
-        This function is an alias for calibrate_qubits_qubit_first() and
-        executes tasks sequentially (qubit by qubit). The name is kept
-        for backward compatibility.
-
-        For true parallel execution, use :func:`calibrate_parallel` from parallel_helpers.
-
-    """
-    return calibrate_qubits_qubit_first(qids, tasks, task_details)
 
 
 def execute_schedule(

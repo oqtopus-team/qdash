@@ -4,6 +4,7 @@ from prefect import flow, get_run_logger
 from qdash.workflow.helpers import (
     calibrate_qubits_task_first,
     finish_calibration,
+    get_session,
     init_calibration,
 )
 
@@ -35,14 +36,21 @@ def parallel_calibration_flow(
 
     logger.info(f"Starting parallel calibration for user={username}, chip_id={chip_id}, qids={qids}")
 
-    init_calibration(username, chip_id, qids, flow_name=flow_name)
+    try:
+        init_calibration(username, chip_id, qids, flow_name=flow_name)
 
-    # TODO: Edit the tasks you want to run in parallel
-    # Execute tasks sequentially, but process all qubits in parallel for each task
-    logger.info("Executing tasks in task-first order (parallel per task)...")
-    results = calibrate_qubits_task_first(qids=qids, tasks=["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"])
+        # TODO: Edit the tasks you want to run in parallel
+        # Execute tasks sequentially, but process all qubits in parallel for each task
+        logger.info("Executing tasks in task-first order (parallel per task)...")
+        results = calibrate_qubits_task_first(qids=qids, tasks=["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"])
 
-    finish_calibration()
+        finish_calibration()
 
-    logger.info("Parallel calibration completed successfully")
-    return results
+        logger.info("Parallel calibration completed successfully")
+        return results
+
+    except Exception as e:
+        logger.error(f"Parallel calibration failed: {e}")
+        session = get_session()
+        session.fail_calibration(str(e))
+        raise

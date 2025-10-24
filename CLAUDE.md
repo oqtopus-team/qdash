@@ -70,8 +70,6 @@ QDash follows a microservices architecture with three major components:
   - `calibrate_qubits_qubit_first()` - Execute tasks sequentially, completing all tasks for each qubit
   - `adaptive_calibrate()` - Closed-loop calibration with convergence
   - `execute_schedule()` - Execute tasks according to schedule definition (SerialNode, ParallelNode, BatchNode)
-  - `calibrate_qubits_parallel()` - Alias for `task_first` (backward compatibility)
-  - `calibrate_qubits_serial()` - Alias for `qubit_first` (backward compatibility)
 - **Integration**: Built on top of refactored TaskManager with unified save processing
 
 **Execution Modes (Sequential):**
@@ -87,16 +85,24 @@ Python Flow Editor provides simple sequential execution for custom flows. For tr
 
 ```python
 from prefect import flow
-from qdash.workflow.helpers import init_calibration, calibrate_qubits_parallel, finish_calibration, execute_schedule
+from qdash.workflow.helpers import init_calibration, get_session, finish_calibration, execute_schedule
 from qdash.datamodel.menu import SerialNode, ParallelNode, BatchNode
 
-# Simple parallel calibration
+# Simple sequential calibration
 @flow
 def simple_calibration(username, chip_id, qids):
     # execution_id auto-generated, ExecutionLock managed automatically
     # qids required for qubex backend initialization
     session = init_calibration(username, chip_id, qids)
-    results = calibrate_qubits_parallel(qids=qids, tasks=["CheckFreq", "CheckRabi"])
+
+    # Execute tasks sequentially
+    session = get_session()
+    results = {}
+    for qid in qids:
+        results[qid] = {}
+        for task in ["CheckFreq", "CheckRabi"]:
+            results[qid][task] = session.execute_task(task, qid)
+
     finish_calibration()
     return results
 
@@ -233,11 +239,6 @@ def custom_parallel_flow(username, chip_id, qids):
     finish_calibration()
     return results
 ```
-
-**Note on Naming:**
-
-- `calibrate_qubits_parallel()` - **sequential** (kept for backward compatibility)
-- `calibrate_parallel()` - **true parallel** using Prefect tasks
 
 ## Directory Structure
 

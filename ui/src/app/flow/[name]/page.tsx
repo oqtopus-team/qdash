@@ -283,7 +283,7 @@ export default function EditFlowPage() {
         )}
 
         {/* Main Editor Area */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden mb-4">
           {/* Editor */}
           <div className="flex-1 flex flex-col">
             <Editor
@@ -305,7 +305,8 @@ export default function EditFlowPage() {
                 fontSize: 14,
                 lineNumbers: "on",
                 automaticLayout: true,
-                scrollBeyondLastLine: false,
+                scrollBeyondLastLine: true,
+                padding: { top: 16, bottom: 16 },
                 wordWrap: "on",
                 folding: true,
                 renderLineHighlight: "all",

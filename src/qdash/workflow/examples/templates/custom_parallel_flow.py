@@ -108,25 +108,32 @@ def custom_parallel_flow(
     logger.info(f"Group 2: {group2} (sequential)")
     logger.info("Groups will run in parallel")
 
-    # Initialize session
-    init_calibration(username, chip_id, all_qids)
+    try:
+        # Initialize session
+        init_calibration(username, chip_id, all_qids)
 
-    # TODO: Edit the tasks you want to run
-    tasks = ["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"]
+        # TODO: Edit the tasks you want to run
+        tasks = ["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"]
 
-    # Submit both groups for parallel execution
-    logger.info("Submitting groups for parallel execution...")
-    future1 = calibrate_group.submit(qids=group1, tasks=tasks)
-    future2 = calibrate_group.submit(qids=group2, tasks=tasks)
+        # Submit both groups for parallel execution
+        logger.info("Submitting groups for parallel execution...")
+        future1 = calibrate_group.submit(qids=group1, tasks=tasks)
+        future2 = calibrate_group.submit(qids=group2, tasks=tasks)
 
-    # Wait for completion
-    logger.info("Waiting for groups to complete...")
-    results1 = future1.result()
-    results2 = future2.result()
+        # Wait for completion
+        logger.info("Waiting for groups to complete...")
+        results1 = future1.result()
+        results2 = future2.result()
 
-    # Combine results
-    all_results = {**results1, **results2}
+        # Combine results
+        all_results = {**results1, **results2}
 
-    finish_calibration()
+        finish_calibration()
 
-    return all_results
+        return all_results
+
+    except Exception as e:
+        logger.error(f"Custom parallel calibration failed: {e}")
+        session = get_session()
+        session.fail_calibration(str(e))
+        raise
