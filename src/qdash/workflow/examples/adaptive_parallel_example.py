@@ -10,7 +10,6 @@ Key points:
 """
 
 from prefect import flow
-
 from qdash.workflow.helpers import (
     calibrate_parallel,
     finish_calibration,
@@ -102,7 +101,7 @@ def adaptive_parallel_example(
         qids = ["32", "38"]
 
     # Initialize calibration session
-    session = init_calibration(
+    init_calibration(
         username=username,
         chip_id=chip_id,
         qids=qids,
@@ -154,6 +153,6 @@ def adaptive_parallel_example(
 if __name__ == "__main__":
     # Run the flow directly
     results = adaptive_parallel_example()
-    print(f"\n=== Final Results ===")
+    print("\n=== Final Results ===")
     print(f"Adaptive results: {results['adaptive_results']}")
     print(f"Follow-up results: {results['followup_results']}")

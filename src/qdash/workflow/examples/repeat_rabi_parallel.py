@@ -5,7 +5,6 @@ for each qubit, with each qubit running in parallel.
 """
 
 from prefect import flow
-
 from qdash.workflow.helpers import (
     finish_calibration,
     get_session,
@@ -67,7 +66,7 @@ def repeat_rabi_parallel(
         qids = ["32", "38"]
 
     # Initialize calibration session
-    session = init_calibration(
+    init_calibration(
         username=username,
         chip_id=chip_id,
         qids=qids,
@@ -93,6 +92,6 @@ def repeat_rabi_parallel(
 if __name__ == "__main__":
     # Run the flow directly
     results = repeat_rabi_parallel()
-    print(f"\n=== Final Results ===")
+    print("\n=== Final Results ===")
     for qid, result in results.items():
         print(f"Q{qid}: Completed {len(result)} iterations")

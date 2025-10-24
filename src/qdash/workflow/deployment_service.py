@@ -8,9 +8,7 @@ from logging import getLogger
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from prefect import flow
 from prefect.client.orchestration import get_client
-from prefect.client.schemas.schedules import CronSchedule
 from prefect.deployments import Deployment
 from pydantic import BaseModel
 

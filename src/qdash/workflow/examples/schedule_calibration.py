@@ -53,7 +53,7 @@ def schedule_calibration(
 
     """
     # Initialize calibration session
-    session = init_calibration(
+    init_calibration(
         username=username,
         chip_id=chip_id,
         qids=qids,
@@ -64,18 +64,18 @@ def schedule_calibration(
 
     # Example 1: Simple serial schedule
     # Execute Q0 → Q1 → Q2 sequentially
-    simple_serial_schedule = SerialNode(serial=["0", "1", "2"])
+    SerialNode(serial=["0", "1", "2"])
 
     # Example 2: Batch schedule
     # Execute all qubits together for each task
-    batch_schedule = BatchNode(batch=["0", "1", "2"])
+    BatchNode(batch=["0", "1", "2"])
 
     # Example 3: Complex nested schedule
     # This mimics real-world calibration patterns:
     # 1. First, calibrate Q0 and Q1 in serial
     # 2. Then, calibrate Q2
     # 3. Finally, run all qubits together as a batch
-    complex_schedule = SerialNode(
+    SerialNode(
         serial=[
             ParallelNode(parallel=["0", "1"]),  # Q0 and Q1 (sequential)
             "2",  # Q2
@@ -126,7 +126,7 @@ def advanced_schedule_calibration(
 
     """
     # Initialize calibration session
-    session = init_calibration(
+    init_calibration(
         username=username,
         chip_id=chip_id,
         qids=qids,

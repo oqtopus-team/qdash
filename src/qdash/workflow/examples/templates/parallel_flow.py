@@ -1,7 +1,6 @@
 """Parallel calibration flow template."""
 
 from prefect import flow, get_run_logger
-
 from qdash.workflow.helpers import (
     calibrate_qubits_task_first,
     finish_calibration,
@@ -36,7 +35,7 @@ def parallel_calibration_flow(
 
     logger.info(f"Starting parallel calibration for user={username}, chip_id={chip_id}, qids={qids}")
 
-    session = init_calibration(username, chip_id, qids, flow_name=flow_name)
+    init_calibration(username, chip_id, qids, flow_name=flow_name)
 
     # TODO: Edit the tasks you want to run in parallel
     # Execute tasks sequentially, but process all qubits in parallel for each task

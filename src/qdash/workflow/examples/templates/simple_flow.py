@@ -1,7 +1,6 @@
 """Simple calibration flow template."""
 
 from prefect import flow, get_run_logger
-
 from qdash.workflow.helpers import calibrate_qubits_parallel, finish_calibration, init_calibration
 
 
@@ -32,7 +31,7 @@ def my_custom_flow(
     logger.info(f"Starting calibration for user={username}, chip_id={chip_id}, qids={qids}")
 
     # Initialize calibration session
-    session = init_calibration(username, chip_id, qids, flow_name=flow_name)
+    init_calibration(username, chip_id, qids, flow_name=flow_name)
 
     # TODO: Edit the tasks you want to run
     # Available tasks: CheckRabi, CreateHPIPulse, CheckHPIPulse, etc.

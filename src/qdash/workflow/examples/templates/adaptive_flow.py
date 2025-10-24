@@ -1,7 +1,6 @@
 """Adaptive calibration flow template with convergence detection."""
 
 from prefect import flow, get_run_logger
-
 from qdash.workflow.helpers import adaptive_calibrate, finish_calibration, init_calibration
 
 
@@ -39,7 +38,7 @@ def adaptive_calibration_flow(
         f"max_iterations={max_iterations}, threshold={convergence_threshold}"
     )
 
-    session = init_calibration(username, chip_id, qids, flow_name=flow_name)
+    init_calibration(username, chip_id, qids, flow_name=flow_name)
 
     # TODO: Edit the tasks and convergence parameters
     # Execute adaptive calibration with convergence check

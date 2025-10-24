@@ -5,7 +5,6 @@ across multiple qubits using Prefect's task parallelism.
 """
 
 from prefect import flow
-
 from qdash.workflow.helpers import calibrate_parallel, finish_calibration, init_calibration
 
 
@@ -32,7 +31,7 @@ def parallel_calibration_example(
         qids = ["32", "38"]
 
     # Initialize calibration session
-    session = init_calibration(
+    init_calibration(
         username=username,
         chip_id=chip_id,
         qids=qids,

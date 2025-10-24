@@ -8,7 +8,6 @@ which is useful for:
 """
 
 from prefect import flow, get_run_logger, task
-
 from qdash.workflow.helpers import finish_calibration, get_session, init_calibration
 
 
@@ -134,7 +133,7 @@ def iterative_flow(
     logger.info("Groups will run in parallel within each iteration")
 
     # Initialize session
-    session = init_calibration(username, chip_id, all_qids)
+    init_calibration(username, chip_id, all_qids)
 
     # TODO: Edit the tasks you want to run
     tasks = ["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"]

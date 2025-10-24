@@ -1,7 +1,6 @@
 """Sequential calibration flow template."""
 
 from prefect import flow, get_run_logger
-
 from qdash.workflow.helpers import (
     calibrate_qubits_qubit_first,
     finish_calibration,
@@ -36,7 +35,7 @@ def sequential_calibration_flow(
 
     logger.info(f"Starting sequential calibration for user={username}, chip_id={chip_id}, qids={qids}")
 
-    session = init_calibration(username, chip_id, qids, flow_name=flow_name)
+    init_calibration(username, chip_id, qids, flow_name=flow_name)
 
     # TODO: Edit the tasks you want to run sequentially
     # Complete all tasks for each qubit before moving to the next qubit

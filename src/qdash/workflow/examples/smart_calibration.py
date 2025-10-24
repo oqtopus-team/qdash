@@ -4,8 +4,7 @@ This example demonstrates conditional task execution based on measurement result
 """
 
 from prefect import flow
-
-from qdash.workflow.helpers import finish_calibration, get_session, init_calibration
+from qdash.workflow.helpers import finish_calibration, init_calibration
 
 
 @flow(name="Smart Calibration with Branching")

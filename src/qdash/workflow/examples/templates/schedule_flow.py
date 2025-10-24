@@ -1,7 +1,6 @@
 """Custom schedule-based calibration flow template."""
 
 from prefect import flow, get_run_logger
-
 from qdash.datamodel.menu import BatchNode, ParallelNode, SerialNode
 from qdash.workflow.helpers import execute_schedule, finish_calibration, init_calibration
 
@@ -33,7 +32,7 @@ def schedule_based_flow(
 
     logger.info(f"Starting schedule-based calibration for user={username}, chip_id={chip_id}, qids={qids}")
 
-    session = init_calibration(username, chip_id, qids, flow_name=flow_name)
+    init_calibration(username, chip_id, qids, flow_name=flow_name)
 
     # TODO: Define your custom schedule
     # Example: Execute first two qubits in parallel, then all qubits together
