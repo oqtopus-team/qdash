@@ -206,6 +206,7 @@ backend/qcflow/storage
 postgres_data/
 mongo_data/
 calib_data/
+src/qdash/workflow/user_flows/*/
 *.env
 docker_node_modules/
 .venv/src/

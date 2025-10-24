@@ -1,0 +1,26 @@
+[
+  {
+    "id": "simple",
+    "name": "Simple Flow",
+    "description": "Basic sequential calibration demonstrating low-level API usage",
+    "category": "basic",
+    "filename": "simple_flow.py",
+    "function_name": "my_custom_flow"
+  },
+  {
+    "id": "custom_parallel",
+    "name": "Custom Parallel Flow",
+    "description": "Group-based parallel execution using Prefect's @task + submit()",
+    "category": "parallel",
+    "filename": "custom_parallel_flow.py",
+    "function_name": "custom_parallel_flow"
+  },
+  {
+    "id": "iterative",
+    "name": "Iterative Parallel Flow",
+    "description": "Repeat parallel group calibration multiple times with custom parameters",
+    "category": "advanced",
+    "filename": "iterative_flow.py",
+    "function_name": "iterative_flow"
+  }
+]

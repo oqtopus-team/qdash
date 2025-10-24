@@ -1,5 +1,6 @@
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+
 import { IoAnalytics, IoExpand } from "react-icons/io5";
 
 interface EmbeddedAnalysisViewProps {

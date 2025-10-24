@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+
 import { ExecutionPageContent } from "./components/ExecutionPageContent";
 
 export default function ExecutionPage() {

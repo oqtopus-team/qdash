@@ -11,12 +11,23 @@ from qdash.workflow.worker.flows.chip_report.flow import chip_report
 
 from qdash.workflow.worker.flows.scheduler.flow import cron_scheduler_flow
 from qdash.workflow.worker.flows.gateway_integration.flow import gateway_integration
+from qdash.workflow.examples.repeat_rabi_parallel import repeat_rabi_parallel
 from qdash.config import get_settings
 
 settings = get_settings()
 deployment_name = settings.env
 
 if __name__ == "__main__":
+    repeat_rabi_parallel_deploy = repeat_rabi_parallel.to_deployment(
+        name="repeat-rabei",
+        description="S",
+        tags=["example", "python-flow"],
+        parameters={
+            "username": "orangekame3",
+            "chip_id": "64Qv3",
+            "qids": ["32", "38"],
+        },
+    )
     main_deploy = main_flow.to_deployment(
         name=f"{deployment_name}-main",
         description="""This is a flow for E2E calibration.
@@ -144,6 +155,7 @@ if __name__ == "__main__":
     )
 
     _ = serve(
+        repeat_rabi_parallel_deploy,
         main_deploy,  # type: ignore
         cron_scheduler_deploy_1,  # type: ignore
         cron_scheduler_deploy_2,  # type: ignore

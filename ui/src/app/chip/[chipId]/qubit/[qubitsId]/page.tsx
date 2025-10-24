@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import React, { useEffect, Suspense } from "react";
 
-import { BsArrowLeft, BsGraphUp, BsTable, BsEye } from "react-icons/bs";
+import { BsGraphUp, BsEye, BsClock } from "react-icons/bs";
+import { FaArrowLeft } from "react-icons/fa";
 
 import { QubitRadarChart } from "./components/QubitRadarChart";
 import { QubitTimeSeriesView } from "./components/QubitTimeSeriesView";
+import { TaskHistoryViewer } from "./components/TaskHistoryViewer";
 
 import type { Task, TaskResponse } from "@/schemas";
 
@@ -46,7 +48,7 @@ function QubitDetailPageContent() {
     | "dashboard"
     | "timeseries"
     | "radar"
-    | "comparison";
+    | "history";
   const setViewMode = setQubitViewMode;
 
   const { data: chipData } = useFetchChip(chipId);
@@ -223,18 +225,18 @@ function QubitDetailPageContent() {
   return (
     <div className="w-full px-6 py-6" style={{ width: "calc(100vw - 20rem)" }}>
       <div className="space-y-6">
+        {/* Back navigation */}
+        <Link href="/chip" className="btn btn-ghost btn-sm gap-2 w-fit">
+          <FaArrowLeft />
+          Back to Chip View
+        </Link>
+
         {/* Header Section */}
         <div className="flex flex-col gap-6">
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <Link href="/chip" className="btn btn-ghost btn-sm">
-                <BsArrowLeft className="text-lg" />
-                Back to Chip View
-              </Link>
-              <h1 className="text-2xl font-bold">
-                Qubit {qubitId} Analysis - {chipData?.data?.chip_id || chipId}
-              </h1>
-            </div>
+            <h1 className="text-2xl font-bold">
+              Qubit {qubitId} Analysis - {chipData?.data?.chip_id || chipId}
+            </h1>
             <div className="join rounded-lg overflow-hidden">
               <button
                 className={`join-item btn btn-sm ${
@@ -244,6 +246,15 @@ function QubitDetailPageContent() {
               >
                 <BsEye className="text-lg" />
                 <span className="ml-2">Dashboard</span>
+              </button>
+              <button
+                className={`join-item btn btn-sm ${
+                  viewMode === "history" ? "btn-active" : ""
+                }`}
+                onClick={() => setViewMode("history")}
+              >
+                <BsClock className="text-lg" />
+                <span className="ml-2">History</span>
               </button>
               <button
                 className={`join-item btn btn-sm ${
@@ -275,15 +286,6 @@ function QubitDetailPageContent() {
                 </svg>
                 <span className="ml-2">Radar</span>
               </button>
-              <button
-                className={`join-item btn btn-sm ${
-                  viewMode === "comparison" ? "btn-active" : ""
-                }`}
-                onClick={() => setViewMode("comparison")}
-              >
-                <BsTable className="text-lg" />
-                <span className="ml-2">Comparison</span>
-              </button>
             </div>
           </div>
 
@@ -303,32 +305,34 @@ function QubitDetailPageContent() {
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-center gap-1">
-                <button
-                  onClick={navigateToPreviousDay}
-                  disabled={!canNavigatePrevious}
-                  className="btn btn-xs btn-ghost"
-                  title="Previous Day"
-                >
-                  ←
-                </button>
-                <button
-                  onClick={navigateToNextDay}
-                  disabled={!canNavigateNext}
-                  className="btn btn-xs btn-ghost"
-                  title="Next Day"
-                >
-                  →
-                </button>
+            {viewMode !== "history" && (
+              <div className="flex flex-col gap-1">
+                <div className="flex justify-center gap-1">
+                  <button
+                    onClick={navigateToPreviousDay}
+                    disabled={!canNavigatePrevious}
+                    className="btn btn-xs btn-ghost"
+                    title="Previous Day"
+                  >
+                    ←
+                  </button>
+                  <button
+                    onClick={navigateToNextDay}
+                    disabled={!canNavigateNext}
+                    className="btn btn-xs btn-ghost"
+                    title="Next Day"
+                  >
+                    →
+                  </button>
+                </div>
+                <DateSelector
+                  chipId={chipId}
+                  selectedDate={selectedDate}
+                  onDateSelect={setSelectedDate}
+                  disabled={!chipId}
+                />
               </div>
-              <DateSelector
-                chipId={chipId}
-                selectedDate={selectedDate}
-                onDateSelect={setSelectedDate}
-                disabled={!chipId}
-              />
-            </div>
+            )}
 
             <div className="flex flex-col gap-1">
               <div className="flex justify-center gap-1 opacity-0">
@@ -470,7 +474,10 @@ function QubitDetailPageContent() {
                           <div className="card-actions justify-end">
                             <button
                               className="btn btn-sm btn-primary"
-                              onClick={() => setSelectedTask(taskName)}
+                              onClick={() => {
+                                setSelectedTask(taskName);
+                                setViewMode("history");
+                              }}
                             >
                               View Details
                             </button>
@@ -496,189 +503,11 @@ function QubitDetailPageContent() {
               isLoading={isLoading}
             />
           ) : (
-            <div className="space-y-6">
-              {/* Comparison View */}
-              <div className="card bg-base-100 shadow-xl">
-                <div className="card-body">
-                  <h2 className="card-title mb-6">
-                    Experiment Comparison for Qubit {qubitId}
-                  </h2>
-
-                  {/* Comparison Table */}
-                  <div className="overflow-x-auto">
-                    <table className="table table-zebra">
-                      <thead>
-                        <tr>
-                          <th>Experiment</th>
-                          <th>Status</th>
-                          <th>Key Parameters</th>
-                          <th>Last Updated</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(allTasksData).map(
-                          ([taskName, taskData]) => (
-                            <tr key={taskName}>
-                              <td>
-                                <div className="font-bold">
-                                  {taskName.replace("Check", "")}
-                                </div>
-                                <div className="text-sm text-base-content/70">
-                                  {taskName}
-                                </div>
-                              </td>
-                              <td>
-                                <div
-                                  className={`badge ${
-                                    taskData?.status === "completed"
-                                      ? "badge-success"
-                                      : taskData?.status === "failed"
-                                        ? "badge-error"
-                                        : "badge-ghost"
-                                  }`}
-                                >
-                                  {taskData?.status || "No Data"}
-                                </div>
-                              </td>
-                              <td>
-                                {taskData?.output_parameters ? (
-                                  <div className="space-y-1">
-                                    {Object.entries(taskData.output_parameters)
-                                      .slice(0, 2)
-                                      .map(([key, value]) => {
-                                        const paramValue = (
-                                          typeof value === "object" &&
-                                          value !== null &&
-                                          "value" in value
-                                            ? value
-                                            : { value }
-                                        ) as {
-                                          value: number | string;
-                                          unit?: string;
-                                        };
-                                        return (
-                                          <div key={key} className="text-xs">
-                                            <span className="font-medium">
-                                              {key}:
-                                            </span>{" "}
-                                            <span>
-                                              {typeof paramValue.value ===
-                                              "number"
-                                                ? paramValue.value.toFixed(4)
-                                                : String(paramValue.value)}
-                                              {paramValue.unit
-                                                ? ` ${paramValue.unit}`
-                                                : ""}
-                                            </span>
-                                          </div>
-                                        );
-                                      })}
-                                    {Object.keys(taskData.output_parameters)
-                                      .length > 2 && (
-                                      <div className="text-xs text-base-content/60">
-                                        +
-                                        {Object.keys(taskData.output_parameters)
-                                          .length - 2}{" "}
-                                        more...
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="text-base-content/60">
-                                    No parameters
-                                  </span>
-                                )}
-                              </td>
-                              <td>
-                                {taskData?.end_at ? (
-                                  <div className="text-sm">
-                                    {new Date(
-                                      taskData.end_at,
-                                    ).toLocaleDateString()}
-                                    <div className="text-xs text-base-content/70">
-                                      {new Date(
-                                        taskData.end_at,
-                                      ).toLocaleTimeString()}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span className="text-base-content/60">
-                                    -
-                                  </span>
-                                )}
-                              </td>
-                              <td>
-                                <div className="flex gap-2">
-                                  <button
-                                    className="btn btn-xs btn-primary"
-                                    onClick={() => setSelectedTask(taskName)}
-                                    disabled={!taskData}
-                                  >
-                                    View
-                                  </button>
-                                  {taskData?.figure_path && (
-                                    <button
-                                      className="btn btn-xs btn-secondary"
-                                      onClick={() => {
-                                        setSelectedTask(taskName);
-                                        setViewMode("dashboard");
-                                      }}
-                                    >
-                                      Figure
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ),
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Summary Statistics */}
-                  <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="stat bg-base-200 rounded-lg">
-                      <div className="stat-title">Completed Experiments</div>
-                      <div className="stat-value text-success">
-                        {
-                          Object.values(allTasksData).filter(
-                            (task) => task?.status === "completed",
-                          ).length
-                        }
-                      </div>
-                    </div>
-                    <div className="stat bg-base-200 rounded-lg">
-                      <div className="stat-title">Failed Experiments</div>
-                      <div className="stat-value text-error">
-                        {
-                          Object.values(allTasksData).filter(
-                            (task) => task?.status === "failed",
-                          ).length
-                        }
-                      </div>
-                    </div>
-                    <div className="stat bg-base-200 rounded-lg">
-                      <div className="stat-title">Success Rate</div>
-                      <div className="stat-value text-primary">
-                        {Object.values(allTasksData).filter(Boolean).length > 0
-                          ? Math.round(
-                              (Object.values(allTasksData).filter(
-                                (task) => task?.status === "completed",
-                              ).length /
-                                Object.values(allTasksData).filter(Boolean)
-                                  .length) *
-                                100,
-                            )
-                          : 0}
-                        %
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <TaskHistoryViewer
+              chipId={chipId}
+              qubitId={qubitId}
+              taskName={selectedTask || "CheckRabi"}
+            />
           )}
         </div>
       </div>

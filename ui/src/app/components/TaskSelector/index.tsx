@@ -35,7 +35,7 @@ export function TaskSelector({
   };
 
   return (
-    <div className="w-full max-w-xs">
+    <div className="w-88">
       <label className="label">
         <span className="label-text font-medium">Select Task</span>
       </label>

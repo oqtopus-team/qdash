@@ -1,5 +1,7 @@
 import { BsCpu } from "react-icons/bs";
+
 import { EmbeddedAnalysisView } from "./EmbeddedAnalysisView";
+
 import { ChipPageContent } from "@/app/chip/components/ChipPageContent";
 
 /**

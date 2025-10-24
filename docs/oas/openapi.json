@@ -921,7 +921,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/qubit/{task_name}": {
+    "/api/chip/{chip_id}/task/qubit/{task_name}/latest": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch latest qubit task results with optional outlier filtering",
@@ -954,6 +954,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LatestTaskGroupedByChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chip/{chip_id}/task/qubit/{qid}/task/{task_name}": {
+      "get": {
+        "tags": ["chip"],
+        "summary": "Fetch Qubit Task History",
+        "description": "Fetch latest qubit task results with optional defensive outlier filtering.",
+        "operationId": "fetchQubitTaskHistory",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskHistoryResponse"
                 }
               }
             }
@@ -1030,7 +1094,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/coupling/{task_name}": {
+    "/api/chip/{chip_id}/task/coupling/{task_name}/latest": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch the multiplexers",
@@ -1642,6 +1706,264 @@
           }
         ]
       }
+    },
+    "/api/flow": {
+      "get": {
+        "tags": ["flow"],
+        "summary": "List Flows",
+        "description": "List all Flows for the current user.\n\nReturns metadata only (no code content for performance).",
+        "operationId": "list_flows",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListFlowsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["flow"],
+        "summary": "Save a Flow",
+        "description": "Save a Flow to file system and MongoDB.\n\nSteps:\n1. Validate flow name\n2. Validate flow code contains expected function\n3. Create user directory if not exists\n4. Write code to file: user_flows/{username}/{name}.py\n5. Upsert metadata to MongoDB\n6. Return file path and success message",
+        "operationId": "save_flow",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveFlowRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow/{name}": {
+      "get": {
+        "tags": ["flow"],
+        "summary": "Get Flow details",
+        "description": "Get Flow details including code content.\n\nSteps:\n1. Find metadata in MongoDB\n2. Read code from file\n3. Return combined data",
+        "operationId": "get_flow",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["flow"],
+        "summary": "Delete a Flow",
+        "description": "Delete a Flow.\n\nSteps:\n1. Delete file from user_flows/{username}/{name}.py\n2. Delete metadata from MongoDB",
+        "operationId": "delete_flow",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Flow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow/{name}/execute": {
+      "post": {
+        "tags": ["flow"],
+        "summary": "Execute a Flow",
+        "description": "Execute a Flow via Prefect deployment.\n\nSteps:\n1. Find flow metadata in MongoDB\n2. Merge request parameters with default_parameters\n3. Create flow run via Prefect Client\n4. Return execution_id and URLs",
+        "operationId": "execute_flow",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteFlowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow-templates": {
+      "get": {
+        "tags": ["flow"],
+        "summary": "List Flow Templates",
+        "description": "List all available flow templates.\n\nReturns metadata only (no code content for performance).",
+        "operationId": "list_flow_templates",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FlowTemplate"
+                  },
+                  "type": "array",
+                  "title": "Response List Flow Templates"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow-templates/{template_id}": {
+      "get": {
+        "tags": ["flow"],
+        "summary": "Get Flow Template",
+        "description": "Get flow template details including code content.\n\nSteps:\n1. Find template metadata\n2. Read Python file content\n3. Return combined data",
+        "operationId": "get_flow_template",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowTemplateWithCode"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2210,6 +2532,55 @@
         "title": "ExecuteCalibResponse",
         "description": "ExecuteCalibResponse is a subclass of BaseModel."
       },
+      "ExecuteFlowRequest": {
+        "properties": {
+          "parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameters",
+            "description": "Execution parameters (overrides default_parameters)"
+          }
+        },
+        "type": "object",
+        "title": "ExecuteFlowRequest",
+        "description": "Request to execute a Flow.",
+        "examples": [
+          {
+            "parameters": {
+              "max_iterations": 5,
+              "qids": ["32", "38"]
+            }
+          }
+        ]
+      },
+      "ExecuteFlowResponse": {
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id",
+            "description": "Execution ID"
+          },
+          "flow_run_url": {
+            "type": "string",
+            "title": "Flow Run Url",
+            "description": "Prefect flow run URL"
+          },
+          "qdash_ui_url": {
+            "type": "string",
+            "title": "Qdash Ui Url",
+            "description": "QDash UI URL for execution"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Success message"
+          }
+        },
+        "type": "object",
+        "required": ["execution_id", "flow_run_url", "qdash_ui_url", "message"],
+        "title": "ExecuteFlowResponse",
+        "description": "Response after executing a flow."
+      },
       "ExecutionLockStatusResponse": {
         "properties": {
           "lock": {
@@ -2343,6 +2714,229 @@
         "required": ["min", "max"],
         "title": "FidelityCondition",
         "description": "Condition for fidelity filtering."
+      },
+      "FlowSummary": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Flow name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Flow description"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Target chip ID"
+          },
+          "flow_function_name": {
+            "type": "string",
+            "title": "Flow Function Name",
+            "description": "Entry point function name"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "Creation timestamp (ISO format)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "Last update timestamp (ISO format)"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "chip_id",
+          "flow_function_name",
+          "created_at",
+          "updated_at",
+          "tags"
+        ],
+        "title": "FlowSummary",
+        "description": "Summary of a Flow for listing."
+      },
+      "FlowTemplate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Template ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Template name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Template description"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "Template category"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Python filename"
+          },
+          "function_name": {
+            "type": "string",
+            "title": "Function Name",
+            "description": "Flow function name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "category",
+          "filename",
+          "function_name"
+        ],
+        "title": "FlowTemplate",
+        "description": "Flow template metadata."
+      },
+      "FlowTemplateWithCode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Template ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Template name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Template description"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "Template category"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Python filename"
+          },
+          "function_name": {
+            "type": "string",
+            "title": "Function Name",
+            "description": "Flow function name"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Python code content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "category",
+          "filename",
+          "function_name",
+          "code"
+        ],
+        "title": "FlowTemplateWithCode",
+        "description": "Flow template with code content."
+      },
+      "GetFlowResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Flow name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Flow description"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Python code content"
+          },
+          "flow_function_name": {
+            "type": "string",
+            "title": "Flow Function Name",
+            "description": "Entry point function name"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Target chip ID"
+          },
+          "default_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Default Parameters",
+            "description": "Default parameters"
+          },
+          "file_path": {
+            "type": "string",
+            "title": "File Path",
+            "description": "Path to file"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "Creation timestamp (ISO format)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "Last update timestamp (ISO format)"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "code",
+          "flow_function_name",
+          "chip_id",
+          "default_parameters",
+          "file_path",
+          "created_at",
+          "updated_at",
+          "tags"
+        ],
+        "title": "GetFlowResponse",
+        "description": "Response for getting flow details."
       },
       "GetMenuResponse": {
         "properties": {
@@ -2497,16 +3091,6 @@
             },
             "type": "object",
             "title": "Result"
-          },
-          "outlier_detection": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OutlierDetectionMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "type": "object",
@@ -2528,6 +3112,22 @@
         "required": ["schedules"],
         "title": "ListCronScheduleResponse",
         "description": "ListCronScheduleResponse is a subclass of BaseModel."
+      },
+      "ListFlowsResponse": {
+        "properties": {
+          "flows": {
+            "items": {
+              "$ref": "#/components/schemas/FlowSummary"
+            },
+            "type": "array",
+            "title": "Flows",
+            "description": "List of flow summaries"
+          }
+        },
+        "type": "object",
+        "required": ["flows"],
+        "title": "ListFlowsResponse",
+        "description": "Response for listing flows."
       },
       "ListMenuResponse": {
         "properties": {
@@ -2738,62 +3338,6 @@
         "title": "MuxDetailResponse",
         "description": "MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details."
       },
-      "OutlierDetectionMetadata": {
-        "properties": {
-          "enabled": {
-            "type": "boolean",
-            "title": "Enabled"
-          },
-          "method": {
-            "type": "string",
-            "title": "Method"
-          },
-          "parameters": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Parameters"
-          },
-          "original_count": {
-            "type": "integer",
-            "title": "Original Count"
-          },
-          "filtered_count": {
-            "type": "integer",
-            "title": "Filtered Count"
-          },
-          "outlier_count": {
-            "type": "integer",
-            "title": "Outlier Count"
-          },
-          "outlier_qids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Outlier Qids"
-          },
-          "physical_violations": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Physical Violations"
-          }
-        },
-        "type": "object",
-        "required": [
-          "enabled",
-          "method",
-          "parameters",
-          "original_count",
-          "filtered_count",
-          "outlier_count",
-          "outlier_qids",
-          "physical_violations"
-        ],
-        "title": "OutlierDetectionMetadata",
-        "description": "Metadata about outlier detection applied to the data."
-      },
       "OutputParameterModel": {
         "properties": {
           "value": {
@@ -2992,6 +3536,98 @@
         "required": ["t1", "t2"],
         "title": "QubitLifetime",
         "description": "Qubit lifetime of the qubit."
+      },
+      "SaveFlowRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Flow name (alphanumeric + underscore only)"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Flow description",
+            "default": ""
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Python code content"
+          },
+          "flow_function_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Function Name",
+            "description": "Entry point function name (defaults to same as name if not provided)"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Target chip ID"
+          },
+          "default_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Default Parameters",
+            "description": "Default execution parameters"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Tags for categorization"
+          }
+        },
+        "type": "object",
+        "required": ["name", "code", "chip_id"],
+        "title": "SaveFlowRequest",
+        "description": "Request to save a Flow.",
+        "examples": [
+          {
+            "chip_id": "64Qv3",
+            "code": "from prefect import flow\n\n@flow\ndef my_adaptive_calibration():\n    pass",
+            "default_parameters": {
+              "max_iterations": 10,
+              "qids": ["32"]
+            },
+            "description": "Adaptive calibration with convergence check",
+            "flow_function_name": "my_adaptive_calibration",
+            "name": "my_adaptive_calibration",
+            "tags": ["adaptive", "calibration"]
+          }
+        ]
+      },
+      "SaveFlowResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Flow name"
+          },
+          "file_path": {
+            "type": "string",
+            "title": "File Path",
+            "description": "Path to saved file"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Success message"
+          }
+        },
+        "type": "object",
+        "required": ["name", "file_path", "message"],
+        "title": "SaveFlowResponse",
+        "description": "Response after saving a flow."
       },
       "ScheduleCalibRequest": {
         "properties": {
@@ -3463,6 +4099,24 @@
         "type": "object",
         "title": "Task",
         "description": "Task is a Pydantic model that represents a task."
+      },
+      "TaskHistoryResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "data": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Task"
+            },
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": ["name", "data"],
+        "title": "TaskHistoryResponse"
       },
       "TaskResponse": {
         "properties": {
