@@ -2,9 +2,6 @@
 
 from qdash.workflow.helpers.flow_helpers import (
     FlowSession,
-    adaptive_calibrate,
-    calibrate_qubits_qubit_first,
-    calibrate_qubits_task_first,
     execute_schedule,
     finish_calibration,
     generate_execution_id,
@@ -23,10 +20,6 @@ __all__ = [
     # === Parallel Execution (Recommended) ===
     "calibrate_parallel",  # True parallel execution across qubits using @task + submit
     "parallel_map",  # Generic parallel map for custom logic with Prefect UI visibility
-    # === Sequential Execution ===
-    "calibrate_qubits_task_first",  # Task1→all qubits, Task2→all qubits, ...
-    "calibrate_qubits_qubit_first",  # Q0→all tasks, Q1→all tasks, ...
+    # === Schedule-based Execution ===
     "execute_schedule",  # Custom orchestration using SerialNode/ParallelNode/BatchNode
-    # === Adaptive Calibration ===
-    "adaptive_calibrate",  # Single qubit closed-loop helper
 ]
