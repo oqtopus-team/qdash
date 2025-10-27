@@ -215,6 +215,27 @@ async def save_flow(
         logger.error(f"Failed to write flow file: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save flow file: {e}")
 
+    # Auto-format with ruff
+    try:
+        import subprocess
+
+        result = subprocess.run(
+            ["ruff", "format", str(file_path)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            logger.info(f"Auto-formatted flow code with ruff: {file_path}")
+        else:
+            logger.warning(f"Ruff format returned non-zero exit code: {result.stderr}")
+    except subprocess.TimeoutExpired:
+        logger.warning("Ruff format timeout - skipping auto-format")
+    except FileNotFoundError:
+        logger.warning("Ruff not found - skipping auto-format")
+    except Exception as e:
+        logger.warning(f"Failed to auto-format with ruff: {e} - skipping")
+
     # Register Prefect deployment
     try:
         deployment_name = f"{username}-{request.name}"

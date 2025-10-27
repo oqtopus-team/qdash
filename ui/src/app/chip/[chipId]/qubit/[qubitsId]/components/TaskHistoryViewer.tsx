@@ -15,7 +15,7 @@ import type { Task } from "@/schemas";
 import { TaskFigure } from "@/app/components/TaskFigure";
 import PlotlyRenderer from "@/app/components/PlotlyRenderer";
 import { useFetchQubitTaskHistory } from "@/client/chip/chip";
-import { TaskDetailModal } from "@/shared/components/TaskDetailModal";
+import { TaskGridView } from "@/shared/components/TaskGridView";
 
 interface TaskHistoryViewerProps {
   chipId: string;
@@ -39,7 +39,6 @@ export function TaskHistoryViewer({
   const [expandedFigureIdx, setExpandedFigureIdx] = useState<number | null>(
     null,
   );
-  const [modalTaskId, setModalTaskId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
 
   const { data, isLoading, error } = useFetchQubitTaskHistory(
@@ -81,12 +80,6 @@ export function TaskHistoryViewer({
     (): TaskHistoryItem | undefined =>
       taskHistory.find((t) => t.taskId === selectedTaskId),
     [taskHistory, selectedTaskId],
-  );
-
-  const modalTask = useMemo(
-    (): TaskHistoryItem | undefined =>
-      taskHistory.find((t) => t.taskId === modalTaskId),
-    [taskHistory, modalTaskId],
   );
 
   if (isLoading) {
@@ -478,99 +471,12 @@ export function TaskHistoryViewer({
         </div>
       ) : (
         /* Grid View */
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {taskHistory.map((task) => {
-              const figurePath =
-                task.figure_path && task.figure_path.length > 0
-                  ? Array.isArray(task.figure_path)
-                    ? task.figure_path[0]
-                    : task.figure_path
-                  : null;
-
-              return (
-                <div
-                  key={task.taskId}
-                  className="card bg-base-100 shadow-lg hover:shadow-xl transition-all cursor-pointer group"
-                  onClick={() => setModalTaskId(task.taskId)}
-                >
-                  <div className="card-body p-4">
-                    {/* Status Badge */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-xs font-mono text-base-content/60 truncate">
-                        {task.taskId?.slice(-8)}
-                      </div>
-                      {getStatusBadge(task.status)}
-                    </div>
-
-                    {/* Figure */}
-                    {figurePath ? (
-                      <div className="bg-base-200 rounded-lg p-2 aspect-square flex items-center justify-center mb-3">
-                        <TaskFigure
-                          path={figurePath}
-                          qid={qubitId}
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="bg-base-200 rounded-lg p-2 aspect-square flex items-center justify-center mb-3">
-                        <div className="text-center text-base-content/40">
-                          <div className="text-4xl mb-2">📊</div>
-                          <div className="text-xs">No Figure</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Task Info */}
-                    <div className="space-y-2">
-                      <div className="text-sm">
-                        {formatDateTime(task.start_at)}
-                      </div>
-
-                      {task.elapsed_time && (
-                        <div className="text-xs text-base-content/60">
-                          ⏱ {task.elapsed_time}
-                        </div>
-                      )}
-
-                      {task.message && (
-                        <div className="text-xs text-base-content/70 line-clamp-2">
-                          {task.message}
-                        </div>
-                      )}
-
-                      {task.output_parameters && (
-                        <div className="text-xs text-base-content/60">
-                          {Object.keys(task.output_parameters).length}{" "}
-                          parameters
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Hover indicator */}
-                    <div className="mt-2 text-center">
-                      <span className="text-xs badge badge-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                        Click to view details
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <TaskGridView
+          tasks={taskHistory}
+          qubitId={qubitId}
+          emptyMessage="No task history available"
+        />
       )}
-
-      {/* Task Detail Modal (for Grid View) */}
-      <TaskDetailModal
-        isOpen={!!modalTask}
-        task={modalTask || null}
-        qid={qubitId}
-        onClose={() => setModalTaskId(null)}
-        taskId={modalTask?.taskId}
-        taskName={modalTask?.name}
-        variant="detailed"
-      />
 
       {/* Figure Expansion Modal (for List View) */}
       {expandedFigureIdx !== null &&
