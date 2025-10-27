@@ -69,6 +69,12 @@ class BaseTask(ABC):
             params: Optional dictionary containing task parameters
 
         """
+        # Create instance-specific deep copies of input/output parameters
+        # to avoid sharing state between task instances
+        from copy import deepcopy
+        self.input_parameters = deepcopy(self.__class__.input_parameters)
+        self.output_parameters = deepcopy(self.__class__.output_parameters)
+        
         if params is not None:
             self._convert_and_set_parameters(params)
 
@@ -118,11 +124,30 @@ class BaseTask(ABC):
             input_params = params["input_parameters"]
             for name, param_data in input_params.items():
                 if name in self.input_parameters:
+                    # Parameter already exists in class definition - update its value
                     value = param_data.get("value")
                     if value is not None:
                         value_type = param_data.get("value_type", self.input_parameters[name].value_type)
                         converted_value = self._convert_value_to_type(value, value_type)
                         self.input_parameters[name].value = converted_value
+                else:
+                    # Parameter doesn't exist yet (e.g., qubit_frequency added by preprocess)
+                    # Create a new InputParameterModel from the provided data
+                    from qdash.datamodel.task import InputParameterModel
+                    
+                    value = param_data.get("value")
+                    if value is not None:
+                        value_type = param_data.get("value_type", "float")
+                        unit = param_data.get("unit", "")
+                        description = param_data.get("description", "")
+                        converted_value = self._convert_value_to_type(value, value_type)
+                        
+                        self.input_parameters[name] = InputParameterModel(
+                            unit=unit,
+                            description=description,
+                            value=converted_value,
+                            value_type=value_type,
+                        )
 
     @abstractmethod
     def preprocess(self, session: BaseSession, qid: str) -> PreProcessResult:

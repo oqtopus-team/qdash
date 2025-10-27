@@ -17,6 +17,7 @@ import dynamic from "next/dynamic";
 import { toast } from "react-toastify";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { FlowExecuteConfirmModal } from "./FlowExecuteConfirmModal";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -34,6 +35,7 @@ export default function EditFlowPage() {
   const [chipId, setChipId] = useState("");
   const [tags, setTags] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
 
   // Fetch current user
@@ -206,17 +208,7 @@ export default function EditFlowPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() =>
-                executeMutation.mutate({
-                  name,
-                  data: {
-                    parameters: {
-                      username: username,
-                      chip_id: chipId,
-                    },
-                  },
-                })
-              }
+              onClick={() => setShowExecuteConfirm(true)}
               className={`px-3 py-1 text-sm text-white border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 lockStatus?.data.lock
                   ? "bg-gray-600 border-gray-700"
@@ -226,7 +218,6 @@ export default function EditFlowPage() {
                 saveMutation.isPending ||
                 deleteMutation.isPending ||
                 executeMutation.isPending ||
-                lockStatus?.data.lock ||
                 isLockStatusLoading
               }
               title={
@@ -496,6 +487,32 @@ export default function EditFlowPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Execute Confirmation Modal */}
+        {showExecuteConfirm && (
+          <FlowExecuteConfirmModal
+            flowName={name}
+            username={username}
+            chipId={chipId}
+            description={description}
+            tags={tags}
+            isLocked={lockStatus?.data.lock ?? false}
+            isLockStatusLoading={isLockStatusLoading}
+            onConfirm={() => {
+              setShowExecuteConfirm(false);
+              executeMutation.mutate({
+                name,
+                data: {
+                  parameters: {
+                    username: username,
+                    chip_id: chipId,
+                  },
+                },
+              });
+            }}
+            onClose={() => setShowExecuteConfirm(false)}
+          />
         )}
       </div>
     </>
