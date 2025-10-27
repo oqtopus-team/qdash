@@ -121,13 +121,14 @@ export function TaskGridView({
 
                 {/* Task Info */}
                 <div className="space-y-2">
-                  <div className="font-semibold text-sm truncate" title={task.name}>
+                  <div
+                    className="font-semibold text-sm truncate"
+                    title={task.name}
+                  >
                     {task.name}
                   </div>
 
-                  <div className="text-sm">
-                    {formatDateTime(task.start_at)}
-                  </div>
+                  <div className="text-sm">{formatDateTime(task.start_at)}</div>
 
                   {task.elapsed_time && (
                     <div className="text-xs text-base-content/60">
