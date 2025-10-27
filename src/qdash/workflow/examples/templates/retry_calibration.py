@@ -124,18 +124,21 @@ def _execute_ramsey_with_fallback(
 
     try:
         ramsey_result = session.execute_task("CheckRamsey", qid, task_details=task_details)
-        
+
         # Extract values from OutputParameterModel if needed
         measured_freq_raw = ramsey_result.get("bare_frequency")
         ramsey_freq_raw = ramsey_result.get("ramsey_frequency")
         t2_star_raw = ramsey_result.get("t2_star")
-        
+
         # Convert OutputParameterModel to float values
         from qdash.datamodel.task import OutputParameterModel
-        measured_freq = measured_freq_raw.value if isinstance(measured_freq_raw, OutputParameterModel) else measured_freq_raw
+
+        measured_freq = (
+            measured_freq_raw.value if isinstance(measured_freq_raw, OutputParameterModel) else measured_freq_raw
+        )
         ramsey_freq = ramsey_freq_raw.value if isinstance(ramsey_freq_raw, OutputParameterModel) else ramsey_freq_raw
         t2_star = t2_star_raw.value if isinstance(t2_star_raw, OutputParameterModel) else t2_star_raw
-        
+
         # Log detailed information about the Ramsey measurement
         logger.info(f"    ✓ CheckRamsey succeeded:")
         logger.info(f"      - Bare frequency: {measured_freq:.6f} GHz")
@@ -143,21 +146,21 @@ def _execute_ramsey_with_fallback(
             logger.info(f"      - Ramsey frequency: {ramsey_freq:.3f} MHz")
         if t2_star is not None:
             logger.info(f"      - T2*: {t2_star:.3f} μs")
-        
+
         return {"CheckRamsey": ramsey_result}, measured_freq, True
 
     except Exception as ramsey_error:
         # Log detailed error information
         error_msg = str(ramsey_error)
         logger.warning(f"    ✗ CheckRamsey failed: {error_msg}")
-        
+
         # Try to extract R2 information from the error message if available
         if "R²" in error_msg or "R2" in error_msg:
             logger.warning(f"      Reason: Low R² value (fit quality too poor)")
-        
+
         # Log exception type for better debugging
         logger.warning(f"      Exception type: {type(ramsey_error).__name__}")
-        
+
         return {"CheckRamsey": {"error": str(ramsey_error)}}, None, False
 
 
@@ -190,18 +193,18 @@ def _execute_tasks_after_ramsey(
         if measured_freq is not None:
             # Use measured frequency - create new task_details
             freq_override_details = {}
-            freq_override_details[task_name] = {
-                "input_parameters": {"qubit_frequency": {"value": measured_freq}}
-            }
+            freq_override_details[task_name] = {"input_parameters": {"qubit_frequency": {"value": measured_freq}}}
             # Convert to float if it's an OutputParameterModel
-            freq_value = measured_freq.value if hasattr(measured_freq, 'value') else measured_freq
+            freq_value = measured_freq.value if hasattr(measured_freq, "value") else measured_freq
             logger.info(f"    Executing {task_name} with measured frequency {freq_value:.6f} GHz...")
         else:
             # Use default frequency - don't pass any task_details to reset to default
             freq_override_details = {}
             logger.info(f"    Executing {task_name} with default frequency...")
 
-        task_result = session.execute_task(task_name, qid, task_details=freq_override_details if freq_override_details else None)
+        task_result = session.execute_task(
+            task_name, qid, task_details=freq_override_details if freq_override_details else None
+        )
         result[task_name] = task_result
 
     return result
@@ -279,7 +282,9 @@ def calibrate_group_with_retry(
                 result.update(ramsey_result)
 
                 # Debug: Log the ramsey execution result
-                logger.info(f"    CheckRamsey execution result: success={ramsey_success}, measured_freq={measured_freq}")
+                logger.info(
+                    f"    CheckRamsey execution result: success={ramsey_success}, measured_freq={measured_freq}"
+                )
 
                 # Check if CheckRamsey failed and we should retry
                 if not ramsey_success and attempt < max_retries:
@@ -297,7 +302,7 @@ def calibrate_group_with_retry(
                     logger.warning(f"    Proceeding with default frequency for remaining tasks")
                 else:
                     # Convert to float if it's an OutputParameterModel
-                    freq_value = measured_freq.value if hasattr(measured_freq, 'value') else measured_freq
+                    freq_value = measured_freq.value if hasattr(measured_freq, "value") else measured_freq
                     logger.info(f"    Using measured frequency: {freq_value:.6f} GHz")
 
                 after_ramsey_results = _execute_tasks_after_ramsey(
@@ -412,6 +417,9 @@ def retry_calibration(
 
         # Phase 2: Tasks after Ramsey (executed with measured frequency from Ramsey)
         tasks_after_ramsey = [
+            "CheckRabi",
+            "CreateHPIPulse",
+            "CheckHPIPulse",
             # Pi pulse optimization (CheckRabi/HPIPulse were already done before Ramsey)
             "CreatePIPulse",
             "CheckPIPulse",
