@@ -8,6 +8,8 @@ import {
   FaCalendarAlt,
   FaClock,
   FaArrowLeft,
+  FaThLarge,
+  FaList,
 } from "react-icons/fa";
 import { BsCheckCircle, BsXCircle, BsClock } from "react-icons/bs";
 import Link from "next/link";
@@ -20,6 +22,7 @@ import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 import { TaskFigure } from "@/app/components/TaskFigure";
 import PlotlyRenderer from "@/app/components/PlotlyRenderer";
 import { useFetchExecutionByChipId } from "@/client/chip/chip";
+import { TaskGridView } from "@/shared/components/TaskGridView";
 
 interface ExecutionDetailClientProps {
   chip_id: string;
@@ -37,6 +40,7 @@ export default function ExecutionDetailClient({
     index: number;
   } | null>(null);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
+  const [taskViewMode, setTaskViewMode] = useState<"list" | "grid">("list");
   const [selectedTaskIndex, setSelectedTaskIndex] = useState<number | null>(
     null,
   );
@@ -113,6 +117,14 @@ export default function ExecutionDetailClient({
       return matchesQubitId && matchesTaskName;
     });
   }, [execution?.task, filterQubitId, filterTaskName]);
+
+  // Transform tasks for TaskGridView (adds taskId field)
+  const tasksForGridView = useMemo(() => {
+    return filteredTasks.map((task: any) => ({
+      ...task,
+      taskId: task.task_id,
+    }));
+  }, [filteredTasks]);
 
   // Auto-select first task when filters change
   useEffect(() => {
@@ -338,76 +350,102 @@ export default function ExecutionDetailClient({
         </div>
 
         <div className="bg-base-100 rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4">
-            Tasks
-            <span className="badge badge-primary ml-2">
-              {filteredTasks.length}
-              {filteredTasks.length !== execution.task?.length &&
-                ` / ${execution.task?.length || 0}`}
-            </span>
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">
+              Tasks
+              <span className="badge badge-primary ml-2">
+                {filteredTasks.length}
+                {filteredTasks.length !== execution.task?.length &&
+                  ` / ${execution.task?.length || 0}`}
+              </span>
+            </h2>
+            <div className="btn-group">
+              <button
+                className={`btn btn-sm ${taskViewMode === "list" ? "btn-active" : ""}`}
+                onClick={() => setTaskViewMode("list")}
+              >
+                <FaList />
+                List
+              </button>
+              <button
+                className={`btn btn-sm ${taskViewMode === "grid" ? "btn-active" : ""}`}
+                onClick={() => setTaskViewMode("grid")}
+              >
+                <FaThLarge />
+                Grid
+              </button>
+            </div>
+          </div>
 
-          <div className="flex gap-4 h-[calc(100vh-400px)]">
-            {/* Left Panel - Task Timeline */}
-            <div className="w-96 flex-shrink-0">
+          {/* Filter Controls */}
+          <div className="flex gap-4 mb-4">
+            <div className="form-control flex-1">
+              <label className="label py-1">
+                <span className="label-text text-xs font-semibold">
+                  Qubit ID
+                </span>
+              </label>
+              <select
+                className="select select-bordered select-sm w-full"
+                value={filterQubitId}
+                onChange={(e) => setFilterQubitId(e.target.value)}
+              >
+                <option value="all">All Qubits</option>
+                {uniqueQubitIds.map((qid) => (
+                  <option key={qid} value={qid}>
+                    {qid}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-control flex-1">
+              <label className="label py-1">
+                <span className="label-text text-xs font-semibold">
+                  Task Name
+                </span>
+              </label>
+              <select
+                className="select select-bordered select-sm w-full"
+                value={filterTaskName}
+                onChange={(e) => setFilterTaskName(e.target.value)}
+              >
+                <option value="all">All Tasks</option>
+                {uniqueTaskNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {(filterQubitId !== "all" || filterTaskName !== "all") && (
+              <div className="form-control">
+                <label className="label py-1">
+                  <span className="label-text text-xs font-semibold opacity-0">
+                    Clear
+                  </span>
+                </label>
+                <button
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => {
+                    setFilterQubitId("all");
+                    setFilterTaskName("all");
+                  }}
+                >
+                  Clear Filters
+                </button>
+              </div>
+            )}
+          </div>
+
+          {taskViewMode === "list" ? (
+            <div className="flex gap-4 h-[calc(100vh-400px)]">
+              {/* Left Panel - Task Timeline */}
+              <div className="w-96 flex-shrink-0">
               <div className="card bg-base-100 shadow-xl h-full">
                 <div className="card-body p-4 overflow-hidden flex flex-col">
                   <h3 className="card-title text-lg mb-2">Timeline</h3>
-
-                  {/* Filter Controls */}
-                  <div className="space-y-2 mb-4">
-                    <div className="form-control">
-                      <label className="label py-1">
-                        <span className="label-text text-xs font-semibold">
-                          Qubit ID
-                        </span>
-                      </label>
-                      <select
-                        className="select select-bordered select-sm w-full"
-                        value={filterQubitId}
-                        onChange={(e) => setFilterQubitId(e.target.value)}
-                      >
-                        <option value="all">All Qubits</option>
-                        {uniqueQubitIds.map((qid) => (
-                          <option key={qid} value={qid}>
-                            {qid}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="form-control">
-                      <label className="label py-1">
-                        <span className="label-text text-xs font-semibold">
-                          Task Name
-                        </span>
-                      </label>
-                      <select
-                        className="select select-bordered select-sm w-full"
-                        value={filterTaskName}
-                        onChange={(e) => setFilterTaskName(e.target.value)}
-                      >
-                        <option value="all">All Tasks</option>
-                        {uniqueTaskNames.map((name) => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {(filterQubitId !== "all" || filterTaskName !== "all") && (
-                      <button
-                        className="btn btn-xs btn-ghost w-full"
-                        onClick={() => {
-                          setFilterQubitId("all");
-                          setFilterTaskName("all");
-                        }}
-                      >
-                        Clear Filters
-                      </button>
-                    )}
-                  </div>
 
                   <div className="flex-1 overflow-y-auto space-y-2">
                     {filteredTasks.length === 0 ? (
@@ -757,7 +795,16 @@ export default function ExecutionDetailClient({
                 </div>
               )}
             </div>
-          </div>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <TaskGridView
+                tasks={tasksForGridView}
+                qubitId={chip_id}
+                emptyMessage="No tasks found"
+              />
+            </div>
+          )}
         </div>
       </div>
 

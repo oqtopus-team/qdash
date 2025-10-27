@@ -22,5 +22,21 @@
     "category": "advanced",
     "filename": "iterative_flow.py",
     "function_name": "iterative_flow"
+  },
+  {
+    "id": "full_qubit",
+    "name": "Full Qubit Calibration",
+    "description": "Complete 1-qubit calibration suite with all standard tasks (Rabi, T1/T2, DRAG, RB)",
+    "category": "production",
+    "filename": "full_qubit_calibration.py",
+    "function_name": "full_qubit_calibration"
+  },
+  {
+    "id": "retry",
+    "name": "Retry Calibration",
+    "description": "Full 1-qubit calibration with smart per-qubit retry - immediately retries failed qubits within groups",
+    "category": "advanced",
+    "filename": "retry_calibration.py",
+    "function_name": "retry_calibration"
   }
 ]

@@ -3213,6 +3213,7 @@ api = [
     { name = "python-jose" },
     { name = "python-multipart" },
     { name = "pyyaml" },
+    { name = "ruff" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "scipy", version = "1.16.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "uvicorn", extra = ["standard"] },
@@ -3273,6 +3274,7 @@ api = [
     { name = "python-jose", specifier = "==3.4.0" },
     { name = "python-multipart", specifier = "==0.0.20" },
     { name = "pyyaml", specifier = "==6.0.1" },
+    { name = "ruff", specifier = "==0.5.5" },
     { name = "scipy", specifier = ">=1.15.3" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.34.0" },
 ]

@@ -1,4 +1,13 @@
-"""Custom parallel flow with simple parallel execution using .submit()."""
+"""Complete 1-qubit calibration flow with all standard tasks.
+
+This template includes all standard single-qubit calibration tasks:
+- Basic characterization (Rabi, T1, T2)
+- Pulse optimization (HPI, PI, DRAG)
+- Readout calibration
+- Benchmarking (RB, IRB)
+
+Supports parallel execution across multiple qubit groups.
+"""
 
 from prefect import flow, get_run_logger, task
 from qdash.workflow.helpers import finish_calibration, get_session, init_calibration
@@ -55,18 +64,25 @@ def calibrate_group(qids: list[str], tasks: list[str]) -> dict:
 
 
 @flow
-def custom_parallel_flow(
+def full_qubit_calibration(
     username: str,  # Automatically provided from UI properties
     chip_id: str,  # Automatically provided from UI properties
     qids: list[str] | None = None,
     flow_name: str | None = None,  # Automatically injected by API
 ):
-    """Custom parallel calibration with simple group execution.
+    """Complete 1-qubit calibration with all standard tasks.
 
-    Example: Execute (32→33) and (36→38) in parallel
-    - Group 1: Calibrate 32, then 33 (sequential)
-    - Group 2: Calibrate 36, then 38 (sequential)
-    - Both groups run in parallel
+    This flow executes a comprehensive calibration suite for single qubits:
+    1. Basic characterization (Rabi oscillations, T1, T2)
+    2. Pulse creation and optimization (HPI, PI, DRAG)
+    3. Readout calibration
+    4. Gate benchmarking (RB, IRB)
+
+    Supports parallel execution across multiple qubit groups.
+
+    Example: Calibrate two groups in parallel
+    - Group 1: Q32 → Q33 (sequential)
+    - Group 2: Q36 → Q38 (sequential)
 
     Note: username and chip_id are automatically provided from UI properties.
 
@@ -75,21 +91,22 @@ def custom_parallel_flow(
         username: User name for calibration (from UI)
         chip_id: Target chip ID (from UI)
         qids: List of qubit IDs (not used, groups are defined explicitly)
+        flow_name: Flow name (automatically injected by API)
 
     """
     logger = get_run_logger()
 
     # TODO: Define your qubit groups
     groups = [
-        ["33", "32"],  # Group 1: 32 → 33 (sequential)
-        ["36", "38"],  # Group 2: 36 → 38 (sequential)
+        ["32", "33"],  # Group 1: Q32 → Q33 (sequential)
+        ["36", "38"],  # Group 2: Q36 → Q38 (sequential)
         # Add more groups as needed
     ]
 
     # Flatten all qids for initialization
     all_qids = [qid for group in groups for qid in group]
 
-    logger.info(f"Starting calibration for user={username}, chip_id={chip_id}")
+    logger.info(f"Starting full qubit calibration for user={username}, chip_id={chip_id}")
     for i, group in enumerate(groups, start=1):
         logger.info(f"Group {i}: {group} (sequential)")
     logger.info("Groups will run in parallel")
@@ -98,8 +115,30 @@ def custom_parallel_flow(
         # Initialize session
         init_calibration(username, chip_id, all_qids, flow_name=flow_name)
 
-        # TODO: Edit the tasks you want to run
-        tasks = ["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"]
+        # Complete 1-qubit calibration task suite
+        tasks = [
+            # Phase 1: Basic characterization
+            "CheckRabi",  # Rabi oscillations for pi-pulse calibration
+            # Phase 2: Half-pi pulse optimization
+            "CreateHPIPulse",  # Create half-pi pulse
+            "CheckHPIPulse",  # Verify half-pi pulse
+            # Phase 3: Pi pulse optimization
+            "CreatePIPulse",  # Create pi pulse
+            "CheckPIPulse",  # Verify pi pulse
+            # Phase 4: Decoherence characterization
+            "CheckT1",  # Energy relaxation time
+            "CheckT2Echo",  # Dephasing time (echo)
+            # Phase 5: DRAG pulse optimization
+            "CreateDRAGHPIPulse",  # Create DRAG half-pi pulse
+            "CheckDRAGHPIPulse",  # Verify DRAG half-pi pulse
+            "CreateDRAGPIPulse",  # Create DRAG pi pulse
+            "CheckDRAGPIPulse",  # Verify DRAG pi pulse
+            # Phase 6: Readout calibration
+            "ReadoutClassification",  # Optimize readout fidelity
+            # Phase 7: Gate benchmarking
+            "RandomizedBenchmarking",  # Overall gate fidelity (RB)
+            "X90InterleavedRandomizedBenchmarking",  # X90 gate fidelity (IRB)
+        ]
 
         # Submit all groups for parallel execution
         logger.info("Submitting groups for parallel execution...")
@@ -116,10 +155,11 @@ def custom_parallel_flow(
 
         finish_calibration()
 
+        logger.info("Full qubit calibration completed successfully!")
         return all_results
 
     except Exception as e:
-        logger.error(f"Custom parallel calibration failed: {e}")
+        logger.error(f"Full qubit calibration failed: {e}")
         session = get_session()
         session.fail_calibration(str(e))
         raise

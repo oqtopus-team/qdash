@@ -42,48 +42,30 @@ def calibrate_group(
 
     session = get_session()
     results = {}
-    failed_qubits = []
-    last_task_id = None  # Track last task_id for upstream dependency
 
     # Execute each qubit in order
     for qid in qids:
-        logger.info(f"  Calibrating qubit {qid}")
+        logger.info(f"  Calibrating qubit {qid}...")
 
         try:
             # Execute all tasks for this qubit
+            result = {"iteration": iteration, "group": group_name}
             for task_name in tasks:
-                logger.info(f"    Executing {task_name} on qubit {qid}")
+                logger.info(f"    Executing {task_name}...")
+                task_result = session.execute_task(task_name, qid, task_details=task_details)
+                result[task_name] = task_result
 
-                # Pass upstream_id from previous qid's last task (for group dependency)
-                result = session.execute_task(task_name, qid, task_details=task_details, upstream_id=last_task_id)
-
-                if qid not in results:
-                    results[qid] = {"status": "success", "iteration": iteration, "group": group_name}
-
-                results[qid].update(result)
-
-                # Update last_task_id for next task/qid
-                last_task_id = result.get("task_id")
-
-            logger.info(f"  ✓ Successfully calibrated qubit {qid}")
+            logger.info(f"  ✓ Qubit {qid} completed successfully")
+            result["status"] = "success"
 
         except Exception as e:
             # Log the error and continue with next qubit
             logger.error(f"  ✗ Failed to calibrate qubit {qid}: {e}")
-            logger.warning(f"  Skipping qubit {qid} and continuing with next qubit")
+            logger.warning(f"  Skipping remaining tasks for qubit {qid}")
+            result["status"] = "failed"
+            result["error"] = str(e)
 
-            failed_qubits.append(qid)
-            results[qid] = {"status": "failed", "error": str(e), "iteration": iteration, "group": group_name}
-
-            # Continue to next qubit (last_task_id preserved for next qid)
-            continue
-
-    # Summary
-    successful_qubits = [qid for qid in qids if qid not in failed_qubits]
-    logger.info(f"Iteration {iteration + 1} - {group_name} completed:")
-    logger.info(f"  Successful: {successful_qubits}")
-    if failed_qubits:
-        logger.warning(f"  Failed: {failed_qubits}")
+        results[qid] = result
 
     return results
 
@@ -121,20 +103,24 @@ def iterative_flow(
     logger = get_run_logger()
 
     # TODO: Define your qubit groups
-    group1 = ["33", "32"]  # 33 → 32
-    group2 = ["36", "38"]  # 36 → 38
+    groups = [
+        ["33", "32"],  # Group 1: 33 → 32 (sequential)
+        ["36", "38"],  # Group 2: 36 → 38 (sequential)
+        # Add more groups as needed
+    ]
 
-    all_qids = group1 + group2
+    # Flatten all qids for initialization
+    all_qids = [qid for group in groups for qid in group]
 
     logger.info(f"Starting iterative parallel calibration for user={username}, chip_id={chip_id}")
-    logger.info(f"Group 1: {group1} (sequential)")
-    logger.info(f"Group 2: {group2} (sequential)")
+    for i, group in enumerate(groups, start=1):
+        logger.info(f"Group {i}: {group} (sequential)")
     logger.info(f"Max iterations: {max_iterations}")
     logger.info("Groups will run in parallel within each iteration")
 
     try:
         # Initialize session
-        init_calibration(username, chip_id, all_qids)
+        init_calibration(username, chip_id, all_qids, flow_name=flow_name)
 
         # TODO: Edit the tasks you want to run
         tasks = ["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"]
@@ -174,22 +160,27 @@ def iterative_flow(
                 task_details_per_iteration[iteration] if iteration < len(task_details_per_iteration) else None
             )
 
-            # Submit both groups for parallel execution
+            # Submit all groups for parallel execution
             logger.info("Submitting groups for parallel execution...")
-            future1 = calibrate_group.submit(
-                qids=group1, tasks=tasks, group_name="Group1", iteration=iteration, task_details=task_details
-            )
-            future2 = calibrate_group.submit(
-                qids=group2, tasks=tasks, group_name="Group2", iteration=iteration, task_details=task_details
-            )
+            futures = [
+                calibrate_group.submit(
+                    qids=group,
+                    tasks=tasks,
+                    group_name=f"Group{i+1}",
+                    iteration=iteration,
+                    task_details=task_details,
+                )
+                for i, group in enumerate(groups)
+            ]
 
             # Wait for completion
             logger.info("Waiting for groups to complete...")
-            results1 = future1.result()
-            results2 = future2.result()
+            results_list = [future.result() for future in futures]
 
             # Combine results for this iteration
-            iteration_results = {**results1, **results2}
+            iteration_results = {}
+            for results in results_list:
+                iteration_results.update(results)
             all_iterations_results.append(iteration_results)
 
         finish_calibration()
