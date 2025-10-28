@@ -10,8 +10,13 @@ Based on full_qubit_calibration with automatic retry capability:
 Useful when some qubits fail due to parameter sensitivity.
 """
 
+from typing import TYPE_CHECKING
+
 from prefect import flow, get_run_logger, task
 from qdash.workflow.helpers import finish_calibration, get_session, init_calibration
+
+if TYPE_CHECKING:
+    from qdash.workflow.helpers.session import FlowSession
 
 
 def _apply_frequency_offset_strategy(
@@ -109,7 +114,7 @@ def _execute_ramsey_with_fallback(
         Tuple of (ramsey_result_dict, measured_frequency_or_None, success_flag)
 
     """
-    logger.info(f"    Executing CheckRamsey to measure accurate frequency...")
+    logger.info("    Executing CheckRamsey to measure accurate frequency...")
     measured_freq = None
 
     try:
@@ -269,7 +274,7 @@ def calibrate_group_with_retry(
 
                 # Phase 3: Execute tasks after Ramsey with measured or default frequency
                 if not ramsey_success:
-                    logger.warning(f"    Proceeding with default frequency")
+                    logger.warning("    Proceeding with default frequency")
 
                 after_ramsey_results = _execute_tasks_after_ramsey(
                     tasks_after_ramsey, session, qid, task_details, measured_freq, logger
