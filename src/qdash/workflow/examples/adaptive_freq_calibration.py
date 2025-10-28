@@ -13,8 +13,7 @@ accurate frequency tracking.
 """
 
 from prefect import flow, get_run_logger
-
-from qdash.workflow.helpers import finish_calibration, get_session, init_calibration
+from qdash.workflow.helpers import finish_calibration, init_calibration
 
 
 @flow
