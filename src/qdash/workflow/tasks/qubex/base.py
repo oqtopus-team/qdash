@@ -26,7 +26,7 @@ class QubexTask(BaseTask):
     def preprocess(self, session: "QubexSession", qid: str) -> PreProcessResult:
         exp = self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
-        
+
         # Add default parameters only if they don't exist yet
         # This preserves any overrides provided via task_details
         if "readout_amplitude" not in self.input_parameters:

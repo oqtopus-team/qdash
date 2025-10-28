@@ -84,18 +84,10 @@ def adaptive_freq_calibration(
             rabi_result = session.execute_task(
                 "CheckRabi",
                 qid,
-                task_details={
-                    "CheckRabi": {
-                        "input_parameters": {
-                            "qubit_frequency": {"value": measured_freq}
-                        }
-                    }
-                },
+                task_details={"CheckRabi": {"input_parameters": {"qubit_frequency": {"value": measured_freq}}}},
             )
 
-            logger.info(
-                f"Qubit {qid} - Rabi frequency: {rabi_result['rabi_frequency']:.2f} MHz"
-            )
+            logger.info(f"Qubit {qid} - Rabi frequency: {rabi_result['rabi_frequency']:.2f} MHz")
 
             # Store iteration results
             iteration_results.append(
@@ -112,14 +104,10 @@ def adaptive_freq_calibration(
             logger.info(f"Qubit {qid} - Frequency error: {freq_error:.6f} GHz")
 
             if freq_error < frequency_tolerance:
-                logger.info(
-                    f"Qubit {qid} - Converged in {iteration + 1} iterations!"
-                )
+                logger.info(f"Qubit {qid} - Converged in {iteration + 1} iterations!")
                 break
         else:
-            logger.warning(
-                f"Qubit {qid} - Did not converge within {max_iterations} iterations"
-            )
+            logger.warning(f"Qubit {qid} - Did not converge within {max_iterations} iterations")
 
         # Store final results
         results[qid] = {
@@ -188,19 +176,11 @@ def adaptive_multi_task_calibration(
             logger.info(f"Qubit {qid} - Measured frequency: {measured_freq:.6f} GHz")
 
             # Step 2: Run multiple tasks with the same frequency
-            task_details_with_freq = {
-                "input_parameters": {"qubit_frequency": {"value": measured_freq}}
-            }
+            task_details_with_freq = {"input_parameters": {"qubit_frequency": {"value": measured_freq}}}
 
-            rabi_result = session.execute_task(
-                "CheckRabi", qid, task_details={"CheckRabi": task_details_with_freq}
-            )
-            t1_result = session.execute_task(
-                "CheckT1", qid, task_details={"CheckT1": task_details_with_freq}
-            )
-            t2_result = session.execute_task(
-                "CheckT2Echo", qid, task_details={"CheckT2Echo": task_details_with_freq}
-            )
+            rabi_result = session.execute_task("CheckRabi", qid, task_details={"CheckRabi": task_details_with_freq})
+            t1_result = session.execute_task("CheckT1", qid, task_details={"CheckT1": task_details_with_freq})
+            t2_result = session.execute_task("CheckT2Echo", qid, task_details={"CheckT2Echo": task_details_with_freq})
 
             logger.info(
                 f"Qubit {qid} - Rabi: {rabi_result['rabi_frequency']:.2f} MHz, "
@@ -211,14 +191,10 @@ def adaptive_multi_task_calibration(
             freq_error = abs(measured_freq - target_frequency)
 
             if freq_error < frequency_tolerance:
-                logger.info(
-                    f"Qubit {qid} - Converged in {iteration + 1} iterations!"
-                )
+                logger.info(f"Qubit {qid} - Converged in {iteration + 1} iterations!")
                 break
         else:
-            logger.warning(
-                f"Qubit {qid} - Did not converge within {max_iterations} iterations"
-            )
+            logger.warning(f"Qubit {qid} - Did not converge within {max_iterations} iterations")
 
         results[qid] = {
             "final_frequency": measured_freq,

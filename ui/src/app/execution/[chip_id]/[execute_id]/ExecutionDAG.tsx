@@ -188,7 +188,14 @@ function FlowContent({
         >
           <div className="text-sm">Click nodes to see details</div>
           <button
-            onClick={() => fitView({ padding: 0.05, minZoom: 0.1, maxZoom: 1.5, duration: 300 })}
+            onClick={() =>
+              fitView({
+                padding: 0.05,
+                minZoom: 0.1,
+                maxZoom: 1.5,
+                duration: 300,
+              })
+            }
             className="btn btn-sm btn-ghost"
             title="Fit to view"
           >

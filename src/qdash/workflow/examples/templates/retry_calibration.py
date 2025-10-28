@@ -55,6 +55,7 @@ def _apply_frequency_offset_strategy(
     logger.info(f"    Target frequency: {target_freq:.6f} GHz")
 
     # Create task_details with frequency override for all tasks_before_ramsey
+    # Note: Only 'value' needs to be specified - unit/value_type/description are preserved from task definition
     task_details = {}
     for task_name in tasks_before_ramsey:
         task_details[task_name] = {"input_parameters": {"qubit_frequency": {"value": target_freq}}}
@@ -84,17 +85,6 @@ def _execute_tasks_before_ramsey(
     """
     result = {}
     for task_name in tasks_before_ramsey:
-        # Log frequency override if present
-        if task_details and task_name in task_details:
-            task_params = task_details[task_name]
-            if "input_parameters" in task_params and "qubit_frequency" in task_params["input_parameters"]:
-                override_freq = task_params["input_parameters"]["qubit_frequency"]["value"]
-                logger.info(f"    Executing {task_name} with frequency override: {override_freq:.6f} GHz...")
-            else:
-                logger.info(f"    Executing {task_name}...")
-        else:
-            logger.info(f"    Executing {task_name}...")
-
         task_result = session.execute_task(task_name, qid, task_details=task_details)
         result[task_name] = task_result
 
@@ -139,27 +129,18 @@ def _execute_ramsey_with_fallback(
         ramsey_freq = ramsey_freq_raw.value if isinstance(ramsey_freq_raw, OutputParameterModel) else ramsey_freq_raw
         t2_star = t2_star_raw.value if isinstance(t2_star_raw, OutputParameterModel) else t2_star_raw
 
-        # Log detailed information about the Ramsey measurement
-        logger.info(f"    ✓ CheckRamsey succeeded:")
-        logger.info(f"      - Bare frequency: {measured_freq:.6f} GHz")
-        if ramsey_freq is not None:
-            logger.info(f"      - Ramsey frequency: {ramsey_freq:.3f} MHz")
-        if t2_star is not None:
-            logger.info(f"      - T2*: {t2_star:.3f} μs")
+        # Log Ramsey measurement result
+        logger.info(
+            f"    ✓ CheckRamsey: {measured_freq:.6f} GHz (R_freq={ramsey_freq:.1f} MHz, T2*={t2_star:.1f} μs)"
+            if ramsey_freq and t2_star
+            else f"    ✓ CheckRamsey: {measured_freq:.6f} GHz"
+        )
 
         return {"CheckRamsey": ramsey_result}, measured_freq, True
 
     except Exception as ramsey_error:
-        # Log detailed error information
-        error_msg = str(ramsey_error)
-        logger.warning(f"    ✗ CheckRamsey failed: {error_msg}")
-
-        # Try to extract R2 information from the error message if available
-        if "R²" in error_msg or "R2" in error_msg:
-            logger.warning(f"      Reason: Low R² value (fit quality too poor)")
-
-        # Log exception type for better debugging
-        logger.warning(f"      Exception type: {type(ramsey_error).__name__}")
+        # Log error information
+        logger.warning(f"    ✗ CheckRamsey failed: {str(ramsey_error)}")
 
         return {"CheckRamsey": {"error": str(ramsey_error)}}, None, False
 
@@ -191,16 +172,12 @@ def _execute_tasks_after_ramsey(
     for task_name in tasks_after_ramsey:
         # Determine which task_details to use
         if measured_freq is not None:
-            # Use measured frequency - create new task_details
+            # Use measured frequency - only specify value (unit/value_type/description preserved from task)
             freq_override_details = {}
             freq_override_details[task_name] = {"input_parameters": {"qubit_frequency": {"value": measured_freq}}}
-            # Convert to float if it's an OutputParameterModel
-            freq_value = measured_freq.value if hasattr(measured_freq, "value") else measured_freq
-            logger.info(f"    Executing {task_name} with measured frequency {freq_value:.6f} GHz...")
         else:
             # Use default frequency - don't pass any task_details to reset to default
             freq_override_details = {}
-            logger.info(f"    Executing {task_name} with default frequency...")
 
         task_result = session.execute_task(
             task_name, qid, task_details=freq_override_details if freq_override_details else None
@@ -281,11 +258,6 @@ def calibrate_group_with_retry(
                 )
                 result.update(ramsey_result)
 
-                # Debug: Log the ramsey execution result
-                logger.info(
-                    f"    CheckRamsey execution result: success={ramsey_success}, measured_freq={measured_freq}"
-                )
-
                 # Check if CheckRamsey failed and we should retry
                 if not ramsey_success and attempt < max_retries:
                     logger.warning(f"    CheckRamsey failed on attempt {attempt}")
@@ -296,20 +268,13 @@ def calibrate_group_with_retry(
                     continue  # Retry from the beginning
 
                 # Phase 3: Execute tasks after Ramsey with measured or default frequency
-                # (proceeds even if CheckRamsey failed, using default frequency)
-                logger.info(f"    Proceeding to tasks_after_ramsey (ramsey_success={ramsey_success})")
                 if not ramsey_success:
-                    logger.warning(f"    Proceeding with default frequency for remaining tasks")
-                else:
-                    # Convert to float if it's an OutputParameterModel
-                    freq_value = measured_freq.value if hasattr(measured_freq, "value") else measured_freq
-                    logger.info(f"    Using measured frequency: {freq_value:.6f} GHz")
+                    logger.warning(f"    Proceeding with default frequency")
 
                 after_ramsey_results = _execute_tasks_after_ramsey(
                     tasks_after_ramsey, session, qid, task_details, measured_freq, logger
                 )
                 result.update(after_ramsey_results)
-                logger.info(f"    ✓ All tasks_after_ramsey completed successfully")
 
                 # All tasks completed successfully
                 logger.info(f"  ✓ Qubit {qid} completed all tasks successfully on attempt {attempt}")

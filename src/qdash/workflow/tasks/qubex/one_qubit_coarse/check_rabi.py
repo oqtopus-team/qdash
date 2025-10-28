@@ -48,7 +48,6 @@ class CheckRabi(QubexTask):
         "rabi_reference_phase": OutputParameterModel(unit="a.u.", description="Rabi reference phase"),
     }
 
-
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:

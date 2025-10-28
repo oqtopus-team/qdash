@@ -112,11 +112,12 @@ class CheckRamsey(QubexTask):
 
         # Check if results contain the expected label
         from prefect import get_run_logger
+
         logger = get_run_logger()
 
         # Debug: Check what labels are actually in the data
-        x_labels = list(run_result.raw_result["x"].data.keys()) if hasattr(run_result.raw_result["x"], 'data') else []
-        y_labels = list(run_result.raw_result["y"].data.keys()) if hasattr(run_result.raw_result["y"], 'data') else []
+        x_labels = list(run_result.raw_result["x"].data.keys()) if hasattr(run_result.raw_result["x"], "data") else []
+        y_labels = list(run_result.raw_result["y"].data.keys()) if hasattr(run_result.raw_result["y"], "data") else []
 
         logger.info(f"Expected label: {label}")
         logger.info(f"X-axis data labels: {x_labels}")
@@ -145,15 +146,15 @@ class CheckRamsey(QubexTask):
             result_y = None
         else:
             result_y = run_result.raw_result["y"].data[label]
-        
+
         # Determine which fit was successful based on R2
         # R2 is used to determine if fit was successful (not exceptions)
         # Handle cases where one or both experiments failed
         x_fit = result_x.fit() if result_x is not None else None
         y_fit = result_y.fit() if result_y is not None else None
 
-        x_r2 = result_x.r2 if result_x is not None and hasattr(result_x, 'r2') else None
-        y_r2 = result_y.r2 if result_y is not None and hasattr(result_y, 'r2') else None
+        x_r2 = result_x.r2 if result_x is not None and hasattr(result_x, "r2") else None
+        y_r2 = result_y.r2 if result_y is not None and hasattr(result_y, "r2") else None
 
         # Log R2 values for debugging
         logger.info(f"CheckRamsey fit results for Q{qid}:")
@@ -172,7 +173,7 @@ class CheckRamsey(QubexTask):
         y_fit_status = "✓ Success" if y_fit_success else ("✗ Failed" if result_y is not None else "✗ No data")
         logger.info(f"  X-axis fit: {x_fit_status}")
         logger.info(f"  Y-axis fit: {y_fit_status}")
-        
+
         # Choose the best result:
         # 1. If both succeed, prefer the one with higher R2
         # 2. If only one succeeds, use that one
@@ -263,22 +264,23 @@ class CheckRamsey(QubexTask):
 
         # Debug: Log what data was returned
         from prefect import get_run_logger
+
         logger = get_run_logger()
         logger.info(f"Ramsey experiment completed for Q{qid}")
         logger.info(f"  X-axis result type: {type(result_x)}")
         logger.info(f"  Y-axis result type: {type(result_y)}")
-        if hasattr(result_x, 'data'):
+        if hasattr(result_x, "data"):
             logger.info(f"  X-axis data keys: {list(result_x.data.keys())}")
-        if hasattr(result_y, 'data'):
+        if hasattr(result_y, "data"):
             logger.info(f"  Y-axis data keys: {list(result_y.data.keys())}")
 
         # Get R2 from both X and Y, and use the higher one
         # This ensures that if one fit succeeds, the task is not marked as failed
         x_r2 = None
         y_r2 = None
-        if result_x.data and hasattr(result_x.data[label], 'r2'):
+        if result_x.data and hasattr(result_x.data[label], "r2"):
             x_r2 = result_x.data[label].r2
-        if result_y.data and hasattr(result_y.data[label], 'r2'):
+        if result_y.data and hasattr(result_y.data[label], "r2"):
             y_r2 = result_y.data[label].r2
 
         # Choose the higher R2 value
