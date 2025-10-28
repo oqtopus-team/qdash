@@ -24,6 +24,9 @@ from qdash.workflow.tasks.qubex.cw.check_resonator_frequencies import CheckReson
 from qdash.workflow.tasks.qubex.cw.check_resonator_spectroscopy import CheckResonatorSpectroscopy
 from qdash.workflow.tasks.qubex.measurement.readout_classification import ReadoutClassification
 from qdash.workflow.tasks.qubex.one_qubit_coarse.check_hpi_pulse import CheckHPIPulse
+from qdash.workflow.tasks.qubex.one_qubit_coarse.check_optimal_readout_amplitude import (
+    CheckOptimalReadoutAmplitude,
+)
 from qdash.workflow.tasks.qubex.one_qubit_coarse.check_pi_pulse import CheckPIPulse
 from qdash.workflow.tasks.qubex.one_qubit_coarse.check_qubit import CheckQubit
 from qdash.workflow.tasks.qubex.one_qubit_coarse.check_qubit_frequency import (
@@ -96,4 +99,5 @@ __all__ = [
     "CheckReflectionCoefficient",
     "CheckQubitFrequencies",
     "CheckQubitSpectroscopy",
+    "CheckOptimalReadoutAmplitude",
 ]
