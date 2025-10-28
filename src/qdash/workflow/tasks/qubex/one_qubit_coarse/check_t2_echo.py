@@ -55,13 +55,17 @@ class CheckT2Echo(QubexTask):
     def run(self, session: QubexSession, qid: str) -> RunResult:
         exp = self.get_experiment(session)
         labels = [exp.get_qubit_label(int(qid))]
-        result = exp.t2_experiment(
-            labels,
-            time_range=self.input_parameters["time_range"].get_value(),
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
-            save_image=False,
-        )
+
+        # Apply frequency override if qubit_frequency was explicitly provided
+        with self._apply_frequency_override(session, qid):
+            result = exp.t2_experiment(
+                labels,
+                time_range=self.input_parameters["time_range"].get_value(),
+                shots=self.input_parameters["shots"].get_value(),
+                interval=self.input_parameters["interval"].get_value(),
+                save_image=False,
+            )
+
         r2 = result.data[exp.get_qubit_label(int(qid))].r2
         self.save_calibration(session)
         return RunResult(raw_result=result, r2={qid: r2})

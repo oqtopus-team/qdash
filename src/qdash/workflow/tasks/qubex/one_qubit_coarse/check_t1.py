@@ -55,12 +55,16 @@ class CheckT1(QubexTask):
     def run(self, session: QubexSession, qid: str) -> RunResult:
         exp = self.get_experiment(session)
         labels = [exp.get_qubit_label(int(qid))]
-        result = exp.t1_experiment(
-            time_range=self.input_parameters["time_range"].get_value(),
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
-            targets=labels,
-        )
+
+        # Apply frequency override if qubit_frequency was explicitly provided
+        with self._apply_frequency_override(session, qid):
+            result = exp.t1_experiment(
+                time_range=self.input_parameters["time_range"].get_value(),
+                shots=self.input_parameters["shots"].get_value(),
+                interval=self.input_parameters["interval"].get_value(),
+                targets=labels,
+            )
+
         self.save_calibration(session)
         r2 = result.data[exp.get_qubit_label(int(qid))].r2
         return RunResult(raw_result=result, r2={qid: r2})
