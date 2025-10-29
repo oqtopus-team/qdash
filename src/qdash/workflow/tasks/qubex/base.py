@@ -164,8 +164,119 @@ class QubexTask(BaseTask):
         return abs(current_freq - default_freq) > 1e-9
 
     @contextmanager
+    def _apply_parameter_overrides(self, session: "QubexSession", qid: str):
+        """Context manager to apply multiple parameter overrides.
+
+        This unified method handles all parameter types that can be overridden:
+        - qubit_frequency: Uses exp.modified_frequencies() context manager
+        - readout_amplitude: Direct modification with restoration
+        - control_amplitude: Direct modification with restoration
+        - readout_frequency: Direct modification with restoration
+
+        All modified parameters are automatically restored when exiting the context,
+        even if an exception occurs.
+
+        Args:
+        ----
+            session: Qubex session object
+            qid: Qubit ID
+
+        Yields:
+        ------
+            Context with modified parameters (automatically restored on exit)
+
+        Example:
+        -------
+            ```python
+            # Single parameter override
+            task_details = {
+                "ChevronPattern": {
+                    "input_parameters": {
+                        "readout_amplitude": {"value": 0.15}
+                    }
+                }
+            }
+
+            # Multiple parameter overrides
+            task_details = {
+                "ChevronPattern": {
+                    "input_parameters": {
+                        "qubit_frequency": {"value": 5.2},
+                        "readout_amplitude": {"value": 0.15}
+                    }
+                }
+            }
+
+            # Usage in task run method:
+            with self._apply_parameter_overrides(session, qid):
+                result = exp.chevron_pattern(...)
+            ```
+
+        """
+        exp = self.get_experiment(session)
+        label = self.get_qubit_label(session, qid)
+
+        # Track original values for restoration
+        original_values = {}
+        frequency_override = None
+
+        try:
+            # Check and apply readout_amplitude override
+            if "readout_amplitude" in self.input_parameters:
+                override_value = self.input_parameters["readout_amplitude"].get_value()
+                default_value = exp.experiment_system.control_params.get_readout_amplitude(label)
+                # Only override if different from default
+                if abs(override_value - default_value) > 1e-9:
+                    original_values["readout_amplitude"] = exp.params.readout_amplitude[label]
+                    exp.params.readout_amplitude[label] = override_value
+
+            # Check and apply control_amplitude override
+            if "control_amplitude" in self.input_parameters:
+                override_value = self.input_parameters["control_amplitude"].get_value()
+                default_value = exp.experiment_system.control_params.get_control_amplitude(label)
+                # Only override if different from default
+                if abs(override_value - default_value) > 1e-9:
+                    original_values["control_amplitude"] = exp.params.control_amplitude[label]
+                    exp.params.control_amplitude[label] = override_value
+
+            # Check and apply readout_frequency override
+            if "readout_frequency" in self.input_parameters:
+                resonator_label = exp.get_resonator_label(int(qid))
+                resonator = exp.experiment_system.quantum_system.get_resonator(resonator_label)
+                override_value = self.input_parameters["readout_frequency"].get_value()
+                default_value = resonator.frequency
+                # Only override if different from default
+                if abs(override_value - default_value) > 1e-9:
+                    original_values["readout_frequency"] = resonator.frequency
+                    resonator.frequency = override_value
+
+            # Check qubit_frequency override (handled specially via modified_frequencies)
+            if self._is_frequency_overridden(session, qid):
+                frequency_override = self.input_parameters["qubit_frequency"].get_value()
+
+            # Execute with frequency override if needed
+            if frequency_override is not None:
+                with exp.modified_frequencies({label: frequency_override}):
+                    yield
+            else:
+                yield
+
+        finally:
+            # Restore all modified parameters
+            if "readout_amplitude" in original_values:
+                exp.params.readout_amplitude[label] = original_values["readout_amplitude"]
+            if "control_amplitude" in original_values:
+                exp.params.control_amplitude[label] = original_values["control_amplitude"]
+            if "readout_frequency" in original_values:
+                resonator_label = exp.get_resonator_label(int(qid))
+                resonator = exp.experiment_system.quantum_system.get_resonator(resonator_label)
+                resonator.frequency = original_values["readout_frequency"]
+
+    @contextmanager
     def _apply_frequency_override(self, session: "QubexSession", qid: str):
         """Context manager to apply frequency override if needed.
+
+        DEPRECATED: Use _apply_parameter_overrides() instead for better flexibility.
 
         This method checks if the qubit_frequency was explicitly overridden
         via task_details. If so, it uses exp.modified_frequencies() to

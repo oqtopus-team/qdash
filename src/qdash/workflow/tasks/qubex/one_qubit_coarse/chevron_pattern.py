@@ -76,25 +76,29 @@ class ChevronPattern(QubexTask):
         exp = self.get_experiment(session)
         labels = [exp.get_qubit_label(int(qid))]
 
-        # rabi_param = RabiParam(
-        #     **{
-        #         "amplitude": 0.018757924680085324,
-        #         "angle": 0.2550564567234854,
-        #         "distance": -0.013257740996778011,
-        #         "frequency": 0.012516133217763476,
-        #         "noise": 0.00035153969656676054,
-        #         "offset": 0.0009658521547125462,
-        #         "phase": -0.02116097291450829,
-        #         "r2": 0.99857055386212,
-        #         "reference_phase": 2.403657416868579,
-        #         "target": "Q04",
-        #     }
-        # )
-        result = exp.chevron_pattern(
-            targets=labels,
-            detuning_range=np.linspace(-0.05, 0.05, 51),
-            time_range=np.arange(0, 201, 4),
-            # rabi_params={labels[0]: rabi_param},
-        )
+        # Apply parameter overrides if provided via task_details
+        # Supports: qubit_frequency, readout_amplitude, control_amplitude, readout_frequency
+        with self._apply_parameter_overrides(session, qid):
+            # rabi_param = RabiParam(
+            #     **{
+            #         "amplitude": 0.018757924680085324,
+            #         "angle": 0.2550564567234854,
+            #         "distance": -0.013257740996778011,
+            #         "frequency": 0.012516133217763476,
+            #         "noise": 0.00035153969656676054,
+            #         "offset": 0.0009658521547125462,
+            #         "phase": -0.02116097291450829,
+            #         "r2": 0.99857055386212,
+            #         "reference_phase": 2.403657416868579,
+            #         "target": "Q04",
+            #     }
+            # )
+            result = exp.chevron_pattern(
+                targets=labels,
+                detuning_range=np.linspace(-0.05, 0.05, 51),
+                time_range=np.arange(0, 201, 4),
+                # rabi_params={labels[0]: rabi_param},
+            )
+
         self.save_calibration(session)
         return RunResult(raw_result=result)
