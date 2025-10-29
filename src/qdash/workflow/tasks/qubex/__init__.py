@@ -23,6 +23,7 @@ from qdash.workflow.tasks.qubex.cw.check_reflection_coefficient import CheckRefl
 from qdash.workflow.tasks.qubex.cw.check_resonator_frequencies import CheckResonatorFrequencies
 from qdash.workflow.tasks.qubex.cw.check_resonator_spectroscopy import CheckResonatorSpectroscopy
 from qdash.workflow.tasks.qubex.measurement.readout_classification import ReadoutClassification
+from qdash.workflow.tasks.qubex.one_qubit_coarse.check_dispersive_shift import CheckDispersiveShift
 from qdash.workflow.tasks.qubex.one_qubit_coarse.check_hpi_pulse import CheckHPIPulse
 from qdash.workflow.tasks.qubex.one_qubit_coarse.check_optimal_readout_amplitude import (
     CheckOptimalReadoutAmplitude,
@@ -100,4 +101,5 @@ __all__ = [
     "CheckQubitFrequencies",
     "CheckQubitSpectroscopy",
     "CheckOptimalReadoutAmplitude",
+    "CheckDispersiveShift",
 ]
