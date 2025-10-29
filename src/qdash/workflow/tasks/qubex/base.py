@@ -25,38 +25,114 @@ class QubexTask(BaseTask):
 
     def preprocess(self, session: "QubexSession", qid: str) -> PreProcessResult:
         exp = self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
 
-        # Add default parameters only if they don't exist yet
-        # This preserves any overrides provided via task_details
-        if "readout_amplitude" not in self.input_parameters:
-            self.input_parameters["readout_amplitude"] = InputParameterModel(
-                unit="a.u.",
-                description="Readout Amplitude",
-                value=exp.experiment_system.control_params.get_readout_amplitude(label),
-                value_type="float",
-            )
-        if "readout_frequency" not in self.input_parameters:
-            self.input_parameters["readout_frequency"] = InputParameterModel(
-                unit="GHz",
-                description="Readout Frequency",
-                value=exp.experiment_system.quantum_system.get_resonator(exp.get_resonator_label(int(qid))).frequency,
-                value_type="float",
-            )
-        if "control_amplitude" not in self.input_parameters:
-            self.input_parameters["control_amplitude"] = InputParameterModel(
-                unit="a.u.",
-                description="Qubit Control Amplitude",
-                value=exp.experiment_system.control_params.get_control_amplitude(label),
-                value_type="float",
-            )
-        if "qubit_frequency" not in self.input_parameters:
-            self.input_parameters["qubit_frequency"] = InputParameterModel(
-                unit="GHz",
-                description="Qubit Frequency",
-                value=exp.experiment_system.quantum_system.get_qubit(label).frequency,
-                value_type="float",
-            )
+        # Check if this is a coupling task (qid format: "0-1")
+        if "-" in qid:
+            # Coupling task: add parameters for both qubits
+            control_qid, target_qid = qid.split("-")
+            control_label = exp.get_qubit_label(int(control_qid))
+            target_label = exp.get_qubit_label(int(target_qid))
+
+            # Add control qubit parameters
+            if "control_readout_amplitude" not in self.input_parameters:
+                self.input_parameters["control_readout_amplitude"] = InputParameterModel(
+                    unit="a.u.",
+                    description="Control Qubit Readout Amplitude",
+                    value=exp.experiment_system.control_params.get_readout_amplitude(control_label),
+                    value_type="float",
+                )
+            if "control_readout_frequency" not in self.input_parameters:
+                self.input_parameters["control_readout_frequency"] = InputParameterModel(
+                    unit="GHz",
+                    description="Control Qubit Readout Frequency",
+                    value=exp.experiment_system.quantum_system.get_resonator(
+                        exp.get_resonator_label(int(control_qid))
+                    ).frequency,
+                    value_type="float",
+                )
+            if "control_control_amplitude" not in self.input_parameters:
+                self.input_parameters["control_control_amplitude"] = InputParameterModel(
+                    unit="a.u.",
+                    description="Control Qubit Control Amplitude",
+                    value=exp.experiment_system.control_params.get_control_amplitude(control_label),
+                    value_type="float",
+                )
+            if "control_qubit_frequency" not in self.input_parameters:
+                self.input_parameters["control_qubit_frequency"] = InputParameterModel(
+                    unit="GHz",
+                    description="Control Qubit Frequency",
+                    value=exp.experiment_system.quantum_system.get_qubit(control_label).frequency,
+                    value_type="float",
+                )
+
+            # Add target qubit parameters
+            if "target_readout_amplitude" not in self.input_parameters:
+                self.input_parameters["target_readout_amplitude"] = InputParameterModel(
+                    unit="a.u.",
+                    description="Target Qubit Readout Amplitude",
+                    value=exp.experiment_system.control_params.get_readout_amplitude(target_label),
+                    value_type="float",
+                )
+            if "target_readout_frequency" not in self.input_parameters:
+                self.input_parameters["target_readout_frequency"] = InputParameterModel(
+                    unit="GHz",
+                    description="Target Qubit Readout Frequency",
+                    value=exp.experiment_system.quantum_system.get_resonator(
+                        exp.get_resonator_label(int(target_qid))
+                    ).frequency,
+                    value_type="float",
+                )
+            if "target_control_amplitude" not in self.input_parameters:
+                self.input_parameters["target_control_amplitude"] = InputParameterModel(
+                    unit="a.u.",
+                    description="Target Qubit Control Amplitude",
+                    value=exp.experiment_system.control_params.get_control_amplitude(target_label),
+                    value_type="float",
+                )
+            if "target_qubit_frequency" not in self.input_parameters:
+                self.input_parameters["target_qubit_frequency"] = InputParameterModel(
+                    unit="GHz",
+                    description="Target Qubit Frequency",
+                    value=exp.experiment_system.quantum_system.get_qubit(target_label).frequency,
+                    value_type="float",
+                )
+        else:
+            # Single qubit task
+            label = self.get_qubit_label(session, qid)
+
+            # Add default parameters only if they don't exist yet
+            # This preserves any overrides provided via task_details
+            if "readout_amplitude" not in self.input_parameters:
+                self.input_parameters["readout_amplitude"] = InputParameterModel(
+                    unit="a.u.",
+                    description="Readout Amplitude",
+                    value=exp.experiment_system.control_params.get_readout_amplitude(label),
+                    value_type="float",
+                )
+            if "readout_frequency" not in self.input_parameters:
+                self.input_parameters["readout_frequency"] = InputParameterModel(
+                    unit="GHz",
+                    description="Readout Frequency",
+                    value=exp.experiment_system.quantum_system.get_resonator(
+                        exp.get_resonator_label(int(qid))
+                    ).frequency,
+                    value_type="float",
+                )
+            if "control_amplitude" not in self.input_parameters:
+                self.input_parameters["control_amplitude"] = InputParameterModel(
+                    unit="a.u.",
+                    description="Qubit Control Amplitude",
+                    value=exp.experiment_system.control_params.get_control_amplitude(label),
+                    value_type="float",
+                )
+            if "qubit_frequency" not in self.input_parameters:
+                self.input_parameters["qubit_frequency"] = InputParameterModel(
+                    unit="GHz",
+                    description="Qubit Frequency",
+                    value=exp.experiment_system.quantum_system.get_qubit(label).frequency,
+                    value_type="float",
+                )
+
         return PreProcessResult(input_parameters=self.input_parameters)
 
     def batch_run(self, session: "QubexSession", qids: list[str]) -> RunResult:

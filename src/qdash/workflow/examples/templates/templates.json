@@ -46,5 +46,13 @@
     "category": "advanced",
     "filename": "iterative_chevron_pattern_flow.py",
     "function_name": "iterative_chevron_pattern_flow"
+  },
+  {
+    "id": "coupling_calibration",
+    "name": "Coupling Calibration Flow",
+    "description": "2-qubit coupling calibration with group-based parallel execution (e.g., CheckCrossResonance)",
+    "category": "coupling",
+    "filename": "coupling_calibration_flow.py",
+    "function_name": "my_coupling_flow"
   }
 ]
