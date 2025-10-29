@@ -38,5 +38,13 @@
     "category": "advanced",
     "filename": "retry_calibration.py",
     "function_name": "retry_calibration"
+  },
+  {
+    "id": "iterative_chevron_pattern",
+    "name": "Iterative ChevronPattern Flow",
+    "description": "Execute ChevronPattern repeatedly with varying readout amplitudes to investigate readout power effects",
+    "category": "advanced",
+    "filename": "iterative_chevron_pattern_flow.py",
+    "function_name": "iterative_chevron_pattern_flow"
   }
 ]
