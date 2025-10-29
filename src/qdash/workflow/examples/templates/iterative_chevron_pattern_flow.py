@@ -65,7 +65,7 @@ def calibrate_group(
 
         try:
             # Execute ChevronPattern task with parameter overrides
-            logger.info(f"    Executing ChevronPattern...")
+            logger.info("    Executing ChevronPattern...")
             result = session.execute_task("ChevronPattern", qid, task_details=task_details)
 
             logger.info(f"    ✓ ChevronPattern completed: bare_frequency={result.get('bare_frequency')} GHz")
