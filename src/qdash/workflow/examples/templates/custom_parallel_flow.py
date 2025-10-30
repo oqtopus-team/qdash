@@ -98,6 +98,17 @@ def custom_parallel_flow(
         # Initialize session
         init_calibration(username, chip_id, all_qids, flow_name=flow_name)
 
+        # Optional: GitHub integration (uncomment to enable)
+        # from qdash.workflow.helpers import GitHubPushConfig, ConfigFileType
+        # init_calibration(
+        #     username, chip_id, all_qids, flow_name=flow_name,
+        #     enable_github_pull=True,
+        #     github_push_config=GitHubPushConfig(
+        #         enabled=True,
+        #         file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.PROPS]
+        #     )
+        # )
+
         # TODO: Edit the tasks you want to run
         tasks = ["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"]
 
@@ -120,6 +131,10 @@ def custom_parallel_flow(
 
     except Exception as e:
         logger.error(f"Custom parallel calibration failed: {e}")
-        session = get_session()
-        session.fail_calibration(str(e))
+        try:
+            session = get_session()
+            session.fail_calibration(str(e))
+        except RuntimeError:
+            # Session not initialized yet, skip fail_calibration
+            pass
         raise

@@ -238,6 +238,10 @@ def iterative_chevron_pattern_flow(
 
     except Exception as e:
         logger.error(f"Iterative ChevronPattern calibration failed: {e}")
-        session = get_session()
-        session.fail_calibration(str(e))
+        try:
+            session = get_session()
+            session.fail_calibration(str(e))
+        except RuntimeError:
+            # Session not initialized yet, skip fail_calibration
+            pass
         raise

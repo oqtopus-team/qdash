@@ -127,5 +127,49 @@ def init_all_data(
         raise typer.Exit(1)
 
 
+@app.command()
+def export_note(
+    execution_id: str = typer.Option(..., "--execution-id", "-e", help="Execution ID (e.g., 20250130-001)"),
+    task_id: str = typer.Option("master", "--task-id", "-t", help="Task ID (default: master)"),
+    output: str = typer.Option(None, "--output", "-o", help="Output file path"),
+    username: str = typer.Option(None, "--username", "-u", help="Username filter (optional)"),
+    chip_id: str = typer.Option(None, "--chip-id", "-c", help="Chip ID filter (optional)"),
+) -> None:
+    """Export calibration note from MongoDB to file.
+
+    This command retrieves a calibration note from MongoDB and exports it to a JSON file.
+    Useful for debugging or archival purposes.
+
+    Examples:
+        # Export master note for execution
+        qdash export-note --execution-id 20250130-001
+
+        # Export specific task note
+        qdash export-note --execution-id 20250130-001 --task-id abc-123-def
+
+        # Export to specific file
+        qdash export-note -e 20250130-001 -o /path/to/output.json
+
+        # Filter by username
+        qdash export-note -e 20250130-001 -u alice
+
+        # Filter by chip ID
+        qdash export-note -e 20250130-001 -c 64Qv3
+    """
+    try:
+        from qdash.cli.export_note import export_calibration_note
+
+        export_calibration_note(
+            execution_id=execution_id,
+            task_id=task_id,
+            output=output,
+            username=username,
+            chip_id=chip_id,
+        )
+    except Exception as e:
+        typer.echo(f"❌ Error exporting calibration note: {e}", err=True)
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

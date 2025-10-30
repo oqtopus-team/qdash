@@ -71,17 +71,23 @@ class QubexSession(BaseSession):
             raise RuntimeError(msg)
         return str(exp.calib_note)
 
-    def save_note(self, username: str, calib_dir: str, execution_id: str, task_manager_id: str) -> None:
+    def save_note(self, username: str, chip_id: str, calib_dir: str, execution_id: str, task_manager_id: str) -> None:
         """Save the calibration note to the experiment."""
         # Initialize calibration note
         note_path = Path(f"{calib_dir}/calib_note/{task_manager_id}.json")
         note_path.parent.mkdir(parents=True, exist_ok=True)
 
-        master_doc = CalibrationNoteDocument.find({"task_id": "master"}).sort([("timestamp", -1)]).limit(1).run()
+        master_doc = (
+            CalibrationNoteDocument.find({"task_id": "master", "chip_id": chip_id})
+            .sort([("timestamp", -1)])
+            .limit(1)
+            .run()
+        )
 
         if not master_doc:
             master_doc = CalibrationNoteDocument.upsert_note(
                 username=username,
+                chip_id=chip_id,
                 execution_id=execution_id,
                 task_id="master",
                 note={},
@@ -90,37 +96,53 @@ class QubexSession(BaseSession):
             master_doc = master_doc[0]
         note_path.write_text(json.dumps(master_doc.note, indent=2))
 
-    def update_note(self, username: str, calib_dir: str, execution_id: str, task_manager_id: str) -> None:
-        """Update the calibration note in the experiment."""
+    def update_note(self, username: str, chip_id: str, calib_dir: str, execution_id: str, task_manager_id: str) -> None:
+        """Update the master calibration note in MongoDB only.
+
+        This method saves calibration notes exclusively to MongoDB, avoiding
+        file I/O operations during task execution. This design:
+        - Eliminates race conditions in thread-based parallel execution
+        - Reduces unnecessary disk I/O
+        - Establishes MongoDB as the single source of truth
+        - Simplified architecture: only master note is maintained (no per-task notes)
+
+        The calibration note file is only written during initialization (save_note)
+        and optionally during export (finish_calibration with export_note_to_file=True).
+
+        Note:
+        ----
+            task_manager_id is kept as a parameter for backward compatibility but not used.
+            Only the master note (task_id="master") is updated.
+        """
         calib_note = json.loads(self.get_note())
-        task_doc = CalibrationNoteDocument.find_one(
+
+        # Get the latest master note for this chip
+        master_doc = CalibrationNoteDocument.find_one(
             {
-                "execution_id": execution_id,
-                "task_id": task_manager_id,
-                "username": username,
+                "task_id": "master",
+                "chip_id": chip_id,
             }
         ).run()
 
-        if task_doc is None:
-            # タスクノートが存在しない場合は新規作成
-            task_doc = CalibrationNoteDocument.upsert_note(
+        if master_doc is None:
+            # マスターノートが存在しない場合は新規作成
+            CalibrationNoteDocument.upsert_note(
                 username=username,
+                chip_id=chip_id,
                 execution_id=execution_id,
-                task_id=task_manager_id,
+                task_id="master",
                 note=calib_note,
             )
         else:
-            # タスクノートが存在する場合はマージ
-            merged_note = merge_notes_by_timestamp(task_doc.note, calib_note)
-            task_doc = CalibrationNoteDocument.upsert_note(
+            # マスターノートが存在する場合はマージ
+            merged_note = merge_notes_by_timestamp(master_doc.note, calib_note)
+            CalibrationNoteDocument.upsert_note(
                 username=username,
+                chip_id=chip_id,
                 execution_id=execution_id,
-                task_id=task_manager_id,
+                task_id="master",
                 note=merged_note,
             )
 
-        # JSONファイルとして出力
-        note_dir = Path(f"{calib_dir}/calib_note")
-        note_dir.mkdir(parents=True, exist_ok=True)
-        note_path = note_dir / f"{task_manager_id}.json"
-        note_path.write_text(json.dumps(task_doc.note, indent=2))
+        # File I/O removed - MongoDB is the single source of truth
+        # For file export, use finish_calibration(export_note_to_file=True)

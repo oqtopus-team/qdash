@@ -84,6 +84,18 @@ def my_custom_flow(
         # Initialize calibration session
         init_calibration(username, chip_id, qids, flow_name=flow_name)
 
+        # Optional: GitHub integration (uncomment to enable)
+        # from qdash.workflow.helpers import GitHubPushConfig, ConfigFileType
+        # init_calibration(
+        #     username, chip_id, qids, flow_name=flow_name,
+        #     enable_github_pull=True,  # Pull latest config before calibration
+        #     github_push_config=GitHubPushConfig(
+        #         enabled=True,
+        #         file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.PROPS],
+        #         commit_message=f"Update calibration results for {chip_id}"
+        #     )
+        # )
+
         # TODO: Edit the tasks you want to run
         # Available tasks: CheckRabi, CreateHPIPulse, CheckHPIPulse, etc.
         tasks = ["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"]
@@ -103,6 +115,10 @@ def my_custom_flow(
 
     except Exception as e:
         logger.error(f"Calibration failed: {e}")
-        session = get_session()
-        session.fail_calibration(str(e))
+        try:
+            session = get_session()
+            session.fail_calibration(str(e))
+        except RuntimeError:
+            # Session not initialized yet, skip fail_calibration
+            pass
         raise

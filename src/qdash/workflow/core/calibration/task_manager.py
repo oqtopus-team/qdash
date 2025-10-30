@@ -715,6 +715,7 @@ class TaskManager(BaseModel):
         if session.name == "qubex":
             session.update_note(
                 username=self.username,
+                chip_id=execution_manager.chip_id,
                 calib_dir=self.calib_dir,
                 execution_id=execution_manager.execution_id,
                 task_manager_id=self.id,

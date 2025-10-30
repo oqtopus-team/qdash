@@ -104,6 +104,92 @@ def my_custom_flow(username, chip_id, qids, flow_name=None):
     return results
 ```
 
+## GitHub Integration
+
+Python Flow Editor supports GitHub integration for configuration management:
+
+### Pulling Latest Configuration
+
+Pull latest config from GitHub before calibration:
+
+```python
+from qdash.workflow.helpers import init_calibration, GitHubPushConfig
+
+session = init_calibration(
+    username, chip_id, qids, flow_name=flow_name,
+    enable_github_pull=True  # Pull latest config before starting
+)
+```
+
+### Pushing Calibration Results
+
+Push results to GitHub after calibration:
+
+```python
+from qdash.workflow.helpers import (
+    init_calibration,
+    finish_calibration,
+    GitHubPushConfig,
+    ConfigFileType,
+)
+
+# Configure GitHub push
+session = init_calibration(
+    username, chip_id, qids, flow_name=flow_name,
+    enable_github_pull=True,
+    github_push_config=GitHubPushConfig(
+        enabled=True,
+        file_types=[
+            ConfigFileType.CALIB_NOTE,  # Push calib_note.json
+            ConfigFileType.PROPS,       # Push props.yaml (with merge logic)
+        ],
+        commit_message=f"Update calibration results for {chip_id}",
+        branch="main"
+    )
+)
+
+# Calibration logic...
+
+# Push results to GitHub
+push_results = finish_calibration()
+print(f"GitHub push results: {push_results}")
+```
+
+### Available File Types
+
+- `ConfigFileType.CALIB_NOTE` - calibration/calib_note.json (direct copy)
+- `ConfigFileType.PROPS` - params/props.yaml (uses existing merge logic)
+- `ConfigFileType.PARAMS` - params/params.yaml (direct copy)
+- `ConfigFileType.ALL_PARAMS` - All *.yaml files in params/ directory
+
+### Environment Variables Required
+
+Set these environment variables for GitHub integration:
+
+```bash
+GITHUB_USER=your-username
+GITHUB_TOKEN=your-personal-access-token
+CONFIG_REPO_URL=https://github.com/your-org/your-config-repo.git
+```
+
+### Example in Templates
+
+All templates include commented-out GitHub integration examples.
+Simply uncomment and configure to enable:
+
+```python
+# Optional: GitHub integration (uncomment to enable)
+# from qdash.workflow.helpers import GitHubPushConfig, ConfigFileType
+# init_calibration(
+#     username, chip_id, qids, flow_name=flow_name,
+#     enable_github_pull=True,
+#     github_push_config=GitHubPushConfig(
+#         enabled=True,
+#         file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.PROPS]
+#     )
+# )
+```
+
 ## API Reference
 
 See the [Python Flow Helper Documentation](../helpers/) for complete API details.
