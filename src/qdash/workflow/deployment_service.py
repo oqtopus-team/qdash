@@ -131,3 +131,158 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
 async def health() -> dict:
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+# ============================================================================
+# Schedule Management Endpoints
+# ============================================================================
+
+
+class SetScheduleRequest(BaseModel):
+    """Request to set a schedule on a deployment."""
+
+    deployment_id: str
+    cron: str
+    timezone: str = "Asia/Tokyo"
+    active: bool = True
+    parameters: dict | None = None
+
+
+class SetScheduleResponse(BaseModel):
+    """Response from setting a schedule."""
+
+    deployment_id: str
+    cron: str
+    active: bool
+    message: str
+
+
+class CreateScheduledRunRequest(BaseModel):
+    """Request to create a scheduled flow run."""
+
+    deployment_id: str
+    scheduled_time: str  # ISO format
+    parameters: dict | None = None
+
+
+class CreateScheduledRunResponse(BaseModel):
+    """Response from creating a scheduled run."""
+
+    flow_run_id: str
+    scheduled_time: str
+    message: str
+
+
+@app.post("/set-schedule", response_model=SetScheduleResponse)
+async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
+    """Set or update a cron schedule on a deployment.
+
+    Args:
+    ----
+        request: Schedule configuration request
+
+    Returns:
+    -------
+        Schedule configuration response
+
+    """
+    from prefect.client.schemas.schedules import CronSchedule
+
+    try:
+        logger.info(f"Setting schedule for deployment {request.deployment_id}")
+        logger.info(f"Cron: {request.cron}, Timezone: {request.timezone}, Active: {request.active}")
+
+        cron_schedule = CronSchedule(cron=request.cron, timezone=request.timezone)
+
+        async with get_client() as client:
+            # Read existing deployment
+            try:
+                target_deployment = await client.read_deployment(request.deployment_id)
+                logger.info(f"Found deployment: {target_deployment.name}")
+            except Exception as e:
+                logger.error(f"Failed to read deployment {request.deployment_id}: {e}")
+                raise HTTPException(status_code=404, detail=f"Deployment not found: {request.deployment_id}")
+
+            # Update schedule and parameters
+            try:
+                await client.update_deployment(
+                    deployment=target_deployment,
+                    schedule=cron_schedule,
+                    is_schedule_active=request.active,
+                )
+                logger.info("Successfully updated deployment schedule")
+            except Exception as e:
+                logger.error(f"Failed to update deployment: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to update deployment: {str(e)}")
+
+            logger.info(
+                f"Set schedule on deployment {request.deployment_id}: cron={request.cron}, active={request.active}"
+            )
+
+            return SetScheduleResponse(
+                deployment_id=request.deployment_id,
+                cron=request.cron,
+                active=request.active,
+                message=f"Schedule set successfully on deployment {target_deployment.name}",
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to set schedule (unexpected error): {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
+@app.post("/create-scheduled-run", response_model=CreateScheduledRunResponse)
+async def create_scheduled_run(request: CreateScheduledRunRequest) -> CreateScheduledRunResponse:
+    """Create a one-time scheduled flow run.
+
+    Args:
+    ----
+        request: Scheduled run request
+
+    Returns:
+    -------
+        Scheduled run response with flow_run_id
+
+    """
+    from datetime import datetime
+
+    from prefect.states import Scheduled
+
+    try:
+        logger.info(f"Creating scheduled run for deployment {request.deployment_id}")
+        logger.info(f"Scheduled time: {request.scheduled_time}")
+
+        try:
+            scheduled_time = datetime.fromisoformat(request.scheduled_time)
+            logger.info(f"Parsed scheduled time: {scheduled_time}")
+        except Exception as e:
+            logger.error(f"Failed to parse scheduled time: {e}")
+            raise HTTPException(status_code=400, detail=f"Invalid scheduled_time format: {str(e)}")
+
+        async with get_client() as client:
+            try:
+                flow_run = await client.create_flow_run_from_deployment(
+                    deployment_id=request.deployment_id,
+                    state=Scheduled(scheduled_time=scheduled_time),
+                    parameters=request.parameters or {},
+                )
+                logger.info(f"Successfully created scheduled run {flow_run.id}")
+            except Exception as e:
+                logger.error(f"Failed to create flow run: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to create flow run: {str(e)}")
+
+            logger.info(f"Created scheduled run {flow_run.id} for {scheduled_time}")
+
+            return CreateScheduledRunResponse(
+                flow_run_id=str(flow_run.id),
+                scheduled_time=request.scheduled_time,
+                message=f"Flow run scheduled successfully for {scheduled_time}",
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to create scheduled run (unexpected error): {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")

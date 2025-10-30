@@ -1964,6 +1964,216 @@
           }
         }
       }
+    },
+    "/api/flow/{name}/schedule": {
+      "post": {
+        "tags": ["flow_schedule"],
+        "summary": "Schedule a Flow execution (cron or one-time)",
+        "description": "Schedule a Flow execution with cron or one-time schedule.\n\nArgs:\n----\n    name: Flow name\n    request: Schedule request (must provide either cron or scheduled_time)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Schedule response with schedule_id and details",
+        "operationId": "schedule_flow",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleFlowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow/{name}/schedules": {
+      "get": {
+        "tags": ["flow_schedule"],
+        "summary": "List schedules for a specific Flow",
+        "description": "List all schedules (cron and one-time) for a specific Flow.\n\nArgs:\n----\n    name: Flow name\n    current_user: Current authenticated user\n\nReturns:\n-------\n    List of schedules for the flow",
+        "operationId": "list_flow_schedules",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListFlowSchedulesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow-schedules": {
+      "get": {
+        "tags": ["flow_schedule"],
+        "summary": "List all Flow schedules for current user",
+        "description": "List all Flow schedules (cron and one-time) for the current user.\n\nArgs:\n----\n    current_user: Current authenticated user\n\nReturns:\n-------\n    List of all flow schedules",
+        "operationId": "list_all_flow_schedules",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListFlowSchedulesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow-schedule/{schedule_id}": {
+      "delete": {
+        "tags": ["flow_schedule"],
+        "summary": "Delete a Flow schedule",
+        "description": "Delete a Flow schedule (cron or one-time).\n\nFor cron schedules: Deactivates the schedule on the deployment.\nFor one-time schedules: Deletes the scheduled flow run.\n\nArgs:\n----\n    schedule_id: Schedule ID (deployment_id for cron, flow_run_id for one-time)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Success message",
+        "operationId": "delete_flow_schedule",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Flow Schedule"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["flow_schedule"],
+        "summary": "Update a Flow schedule",
+        "description": "Update a Flow schedule (cron schedules only).\n\nCan update: active status, cron expression, parameters.\n\nArgs:\n----\n    schedule_id: Schedule ID (deployment_id)\n    request: Update request\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Success message",
+        "operationId": "update_flow_schedule",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScheduleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Update Flow Schedule"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2715,6 +2925,69 @@
         "title": "FidelityCondition",
         "description": "Condition for fidelity filtering."
       },
+      "FlowScheduleSummary": {
+        "properties": {
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id",
+            "description": "Schedule ID"
+          },
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name",
+            "description": "Flow name"
+          },
+          "schedule_type": {
+            "type": "string",
+            "title": "Schedule Type",
+            "description": "Schedule type: 'cron' or 'one-time'"
+          },
+          "cron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron",
+            "description": "Cron expression"
+          },
+          "next_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run",
+            "description": "Next scheduled run time"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "description": "Whether the schedule is active"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "Schedule creation time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule_id",
+          "flow_name",
+          "schedule_type",
+          "active",
+          "created_at"
+        ],
+        "title": "FlowScheduleSummary",
+        "description": "Summary of a scheduled Flow."
+      },
       "FlowSummary": {
         "properties": {
           "name": {
@@ -3112,6 +3385,22 @@
         "required": ["schedules"],
         "title": "ListCronScheduleResponse",
         "description": "ListCronScheduleResponse is a subclass of BaseModel."
+      },
+      "ListFlowSchedulesResponse": {
+        "properties": {
+          "schedules": {
+            "items": {
+              "$ref": "#/components/schemas/FlowScheduleSummary"
+            },
+            "type": "array",
+            "title": "Schedules",
+            "description": "List of flow schedules"
+          }
+        },
+        "type": "object",
+        "required": ["schedules"],
+        "title": "ListFlowSchedulesResponse",
+        "description": "Response for listing flow schedules."
       },
       "ListFlowsResponse": {
         "properties": {
@@ -3738,6 +4027,136 @@
         "title": "ScheduleCronCalibResponse",
         "description": "ScheduleCronCalibResponse is a subclass of BaseModel."
       },
+      "ScheduleFlowRequest": {
+        "properties": {
+          "cron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron",
+            "description": "Cron expression (e.g., '0 2 * * *' for daily at 2am JST)"
+          },
+          "scheduled_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled Time",
+            "description": "One-time execution time (ISO format, JST)"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameters",
+            "description": "Execution parameters (overrides default_parameters)"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "description": "Whether the schedule is active",
+            "default": true
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "description": "Timezone for schedule",
+            "default": "Asia/Tokyo"
+          }
+        },
+        "type": "object",
+        "title": "ScheduleFlowRequest",
+        "description": "Request to schedule a Flow execution.",
+        "examples": [
+          {
+            "active": true,
+            "cron": "0 2 * * *",
+            "parameters": {
+              "max_iterations": 10,
+              "qids": ["32"]
+            },
+            "timezone": "Asia/Tokyo"
+          },
+          {
+            "active": true,
+            "parameters": {
+              "qids": ["32"]
+            },
+            "scheduled_time": "2025-11-01T02:00:00+09:00"
+          }
+        ]
+      },
+      "ScheduleFlowResponse": {
+        "properties": {
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id",
+            "description": "Schedule ID (deployment ID for cron, flow_run_id for one-time)"
+          },
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name",
+            "description": "Flow name"
+          },
+          "schedule_type": {
+            "type": "string",
+            "title": "Schedule Type",
+            "description": "Schedule type: 'cron' or 'one-time'"
+          },
+          "cron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron",
+            "description": "Cron expression (for cron schedules)"
+          },
+          "next_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run",
+            "description": "Next scheduled run time (ISO format)"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "description": "Whether the schedule is active"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Success message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule_id",
+          "flow_name",
+          "schedule_type",
+          "active",
+          "message"
+        ],
+        "title": "ScheduleFlowResponse",
+        "description": "Response after scheduling a flow."
+      },
       "SerialNode": {
         "properties": {
           "serial": {
@@ -4286,6 +4705,44 @@
         "required": ["name"],
         "title": "UpdateMenuResponse",
         "description": "UpdateMenuResponse is a Pydantic model for the update menu response."
+      },
+      "UpdateScheduleRequest": {
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "description": "Whether the schedule is active"
+          },
+          "cron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron",
+            "description": "Updated cron expression (optional)"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters",
+            "description": "Updated parameters (optional)"
+          }
+        },
+        "type": "object",
+        "required": ["active"],
+        "title": "UpdateScheduleRequest",
+        "description": "Request to update a schedule."
       },
       "User": {
         "properties": {

@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 import {
   getFlow,
   saveFlow,
@@ -13,11 +17,11 @@ import { useListChips } from "@/client/chip/chip";
 import { useAuthReadUsersMe } from "@/client/auth/auth";
 import { useFetchExecutionLockStatus } from "@/client/execution/execution";
 import type { SaveFlowRequest } from "@/schemas";
-import dynamic from "next/dynamic";
-import { toast } from "react-toastify";
-import { ToastContainer } from "react-toastify";
+
 import "react-toastify/dist/ReactToastify.css";
+
 import { FlowExecuteConfirmModal } from "./FlowExecuteConfirmModal";
+import { FlowSchedulePanel } from "./FlowSchedulePanel";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -434,6 +438,12 @@ export default function EditFlowPage() {
                     disabled
                   />
                 </div>
+              </div>
+
+              {/* Flow Schedules Section */}
+              <div className="divider my-2"></div>
+              <div className="px-4 pb-4">
+                <FlowSchedulePanel flowName={name} />
               </div>
             </div>
           </div>

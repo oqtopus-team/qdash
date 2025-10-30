@@ -14,7 +14,7 @@ tasks:
     dotenv: [.env]
     cmds:
       - curl http://api:$API_PORT/openapi.json | jq > ../docs/oas/openapi.json
-      - bunx orval --config ./orval.config.cjs
+      - bunx orval@7.14.0 --config ./orval.config.cjs
       - task fmt-ui
     desc: Generate the TypeScript client
 

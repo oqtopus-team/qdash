@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { listFlows } from "@/client/flow/flow";
+import { FlowSchedulesSection } from "./FlowSchedulesSection";
 
 export default function FlowListPage() {
   const { data, isLoading, error } = useQuery({
@@ -89,6 +90,13 @@ export default function FlowListPage() {
               </div>
             </Link>
           ))}
+        </div>
+      )}
+
+      {/* Scheduled Flows Section */}
+      {flows.length > 0 && (
+        <div className="mt-8">
+          <FlowSchedulesSection />
         </div>
       )}
     </div>
