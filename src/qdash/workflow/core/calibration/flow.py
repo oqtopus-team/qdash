@@ -332,6 +332,7 @@ def setup_calibration(
     if session.name == "qubex":
         session.save_note(
             username=menu.username,
+            chip_id=menu.chip_id,
             calib_dir=calib_dir,
             execution_id=execution_id,
             task_manager_id=task_manager.id,

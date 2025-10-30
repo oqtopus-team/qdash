@@ -1,8 +1,6 @@
 # application code for the execution manager.
-import json
 import logging
 from collections.abc import Callable
-from pathlib import Path
 
 import pendulum
 from pydantic import BaseModel, Field
@@ -13,11 +11,9 @@ from qdash.datamodel.execution import (
     TaskResultModel,
 )
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.core.calibration.task_manager import TaskManager
-from qdash.workflow.utils.merge_notes import merge_notes_by_timestamp
 
 initialize()
 
@@ -237,64 +233,6 @@ class ExecutionManager(BaseModel):
             return self
         return ExecutionManager.model_validate(doc.model_dump())
 
-    def _merge_calib_notes(self, task_id: str) -> None:
-        """Merge calibration notes from task with master note.
-
-        Args:
-        ----
-            task_id: ID of the task whose note to merge
-
-        Note:
-        ----
-            This function handles the loading, merging and saving of calibration notes.
-            It uses timestamp-based merging to ensure the most recent data is kept.
-
-        """
-        try:
-            # タスクのノートを読み込む
-            task_note_path = Path(f"{self.calib_data_path}/calib_note/{task_id}.json")
-            if not task_note_path.exists():
-                return  # Skip if task note doesn't exist
-
-            task_note = json.loads(task_note_path.read_text())
-
-            # 最新のマスターノートを取得
-            master_docs = (
-                CalibrationNoteDocument.find({"task_id": "master"})
-                .sort([("timestamp", -1)])  # timestampで降順ソート
-                .limit(1)
-                .run()
-            )
-
-            if not master_docs:
-                # マスターノートが存在しない場合は新規作成
-                CalibrationNoteDocument.upsert_note(
-                    username=self.username,
-                    execution_id=self.execution_id,
-                    task_id="master",
-                    note=task_note,
-                )
-            else:
-                # マスターノートが存在する場合はマージして更新
-                master_doc = master_docs[0]
-                merged_note = merge_notes_by_timestamp(master_doc.note, task_note)
-                CalibrationNoteDocument.upsert_note(
-                    username=self.username,
-                    execution_id=self.execution_id,  # 最新のexecution_idで更新
-                    task_id="master",
-                    note=merged_note,
-                )
-
-            CalibrationNoteDocument.upsert_note(
-                username=self.username,
-                execution_id=self.execution_id,
-                task_id=task_id,
-                note=task_note,
-            )
-
-        except Exception as e:
-            logger.info(f"Error merging notes: {e}")  # Log error but continue execution
-
     def update_with_task_manager(self, task_manager: TaskManager) -> "ExecutionManager":
         def updater(updated: ExecutionManager) -> None:
             # Update task results
@@ -315,8 +253,8 @@ class ExecutionManager(BaseModel):
             for _id in task_manager.controller_info:
                 updated.controller_info[_id] = task_manager.controller_info[_id]
 
-            # Merge calibration notes
-            self._merge_calib_notes(task_manager.id)
+            # Note: Calibration notes are now updated directly in session.update_note()
+            # No need for additional merge processing here
 
         self._with_db_transaction(updater)
         return self.reload()

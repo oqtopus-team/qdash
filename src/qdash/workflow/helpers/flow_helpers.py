@@ -23,6 +23,7 @@ Example:
     ```
 """
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,7 @@ from qdash.workflow.core.calibration.execution_manager import ExecutionManager
 from qdash.workflow.core.calibration.task import execute_dynamic_task_by_qid
 from qdash.workflow.core.calibration.task_manager import TaskManager
 from qdash.workflow.core.session.factory import create_session
+from qdash.workflow.helpers.github_integration import GitHubIntegration, GitHubPushConfig
 from qdash.workflow.tasks.active_protocols import generate_task_instances
 
 
@@ -101,6 +103,8 @@ class FlowSession:
         tags: list[str] | None = None,
         use_lock: bool = True,
         note: dict[str, Any] | None = None,
+        enable_github_pull: bool = False,
+        github_push_config: GitHubPushConfig | None = None,
     ) -> None:
         """Initialize a new calibration flow session.
 
@@ -115,6 +119,8 @@ class FlowSession:
             tags: List of tags for categorization (default: ['python_flow'])
             use_lock: Whether to use ExecutionLock to prevent concurrent calibrations (default: True)
             note: Additional notes to store with execution (default: {})
+            enable_github_pull: Whether to pull latest config from GitHub before starting (default: False)
+            github_push_config: Configuration for GitHub push operations (default: disabled)
 
         Raises:
             RuntimeError: If use_lock=True and another calibration is already running
@@ -133,6 +139,15 @@ class FlowSession:
             execution_id = generate_execution_id(username, chip_id)
 
         self.execution_id = execution_id
+
+        # Initialize GitHub integration
+        self.github_integration = GitHubIntegration(
+            username=username,
+            chip_id=chip_id,
+            execution_id=execution_id,
+        )
+        self.github_push_config = github_push_config or GitHubPushConfig()
+        self.enable_github_pull = enable_github_pull
 
         # Acquire lock if requested
         if use_lock:
@@ -158,6 +173,16 @@ class FlowSession:
         Path(f"{calib_data_path}/fig").mkdir(exist_ok=True)
         Path(f"{calib_data_path}/calib").mkdir(exist_ok=True)
         Path(f"{calib_data_path}/calib_note").mkdir(exist_ok=True)
+
+        # Pull config from GitHub if requested
+        if enable_github_pull:
+            logger = get_run_logger()
+            if GitHubIntegration.check_credentials():
+                commit_id = self.github_integration.pull_config()
+                if commit_id:
+                    note["config_commit_id"] = commit_id
+            else:
+                logger.warning("GitHub credentials not configured, skipping pull")
 
         # Initialize ExecutionManager with integrated save processing
         self.execution_manager = (
@@ -203,6 +228,7 @@ class FlowSession:
         if self.session.name == "qubex":
             self.session.save_note(
                 username=username,
+                chip_id=chip_id,
                 calib_dir=calib_data_path,
                 execution_id=execution_id,
                 task_manager_id=self.task_manager.id,
@@ -429,23 +455,48 @@ class FlowSession:
             self.execution_manager.calib_data.qubit[qid] = {}
         self.execution_manager.calib_data.qubit[qid][param_name] = value
 
-    def finish_calibration(self, update_chip_history: bool = True) -> None:
+    def finish_calibration(
+        self,
+        update_chip_history: bool = True,
+        push_to_github: bool | None = None,
+        export_note_to_file: bool = False,
+    ) -> dict[str, Any] | None:
         """Complete the calibration session and save final state.
 
         This method performs cleanup and finalization:
         - Marks the execution as complete
         - Updates ChipDocument and ChipHistoryDocument (if requested)
+        - Exports calibration note to file (if requested)
+        - Pushes results to GitHub (if configured)
         - Releases the execution lock (if it was acquired)
 
         Args:
             update_chip_history: Whether to update ChipHistoryDocument (default: True)
+            push_to_github: Override github_push_config.enabled if specified
+            export_note_to_file: Whether to export calibration note to local file (default: False)
+                Useful for debugging or archival purposes. The note is always available
+                in MongoDB regardless of this setting.
+
+        Returns:
+            Push results dictionary if push was performed, else None
 
         Example:
             ```python
+            # Basic usage
             session.finish_calibration()
+
+            # With explicit push override
+            push_results = session.finish_calibration(push_to_github=True)
+            print(f"Pushed files: {push_results}")
+
+            # Export note to file for debugging
+            session.finish_calibration(export_note_to_file=True)
             ```
 
         """
+        logger = get_run_logger()
+        push_results = None
+
         try:
             # Reload and complete execution
             self.execution_manager = self.execution_manager.reload().complete_execution()
@@ -459,11 +510,58 @@ class FlowSession:
                     # If chip history update fails, log but don't fail the calibration
                     pass
 
+            # Export calibration note to file if requested
+            if export_note_to_file:
+                try:
+                    from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+
+                    latest_doc = CalibrationNoteDocument.find_one(
+                        {
+                            "username": self.username,
+                            "task_id": self.task_manager.id,
+                            "execution_id": self.execution_id,
+                            "chip_id": self.chip_id,
+                        }
+                    ).run()
+
+                    if latest_doc:
+                        note_path = Path(
+                            f"{self.execution_manager.calib_data_path}/calib_note/{self.task_manager.id}.json"
+                        )
+                        note_path.parent.mkdir(parents=True, exist_ok=True)
+                        note_path.write_text(json.dumps(latest_doc.note, indent=2, ensure_ascii=False))
+                        logger.info(f"Exported calibration note to {note_path}")
+                    else:
+                        logger.warning(f"No calibration note found for task_id={self.task_manager.id}")
+                except Exception as e:
+                    logger.error(f"Failed to export calibration note: {e}")
+
+            # Push to GitHub if configured
+            should_push = push_to_github if push_to_github is not None else self.github_push_config.enabled
+
+            if should_push:
+                if GitHubIntegration.check_credentials():
+                    try:
+                        push_results = self.github_integration.push_files(self.github_push_config)
+
+                        # Store push results in execution note
+                        if push_results:
+                            self.execution_manager.note["github_push_results"] = push_results
+                            self.execution_manager.save()
+                            logger.info(f"GitHub push completed: {push_results}")
+                    except Exception as e:
+                        logger.error(f"Failed to push to GitHub: {e}")
+                        push_results = {"error": str(e)}
+                else:
+                    logger.warning("GitHub credentials not configured, skipping push")
+
         finally:
             # Always release lock if we acquired it
             if self.use_lock and self._lock_acquired:
                 ExecutionLockDocument.unlock()
                 self._lock_acquired = False
+
+        return push_results
 
     def fail_calibration(self, error_message: str = "") -> None:
         """Mark the calibration as failed and cleanup.
@@ -509,6 +607,8 @@ def init_calibration(
     tags: list[str] | None = None,
     use_lock: bool = True,
     note: dict[str, Any] | None = None,
+    enable_github_pull: bool = False,
+    github_push_config: GitHubPushConfig | None = None,
 ) -> FlowSession:
     """Initialize a calibration session for use in Prefect flows.
 
@@ -529,6 +629,8 @@ def init_calibration(
         tags: List of tags for categorization
         use_lock: Whether to use ExecutionLock to prevent concurrent calibrations
         note: Additional notes to store with execution
+        enable_github_pull: Whether to pull latest config from GitHub before starting (default: False)
+        github_push_config: Configuration for GitHub push operations (default: disabled)
 
     Returns:
         Initialized FlowSession instance
@@ -540,6 +642,24 @@ def init_calibration(
             # flow_name will be automatically injected by API
             session = init_calibration(username, chip_id, qids, flow_name=flow_name)
             # ... perform calibration tasks
+            finish_calibration()
+        ```
+
+        ```python
+        # With GitHub integration
+        from qdash.workflow.helpers import GitHubPushConfig, ConfigFileType
+
+        @flow
+        def calibration_with_github(username, chip_id, qids):
+            session = init_calibration(
+                username, chip_id, qids,
+                enable_github_pull=True,
+                github_push_config=GitHubPushConfig(
+                    enabled=True,
+                    file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.PROPS]
+                )
+            )
+            # ... calibration tasks
             finish_calibration()
         ```
 
@@ -569,6 +689,8 @@ def init_calibration(
         tags=tags,
         use_lock=use_lock,
         note=note,
+        enable_github_pull=enable_github_pull,
+        github_push_config=github_push_config,
     )
     return _current_session
 
@@ -595,10 +717,22 @@ def get_session() -> FlowSession:
     return _current_session
 
 
-def finish_calibration() -> None:
+def finish_calibration(
+    update_chip_history: bool = True,
+    push_to_github: bool | None = None,
+    export_note_to_file: bool = False,
+) -> dict[str, Any] | None:
     """Finish the current calibration session.
 
     This is a convenience wrapper around session.finish_calibration().
+
+    Args:
+        update_chip_history: Whether to update ChipHistoryDocument (default: True)
+        push_to_github: Override github_push_config.enabled if specified
+        export_note_to_file: Whether to export calibration note to local file (default: False)
+
+    Returns:
+        Push results dictionary if push was performed, else None
 
     Example:
         ```python
@@ -607,11 +741,18 @@ def finish_calibration() -> None:
             init_calibration(...)
             # ... calibration tasks
             finish_calibration()
+
+            # With file export for debugging
+            finish_calibration(export_note_to_file=True)
         ```
 
     """
     session = get_session()
-    session.finish_calibration()
+    return session.finish_calibration(
+        update_chip_history=update_chip_history,
+        push_to_github=push_to_github,
+        export_note_to_file=export_note_to_file,
+    )
 
 
 def execute_schedule(

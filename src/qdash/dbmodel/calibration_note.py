@@ -13,15 +13,17 @@ class CalibrationNoteDocument(Document):
     Attributes
     ----------
         username (str): The username of the user who created the note.
+        chip_id (str): The chip ID associated with this note.
         execution_id (str): The execution ID associated with this note.
         task_id (str): The task ID associated with this note.
         note (dict): The calibration note data.
-        created_at (str): The time when the note was created.
-        updated_at (str): The time when the note was last updated.
+        timestamp (str): The time when the note was last updated.
+        system_info (SystemInfoModel): The system information.
 
     """
 
     username: str = Field(..., description="The username of the user who created the note")
+    chip_id: str = Field(..., description="The chip ID associated with this note")
     execution_id: str = Field(..., description="The execution ID associated with this note")
     task_id: str = Field(..., description="The task ID associated with this note")
     note: dict = Field(..., description="The calibration note data")
@@ -37,15 +39,20 @@ class CalibrationNoteDocument(Document):
         name = "calibration_note"
         indexes: ClassVar = [
             IndexModel(
-                [("execution_id", ASCENDING), ("task_id", ASCENDING), ("username")],
+                [("execution_id", ASCENDING), ("task_id", ASCENDING), ("username", ASCENDING), ("chip_id", ASCENDING)],
                 unique=True,
-            )
+            ),
+            IndexModel(
+                [("chip_id", ASCENDING), ("timestamp", ASCENDING)],
+                name="chip_id_timestamp_idx",
+            ),
         ]
 
     @classmethod
     def upsert_note(
         cls,
         username: str,
+        chip_id: str,
         execution_id: str,
         task_id: str,
         note: dict,
@@ -55,20 +62,21 @@ class CalibrationNoteDocument(Document):
         Args:
         ----
             username (str): The username of the user who created the note.
+            chip_id (str): The chip ID associated with this note.
             execution_id (str): The execution ID associated with this note.
             task_id (str): The task ID associated with this note.
             note (dict): The calibration note data.
-            created_at (str): The time when the note was created.
-            updated_at (str): The time when the note was last updated.
 
         Returns:
         -------
             CalibrationNoteDocument: The upserted document.
 
         """
-        doc = cls.find_one({"execution_id": execution_id, "task_id": task_id, "username": username}).run()
+        doc = cls.find_one(
+            {"execution_id": execution_id, "task_id": task_id, "username": username, "chip_id": chip_id}
+        ).run()
         if doc is None:
-            doc = cls(username=username, execution_id=execution_id, task_id=task_id, note=note)
+            doc = cls(username=username, chip_id=chip_id, execution_id=execution_id, task_id=task_id, note=note)
             doc.save()
             return doc
 
