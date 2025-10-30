@@ -163,3 +163,18 @@ class UpdateScheduleRequest(BaseModel):
     active: bool = Field(..., description="Whether the schedule is active")
     cron: str | None = Field(None, description="Updated cron expression (optional)")
     parameters: dict[str, Any] | None = Field(None, description="Updated parameters (optional)")
+
+
+class DeleteScheduleResponse(BaseModel):
+    """Response for deleting a schedule."""
+
+    message: str = Field(..., description="Success message")
+    schedule_id: str = Field(..., description="Deleted schedule ID")
+    schedule_type: str = Field(..., description="Type of deleted schedule (cron or one-time)")
+
+
+class UpdateScheduleResponse(BaseModel):
+    """Response for updating a schedule."""
+
+    message: str = Field(..., description="Success message")
+    schedule_id: str = Field(..., description="Updated schedule ID")

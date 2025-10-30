@@ -22,13 +22,15 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
-  DeleteFlowSchedule200,
+  DeleteScheduleResponse,
   HTTPValidationError,
+  ListAllFlowSchedulesParams,
+  ListFlowSchedulesParams,
   ListFlowSchedulesResponse,
   ScheduleFlowRequest,
   ScheduleFlowResponse,
-  UpdateFlowSchedule200,
   UpdateScheduleRequest,
+  UpdateScheduleResponse,
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
@@ -146,6 +148,8 @@ Args:
 ----
     name: Flow name
     current_user: Current authenticated user
+    limit: Maximum number of schedules to return (max 100)
+    offset: Number of schedules to skip
 
 Returns:
 -------
@@ -154,17 +158,21 @@ Returns:
  */
 export const listFlowSchedules = (
   name: string,
+  params?: ListFlowSchedulesParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<ListFlowSchedulesResponse>(
-    { url: `/api/flow/${name}/schedules`, method: "GET", signal },
+    { url: `/api/flow/${name}/schedules`, method: "GET", params, signal },
     options,
   );
 };
 
-export const getListFlowSchedulesQueryKey = (name?: string) => {
-  return [`/api/flow/${name}/schedules`] as const;
+export const getListFlowSchedulesQueryKey = (
+  name?: string,
+  params?: ListFlowSchedulesParams,
+) => {
+  return [`/api/flow/${name}/schedules`, ...(params ? [params] : [])] as const;
 };
 
 export const getListFlowSchedulesQueryOptions = <
@@ -172,6 +180,7 @@ export const getListFlowSchedulesQueryOptions = <
   TError = ErrorType<HTTPValidationError>,
 >(
   name: string,
+  params?: ListFlowSchedulesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -185,11 +194,12 @@ export const getListFlowSchedulesQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListFlowSchedulesQueryKey(name);
+  const queryKey =
+    queryOptions?.queryKey ?? getListFlowSchedulesQueryKey(name, params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listFlowSchedules>>
-  > = ({ signal }) => listFlowSchedules(name, requestOptions, signal);
+  > = ({ signal }) => listFlowSchedules(name, params, requestOptions, signal);
 
   return {
     queryKey,
@@ -213,6 +223,7 @@ export function useListFlowSchedules<
   TError = ErrorType<HTTPValidationError>,
 >(
   name: string,
+  params: undefined | ListFlowSchedulesParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -240,6 +251,7 @@ export function useListFlowSchedules<
   TError = ErrorType<HTTPValidationError>,
 >(
   name: string,
+  params?: ListFlowSchedulesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -265,6 +277,7 @@ export function useListFlowSchedules<
   TError = ErrorType<HTTPValidationError>,
 >(
   name: string,
+  params?: ListFlowSchedulesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -286,6 +299,7 @@ export function useListFlowSchedules<
   TError = ErrorType<HTTPValidationError>,
 >(
   name: string,
+  params?: ListFlowSchedulesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -298,7 +312,7 @@ export function useListFlowSchedules<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListFlowSchedulesQueryOptions(name, options);
+  const queryOptions = getListFlowSchedulesQueryOptions(name, params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -316,6 +330,8 @@ export function useListFlowSchedules<
 Args:
 ----
     current_user: Current authenticated user
+    limit: Maximum number of schedules to return (max 100)
+    offset: Number of schedules to skip
 
 Returns:
 -------
@@ -323,39 +339,46 @@ Returns:
  * @summary List all Flow schedules for current user
  */
 export const listAllFlowSchedules = (
+  params?: ListAllFlowSchedulesParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<ListFlowSchedulesResponse>(
-    { url: `/api/flow-schedules`, method: "GET", signal },
+    { url: `/api/flow-schedules`, method: "GET", params, signal },
     options,
   );
 };
 
-export const getListAllFlowSchedulesQueryKey = () => {
-  return [`/api/flow-schedules`] as const;
+export const getListAllFlowSchedulesQueryKey = (
+  params?: ListAllFlowSchedulesParams,
+) => {
+  return [`/api/flow-schedules`, ...(params ? [params] : [])] as const;
 };
 
 export const getListAllFlowSchedulesQueryOptions = <
   TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof listAllFlowSchedules>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params?: ListAllFlowSchedulesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listAllFlowSchedules>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListAllFlowSchedulesQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getListAllFlowSchedulesQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listAllFlowSchedules>>
-  > = ({ signal }) => listAllFlowSchedules(requestOptions, signal);
+  > = ({ signal }) => listAllFlowSchedules(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listAllFlowSchedules>>,
@@ -367,12 +390,13 @@ export const getListAllFlowSchedulesQueryOptions = <
 export type ListAllFlowSchedulesQueryResult = NonNullable<
   Awaited<ReturnType<typeof listAllFlowSchedules>>
 >;
-export type ListAllFlowSchedulesQueryError = ErrorType<unknown>;
+export type ListAllFlowSchedulesQueryError = ErrorType<HTTPValidationError>;
 
 export function useListAllFlowSchedules<
   TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
+  params: undefined | ListAllFlowSchedulesParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -397,8 +421,9 @@ export function useListAllFlowSchedules<
 };
 export function useListAllFlowSchedules<
   TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
+  params?: ListAllFlowSchedulesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -421,8 +446,9 @@ export function useListAllFlowSchedules<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListAllFlowSchedules<
   TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
+  params?: ListAllFlowSchedulesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -441,8 +467,9 @@ export function useListAllFlowSchedules<
 
 export function useListAllFlowSchedules<
   TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
+  params?: ListAllFlowSchedulesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -455,7 +482,7 @@ export function useListAllFlowSchedules<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListAllFlowSchedulesQueryOptions(options);
+  const queryOptions = getListAllFlowSchedulesQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -470,8 +497,13 @@ export function useListAllFlowSchedules<
 /**
  * Delete a Flow schedule (cron or one-time).
 
-For cron schedules: Deactivates the schedule on the deployment.
-For one-time schedules: Deletes the scheduled flow run.
+Schedule ID Types:
+- **Cron schedules**: schedule_id is the deployment_id (UUID format)
+- **One-time schedules**: schedule_id is the flow_run_id (UUID format)
+
+The API automatically determines the type and handles accordingly:
+- Cron: Removes the schedule from the deployment (schedule=None)
+- One-time: Deletes the scheduled flow run
 
 Args:
 ----
@@ -480,14 +512,14 @@ Args:
 
 Returns:
 -------
-    Success message
+    Standardized response with schedule type information
  * @summary Delete a Flow schedule
  */
 export const deleteFlowSchedule = (
   scheduleId: string,
   options?: SecondParameter<typeof customInstance>,
 ) => {
-  return customInstance<DeleteFlowSchedule200>(
+  return customInstance<DeleteScheduleResponse>(
     { url: `/api/flow-schedule/${scheduleId}`, method: "DELETE" },
     options,
   );
@@ -585,7 +617,7 @@ export const updateFlowSchedule = (
   updateScheduleRequest: BodyType<UpdateScheduleRequest>,
   options?: SecondParameter<typeof customInstance>,
 ) => {
-  return customInstance<UpdateFlowSchedule200>(
+  return customInstance<UpdateScheduleResponse>(
     {
       url: `/api/flow-schedule/${scheduleId}`,
       method: "PATCH",

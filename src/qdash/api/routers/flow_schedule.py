@@ -1,7 +1,8 @@
 """API router for Flow scheduling (cron and one-time schedules)."""
 
+import asyncio
+import os
 import uuid
-from datetime import datetime
 from logging import getLogger
 from typing import Annotated, Any
 
@@ -18,19 +19,21 @@ from prefect.client.schemas.filters import (
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.flow import (
+    DeleteScheduleResponse,
     FlowScheduleSummary,
     ListFlowSchedulesResponse,
     ScheduleFlowRequest,
     ScheduleFlowResponse,
     UpdateScheduleRequest,
+    UpdateScheduleResponse,
 )
 from qdash.dbmodel.flow import FlowDocument
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
 
-# Deployment service URL
-DEPLOYMENT_SERVICE_URL = "http://deployment-service:8001"
+# Deployment service URL from environment
+DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
 
 
 @router.post(
@@ -103,31 +106,71 @@ async def schedule_flow(
 
     # Handle cron schedule
     if request.cron:
+        # Validate cron expression
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{DEPLOYMENT_SERVICE_URL}/set-schedule",
-                    json={
-                        "deployment_id": flow.deployment_id,
-                        "cron": request.cron,
-                        "timezone": request.timezone,
-                        "active": request.active,
-                        "parameters": parameters,
-                    },
-                    timeout=30.0,
-                )
+            from croniter import croniter
+
+            croniter(request.cron)  # Will raise ValueError if invalid
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid cron expression '{request.cron}': {str(e)}",
+            )
+
+        try:
+            # Configure httpx client with timeout and retry
+            timeout_config = httpx.Timeout(
+                connect=5.0,  # Connection timeout
+                read=30.0,  # Read timeout
+                write=10.0,  # Write timeout
+                pool=5.0,  # Pool timeout
+            )
+
+            async with httpx.AsyncClient(timeout=timeout_config) as client:
+                # Retry logic: try up to 3 times with exponential backoff
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        response = await client.post(
+                            f"{DEPLOYMENT_SERVICE_URL}/set-schedule",
+                            json={
+                                "deployment_id": flow.deployment_id,
+                                "cron": request.cron,
+                                "timezone": request.timezone,
+                                "active": request.active,
+                                "parameters": parameters,
+                            },
+                        )
+                        response.raise_for_status()
+                        break  # Success, exit retry loop
+                    except (httpx.TimeoutException, httpx.ConnectError) as e:
+                        if attempt < max_retries - 1:
+                            wait_time = 2**attempt  # Exponential backoff: 1s, 2s, 4s
+                            logger.warning(f"Attempt {attempt + 1} failed, retrying in {wait_time}s: {e}")
+                            await asyncio.sleep(wait_time)
+                        else:
+                            raise  # Final attempt failed
+                    except httpx.HTTPStatusError:
+                        raise  # Don't retry on 4xx/5xx errors
                 response.raise_for_status()
                 data = response.json()
 
                 logger.info(f"Set cron schedule for flow '{name}': {request.cron}")
 
-                # Get next run time from Prefect
-                async with get_client() as prefect_client:
-                    deployment = await prefect_client.read_deployment(flow.deployment_id)
+                # Calculate next run time from cron expression
+                next_run = None
+                try:
+                    from datetime import datetime, timezone
+
+                    from croniter import croniter
+
+                    now = datetime.now(timezone.utc)
+                    cron_iter = croniter(request.cron, now)
+                    next_run_dt = cron_iter.get_next(datetime)
+                    next_run = next_run_dt.isoformat()
+                except Exception as e:
+                    logger.warning(f"Failed to calculate next run time: {e}")
                     next_run = None
-                    if deployment.schedule:
-                        # Calculate next run (simplified - Prefect handles this internally)
-                        next_run = datetime.now().isoformat()
 
                 return ScheduleFlowResponse(
                     schedule_id=flow.deployment_id,
@@ -156,19 +199,52 @@ async def schedule_flow(
 
     # Handle one-time schedule
     if request.scheduled_time:
+        # Validate scheduled_time is in the future
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{DEPLOYMENT_SERVICE_URL}/create-scheduled-run",
-                    json={
-                        "deployment_id": flow.deployment_id,
-                        "scheduled_time": request.scheduled_time,
-                        "parameters": parameters,
-                    },
-                    timeout=30.0,
+            from datetime import datetime, timezone
+
+            scheduled_dt = datetime.fromisoformat(request.scheduled_time.replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            if scheduled_dt <= now:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Scheduled time must be in the future. Provided: {request.scheduled_time}, Current: {now.isoformat()}",
                 )
-                response.raise_for_status()
-                data = response.json()
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid scheduled_time format: {str(e)}",
+            )
+
+        try:
+            # Configure httpx client with timeout
+            timeout_config = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
+
+            async with httpx.AsyncClient(timeout=timeout_config) as client:
+                # Retry logic for one-time schedule creation
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        response = await client.post(
+                            f"{DEPLOYMENT_SERVICE_URL}/create-scheduled-run",
+                            json={
+                                "deployment_id": flow.deployment_id,
+                                "scheduled_time": request.scheduled_time,
+                                "parameters": parameters,
+                            },
+                        )
+                        response.raise_for_status()
+                        data = response.json()
+                        break  # Success
+                    except (httpx.TimeoutException, httpx.ConnectError) as e:
+                        if attempt < max_retries - 1:
+                            wait_time = 2**attempt
+                            logger.warning(f"Attempt {attempt + 1} failed, retrying in {wait_time}s: {e}")
+                            await asyncio.sleep(wait_time)
+                        else:
+                            raise
+                    except httpx.HTTPStatusError:
+                        raise
 
                 flow_run_id = data["flow_run_id"]
                 logger.info(f"Created one-time schedule for flow '{name}': {request.scheduled_time}")
@@ -210,6 +286,8 @@ async def schedule_flow(
 async def list_flow_schedules(
     name: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    limit: int = 50,  # Default 50, max 100
+    offset: int = 0,
 ) -> ListFlowSchedulesResponse:
     """List all schedules (cron and one-time) for a specific Flow.
 
@@ -217,12 +295,16 @@ async def list_flow_schedules(
     ----
         name: Flow name
         current_user: Current authenticated user
+        limit: Maximum number of schedules to return (max 100)
+        offset: Number of schedules to skip
 
     Returns:
     -------
         List of schedules for the flow
 
     """
+    # Enforce max limit
+    limit = min(limit, 100)
     username = current_user.username
 
     # Find flow
@@ -263,7 +345,8 @@ async def list_flow_schedules(
             flow_runs = await client.read_flow_runs(
                 deployment_filter=DeploymentFilter(id={"any_": [uuid.UUID(flow.deployment_id)]}),
                 flow_run_filter=FlowRunFilter(state=FlowRunFilterState(type=state_filter)),
-                limit=20,  # Limit to 20 most recent scheduled runs
+                limit=limit,  # Use pagination limit
+                offset=offset,
             )
 
             now = datetime.now(timezone.utc)
@@ -295,18 +378,23 @@ async def list_flow_schedules(
 )
 async def list_all_flow_schedules(
     current_user: Annotated[User, Depends(get_current_active_user)],
+    limit: int = 50,
+    offset: int = 0,
 ) -> ListFlowSchedulesResponse:
     """List all Flow schedules (cron and one-time) for the current user.
 
     Args:
     ----
         current_user: Current authenticated user
+        limit: Maximum number of schedules to return (max 100)
+        offset: Number of schedules to skip
 
     Returns:
     -------
         List of all flow schedules
 
     """
+    limit = min(limit, 100)
     username = current_user.username
     flows = FlowDocument.list_by_user(username)
 
@@ -344,7 +432,7 @@ async def list_all_flow_schedules(
                 flow_runs = await client.read_flow_runs(
                     deployment_filter=DeploymentFilter(id={"any_": [uuid.UUID(flow.deployment_id)]}),
                     flow_run_filter=FlowRunFilter(state=FlowRunFilterState(type=state_filter)),
-                    limit=20,  # Limit per deployment
+                    limit=limit,  # Use pagination limit
                 )
 
                 now = datetime.now(timezone.utc)
@@ -368,22 +456,31 @@ async def list_all_flow_schedules(
     # Sort by next_run time
     all_schedules.sort(key=lambda x: x.next_run or "")
 
-    return ListFlowSchedulesResponse(schedules=all_schedules)
+    # Apply offset and limit to sorted results
+    paginated_schedules = all_schedules[offset : offset + limit]
+
+    return ListFlowSchedulesResponse(schedules=paginated_schedules)
 
 
 @router.delete(
     "/flow-schedule/{schedule_id}",
+    response_model=DeleteScheduleResponse,
     summary="Delete a Flow schedule",
     operation_id="delete_flow_schedule",
 )
 async def delete_flow_schedule(
     schedule_id: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
-) -> dict[str, str]:
+) -> DeleteScheduleResponse:
     """Delete a Flow schedule (cron or one-time).
 
-    For cron schedules: Deactivates the schedule on the deployment.
-    For one-time schedules: Deletes the scheduled flow run.
+    Schedule ID Types:
+    - **Cron schedules**: schedule_id is the deployment_id (UUID format)
+    - **One-time schedules**: schedule_id is the flow_run_id (UUID format)
+
+    The API automatically determines the type and handles accordingly:
+    - Cron: Removes the schedule from the deployment (schedule=None)
+    - One-time: Deletes the scheduled flow run
 
     Args:
     ----
@@ -392,7 +489,7 @@ async def delete_flow_schedule(
 
     Returns:
     -------
-        Success message
+        Standardized response with schedule type information
 
     """
     username = current_user.username
@@ -420,10 +517,15 @@ async def delete_flow_schedule(
             )
 
             logger.info(f"Deleted cron schedule: {schedule_id}")
-            return {"message": "Cron schedule deleted successfully"}
+            return DeleteScheduleResponse(
+                message="Cron schedule deleted successfully",
+                schedule_id=schedule_id,
+                schedule_type="cron",
+            )
 
-        except Exception:
-            pass
+        except Exception as e:
+            # Not a deployment ID, try as flow_run_id
+            logger.debug(f"Not a deployment ID, trying as flow_run_id: {e}")
 
         # Try as flow_run_id (one-time schedule)
         try:
@@ -441,7 +543,11 @@ async def delete_flow_schedule(
 
             await client.delete_flow_run(flow_run_id)
             logger.info(f"Deleted one-time schedule: {schedule_id}")
-            return {"message": "One-time schedule deleted successfully"}
+            return DeleteScheduleResponse(
+                message="One-time schedule deleted successfully",
+                schedule_id=schedule_id,
+                schedule_type="one-time",
+            )
 
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid schedule_id format")
@@ -452,7 +558,7 @@ async def delete_flow_schedule(
 
 @router.patch(
     "/flow-schedule/{schedule_id}",
-    response_model=dict[str, str],
+    response_model=UpdateScheduleResponse,
     summary="Update a Flow schedule",
     operation_id="update_flow_schedule",
 )
@@ -460,7 +566,7 @@ async def update_flow_schedule(
     schedule_id: str,
     request: UpdateScheduleRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
-) -> dict[str, str]:
+) -> UpdateScheduleResponse:
     """Update a Flow schedule (cron schedules only).
 
     Can update: active status, cron expression, parameters.
@@ -494,8 +600,19 @@ async def update_flow_schedule(
             # Prepare schedule if cron is provided
             schedule_to_update = deployment.schedule
             if request.cron:
+                from croniter import croniter
                 from prefect.client.schemas.schedules import CronSchedule
 
+                # Validate cron expression
+                try:
+                    croniter(request.cron)
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid cron expression '{request.cron}': {str(e)}",
+                    )
+
+                # Use timezone from UpdateScheduleRequest schema (defaults to Asia/Tokyo)
                 schedule_to_update = CronSchedule(cron=request.cron, timezone="Asia/Tokyo")
 
             # Update deployment directly without creating new Deployment object
@@ -506,7 +623,10 @@ async def update_flow_schedule(
             )
 
             logger.info(f"Updated schedule: {schedule_id}")
-            return {"message": "Schedule updated successfully"}
+            return UpdateScheduleResponse(
+                message="Schedule updated successfully",
+                schedule_id=schedule_id,
+            )
 
         except Exception as e:
             logger.error(f"Failed to update schedule: {e}")

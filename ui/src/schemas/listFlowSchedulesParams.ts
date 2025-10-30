@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type UpdateFlowSchedule200 = { [key: string]: string };
+export type ListFlowSchedulesParams = {
+  limit?: number;
+  offset?: number;
+};

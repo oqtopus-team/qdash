@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type DeleteFlowSchedule200 = { [key: string]: string };
+export type ListAllFlowSchedulesParams = {
+  limit?: number;
+  offset?: number;
+};
