@@ -163,6 +163,7 @@ class UpdateScheduleRequest(BaseModel):
     active: bool = Field(..., description="Whether the schedule is active")
     cron: str | None = Field(None, description="Updated cron expression (optional)")
     parameters: dict[str, Any] | None = Field(None, description="Updated parameters (optional)")
+    timezone: str = Field(default="Asia/Tokyo", description="Timezone for cron schedule")
 
 
 class DeleteScheduleResponse(BaseModel):

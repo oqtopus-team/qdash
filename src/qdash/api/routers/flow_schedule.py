@@ -523,8 +523,10 @@ async def delete_flow_schedule(
                 schedule_type="cron",
             )
 
+        except HTTPException:
+            raise  # Re-raise permission errors
         except Exception as e:
-            # Not a deployment ID, try as flow_run_id
+            # Not a deployment ID (could be 404 or other Prefect error), try as flow_run_id
             logger.debug(f"Not a deployment ID, trying as flow_run_id: {e}")
 
         # Try as flow_run_id (one-time schedule)
@@ -612,8 +614,8 @@ async def update_flow_schedule(
                         detail=f"Invalid cron expression '{request.cron}': {str(e)}",
                     )
 
-                # Use timezone from UpdateScheduleRequest schema (defaults to Asia/Tokyo)
-                schedule_to_update = CronSchedule(cron=request.cron, timezone="Asia/Tokyo")
+                # Use timezone from request (defaults to Asia/Tokyo in schema)
+                schedule_to_update = CronSchedule(cron=request.cron, timezone=request.timezone)
 
             # Update deployment directly without creating new Deployment object
             await client.update_deployment(
