@@ -186,7 +186,8 @@ class FlowSession:
 
         # Initialize backend session
         # Note: For qubex backend, qids must be provided for proper box selection
-        note_path = Path(f"{calib_data_path}/calib_note/flow.json")
+        # Use task_manager.id for note_path (same as setup_calibration)
+        note_path = Path(f"{calib_data_path}/calib_note/{self.task_manager.id}.json")
         self.session = create_session(
             backend=backend,
             config={
@@ -197,6 +198,16 @@ class FlowSession:
                 "chip_id": chip_id,
             },
         )
+
+        # Save calibration_note before connecting (loads parameter overrides)
+        if self.session.name == "qubex":
+            self.session.save_note(
+                username=username,
+                calib_dir=calib_data_path,
+                execution_id=execution_id,
+                task_manager_id=self.task_manager.id,
+            )
+
         self.session.connect()
 
     def _ensure_task_in_workflow(self, task_name: str, task_type: str, qid: str) -> None:

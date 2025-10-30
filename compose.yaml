@@ -93,7 +93,7 @@ services:
   deployment-service:
     build:
       context: .
-      dockerfile: ./src/qdash/workflow/Dockerfile
+      dockerfile: ./src/qdash/workflow/Dockerfile.deployment
     restart: always
     env_file:
       - .env

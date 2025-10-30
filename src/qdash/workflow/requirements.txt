@@ -12,8 +12,6 @@ anyio==4.8.0
     # via
     #   httpx
     #   jupyter-server
-    #   starlette
-    #   watchfiles
 appnope==0.1.4 ; sys_platform == 'darwin'
     # via ipykernel
 argon2-cffi==25.1.0
@@ -62,11 +60,7 @@ chex==0.1.90
 clarabel==0.11.1
     # via cvxpy
 click==8.1.8
-    # via
-    #   bunnet
-    #   rich-toolkit
-    #   typer
-    #   uvicorn
+    # via bunnet
 cma==4.3.0
     # via qubex
 colorama==0.4.6 ; sys_platform == 'win32'
@@ -75,7 +69,6 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   ipython
     #   pytest
     #   tqdm
-    #   uvicorn
 comm==0.2.3
     # via
     #   ipykernel
@@ -105,15 +98,11 @@ decorator==5.2.1
 defusedxml==0.7.1
     # via nbconvert
 dnspython==2.7.0
-    # via
-    #   email-validator
-    #   pymongo
+    # via pymongo
 e7awgsw @ git+https://github.com/e-trees/e7awg_sw.git@7dccc53ce613fc42f8b0e3302b27959f0e486f87
     # via
     #   qubecalib
     #   quel-ic-config
-email-validator==2.2.0
-    # via fastapi
 exceptiongroup==1.2.2 ; python_full_version < '3.11'
     # via
     #   anyio
@@ -121,9 +110,6 @@ exceptiongroup==1.2.2 ; python_full_version < '3.11'
     #   pytest
 executing==2.2.0
     # via stack-data
-fastapi==0.111.1
-fastapi-cli==0.0.7
-    # via fastapi
 fastjsonschema==2.21.1
     # via nbformat
 filelock==3.17.0
@@ -137,16 +123,11 @@ gitdb==4.0.12
     # via gitpython
 gitpython==3.1.45
 h11==0.14.0
-    # via
-    #   httpcore
-    #   uvicorn
+    # via httpcore
 httpcore==1.0.7
     # via httpx
-httptools==0.6.4
-    # via uvicorn
 httpx==0.27.2
     # via
-    #   fastapi
     #   jupyterlab
     #   qubex
 hyperlink==21.0.0
@@ -154,7 +135,6 @@ hyperlink==21.0.0
 idna==3.10
     # via
     #   anyio
-    #   email-validator
     #   httpx
     #   hyperlink
     #   jsonschema
@@ -208,7 +188,6 @@ jedi==0.19.2
     # via ipython
 jinja2==3.1.6
     # via
-    #   fastapi
     #   jupyter-server
     #   jupyterlab
     #   jupyterlab-server
@@ -430,7 +409,6 @@ pycparser==2.22
 pydantic==2.4.2
     # via
     #   bunnet
-    #   fastapi
     #   lazy-model
     #   qubex
     #   quel-ic-config
@@ -474,11 +452,8 @@ python-dateutil==2.9.0.post0
     #   matplotlib
     #   pendulum
 python-dotenv==1.0.1
-    # via uvicorn
 python-json-logger==3.3.0
     # via jupyter-events
-python-multipart==0.0.20
-    # via fastapi
 pywin32==308 ; platform_python_implementation != 'PyPy' and sys_platform == 'win32'
     # via jupyter-core
 pywinpty==2.0.15 ; os_name == 'nt'
@@ -492,7 +467,6 @@ pyyaml==6.0.1
     #   qubecalib
     #   qubex
     #   quel-ic-config
-    #   uvicorn
 pyzmq==27.0.1
     # via
     #   ipykernel
@@ -531,12 +505,7 @@ rfc3986-validator==0.1.1
     #   jsonschema
     #   jupyter-events
 rich==13.9.4
-    # via
-    #   qubex
-    #   rich-toolkit
-    #   typer
-rich-toolkit==0.13.2
-    # via fastapi-cli
+    # via qubex
 rpds-py==0.23.1
     # via
     #   jsonschema
@@ -580,8 +549,6 @@ setuptools==80.9.0
     #   jupyterlab
     #   osqp
     #   zope-interface
-shellingham==1.5.4
-    # via typer
 six==1.17.0
     # via
     #   python-dateutil
@@ -597,8 +564,6 @@ soupsieve==2.7
     # via beautifulsoup4
 stack-data==0.6.3
     # via ipython
-starlette==0.37.2
-    # via fastapi
 tenacity==9.1.2
     # via plotly
 terminado==0.18.1
@@ -647,8 +612,6 @@ traitlets==5.14.3
     #   nbformat
 twisted==25.5.0
     # via pylabrad
-typer==0.14.0
-    # via fastapi-cli
 types-python-dateutil==2.9.0.20250809
     # via arrow
 types-pyyaml==6.0.12.20250809
@@ -660,7 +623,6 @@ typing-extensions==4.12.2
     #   beautifulsoup4
     #   bunnet
     #   chex
-    #   fastapi
     #   ipython
     #   mistune
     #   pydantic
@@ -668,24 +630,13 @@ typing-extensions==4.12.2
     #   pyopenssl
     #   referencing
     #   rich
-    #   rich-toolkit
     #   twisted
-    #   typer
-    #   uvicorn
 tzdata==2025.2
     # via pendulum
 uri-template==1.3.0
     # via jsonschema
 urllib3==2.3.0
     # via requests
-uvicorn==0.34.0
-    # via
-    #   fastapi
-    #   fastapi-cli
-uvloop==0.21.0 ; platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'
-    # via uvicorn
-watchfiles==1.0.4
-    # via uvicorn
 wcwidth==0.2.13
     # via prompt-toolkit
 webcolors==24.11.1
@@ -696,8 +647,6 @@ webencodings==0.5.1
     #   tinycss2
 websocket-client==1.8.0
     # via jupyter-server
-websockets==15.0
-    # via uvicorn
 widgetsnbextension==4.0.14
     # via ipywidgets
 zope-interface==7.2
