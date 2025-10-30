@@ -160,7 +160,7 @@ print(f"GitHub push results: {push_results}")
 - `ConfigFileType.CALIB_NOTE` - calibration/calib_note.json (direct copy)
 - `ConfigFileType.PROPS` - params/props.yaml (uses existing merge logic)
 - `ConfigFileType.PARAMS` - params/params.yaml (direct copy)
-- `ConfigFileType.ALL_PARAMS` - All *.yaml files in params/ directory
+- `ConfigFileType.ALL_PARAMS` - All \*.yaml files in params/ directory
 
 ### Environment Variables Required
 

@@ -95,3 +95,87 @@ class ExecuteFlowResponse(BaseModel):
     flow_run_url: str = Field(..., description="Prefect flow run URL")
     qdash_ui_url: str = Field(..., description="QDash UI URL for execution")
     message: str = Field(..., description="Success message")
+
+
+class ScheduleFlowRequest(BaseModel):
+    """Request to schedule a Flow execution."""
+
+    cron: str | None = Field(None, description="Cron expression (e.g., '0 2 * * *' for daily at 2am JST)")
+    scheduled_time: str | None = Field(None, description="One-time execution time (ISO format, JST)")
+    parameters: dict[str, Any] = Field(
+        default_factory=dict, description="Execution parameters (overrides default_parameters)"
+    )
+    active: bool = Field(True, description="Whether the schedule is active")
+    timezone: str = Field("Asia/Tokyo", description="Timezone for schedule")
+
+    model_config: ClassVar[dict] = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "cron": "0 2 * * *",
+                    "parameters": {"qids": ["32"], "max_iterations": 10},
+                    "active": True,
+                    "timezone": "Asia/Tokyo",
+                },
+                {
+                    "scheduled_time": "2025-11-01T02:00:00+09:00",
+                    "parameters": {"qids": ["32"]},
+                    "active": True,
+                },
+            ]
+        }
+    }
+
+
+class ScheduleFlowResponse(BaseModel):
+    """Response after scheduling a flow."""
+
+    schedule_id: str = Field(..., description="Schedule ID (deployment ID for cron, flow_run_id for one-time)")
+    flow_name: str = Field(..., description="Flow name")
+    schedule_type: str = Field(..., description="Schedule type: 'cron' or 'one-time'")
+    cron: str | None = Field(None, description="Cron expression (for cron schedules)")
+    next_run: str | None = Field(None, description="Next scheduled run time (ISO format)")
+    active: bool = Field(..., description="Whether the schedule is active")
+    message: str = Field(..., description="Success message")
+
+
+class FlowScheduleSummary(BaseModel):
+    """Summary of a scheduled Flow."""
+
+    schedule_id: str = Field(..., description="Schedule ID")
+    flow_name: str = Field(..., description="Flow name")
+    schedule_type: str = Field(..., description="Schedule type: 'cron' or 'one-time'")
+    cron: str | None = Field(None, description="Cron expression")
+    next_run: str | None = Field(None, description="Next scheduled run time")
+    active: bool = Field(..., description="Whether the schedule is active")
+    created_at: str = Field(..., description="Schedule creation time")
+
+
+class ListFlowSchedulesResponse(BaseModel):
+    """Response for listing flow schedules."""
+
+    schedules: list[FlowScheduleSummary] = Field(..., description="List of flow schedules")
+
+
+class UpdateScheduleRequest(BaseModel):
+    """Request to update a schedule."""
+
+    active: bool = Field(..., description="Whether the schedule is active")
+    cron: str | None = Field(None, description="Updated cron expression (optional)")
+    parameters: dict[str, Any] | None = Field(None, description="Updated parameters (optional)")
+    timezone: str = Field(default="Asia/Tokyo", description="Timezone for cron schedule")
+
+
+class DeleteScheduleResponse(BaseModel):
+    """Response for deleting a schedule."""
+
+    message: str = Field(..., description="Success message")
+    schedule_id: str = Field(..., description="Deleted schedule ID")
+    schedule_type: str = Field(..., description="Type of deleted schedule (cron or one-time)")
+
+
+class UpdateScheduleResponse(BaseModel):
+    """Response for updating a schedule."""
+
+    message: str = Field(..., description="Success message")
+    schedule_id: str = Field(..., description="Updated schedule ID")
