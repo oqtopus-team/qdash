@@ -7,7 +7,7 @@ import { toast } from "react-toastify";
 
 import type { GetMenuResponse } from "@/schemas";
 
-import { ScheduleDisplay } from "@/app/calibration/components/CalibrationCronScheduleTable/ScheduleDisplay";
+import { ScheduleDisplay } from "@/app/components/ScheduleDisplay";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useExecuteCalib } from "@/client/calibration/calibration";
 import { useFetchExecutionLockStatus } from "@/client/execution/execution";

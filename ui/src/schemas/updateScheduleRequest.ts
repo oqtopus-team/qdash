@@ -18,4 +18,6 @@ export interface UpdateScheduleRequest {
   cron?: UpdateScheduleRequestCron;
   /** Updated parameters (optional) */
   parameters?: UpdateScheduleRequestParameters;
+  /** Timezone for cron schedule */
+  timezone?: string;
 }

@@ -4,16 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { BsListTask, BsMenuButton } from "react-icons/bs";
+import { BsListTask, BsMenuButton, BsGrid } from "react-icons/bs";
 import { BsCpu } from "react-icons/bs";
-import { FaScrewdriverWrench } from "react-icons/fa6";
 import { FaBolt } from "react-icons/fa6";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
-import { GiGinkgoLeaf } from "react-icons/gi";
 import { GoWorkflow } from "react-icons/go";
 import { IoMdSettings } from "react-icons/io";
 import { IoAnalytics } from "react-icons/io5";
-import { MdDashboard } from "react-icons/md";
 import { FaCode } from "react-icons/fa";
 
 import { useSidebar } from "@/app/contexts/SidebarContext";
@@ -58,16 +55,16 @@ function Sidebar() {
         )}
         <li>
           <Link
-            href="/dashboard"
+            href="/metrics"
             className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
-              isActive("/dashboard")
+              isActive("/metrics")
                 ? "bg-neutral text-neutral-content"
                 : "text-base-content"
             }`}
-            title="Dashboard"
+            title="Metrics"
           >
-            <MdDashboard />
-            {isOpen && <span className="ml-2">Dashboard</span>}
+            <BsGrid />
+            {isOpen && <span className="ml-2">Metrics</span>}
           </Link>
         </li>
         <li>
@@ -86,16 +83,16 @@ function Sidebar() {
         </li>
         <li>
           <Link
-            href="/tasks"
+            href="/flow"
             className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
-              isActive("/tasks")
+              pathname.startsWith("/flow")
                 ? "bg-neutral text-neutral-content"
                 : "text-base-content"
             }`}
-            title="Tasks"
+            title="Flow Editor"
           >
-            <BsListTask />
-            {isOpen && <span className="ml-2">Tasks</span>}
+            <FaCode />
+            {isOpen && <span className="ml-2">Flow Editor</span>}
           </Link>
         </li>
         <li>
@@ -114,16 +111,16 @@ function Sidebar() {
         </li>
         <li>
           <Link
-            href="/flow"
+            href="/execution"
             className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
-              pathname.startsWith("/flow")
+              isActive("/execution")
                 ? "bg-neutral text-neutral-content"
                 : "text-base-content"
             }`}
-            title="Flow Editor"
+            title="Execution"
           >
-            <FaCode />
-            {isOpen && <span className="ml-2">Flow Editor</span>}
+            <FaBolt />
+            {isOpen && <span className="ml-2">Execution</span>}
           </Link>
         </li>
         <li>
@@ -142,30 +139,16 @@ function Sidebar() {
         </li>
         <li>
           <Link
-            href="/calibration"
+            href="/tasks"
             className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
-              isActive("/calibration")
+              isActive("/tasks")
                 ? "bg-neutral text-neutral-content"
                 : "text-base-content"
             }`}
-            title="Calibration"
+            title="Tasks"
           >
-            <FaScrewdriverWrench />
-            {isOpen && <span className="ml-2">Calibration</span>}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/execution"
-            className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
-              isActive("/execution")
-                ? "bg-neutral text-neutral-content"
-                : "text-base-content"
-            }`}
-            title="Execution"
-          >
-            <FaBolt />
-            {isOpen && <span className="ml-2">Execution</span>}
+            <BsListTask />
+            {isOpen && <span className="ml-2">Tasks</span>}
           </Link>
         </li>
         {/* TODO: Implement Fridge page
@@ -208,18 +191,6 @@ function Sidebar() {
           >
             <GoWorkflow />
             {isOpen && <span className="ml-2">Workflow</span>}
-          </a>
-        </li>
-        <li>
-          <a
-            href="https://qulacs-gui.github.io/qulacs-simulator/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center`}
-            title="Qulacs Simulator"
-          >
-            <GiGinkgoLeaf />
-            {isOpen && <span className="ml-2">Qulacs Simulator</span>}
           </a>
         </li>
       </ul>

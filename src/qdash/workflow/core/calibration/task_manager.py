@@ -650,6 +650,10 @@ class TaskManager(BaseModel):
 
         # 1. Save output parameters
         if postprocess_result.output_parameters:
+            # Get current task to retrieve task_id
+            current_task = self.get_task(task_name=task_name, task_type=task_type, qid=qid)
+            # Attach task_id to all output parameters
+            task_instance.attach_task_id(current_task.task_id)
             self.put_output_parameters(task_name, postprocess_result.output_parameters, task_type=task_type, qid=qid)
 
         # 2. Save figures (using existing method)

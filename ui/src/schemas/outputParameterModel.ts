@@ -24,4 +24,5 @@ export interface OutputParameterModel {
   /** The time when the system information was created */
   calibrated_at?: string;
   execution_id?: string;
+  task_id?: string;
 }

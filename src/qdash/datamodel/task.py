@@ -91,6 +91,7 @@ class OutputParameterModel(BaseModel):
         description="The time when the system information was created",
     )
     execution_id: str = ""
+    task_id: str = ""
 
     @field_validator("value", mode="before")
     @classmethod

@@ -28,7 +28,7 @@ logger = getLogger("uvicorn.app")
 # Base directory for user flows (shared volume between API and Workflow containers)
 USER_FLOWS_BASE_DIR = Path("/app/qdash/workflow/user_flows")
 
-# Deployment service URL (Deployment service container)
+# Deployment service URL (Deployment service container - internal Docker network)
 DEPLOYMENT_SERVICE_URL = "http://deployment-service:8001"
 
 # Path to templates directory
@@ -146,6 +146,7 @@ async def register_flow_deployment(
 
     """
     try:
+        logger.info(f"Registering deployment '{deployment_name}' at {DEPLOYMENT_SERVICE_URL}")
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{DEPLOYMENT_SERVICE_URL}/register-deployment",
@@ -159,9 +160,16 @@ async def register_flow_deployment(
             )
             response.raise_for_status()
             data = response.json()
+            logger.info(f"Successfully registered deployment: {data['deployment_id']}")
             return data["deployment_id"]
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error during deployment registration: {e.response.status_code} - {e.response.text}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to register deployment: {e.response.status_code}: {e.response.text}",
+        )
     except httpx.HTTPError as e:
-        logger.error(f"Failed to register deployment: {e}")
+        logger.error(f"Failed to register deployment: {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to register deployment: {e}",
