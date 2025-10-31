@@ -1,23 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  saveFlow,
-  listFlowTemplates,
-  getFlowTemplate,
-} from "@/client/flow/flow";
-import { useListChips } from "@/client/chip/chip";
-import { useAuthReadUsersMe } from "@/client/auth/auth";
-import type { SaveFlowRequest } from "@/schemas";
 import dynamic from "next/dynamic";
-import { toast } from "react-toastify";
-import { ToastContainer } from "react-toastify";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+
+import { useMutation, useQuery } from "@tanstack/react-query";
+import Select, { type SingleValue, type StylesConfig } from "react-select";
+import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+
+import type { SaveFlowRequest } from "@/schemas";
+
+import { useAuthReadUsersMe } from "@/client/auth/auth";
+import { useListChips } from "@/client/chip/chip";
+import {
+  getFlowTemplate,
+  listFlowTemplates,
+  saveFlow,
+} from "@/client/flow/flow";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+
+type TemplateOption = {
+  value: string;
+  label: string;
+  description?: string;
+};
 
 export default function NewFlowPage() {
   const router = useRouter();
@@ -38,12 +47,85 @@ export default function NewFlowPage() {
   const { data: chipsData } = useListChips();
 
   // Fetch templates
-  const { data: templatesData } = useQuery({
+  const { data: templatesData, isLoading: isTemplatesLoading } = useQuery({
     queryKey: ["flowTemplates"],
     queryFn: () => listFlowTemplates(),
   });
 
-  const templates = templatesData?.data || [];
+  const templateOptions: TemplateOption[] = useMemo(
+    () =>
+      (templatesData?.data ?? []).map((template) => ({
+        value: template.id,
+        label: template.description
+          ? `${template.name} - ${template.description}`
+          : template.name,
+        description: template.description,
+      })),
+    [templatesData],
+  );
+
+  const templateSelectStyles = useMemo<StylesConfig<TemplateOption, false>>(
+    () => ({
+      control: (provided, state) => ({
+        ...provided,
+        backgroundColor: "#3c3c3c",
+        borderColor: state.isFocused ? "#007acc" : "#454545",
+        boxShadow: state.isFocused ? "0 0 0 1px #007acc" : "none",
+        "&:hover": {
+          borderColor: "#007acc",
+        },
+        minHeight: 38,
+      }),
+      valueContainer: (provided) => ({
+        ...provided,
+        padding: "2px 8px",
+      }),
+      menu: (provided) => ({
+        ...provided,
+        backgroundColor: "#252526",
+        border: "1px solid #3c3c3c",
+      }),
+      menuList: (provided) => ({
+        ...provided,
+        backgroundColor: "#252526",
+      }),
+      option: (provided, state) => ({
+        ...provided,
+        backgroundColor: state.isFocused ? "#3c3c3c" : "#252526",
+        color: "#ffffff",
+        "&:active": {
+          backgroundColor: "#007acc",
+        },
+      }),
+      singleValue: (provided) => ({
+        ...provided,
+        color: "#ffffff",
+      }),
+      placeholder: (provided) => ({
+        ...provided,
+        color: "#9ca3af",
+      }),
+      input: (provided) => ({
+        ...provided,
+        color: "#ffffff",
+      }),
+      dropdownIndicator: (provided) => ({
+        ...provided,
+        color: "#ffffff",
+        "&:hover": { color: "#ffffff" },
+      }),
+      clearIndicator: (provided) => ({
+        ...provided,
+        color: "#ffffff",
+        "&:hover": { color: "#ffffff" },
+      }),
+      indicatorSeparator: (provided) => ({
+        ...provided,
+        backgroundColor: "#4b5563",
+      }),
+    }),
+    [],
+  );
 
   // Set default username and chip_id
   useEffect(() => {
@@ -235,18 +317,28 @@ export default function NewFlowPage() {
                 <h2 className="text-sm font-semibold text-white mb-3">
                   TEMPLATE
                 </h2>
-                <select
-                  value={selectedTemplateId}
-                  onChange={(e) => handleTemplateSelect(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#3c3c3c] text-white text-sm border border-[#454545] rounded focus:outline-none focus:border-[#007acc]"
-                >
-                  <option value="">Select a template...</option>
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name} - {template.description}
-                    </option>
-                  ))}
-                </select>
+                <Select<TemplateOption, false>
+                  className="text-sm"
+                  classNamePrefix="react-select"
+                  options={templateOptions}
+                  value={
+                    templateOptions.find(
+                      (option) => option.value === selectedTemplateId,
+                    ) ?? null
+                  }
+                  onChange={(option: SingleValue<TemplateOption>) => {
+                    if (!option) {
+                      setSelectedTemplateId("");
+                      return;
+                    }
+                    handleTemplateSelect(option.value);
+                  }}
+                  placeholder="Select a template..."
+                  styles={templateSelectStyles}
+                  isClearable
+                  isLoading={isTemplatesLoading}
+                  noOptionsMessage={() => "No templates available"}
+                />
                 {selectedTemplateId && (
                   <p className="text-xs text-gray-400 mt-2">
                     Template loaded. You can modify the code as needed.

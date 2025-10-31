@@ -421,9 +421,8 @@ export function CouplingGrid({
                     left: centerX,
                     width: displayCellSize * 0.6,
                     height: displayCellSize * 0.6,
-                    transform: "translate(-50%, -50%)",
                   }}
-                  className={`rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow ${
+                  className={`rounded-lg bg-base-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 -translate-x-1/2 -translate-y-1/2 ${
                     task.over_threshold
                       ? "border-2 border-primary animate-pulse-light"
                       : ""

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+
+import Select, {
+  type GroupBase,
+  type SingleValue,
+  type StylesConfig,
+} from "react-select";
 
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 
@@ -20,6 +26,11 @@ type MetricConfig = {
     max: number;
     colors: string[];
   };
+};
+
+type MetricOption = {
+  value: string;
+  label: string;
 };
 
 // Unified color scale (Viridis-like)
@@ -110,6 +121,48 @@ export function MetricsPageContent() {
 
   const currentMetricConfig = metricsConfig.find(
     (m) => m.key === selectedMetric,
+  );
+
+  const metricOptions: MetricOption[] = useMemo(
+    () =>
+      metricsConfig.map((metric) => ({
+        value: metric.key,
+        label: metric.title,
+      })),
+    [metricsConfig],
+  );
+
+  const groupedMetricOptions: GroupBase<MetricOption>[] = useMemo(
+    () => [
+      {
+        label: "Single-Qubit Metrics",
+        options: metricOptions,
+      },
+    ],
+    [metricOptions],
+  );
+
+  const metricSelectStyles = useMemo<StylesConfig<MetricOption, false>>(
+    () => ({
+      control: (provided) => ({
+        ...provided,
+        minHeight: 36,
+        height: 36,
+      }),
+      valueContainer: (provided) => ({
+        ...provided,
+        padding: "2px 8px",
+      }),
+      indicatorsContainer: (provided) => ({
+        ...provided,
+        height: 36,
+      }),
+      menu: (provided) => ({
+        ...provided,
+        zIndex: 20,
+      }),
+    }),
+    [],
   );
 
   // Process metric data
@@ -207,22 +260,24 @@ export function MetricsPageContent() {
               <label className="text-xs text-base-content/60 font-medium">
                 Metric
               </label>
-              <select
-                className="select select-bordered select-sm w-full sm:w-64"
-                value={selectedMetric}
-                onChange={(e) => setSelectedMetric(e.target.value)}
-              >
-                <option value="" disabled>
-                  Select a metric
-                </option>
-                <optgroup label="Single-Qubit Metrics">
-                  {metricsConfig.map((metric) => (
-                    <option key={metric.key} value={metric.key}>
-                      {metric.title}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
+              <Select<MetricOption, false, GroupBase<MetricOption>>
+                className="w-full sm:w-64 text-base-content"
+                classNamePrefix="react-select"
+                options={groupedMetricOptions}
+                value={
+                  metricOptions.find(
+                    (option) => option.value === selectedMetric,
+                  ) ?? null
+                }
+                onChange={(option: SingleValue<MetricOption>) => {
+                  if (option) {
+                    setSelectedMetric(option.value);
+                  }
+                }}
+                placeholder="Select a metric"
+                isSearchable={false}
+                styles={metricSelectStyles}
+              />
             </div>
           </div>
         </div>

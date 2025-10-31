@@ -279,7 +279,7 @@ export function TaskResultGrid({
                     onClick={() => {
                       if (figurePath) setSelectedTaskInfo({ qid, task });
                     }}
-                    className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow relative w-full ${
+                    className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 relative w-full ${
                       task.over_threshold
                         ? "border-2 border-primary animate-pulse-light"
                         : ""
