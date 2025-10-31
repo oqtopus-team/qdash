@@ -44,7 +44,7 @@ class CheckRamsey(QubexTask):
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "ramsey_frequency": OutputParameterModel(unit="MHz", description="Ramsey oscillation frequency"),
-        "bare_frequency": OutputParameterModel(unit="GHz", description="Qubit bare frequency"),
+        "qubit_frequency": OutputParameterModel(unit="GHz", description="Qubit bare frequency"),
         "t2_star": OutputParameterModel(unit="μs", description="T2* time"),
     }
 
@@ -214,7 +214,7 @@ class CheckRamsey(QubexTask):
 
         self.output_parameters["ramsey_frequency"].value = selected_fit["f"] * 1000  # convert to MHz
         self.output_parameters["ramsey_frequency"].error = selected_fit["f_err"] * 1000
-        self.output_parameters["bare_frequency"].value = selected_result.bare_freq
+        self.output_parameters["qubit_frequency"].value = selected_result.bare_freq
         self.output_parameters["t2_star"].value = selected_result.t2 * 0.001  # convert to μs
         self.output_parameters["t2_star"].error = selected_fit["tau_err"] * 0.001  # convert to μs
         output_parameters = self.attach_execution_id(execution_id)

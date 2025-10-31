@@ -99,7 +99,7 @@ def _process_qubit_data(qubit_data: dict) -> QubitProperties:
         return qubit_props
     for key, value in qubit_data.items():
         v = value.get("value")
-        if key == "bare_frequency":
+        if key == "qubit_frequency":
             qubit_props.qubit_frequency = v
         elif key == "t1":
             qubit_props.t1 = v * 1e3 if v is not None else None  # Convert to ns

@@ -44,7 +44,7 @@ class CheckQubitFrequency(QubexTask):
         ),
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "bare_frequency": OutputParameterModel(unit="GHz", description="Qubit frequency"),
+        "qubit_frequency": OutputParameterModel(unit="GHz", description="Qubit frequency"),
     }
 
     def postprocess(
@@ -53,7 +53,7 @@ class CheckQubitFrequency(QubexTask):
         self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
-        self.output_parameters["bare_frequency"].value = result[label]
+        self.output_parameters["qubit_frequency"].value = result[label]
         output_parameters = self.attach_execution_id(execution_id)
         figures: list[go.Figure] = []
         return PostProcessResult(output_parameters=output_parameters, figures=figures)

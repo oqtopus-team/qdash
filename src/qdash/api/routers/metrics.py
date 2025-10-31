@@ -71,7 +71,7 @@ def extract_qubit_metrics(chip: ChipDocument, within_hours: int | None = None) -
     """
     # Field mapping from DB to display names
     field_map = {
-        "bare_frequency": "qubit_frequency",
+        "qubit_frequency": "qubit_frequency",
         "anharmonicity": "anharmonicity",
         "t1": "t1",
         "t2_echo": "t2_echo",

@@ -102,7 +102,7 @@ def filter_cr_pairs_by_mux(cr_pairs: list[str], mux_list: list[int]) -> list[str
     return filtered_pairs
 
 
-def extract_bare_frequency(qubits: dict[str, QubitModel]) -> dict[str, float]:
+def extract_qubit_frequency(qubits: dict[str, QubitModel]) -> dict[str, float]:
     """Extract bare frequency values from qubit data.
 
     Args:
@@ -116,8 +116,8 @@ def extract_bare_frequency(qubits: dict[str, QubitModel]) -> dict[str, float]:
     """
     result = {}
     for qid, qubit in qubits.items():
-        if qubit.data and "bare_frequency" in qubit.data:
-            result[qid] = qubit.data["bare_frequency"]["value"]
+        if qubit.data and "qubit_frequency" in qubit.data:
+            result[qid] = qubit.data["qubit_frequency"]["value"]
     return result
 
 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     chip_doc = ChipDocument.get_current_chip(username)
     two_qubit_list = get_two_qubit_pair_list(chip_doc)
 
-    bare_freq = extract_bare_frequency(chip_doc.qubits)
+    bare_freq = extract_qubit_frequency(chip_doc.qubits)
     print(two_qubit_list)
     print(len(two_qubit_list), "couplings found.")
     print(bare_freq)

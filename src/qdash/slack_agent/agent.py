@@ -203,7 +203,7 @@ async def get_chip_parameters(
 
     # Field mapping based on chip_report implementation
     qubit_field_map = {
-        "bare_frequency": "qubit_frequency",
+        "qubit_frequency": "qubit_frequency",
         "t1": "t1",
         "t2_echo": "t2_echo",
         "t2_star": "t2_star",
