@@ -121,7 +121,7 @@ def _execute_ramsey_with_fallback(
         ramsey_result = session.execute_task("CheckRamsey", qid, task_details=task_details)
 
         # Extract values from OutputParameterModel if needed
-        measured_freq_raw = ramsey_result.get("bare_frequency")
+        measured_freq_raw = ramsey_result.get("qubit_frequency")
         ramsey_freq_raw = ramsey_result.get("ramsey_frequency")
         t2_star_raw = ramsey_result.get("t2_star")
 

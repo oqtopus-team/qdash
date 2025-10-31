@@ -1,5 +1,7 @@
 import json
+import logging
 import uuid
+from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -19,6 +21,9 @@ from qdash.datamodel.task import (
     TaskStatusModel,
 )
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.workflow.core.calibration.params_updater import get_params_updater
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from qdash.workflow.core.calibration.execution_manager import ExecutionManager
@@ -491,6 +496,13 @@ class TaskManager(BaseModel):
     def get_coupling_calib_data(self, qid: str) -> dict:
         return dict(self.calib_data.coupling[qid])
 
+    def _clear_qubit_calib_data(self, qid: str, parameter_names: Iterable[str]) -> None:
+        store = self.calib_data.qubit.get(qid)
+        if store is None:
+            return
+        for name in parameter_names:
+            store.pop(name, None)
+
     def get_output_parameter_by_task_name(
         self, task_name: str, task_type: str = "global", qid: str = ""
     ) -> dict[str, Any]:
@@ -667,15 +679,32 @@ class TaskManager(BaseModel):
         # 4. Save task manager state
         self.save()
 
-        # 5. R2 check
-        if run_result.has_r2() and run_result.r2[qid] < task_instance.r2_threshold:
-            raise ValueError(f"{task_instance.name} R² value too low: {run_result.r2[qid]:.4f}")
+        backend_success = True
+        r2_value = None
+        if run_result.has_r2():
+            r2_value = run_result.r2.get(qid)
+            if r2_value is None:
+                backend_success = False
+            elif r2_value < task_instance.r2_threshold:
+                if postprocess_result is not None and postprocess_result.output_parameters:
+                    self._clear_qubit_calib_data(qid, postprocess_result.output_parameters.keys())
+                raise ValueError(f"{task_instance.name} R² value too low: {r2_value:.4f}")
+        else:
+            backend_success = False
+
+        if not backend_success and postprocess_result is not None and postprocess_result.output_parameters:
+            self._clear_qubit_calib_data(qid, postprocess_result.output_parameters.keys())
 
         # 6. Backend-specific save processing
-        self._save_backend_specific(task_instance, execution_manager, qid, session)
+        self._save_backend_specific(task_instance, execution_manager, qid, session, backend_success)
 
     def _save_backend_specific(
-        self, task_instance: "BaseTask", execution_manager: "ExecutionManager", qid: str, session: "BaseSession"
+        self,
+        task_instance: "BaseTask",
+        execution_manager: "ExecutionManager",
+        qid: str,
+        session: "BaseSession",
+        success: bool,
     ) -> None:
         """Backend-specific save processing.
 
@@ -685,12 +714,13 @@ class TaskManager(BaseModel):
             execution_manager: Execution manager
             qid: Qubit ID
             session: Session object
+            success: Whether the backend update should be applied
 
         """
         if task_instance.backend == "qubex":
-            self._save_qubex_specific(task_instance, execution_manager, qid, session)
+            self._save_qubex_specific(task_instance, execution_manager, qid, session, success)
         elif task_instance.backend == "fake":
-            self._save_fake_specific(task_instance, execution_manager, qid, session)
+            self._save_fake_specific(task_instance, execution_manager, qid, session, success)
 
     def _save_qubex_specific(
         self,
@@ -698,6 +728,7 @@ class TaskManager(BaseModel):
         execution_manager: "ExecutionManager",
         qid: str,
         session: "BaseSession",
+        success: bool,
     ) -> None:
         """Qubex-specific save processing.
 
@@ -711,6 +742,10 @@ class TaskManager(BaseModel):
         """
         from qdash.dbmodel.coupling import CouplingDocument
         from qdash.dbmodel.qubit import QubitDocument
+
+        if not success:
+            logger.info("Skipping backend updates for %s due to failed R² validation", task_instance.get_name())
+            return
 
         task_name = task_instance.get_name()
         task_type = task_instance.get_task_type()
@@ -736,13 +771,29 @@ class TaskManager(BaseModel):
                     chip_id=execution_manager.chip_id,
                     output_parameters=output_parameters,
                 )
-            elif task_instance.is_coupling_task():
-                CouplingDocument.update_calib_data(
+                self._update_backend_params(session, execution_manager, qid, output_parameters)
+        elif task_instance.is_coupling_task():
+            CouplingDocument.update_calib_data(
                     username=self.username,
                     qid=qid,
                     chip_id=execution_manager.chip_id,
                     output_parameters=output_parameters,
                 )
+
+    def _update_backend_params(
+        self,
+        session: "BaseSession",
+        execution_manager: "ExecutionManager",
+        qid: str,
+        output_parameters: dict[str, Any],
+    ) -> None:
+        updater = get_params_updater(session, execution_manager.chip_id)
+        if updater is None:
+            return
+        try:
+            updater.update(qid, output_parameters)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to update backend params for qid=%s: %s", qid, exc)
 
     def _save_fake_specific(
         self,
@@ -750,6 +801,7 @@ class TaskManager(BaseModel):
         execution_manager: "ExecutionManager",
         qid: str,
         session: "BaseSession",
+        success: bool,
     ) -> None:
         """Fake-specific save processing.
 

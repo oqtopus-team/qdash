@@ -75,7 +75,7 @@ def adaptive_freq_calibration(
 
             # Step 1: Measure qubit frequency
             freq_result = session.execute_task("CheckFreq", qid)
-            measured_freq = freq_result["bare_frequency"]
+            measured_freq = freq_result["qubit_frequency"]
 
             logger.info(f"Qubit {qid} - Measured frequency: {measured_freq:.6f} GHz")
 
@@ -170,7 +170,7 @@ def adaptive_multi_task_calibration(
 
             # Step 1: Measure qubit frequency
             freq_result = session.execute_task("CheckFreq", qid)
-            measured_freq = freq_result["bare_frequency"]
+            measured_freq = freq_result["qubit_frequency"]
 
             logger.info(f"Qubit {qid} - Measured frequency: {measured_freq:.6f} GHz")
 

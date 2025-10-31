@@ -68,7 +68,7 @@ def generate_device_topology_request(request: DeviceTopologyRequest, save_path: 
         msg = "No current chip found in the database."
         raise ValueError(msg)
     for qid, qubit in chip.qubits.items():
-        if qubit.get_bare_frequency() is not None:
+        if qubit.get_qubit_frequency() is not None:
             request.qubits.append(qid)
     save_path = save_path / "device_topology_request.json"
     # Save request data to file

@@ -19,7 +19,7 @@ class ChevronPattern(QubexTask):
     timeout: int = 60 * 240
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "bare_frequency": OutputParameterModel(unit="GHz", description="Qubit bare frequency"),
+        "qubit_frequency": OutputParameterModel(unit="GHz", description="Qubit bare frequency"),
     }
 
     def make_figure(self, result: Any, label: str) -> go.Figure:
@@ -67,7 +67,7 @@ class ChevronPattern(QubexTask):
         self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
-        self.output_parameters["bare_frequency"].value = result["resonant_frequencies"][label]
+        self.output_parameters["qubit_frequency"].value = result["resonant_frequencies"][label]
         output_parameters = self.attach_execution_id(execution_id)
         figures = [self.make_figure(result, label)]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)

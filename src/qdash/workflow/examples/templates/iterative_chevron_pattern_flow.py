@@ -68,11 +68,11 @@ def calibrate_group(
             logger.info("    Executing ChevronPattern...")
             result = session.execute_task("ChevronPattern", qid, task_details=task_details)
 
-            logger.info(f"    ✓ ChevronPattern completed: bare_frequency={result.get('bare_frequency')} GHz")
+            logger.info(f"    ✓ ChevronPattern completed: qubit_frequency={result.get('qubit_frequency')} GHz")
 
             results[qid] = {
                 "iteration": iteration,
-                "bare_frequency": result.get("bare_frequency"),
+                "qubit_frequency": result.get("qubit_frequency"),
                 "task_id": result.get("task_id"),
                 "status": "success",
             }
@@ -224,7 +224,7 @@ def iterative_chevron_pattern_flow(
             logger.info(f"Iteration {iteration + 1} summary:")
             for qid, result in iteration_results.items():
                 if result["status"] == "success":
-                    logger.info(f"  Q{qid}: bare_frequency = {result['bare_frequency']} GHz")
+                    logger.info(f"  Q{qid}: qubit_frequency = {result['qubit_frequency']} GHz")
                 else:
                     logger.error(f"  Q{qid}: FAILED - {result.get('error')}")
 

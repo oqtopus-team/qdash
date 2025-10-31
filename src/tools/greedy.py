@@ -85,11 +85,11 @@ def cr_pair_list(two_qubit_list: list[str], bare_freq: dict[str, float]) -> list
     ]
 
 
-def extract_bare_frequency(qubits: dict[str, QubitModel]) -> dict[str, float]:
+def extract_qubit_frequency(qubits: dict[str, QubitModel]) -> dict[str, float]:
     return {
-        qid: qubit.data["bare_frequency"]["value"]
+        qid: qubit.data["qubit_frequency"]["value"]
         for qid, qubit in qubits.items()
-        if qubit.data and "bare_frequency" in qubit.data
+        if qubit.data and "qubit_frequency" in qubit.data
     }
 
 
@@ -337,7 +337,7 @@ if __name__ == "__main__":
     # create schedule directory
     chip_doc = ChipDocument.get_current_chip("admin")
     two_qubit_list = get_two_qubit_pair_list(chip_doc)
-    bare_freq = extract_bare_frequency(chip_doc.qubits)
+    bare_freq = extract_qubit_frequency(chip_doc.qubits)
     cr_pairs = cr_pair_list(two_qubit_list, bare_freq)
     cr_pairs = [pair for pair in cr_pairs if not set(pair.split("-")) & EXCLUDE_QUBITS]
 

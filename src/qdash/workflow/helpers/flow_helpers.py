@@ -35,6 +35,7 @@ from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.workflow.core.calibration.execution_manager import ExecutionManager
+from qdash.workflow.core.calibration.params_updater import get_params_updater
 from qdash.workflow.core.calibration.task import execute_dynamic_task_by_qid
 from qdash.workflow.core.calibration.task_manager import TaskManager
 from qdash.workflow.core.session.factory import create_session
@@ -455,6 +456,20 @@ class FlowSession:
             self.execution_manager.calib_data.qubit[qid] = {}
         self.execution_manager.calib_data.qubit[qid][param_name] = value
 
+    def _sync_backend_params_before_push(self, logger) -> None:
+        """Sync recent calibration results into backend YAML params prior to GitHub push."""
+        updater_instance = get_params_updater(self.session, self.chip_id)
+        if updater_instance is None:
+            return
+
+        for qid, params in self.execution_manager.calib_data.qubit.items():
+            if "-" in qid or not params:
+                continue
+            try:
+                updater_instance.update(qid, params)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Failed to sync params for qid={qid}: {exc}")
+
     def finish_calibration(
         self,
         update_chip_history: bool = True,
@@ -540,6 +555,7 @@ class FlowSession:
             should_push = push_to_github if push_to_github is not None else self.github_push_config.enabled
 
             if should_push:
+                self._sync_backend_params_before_push(logger)
                 if GitHubIntegration.check_credentials():
                     try:
                         push_results = self.github_integration.push_files(self.github_push_config)
