@@ -774,11 +774,11 @@ class TaskManager(BaseModel):
                 self._update_backend_params(session, execution_manager, qid, output_parameters)
         elif task_instance.is_coupling_task():
             CouplingDocument.update_calib_data(
-                    username=self.username,
-                    qid=qid,
-                    chip_id=execution_manager.chip_id,
-                    output_parameters=output_parameters,
-                )
+                username=self.username,
+                qid=qid,
+                chip_id=execution_manager.chip_id,
+                output_parameters=output_parameters,
+            )
 
     def _update_backend_params(
         self,

@@ -17,7 +17,7 @@ class ParamsUpdater(Protocol):
     def update(self, qid: str, output_parameters: dict[str, Any]) -> None: ...
 
 
-def get_params_updater(session: "BaseSession", chip_id: str | None = None) -> ParamsUpdater | None:
+def get_params_updater(session: BaseSession, chip_id: str | None = None) -> ParamsUpdater | None:
     """Resolve a backend-specific params updater for the given session."""
     qubex_updater = _resolve_qubex_updater(session, chip_id)
     if qubex_updater is not None:
@@ -25,7 +25,7 @@ def get_params_updater(session: "BaseSession", chip_id: str | None = None) -> Pa
     return None
 
 
-def _resolve_qubex_updater(session: "BaseSession", chip_id: str | None) -> ParamsUpdater | None:
+def _resolve_qubex_updater(session: BaseSession, chip_id: str | None) -> ParamsUpdater | None:
     try:
         from qdash.workflow.core.session.qubex import QubexSession
     except ImportError:

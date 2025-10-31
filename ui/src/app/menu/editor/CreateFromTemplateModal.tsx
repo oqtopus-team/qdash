@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { BsPlus } from "react-icons/bs";
+import Select, { type SingleValue } from "react-select";
 import { toast } from "react-toastify";
 
 import { ScheduleInput } from "./ScheduleInput";
@@ -25,6 +26,11 @@ const defaultFormData: CreateMenuRequest = {
   tags: [],
 };
 
+type PresetOption = {
+  value: string;
+  label: string;
+};
+
 export function CreateFromTemplateModal({
   onClose,
   onSuccess,
@@ -35,6 +41,18 @@ export function CreateFromTemplateModal({
   const createMutation = useCreateMenu();
   const { data: presetData } = useListPreset();
   const [formData, setFormData] = useState<CreateMenuRequest>(defaultFormData);
+  const [selectedPresetName, setSelectedPresetName] = useState<string>("");
+
+  const presetOptions: PresetOption[] = useMemo(() => {
+    if (!presetData?.data?.menus) return [];
+
+    return presetData.data.menus.map((menu) => ({
+      value: menu.name,
+      label: menu.description
+        ? `${menu.name} - ${menu.description}`
+        : menu.name,
+    }));
+  }, [presetData]);
 
   const handleInputChange = (
     field: keyof CreateMenuRequest,
@@ -108,16 +126,31 @@ export function CreateFromTemplateModal({
           </div>
 
           <div className="flex items-center gap-4">
-            <select
-              className="select select-bordered w-full"
-              onChange={(e) => {
-                if (e.target.value === "") {
+            <Select<PresetOption, false>
+              className="w-full text-base-content"
+              classNamePrefix="react-select"
+              options={presetOptions}
+              placeholder="Select a preset..."
+              isClearable
+              value={
+                selectedPresetName
+                  ? (presetOptions.find(
+                      (option) => option.value === selectedPresetName,
+                    ) ?? null)
+                  : null
+              }
+              onChange={(option: SingleValue<PresetOption>) => {
+                if (!option) {
+                  setSelectedPresetName("");
                   setFormData(defaultFormData);
                   return;
                 }
-                const selectedPreset = presetData?.data.menus.find(
-                  (menu) => menu.name === e.target.value,
+
+                setSelectedPresetName(option.value);
+                const selectedPreset = presetData?.data?.menus.find(
+                  (menu) => menu.name === option.value,
                 );
+
                 if (selectedPreset) {
                   // Convert schedule format if needed
                   const schedule = selectedPreset.schedule || {
@@ -131,14 +164,7 @@ export function CreateFromTemplateModal({
                   });
                 }
               }}
-            >
-              <option value="">Select a preset...</option>
-              {presetData?.data.menus.map((menu) => (
-                <option key={menu.name} value={menu.name}>
-                  {menu.name} - {menu.description}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         </div>
 

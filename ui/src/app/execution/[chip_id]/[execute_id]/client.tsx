@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
+import { BsCheckCircle, BsClock, BsXCircle } from "react-icons/bs";
 import {
   FaExternalLinkAlt,
   FaDownload,
@@ -11,18 +13,22 @@ import {
   FaThLarge,
   FaList,
 } from "react-icons/fa";
-import { BsCheckCircle, BsXCircle, BsClock } from "react-icons/bs";
-import Link from "next/link";
+import Select, { type SingleValue, type StylesConfig } from "react-select";
 
 import ExecutionDAG from "./ExecutionDAG";
 
 import type { ExecutionResponseDetail } from "@/schemas";
 
 import { LoadingSpinner } from "@/app/components/LoadingSpinner";
-import { TaskFigure } from "@/app/components/TaskFigure";
 import PlotlyRenderer from "@/app/components/PlotlyRenderer";
+import { TaskFigure } from "@/app/components/TaskFigure";
 import { useFetchExecutionByChipId } from "@/client/chip/chip";
 import { TaskGridView } from "@/shared/components/TaskGridView";
+
+type FilterOption = {
+  value: string;
+  label: string;
+};
 
 interface ExecutionDetailClientProps {
   chip_id: string;
@@ -105,6 +111,45 @@ export default function ExecutionDetailClient({
     });
     return Array.from(names).sort();
   }, [execution?.task]);
+
+  const qubitFilterOptions: FilterOption[] = useMemo(
+    () => [
+      { value: "all", label: "All Qubits" },
+      ...uniqueQubitIds.map((qid) => ({ value: qid, label: qid })),
+    ],
+    [uniqueQubitIds],
+  );
+
+  const taskFilterOptions: FilterOption[] = useMemo(
+    () => [
+      { value: "all", label: "All Tasks" },
+      ...uniqueTaskNames.map((name) => ({ value: name, label: name })),
+    ],
+    [uniqueTaskNames],
+  );
+
+  const filterSelectStyles = useMemo<StylesConfig<FilterOption, false>>(
+    () => ({
+      control: (provided) => ({
+        ...provided,
+        minHeight: 34,
+        height: 34,
+      }),
+      valueContainer: (provided) => ({
+        ...provided,
+        padding: "2px 8px",
+      }),
+      indicatorsContainer: (provided) => ({
+        ...provided,
+        height: 34,
+      }),
+      menu: (provided) => ({
+        ...provided,
+        zIndex: 20,
+      }),
+    }),
+    [],
+  );
 
   // Filter tasks based on selected filters
   const filteredTasks = useMemo(() => {
@@ -385,18 +430,22 @@ export default function ExecutionDetailClient({
                   Qubit ID
                 </span>
               </label>
-              <select
-                className="select select-bordered select-sm w-full"
-                value={filterQubitId}
-                onChange={(e) => setFilterQubitId(e.target.value)}
-              >
-                <option value="all">All Qubits</option>
-                {uniqueQubitIds.map((qid) => (
-                  <option key={qid} value={qid}>
-                    {qid}
-                  </option>
-                ))}
-              </select>
+              <Select<FilterOption, false>
+                className="text-sm"
+                classNamePrefix="react-select"
+                options={qubitFilterOptions}
+                value={
+                  qubitFilterOptions.find(
+                    (option) => option.value === filterQubitId,
+                  ) ?? null
+                }
+                onChange={(option: SingleValue<FilterOption>) => {
+                  setFilterQubitId(option?.value ?? "all");
+                }}
+                placeholder="All Qubits"
+                isSearchable
+                styles={filterSelectStyles}
+              />
             </div>
 
             <div className="form-control flex-1">
@@ -405,18 +454,22 @@ export default function ExecutionDetailClient({
                   Task Name
                 </span>
               </label>
-              <select
-                className="select select-bordered select-sm w-full"
-                value={filterTaskName}
-                onChange={(e) => setFilterTaskName(e.target.value)}
-              >
-                <option value="all">All Tasks</option>
-                {uniqueTaskNames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+              <Select<FilterOption, false>
+                className="text-sm"
+                classNamePrefix="react-select"
+                options={taskFilterOptions}
+                value={
+                  taskFilterOptions.find(
+                    (option) => option.value === filterTaskName,
+                  ) ?? null
+                }
+                onChange={(option: SingleValue<FilterOption>) => {
+                  setFilterTaskName(option?.value ?? "all");
+                }}
+                placeholder="All Tasks"
+                isSearchable
+                styles={filterSelectStyles}
+              />
             </div>
 
             {(filterQubitId !== "all" || filterTaskName !== "all") && (

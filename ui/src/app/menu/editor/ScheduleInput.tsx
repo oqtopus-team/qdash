@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import Select, { type SingleValue, type StylesConfig } from "react-select";
 
 import type { BatchNode } from "@/schemas/batchNode";
 import type { CreateMenuRequestSchedule } from "@/schemas/createMenuRequestSchedule";
@@ -8,6 +10,11 @@ import type { SerialNode } from "@/schemas/serialNode";
 type Block = {
   type: "serial" | "batch";
   tasks: string;
+};
+
+type BlockTypeOption = {
+  value: "serial" | "batch";
+  label: string;
 };
 
 const isSerialNode = (node: any): node is SerialNode =>
@@ -140,6 +147,34 @@ export function ScheduleInput({ value, onChange }: ScheduleInputProps) {
     setBlocks((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const blockTypeOptions: BlockTypeOption[] = useMemo(
+    () => [
+      { value: "serial", label: "Serial" },
+      { value: "batch", label: "Batch" },
+    ],
+    [],
+  );
+
+  const blockTypeSelectStyles = useMemo<StylesConfig<BlockTypeOption, false>>(
+    () => ({
+      container: (provided) => ({
+        ...provided,
+        width: 160,
+        minWidth: 160,
+        flex: "none",
+      }),
+      control: (provided) => ({
+        ...provided,
+        minHeight: 40,
+      }),
+      valueContainer: (provided) => ({
+        ...provided,
+        padding: "2px 8px",
+      }),
+    }),
+    [],
+  );
+
   return (
     <div className="space-y-4">
       <div className="form-control">
@@ -186,20 +221,21 @@ export function ScheduleInput({ value, onChange }: ScheduleInputProps) {
                 )}
               </label>
               <div className="flex gap-2">
-                <select
-                  className="select select-bordered"
-                  value={block.type}
-                  onChange={(e) =>
-                    handleBlockChange(
-                      index,
-                      "type",
-                      e.target.value as "serial" | "batch",
-                    )
-                  }
-                >
-                  <option value="serial">Serial</option>
-                  <option value="batch">Batch</option>
-                </select>
+                <Select<BlockTypeOption, false>
+                  className="text-base-content"
+                  classNamePrefix="react-select"
+                  options={blockTypeOptions}
+                  value={blockTypeOptions.find(
+                    (option) => option.value === block.type,
+                  )}
+                  onChange={(option: SingleValue<BlockTypeOption>) => {
+                    if (option) {
+                      handleBlockChange(index, "type", option.value);
+                    }
+                  }}
+                  isSearchable={false}
+                  styles={blockTypeSelectStyles}
+                />
                 <input
                   type="text"
                   className="input input-bordered flex-1"

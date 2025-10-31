@@ -550,7 +550,7 @@ export function ChipPageContent() {
                                               });
                                             }
                                           }}
-                                          className="card bg-base-100 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow relative w-full"
+                                          className="card bg-base-100 shadow-sm rounded-xl overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 relative w-full"
                                         >
                                           <div className="card-body p-2">
                                             <div className="text-sm font-medium mb-2">
