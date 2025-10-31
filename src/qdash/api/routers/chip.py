@@ -1151,3 +1151,80 @@ def fetch_timeseries_task_result_by_tag_and_parameter(
     """
     logger.debug(f"Fetching timeseries task result for tag {tag}, parameter {parameter}")
     return _fetch_timeseries_data(chip_id, tag, parameter, current_user, start_at=start_at, end_at=end_at)
+
+
+class TaskResultResponse(BaseModel):
+    """Response model for task result by task_id.
+
+    Attributes
+    ----------
+        task_id (str): The task ID.
+        task_name (str): The name of the task.
+        qid (str): The qubit or coupling ID.
+        status (str): The task status.
+        execution_id (str): The execution ID.
+        figure_path (list[str]): List of figure paths.
+        json_figure_path (list[str]): List of JSON figure paths.
+        input_parameters (dict): Input parameters.
+        output_parameters (dict): Output parameters.
+        start_at (str): Start time.
+        end_at (str): End time.
+        elapsed_time (str): Elapsed time.
+
+    """
+
+    task_id: str
+    task_name: str
+    qid: str
+    status: str
+    execution_id: str
+    figure_path: list[str]
+    json_figure_path: list[str]
+    input_parameters: dict
+    output_parameters: dict
+    start_at: str
+    end_at: str
+    elapsed_time: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+@router.get("/task/{task_id}", response_model=TaskResultResponse)
+def get_task_result_by_task_id(
+    task_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> TaskResultResponse:
+    """Get task result by task_id.
+
+    Args:
+    ----
+        task_id: The task ID to search for.
+        current_user: The current authenticated user.
+
+    Returns:
+    -------
+        TaskResultResponse: The task result information including figure paths.
+
+    """
+    # Find task result by task_id
+    task_result = TaskResultHistoryDocument.find_one({"task_id": task_id}).run()
+
+    if not task_result:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail=f"Task result with task_id {task_id} not found")
+
+    return TaskResultResponse(
+        task_id=task_result.task_id,
+        task_name=task_result.name,
+        qid=task_result.qid,
+        status=task_result.status,
+        execution_id=task_result.execution_id,
+        figure_path=task_result.figure_path,
+        json_figure_path=task_result.json_figure_path,
+        input_parameters=task_result.input_parameters,
+        output_parameters=task_result.output_parameters,
+        start_at=task_result.start_at,
+        end_at=task_result.end_at,
+        elapsed_time=task_result.elapsed_time,
+    )

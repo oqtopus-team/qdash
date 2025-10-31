@@ -1307,6 +1307,47 @@
         }
       }
     },
+    "/api/task/{task_id}": {
+      "get": {
+        "tags": ["chip"],
+        "summary": "Get Task Result By Task Id",
+        "description": "Get task result by task_id.\n\nArgs:\n----\n    task_id: The task ID to search for.\n    current_user: The current authenticated user.\n\nReturns:\n-------\n    TaskResultResponse: The task result information including figure paths.",
+        "operationId": "chip-get_task_result_by_task_id",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/file/raw_data": {
       "get": {
         "tags": ["file"],
@@ -2218,6 +2259,174 @@
           }
         }
       }
+    },
+    "/api/chip/{chip_id}/metrics": {
+      "get": {
+        "tags": ["metrics"],
+        "summary": "Get Chip Metrics",
+        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
+        "operationId": "metrics-get_chip_metrics",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "within_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to data within N hours (e.g., 24)",
+              "title": "Within Hours"
+            },
+            "description": "Filter to data within N hours (e.g., 24)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipMetricsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chips": {
+      "get": {
+        "tags": ["metrics"],
+        "summary": "List Chips",
+        "description": "Get list of available chips for a user.\n\nArgs:\n----\n    username: Username to filter by\n    _current_user: Current authenticated user\n\nReturns:\n-------\n    Dictionary with list of chips",
+        "operationId": "metrics-list_chips",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Username",
+              "default": "admin",
+              "title": "Username"
+            },
+            "description": "Username"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Metrics-List Chips"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chip/current": {
+      "get": {
+        "tags": ["metrics"],
+        "summary": "Get Current Chip",
+        "description": "Get current chip for a user.\n\nArgs:\n----\n    username: Username to filter by\n    _current_user: Current authenticated user\n\nReturns:\n-------\n    Dictionary with current chip_id",
+        "operationId": "metrics-get_current_chip",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Username",
+              "default": "admin",
+              "title": "Username"
+            },
+            "description": "Username"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Metrics-Get Current Chip"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2318,6 +2527,49 @@
         "title": "ChipDatesResponse",
         "description": "Response model for chip dates."
       },
+      "ChipMetricsResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "qubit_count": {
+            "type": "integer",
+            "title": "Qubit Count"
+          },
+          "within_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Within Hours"
+          },
+          "qubit_metrics": {
+            "$ref": "#/components/schemas/QubitMetrics"
+          },
+          "coupling_metrics": {
+            "$ref": "#/components/schemas/CouplingMetrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "username",
+          "qubit_count",
+          "qubit_metrics",
+          "coupling_metrics"
+        ],
+        "title": "ChipMetricsResponse",
+        "description": "Complete chip metrics response."
+      },
       "ChipResponse": {
         "properties": {
           "chip_id": {
@@ -2408,6 +2660,55 @@
         "required": ["rzx90"],
         "title": "CouplingGateDuration",
         "description": "Gate duration of the coupling."
+      },
+      "CouplingMetrics": {
+        "properties": {
+          "zx90_gate_fidelity": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zx90 Gate Fidelity"
+          },
+          "bell_state_fidelity": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bell State Fidelity"
+          },
+          "static_zz_interaction": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Static Zz Interaction"
+          }
+        },
+        "type": "object",
+        "title": "CouplingMetrics",
+        "description": "Two-qubit coupling metrics data."
       },
       "CreateMenuRequest": {
         "properties": {
@@ -3672,6 +3973,46 @@
         "title": "MenuModel",
         "description": "Menu model.\n\nAttributes\n----------\n    name (str): The name of the menu.\n    username (str): The username of the user who created\n    description (str): Detailed description of the menu.\n    cal_plan (list[list[int]]): The calibration plan.\n    notify_bool (bool): The notification boolean.\n    tasks (list[str]): The tasks.\n    tags (list[str]): The tags."
       },
+      "MetricValue": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          }
+        },
+        "type": "object",
+        "title": "MetricValue",
+        "description": "Single metric value with metadata."
+      },
       "MuxDetailResponse": {
         "properties": {
           "mux_id": {
@@ -3736,6 +4077,11 @@
           "execution_id": {
             "type": "string",
             "title": "Execution Id",
+            "default": ""
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
             "default": ""
           }
         },
@@ -3892,6 +4238,125 @@
         "required": ["t1", "t2"],
         "title": "QubitLifetime",
         "description": "Qubit lifetime of the qubit."
+      },
+      "QubitMetrics": {
+        "properties": {
+          "qubit_frequency": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qubit Frequency"
+          },
+          "anharmonicity": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anharmonicity"
+          },
+          "t1": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "T1"
+          },
+          "t2_echo": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "T2 Echo"
+          },
+          "t2_star": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "T2 Star"
+          },
+          "average_readout_fidelity": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Readout Fidelity"
+          },
+          "x90_gate_fidelity": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "X90 Gate Fidelity"
+          },
+          "x180_gate_fidelity": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "X180 Gate Fidelity"
+          }
+        },
+        "type": "object",
+        "title": "QubitMetrics",
+        "description": "Single qubit metrics data."
       },
       "SaveFlowRequest": {
         "properties": {
@@ -4655,6 +5120,83 @@
         "title": "TaskResponse",
         "description": "Response model for a task."
       },
+      "TaskResultResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "figure_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Figure Path"
+          },
+          "json_figure_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Json Figure Path"
+          },
+          "input_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input Parameters"
+          },
+          "output_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Output Parameters"
+          },
+          "start_at": {
+            "type": "string",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "type": "string",
+            "title": "Elapsed Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "task_name",
+          "qid",
+          "status",
+          "execution_id",
+          "figure_path",
+          "json_figure_path",
+          "input_parameters",
+          "output_parameters",
+          "start_at",
+          "end_at",
+          "elapsed_time"
+        ],
+        "title": "TaskResultResponse",
+        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (str): Start time.\n    end_at (str): End time.\n    elapsed_time (str): Elapsed time."
+      },
       "TimeSeriesData": {
         "properties": {
           "data": {
@@ -4804,6 +5346,12 @@
             ],
             "title": "Parameters",
             "description": "Updated parameters (optional)"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "description": "Timezone for cron schedule",
+            "default": "Asia/Tokyo"
           }
         },
         "type": "object",

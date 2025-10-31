@@ -30,6 +30,7 @@ import type {
   ListMuxResponse,
   MuxDetailResponse,
   TaskHistoryResponse,
+  TaskResultResponse,
   TimeSeriesData,
 } from "../../schemas";
 
@@ -2652,6 +2653,182 @@ export function useFetchTimeseriesTaskResultByTagAndParameter<
       params,
       options,
     );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get task result by task_id.
+
+Args:
+----
+    task_id: The task ID to search for.
+    current_user: The current authenticated user.
+
+Returns:
+-------
+    TaskResultResponse: The task result information including figure paths.
+ * @summary Get Task Result By Task Id
+ */
+export const chipGetTaskResultByTaskId = (
+  taskId: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<TaskResultResponse>(
+    { url: `/api/task/${taskId}`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getChipGetTaskResultByTaskIdQueryKey = (taskId?: string) => {
+  return [`/api/task/${taskId}`] as const;
+};
+
+export const getChipGetTaskResultByTaskIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  taskId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getChipGetTaskResultByTaskIdQueryKey(taskId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>
+  > = ({ signal }) => chipGetTaskResultByTaskId(taskId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!taskId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type ChipGetTaskResultByTaskIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>
+>;
+export type ChipGetTaskResultByTaskIdQueryError =
+  ErrorType<HTTPValidationError>;
+
+export function useChipGetTaskResultByTaskId<
+  TData = Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  taskId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+          TError,
+          Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useChipGetTaskResultByTaskId<
+  TData = Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  taskId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+          TError,
+          Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useChipGetTaskResultByTaskId<
+  TData = Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  taskId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get Task Result By Task Id
+ */
+
+export function useChipGetTaskResultByTaskId<
+  TData = Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  taskId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof chipGetTaskResultByTaskId>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getChipGetTaskResultByTaskIdQueryOptions(
+    taskId,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

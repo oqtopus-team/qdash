@@ -13,6 +13,7 @@ from qdash.api.routers import (
     flow,
     flow_schedule,
     menu,
+    metrics,
     parameter,
     settings,
     tag,
@@ -81,3 +82,4 @@ app.include_router(device_topology.router, prefix="/api", tags=["device_topology
 app.include_router(backend.router, prefix="/api", tags=["backend"])
 app.include_router(flow.router, prefix="/api", tags=["flow"])
 app.include_router(flow_schedule.router, prefix="/api", tags=["flow_schedule"])
+app.include_router(metrics.router, prefix="/api", tags=["metrics"])
