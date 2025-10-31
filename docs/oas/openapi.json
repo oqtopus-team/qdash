@@ -1307,47 +1307,6 @@
         }
       }
     },
-    "/api/task/{task_id}": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Get Task Result By Task Id",
-        "description": "Get task result by task_id.\n\nArgs:\n----\n    task_id: The task ID to search for.\n    current_user: The current authenticated user.\n\nReturns:\n-------\n    TaskResultResponse: The task result information including figure paths.",
-        "operationId": "chip-get_task_result_by_task_id",
-        "parameters": [
-          {
-            "name": "task_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Task Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskResultResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/file/raw_data": {
       "get": {
         "tags": ["file"],
@@ -1589,6 +1548,47 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ListTaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/task/{task_id}": {
+      "get": {
+        "tags": ["task"],
+        "summary": "Get task result by task ID",
+        "description": "Get task result by task_id.\n\nArgs:\n----\n    task_id: The task ID to search for.\n    current_user: The current authenticated user.\n\nReturns:\n-------\n    TaskResultResponse: The task result information including figure paths.",
+        "operationId": "get_task_result_by_task_id",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResultResponse"
                 }
               }
             }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { Task } from "@/schemas";
+import { useGetTaskResultByTaskId } from "@/client/task/task";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
 
@@ -15,7 +16,7 @@ const PlotlyRenderer = dynamic(
 
 interface TaskDetailModalProps {
   isOpen: boolean;
-  task: Task | null;
+  task?: Task | null;
   qid: string;
   onClose: () => void;
   chipId?: string;
@@ -34,7 +35,7 @@ interface TaskDetailModalProps {
 
 export function TaskDetailModal({
   isOpen,
-  task,
+  task: taskProp,
   qid,
   onClose,
   chipId,
@@ -53,7 +54,69 @@ export function TaskDetailModal({
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [subIndex, setSubIndex] = useState(initialSubIndex);
 
-  if (!isOpen || !task) return null;
+  // Use generated API client hook when taskId is provided
+  const {
+    data: fetchedResponse,
+    isLoading: loading,
+    error: fetchError,
+  } = useGetTaskResultByTaskId(taskId!, {
+    query: {
+      enabled: isOpen && !!taskId && !taskProp,
+    },
+  });
+
+  // Extract data from AxiosResponse and convert to Task format
+  const fetchedTaskData = fetchedResponse?.data;
+  const fetchedTask: Task | null = fetchedTaskData
+    ? ({
+        task_id: fetchedTaskData.task_id,
+        name: fetchedTaskData.task_name,
+        qid: fetchedTaskData.qid,
+        status: fetchedTaskData.status,
+        figure_path: fetchedTaskData.figure_path,
+        json_figure_path: fetchedTaskData.json_figure_path,
+        input_parameters: fetchedTaskData.input_parameters,
+        output_parameters: fetchedTaskData.output_parameters,
+        start_at: fetchedTaskData.start_at,
+        end_at: fetchedTaskData.end_at,
+        elapsed_time: fetchedTaskData.elapsed_time,
+      } as Task)
+    : null;
+
+  const task = taskProp || fetchedTask;
+  const error = fetchError?.message || null;
+
+  if (!isOpen) return null;
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div className="bg-base-100 rounded-xl p-8">
+          <span className="loading loading-spinner loading-lg"></span>
+          <p className="mt-4 text-center">Loading task details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+        <div className="bg-base-100 rounded-xl p-8 max-w-md">
+          <div className="alert alert-error">
+            <span>Error: {error}</span>
+          </div>
+          <button onClick={onClose} className="btn btn-primary mt-4 w-full">
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!task) return null;
 
   const showDateNavigation =
     selectedDate && onNavigatePrevious && onNavigateNext && formatDate;

@@ -422,7 +422,6 @@ export function QubitMetricsGrid({
                       <div className="relative h-96 w-full">
                         <TaskFigure
                           taskId={selectedQubitInfo.metric.task_id}
-                          chipId={chipId}
                           qid={selectedQubitInfo.qid}
                           className="w-full h-full object-contain"
                         />

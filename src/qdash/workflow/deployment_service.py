@@ -4,6 +4,7 @@ This service runs in the Workflow container and provides a single endpoint
 to register user flows as Prefect deployments.
 """
 
+import os
 from logging import getLogger
 from pathlib import Path
 
@@ -17,6 +18,10 @@ logger = getLogger("uvicorn.app")
 
 # Work pool name for user flows
 WORK_POOL_NAME = "user-flows-pool"
+
+# Log Prefect API URL on startup
+PREFECT_API_URL = os.getenv("PREFECT_API_URL", "not set")
+logger.info(f"Deployment Service starting with PREFECT_API_URL: {PREFECT_API_URL}")
 
 
 class RegisterDeploymentRequest(BaseModel):
@@ -91,13 +96,15 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
         # Delete old deployment if it exists
         if request.old_deployment_id:
             try:
+                logger.info(f"Attempting to delete old deployment: {request.old_deployment_id}")
                 async with get_client() as client:
                     await client.delete_deployment(request.old_deployment_id)
                     logger.info(f"Deleted old deployment: {request.old_deployment_id}")
             except Exception as e:
-                logger.warning(f"Failed to delete old deployment: {e}")
+                logger.warning(f"Failed to delete old deployment {request.old_deployment_id}: {type(e).__name__}: {e}")
 
         # Build deployment using the flow object with work pool
+        logger.info(f"Building deployment with work pool: {WORK_POOL_NAME}")
         deployment = await Deployment.build_from_flow(
             flow=flow_obj,
             name=deployment_name,
@@ -107,9 +114,10 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
         )
 
         # Apply to Prefect Server
+        logger.info(f"Applying deployment to Prefect Server at {PREFECT_API_URL}")
         deployment_id = await deployment.apply()
 
-        logger.info(f"Deployment created: {deployment_id}")
+        logger.info(f"Deployment created successfully: {deployment_id}")
 
         return RegisterDeploymentResponse(
             deployment_id=str(deployment_id),
@@ -123,7 +131,7 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
         logger.error(f"Flow function not found: {e}")
         raise HTTPException(status_code=400, detail=f"Flow function '{request.flow_function_name}' not found")
     except Exception as e:
-        logger.error(f"Failed to register deployment: {e}")
+        logger.error(f"Failed to register deployment: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

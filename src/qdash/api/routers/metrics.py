@@ -8,7 +8,6 @@ from typing import Annotated, Any
 import pendulum
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-
 from qdash.api.lib.auth import get_optional_current_user
 from qdash.api.schemas.auth import User
 from qdash.dbmodel.chip import ChipDocument

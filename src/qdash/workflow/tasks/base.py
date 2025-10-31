@@ -236,3 +236,9 @@ class BaseTask(ABC):
         for value in self.output_parameters.values():
             value.execution_id = execution_id
         return self.output_parameters
+
+    def attach_task_id(self, task_id: str) -> dict[str, OutputParameterModel]:
+        """Attach the task id to the output parameters."""
+        for value in self.output_parameters.values():
+            value.task_id = task_id
+        return self.output_parameters

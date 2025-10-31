@@ -106,11 +106,11 @@ services:
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/config.py:/app/qdash/config.py
     working_dir: /app/qdash/workflow
-    command: uvicorn deployment_service:app --host 0.0.0.0 --port ${DEPLOYMENT_SERVICE_PORT:-8001}
+    command: uvicorn deployment_service:app --host 0.0.0.0 --port 8001
     ports:
-      - "${DEPLOYMENT_SERVICE_PORT:-8001}:${DEPLOYMENT_SERVICE_PORT:-8001}"
+      - "${DEPLOYMENT_SERVICE_PORT:-8001}:8001"
     environment:
-      - PREFECT_API_URL=http://prefect-server:${PREFECT_PORT:-4200}/api
+      - PREFECT_API_URL=http://prefect-server:4200/api
       - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
     networks:
       - custom_net
@@ -175,8 +175,8 @@ services:
       - PYTHONPATH=/app:/app/qdash:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
       - CALIB_DATA_PATH=/app/calib_data
       - QPU_DATA_PATH=/app/qpu_data
-      - PREFECT_API_URL=http://prefect-server:${PREFECT_PORT:-4200}/api
-      - DEPLOYMENT_SERVICE_URL=http://deployment-service:${DEPLOYMENT_SERVICE_PORT:-8001}
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
     networks:
       - custom_net
   ui:
