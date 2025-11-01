@@ -3,8 +3,8 @@ from pathlib import Path
 from prefect import flow
 from prefect.logging import get_run_logger
 from qdash.config import get_settings
-from qdash.workflow.utils.slack import SlackContents, Status
-from qdash.workflow.utiltask.create_directory import (
+from qdash.workflow._internal.slack import SlackContents, Status
+from qdash.workflow.worker.tasks.filesystem import (
     create_directory_task,
 )
 from qdash.workflow.worker.flows.gateway_integration.task import (
