@@ -3,7 +3,7 @@ from typing import ClassVar
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
-from qdash.workflow.core.session.qubex import QubexSession
+from qdash.workflow.engine.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,

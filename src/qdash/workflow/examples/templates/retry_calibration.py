@@ -13,10 +13,10 @@ Useful when some qubits fail due to parameter sensitivity.
 from typing import TYPE_CHECKING
 
 from prefect import flow, get_run_logger, task
-from qdash.workflow.helpers import finish_calibration, get_session, init_calibration
+from qdash.workflow.flow import finish_calibration, get_session, init_calibration
 
 if TYPE_CHECKING:
-    from qdash.workflow.helpers.session import FlowSession
+    from qdash.workflow.flow.session import FlowSession
 
 
 def _apply_frequency_offset_strategy(

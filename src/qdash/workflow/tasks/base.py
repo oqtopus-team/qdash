@@ -4,7 +4,7 @@ from typing import Any, ClassVar, Literal
 import plotly.graph_objs as go
 from pydantic import BaseModel
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.session.base import BaseSession
+from qdash.workflow.engine.session.base import BaseSession
 
 
 class PreProcessResult(BaseModel):

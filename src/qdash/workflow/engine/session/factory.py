@@ -1,4 +1,4 @@
-from qdash.workflow.core.session.base import BaseSession
+from qdash.workflow.engine.session.base import BaseSession
 
 
 def create_session(backend: str, config: dict) -> BaseSession:
@@ -12,7 +12,7 @@ def create_session(backend: str, config: dict) -> BaseSession:
 
 def _load_qubex_session(config: dict) -> BaseSession:
     try:
-        from qdash.workflow.core.session.qubex import QubexSession
+        from qdash.workflow.engine.session.qubex import QubexSession
 
         return QubexSession(config)
     except ImportError as e:
@@ -21,6 +21,6 @@ def _load_qubex_session(config: dict) -> BaseSession:
 
 
 def _load_fake_session(config: dict) -> BaseSession:
-    from qdash.workflow.core.session.fake import FakeSession
+    from qdash.workflow.engine.session.fake import FakeSession
 
     return FakeSession(config)

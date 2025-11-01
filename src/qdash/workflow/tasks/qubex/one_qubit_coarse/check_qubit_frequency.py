@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, ClassVar
 if TYPE_CHECKING:
     import plotly.graph_objs as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.session.qubex import QubexSession
+from qdash.workflow.engine.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,

@@ -3,7 +3,7 @@ from typing import ClassVar
 import numpy as np
 import plotly.graph_objects as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.session.qubex import QubexSession
+from qdash.workflow.engine.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,

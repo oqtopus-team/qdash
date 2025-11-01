@@ -13,7 +13,7 @@ from qdash.datamodel.execution import (
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.initialize import initialize
-from qdash.workflow.core.calibration.task_manager import TaskManager
+from qdash.workflow.engine.calibration.task_manager import TaskManager
 
 initialize()
 

@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.session.qubex import QubexSession
+from qdash.workflow.engine.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     PreProcessResult,
