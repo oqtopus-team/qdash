@@ -8,7 +8,6 @@ from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.flow import FlowDocument
-from qdash.dbmodel.menu import MenuDocument
 from qdash.dbmodel.parameter import ParameterDocument
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
@@ -29,7 +28,6 @@ def document_models() -> list[str]:
         TaskDocument,
         CouplingDocument,
         UserDocument,
-        MenuDocument,
         ExecutionCounterDocument,
         ExecutionLockDocument,
         TagDocument,

@@ -29,7 +29,6 @@ from typing import Any
 
 import pendulum
 from prefect import get_run_logger
-from qdash.datamodel.menu import BatchNode, ParallelNode, ScheduleNode, SerialNode
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
@@ -771,97 +770,4 @@ def finish_calibration(
     )
 
 
-def execute_schedule(
-    tasks: list[str],
-    schedule: ScheduleNode,
-    task_details: dict[str, Any] | None = None,
-) -> dict[str, dict[str, Any]]:
-    """Execute calibration tasks according to a schedule definition.
 
-    This function provides workflow orchestration similar to dispatch_cal_flow,
-    but within Python Flow Editor. It supports SerialNode, ParallelNode (as sequential),
-    and BatchNode schedules.
-
-    Args:
-        tasks: List of task names to execute
-        schedule: Schedule definition (SerialNode, ParallelNode, or BatchNode)
-        task_details: Optional task-specific configuration
-
-    Returns:
-        Dictionary mapping qubit IDs to their output parameters
-
-    Note:
-        ParallelNode is executed sequentially in Python Flow Editor.
-        For true parallel execution via deployments, use dispatch_cal_flow.
-
-    Example:
-        ```python
-        from qdash.datamodel.menu import SerialNode, ParallelNode
-
-        # Serial execution of qubits
-        schedule = SerialNode(serial=["0", "1", "2"])
-        results = execute_schedule(
-            tasks=["CheckFreq", "CheckRabi"],
-            schedule=schedule
-        )
-
-        # Parallel schedule (executed sequentially in Python Flow)
-        schedule = ParallelNode(parallel=["0", "1", "2"])
-        results = execute_schedule(
-            tasks=["CheckFreq", "CheckRabi"],
-            schedule=schedule
-        )
-
-        # Nested schedule
-        schedule = SerialNode(serial=[
-            ParallelNode(parallel=["0", "1"]),
-            SerialNode(serial=["2", "3"])
-        ])
-        results = execute_schedule(tasks=["CheckFreq"], schedule=schedule)
-        ```
-
-    """
-    session = get_session()
-    logger = get_run_logger()
-    results: dict[str, dict[str, Any]] = {}
-
-    if task_details is None:
-        task_details = {}
-
-    def _execute_qubits(qids: list[str]) -> None:
-        """Execute all tasks for given qubits."""
-        for qid in qids:
-            if qid not in results:
-                results[qid] = {}
-            for task_name in tasks:
-                task_result = session.execute_task(task_name, qid, task_details)
-                results[qid].update(task_result)
-
-    def _process_schedule(node: ScheduleNode | str) -> None:
-        """Recursively process schedule nodes."""
-        if isinstance(node, str):
-            # Leaf node: single qubit ID
-            _execute_qubits([node])
-        elif isinstance(node, SerialNode):
-            # Execute each sub-node sequentially
-            logger.info(f"Executing SerialNode with {len(node.serial)} items")
-            for sub_node in node.serial:
-                _process_schedule(sub_node)
-        elif isinstance(node, ParallelNode):
-            # Note: In Python Flow Editor, this is executed sequentially
-            # For true parallel execution, use dispatch_cal_flow
-            logger.info(
-                f"Executing ParallelNode with {len(node.parallel)} items "
-                "(sequentially - use dispatch_cal_flow for true parallelism)"
-            )
-            for sub_node in node.parallel:
-                _process_schedule(sub_node)
-        elif isinstance(node, BatchNode):
-            # Execute all qubits in batch
-            logger.info(f"Executing BatchNode with qubits: {node.batch}")
-            _execute_qubits(node.batch)
-
-    # Start processing from root schedule
-    _process_schedule(schedule)
-
-    return results

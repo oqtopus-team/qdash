@@ -4,14 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { BsListTask, BsMenuButton, BsGrid } from "react-icons/bs";
-import { BsCpu } from "react-icons/bs";
+import { BsListTask, BsGrid, BsCpu } from "react-icons/bs";
+import { FaCode } from "react-icons/fa";
 import { FaBolt } from "react-icons/fa6";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { GoWorkflow } from "react-icons/go";
 import { IoMdSettings } from "react-icons/io";
 import { IoAnalytics } from "react-icons/io5";
-import { FaCode } from "react-icons/fa";
 
 import { useSidebar } from "@/app/contexts/SidebarContext";
 
@@ -97,20 +96,6 @@ function Sidebar() {
         </li>
         <li>
           <Link
-            href="/menu/editor"
-            className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
-              isActive("/menu/editor")
-                ? "bg-neutral text-neutral-content"
-                : "text-base-content"
-            }`}
-            title="Menu Editor"
-          >
-            <BsMenuButton />
-            {isOpen && <span className="ml-2">Menu Editor</span>}
-          </Link>
-        </li>
-        <li>
-          <Link
             href="/execution"
             className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
               isActive("/execution")
@@ -151,21 +136,7 @@ function Sidebar() {
             {isOpen && <span className="ml-2">Tasks</span>}
           </Link>
         </li>
-        {/* TODO: Implement Fridge page
-          <li>
-            <Link
-              href="/fridge"
-              className={`py-4 px-4 mx-10 my-2 text-base font-bold flex items-center ${
-                isActive("/fridge")
-                  ? "bg-neutral text-neutral-content"
-                  : "text-base-content"
-              }`}
-            >
-              <LuThermometerSnowflake />
-              <span className="ml-2">Fridge</span>
-            </Link>
-          </li>
-          */}
+
         <li>
           <Link
             href="/setting"

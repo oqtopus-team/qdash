@@ -6,8 +6,8 @@ from prefect import flow, get_run_logger, task
 from prefect.deployments import run_deployment
 from prefect.task_runners import SequentialTaskRunner
 from qdash.config import get_settings
-from qdash.datamodel.menu import BatchNode, ParallelNode, ScheduleNode, SerialNode
-from qdash.datamodel.menu import MenuModel as Menu
+from qdash.datamodel.schedule import BatchNode, ParallelNode, ScheduleNode, SerialNode
+from qdash.datamodel.schedule import MenuModel as Menu
 from qdash.datamodel.task import (
     CouplingTaskModel,
     GlobalTaskModel,
