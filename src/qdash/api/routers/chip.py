@@ -4,12 +4,13 @@ import logging
 from typing import Annotated, Any
 
 import pendulum
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from pymongo import ASCENDING, DESCENDING
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
 from qdash.api.schemas.auth import User
 from qdash.api.services.response_processor import response_processor
+from qdash.api.services.chip_initializer import ChipInitializer
 from qdash.datamodel.task import OutputParameterModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
@@ -111,6 +112,20 @@ class ChipResponse(BaseModel):
     installed_at: str = ""
 
 
+class CreateChipRequest(BaseModel):
+    """Request model for creating a new chip.
+
+    Attributes
+    ----------
+        chip_id (str): The ID of the chip to create.
+        size (int): The size of the chip (64, 144, 256, or 1024).
+
+    """
+
+    chip_id: str
+    size: int = 64
+
+
 @router.get("/chip", response_model=list[ChipResponse], summary="Fetch all chips", operation_id="listChips")
 def list_chips(
     current_user: Annotated[User, Depends(get_optional_current_user)],
@@ -140,6 +155,57 @@ def list_chips(
         )
         for chip in chips
     ]
+
+
+@router.post("/chip", response_model=ChipResponse, summary="Create a new chip", operation_id="createChip")
+def create_chip(
+    request: CreateChipRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> ChipResponse:
+    """Create a new chip.
+
+    Parameters
+    ----------
+    request : CreateChipRequest
+        Chip creation request containing chip_id and size
+    current_user : User
+        Current authenticated user
+
+    Returns
+    -------
+    ChipResponse
+        Created chip information
+
+    Raises
+    ------
+    HTTPException
+        If chip_id already exists or size is invalid
+
+    """
+    logger.debug(f"Creating chip {request.chip_id} for user: {current_user.username}")
+
+    try:
+        # Use ChipInitializer service to create chip with full initialization
+        chip = ChipInitializer.create_chip(
+            username=current_user.username,
+            chip_id=request.chip_id,
+            size=request.size,
+        )
+
+        return ChipResponse(
+            chip_id=chip.chip_id,
+            size=chip.size,
+            qubits=chip.qubits,
+            couplings=chip.couplings,
+            installed_at=chip.installed_at,
+        )
+    except ValueError as e:
+        # Handle validation errors (duplicate chip, invalid size, etc.)
+        logger.warning(f"Validation error creating chip {request.chip_id}: {e}")
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Error creating chip {request.chip_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create chip: {str(e)}") from e
 
 
 class ChipDatesResponse(BaseModel):
@@ -175,7 +241,9 @@ def fetch_chip_dates(
     logger.debug(f"Fetching dates for chip {chip_id}, user: {current_user.username}")
     counter_list = ExecutionCounterDocument.find({"chip_id": chip_id, "username": current_user.username}).run()
     if not counter_list:
-        raise ValueError(f"No execution counter found for chip {chip_id} and user {current_user.username}")
+        # Return empty list for newly created chips with no execution history
+        logger.debug(f"No execution counter found for chip {chip_id}, returning empty dates list")
+        return ChipDatesResponse(data=[])
     # Extract unique dates from the counter
     dates = [counter.date for counter in counter_list]
     # Return dates in a format matching the API schema

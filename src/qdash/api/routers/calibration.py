@@ -21,9 +21,6 @@ router = APIRouter()
 logger = getLogger("uvicorn.app")
 
 
-
-
-
 def generate_execution_id(username: str, chip_id: str) -> str:
     """Generate a unique execution ID based on the current date and an execution index. e.g. 20220101-001.
 
@@ -78,23 +75,5 @@ def get_calibration_note(
     )
 
 
-
-
-
-
-
-
-
-
-
 ja = dateutil.tz.gettz("Asia/Tokyo")
 local_date = datetime.now(tz=ja)
-
-
-
-
-
-
-
-
-
