@@ -6,8 +6,8 @@ from qdash.config import get_settings
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.engine.session.factory import create_session
-from qdash.workflow.utils.slack import SlackContents, Status
-from qdash.workflow.utiltask.create_directory import (
+from qdash.workflow._internal.slack import SlackContents, Status
+from qdash.workflow.worker.tasks.filesystem import (
     create_directory_task,
 )
 from qdash.workflow.worker.flows.chip_report.generate_report import generate_chip_info_report
