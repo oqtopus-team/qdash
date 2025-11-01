@@ -7,7 +7,7 @@ from qdash.db.init.coupling import bi_direction, generate_coupling
 from qdash.db.init.qubit import generate_dummy_data  # qubit_lattice
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
-from qdash.dbmodel.menu import MenuDocument
+
 from qdash.workflow.tasks.base import BaseTask
 
 logging.basicConfig(level=logging.INFO)
@@ -82,32 +82,7 @@ def add_new_chip(
         raise
 
 
-def rename_all_menu_with_chip_id(
-    username: str = "admin",
-    chip_id: str = "64Q",
-) -> None:
-    """Rename menu with chip ID.
 
-    This function renames the menu with the given chip ID.
-
-    Args:
-    ----
-        username (str): The username for the initialization.
-        chip_id (str): The chip ID for the initialization.
-
-    """
-    try:
-        # Initialize menu data
-        initialize()
-        menus = MenuDocument.find({"username": username}).run()
-        for menu in menus:
-            menu.chip_id = chip_id
-            menu.save()
-            logging.info(f"Updated menu: {menu.username} - {menu.name} with chip ID: {chip_id}")
-        logging.info(f"Menu renamed with chip ID: {chip_id} for user: {username}")
-    except Exception as e:
-        logging.error(f"Error renaming menu with chip ID: {e}")
-        raise
 
 
 def convert_output_parameters(username: str, outputs: dict[str, any]) -> dict[str, dict]:  # type: ignore # noqa: PGH003

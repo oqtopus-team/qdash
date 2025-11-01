@@ -1,7 +1,7 @@
 from typing import ClassVar, TypeVar
 
 from pydantic import BaseModel
-from qdash.datamodel.menu import MenuModel
+from qdash.datamodel.schedule import MenuModel
 
 T = TypeVar("T")
 

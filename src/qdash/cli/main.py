@@ -3,7 +3,6 @@
 import typer
 from qdash.db.init import (
     init_chip_document,
-    init_menu,
     init_task_document,
 )
 from qdash.dbmodel.initialize import initialize
@@ -114,9 +113,6 @@ def init_all_data(
 
         init_chip_document(username=username, chip_id=chip_id, size=chip_size)
         typer.echo("✅ Chip data initialized")
-
-        init_menu(username=username, chip_id=chip_id, backend=backend)
-        typer.echo("✅ Menu data initialized")
 
         init_task_document(username=username, backend=backend)
         typer.echo("✅ Task data initialized")

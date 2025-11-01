@@ -2,7 +2,6 @@
 
 from qdash.workflow.helpers.flow_helpers import (
     FlowSession,
-    execute_schedule,
     finish_calibration,
     generate_execution_id,
     get_session,
@@ -29,6 +28,4 @@ __all__ = [
     # === Parallel Execution (Recommended) ===
     "calibrate_parallel",  # True parallel execution across qubits using @task + submit
     "parallel_map",  # Generic parallel map for custom logic with Prefect UI visibility
-    # === Schedule-based Execution ===
-    "execute_schedule",  # Custom orchestration using SerialNode/ParallelNode/BatchNode
 ]

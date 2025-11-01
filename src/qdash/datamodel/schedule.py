@@ -1,3 +1,5 @@
+"""Schedule and menu models for calibration workflows."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -32,14 +34,14 @@ BatchNode.model_rebuild()
 
 
 class MenuModel(BaseModel):
-    """Menu model.
+    """Menu model for calibration workflows.
 
     Attributes
     ----------
         name (str): The name of the menu.
         username (str): The username of the user who created
         description (str): Detailed description of the menu.
-        cal_plan (list[list[int]]): The calibration plan.
+        schedule (ScheduleNode): The schedule node.
         notify_bool (bool): The notification boolean.
         tasks (list[str]): The tasks.
         tags (list[str]): The tags.
