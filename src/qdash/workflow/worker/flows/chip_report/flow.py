@@ -5,7 +5,7 @@ from prefect import flow, get_run_logger
 from qdash.config import get_settings
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
-from qdash.workflow.core.session.factory import create_session
+from qdash.workflow.engine.session.factory import create_session
 from qdash.workflow.utils.slack import SlackContents, Status
 from qdash.workflow.utiltask.create_directory import (
     create_directory_task,

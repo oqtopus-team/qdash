@@ -9,7 +9,7 @@ from qdash.workflow.tasks.base import (
 )
 
 if TYPE_CHECKING:
-    from qdash.workflow.core.session.qubex import QubexSession
+    from qdash.workflow.engine.session.qubex import QubexSession
 
 
 class QubexTask(BaseTask):

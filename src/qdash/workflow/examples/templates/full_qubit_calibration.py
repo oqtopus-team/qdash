@@ -10,7 +10,7 @@ Supports parallel execution across multiple qubit groups.
 """
 
 from prefect import flow, get_run_logger, task
-from qdash.workflow.helpers import finish_calibration, get_session, init_calibration
+from qdash.workflow.flow import finish_calibration, get_session, init_calibration
 
 
 @task
@@ -116,7 +116,7 @@ def full_qubit_calibration(
         init_calibration(username, chip_id, all_qids, flow_name=flow_name)
 
         # Optional: GitHub integration (uncomment to enable)
-        # from qdash.workflow.helpers import GitHubPushConfig, ConfigFileType
+        # from qdash.workflow.flow import GitHubPushConfig, ConfigFileType
         # init_calibration(
         #     username, chip_id, all_qids, flow_name=flow_name,
         #     enable_github_pull=True,

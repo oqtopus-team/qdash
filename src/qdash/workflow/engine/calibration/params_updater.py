@@ -8,7 +8,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
 if TYPE_CHECKING:
-    from qdash.workflow.core.session.base import BaseSession
+    from qdash.workflow.engine.session.base import BaseSession
 
 
 class ParamsUpdater(Protocol):
@@ -27,7 +27,7 @@ def get_params_updater(session: BaseSession, chip_id: str | None = None) -> Para
 
 def _resolve_qubex_updater(session: BaseSession, chip_id: str | None) -> ParamsUpdater | None:
     try:
-        from qdash.workflow.core.session.qubex import QubexSession
+        from qdash.workflow.engine.session.qubex import QubexSession
     except ImportError:
         return None
 

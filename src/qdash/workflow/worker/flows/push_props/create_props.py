@@ -1,6 +1,6 @@
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
-from qdash.workflow.core.session.qubex import QubexSession
+from qdash.workflow.engine.session.qubex import QubexSession
 from qdash.workflow.worker.flows.push_props.formatter import format_number
 from qdash.workflow.worker.flows.push_props.io import ChipPropertyYAMLHandler
 from qdash.workflow.worker.flows.push_props.models import (
@@ -122,7 +122,7 @@ def create_chip_properties(username: str, source_path: str, target_path: str, ch
     """Create and write chip properties to a YAML file."""
     initialize()
     chip = ChipDocument.get_current_chip(username=username)
-    from qdash.workflow.core.session.factory import create_session
+    from qdash.workflow.engine.session.factory import create_session
 
     session = create_session(
         backend="qubex",

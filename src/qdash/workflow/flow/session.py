@@ -9,7 +9,7 @@ Example:
 
     ```python
     from prefect import flow
-    from qdash.workflow.helpers import init_calibration, calibrate_qubits_parallel, finish_calibration
+    from qdash.workflow.flow import init_calibration, calibrate_qubits_parallel, finish_calibration
 
     @flow
     def simple_calibration(username, execution_id, chip_id, qids):
@@ -33,12 +33,12 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
-from qdash.workflow.core.calibration.execution_manager import ExecutionManager
-from qdash.workflow.core.calibration.params_updater import get_params_updater
-from qdash.workflow.core.calibration.task import execute_dynamic_task_by_qid
-from qdash.workflow.core.calibration.task_manager import TaskManager
-from qdash.workflow.core.session.factory import create_session
-from qdash.workflow.helpers.github_integration import GitHubIntegration, GitHubPushConfig
+from qdash.workflow.engine.calibration.execution_manager import ExecutionManager
+from qdash.workflow.engine.calibration.params_updater import get_params_updater
+from qdash.workflow.engine.calibration.task import execute_dynamic_task_by_qid
+from qdash.workflow.engine.calibration.task_manager import TaskManager
+from qdash.workflow.engine.session.factory import create_session
+from qdash.workflow.flow.github import GitHubIntegration, GitHubPushConfig
 from qdash.workflow.tasks.active_protocols import generate_task_instances
 
 
@@ -662,7 +662,7 @@ def init_calibration(
 
         ```python
         # With GitHub integration
-        from qdash.workflow.helpers import GitHubPushConfig, ConfigFileType
+        from qdash.workflow.flow import GitHubPushConfig, ConfigFileType
 
         @flow
         def calibration_with_github(username, chip_id, qids):

@@ -13,7 +13,7 @@ For single-qubit calibration, see simple_flow.py or custom_parallel_flow.py.
 """
 
 from prefect import flow, get_run_logger, task
-from qdash.workflow.helpers import finish_calibration, get_session, init_calibration
+from qdash.workflow.flow import finish_calibration, get_session, init_calibration
 
 
 @task

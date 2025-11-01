@@ -1,6 +1,6 @@
 from typing import Any
 
-from qdash.workflow.core.session.base import BaseSession
+from qdash.workflow.engine.session.base import BaseSession
 
 
 class FakeSession(BaseSession):

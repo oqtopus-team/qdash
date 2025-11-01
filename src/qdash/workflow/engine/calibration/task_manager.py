@@ -21,13 +21,13 @@ from qdash.datamodel.task import (
     TaskStatusModel,
 )
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-from qdash.workflow.core.calibration.params_updater import get_params_updater
+from qdash.workflow.engine.calibration.params_updater import get_params_updater
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from qdash.workflow.core.calibration.execution_manager import ExecutionManager
-    from qdash.workflow.core.session.base import BaseSession
+    from qdash.workflow.engine.calibration.execution_manager import ExecutionManager
+    from qdash.workflow.engine.session.base import BaseSession
     from qdash.workflow.tasks.base import BaseTask
 
 
