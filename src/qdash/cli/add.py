@@ -82,9 +82,6 @@ def add_new_chip(
         raise
 
 
-
-
-
 def convert_output_parameters(username: str, outputs: dict[str, any]) -> dict[str, dict]:  # type: ignore # noqa: PGH003
     """Convert the output parameters to the Parameter class."""
     converted = {}

@@ -76,9 +76,6 @@ def migrate_history_dates() -> None:
         raise
 
 
-
-
-
 def migrate_execution_counter_v1(
     username: str = "admin",
     chip_id: str = "64Q",

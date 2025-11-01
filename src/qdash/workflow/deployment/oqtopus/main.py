@@ -13,8 +13,6 @@ settings = get_settings()
 deployment_name = settings.env
 
 if __name__ == "__main__":
-
-
     chip_report_deploy = chip_report.to_deployment(
         name=f"{deployment_name}-chip-report",
         description="""This is a props update flow.

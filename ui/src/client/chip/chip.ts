@@ -5,15 +5,18 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
@@ -21,6 +24,7 @@ import type {
 import type {
   ChipDatesResponse,
   ChipResponse,
+  CreateChipRequest,
   ExecutionResponseDetail,
   ExecutionResponseSummary,
   FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
@@ -34,7 +38,7 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType } from "../../lib/custom-instance";
+import type { ErrorType, BodyType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -177,6 +181,115 @@ export function useListChips<
   return query;
 }
 
+/**
+ * Create a new chip.
+
+Parameters
+----------
+request : CreateChipRequest
+    Chip creation request containing chip_id and size
+current_user : User
+    Current authenticated user
+
+Returns
+-------
+ChipResponse
+    Created chip information
+
+Raises
+------
+HTTPException
+    If chip_id already exists or size is invalid
+ * @summary Create a new chip
+ */
+export const createChip = (
+  createChipRequest: BodyType<CreateChipRequest>,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ChipResponse>(
+    {
+      url: `/api/chip`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: createChipRequest,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getCreateChipMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createChip>>,
+    TError,
+    { data: BodyType<CreateChipRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createChip>>,
+  TError,
+  { data: BodyType<CreateChipRequest> },
+  TContext
+> => {
+  const mutationKey = ["createChip"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createChip>>,
+    { data: BodyType<CreateChipRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createChip(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateChipMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createChip>>
+>;
+export type CreateChipMutationBody = BodyType<CreateChipRequest>;
+export type CreateChipMutationError = ErrorType<HTTPValidationError>;
+
+/**
+ * @summary Create a new chip
+ */
+export const useCreateChip = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createChip>>,
+      TError,
+      { data: BodyType<CreateChipRequest> },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof createChip>>,
+  TError,
+  { data: BodyType<CreateChipRequest> },
+  TContext
+> => {
+  const mutationOptions = getCreateChipMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 /**
  * Fetch available dates for a chip from execution counter.
 

@@ -20,6 +20,7 @@ import { useChipUrlState } from "@/app/hooks/useUrlState";
 import { useListMuxes, useFetchChip, useListChips } from "@/client/chip/chip";
 import { useFetchAllTasks } from "@/client/task/task";
 import { TaskDetailModal } from "@/shared/components/TaskDetailModal";
+import { CreateChipModal } from "./CreateChipModal";
 
 interface SelectedTaskInfo {
   qid: string;
@@ -74,6 +75,7 @@ export function ChipPageContent() {
   }>({});
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
+  const [isCreateChipModalOpen, setIsCreateChipModalOpen] = useState(false);
 
   // Track previous date to distinguish modal navigation from external navigation
   const [previousDate, setPreviousDate] = useState(selectedDate);
@@ -308,7 +310,28 @@ export function ChipPageContent() {
         <div className="flex flex-col gap-6">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold">Chip Experiments</h1>
-            <div className="join rounded-lg overflow-hidden">
+            <div className="flex gap-3 items-center">
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => setIsCreateChipModalOpen(true)}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Create Chip
+              </button>
+              <div className="join rounded-lg overflow-hidden">
               <button
                 className={`join-item btn btn-sm ${
                   viewMode === "1q" ? "btn-active" : ""
@@ -336,6 +359,7 @@ export function ChipPageContent() {
                 <BsListUl className="text-lg" />
                 <span className="ml-2">MUX View</span>
               </button>
+            </div>
             </div>
           </div>
 
@@ -632,6 +656,16 @@ export function ChipPageContent() {
         formatDate={formatDate}
         taskName={selectedTaskInfo?.task?.name}
         variant="detailed"
+      />
+
+      {/* Create Chip Modal */}
+      <CreateChipModal
+        isOpen={isCreateChipModalOpen}
+        onClose={() => setIsCreateChipModalOpen(false)}
+        onSuccess={(chipId) => {
+          // Automatically select the newly created chip
+          setSelectedChip(chipId);
+        }}
       />
     </div>
   );

@@ -768,6 +768,3 @@ def finish_calibration(
         push_to_github=push_to_github,
         export_note_to_file=export_note_to_file,
     )
-
-
-
