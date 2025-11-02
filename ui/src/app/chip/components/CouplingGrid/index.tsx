@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
 
@@ -79,6 +79,7 @@ export function CouplingGrid({
     useState<SelectedTaskInfo | null>(null);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [cellSize, setCellSize] = useState(60);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -125,25 +126,6 @@ export function CouplingGrid({
       originalNavigateToNextDay();
     }
   }, [originalNavigateToNextDay, selectedTaskInfo]);
-
-  useEffect(() => {
-    const updateSize = () => {
-      const vw = window.innerWidth;
-      // Use more screen width (95% instead of 75%) and account for padding
-      // Subtract padding/margins: px-4 (2rem) on parent container
-      const availableWidth = vw * 0.95 - 32; // 32px = 2rem padding
-      const effectiveGridSize = zoomMode === "region" ? regionSize : gridSize;
-      const gap = 8; // gap between cells
-      const totalGap = gap * (effectiveGridSize - 1);
-      const calculatedSize = Math.floor(
-        (availableWidth - totalGap) / effectiveGridSize,
-      );
-      setCellSize(Math.max(calculatedSize, 30));
-    };
-    updateSize();
-    window.addEventListener("resize", updateSize);
-    return () => window.removeEventListener("resize", updateSize);
-  }, [gridSize, zoomMode, regionSize]);
 
   const {
     data: taskResponse,
@@ -222,6 +204,39 @@ export function CouplingGrid({
     };
   }, [taskResponse?.data?.result, selectedTaskInfo?.couplingId]);
 
+  // Calculate cell size based on container width
+  const updateSize = useCallback(() => {
+    // Use actual container width instead of viewport width
+    const containerWidth = containerRef.current?.offsetWidth || window.innerWidth;
+    // Subtract padding: px-4 on both sides (32px total) + some margin for safety
+    const availableWidth = containerWidth - 64; // 64px = padding + margin
+    const effectiveGridSize = zoomMode === "region" ? regionSize : gridSize;
+    const gap = 8; // gap between cells
+    const totalGap = gap * (effectiveGridSize - 1);
+    const calculatedSize = Math.floor(
+      (availableWidth - totalGap) / effectiveGridSize,
+    );
+    setCellSize(Math.max(calculatedSize, 30));
+  }, [gridSize, zoomMode, regionSize]);
+
+  useEffect(() => {
+    // Initial calculation with a small delay to ensure container is rendered
+    const timeoutId = setTimeout(updateSize, 0);
+
+    window.addEventListener("resize", updateSize);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener("resize", updateSize);
+    };
+  }, [updateSize]);
+
+  // Recalculate when data loads
+  useEffect(() => {
+    if (taskResponse?.data) {
+      updateSize();
+    }
+  }, [taskResponse?.data, updateSize]);
+
   const normalizedResultMap: Record<string, ExtendedTask[]> = {};
   if (taskResponse?.data?.result) {
     for (const [couplingId, task] of Object.entries(taskResponse.data.result)) {
@@ -284,7 +299,7 @@ export function CouplingGrid({
   };
 
   return (
-    <div className="space-y-4 px-4">
+    <div ref={containerRef} className="space-y-4 px-4">
       {/* Zoom mode toggle - only show in full view mode */}
       {zoomMode === "full" && (
         <div className="flex items-center gap-2 px-4">
@@ -322,7 +337,7 @@ export function CouplingGrid({
       )}
 
       {/* Grid Container */}
-      <div className="relative w-full overflow-x-auto flex justify-center">
+      <div className="relative w-full flex justify-center">
         <div
           className="relative"
           style={{

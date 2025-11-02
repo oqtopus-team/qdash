@@ -372,8 +372,16 @@ def retry_calibration(
     logger.info(f"Max retries: {max_retries}")
 
     try:
-        # Initialize session
-        init_calibration(username, chip_id, all_qids, flow_name=flow_name)
+        # Initialize session with GitHub integration
+        from qdash.workflow.flow import GitHubPushConfig, ConfigFileType
+        init_calibration(
+            username, chip_id, all_qids, flow_name=flow_name,
+            enable_github_pull=True,
+            github_push_config=GitHubPushConfig(
+                enabled=True,
+                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
+            )
+        )
 
         # Complete 1-qubit calibration task suite with frequency feedback
         # Split into two phases: before and after CheckRamsey

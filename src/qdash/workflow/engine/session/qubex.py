@@ -2,8 +2,8 @@ import json
 from pathlib import Path
 
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
-from qdash.workflow.engine.session.base import BaseSession
 from qdash.workflow._internal.merge_notes import merge_notes_by_timestamp
+from qdash.workflow.engine.session.base import BaseSession
 
 
 class QubexSession(BaseSession):
@@ -51,6 +51,7 @@ class QubexSession(BaseSession):
                 qubits=qubits,
                 config_dir=self._config.get("config_dir", f"/app/config/qubex/{chip_id}/config"),
                 params_dir=self._config.get("params_dir", f"/app/config/qubex/{chip_id}/params"),
+                classifier_dir=self._config.get("classifier_dir", "/app/.classifier"),
                 calib_note_path=self._config.get("note_path", "/app/calib_note.json"),
             )
             self._exp.connect()
