@@ -54,5 +54,21 @@
     "category": "coupling",
     "filename": "coupling_calibration_flow.py",
     "function_name": "my_coupling_flow"
+  },
+  {
+    "id": "sequential_stage",
+    "name": "Sequential Stage Calibration",
+    "description": "Execute same calibration tasks across multiple stages with isolated sessions (e.g., chassis-based execution with hardware constraints)",
+    "category": "advanced",
+    "filename": "sequential_stage_calibration.py",
+    "function_name": "sequential_stage_calibration"
+  },
+  {
+    "id": "two_qubit_parallel",
+    "name": "Two-Qubit Parallel Calibration",
+    "description": "Execute 2-qubit coupling calibration with parallel groups to manage qubit-sharing constraints",
+    "category": "coupling",
+    "filename": "two_qubit_parallel_calibration.py",
+    "function_name": "two_qubit_parallel_calibration"
   }
 ]

@@ -165,10 +165,13 @@ class FlowSession:
 
         # Setup calibration directory
         date_str, index = execution_id.split("-")
-        calib_data_path = f"/app/calib_data/{username}/{date_str}/{index}"
+        user_path = f"/app/calib_data/{username}"
+        classifier_dir = f"{user_path}/.classifier"
+        calib_data_path = f"{user_path}/{date_str}/{index}"
 
         # Create directory structure (matching create_directory_task behavior)
         Path(calib_data_path).mkdir(parents=True, exist_ok=True)
+        Path(classifier_dir).mkdir(exist_ok=True)
         Path(f"{calib_data_path}/task").mkdir(exist_ok=True)
         Path(f"{calib_data_path}/fig").mkdir(exist_ok=True)
         Path(f"{calib_data_path}/calib").mkdir(exist_ok=True)
@@ -212,15 +215,16 @@ class FlowSession:
         # Initialize backend session
         # Note: For qubex backend, qids must be provided for proper box selection
         # Use task_manager.id for note_path (same as setup_calibration)
-        note_path = Path(f"{calib_data_path}/calib_note/{self.task_manager.id}.json")
+        note_path = f"{calib_data_path}/calib_note/{self.task_manager.id}.json"
         self.session = create_session(
             backend=backend,
             config={
                 "task_type": "qubit",
                 "username": username,
                 "qids": qids,
-                "note_path": str(note_path),
+                "note_path": note_path,
                 "chip_id": chip_id,
+                "classifier_dir": classifier_dir,
             },
         )
 

@@ -48,9 +48,6 @@ class RandomizedBenchmarking(QubexTask):
         ),
     }
 
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
-        return PreProcessResult(input_parameters=self.input_parameters)
-
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:

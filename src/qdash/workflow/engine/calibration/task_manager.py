@@ -660,7 +660,23 @@ class TaskManager(BaseModel):
         task_name = task_instance.get_name()
         task_type = task_instance.get_task_type()
 
-        # 1. Save output parameters
+        # 1. Validate fidelity values for randomized benchmarking tasks
+        if postprocess_result.output_parameters:
+            # Check if this is a randomized benchmarking task
+            is_rb_task = "randomized" in task_name.lower() or "benchmarking" in task_name.lower()
+            
+            if is_rb_task:
+                # Check all fidelity parameters for values > 1.0 (100%)
+                for param_name, param_value in postprocess_result.output_parameters.items():
+                    if "fidelity" in param_name.lower():
+                        fidelity_value = param_value.value
+                        if fidelity_value is not None and fidelity_value > 1.0:
+                            raise ValueError(
+                                f"{task_name} failed: {param_name} = {fidelity_value:.4f} exceeds 100% "
+                                f"(physical maximum is 1.0). This indicates a fitting error."
+                            )
+        
+        # 2. Save output parameters
         if postprocess_result.output_parameters:
             # Get current task to retrieve task_id
             current_task = self.get_task(task_name=task_name, task_type=task_type, qid=qid)
@@ -668,17 +684,18 @@ class TaskManager(BaseModel):
             task_instance.attach_task_id(current_task.task_id)
             self.put_output_parameters(task_name, postprocess_result.output_parameters, task_type=task_type, qid=qid)
 
-        # 2. Save figures (using existing method)
+        # 3. Save figures (using existing method)
         if postprocess_result.figures:
             self.save_figures(postprocess_result.figures, task_name, task_type=task_type, qid=qid)
 
-        # 3. Save raw data (using existing method)
+        # 4. Save raw data (using existing method)
         if postprocess_result.raw_data:
             self.save_raw_data(postprocess_result.raw_data, task_name, task_type=task_type, qid=qid)
 
-        # 4. Save task manager state
+        # 5. Save task manager state
         self.save()
 
+        # 6. R² validation
         backend_success = True
         r2_value = None
         if run_result.has_r2():
@@ -689,13 +706,13 @@ class TaskManager(BaseModel):
                 if postprocess_result is not None and postprocess_result.output_parameters:
                     self._clear_qubit_calib_data(qid, postprocess_result.output_parameters.keys())
                 raise ValueError(f"{task_instance.name} R² value too low: {r2_value:.4f}")
-        else:
-            backend_success = False
 
-        if not backend_success and postprocess_result is not None and postprocess_result.output_parameters:
-            self._clear_qubit_calib_data(qid, postprocess_result.output_parameters.keys())
+            if not backend_success and postprocess_result is not None and postprocess_result.output_parameters:
+                self._clear_qubit_calib_data(qid, postprocess_result.output_parameters.keys())
+        # else: Tasks without R² (like ReadoutClassification) should still save to database
 
-        # 6. Backend-specific save processing
+        # 7. Backend-specific save processing
+        # Always call _save_backend_specific, but pass backend_success to indicate R² validation status
         self._save_backend_specific(task_instance, execution_manager, qid, session, backend_success)
 
     def _save_backend_specific(
@@ -743,12 +760,32 @@ class TaskManager(BaseModel):
         from qdash.dbmodel.coupling import CouplingDocument
         from qdash.dbmodel.qubit import QubitDocument
 
-        if not success:
-            logger.info("Skipping backend updates for %s due to failed R² validation", task_instance.get_name())
-            return
-
         task_name = task_instance.get_name()
         task_type = task_instance.get_task_type()
+
+        # Get output parameters first to check if there's data to save
+        output_parameters = self.get_output_parameter_by_task_name(task_name, task_type=task_type, qid=qid)
+
+        if not success:
+            logger.info("Skipping backend parameter updates for %s due to failed R² validation", task_instance.get_name())
+            # Still save to database even if R² failed or doesn't exist
+            # This is important for tasks like ReadoutClassification that don't have R²
+            if output_parameters:
+                if task_instance.is_qubit_task():
+                    QubitDocument.update_calib_data(
+                        username=self.username,
+                        qid=qid,
+                        chip_id=execution_manager.chip_id,
+                        output_parameters=output_parameters,
+                    )
+                elif task_instance.is_coupling_task():
+                    CouplingDocument.update_calib_data(
+                        username=self.username,
+                        qid=qid,
+                        chip_id=execution_manager.chip_id,
+                        output_parameters=output_parameters,
+                    )
+            return
 
         # 1. Save calibration note
         if session.name == "qubex":
@@ -760,9 +797,7 @@ class TaskManager(BaseModel):
                 task_manager_id=self.id,
             )
 
-        # 2. Update parameters
-        output_parameters = self.get_output_parameter_by_task_name(task_name, task_type=task_type, qid=qid)
-
+        # 2. Update parameters (already retrieved above)
         if output_parameters:
             if task_instance.is_qubit_task():
                 QubitDocument.update_calib_data(
@@ -772,13 +807,13 @@ class TaskManager(BaseModel):
                     output_parameters=output_parameters,
                 )
                 self._update_backend_params(session, execution_manager, qid, output_parameters)
-        elif task_instance.is_coupling_task():
-            CouplingDocument.update_calib_data(
-                username=self.username,
-                qid=qid,
-                chip_id=execution_manager.chip_id,
-                output_parameters=output_parameters,
-            )
+            elif task_instance.is_coupling_task():
+                CouplingDocument.update_calib_data(
+                    username=self.username,
+                    qid=qid,
+                    chip_id=execution_manager.chip_id,
+                    output_parameters=output_parameters,
+                )
 
     def _update_backend_params(
         self,

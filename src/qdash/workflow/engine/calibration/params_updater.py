@@ -49,6 +49,11 @@ class _QubexParamsUpdater:
         "readout_frequency": "readout_frequency.yaml",
         "control_amplitude": "control_amplitude.yaml",
         "qubit_frequency": "qubit_frequency.yaml",
+        "x90_gate_fidelity": "x90_gate_fidelity.yaml",
+        "x180_gate_fidelity": "x180_gate_fidelity.yaml",
+        "zx90_gate_fidelity": "zx90_gate_fidelity.yaml",
+        "average_gate_fidelity": "average_gate_fidelity.yaml",
+        "average_readout_fidelity": "average_readout_fidelity.yaml",
     }
 
     def __init__(self, session: Any, chip_id: str | None) -> None:
@@ -87,8 +92,12 @@ class _QubexParamsUpdater:
             if path.exists():
                 return path
 
+        # Only call get_session() if already connected (avoid reconnection with empty qids)
+        session_obj = None
         try:
-            session_obj = self._session.get_session()
+            # Check if session is already initialized (QubexSession has _exp attribute)
+            if hasattr(self._session, "_exp") and self._session._exp is not None:
+                session_obj = self._session.get_session()
         except Exception:
             session_obj = None
 

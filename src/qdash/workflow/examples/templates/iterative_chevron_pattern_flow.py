@@ -179,8 +179,16 @@ def iterative_chevron_pattern_flow(
     logger.info("Groups will run in parallel within each iteration")
 
     try:
-        # Initialize session
-        init_calibration(username, chip_id, all_qids, flow_name=flow_name)
+        # Initialize session with GitHub integration
+        from qdash.workflow.flow import GitHubPushConfig, ConfigFileType
+        init_calibration(
+            username, chip_id, all_qids, flow_name=flow_name,
+            enable_github_pull=True,
+            github_push_config=GitHubPushConfig(
+                enabled=True,
+                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
+            )
+        )
 
         # Store results from all iterations
         all_iterations_results = []

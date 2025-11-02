@@ -112,6 +112,6 @@ class ReadoutClassification(QubexTask):
     def run(self, session: QubexSession, qid: str) -> RunResult:
         exp = self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
-        result = exp.build_classifier(targets=label)
+        result = exp.build_classifier(targets=label, save_dir=exp.classifier_dir)
         self.save_calibration(session)
         return RunResult(raw_result=result)
