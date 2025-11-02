@@ -187,6 +187,29 @@ def convert_to_serial_parallel(grouped: list[list[str]]) -> dict:
     return {"serial": [{"parallel": group} for group in grouped]}
 
 
+def convert_to_parallel_groups(grouped: list[list[str]]) -> list[list[tuple[str, str]]]:
+    """Convert grouped CR pairs to parallel_groups format for two_qubit_parallel_calibration.py.
+    
+    Args:
+        grouped: List of groups, where each group contains CR pair strings like "0-1"
+    
+    Returns:
+        List of parallel groups, where each group contains tuples like ("0", "1")
+    
+    Example:
+        Input:  [["0-1", "2-3"], ["1-2"]]
+        Output: [[("0", "1"), ("2", "3")], [("1", "2")]]
+    """
+    parallel_groups = []
+    for group in grouped:
+        parallel_group = []
+        for pair in group:
+            control, target = pair.split("-")
+            parallel_group.append((control, target))
+        parallel_groups.append(parallel_group)
+    return parallel_groups
+
+
 def visualize_combined_schedule(
     schedule: dict, qid_to_mux: dict[str, int], lattice_pos: dict[str, tuple[float, float]]
 ) -> None:
@@ -359,10 +382,29 @@ if __name__ == "__main__":
     internal_pairs = set(itertools.chain.from_iterable(grouped))
     external_pairs = [pair for pair in cr_pairs if pair not in internal_pairs]
 
+    # Generate both formats
     internal_schedule = convert_to_serial_parallel(grouped)
-    print("\n\U0001f4e6 Schedule")
+    parallel_groups = convert_to_parallel_groups(grouped)
+    
+    # Print legacy serial/parallel format
+    print("
+📦 Legacy Schedule Format (serial/parallel)")
     print(json.dumps(internal_schedule, indent=2))
     print(f"steps: {len(internal_schedule['serial'])}")
+    
+    # Print new parallel_groups format for two_qubit_parallel_calibration.py
+    print("
+📋 Parallel Groups Format (for two_qubit_parallel_calibration.py)")
+    print("parallel_groups = [")
+    for group_idx, group in enumerate(parallel_groups, start=1):
+        group_str = ", ".join([f'("{c}", "{t}")' for c, t in group])
+        comment = f"  # Group {group_idx}: {len(group)} pairs"
+        print(f"    [{group_str}],{comment}")
+    print("]")
+    print(f"
+Total: {sum(len(g) for g in parallel_groups)} coupling pairs in {len(parallel_groups)} parallel groups")
+    
+    # Visualize
     lattice_pos = qubit_lattice(64, 4)
     visualize_each_step(internal_schedule, qid_to_mux=qid_to_mux, lattice_pos=lattice_pos)
     visualize_combined_schedule(internal_schedule, qid_to_mux=qid_to_mux, lattice_pos=lattice_pos)
