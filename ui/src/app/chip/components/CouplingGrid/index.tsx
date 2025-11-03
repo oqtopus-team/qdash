@@ -346,6 +346,58 @@ export function CouplingGrid({
             height: displayGridSize * (displayCellSize + 8),
           }}
         >
+          {/* MUX highlight overlay */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div
+              className="grid gap-2 w-full h-full"
+              style={{
+                gridTemplateColumns: `repeat(${Math.floor(displayGridSize / MUX_SIZE)}, minmax(0, 1fr))`,
+              }}
+            >
+              {Array.from({
+                length: Math.pow(Math.floor(displayGridSize / MUX_SIZE), 2),
+              }).map((_, muxIndex) => {
+                const muxRow = Math.floor(
+                  muxIndex / Math.floor(displayGridSize / MUX_SIZE),
+                );
+                const muxCol =
+                  muxIndex % Math.floor(displayGridSize / MUX_SIZE);
+                const isEvenMux = (muxRow + muxCol) % 2 === 0;
+
+                return (
+                  <div
+                    key={muxIndex}
+                    className={`rounded-lg relative ${
+                      isEvenMux
+                        ? "bg-primary/5 border border-primary/10"
+                        : "bg-secondary/5 border border-secondary/10"
+                    }`}
+                  >
+                    {/* MUX number label - positioned absolutely relative to grid container */}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {/* MUX labels overlay - separate layer on top */}
+          <div className="absolute inset-0 pointer-events-none z-10">
+            <div
+              className="grid gap-2 w-full h-full"
+              style={{
+                gridTemplateColumns: `repeat(${Math.floor(displayGridSize / MUX_SIZE)}, minmax(0, 1fr))`,
+              }}
+            >
+              {Array.from({
+                length: Math.pow(Math.floor(displayGridSize / MUX_SIZE), 2),
+              }).map((_, muxIndex) => (
+                <div key={muxIndex} className="relative">
+                  <div className="absolute top-0.5 right-0.5 md:top-1 md:right-1 text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
+                    MUX{muxIndex}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           {Array.from({ length: gridSize === 8 ? 64 : 144 })
             .filter((_, qid) => isQubitInRegion(qid))
             .map((_, idx) => {
