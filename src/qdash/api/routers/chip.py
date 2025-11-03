@@ -4,7 +4,7 @@ import logging
 from typing import Annotated, Any
 
 import pendulum
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from pymongo import ASCENDING, DESCENDING
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
@@ -286,9 +286,12 @@ def fetch_chip(chip_id: str, current_user: Annotated[User, Depends(get_current_a
     operation_id="listExecutionsByChipId",
 )
 def list_executions_by_chip_id(
-    chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]
+    chip_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    skip: Annotated[int, Query(ge=0, description="Number of items to skip")] = 0,
+    limit: Annotated[int, Query(ge=1, le=100, description="Number of items to return")] = 20,
 ) -> list[ExecutionResponseSummary]:
-    """Fetch all executions for a given chip.
+    """Fetch executions for a given chip with pagination.
 
     Parameters
     ----------
@@ -296,6 +299,10 @@ def list_executions_by_chip_id(
         ID of the chip to fetch executions for
     current_user : str
         Current user ID from authentication
+    skip : int
+        Number of items to skip (default: 0)
+    limit : int
+        Number of items to return (default: 20, max: 100)
 
     Returns
     -------
@@ -303,12 +310,13 @@ def list_executions_by_chip_id(
         List of executions for the chip
 
     """
-    logger.debug(f"Listing executions for chip {chip_id}, user: {current_user.username}")
+    logger.debug(f"Listing executions for chip {chip_id}, user: {current_user.username}, skip: {skip}, limit: {limit}")
     executions = (
         ExecutionHistoryDocument.find(
             {"chip_id": chip_id, "username": current_user.username}, sort=[("start_at", DESCENDING)]
         )
-        .limit(50)
+        .skip(skip)
+        .limit(limit)
         .run()
     )
     return [
