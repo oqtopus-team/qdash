@@ -178,10 +178,7 @@ export function ExecutionPageContent() {
   };
 
   return (
-    <div
-      className="w-full px-4 relative"
-      style={{ width: "calc(100vw - 20rem)" }}
-    >
+    <div className="w-full px-4 relative">
       <div className="px-10 pb-3">
         <h1 className="text-left text-3xl font-bold">Execution History</h1>
       </div>
