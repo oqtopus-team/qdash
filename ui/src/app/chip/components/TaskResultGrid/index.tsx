@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
@@ -37,7 +36,6 @@ export function TaskResultGrid({
   gridSize,
   onDateChange,
 }: TaskResultGridProps) {
-  const router = useRouter();
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
 
@@ -232,11 +230,63 @@ export function TaskResultGrid({
       {/* Grid Container */}
       <div className="relative">
         <div
-          className={`grid gap-2 p-4 bg-base-200/50 rounded-xl`}
+          className={`grid gap-2 p-4 bg-base-200/50 rounded-xl relative`}
           style={{
             gridTemplateColumns: `repeat(${displayGridSize}, minmax(0, 1fr))`,
           }}
         >
+          {/* MUX highlight overlay */}
+          <div className="absolute inset-0 pointer-events-none p-4">
+            <div
+              className="grid gap-2 w-full h-full"
+              style={{
+                gridTemplateColumns: `repeat(${Math.floor(displayGridSize / MUX_SIZE)}, minmax(0, 1fr))`,
+              }}
+            >
+              {Array.from({
+                length: Math.pow(Math.floor(displayGridSize / MUX_SIZE), 2),
+              }).map((_, muxIndex) => {
+                const muxRow = Math.floor(
+                  muxIndex / Math.floor(displayGridSize / MUX_SIZE),
+                );
+                const muxCol =
+                  muxIndex % Math.floor(displayGridSize / MUX_SIZE);
+                const isEvenMux = (muxRow + muxCol) % 2 === 0;
+
+                return (
+                  <div
+                    key={muxIndex}
+                    className={`rounded-lg relative ${
+                      isEvenMux
+                        ? "bg-primary/5 border border-primary/10"
+                        : "bg-secondary/5 border border-secondary/10"
+                    }`}
+                  >
+                    {/* MUX number label - positioned absolutely relative to grid container */}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {/* MUX labels overlay - separate layer on top */}
+          <div className="absolute inset-0 pointer-events-none p-4 z-10">
+            <div
+              className="grid gap-2 w-full h-full"
+              style={{
+                gridTemplateColumns: `repeat(${Math.floor(displayGridSize / MUX_SIZE)}, minmax(0, 1fr))`,
+              }}
+            >
+              {Array.from({
+                length: Math.pow(Math.floor(displayGridSize / MUX_SIZE), 2),
+              }).map((_, muxIndex) => (
+                <div key={muxIndex} className="relative">
+                  <div className="absolute top-0.5 right-0.5 md:top-1 md:right-1 text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
+                    MUX{muxIndex}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           {Array.from({ length: displayGridSize * displayGridSize }).map(
             (_, index) => {
               const localRow = Math.floor(index / displayGridSize);
@@ -274,49 +324,39 @@ export function TaskResultGrid({
                 ? task.figure_path[0]
                 : task.figure_path || null;
               return (
-                <div key={index} className="relative group">
-                  <button
-                    onClick={() => {
-                      if (figurePath) setSelectedTaskInfo({ qid, task });
-                    }}
-                    className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 relative w-full ${
-                      task.over_threshold
-                        ? "border-2 border-primary animate-pulse-light"
-                        : ""
-                    }`}
-                  >
-                    {task.figure_path && figurePath && (
-                      <div className="absolute inset-0">
-                        <TaskFigure
-                          path={figurePath}
-                          qid={qid}
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                    )}
-                    <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
-                      {qid}
+                <button
+                  key={index}
+                  onClick={() => {
+                    if (figurePath) setSelectedTaskInfo({ qid, task });
+                  }}
+                  className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 relative w-full ${
+                    task.over_threshold
+                      ? "border-2 border-primary animate-pulse-light"
+                      : ""
+                  }`}
+                >
+                  {task.figure_path && figurePath && (
+                    <div className="absolute inset-0">
+                      <TaskFigure
+                        path={figurePath}
+                        qid={qid}
+                        className="w-full h-full object-contain"
+                      />
                     </div>
-                    <div
-                      className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
-                        task.status === "completed"
-                          ? "bg-success"
-                          : task.status === "failed"
-                            ? "bg-error"
-                            : "bg-warning"
-                      }`}
-                    />
-                  </button>
-
-                  {/* Detail Analysis Button */}
-                  <button
-                    onClick={() => router.push(`/chip/${chipId}/qubit/${qid}`)}
-                    className="absolute top-1 right-1 btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                    title="Detailed Analysis"
-                  >
-                    Detail
-                  </button>
-                </div>
+                  )}
+                  <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
+                    {qid}
+                  </div>
+                  <div
+                    className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
+                      task.status === "completed"
+                        ? "bg-success"
+                        : task.status === "failed"
+                          ? "bg-error"
+                          : "bg-warning"
+                    }`}
+                  />
+                </button>
               );
             },
           )}

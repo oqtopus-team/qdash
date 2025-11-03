@@ -309,13 +309,29 @@ export function QubitMetricsGrid({
                       gridRow: `span 1`,
                     }}
                   >
-                    {/* MUX number label */}
-                    <div className="absolute top-0.5 right-0.5 md:top-1 md:right-1 text-[0.5rem] md:text-xs font-semibold text-base-content/20 bg-base-100/30 backdrop-blur-sm px-1 rounded">
-                      MUX{muxIndex}
-                    </div>
+                    {/* MUX number label - positioned absolutely relative to grid container */}
                   </div>
                 );
               })}
+            </div>
+          </div>
+          {/* MUX labels overlay - separate layer on top */}
+          <div className="absolute inset-0 pointer-events-none p-3 md:p-4 lg:p-6 z-10">
+            <div
+              className="grid gap-1 md:gap-2 lg:gap-3 w-full h-full"
+              style={{
+                gridTemplateColumns: `repeat(${Math.floor(displayGridSize / MUX_SIZE)}, minmax(0, 1fr))`,
+              }}
+            >
+              {Array.from({
+                length: Math.pow(Math.floor(displayGridSize / MUX_SIZE), 2),
+              }).map((_, muxIndex) => (
+                <div key={muxIndex} className="relative">
+                  <div className="absolute top-0.5 right-0.5 md:top-1 md:right-1 text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
+                    MUX{muxIndex}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           {Array.from({ length: displayGridSize * displayGridSize }).map(
