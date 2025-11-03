@@ -204,12 +204,12 @@ export function ExecutionPageContent() {
       >
         Previous
       </button>
-      <span className="text-sm">
-        Page {currentPage}
-      </span>
+      <span className="text-sm">Page {currentPage}</span>
       <button
         onClick={() => setCurrentPage((prev) => prev + 1)}
-        disabled={!executionData?.data || executionData.data.length < itemsPerPage}
+        disabled={
+          !executionData?.data || executionData.data.length < itemsPerPage
+        }
         className="btn btn-sm btn-outline"
       >
         Next
