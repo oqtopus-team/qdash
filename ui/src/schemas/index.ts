@@ -63,6 +63,7 @@ export * from "./inputParameterModelValue";
 export * from "./latestTaskGroupedByChipResponse";
 export * from "./latestTaskGroupedByChipResponseResult";
 export * from "./listAllFlowSchedulesParams";
+export * from "./listExecutionsByChipIdParams";
 export * from "./listFlowSchedulesParams";
 export * from "./listFlowSchedulesResponse";
 export * from "./listFlowsResponse";

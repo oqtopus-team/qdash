@@ -38,6 +38,10 @@ export function ExecutionPageContent() {
   const [cardData, setCardData] = useState<ExecutionResponseSummary[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
   // Track if we've already set the default chip to prevent race conditions
   const hasSetDefaultChip = useRef(false);
 
@@ -75,21 +79,28 @@ export function ExecutionPageContent() {
     }
   }, [isInitialized, selectedChip, sortedChips, setSelectedChip]);
 
-  // chip_id による実行概要一覧の取得
+  // Fetch execution summary list by chip_id
   const {
     data: executionData,
     isError,
     isLoading,
-  } = useListExecutionsByChipId(selectedChip || "", {
-    query: {
-      // Refresh every 5 seconds
-      refetchInterval: 5000,
-      // Keep polling even when the window is in the background
-      refetchIntervalInBackground: true,
+  } = useListExecutionsByChipId(
+    selectedChip || "",
+    {
+      skip: (currentPage - 1) * itemsPerPage,
+      limit: itemsPerPage,
     },
-  });
+    {
+      query: {
+        // Refresh every 5 seconds
+        refetchInterval: 5000,
+        // Keep polling even when the window is in the background
+        refetchIntervalInBackground: true,
+      },
+    },
+  );
 
-  // 選択された execution_id に対して、チップと実行IDでタスク一覧取得
+  // Fetch task list for the selected execution_id
   const {
     data: executionDetailData,
     isLoading: isDetailLoading,
@@ -109,7 +120,7 @@ export function ExecutionPageContent() {
     },
   );
 
-  // 実行データ取得時にカードデータをセット（日付でフィルタリング）
+  // Set card data when execution data is fetched (filter by date)
   useEffect(() => {
     if (executionData) {
       let filteredData = executionData.data;
@@ -129,18 +140,24 @@ export function ExecutionPageContent() {
     }
   }, [executionData, selectedDate]);
 
-  // チップ選択の変更ハンドラ
+  // Chip selection change handler
   const handleChipChange = (chipId: string) => {
     setSelectedChip(chipId || null);
     setSelectedExecutionId(null);
     setIsSidebarOpen(false);
     setCardData([]);
+    setCurrentPage(1); // Reset to first page when changing chips
   };
+
+  // Reset page when date changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedDate]);
 
   if (isLoading) return <div>Loading...</div>;
   if (isError) return <div>Error</div>;
 
-  // 一意キー生成
+  // Generate unique key for execution
   const getExecutionKey = (execution: ExecutionResponseSummary) =>
     `${execution.execution_id}`;
 
@@ -156,12 +173,12 @@ export function ExecutionPageContent() {
     setExpandedTaskIndex(null);
   };
 
-  // タスククリック時の展開トグル
+  // Toggle task expansion on click
   const handleTaskClick = (index: number) => {
     setExpandedTaskIndex(expandedTaskIndex === index ? null : index);
   };
 
-  // ステータス別ボーダーカラー
+  // Get border color based on status
   const getStatusBorderStyle = (status: string) => {
     switch (status) {
       case "running":
@@ -176,6 +193,29 @@ export function ExecutionPageContent() {
         return "border-l-4 border-base-300";
     }
   };
+
+  // Pagination controls component
+  const PaginationControls = () => (
+    <div className="flex justify-center items-center gap-4 my-4">
+      <button
+        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+        disabled={currentPage === 1}
+        className="btn btn-sm btn-outline"
+      >
+        Previous
+      </button>
+      <span className="text-sm">
+        Page {currentPage}
+      </span>
+      <button
+        onClick={() => setCurrentPage((prev) => prev + 1)}
+        disabled={!executionData?.data || executionData.data.length < itemsPerPage}
+        className="btn btn-sm btn-outline"
+      >
+        Next
+      </button>
+    </div>
+  );
 
   return (
     <div className="w-full px-4 relative">
@@ -221,12 +261,14 @@ export function ExecutionPageContent() {
           />
         </div>
       </div>
-      {/* 統計情報の表示 */}
+      {/* Statistics display */}
       <ExecutionStats
         executions={cardData}
         selectedTag={selectedTag}
         onTagSelect={setSelectedTag}
       />
+      {/* Pagination controls - Top */}
+      <PaginationControls />
       <div className="grid grid-cols-1 gap-2 mx-5">
         {cardData.map((execution) => {
           const executionKey = getExecutionKey(execution);
@@ -250,6 +292,11 @@ export function ExecutionPageContent() {
                   <p className="text-sm text-base-content/60 mr-4">
                     {new Date(execution.start_at).toLocaleString()}
                   </p>
+                  {execution.elapsed_time && (
+                    <p className="text-sm text-base-content/60 mr-4">
+                      Duration: {execution.elapsed_time}
+                    </p>
+                  )}
                   <span
                     className={`text-sm font-semibold ${
                       execution.status === "running"
@@ -275,7 +322,9 @@ export function ExecutionPageContent() {
           );
         })}
       </div>
-      {/* サイドバー */}
+      {/* Pagination controls - Bottom */}
+      <PaginationControls />
+      {/* Sidebar */}
       <div
         className={`fixed right-0 top-0 w-1/2 h-full bg-base-100 shadow-xl border-l overflow-y-auto p-6 transition-transform duration-300 ${
           isSidebarOpen

@@ -272,7 +272,7 @@
       "get": {
         "tags": ["chip"],
         "summary": "Fetch executions",
-        "description": "Fetch all executions for a given chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch executions for\ncurrent_user : str\n    Current user ID from authentication\n\nReturns\n-------\nlist[ExecutionResponseSummary]\n    List of executions for the chip",
+        "description": "Fetch executions for a given chip with pagination.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch executions for\ncurrent_user : str\n    Current user ID from authentication\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nlist[ExecutionResponseSummary]\n    List of executions for the chip",
         "operationId": "listExecutionsByChipId",
         "parameters": [
           {
@@ -283,6 +283,33 @@
               "type": "string",
               "title": "Chip Id"
             }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of items to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of items to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Number of items to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Number of items to return"
           }
         ],
         "responses": {
