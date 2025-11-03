@@ -186,6 +186,7 @@ services:
       dockerfile: ./ui/Dockerfile.prod
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_PREFECT_URL: ${NEXT_PUBLIC_PREFECT_URL}
     restart: always
     env_file:
       - .env
