@@ -20,10 +20,7 @@ function AnalyzePageContent() {
   };
 
   return (
-    <div
-      className="w-full min-h-screen bg-base-100/50 px-6 py-8"
-      style={{ width: "calc(100vw - 20rem)" }}
-    >
+    <div className="w-full min-h-screen bg-base-100/50 px-6 py-8">
       <div className="max-w-[1400px] mx-auto space-y-8">
         {/* Header Section */}
         <div className="flex justify-between items-center mb-8">
