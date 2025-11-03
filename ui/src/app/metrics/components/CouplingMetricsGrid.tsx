@@ -344,6 +344,42 @@ export function CouplingMetricsGrid({
             height: displayGridSize * (displayCellSize + 8),
           }}
         >
+          {/* MUX highlight overlay */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div
+              className="grid gap-2 w-full h-full"
+              style={{
+                gridTemplateColumns: `repeat(${Math.floor(displayGridSize / MUX_SIZE)}, minmax(0, 1fr))`,
+              }}
+            >
+              {Array.from({
+                length: Math.pow(Math.floor(displayGridSize / MUX_SIZE), 2),
+              }).map((_, muxIndex) => {
+                const muxRow = Math.floor(
+                  muxIndex / Math.floor(displayGridSize / MUX_SIZE),
+                );
+                const muxCol =
+                  muxIndex % Math.floor(displayGridSize / MUX_SIZE);
+                const isEvenMux = (muxRow + muxCol) % 2 === 0;
+
+                return (
+                  <div
+                    key={muxIndex}
+                    className={`rounded-lg relative ${
+                      isEvenMux
+                        ? "bg-primary/5 border border-primary/10"
+                        : "bg-secondary/5 border border-secondary/10"
+                    }`}
+                  >
+                    {/* MUX number label */}
+                    <div className="absolute top-0.5 right-0.5 md:top-1 md:right-1 text-[0.5rem] md:text-xs font-semibold text-base-content/20 bg-base-100/30 backdrop-blur-sm px-1 rounded">
+                      MUX{muxIndex}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           {/* Qubit cells (background) */}
           {Array.from({ length: gridSize === 8 ? 64 : 144 })
             .filter((_, qid) => isQubitInRegion(qid))

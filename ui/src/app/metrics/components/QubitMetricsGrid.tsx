@@ -273,11 +273,51 @@ export function QubitMetricsGrid({
       {/* Grid display */}
       <div className="flex-1 p-2 md:p-4 relative">
         <div
-          className="grid gap-1 md:gap-2 lg:gap-3 p-3 md:p-4 lg:p-6 bg-base-200/50 rounded-xl max-w-full"
+          className="grid gap-1 md:gap-2 lg:gap-3 p-3 md:p-4 lg:p-6 bg-base-200/50 rounded-xl max-w-full relative"
           style={{
             gridTemplateColumns: `repeat(${displayGridSize}, minmax(0, 1fr))`,
           }}
         >
+          {/* MUX highlight overlay */}
+          <div className="absolute inset-0 pointer-events-none p-3 md:p-4 lg:p-6">
+            <div
+              className="grid gap-1 md:gap-2 lg:gap-3 w-full h-full"
+              style={{
+                gridTemplateColumns: `repeat(${Math.floor(displayGridSize / MUX_SIZE)}, minmax(0, 1fr))`,
+              }}
+            >
+              {Array.from({
+                length: Math.pow(Math.floor(displayGridSize / MUX_SIZE), 2),
+              }).map((_, muxIndex) => {
+                const muxRow = Math.floor(
+                  muxIndex / Math.floor(displayGridSize / MUX_SIZE),
+                );
+                const muxCol =
+                  muxIndex % Math.floor(displayGridSize / MUX_SIZE);
+                const isEvenMux = (muxRow + muxCol) % 2 === 0;
+
+                return (
+                  <div
+                    key={muxIndex}
+                    className={`rounded-lg relative ${
+                      isEvenMux
+                        ? "bg-primary/5 border border-primary/10"
+                        : "bg-secondary/5 border border-secondary/10"
+                    }`}
+                    style={{
+                      gridColumn: `span 1`,
+                      gridRow: `span 1`,
+                    }}
+                  >
+                    {/* MUX number label */}
+                    <div className="absolute top-0.5 right-0.5 md:top-1 md:right-1 text-[0.5rem] md:text-xs font-semibold text-base-content/20 bg-base-100/30 backdrop-blur-sm px-1 rounded">
+                      MUX{muxIndex}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           {Array.from({ length: displayGridSize * displayGridSize }).map(
             (_, index) => {
               const localRow = Math.floor(index / displayGridSize);
