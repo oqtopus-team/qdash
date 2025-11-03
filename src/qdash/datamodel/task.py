@@ -91,6 +91,7 @@ class OutputParameterModel(BaseModel):
         description="The time when the system information was created",
     )
     execution_id: str = ""
+    task_id: str = ""
 
     @field_validator("value", mode="before")
     @classmethod
@@ -137,9 +138,13 @@ class CalibDataModel(BaseModel):
     coupling: dict[str, dict[str, OutputParameterModel]] = Field(default_factory=dict)
 
     def put_qubit_data(self, qid: str, parameter_name: str, data: OutputParameterModel) -> None:
+        if qid not in self.qubit:
+            self.qubit[qid] = {}
         self.qubit[qid][parameter_name] = data
 
     def put_coupling_data(self, qid: str, parameter_name: str, data: OutputParameterModel) -> None:
+        if qid not in self.coupling:
+            self.coupling[qid] = {}
         self.coupling[qid][parameter_name] = data
 
     def __getitem__(self, key: str) -> dict:

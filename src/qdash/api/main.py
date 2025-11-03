@@ -10,7 +10,9 @@ from qdash.api.routers import (
     device_topology,
     execution,
     file,
-    menu,
+    flow,
+    flow_schedule,
+    metrics,
     parameter,
     settings,
     tag,
@@ -66,7 +68,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(calibration.router, prefix="/api", tags=["calibration"])
-app.include_router(menu.router, prefix="/api", tags=["menu"])
 app.include_router(settings.router, prefix="/api", tags=["settings"])
 app.include_router(execution.router, prefix="/api", tags=["execution"])
 app.include_router(chip.router, prefix="/api", tags=["chip"])
@@ -77,3 +78,6 @@ app.include_router(parameter.router, prefix="/api", tags=["parameter"])
 app.include_router(tag.router, prefix="/api", tags=["tag"])
 app.include_router(device_topology.router, prefix="/api", tags=["device_topology"])
 app.include_router(backend.router, prefix="/api", tags=["backend"])
+app.include_router(flow.router, prefix="/api", tags=["flow"])
+app.include_router(flow_schedule.router, prefix="/api", tags=["flow_schedule"])
+app.include_router(metrics.router, prefix="/api", tags=["metrics"])

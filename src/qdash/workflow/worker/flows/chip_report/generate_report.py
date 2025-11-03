@@ -357,7 +357,7 @@ def pad_qubit_data(data: dict[str, float], chip_id: str = "64Qv1") -> dict[str, 
     result: dict[str, float] = {}
     import re
 
-    from qdash.workflow.core.session.factory import create_session
+    from qdash.workflow.engine.session.factory import create_session
 
     session = create_session(
         backend="qubex",

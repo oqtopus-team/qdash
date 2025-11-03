@@ -12,6 +12,7 @@ import {
   ReactFlowProvider,
   Panel,
   MarkerType,
+  useReactFlow,
 } from "@xyflow/react";
 import dagre from "dagre";
 import JsonView from "react18-json-view";
@@ -126,6 +127,136 @@ interface ExecutionDAGProps {
   tasks: TaskNode[];
 }
 
+// Inner component that can use useReactFlow hook
+function FlowContent({
+  nodes,
+  edges,
+  setSelectedTask,
+  isMaximized,
+  setIsMaximized,
+}: {
+  nodes: Node[];
+  edges: Edge[];
+  setSelectedTask: (task: TaskDetails | null) => void;
+  isMaximized: boolean;
+  setIsMaximized: (value: boolean) => void;
+}) {
+  const { fitView } = useReactFlow();
+
+  return (
+    <>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        fitView
+        className="bg-base-200"
+        minZoom={0.1}
+        maxZoom={1.5}
+        defaultEdgeOptions={{
+          type: "smoothstep",
+          animated: true,
+          style: { strokeWidth: 2 },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: "#64748b",
+          },
+        }}
+        fitViewOptions={{
+          padding: 0.05,
+          minZoom: 0.1,
+          maxZoom: 1.5,
+        }}
+        onNodeClick={(_, node) => {
+          const data = node.data as NodeData;
+          setSelectedTask({
+            name: data.name,
+            status: data.status,
+            startAt: data.startAt,
+            elapsedTime: data.elapsedTime,
+            figurePath: data.figurePath,
+            inputParameters: data.inputParameters,
+            outputParameters: data.outputParameters,
+          });
+        }}
+      >
+        <Background />
+        <Controls />
+        <Panel
+          position="top-left"
+          className="bg-base-100 p-2 rounded flex items-center gap-2"
+        >
+          <div className="text-sm">Click nodes to see details</div>
+          <button
+            onClick={() =>
+              fitView({
+                padding: 0.05,
+                minZoom: 0.1,
+                maxZoom: 1.5,
+                duration: 300,
+              })
+            }
+            className="btn btn-sm btn-ghost"
+            title="Fit to view"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m-4 0h4m0 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={() => setIsMaximized(!isMaximized)}
+            className="btn btn-sm btn-ghost"
+            title={isMaximized ? "Exit fullscreen" : "Fullscreen"}
+          >
+            {isMaximized ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
+                />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
+                />
+              </svg>
+            )}
+          </button>
+        </Panel>
+      </ReactFlow>
+    </>
+  );
+}
+
 export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
   const [selectedTask, setSelectedTask] = useState<TaskDetails | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -215,82 +346,13 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
           }}
           className={isMaximized ? "bg-base-100 p-4 rounded-lg shadow-xl" : ""}
         >
-          <ReactFlow
+          <FlowContent
             nodes={nodes}
             edges={edges}
-            nodeTypes={nodeTypes}
-            fitView
-            className="bg-base-200"
-            defaultEdgeOptions={{
-              type: "smoothstep",
-              animated: true,
-              style: { strokeWidth: 2 },
-              markerEnd: {
-                type: MarkerType.ArrowClosed,
-                color: "#64748b",
-              },
-            }}
-            fitViewOptions={{
-              padding: 0.2,
-            }}
-            onNodeClick={(_, node) => {
-              const data = node.data as NodeData;
-              setSelectedTask({
-                name: data.name,
-                status: data.status,
-                startAt: data.startAt,
-                elapsedTime: data.elapsedTime,
-                figurePath: data.figurePath,
-                inputParameters: data.inputParameters,
-                outputParameters: data.outputParameters,
-              });
-            }}
-          >
-            <Background />
-            <Controls />
-            <Panel
-              position="top-left"
-              className="bg-base-100 p-2 rounded flex items-center gap-4"
-            >
-              <div className="text-sm">Click nodes to see details</div>
-              <button
-                onClick={() => setIsMaximized(!isMaximized)}
-                className="btn btn-sm btn-ghost"
-              >
-                {isMaximized ? (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
-                    />
-                  </svg>
-                )}
-              </button>
-            </Panel>
-          </ReactFlow>
+            setSelectedTask={setSelectedTask}
+            isMaximized={isMaximized}
+            setIsMaximized={setIsMaximized}
+          />
         </div>
       </ReactFlowProvider>
 

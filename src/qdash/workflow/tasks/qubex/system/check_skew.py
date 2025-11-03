@@ -3,21 +3,19 @@ from typing import Any, ClassVar
 
 import yaml
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.session.qubex import QubexSession
+from qdash.workflow.engine.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    BaseTask,
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
+from qdash.workflow.tasks.qubex.base import QubexTask
 from qubecalib.instrument.quel.quel1.tool.skew import Skew, SkewSetting
 
 
-class CheckSkew(BaseTask):
+class CheckSkew(QubexTask):
     """Task to check skew the boxies."""
 
     name: str = "CheckSkew"
-    backend: str = "qubex"
     task_type: str = "system"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "muxes": InputParameterModel(
@@ -28,9 +26,6 @@ class CheckSkew(BaseTask):
         ),
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
-
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:
-        return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
@@ -73,7 +68,3 @@ class CheckSkew(BaseTask):
             "fig": fig,
         }
         return RunResult(raw_result=result)
-
-    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
-        """Batch run is not implemented."""
-        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

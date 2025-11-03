@@ -2,21 +2,19 @@ from typing import ClassVar
 
 import numpy as np
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.session.qubex import QubexSession
+from qdash.workflow.engine.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    BaseTask,
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
+from qdash.workflow.tasks.qubex.base import QubexTask
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 
-class CheckT2Echo(BaseTask):
+class CheckT2Echo(QubexTask):
     """Task to check the T2 echo time."""
 
     name: str = "CheckT2Echo"
-    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "time_range": InputParameterModel(
@@ -42,14 +40,11 @@ class CheckT2Echo(BaseTask):
         "t2_echo": OutputParameterModel(unit="μs", description="T2 echo time"),
     }
 
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
-        return PreProcessResult(input_parameters=self.input_parameters)
-
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        exp = session.get_session()
-        label = exp.get_qubit_label(int(qid))
+        self.get_experiment(session)
+        label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
         self.output_parameters["t2_echo"].value = result.data[label].t2 * 0.001  # convert to μs
         self.output_parameters["t2_echo"].error = result.data[label].t2_err * 0.001  # convert to μs
@@ -58,19 +53,19 @@ class CheckT2Echo(BaseTask):
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
-        exp = session.get_session()
+        exp = self.get_experiment(session)
         labels = [exp.get_qubit_label(int(qid))]
-        result = exp.t2_experiment(
-            labels,
-            time_range=self.input_parameters["time_range"].get_value(),
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
-            save_image=False,
-        )
-        r2 = result.data[exp.get_qubit_label(int(qid))].r2
-        exp.calib_note.save()
-        return RunResult(raw_result=result, r2={qid: r2})
 
-    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
-        """Batch run is not implemented."""
-        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")
+        # Apply frequency override if qubit_frequency was explicitly provided
+        with self._apply_frequency_override(session, qid):
+            result = exp.t2_experiment(
+                labels,
+                time_range=self.input_parameters["time_range"].get_value(),
+                shots=self.input_parameters["shots"].get_value(),
+                interval=self.input_parameters["interval"].get_value(),
+                save_image=False,
+            )
+
+        r2 = result.data[exp.get_qubit_label(int(qid))].r2
+        self.save_calibration(session)
+        return RunResult(raw_result=result, r2={qid: r2})

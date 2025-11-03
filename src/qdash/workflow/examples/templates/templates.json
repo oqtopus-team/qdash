@@ -1,0 +1,74 @@
+[
+  {
+    "id": "simple",
+    "name": "Simple Flow",
+    "description": "Basic sequential calibration demonstrating low-level API usage",
+    "category": "basic",
+    "filename": "simple_flow.py",
+    "function_name": "my_custom_flow"
+  },
+  {
+    "id": "custom_parallel",
+    "name": "Custom Parallel Flow",
+    "description": "Group-based parallel execution using Prefect's @task + submit()",
+    "category": "parallel",
+    "filename": "custom_parallel_flow.py",
+    "function_name": "custom_parallel_flow"
+  },
+  {
+    "id": "iterative",
+    "name": "Iterative Parallel Flow",
+    "description": "Repeat parallel group calibration multiple times with custom parameters",
+    "category": "advanced",
+    "filename": "iterative_flow.py",
+    "function_name": "iterative_flow"
+  },
+  {
+    "id": "full_qubit",
+    "name": "Full Qubit Calibration",
+    "description": "Complete 1-qubit calibration suite with all standard tasks (Rabi, T1/T2, DRAG, RB)",
+    "category": "production",
+    "filename": "full_qubit_calibration.py",
+    "function_name": "full_qubit_calibration"
+  },
+  {
+    "id": "retry",
+    "name": "Retry Calibration",
+    "description": "Full 1-qubit calibration with smart per-qubit retry - immediately retries failed qubits within groups",
+    "category": "advanced",
+    "filename": "retry_calibration.py",
+    "function_name": "retry_calibration"
+  },
+  {
+    "id": "iterative_chevron_pattern",
+    "name": "Iterative ChevronPattern Flow",
+    "description": "Execute ChevronPattern repeatedly with varying readout amplitudes to investigate readout power effects",
+    "category": "advanced",
+    "filename": "iterative_chevron_pattern_flow.py",
+    "function_name": "iterative_chevron_pattern_flow"
+  },
+  {
+    "id": "coupling_calibration",
+    "name": "Coupling Calibration Flow",
+    "description": "2-qubit coupling calibration with group-based parallel execution (e.g., CheckCrossResonance)",
+    "category": "coupling",
+    "filename": "coupling_calibration_flow.py",
+    "function_name": "my_coupling_flow"
+  },
+  {
+    "id": "sequential_stage",
+    "name": "Sequential Stage Calibration",
+    "description": "Execute same calibration tasks across multiple stages with isolated sessions (e.g., chassis-based execution with hardware constraints)",
+    "category": "advanced",
+    "filename": "sequential_stage_calibration.py",
+    "function_name": "sequential_stage_calibration"
+  },
+  {
+    "id": "two_qubit_parallel",
+    "name": "Two-Qubit Parallel Calibration",
+    "description": "Execute 2-qubit coupling calibration with parallel groups to manage qubit-sharing constraints",
+    "category": "coupling",
+    "filename": "two_qubit_parallel_calibration.py",
+    "function_name": "two_qubit_parallel_calibration"
+  }
+]

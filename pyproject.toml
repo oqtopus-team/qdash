@@ -91,6 +91,8 @@ api = [
     "matplotlib>=3.8.0",
     "networkx>=3.4.2",
     "scipy>=1.15.3",
+    "httpx>=0.27.0",  # For deployment service communication
+    "ruff==0.5.5",  # For auto-formatting saved flows
 ]
 workflow = [
     "pymongo==4.8.0",
@@ -124,5 +126,5 @@ agent = [
 ]
 
 [tool.uv.sources]
-qubex = { git = "https://github.com/amachino/qubex.git", tag = "v1.4.1b1" }
+qubex = { git = "https://github.com/amachino/qubex.git", tag = "v1.4.3b3" }
 strands-agents = { git = "https://github.com/strands-agents/sdk-python.git" }

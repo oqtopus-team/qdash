@@ -1,13 +1,12 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.session.qubex import QubexSession
+from qdash.workflow.engine.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    BaseTask,
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
+from qdash.workflow.tasks.qubex.base import QubexTask
 
 PEAKS_COUNT = 4
 peak_positions = {
@@ -18,11 +17,10 @@ peak_positions = {
 }
 
 
-class CheckResonatorFrequencies(BaseTask):
+class CheckResonatorFrequencies(QubexTask):
     """Task to check the resonator frequencies."""
 
     name: str = "CheckResonatorFrequencies"
-    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "frequency_range": InputParameterModel(
@@ -35,10 +33,6 @@ class CheckResonatorFrequencies(BaseTask):
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "coarse_resonator_frequency": OutputParameterModel(unit="GHz", description="Coarse resonator frequency"),
     }
-
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
-        """Preprocess the task."""
-        return PreProcessResult(input_parameters=self.input_parameters)
 
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
@@ -56,18 +50,18 @@ class CheckResonatorFrequencies(BaseTask):
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         """Run the task."""
-        exp = session.get_session()
-        label = exp.get_qubit_label(int(qid))
+        exp = self.get_experiment(session)
+        label = self.get_qubit_label(session, qid)
         result = exp.scan_resonator_frequencies(
             target=label, frequency_range=self.input_parameters["frequency_range"].get_value()
         )
-        exp.calib_note.save()
+        self.save_calibration(session)
         return RunResult(raw_result=result)
 
     def batch_run(self, session: QubexSession, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits."""
-        exp = session.get_session()
-        labels = [exp.get_qubit_label(int(qid)) for qid in qids]
+        exp = self.get_experiment(session)
+        labels = [self.get_qubit_label(session, qid) for qid in qids]
         read_box = exp.experiment_system.get_readout_box_for_qubit(labels[0])
         import numpy as np
         from qubex.backend import BoxType
@@ -82,5 +76,5 @@ class CheckResonatorFrequencies(BaseTask):
             shots=1024,
             filter="savgol",
         )
-        exp.calib_note.save()
+        self.save_calibration(session)
         return RunResult(raw_result=result)

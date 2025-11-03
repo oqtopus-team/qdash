@@ -206,6 +206,7 @@ backend/qcflow/storage
 postgres_data/
 mongo_data/
 calib_data/
+src/qdash/workflow/user_flows/*/
 *.env
 docker_node_modules/
 .venv/src/
@@ -222,6 +223,8 @@ src/qdash/workflow/*.json
 src/qdash/workflow/.calibration/*.json
 src/qdash/workflow/.classifier/*/*
 /config
+# Exception: Keep metrics configuration in git
+!/config/metrics_metadata.yaml
 src/tools/schedule/*
 .serena/cache/*
 .mcp.json

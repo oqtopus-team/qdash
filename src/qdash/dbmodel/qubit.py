@@ -89,6 +89,7 @@ class QubitDocument(Document):
                         "description": new_param.description,
                         "calibrated_at": new_param.calibrated_at,
                         "execution_id": new_param.execution_id,
+                        "task_id": new_param.task_id,
                     }
 
         return current_best

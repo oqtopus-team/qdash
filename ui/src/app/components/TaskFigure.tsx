@@ -1,18 +1,62 @@
 "use client";
 
+import { useGetTaskResultByTaskId } from "@/client/task/task";
+
 interface TaskFigureProps {
-  path: string | string[];
+  path?: string | string[];
+  taskId?: string;
   qid: string;
   className?: string;
 }
 
-export function TaskFigure({ path, qid, className = "" }: TaskFigureProps) {
+export function TaskFigure({
+  path,
+  taskId,
+  qid,
+  className = "",
+}: TaskFigureProps) {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
-  if (Array.isArray(path)) {
+  // Use generated API client hook when taskId is provided
+  const {
+    data: taskResultResponse,
+    isLoading: loading,
+    error: fetchError,
+  } = useGetTaskResultByTaskId(taskId!, {
+    query: {
+      enabled: !!taskId && !path,
+    },
+  });
+
+  const taskResult = taskResultResponse?.data;
+  const error = fetchError?.message || null;
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="alert alert-error">
+        <span>Error loading figure: {error}</span>
+      </div>
+    );
+  }
+
+  // Use fetched task result if available (prefer static images over JSON)
+  const figurePaths =
+    path || taskResult?.figure_path || taskResult?.json_figure_path || [];
+
+  if (Array.isArray(figurePaths) && figurePaths.length > 0) {
     return (
       <>
-        {path.map((p, i) => (
+        {figurePaths.map((p, i) => (
           <img
             key={i}
             src={`${apiUrl}/api/executions/figure?path=${encodeURIComponent(
@@ -26,11 +70,20 @@ export function TaskFigure({ path, qid, className = "" }: TaskFigureProps) {
     );
   }
 
+  if (typeof figurePaths === "string") {
+    return (
+      <img
+        src={`${apiUrl}/api/executions/figure?path=${encodeURIComponent(figurePaths)}`}
+        alt={`Result for QID ${qid}`}
+        className={className}
+      />
+    );
+  }
+
+  // No figure available
   return (
-    <img
-      src={`${apiUrl}/api/executions/figure?path=${encodeURIComponent(path)}`}
-      alt={`Result for QID ${qid}`}
-      className={className}
-    />
+    <div className="alert alert-info">
+      <span>No figure available for this task</span>
+    </div>
   );
 }

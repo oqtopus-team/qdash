@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
 
@@ -79,6 +79,22 @@ export function CouplingGrid({
     useState<SelectedTaskInfo | null>(null);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [cellSize, setCellSize] = useState(60);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Region selection state
+  const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
+  const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
+  const [selectedRegion, setSelectedRegion] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
+  const [hoveredRegion, setHoveredRegion] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
+
+  const regionSize = 4; // 4×4 qubits per region
+  const numRegions = Math.floor(gridSize / regionSize);
 
   // Track previous date to distinguish modal navigation from external navigation
   const [previousDate, setPreviousDate] = useState(selectedDate);
@@ -110,16 +126,6 @@ export function CouplingGrid({
       originalNavigateToNextDay();
     }
   }, [originalNavigateToNextDay, selectedTaskInfo]);
-
-  useEffect(() => {
-    const updateSize = () => {
-      const vw = window.innerWidth;
-      setCellSize(Math.max(Math.floor((vw * 0.75) / gridSize - 12), 30));
-    };
-    updateSize();
-    window.addEventListener("resize", updateSize);
-    return () => window.removeEventListener("resize", updateSize);
-  }, [gridSize]);
 
   const {
     data: taskResponse,
@@ -198,6 +204,40 @@ export function CouplingGrid({
     };
   }, [taskResponse?.data?.result, selectedTaskInfo?.couplingId]);
 
+  // Calculate cell size based on container width
+  const updateSize = useCallback(() => {
+    // Use actual container width instead of viewport width
+    const containerWidth =
+      containerRef.current?.offsetWidth || window.innerWidth;
+    // Subtract padding: px-4 on both sides (32px total) + some margin for safety
+    const availableWidth = containerWidth - 64; // 64px = padding + margin
+    const effectiveGridSize = zoomMode === "region" ? regionSize : gridSize;
+    const gap = 8; // gap between cells
+    const totalGap = gap * (effectiveGridSize - 1);
+    const calculatedSize = Math.floor(
+      (availableWidth - totalGap) / effectiveGridSize,
+    );
+    setCellSize(Math.max(calculatedSize, 30));
+  }, [gridSize, zoomMode, regionSize]);
+
+  useEffect(() => {
+    // Initial calculation with a small delay to ensure container is rendered
+    const timeoutId = setTimeout(updateSize, 0);
+
+    window.addEventListener("resize", updateSize);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener("resize", updateSize);
+    };
+  }, [updateSize]);
+
+  // Recalculate when data loads
+  useEffect(() => {
+    if (taskResponse?.data) {
+      updateSize();
+    }
+  }, [taskResponse?.data, updateSize]);
+
   const normalizedResultMap: Record<string, ExtendedTask[]> = {};
   if (taskResponse?.data?.result) {
     for (const [couplingId, task] of Object.entries(taskResponse.data.result)) {
@@ -223,90 +263,239 @@ export function CouplingGrid({
   if (isError)
     return <div className="alert alert-error">Failed to load data</div>;
 
+  // Calculate displayed area based on zoom mode
+  const displayCellSize = zoomMode === "region" ? cellSize * 0.8 : cellSize;
+  const displayGridSize = zoomMode === "region" ? regionSize : gridSize;
+  const displayGridStart = selectedRegion
+    ? {
+        row: selectedRegion.row * regionSize,
+        col: selectedRegion.col * regionSize,
+      }
+    : { row: 0, col: 0 };
+
+  // Helper function to check if a qubit is in the displayed region
+  const isQubitInRegion = (qid: number): boolean => {
+    if (zoomMode === "full") return true;
+
+    const muxIndex = Math.floor(qid / 4);
+    const localIndex = qid % 4;
+    const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE));
+    const muxCol = muxIndex % (gridSize / MUX_SIZE);
+    const localRow = Math.floor(localIndex / 2);
+    const localCol = localIndex % 2;
+    const row = muxRow * MUX_SIZE + localRow;
+    const col = muxCol * MUX_SIZE + localCol;
+
+    return (
+      row >= displayGridStart.row &&
+      row < displayGridStart.row + regionSize &&
+      col >= displayGridStart.col &&
+      col < displayGridStart.col + regionSize
+    );
+  };
+
+  // Helper function to check if a coupling is in the displayed region
+  const isCouplingInRegion = (qid1: number, qid2: number): boolean => {
+    return isQubitInRegion(qid1) && isQubitInRegion(qid2);
+  };
+
   return (
-    <div className="space-y-6 px-4">
-      <div className="w-full overflow-x-auto">
+    <div ref={containerRef} className="space-y-4 px-4">
+      {/* Zoom mode toggle - only show in full view mode */}
+      {zoomMode === "full" && (
+        <div className="flex items-center gap-2 px-4">
+          <label className="text-sm font-medium">Region Zoom:</label>
+          <input
+            type="checkbox"
+            checked={regionSelectionEnabled}
+            onChange={(e) => setRegionSelectionEnabled(e.target.checked)}
+            className="toggle toggle-sm toggle-primary"
+          />
+          <span className="text-xs text-base-content/70">
+            {regionSelectionEnabled
+              ? "Enabled - Click a region to zoom"
+              : "Disabled"}
+          </span>
+        </div>
+      )}
+
+      {/* Back button when in region mode */}
+      {zoomMode === "region" && selectedRegion && (
+        <div className="flex items-center gap-4 px-4">
+          <button
+            onClick={() => {
+              setZoomMode("full");
+              setSelectedRegion(null);
+            }}
+            className="btn btn-sm btn-ghost"
+          >
+            ← Back to Full View
+          </button>
+          <span className="text-sm text-base-content/70">
+            Region {selectedRegion.row + 1},{selectedRegion.col + 1}
+          </span>
+        </div>
+      )}
+
+      {/* Grid Container */}
+      <div className="relative w-full flex justify-center">
         <div
-          className="relative inline-block"
+          className="relative"
           style={{
-            width: gridSize * (cellSize + 8),
-            height: gridSize * (cellSize + 8),
+            width: displayGridSize * (displayCellSize + 8),
+            height: displayGridSize * (displayCellSize + 8),
           }}
         >
-          {Array.from({ length: gridSize === 8 ? 64 : 144 }).map((_, qid) => {
-            const muxIndex = Math.floor(qid / 4);
-            const localIndex = qid % 4;
-            const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE));
-            const muxCol = muxIndex % (gridSize / MUX_SIZE);
-            const localRow = Math.floor(localIndex / 2);
-            const localCol = localIndex % 2;
-            const row = muxRow * MUX_SIZE + localRow;
-            const col = muxCol * MUX_SIZE + localCol;
-            const x = col * (cellSize + 8);
-            const y = row * (cellSize + 8);
-            return (
-              <div
-                key={qid}
-                className="absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30"
-                style={{ top: y, left: x, width: cellSize, height: cellSize }}
-              >
-                {qid}
-              </div>
-            );
-          })}
+          {Array.from({ length: gridSize === 8 ? 64 : 144 })
+            .filter((_, qid) => isQubitInRegion(qid))
+            .map((_, idx) => {
+              // Find actual qid from filtered index
+              const allQids = Array.from({
+                length: gridSize === 8 ? 64 : 144,
+              }).map((_, i) => i);
+              const filteredQids = allQids.filter((qid) =>
+                isQubitInRegion(qid),
+              );
+              const qid = filteredQids[idx];
+              const muxIndex = Math.floor(qid / 4);
+              const localIndex = qid % 4;
+              const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE));
+              const muxCol = muxIndex % (gridSize / MUX_SIZE);
+              const localRow = Math.floor(localIndex / 2);
+              const localCol = localIndex % 2;
+              const row = muxRow * MUX_SIZE + localRow;
+              const col = muxCol * MUX_SIZE + localCol;
 
-          {Object.entries(normalizedResultMap).map(([normKey, taskList]) => {
-            const [qid1, qid2] = normKey.split("-").map(Number);
-            const task = taskList[0];
-            const figurePath = Array.isArray(task.figure_path)
-              ? task.figure_path[0]
-              : task.figure_path || null;
-            const { row1, col1, row2, col2 } = getCouplingPosition(
-              qid1,
-              qid2,
-              gridSize,
-            );
-            const centerX = ((col1 + col2) / 2) * (cellSize + 8) + cellSize / 2;
-            const centerY = ((row1 + row2) / 2) * (cellSize + 8) + cellSize / 2;
-            return (
-              <button
-                key={normKey}
-                onClick={() => {
-                  if (figurePath) {
-                    setSelectedTaskInfo({
-                      path: figurePath,
-                      couplingId: normKey,
-                      taskList,
-                      index: 0,
-                      subIndex: 0,
-                    });
-                    setViewMode("static");
-                  }
-                }}
-                style={{
-                  position: "absolute",
-                  top: centerY,
-                  left: centerX,
-                  width: cellSize * 0.6,
-                  height: cellSize * 0.6,
-                  transform: "translate(-50%, -50%)",
-                }}
-                className={`rounded-lg bg-base-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow ${
-                  task.over_threshold
-                    ? "border-2 border-primary animate-pulse-light"
-                    : ""
-                }`}
+              // Adjust position for region mode
+              const displayRow = row - displayGridStart.row;
+              const displayCol = col - displayGridStart.col;
+              const x = displayCol * (displayCellSize + 8);
+              const y = displayRow * (displayCellSize + 8);
+
+              return (
+                <div
+                  key={qid}
+                  className="absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30"
+                  style={{
+                    top: y,
+                    left: x,
+                    width: displayCellSize,
+                    height: displayCellSize,
+                  }}
+                >
+                  {qid}
+                </div>
+              );
+            })}
+
+          {Object.entries(normalizedResultMap)
+            .filter(([normKey]) => {
+              const [qid1, qid2] = normKey.split("-").map(Number);
+              return isCouplingInRegion(qid1, qid2);
+            })
+            .map(([normKey, taskList]) => {
+              const [qid1, qid2] = normKey.split("-").map(Number);
+              const task = taskList[0];
+              const figurePath = Array.isArray(task.figure_path)
+                ? task.figure_path[0]
+                : task.figure_path || null;
+              const { row1, col1, row2, col2 } = getCouplingPosition(
+                qid1,
+                qid2,
+                gridSize,
+              );
+
+              // Adjust position for region mode
+              const displayRow1 = row1 - displayGridStart.row;
+              const displayCol1 = col1 - displayGridStart.col;
+              const displayRow2 = row2 - displayGridStart.row;
+              const displayCol2 = col2 - displayGridStart.col;
+              const centerX =
+                ((displayCol1 + displayCol2) / 2) * (displayCellSize + 8) +
+                displayCellSize / 2;
+              const centerY =
+                ((displayRow1 + displayRow2) / 2) * (displayCellSize + 8) +
+                displayCellSize / 2;
+              return (
+                <button
+                  key={normKey}
+                  onClick={() => {
+                    if (figurePath) {
+                      setSelectedTaskInfo({
+                        path: figurePath,
+                        couplingId: normKey,
+                        taskList,
+                        index: 0,
+                        subIndex: 0,
+                      });
+                      setViewMode("static");
+                    }
+                  }}
+                  style={{
+                    position: "absolute",
+                    top: centerY,
+                    left: centerX,
+                    width: displayCellSize * 0.6,
+                    height: displayCellSize * 0.6,
+                  }}
+                  className={`rounded-lg bg-base-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 -translate-x-1/2 -translate-y-1/2 ${
+                    task.over_threshold
+                      ? "border-2 border-primary animate-pulse-light"
+                      : ""
+                  }`}
+                >
+                  {figurePath && (
+                    <TaskFigure
+                      path={figurePath}
+                      qid={String(task.couplingId)}
+                      className="w-full h-full object-contain"
+                    />
+                  )}
+                </button>
+              );
+            })}
+
+          {/* Region selection overlay - only when enabled and in full view mode */}
+          {zoomMode === "full" && regionSelectionEnabled && (
+            <div className="absolute inset-0 pointer-events-none">
+              <div
+                className="grid gap-2 w-full h-full"
+                style={{ gridTemplateColumns: `repeat(${numRegions}, 1fr)` }}
               >
-                {figurePath && (
-                  <TaskFigure
-                    path={figurePath}
-                    qid={String(task.couplingId)}
-                    className="w-full h-full object-contain"
-                  />
+                {Array.from({ length: numRegions * numRegions }).map(
+                  (_, index) => {
+                    const regionRow = Math.floor(index / numRegions);
+                    const regionCol = index % numRegions;
+                    const isHovered =
+                      hoveredRegion?.row === regionRow &&
+                      hoveredRegion?.col === regionCol;
+
+                    return (
+                      <button
+                        key={index}
+                        className={`pointer-events-auto transition-all duration-200 rounded-lg ${
+                          isHovered
+                            ? "bg-primary/20 border-2 border-primary"
+                            : "bg-transparent border-2 border-transparent hover:border-primary/50"
+                        }`}
+                        onMouseEnter={() =>
+                          setHoveredRegion({ row: regionRow, col: regionCol })
+                        }
+                        onMouseLeave={() => setHoveredRegion(null)}
+                        onClick={() => {
+                          setSelectedRegion({ row: regionRow, col: regionCol });
+                          setZoomMode("region");
+                        }}
+                        title={`Zoom to region (${regionRow + 1}, ${
+                          regionCol + 1
+                        })`}
+                      />
+                    );
+                  },
                 )}
-              </button>
-            );
-          })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -461,6 +650,19 @@ export function CouplingGrid({
                       {selectedTaskInfo.taskList[selectedTaskInfo.index].status}
                     </div>
                   </div>
+                  {(() => {
+                    const endAt =
+                      selectedTaskInfo.taskList[selectedTaskInfo.index].end_at;
+                    if (!endAt) return null;
+                    return (
+                      <div className="card bg-base-200 p-4 rounded-xl">
+                        <h4 className="font-medium mb-2">Calibrated At</h4>
+                        <p className="text-sm">
+                          {new Date(endAt).toLocaleString()}
+                        </p>
+                      </div>
+                    );
+                  })()}
                   {(() => {
                     const outputParams =
                       selectedTaskInfo.taskList[selectedTaskInfo.index]

@@ -1,8 +1,8 @@
 import "./globals.css";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
-import Providers from "./providers";
 import { SidebarProvider } from "./contexts/SidebarContext";
+import Providers from "./providers";
 
 export const metadata = {
   title: "QDash",

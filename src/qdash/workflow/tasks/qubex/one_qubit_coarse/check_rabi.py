@@ -1,22 +1,20 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.session.qubex import QubexSession
+from qdash.workflow.engine.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    BaseTask,
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
+from qdash.workflow.tasks.qubex.base import QubexTask
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
-class CheckRabi(BaseTask):
+class CheckRabi(QubexTask):
     """Task to check the Rabi oscillation."""
 
     name: str = "CheckRabi"
-    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "time_range": InputParameterModel(
@@ -49,16 +47,11 @@ class CheckRabi(BaseTask):
         "rabi_reference_phase": OutputParameterModel(unit="a.u.", description="Rabi reference phase"),
     }
 
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
-        """Preprocess the task."""
-        return PreProcessResult(input_parameters=self.input_parameters)
-
     def postprocess(
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         """Process the results of the task."""
-        exp = session.get_session()
-        label = exp.get_qubit_label(int(qid))
+        label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
         self.output_parameters["rabi_amplitude"].value = result.rabi_params[label].amplitude
         self.output_parameters["rabi_amplitude"].error = result.data[label].fit()["amplitude_err"]
@@ -79,18 +72,18 @@ class CheckRabi(BaseTask):
 
     def run(self, session: QubexSession, qid: str) -> RunResult:
         """Run the task."""
-        exp = session.get_session()
-        label = exp.get_qubit_label(int(qid))
-        result = exp.obtain_rabi_params(
-            time_range=self.input_parameters["time_range"].get_value(),
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
-            targets=label,
-        )
-        exp.calib_note.save()
+        exp = self.get_experiment(session)
+        label = self.get_qubit_label(session, qid)
+
+        # Apply frequency override if qubit_frequency was explicitly provided
+        with self._apply_frequency_override(session, qid):
+            result = exp.obtain_rabi_params(
+                time_range=self.input_parameters["time_range"].get_value(),
+                shots=self.input_parameters["shots"].get_value(),
+                interval=self.input_parameters["interval"].get_value(),
+                targets=label,
+            )
+
+        self.save_calibration(session)
         r2 = result.rabi_params[label].r2 if result.rabi_params else None
         return RunResult(raw_result=result, r2={qid: r2})
-
-    def batch_run(self, session: QubexSession, qid: str) -> RunResult:
-        """Batch run is not implemented."""
-        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")

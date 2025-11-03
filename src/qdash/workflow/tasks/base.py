@@ -4,7 +4,7 @@ from typing import Any, ClassVar, Literal
 import plotly.graph_objs as go
 from pydantic import BaseModel
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.session.base import BaseSession
+from qdash.workflow.engine.session.base import BaseSession
 
 
 class PreProcessResult(BaseModel):
@@ -55,7 +55,11 @@ class BaseTask(ABC):
         if backend is None:
             raise ValueError(f"{cls.__name__} に backend を定義してください")
         task_name = getattr(cls, "name", cls.__name__)
-        BaseTask.registry.setdefault(backend, {})[task_name] = cls
+
+        # Skip registration for intermediate base classes (those with empty name)
+        # Only concrete task implementations should be registered
+        if task_name:
+            BaseTask.registry.setdefault(backend, {})[task_name] = cls
 
     def __init__(self, params: dict[str, Any] | None = None) -> None:
         """Initialize task with parameters.
@@ -65,6 +69,13 @@ class BaseTask(ABC):
             params: Optional dictionary containing task parameters
 
         """
+        # Create instance-specific deep copies of input/output parameters
+        # to avoid sharing state between task instances
+        from copy import deepcopy
+
+        self.input_parameters = deepcopy(self.__class__.input_parameters)
+        self.output_parameters = deepcopy(self.__class__.output_parameters)
+
         if params is not None:
             self._convert_and_set_parameters(params)
 
@@ -114,11 +125,30 @@ class BaseTask(ABC):
             input_params = params["input_parameters"]
             for name, param_data in input_params.items():
                 if name in self.input_parameters:
+                    # Parameter already exists in class definition - update its value
                     value = param_data.get("value")
                     if value is not None:
                         value_type = param_data.get("value_type", self.input_parameters[name].value_type)
                         converted_value = self._convert_value_to_type(value, value_type)
                         self.input_parameters[name].value = converted_value
+                else:
+                    # Parameter doesn't exist yet (e.g., qubit_frequency added by preprocess)
+                    # Create a new InputParameterModel from the provided data
+                    from qdash.datamodel.task import InputParameterModel
+
+                    value = param_data.get("value")
+                    if value is not None:
+                        value_type = param_data.get("value_type", "float")
+                        unit = param_data.get("unit", "")
+                        description = param_data.get("description", "")
+                        converted_value = self._convert_value_to_type(value, value_type)
+
+                        self.input_parameters[name] = InputParameterModel(
+                            unit=unit,
+                            description=description,
+                            value=converted_value,
+                            value_type=value_type,
+                        )
 
     @abstractmethod
     def preprocess(self, session: BaseSession, qid: str) -> PreProcessResult:
@@ -205,4 +235,10 @@ class BaseTask(ABC):
         """Attach the execution id to the output parameters."""
         for value in self.output_parameters.values():
             value.execution_id = execution_id
+        return self.output_parameters
+
+    def attach_task_id(self, task_id: str) -> dict[str, OutputParameterModel]:
+        """Attach the task id to the output parameters."""
+        for value in self.output_parameters.values():
+            value.task_id = task_id
         return self.output_parameters

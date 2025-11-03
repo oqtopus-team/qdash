@@ -35,452 +35,6 @@
         }
       }
     },
-    "/api/calibration/cron-schedule": {
-      "get": {
-        "tags": ["calibration"],
-        "summary": "Fetches all the cron schedules.",
-        "description": "List all the cron schedules.",
-        "operationId": "listCronSchedules",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListCronScheduleResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": ["calibration"],
-        "summary": "Schedules a calibration with cron.",
-        "description": "Schedule a calibration.",
-        "operationId": "scheduleCronCalib",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ScheduleCronCalibRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScheduleCronCalibResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/calibration": {
-      "post": {
-        "tags": ["calibration"],
-        "summary": "Executes a calibration by creating a flow run from a deployment.",
-        "description": "Create a flow run from a deployment.",
-        "operationId": "execute_calib",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ExecuteCalibRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExecuteCalibResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/calibration/schedule": {
-      "get": {
-        "tags": ["calibration"],
-        "summary": "Fetches all the calibration schedules.",
-        "description": "Fetch all the calibration schedules.",
-        "operationId": "fetch_all_calib_schedule",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ScheduleCalibResponse"
-                  },
-                  "type": "array",
-                  "title": "Response Fetch All Calib Schedule"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": ["calibration"],
-        "summary": "Schedules a calibration.",
-        "description": "Schedule a calibration.",
-        "operationId": "schedule_calib",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ScheduleCalibRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScheduleCalibResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/calibration/schedule/{flow_run_id}": {
-      "delete": {
-        "tags": ["calibration"],
-        "summary": "Deletes a calibration schedule.",
-        "description": "Delete a calibration schedule.",
-        "operationId": "delete_calib_schedule",
-        "parameters": [
-          {
-            "name": "flow_run_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Flow Run Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/menu": {
-      "get": {
-        "tags": ["menu"],
-        "summary": "Retrieve a list of menu items.",
-        "description": "Retrieve a list of menu items.\n\nReturns\n-------\n    ListMenuResponse: A response containing the list of menu items.",
-        "operationId": "list_menu",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListMenuResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": ["menu"],
-        "summary": "Create a new menu item.",
-        "description": "Create a new menu item.\n\nArgs:\n----\n    request (CreateMenuRequest): The request object containing the menu item details.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    CreateMenuResponse: The response object containing the name of the created menu item.",
-        "operationId": "create_menu",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateMenuRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateMenuResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/menu/preset": {
-      "get": {
-        "tags": ["menu"],
-        "summary": "Retrieve a list of preset menu items.",
-        "description": "Retrieve a list of preset menu items.\n\nReturns\n-------\n    ListMenuResponse: A response containing the list of preset menu items.",
-        "operationId": "listPreset",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListMenuResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Detail"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/menu/{name}": {
-      "get": {
-        "tags": ["menu"],
-        "summary": "Retrieve a menu by its name.",
-        "description": "Retrieve a menu by its name.\n\nArgs:\n----\n    name (str): The name of the menu.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    GetMenuResponse: The response containing the menu details.\n\nRaises:\n------\n    InternalServerError: If there is an error retrieving the menu.\n    NotFoundErrorResponse: If the menu is not found.",
-        "operationId": "get_menu_by_name",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GetMenuResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Detail"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": ["menu"],
-        "summary": "Update a menu with the given name.",
-        "description": "Update a menu with the given name.\n\nArgs:\n----\n    name (str): The name of the menu to update.\n    req (UpdateMenuRequest): The request object containing the updated menu data.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    Union[UpdateMenuResponse, NotFoundErrorResponse]: The response object indicating the success of the update or an error if the menu is not found.",
-        "operationId": "update_menu",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateMenuRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UpdateMenuResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Detail"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": ["menu"],
-        "summary": "Delete a menu by its name.",
-        "description": "Delete a menu by its name.\n\nArgs:\n----\n    name (str): The name of the menu to be deleted.\n    current_user (User): The current authenticated user.\n\nReturns:\n-------\n    DeleteMenuResponse | NotFoundErrorResponse: The response indicating the success or failure of the deletion.",
-        "operationId": "delete_menu",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeleteMenuResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Detail"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/settings": {
       "get": {
         "tags": ["settings"],
@@ -592,6 +146,44 @@
             "APIKeyHeader": []
           }
         ]
+      },
+      "post": {
+        "tags": ["chip"],
+        "summary": "Create a new chip",
+        "description": "Create a new chip.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
+        "operationId": "createChip",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChipRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/chip/{chip_id}/dates": {
@@ -921,7 +513,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/qubit/{task_name}": {
+    "/api/chip/{chip_id}/task/qubit/{task_name}/latest": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch latest qubit task results with optional outlier filtering",
@@ -954,6 +546,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LatestTaskGroupedByChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chip/{chip_id}/task/qubit/{qid}/task/{task_name}": {
+      "get": {
+        "tags": ["chip"],
+        "summary": "Fetch Qubit Task History",
+        "description": "Fetch latest qubit task results with optional defensive outlier filtering.",
+        "operationId": "fetchQubitTaskHistory",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskHistoryResponse"
                 }
               }
             }
@@ -1030,7 +686,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/coupling/{task_name}": {
+    "/api/chip/{chip_id}/task/coupling/{task_name}/latest": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch the multiplexers",
@@ -1501,6 +1157,47 @@
         }
       }
     },
+    "/api/task/{task_id}": {
+      "get": {
+        "tags": ["task"],
+        "summary": "Get task result by task ID",
+        "description": "Get task result by task_id.\n\nArgs:\n----\n    task_id: The task ID to search for.\n    current_user: The current authenticated user.\n\nReturns:\n-------\n    TaskResultResponse: The task result information including figure paths.",
+        "operationId": "get_task_result_by_task_id",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/parameter": {
       "get": {
         "tags": ["parameter"],
@@ -1642,6 +1339,908 @@
           }
         ]
       }
+    },
+    "/api/flow": {
+      "get": {
+        "tags": ["flow"],
+        "summary": "List Flows",
+        "description": "List all Flows for the current user.\n\nReturns metadata only (no code content for performance).",
+        "operationId": "list_flows",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListFlowsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["flow"],
+        "summary": "Save a Flow",
+        "description": "Save a Flow to file system and MongoDB.\n\nSteps:\n1. Validate flow name\n2. Validate flow code contains expected function\n3. Create user directory if not exists\n4. Write code to file: user_flows/{username}/{name}.py\n5. Upsert metadata to MongoDB\n6. Return file path and success message",
+        "operationId": "save_flow",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveFlowRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow/{name}": {
+      "get": {
+        "tags": ["flow"],
+        "summary": "Get Flow details",
+        "description": "Get Flow details including code content.\n\nSteps:\n1. Find metadata in MongoDB\n2. Read code from file\n3. Return combined data",
+        "operationId": "get_flow",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["flow"],
+        "summary": "Delete a Flow",
+        "description": "Delete a Flow.\n\nSteps:\n1. Delete file from user_flows/{username}/{name}.py\n2. Delete metadata from MongoDB",
+        "operationId": "delete_flow",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Flow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow/{name}/execute": {
+      "post": {
+        "tags": ["flow"],
+        "summary": "Execute a Flow",
+        "description": "Execute a Flow via Prefect deployment.\n\nSteps:\n1. Find flow metadata in MongoDB\n2. Merge request parameters with default_parameters\n3. Create flow run via Prefect Client\n4. Return execution_id and URLs",
+        "operationId": "execute_flow",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteFlowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow-templates": {
+      "get": {
+        "tags": ["flow"],
+        "summary": "List Flow Templates",
+        "description": "List all available flow templates.\n\nReturns metadata only (no code content for performance).",
+        "operationId": "list_flow_templates",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FlowTemplate"
+                  },
+                  "type": "array",
+                  "title": "Response List Flow Templates"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow-templates/{template_id}": {
+      "get": {
+        "tags": ["flow"],
+        "summary": "Get Flow Template",
+        "description": "Get flow template details including code content.\n\nSteps:\n1. Find template metadata\n2. Read Python file content\n3. Return combined data",
+        "operationId": "get_flow_template",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowTemplateWithCode"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow/{name}/schedule": {
+      "post": {
+        "tags": ["flow_schedule"],
+        "summary": "Schedule a Flow execution (cron or one-time)",
+        "description": "Schedule a Flow execution with cron or one-time schedule.\n\nArgs:\n----\n    name: Flow name\n    request: Schedule request (must provide either cron or scheduled_time)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Schedule response with schedule_id and details",
+        "operationId": "schedule_flow",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleFlowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow/{name}/schedules": {
+      "get": {
+        "tags": ["flow_schedule"],
+        "summary": "List schedules for a specific Flow",
+        "description": "List all schedules (cron and one-time) for a specific Flow.\n\nArgs:\n----\n    name: Flow name\n    current_user: Current authenticated user\n    limit: Maximum number of schedules to return (max 100)\n    offset: Number of schedules to skip\n\nReturns:\n-------\n    List of schedules for the flow",
+        "operationId": "list_flow_schedules",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListFlowSchedulesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow-schedules": {
+      "get": {
+        "tags": ["flow_schedule"],
+        "summary": "List all Flow schedules for current user",
+        "description": "List all Flow schedules (cron and one-time) for the current user.\n\nArgs:\n----\n    current_user: Current authenticated user\n    limit: Maximum number of schedules to return (max 100)\n    offset: Number of schedules to skip\n\nReturns:\n-------\n    List of all flow schedules",
+        "operationId": "list_all_flow_schedules",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListFlowSchedulesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/flow-schedule/{schedule_id}": {
+      "delete": {
+        "tags": ["flow_schedule"],
+        "summary": "Delete a Flow schedule",
+        "description": "Delete a Flow schedule (cron or one-time).\n\nSchedule ID Types:\n- **Cron schedules**: schedule_id is the deployment_id (UUID format)\n- **One-time schedules**: schedule_id is the flow_run_id (UUID format)\n\nThe API automatically determines the type and handles accordingly:\n- Cron: Removes the schedule from the deployment (schedule=None)\n- One-time: Deletes the scheduled flow run\n\nArgs:\n----\n    schedule_id: Schedule ID (deployment_id for cron, flow_run_id for one-time)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Standardized response with schedule type information",
+        "operationId": "delete_flow_schedule",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteScheduleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["flow_schedule"],
+        "summary": "Update a Flow schedule",
+        "description": "Update a Flow schedule (cron schedules only).\n\nCan update: active status, cron expression, parameters.\n\nArgs:\n----\n    schedule_id: Schedule ID (deployment_id)\n    request: Update request\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Success message",
+        "operationId": "update_flow_schedule",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScheduleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateScheduleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config": {
+      "get": {
+        "tags": ["metrics"],
+        "summary": "Get Metrics Config",
+        "description": "Get metrics metadata configuration.\n\nThis endpoint returns the metrics configuration loaded from YAML,\nincluding display metadata for all qubit and coupling metrics.\n\nReturns\n-------\n    Dictionary with metrics configuration including:\n    - qubit_metrics: Metadata for single-qubit metrics\n    - coupling_metrics: Metadata for two-qubit coupling metrics\n    - color_scale: Color scale configuration for visualization",
+        "operationId": "metrics-get_metrics_config",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Metrics-Get Metrics Config"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chip/{chip_id}/metrics": {
+      "get": {
+        "tags": ["metrics"],
+        "summary": "Get Chip Metrics",
+        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
+        "operationId": "metrics-get_chip_metrics",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "within_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to data within N hours (e.g., 24)",
+              "title": "Within Hours"
+            },
+            "description": "Filter to data within N hours (e.g., 24)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipMetricsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chips": {
+      "get": {
+        "tags": ["metrics"],
+        "summary": "List Chips",
+        "description": "Get list of available chips for a user.\n\nArgs:\n----\n    username: Username to filter by\n    _current_user: Current authenticated user\n\nReturns:\n-------\n    Dictionary with list of chips",
+        "operationId": "metrics-list_chips",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Username",
+              "default": "admin",
+              "title": "Username"
+            },
+            "description": "Username"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Metrics-List Chips"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chip/current": {
+      "get": {
+        "tags": ["metrics"],
+        "summary": "Get Current Chip",
+        "description": "Get current chip for a user.\n\nArgs:\n----\n    username: Username to filter by\n    _current_user: Current authenticated user\n\nReturns:\n-------\n    Dictionary with current chip_id",
+        "operationId": "metrics-get_current_chip",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Username",
+              "default": "admin",
+              "title": "Username"
+            },
+            "description": "Username"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Metrics-Get Current Chip"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chip/{chip_id}/qubit/{qid}/metric-history": {
+      "get": {
+        "tags": ["metrics"],
+        "summary": "Get Qubit Metric History",
+        "description": "Get historical metric data for a specific qubit with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    qid: The qubit identifier (e.g., \"0\", \"Q00\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items to return (1-100)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids",
+        "operationId": "metrics-get_qubit_metric_history",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "metric",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Metric name (e.g., t1, qubit_frequency)",
+              "title": "Metric"
+            },
+            "description": "Metric name (e.g., t1, qubit_frequency)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Max number of history items",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Max number of history items"
+          },
+          {
+            "name": "within_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to last N days",
+              "default": 30,
+              "title": "Within Days"
+            },
+            "description": "Filter to last N days"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QubitMetricHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chip/{chip_id}/coupling/{coupling_id}/metric-history": {
+      "get": {
+        "tags": ["metrics"],
+        "summary": "Get Coupling Metric History",
+        "description": "Get historical metric data for a specific coupling with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific coupling metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    coupling_id: The coupling identifier (e.g., \"0-1\", \"2-3\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items to return (1-100)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids\n    (Note: qid field contains coupling_id for coupling metrics)",
+        "operationId": "metrics-get_coupling_metric_history",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "coupling_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Coupling Id"
+            }
+          },
+          {
+            "name": "metric",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Metric name (e.g., zx90_gate_fidelity, bell_state_fidelity)",
+              "title": "Metric"
+            },
+            "description": "Metric name (e.g., zx90_gate_fidelity, bell_state_fidelity)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Max number of history items",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Max number of history items"
+          },
+          {
+            "name": "within_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to last N days",
+              "default": 30,
+              "title": "Within Days"
+            },
+            "description": "Filter to last N days"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QubitMetricHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1661,21 +2260,6 @@
         "required": ["name", "username"],
         "title": "BackendResponseModel",
         "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
-      },
-      "BatchNode": {
-        "properties": {
-          "batch": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Batch"
-          }
-        },
-        "type": "object",
-        "required": ["batch"],
-        "title": "BatchNode",
-        "description": "Batch node model."
       },
       "Body_auth-login": {
         "properties": {
@@ -1741,6 +2325,49 @@
         "required": ["data"],
         "title": "ChipDatesResponse",
         "description": "Response model for chip dates."
+      },
+      "ChipMetricsResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "qubit_count": {
+            "type": "integer",
+            "title": "Qubit Count"
+          },
+          "within_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Within Hours"
+          },
+          "qubit_metrics": {
+            "$ref": "#/components/schemas/QubitMetrics"
+          },
+          "coupling_metrics": {
+            "$ref": "#/components/schemas/CouplingMetrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "username",
+          "qubit_count",
+          "qubit_metrics",
+          "coupling_metrics"
+        ],
+        "title": "ChipMetricsResponse",
+        "description": "Complete chip metrics response."
       },
       "ChipResponse": {
         "properties": {
@@ -1833,139 +2460,94 @@
         "title": "CouplingGateDuration",
         "description": "Gate duration of the coupling."
       },
-      "CreateMenuRequest": {
+      "CouplingMetrics": {
         "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "chip_id": {
-            "type": "string",
-            "title": "Chip Id"
-          },
-          "username": {
-            "type": "string",
-            "title": "Username"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "backend": {
-            "type": "string",
-            "title": "Backend",
-            "default": ""
-          },
-          "schedule": {
+          "zx90_gate_fidelity": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SerialNode"
-              },
-              {
-                "$ref": "#/components/schemas/ParallelNode"
-              },
-              {
-                "$ref": "#/components/schemas/BatchNode"
-              }
-            ],
-            "title": "Schedule"
-          },
-          "notify_bool": {
-            "type": "boolean",
-            "title": "Notify Bool",
-            "default": false
-          },
-          "tasks": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
                 },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tasks"
-          },
-          "task_details": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Task Details"
+            "title": "Zx90 Gate Fidelity"
           },
-          "tags": {
+          "bell_state_fidelity": {
             "anyOf": [
               {
-                "items": {
-                  "type": "string"
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
                 },
-                "type": "array"
+                "type": "object"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Tags"
+            "title": "Bell State Fidelity"
+          },
+          "static_zz_interaction": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Static Zz Interaction"
           }
         },
         "type": "object",
-        "required": ["name", "chip_id", "username", "description", "schedule"],
-        "title": "CreateMenuRequest",
-        "description": "CreateMenuRequest is a Pydantic model for creating a menu item.",
-        "example": {
-          "backend": "qubex",
-          "batch_mode": false,
-          "description": "This is a sample menu item.",
-          "name": "CheckOneQubit",
-          "notify_bool": false,
-          "qids": [["28", "29"]],
-          "tags": ["debug"],
-          "tasks": [
-            "CheckStatus",
-            "DumpBox",
-            "CheckNoise",
-            "CheckRabi",
-            "CreateHPIPulse",
-            "CheckHPIPulse",
-            "CreatePIPulse",
-            "CheckPIPulse",
-            "CheckT1",
-            "CheckT2Echo"
-          ],
-          "username": "admin"
-        }
+        "title": "CouplingMetrics",
+        "description": "Two-qubit coupling metrics data."
       },
-      "CreateMenuResponse": {
+      "CreateChipRequest": {
         "properties": {
-          "name": {
+          "chip_id": {
             "type": "string",
-            "title": "Name"
+            "title": "Chip Id"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "default": 64
           }
         },
         "type": "object",
-        "required": ["name"],
-        "title": "CreateMenuResponse",
-        "description": "CreateMenuResponse is a Pydantic model for the create menu response."
+        "required": ["chip_id"],
+        "title": "CreateChipRequest",
+        "description": "Request model for creating a new chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip to create.\n    size (int): The size of the chip (64, 144, 256, or 1024)."
       },
-      "DeleteMenuResponse": {
+      "DeleteScheduleResponse": {
         "properties": {
-          "name": {
+          "message": {
             "type": "string",
-            "title": "Name"
+            "title": "Message",
+            "description": "Success message"
+          },
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id",
+            "description": "Deleted schedule ID"
+          },
+          "schedule_type": {
+            "type": "string",
+            "title": "Schedule Type",
+            "description": "Type of deleted schedule (cron or one-time)"
           }
         },
         "type": "object",
-        "required": ["name"],
-        "title": "DeleteMenuResponse",
-        "description": "DeleteMenuResponse is a Pydantic model for the delete menu response."
+        "required": ["message", "schedule_id", "schedule_type"],
+        "title": "DeleteScheduleResponse",
+        "description": "Response for deleting a schedule."
       },
       "Detail": {
         "properties": {
@@ -2055,160 +2637,54 @@
         "title": "DeviceTopologyRequest",
         "description": "Request model for device topology."
       },
-      "ExecuteCalibRequest": {
+      "ExecuteFlowRequest": {
         "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "chip_id": {
-            "type": "string",
-            "title": "Chip Id"
-          },
-          "username": {
-            "type": "string",
-            "title": "Username"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "backend": {
-            "type": "string",
-            "title": "Backend",
-            "default": ""
-          },
-          "schedule": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SerialNode"
-              },
-              {
-                "$ref": "#/components/schemas/ParallelNode"
-              },
-              {
-                "$ref": "#/components/schemas/BatchNode"
-              }
-            ],
-            "title": "Schedule"
-          },
-          "notify_bool": {
-            "type": "boolean",
-            "title": "Notify Bool",
-            "default": false
-          },
-          "tasks": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tasks"
-          },
-          "task_details": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Task Details"
-          },
-          "tags": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tags"
+          "parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameters",
+            "description": "Execution parameters (overrides default_parameters)"
           }
         },
         "type": "object",
-        "required": ["name", "chip_id", "username", "description", "schedule"],
-        "title": "ExecuteCalibRequest",
-        "description": "ExecuteCalibRequest is a subclass of MenuModel.",
+        "title": "ExecuteFlowRequest",
+        "description": "Request to execute a Flow.",
         "examples": [
           {
-            "backend": "qubex",
-            "chip_id": "chip1",
-            "description": "check one qubit characteristics short",
-            "name": "CheckRabi",
-            "notify_bool": false,
-            "qids": [["28"]],
-            "tags": ["debug"],
-            "task_details": {
-              "CheckRabi": {
-                "description": "Task to check the Rabi oscillation.",
-                "input_parameters": {
-                  "interval": {
-                    "description": "Time interval for Rabi oscillation",
-                    "unit": "ns",
-                    "value": 153600,
-                    "value_type": "int"
-                  },
-                  "shots": {
-                    "description": "Number of shots for Rabi oscillation",
-                    "unit": "a.u.",
-                    "value": 1024,
-                    "value_type": "int"
-                  },
-                  "time_range": {
-                    "description": "Time range for Rabi oscillation",
-                    "unit": "ns",
-                    "value": [0, 201, 4],
-                    "value_type": "range"
-                  }
-                },
-                "name": "CheckRabi",
-                "output_parameters": {
-                  "rabi_amplitude": {
-                    "description": "Rabi oscillation amplitude",
-                    "unit": "a.u."
-                  },
-                  "rabi_frequency": {
-                    "description": "Rabi oscillation frequency",
-                    "unit": "GHz"
-                  }
-                },
-                "task_type": "qubit",
-                "username": "admin"
-              }
-            },
-            "tasks": ["CheckRabi"],
-            "username": "admin"
+            "parameters": {
+              "max_iterations": 5,
+              "qids": ["32", "38"]
+            }
           }
         ]
       },
-      "ExecuteCalibResponse": {
+      "ExecuteFlowResponse": {
         "properties": {
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id",
+            "description": "Execution ID"
+          },
           "flow_run_url": {
             "type": "string",
-            "title": "Flow Run Url"
+            "title": "Flow Run Url",
+            "description": "Prefect flow run URL"
           },
           "qdash_ui_url": {
             "type": "string",
-            "title": "Qdash Ui Url"
+            "title": "Qdash Ui Url",
+            "description": "QDash UI URL for execution"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Success message"
           }
         },
         "type": "object",
-        "required": ["flow_run_url", "qdash_ui_url"],
-        "title": "ExecuteCalibResponse",
-        "description": "ExecuteCalibResponse is a subclass of BaseModel."
+        "required": ["execution_id", "flow_run_url", "qdash_ui_url", "message"],
+        "title": "ExecuteFlowResponse",
+        "description": "Response after executing a flow."
       },
       "ExecutionLockStatusResponse": {
         "properties": {
@@ -2344,93 +2820,291 @@
         "title": "FidelityCondition",
         "description": "Condition for fidelity filtering."
       },
-      "GetMenuResponse": {
+      "FlowScheduleSummary": {
         "properties": {
-          "name": {
+          "schedule_id": {
             "type": "string",
-            "title": "Name"
+            "title": "Schedule Id",
+            "description": "Schedule ID"
           },
-          "chip_id": {
+          "flow_name": {
             "type": "string",
-            "title": "Chip Id"
+            "title": "Flow Name",
+            "description": "Flow name"
           },
-          "username": {
+          "schedule_type": {
             "type": "string",
-            "title": "Username"
+            "title": "Schedule Type",
+            "description": "Schedule type: 'cron' or 'one-time'"
           },
-          "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "backend": {
-            "type": "string",
-            "title": "Backend",
-            "default": ""
-          },
-          "schedule": {
+          "cron": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SerialNode"
+                "type": "string"
               },
               {
-                "$ref": "#/components/schemas/ParallelNode"
-              },
-              {
-                "$ref": "#/components/schemas/BatchNode"
+                "type": "null"
               }
             ],
-            "title": "Schedule"
+            "title": "Cron",
+            "description": "Cron expression"
           },
-          "notify_bool": {
+          "next_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run",
+            "description": "Next scheduled run time"
+          },
+          "active": {
             "type": "boolean",
-            "title": "Notify Bool",
-            "default": false
+            "title": "Active",
+            "description": "Whether the schedule is active"
           },
-          "tasks": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tasks"
-          },
-          "task_details": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Task Details"
-          },
-          "tags": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tags"
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "Schedule creation time"
           }
         },
         "type": "object",
-        "required": ["name", "chip_id", "username", "description", "schedule"],
-        "title": "GetMenuResponse",
-        "description": "GetMenuResponse is a Pydantic model for the get menu response."
+        "required": [
+          "schedule_id",
+          "flow_name",
+          "schedule_type",
+          "active",
+          "created_at"
+        ],
+        "title": "FlowScheduleSummary",
+        "description": "Summary of a scheduled Flow."
+      },
+      "FlowSummary": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Flow name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Flow description"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Target chip ID"
+          },
+          "flow_function_name": {
+            "type": "string",
+            "title": "Flow Function Name",
+            "description": "Entry point function name"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "Creation timestamp (ISO format)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "Last update timestamp (ISO format)"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "chip_id",
+          "flow_function_name",
+          "created_at",
+          "updated_at",
+          "tags"
+        ],
+        "title": "FlowSummary",
+        "description": "Summary of a Flow for listing."
+      },
+      "FlowTemplate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Template ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Template name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Template description"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "Template category"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Python filename"
+          },
+          "function_name": {
+            "type": "string",
+            "title": "Function Name",
+            "description": "Flow function name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "category",
+          "filename",
+          "function_name"
+        ],
+        "title": "FlowTemplate",
+        "description": "Flow template metadata."
+      },
+      "FlowTemplateWithCode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Template ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Template name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Template description"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "Template category"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Python filename"
+          },
+          "function_name": {
+            "type": "string",
+            "title": "Function Name",
+            "description": "Flow function name"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Python code content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "category",
+          "filename",
+          "function_name",
+          "code"
+        ],
+        "title": "FlowTemplateWithCode",
+        "description": "Flow template with code content."
+      },
+      "GetFlowResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Flow name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Flow description"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Python code content"
+          },
+          "flow_function_name": {
+            "type": "string",
+            "title": "Flow Function Name",
+            "description": "Entry point function name"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Target chip ID"
+          },
+          "default_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Default Parameters",
+            "description": "Default parameters"
+          },
+          "file_path": {
+            "type": "string",
+            "title": "File Path",
+            "description": "Path to file"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "Creation timestamp (ISO format)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "Last update timestamp (ISO format)"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "code",
+          "flow_function_name",
+          "chip_id",
+          "default_parameters",
+          "file_path",
+          "created_at",
+          "updated_at",
+          "tags"
+        ],
+        "title": "GetFlowResponse",
+        "description": "Response for getting flow details."
       },
       "HTTPValidationError": {
         "properties": {
@@ -2497,16 +3171,6 @@
             },
             "type": "object",
             "title": "Result"
-          },
-          "outlier_detection": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OutlierDetectionMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "type": "object",
@@ -2514,35 +3178,37 @@
         "title": "LatestTaskGroupedByChipResponse",
         "description": "ChipTaskResponse is a Pydantic model that represents the response for fetching the tasks of a chip."
       },
-      "ListCronScheduleResponse": {
+      "ListFlowSchedulesResponse": {
         "properties": {
           "schedules": {
             "items": {
-              "$ref": "#/components/schemas/ScheduleCronCalibResponse"
+              "$ref": "#/components/schemas/FlowScheduleSummary"
             },
             "type": "array",
-            "title": "Schedules"
+            "title": "Schedules",
+            "description": "List of flow schedules"
           }
         },
         "type": "object",
         "required": ["schedules"],
-        "title": "ListCronScheduleResponse",
-        "description": "ListCronScheduleResponse is a subclass of BaseModel."
+        "title": "ListFlowSchedulesResponse",
+        "description": "Response for listing flow schedules."
       },
-      "ListMenuResponse": {
+      "ListFlowsResponse": {
         "properties": {
-          "menus": {
+          "flows": {
             "items": {
-              "$ref": "#/components/schemas/MenuModel"
+              "$ref": "#/components/schemas/FlowSummary"
             },
             "type": "array",
-            "title": "Menus"
+            "title": "Flows",
+            "description": "List of flow summaries"
           }
         },
         "type": "object",
-        "required": ["menus"],
-        "title": "ListMenuResponse",
-        "description": "ListMenuResponse is a Pydantic model that represents a menu item."
+        "required": ["flows"],
+        "title": "ListFlowsResponse",
+        "description": "Response for listing flows."
       },
       "ListMuxResponse": {
         "properties": {
@@ -2628,93 +3294,94 @@
         "title": "MeasError",
         "description": "Measurement error of the qubit."
       },
-      "MenuModel": {
+      "MetricHistoryItem": {
         "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "chip_id": {
-            "type": "string",
-            "title": "Chip Id"
-          },
-          "username": {
-            "type": "string",
-            "title": "Username"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "backend": {
-            "type": "string",
-            "title": "Backend",
-            "default": ""
-          },
-          "schedule": {
+          "value": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SerialNode"
-              },
-              {
-                "$ref": "#/components/schemas/ParallelNode"
-              },
-              {
-                "$ref": "#/components/schemas/BatchNode"
-              }
-            ],
-            "title": "Schedule"
-          },
-          "notify_bool": {
-            "type": "boolean",
-            "title": "Notify Bool",
-            "default": false
-          },
-          "tasks": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
+                "type": "number"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Tasks"
+            "title": "Value"
           },
-          "task_details": {
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "task_id": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Task Details"
+            "title": "Task Id"
           },
-          "tags": {
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "calibrated_at": {
             "anyOf": [
               {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Tags"
+            "title": "Calibrated At"
           }
         },
         "type": "object",
-        "required": ["name", "chip_id", "username", "description", "schedule"],
-        "title": "MenuModel",
-        "description": "Menu model.\n\nAttributes\n----------\n    name (str): The name of the menu.\n    username (str): The username of the user who created\n    description (str): Detailed description of the menu.\n    cal_plan (list[list[int]]): The calibration plan.\n    notify_bool (bool): The notification boolean.\n    tasks (list[str]): The tasks.\n    tags (list[str]): The tags."
+        "required": ["value", "execution_id", "timestamp"],
+        "title": "MetricHistoryItem",
+        "description": "Single historical metric data point."
+      },
+      "MetricValue": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          }
+        },
+        "type": "object",
+        "title": "MetricValue",
+        "description": "Single metric value with metadata."
       },
       "MuxDetailResponse": {
         "properties": {
@@ -2737,62 +3404,6 @@
         "required": ["mux_id", "detail"],
         "title": "MuxDetailResponse",
         "description": "MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details."
-      },
-      "OutlierDetectionMetadata": {
-        "properties": {
-          "enabled": {
-            "type": "boolean",
-            "title": "Enabled"
-          },
-          "method": {
-            "type": "string",
-            "title": "Method"
-          },
-          "parameters": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Parameters"
-          },
-          "original_count": {
-            "type": "integer",
-            "title": "Original Count"
-          },
-          "filtered_count": {
-            "type": "integer",
-            "title": "Filtered Count"
-          },
-          "outlier_count": {
-            "type": "integer",
-            "title": "Outlier Count"
-          },
-          "outlier_qids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Outlier Qids"
-          },
-          "physical_violations": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Physical Violations"
-          }
-        },
-        "type": "object",
-        "required": [
-          "enabled",
-          "method",
-          "parameters",
-          "original_count",
-          "filtered_count",
-          "outlier_count",
-          "outlier_qids",
-          "physical_violations"
-        ],
-        "title": "OutlierDetectionMetadata",
-        "description": "Metadata about outlier detection applied to the data."
       },
       "OutputParameterModel": {
         "properties": {
@@ -2837,39 +3448,16 @@
             "type": "string",
             "title": "Execution Id",
             "default": ""
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "default": ""
           }
         },
         "type": "object",
         "title": "OutputParameterModel",
         "description": "Data model.\n\nAttributes\n----------\n    qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.\n    coupling (dict[str, dict[str, float | int]]): The calibration data for couplings."
-      },
-      "ParallelNode": {
-        "properties": {
-          "parallel": {
-            "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/SerialNode"
-                },
-                {
-                  "$ref": "#/components/schemas/ParallelNode"
-                },
-                {
-                  "$ref": "#/components/schemas/BatchNode"
-                },
-                {
-                  "type": "string"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Parallel"
-          }
-        },
-        "type": "object",
-        "required": ["parallel"],
-        "title": "ParallelNode",
-        "description": "Parallel node model."
       },
       "ParameterModel": {
         "properties": {
@@ -2993,142 +3581,377 @@
         "title": "QubitLifetime",
         "description": "Qubit lifetime of the qubit."
       },
-      "ScheduleCalibRequest": {
+      "QubitMetricHistoryResponse": {
         "properties": {
-          "menu_name": {
+          "chip_id": {
             "type": "string",
-            "title": "Menu Name"
+            "title": "Chip Id"
           },
-          "scheduled": {
+          "qid": {
             "type": "string",
-            "title": "Scheduled"
+            "title": "Qid"
+          },
+          "metric_name": {
+            "type": "string",
+            "title": "Metric Name"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/MetricHistoryItem"
+            },
+            "type": "array",
+            "title": "History"
           }
         },
         "type": "object",
-        "required": ["menu_name", "scheduled"],
-        "title": "ScheduleCalibRequest",
-        "description": "ScheduleCalibRequest is a subclass of BaseModel."
+        "required": ["chip_id", "qid", "metric_name", "username", "history"],
+        "title": "QubitMetricHistoryResponse",
+        "description": "Historical metric data for a single qubit."
       },
-      "ScheduleCalibResponse": {
+      "QubitMetrics": {
         "properties": {
-          "menu_name": {
-            "type": "string",
-            "title": "Menu Name"
+          "qubit_frequency": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qubit Frequency"
           },
-          "menu": {
-            "$ref": "#/components/schemas/ExecuteCalibRequest"
+          "anharmonicity": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anharmonicity"
+          },
+          "t1": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "T1"
+          },
+          "t2_echo": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "T2 Echo"
+          },
+          "t2_star": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "T2 Star"
+          },
+          "average_readout_fidelity": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Readout Fidelity"
+          },
+          "x90_gate_fidelity": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "X90 Gate Fidelity"
+          },
+          "x180_gate_fidelity": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MetricValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "X180 Gate Fidelity"
+          }
+        },
+        "type": "object",
+        "title": "QubitMetrics",
+        "description": "Single qubit metrics data."
+      },
+      "SaveFlowRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Flow name (alphanumeric + underscore only)"
           },
           "description": {
             "type": "string",
-            "title": "Description"
+            "title": "Description",
+            "description": "Flow description",
+            "default": ""
           },
-          "note": {
+          "code": {
             "type": "string",
-            "title": "Note"
+            "title": "Code",
+            "description": "Python code content"
+          },
+          "flow_function_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Function Name",
+            "description": "Entry point function name (defaults to same as name if not provided)"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Target chip ID"
+          },
+          "default_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Default Parameters",
+            "description": "Default execution parameters"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Tags for categorization"
+          }
+        },
+        "type": "object",
+        "required": ["name", "code", "chip_id"],
+        "title": "SaveFlowRequest",
+        "description": "Request to save a Flow.",
+        "examples": [
+          {
+            "chip_id": "64Qv3",
+            "code": "from prefect import flow\n\n@flow\ndef my_adaptive_calibration():\n    pass",
+            "default_parameters": {
+              "max_iterations": 10,
+              "qids": ["32"]
+            },
+            "description": "Adaptive calibration with convergence check",
+            "flow_function_name": "my_adaptive_calibration",
+            "name": "my_adaptive_calibration",
+            "tags": ["adaptive", "calibration"]
+          }
+        ]
+      },
+      "SaveFlowResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Flow name"
+          },
+          "file_path": {
+            "type": "string",
+            "title": "File Path",
+            "description": "Path to saved file"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Success message"
+          }
+        },
+        "type": "object",
+        "required": ["name", "file_path", "message"],
+        "title": "SaveFlowResponse",
+        "description": "Response after saving a flow."
+      },
+      "ScheduleFlowRequest": {
+        "properties": {
+          "cron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron",
+            "description": "Cron expression (e.g., '0 2 * * *' for daily at 2am JST)"
+          },
+          "scheduled_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled Time",
+            "description": "One-time execution time (ISO format, JST)"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameters",
+            "description": "Execution parameters (overrides default_parameters)"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "description": "Whether the schedule is active",
+            "default": true
           },
           "timezone": {
             "type": "string",
-            "title": "Timezone"
+            "title": "Timezone",
+            "description": "Timezone for schedule",
+            "default": "Asia/Tokyo"
+          }
+        },
+        "type": "object",
+        "title": "ScheduleFlowRequest",
+        "description": "Request to schedule a Flow execution.",
+        "examples": [
+          {
+            "active": true,
+            "cron": "0 2 * * *",
+            "parameters": {
+              "max_iterations": 10,
+              "qids": ["32"]
+            },
+            "timezone": "Asia/Tokyo"
           },
-          "scheduled_time": {
+          {
+            "active": true,
+            "parameters": {
+              "qids": ["32"]
+            },
+            "scheduled_time": "2025-11-01T02:00:00+09:00"
+          }
+        ]
+      },
+      "ScheduleFlowResponse": {
+        "properties": {
+          "schedule_id": {
             "type": "string",
-            "title": "Scheduled Time"
+            "title": "Schedule Id",
+            "description": "Schedule ID (deployment ID for cron, flow_run_id for one-time)"
           },
-          "flow_run_id": {
+          "flow_name": {
             "type": "string",
-            "title": "Flow Run Id"
+            "title": "Flow Name",
+            "description": "Flow name"
+          },
+          "schedule_type": {
+            "type": "string",
+            "title": "Schedule Type",
+            "description": "Schedule type: 'cron' or 'one-time'"
+          },
+          "cron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron",
+            "description": "Cron expression (for cron schedules)"
+          },
+          "next_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run",
+            "description": "Next scheduled run time (ISO format)"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "description": "Whether the schedule is active"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Success message"
           }
         },
         "type": "object",
         "required": [
-          "menu_name",
-          "menu",
-          "description",
-          "note",
-          "timezone",
-          "scheduled_time",
-          "flow_run_id"
+          "schedule_id",
+          "flow_name",
+          "schedule_type",
+          "active",
+          "message"
         ],
-        "title": "ScheduleCalibResponse",
-        "description": "ScheduleCalibResponse is a subclass of BaseModel."
-      },
-      "ScheduleCronCalibRequest": {
-        "properties": {
-          "scheduler_name": {
-            "type": "string",
-            "title": "Scheduler Name"
-          },
-          "menu_name": {
-            "type": "string",
-            "title": "Menu Name"
-          },
-          "cron": {
-            "type": "string",
-            "title": "Cron"
-          },
-          "active": {
-            "type": "boolean",
-            "title": "Active",
-            "default": true
-          }
-        },
-        "type": "object",
-        "required": ["scheduler_name", "menu_name", "cron"],
-        "title": "ScheduleCronCalibRequest",
-        "description": "ScheduleCronCalibRequest is a subclass of BaseModel."
-      },
-      "ScheduleCronCalibResponse": {
-        "properties": {
-          "scheduler_name": {
-            "type": "string",
-            "title": "Scheduler Name"
-          },
-          "menu_name": {
-            "type": "string",
-            "title": "Menu Name"
-          },
-          "cron": {
-            "type": "string",
-            "title": "Cron"
-          },
-          "active": {
-            "type": "boolean",
-            "title": "Active",
-            "default": true
-          }
-        },
-        "type": "object",
-        "required": ["scheduler_name", "menu_name", "cron"],
-        "title": "ScheduleCronCalibResponse",
-        "description": "ScheduleCronCalibResponse is a subclass of BaseModel."
-      },
-      "SerialNode": {
-        "properties": {
-          "serial": {
-            "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/SerialNode"
-                },
-                {
-                  "$ref": "#/components/schemas/ParallelNode"
-                },
-                {
-                  "$ref": "#/components/schemas/BatchNode"
-                },
-                {
-                  "type": "string"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Serial"
-          }
-        },
-        "type": "object",
-        "required": ["serial"],
-        "title": "SerialNode",
-        "description": "Serial node model."
+        "title": "ScheduleFlowResponse",
+        "description": "Response after scheduling a flow."
       },
       "Settings": {
         "properties": {
@@ -3464,6 +4287,24 @@
         "title": "Task",
         "description": "Task is a Pydantic model that represents a task."
       },
+      "TaskHistoryResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "data": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Task"
+            },
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": ["name", "data"],
+        "title": "TaskHistoryResponse"
+      },
       "TaskResponse": {
         "properties": {
           "name": {
@@ -3515,6 +4356,83 @@
         "title": "TaskResponse",
         "description": "Response model for a task."
       },
+      "TaskResultResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "figure_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Figure Path"
+          },
+          "json_figure_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Json Figure Path"
+          },
+          "input_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input Parameters"
+          },
+          "output_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Output Parameters"
+          },
+          "start_at": {
+            "type": "string",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "type": "string",
+            "title": "Elapsed Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "task_name",
+          "qid",
+          "status",
+          "execution_id",
+          "figure_path",
+          "json_figure_path",
+          "input_parameters",
+          "output_parameters",
+          "start_at",
+          "end_at",
+          "elapsed_time"
+        ],
+        "title": "TaskResultResponse",
+        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (str): Start time.\n    end_at (str): End time.\n    elapsed_time (str): Elapsed time."
+      },
       "TimeSeriesData": {
         "properties": {
           "data": {
@@ -3533,63 +4451,26 @@
         "title": "TimeSeriesData",
         "description": "TimeSeriesData is a Pydantic model that represents the time series data."
       },
-      "UpdateMenuRequest": {
+      "UpdateScheduleRequest": {
         "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "chip_id": {
-            "type": "string",
-            "title": "Chip Id"
-          },
-          "username": {
-            "type": "string",
-            "title": "Username"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "backend": {
-            "type": "string",
-            "title": "Backend",
-            "default": ""
-          },
-          "schedule": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SerialNode"
-              },
-              {
-                "$ref": "#/components/schemas/ParallelNode"
-              },
-              {
-                "$ref": "#/components/schemas/BatchNode"
-              }
-            ],
-            "title": "Schedule"
-          },
-          "notify_bool": {
+          "active": {
             "type": "boolean",
-            "title": "Notify Bool",
-            "default": false
+            "title": "Active",
+            "description": "Whether the schedule is active"
           },
-          "tasks": {
+          "cron": {
             "anyOf": [
               {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Tasks"
+            "title": "Cron",
+            "description": "Updated cron expression (optional)"
           },
-          "task_details": {
+          "parameters": {
             "anyOf": [
               {
                 "additionalProperties": true,
@@ -3599,39 +4480,38 @@
                 "type": "null"
               }
             ],
-            "title": "Task Details"
+            "title": "Parameters",
+            "description": "Updated parameters (optional)"
           },
-          "tags": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tags"
-          }
-        },
-        "type": "object",
-        "required": ["name", "chip_id", "username", "description", "schedule"],
-        "title": "UpdateMenuRequest",
-        "description": "UpdateMenuRequest is a Pydantic model for updating a menu item."
-      },
-      "UpdateMenuResponse": {
-        "properties": {
-          "name": {
+          "timezone": {
             "type": "string",
-            "title": "Name"
+            "title": "Timezone",
+            "description": "Timezone for cron schedule",
+            "default": "Asia/Tokyo"
           }
         },
         "type": "object",
-        "required": ["name"],
-        "title": "UpdateMenuResponse",
-        "description": "UpdateMenuResponse is a Pydantic model for the update menu response."
+        "required": ["active"],
+        "title": "UpdateScheduleRequest",
+        "description": "Request to update a schedule."
+      },
+      "UpdateScheduleResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Success message"
+          },
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id",
+            "description": "Updated schedule ID"
+          }
+        },
+        "type": "object",
+        "required": ["message", "schedule_id"],
+        "title": "UpdateScheduleResponse",
+        "description": "Response for updating a schedule."
       },
       "User": {
         "properties": {

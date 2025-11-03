@@ -3,20 +3,18 @@ from typing import ClassVar
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.core.session.qubex import QubexSession
+from qdash.workflow.engine.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
-    BaseTask,
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
+from qdash.workflow.tasks.qubex.base import QubexTask
 
 
-class CheckReadoutAmplitude(BaseTask):
+class CheckReadoutAmplitude(QubexTask):
     """Task to check the readout amplitude."""
 
     name: str = "CheckReadoutAmplitude"
-    backend: str = "qubex"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "amplitude_range": InputParameterModel(
@@ -27,10 +25,6 @@ class CheckReadoutAmplitude(BaseTask):
         )
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
-
-    def preprocess(self, session: QubexSession, qid: str) -> PreProcessResult:  # noqa: ARG002
-        """Preprocess the task."""
-        return PreProcessResult(input_parameters=self.input_parameters)
 
     def make_figure(self, signal: dict, noise: dict, snr: dict, label: str) -> go.Figure:
         fig = make_subplots(rows=3, cols=1, shared_xaxes=True)
@@ -80,8 +74,7 @@ class CheckReadoutAmplitude(BaseTask):
         self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         """Process the results of the task."""
-        exp = session.get_session()
-        label = exp.get_qubit_label(int(qid))
+        label = self.get_qubit_label(session, qid)
         result = run_result.raw_result
         signal = result["signal"]
         noise = result["noise"]
@@ -95,10 +88,10 @@ class CheckReadoutAmplitude(BaseTask):
 
     def batch_run(self, session: QubexSession, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits."""
-        exp = session.get_session()
-        labels = [exp.get_qubit_label(int(qid)) for qid in qids]
+        exp = self.get_experiment(session)
+        labels = [self.get_qubit_label(session, qid) for qid in qids]
         result = exp.sweep_readout_amplitude(
             targets=labels, amplitude_range=self.input_parameters["amplitude_range"].get_value()
         )
-        exp.calib_note.save()
+        self.save_calibration(session)
         return RunResult(raw_result=result)

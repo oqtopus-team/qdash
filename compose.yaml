@@ -90,6 +90,56 @@ services:
       - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
     networks:
       - custom_net
+  deployment-service:
+    build:
+      context: .
+      dockerfile: ./src/qdash/workflow/Dockerfile.deployment
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - prefect-server
+      - workflow
+    volumes:
+      - ./src/qdash/workflow:/app/qdash/workflow
+      - ./src/qdash/dbmodel:/app/qdash/dbmodel
+      - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./src/qdash/config.py:/app/qdash/config.py
+    working_dir: /app/qdash/workflow
+    command: uvicorn deployment_service:app --host 0.0.0.0 --port 8001
+    ports:
+      - "${DEPLOYMENT_SERVICE_PORT:-8001}:8001"
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
+    networks:
+      - custom_net
+  user-flow-worker:
+    build:
+      context: .
+      dockerfile: ./src/qdash/workflow/Dockerfile
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - prefect-server
+      - deployment-service
+    volumes:
+      - ./src/qdash/workflow:/app/qdash/workflow
+      - ./src/qdash/dbmodel:/app/qdash/dbmodel
+      - ./src/qdash/datamodel:/app/qdash/datamodel
+      - ./src/qdash/config.py:/app/qdash/config.py
+      - ${CALIB_DATA_PATH}:/app/calib_data
+      - ${CONFIG_PATH}:/app/config/qubex
+    working_dir: /app/qdash/workflow
+    command: >
+      sh -c "python setup_work_pool.py &&
+             prefect worker start --pool user-flows-pool"
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
+    networks:
+      - custom_net
   api:
     build:
       context: .
@@ -105,9 +155,12 @@ services:
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/config.py:/app/qdash/config.py
+      - ./src/qdash/workflow/user_flows:/app/qdash/workflow/user_flows # Shared user flows
+      - ./src/qdash/workflow/examples/templates:/app/qdash/workflow/examples/templates # Flow templates
+      - ./config:/app/config # Metrics metadata and other config files
       - ${CALIB_DATA_PATH}:/app/calib_data
       - ${QPU_DATA_PATH}:/app/qpu_data
-      - ${CONFIG_PATH}:/app/config
+      - ${CONFIG_PATH}:/app/config/qubex
     working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
     develop:
@@ -118,11 +171,13 @@ services:
     depends_on:
       - mongo
       - prefect-server
+      - deployment-service
     environment:
       - PYTHONPATH=/app:/app/qdash:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
       - CALIB_DATA_PATH=/app/calib_data
       - QPU_DATA_PATH=/app/qpu_data
       - PREFECT_API_URL=http://prefect-server:4200/api
+      - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
     networks:
       - custom_net
   ui:

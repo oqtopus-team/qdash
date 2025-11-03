@@ -71,9 +71,9 @@ class QubitModel(BaseModel):
             raise TypeError(msg)
         return cleaned
 
-    def get_bare_frequency(self) -> float | None:
+    def get_qubit_frequency(self) -> float | None:
         """Get the bare frequency of the qubit."""
-        v = self.data.get("bare_frequency")
+        v = self.data.get("qubit_frequency")
         if v is None:
             return None
         return float(v.get("value", 0.0))

@@ -50,6 +50,196 @@ QDash follows a microservices architecture with three major components:
   - `investigate_calibration`: Investigate calibration results and execution history
   - `get_chip_parameters`: Get chip parameter information including fidelity statistics
 
+### 5. Python Flow Editor (New Feature)
+
+- **Location**: `/src/qdash/workflow/helpers/`
+- **Purpose**: High-level API for creating custom calibration workflows in Python
+- **Features**:
+  - `FlowSession`: Session management for calibration flows
+  - Parallel/serial qubit calibration helpers
+  - Adaptive calibration with convergence detection
+  - Integrated save processing via refactored TaskManager
+- **Examples**: `/src/qdash/workflow/examples/`
+
+**Key Components:**
+
+- **FlowSession**: Manages calibration sessions with automatic save processing
+- **Helper Functions**:
+  - `init_calibration()` - Initialize calibration session
+  - `calibrate_qubits_task_first()` - Execute tasks sequentially, processing all qubits for each task
+  - `calibrate_qubits_qubit_first()` - Execute tasks sequentially, completing all tasks for each qubit
+  - `adaptive_calibrate()` - Closed-loop calibration with convergence
+  - `execute_schedule()` - Execute tasks according to schedule definition (SerialNode, ParallelNode, BatchNode)
+- **Integration**: Built on top of refactored TaskManager with unified save processing
+
+**Execution Modes (Sequential):**
+
+- **`calibrate_qubits_task_first`**: Task1→Q0→Q1→Q2, Task2→Q0→Q1→Q2, Task3→Q0→Q1→Q2
+- **`calibrate_qubits_qubit_first`**: Q0:[Task1→Task2→Task3], Q1:[Task1→Task2→Task3], Q2:[Task1→Task2→Task3]
+- **`execute_schedule`**: Custom orchestration using SerialNode, ParallelNode, BatchNode (compatible with MenuModel schedules)
+
+**Note on Parallel Execution:**
+Python Flow Editor provides simple sequential execution for custom flows. For true parallel execution across multiple qubits or deployment-level orchestration, use the existing `dispatch_cal_flow` with `ParallelNode` schedules.
+
+**Usage Examples:**
+
+```python
+from prefect import flow
+from qdash.workflow.helpers import init_calibration, get_session, finish_calibration, execute_schedule
+from qdash.datamodel.menu import SerialNode, ParallelNode, BatchNode
+
+# Simple sequential calibration
+@flow
+def simple_calibration(username, chip_id, qids):
+    # execution_id auto-generated, ExecutionLock managed automatically
+    # qids required for qubex backend initialization
+    session = init_calibration(username, chip_id, qids)
+
+    # Execute tasks sequentially
+    session = get_session()
+    results = {}
+    for qid in qids:
+        results[qid] = {}
+        for task in ["CheckFreq", "CheckRabi"]:
+            results[qid][task] = session.execute_task(task, qid)
+
+    finish_calibration()
+    return results
+
+# Schedule-based calibration
+@flow
+def schedule_calibration(username, chip_id, qids):
+    session = init_calibration(username, chip_id, qids)
+
+    # Custom schedule: Q0→Q1 in serial, then all together
+    schedule = SerialNode(serial=[
+        ParallelNode(parallel=["0", "1"]),
+        BatchNode(batch=["0", "1", "2"])
+    ])
+
+    results = execute_schedule(tasks=["CheckFreq", "CheckRabi"], schedule=schedule)
+    finish_calibration()
+    return results
+```
+
+**Key Features:**
+
+- **Auto-generation of execution_id**: If not provided, generates YYYYMMDD-NNN format
+- **ExecutionLock management**: Prevents concurrent calibrations (can be disabled with `use_lock=False`)
+- **Automatic directory creation**: Creates calibration data directories automatically
+- **ChipHistory updates**: Updates ChipHistoryDocument on completion
+- **Error handling**: `fail_calibration()` method for proper error cleanup
+- **Integrated with handler.py**: Compatible with existing Menu-based workflows
+
+### Parallel Execution (New)
+
+Python Flow Editor now supports true parallel execution using Prefect's `@task` + `submit()`:
+
+```python
+from prefect import flow
+from qdash.workflow.helpers import init_calibration, calibrate_parallel, finish_calibration
+
+# True parallel execution across multiple qubits
+@flow
+def parallel_calibration(username, chip_id, qids):
+    session = init_calibration(username, chip_id, qids)
+
+    # Each qubit calibrated in parallel (not sequential)
+    results = calibrate_parallel(
+        qids=["0", "1", "2", "3"],
+        tasks=["CheckFreq", "CheckRabi", "CheckT1"]
+    )
+
+    finish_calibration()
+    return results
+```
+
+### Custom Parallel Adaptive Calibration (Closed Loop)
+
+Write your own closed-loop calibration logic and parallelize it:
+
+```python
+from prefect import flow
+from qdash.workflow.helpers import (
+    init_calibration,
+    parallel_map,
+    get_session,
+    finish_calibration
+)
+
+def my_adaptive_calibration(qid, threshold, max_iter):
+    """YOUR custom convergence logic"""
+    session = get_session()
+
+    for iteration in range(max_iter):
+        result = session.execute_task("CheckFreq", qid)
+
+        # YOUR convergence check
+        if abs(result["qubit_frequency"] - 5.0) < threshold:
+            print(f"Q{qid} converged!")
+            break
+
+        # YOUR parameter update
+        session.set_parameter(qid, "qubit_frequency", result["qubit_frequency"])
+
+    return result
+
+# Parallel closed-loop calibration
+@flow
+def adaptive_freq_calibration(username, chip_id, qids):
+    session = init_calibration(username, chip_id, qids)
+
+    # Parallelize your custom logic
+    # Each qubit appears as "adaptive-Q{qid}" in Prefect UI
+    results = parallel_map(
+        items=qids,
+        func=my_adaptive_calibration,
+        task_name_func=lambda qid: f"adaptive-Q{qid}",  # Visible in Prefect UI
+        threshold=0.01,
+        max_iter=10
+    )
+
+    finish_calibration()
+    return results
+```
+
+### Custom Parallel Logic
+
+Execute arbitrary custom code in parallel:
+
+```python
+from prefect import flow
+from qdash.workflow.helpers import (
+    init_calibration,
+    parallel_map,
+    get_session,
+    finish_calibration
+)
+
+def my_custom_calibration(qid, threshold):
+    """Custom calibration logic"""
+    session = get_session()
+    for i in range(10):
+        result = session.execute_task("CheckFreq", qid)
+        if abs(result["qubit_frequency"] - 5.0) < threshold:
+            break
+    return result
+
+@flow
+def custom_parallel_flow(username, chip_id, qids):
+    session = init_calibration(username, chip_id, qids)
+
+    # Parallelize custom logic across qubits
+    results = parallel_map(
+        items=qids,
+        func=my_custom_calibration,
+        threshold=0.01
+    )
+
+    finish_calibration()
+    return results
+```
+
 ## Directory Structure
 
 ```
@@ -69,6 +259,8 @@ qdash/
 │   ├── qdash/
 │   │   ├── api/            # FastAPI backend
 │   │   ├── workflow/       # Prefect workflow engine
+│   │   │   ├── helpers/    # 🆕 Python Flow Editor helpers
+│   │   │   └── examples/   # 🆕 Example Python Flows
 │   │   ├── dbmodel/        # Database models
 │   │   ├── datamodel/      # Data models
 │   │   ├── cli/            # CLI tools
