@@ -223,6 +223,8 @@ src/qdash/workflow/*.json
 src/qdash/workflow/.calibration/*.json
 src/qdash/workflow/.classifier/*/*
 /config
+# Exception: Keep metrics configuration in git
+!/config/metrics_metadata.yaml
 src/tools/schedule/*
 .serena/cache/*
 .mcp.json

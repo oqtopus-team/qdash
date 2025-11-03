@@ -80,29 +80,72 @@ export function QubitMetricsGrid({
   const regionSize = 4; // 4×4 qubits per region
   const numRegions = Math.floor(gridSize / regionSize);
 
-  // Calculate color for a value with auto-adjusted scale
+  // Helper function to interpolate between two hex colors
+  const interpolateColor = (
+    color1: string,
+    color2: string,
+    factor: number,
+  ): string => {
+    const c1 = parseInt(color1.slice(1), 16);
+    const c2 = parseInt(color2.slice(1), 16);
+
+    const r1 = (c1 >> 16) & 0xff;
+    const g1 = (c1 >> 8) & 0xff;
+    const b1 = c1 & 0xff;
+
+    const r2 = (c2 >> 16) & 0xff;
+    const g2 = (c2 >> 8) & 0xff;
+    const b2 = c2 & 0xff;
+
+    const r = Math.round(r1 + (r2 - r1) * factor);
+    const g = Math.round(g1 + (g2 - g1) * factor);
+    const b = Math.round(b1 + (b2 - b1) * factor);
+
+    return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+  };
+
+  // Calculate color for a value with auto-adjusted scale and smooth interpolation
   const getColor = (
     value: number | null,
     autoMin: number,
     autoMax: number,
-  ): string => {
+  ): string | null => {
     if (value === null || value === undefined) {
-      return "bg-base-300/50";
+      return null; // Will use CSS class instead
     }
 
     const { colors } = colorScale;
+    if (colors.length === 0) return null;
+
     // Use auto-adjusted min/max if colorScale has min=max=0
     const effectiveMin =
       colorScale.min === 0 && colorScale.max === 0 ? autoMin : colorScale.min;
     const effectiveMax =
       colorScale.min === 0 && colorScale.max === 0 ? autoMax : colorScale.max;
 
+    // Handle edge case where min === max
+    if (effectiveMin === effectiveMax) {
+      return colors[colors.length - 1];
+    }
+
     const normalized = Math.max(
       0,
       Math.min(1, (value - effectiveMin) / (effectiveMax - effectiveMin)),
     );
-    const colorIndex = Math.floor(normalized * (colors.length - 1));
-    return colors[colorIndex];
+
+    // Calculate position in color array with smooth interpolation
+    const position = normalized * (colors.length - 1);
+    const lowerIndex = Math.floor(position);
+    const upperIndex = Math.min(lowerIndex + 1, colors.length - 1);
+    const factor = position - lowerIndex;
+
+    // If factor is 0 or indices are the same, return exact color
+    if (factor === 0 || lowerIndex === upperIndex) {
+      return colors[lowerIndex];
+    }
+
+    // Interpolate between two adjacent colors
+    return interpolateColor(colors[lowerIndex], colors[upperIndex], factor);
   };
 
   // Calculate statistics
@@ -261,6 +304,8 @@ export function QubitMetricsGrid({
                 );
               }
 
+              const bgColor = getColor(value, stats.min, stats.max);
+
               return (
                 <button
                   key={qid}
@@ -268,10 +313,11 @@ export function QubitMetricsGrid({
                     metric && setSelectedQubitInfo({ qid, metric })
                   }
                   className={`aspect-square rounded-lg shadow-md flex flex-col items-center justify-center transition-all hover:shadow-xl hover:scale-105 relative group cursor-pointer ${
-                    value !== null && value !== undefined
-                      ? getColor(value, stats.min, stats.max)
-                      : "bg-base-300/50"
+                    !bgColor ? "bg-base-300/50" : ""
                   }`}
+                  style={{
+                    backgroundColor: bgColor || undefined,
+                  }}
                 >
                   {/* QID Label - always visible */}
                   <div

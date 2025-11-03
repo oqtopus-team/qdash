@@ -83,6 +83,7 @@ export * from "./metricValueValue";
 export * from "./metricsGetChipMetricsParams";
 export * from "./metricsGetCurrentChip200";
 export * from "./metricsGetCurrentChipParams";
+export * from "./metricsGetMetricsConfig200";
 export * from "./metricsGetQubitMetricHistoryParams";
 export * from "./metricsListChips200";
 export * from "./metricsListChipsParams";
