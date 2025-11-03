@@ -8,9 +8,11 @@
     "**/.next/**",
     "**/build/**",
     "**/dist/**",
-    "src/client/**/*.ts"
+    "src/client/**/*.ts",
+    "src/schemas/**/*.ts"
   ],
   "ignoreDependencies": ["sharp", "daisyui", "tailwindcss", "autoprefixer"],
+  "ignoreBinaries": ["jq", "python"],
   "next": {
     "entry": [
       "next.config.js",

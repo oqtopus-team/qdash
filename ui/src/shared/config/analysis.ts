@@ -125,7 +125,7 @@ export const PARAMETER_GROUPS = {
 } as const;
 
 // Threshold range configurations for sliders
-export const THRESHOLD_RANGES: Record<
+const THRESHOLD_RANGES: Record<
   string,
   { min: number; max: number; step: number }
 > = {
@@ -142,7 +142,7 @@ export const THRESHOLD_RANGES: Record<
 };
 
 // Error rate ranges (for error rate display mode)
-export const ERROR_RATE_RANGES: Record<
+const ERROR_RATE_RANGES: Record<
   string,
   { min: number; max: number; step: number }
 > = {
@@ -155,12 +155,8 @@ export const ERROR_RATE_RANGES: Record<
 };
 
 // Utility functions
-export function isCoherenceParameter(parameter: string): boolean {
+function isCoherenceParameter(parameter: string): boolean {
   return PARAMETER_GROUPS.coherence.includes(parameter as any);
-}
-
-export function isFidelityParameter(parameter: string): boolean {
-  return PARAMETER_GROUPS.fidelity.includes(parameter as any);
 }
 
 export function getParameterRange(

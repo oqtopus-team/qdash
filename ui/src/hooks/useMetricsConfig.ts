@@ -8,7 +8,7 @@
 import { useMemo } from "react";
 import { useMetricsGetMetricsConfig } from "@/client/metrics/metrics";
 
-export interface MetricMetadata {
+interface MetricMetadata {
   title: string;
   unit: string;
   scale: number;
@@ -16,7 +16,7 @@ export interface MetricMetadata {
   description?: string;
 }
 
-export interface MetricsConfig {
+interface MetricsConfig {
   qubit_metrics: Record<string, MetricMetadata>;
   coupling_metrics: Record<string, MetricMetadata>;
   color_scale: {
@@ -24,7 +24,7 @@ export interface MetricsConfig {
   };
 }
 
-export interface MetricConfig {
+interface MetricConfig {
   key: string;
   title: string;
   unit: string;
@@ -104,41 +104,5 @@ export function useMetricsConfig() {
     isLoading,
     isError,
     error,
-  };
-}
-
-/**
- * Get a specific qubit metric configuration by key.
- */
-export function useQubitMetricConfig(metricKey: string) {
-  const { qubitMetrics, isLoading, isError } = useMetricsConfig();
-
-  const metric = useMemo(
-    () => qubitMetrics.find((m) => m.key === metricKey),
-    [qubitMetrics, metricKey],
-  );
-
-  return {
-    metric,
-    isLoading,
-    isError,
-  };
-}
-
-/**
- * Get a specific coupling metric configuration by key.
- */
-export function useCouplingMetricConfig(metricKey: string) {
-  const { couplingMetrics, isLoading, isError } = useMetricsConfig();
-
-  const metric = useMemo(
-    () => couplingMetrics.find((m) => m.key === metricKey),
-    [couplingMetrics, metricKey],
-  );
-
-  return {
-    metric,
-    isLoading,
-    isError,
   };
 }
