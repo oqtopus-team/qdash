@@ -81,6 +81,7 @@ export * from "./metricValueExecutionId";
 export * from "./metricValueTaskId";
 export * from "./metricValueValue";
 export * from "./metricsGetChipMetricsParams";
+export * from "./metricsGetCouplingMetricHistoryParams";
 export * from "./metricsGetCurrentChip200";
 export * from "./metricsGetCurrentChipParams";
 export * from "./metricsGetMetricsConfig200";

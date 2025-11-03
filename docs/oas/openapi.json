@@ -2141,6 +2141,106 @@
           }
         }
       }
+    },
+    "/api/chip/{chip_id}/coupling/{coupling_id}/metric-history": {
+      "get": {
+        "tags": ["metrics"],
+        "summary": "Get Coupling Metric History",
+        "description": "Get historical metric data for a specific coupling with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific coupling metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    coupling_id: The coupling identifier (e.g., \"0-1\", \"2-3\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items to return (1-100)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids\n    (Note: qid field contains coupling_id for coupling metrics)",
+        "operationId": "metrics-get_coupling_metric_history",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "coupling_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Coupling Id"
+            }
+          },
+          {
+            "name": "metric",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Metric name (e.g., zx90_gate_fidelity, bell_state_fidelity)",
+              "title": "Metric"
+            },
+            "description": "Metric name (e.g., zx90_gate_fidelity, bell_state_fidelity)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Max number of history items",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Max number of history items"
+          },
+          {
+            "name": "within_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to last N days",
+              "default": 30,
+              "title": "Within Days"
+            },
+            "description": "Filter to last N days"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QubitMetricHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
