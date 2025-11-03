@@ -9,11 +9,31 @@ import pendulum
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from qdash.api.lib.auth import get_optional_current_user
+from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.schemas.auth import User
 from qdash.dbmodel.chip import ChipDocument
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+@router.get("/config")
+async def get_metrics_config() -> dict[str, Any]:
+    """Get metrics metadata configuration.
+
+    This endpoint returns the metrics configuration loaded from YAML,
+    including display metadata for all qubit and coupling metrics.
+
+    Returns
+    -------
+        Dictionary with metrics configuration including:
+        - qubit_metrics: Metadata for single-qubit metrics
+        - coupling_metrics: Metadata for two-qubit coupling metrics
+        - color_scale: Color scale configuration for visualization
+
+    """
+    config = load_metrics_config()
+    return config.model_dump()
 
 
 class MetricValue(BaseModel):
@@ -89,17 +109,9 @@ def extract_qubit_metrics(chip: ChipDocument, within_hours: int | None = None) -
         QubitMetrics with all qubit-level metrics
 
     """
-    # Field mapping from DB to display names
-    field_map = {
-        "qubit_frequency": "qubit_frequency",
-        "anharmonicity": "anharmonicity",
-        "t1": "t1",
-        "t2_echo": "t2_echo",
-        "t2_star": "t2_star",
-        "average_readout_fidelity": "average_readout_fidelity",
-        "x90_gate_fidelity": "x90_gate_fidelity",
-        "x180_gate_fidelity": "x180_gate_fidelity",
-    }
+    # Get valid metric keys from config
+    config = load_metrics_config()
+    valid_metric_keys = set(config.qubit_metrics.keys())
 
     # Determine cutoff time if filtering
     cutoff_time = None
@@ -107,7 +119,7 @@ def extract_qubit_metrics(chip: ChipDocument, within_hours: int | None = None) -
         cutoff_time = pendulum.now("Asia/Tokyo").subtract(hours=within_hours)
 
     # Initialize metric dictionaries
-    metrics_data: dict[str, dict[str, MetricValue]] = {display_name: {} for display_name in field_map.values()}
+    metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
 
     # Extract data from each qubit
     for qid, qubit_model in chip.qubits.items():
@@ -123,14 +135,13 @@ def extract_qubit_metrics(chip: ChipDocument, within_hours: int | None = None) -
                         except Exception:
                             include_param = False
 
-                    if include_param and param_name in field_map:
-                        display_name = field_map[param_name]
+                    if include_param and param_name in valid_metric_keys:
                         value = param_data.get("value")
                         task_id = param_data.get("task_id", "")
                         execution_id = param_data.get("execution_id", "")
 
                         # Store the value with metadata
-                        metrics_data[display_name][qid] = MetricValue(
+                        metrics_data[param_name][qid] = MetricValue(
                             value=value,
                             task_id=task_id if task_id else None,
                             execution_id=execution_id if execution_id else None,
@@ -162,18 +173,16 @@ def extract_coupling_metrics(chip: ChipDocument, within_hours: int | None = None
         CouplingMetrics with all coupling-level metrics
 
     """
-    field_map = {
-        "zx90_gate_fidelity": "zx90_gate_fidelity",
-        "bell_state_fidelity": "bell_state_fidelity",
-        "static_zz_interaction": "static_zz_interaction",
-    }
+    # Get valid metric keys from config
+    config = load_metrics_config()
+    valid_metric_keys = set(config.coupling_metrics.keys())
 
     cutoff_time = None
     if within_hours:
         cutoff_time = pendulum.now("Asia/Tokyo").subtract(hours=within_hours)
 
     # Initialize metric dictionaries
-    metrics_data: dict[str, dict[str, MetricValue]] = {display_name: {} for display_name in field_map.values()}
+    metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
 
     # Extract data from each coupling
     for coupling_id, coupling_model in chip.couplings.items():
@@ -189,14 +198,13 @@ def extract_coupling_metrics(chip: ChipDocument, within_hours: int | None = None
                         except Exception:
                             include_param = False
 
-                    if include_param and param_name in field_map:
-                        display_name = field_map[param_name]
+                    if include_param and param_name in valid_metric_keys:
                         value = param_data.get("value")
                         task_id = param_data.get("task_id", "")
                         execution_id = param_data.get("execution_id", "")
 
                         # Store the value with metadata
-                        metrics_data[display_name][coupling_id] = MetricValue(
+                        metrics_data[param_name][coupling_id] = MetricValue(
                             value=value,
                             task_id=task_id if task_id else None,
                             execution_id=execution_id if execution_id else None,

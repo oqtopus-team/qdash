@@ -24,6 +24,7 @@ import type {
   MetricsGetChipMetricsParams,
   MetricsGetCurrentChip200,
   MetricsGetCurrentChipParams,
+  MetricsGetMetricsConfig200,
   MetricsGetQubitMetricHistoryParams,
   MetricsListChips200,
   MetricsListChipsParams,
@@ -34,6 +35,166 @@ import { customInstance } from "../../lib/custom-instance";
 import type { ErrorType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+/**
+ * Get metrics metadata configuration.
+
+This endpoint returns the metrics configuration loaded from YAML,
+including display metadata for all qubit and coupling metrics.
+
+Returns
+-------
+    Dictionary with metrics configuration including:
+    - qubit_metrics: Metadata for single-qubit metrics
+    - coupling_metrics: Metadata for two-qubit coupling metrics
+    - color_scale: Color scale configuration for visualization
+ * @summary Get Metrics Config
+ */
+export const metricsGetMetricsConfig = (
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<MetricsGetMetricsConfig200>(
+    { url: `/api/config`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getMetricsGetMetricsConfigQueryKey = () => {
+  return [`/api/config`] as const;
+};
+
+export const getMetricsGetMetricsConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getMetricsGetMetricsConfigQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof metricsGetMetricsConfig>>
+  > = ({ signal }) => metricsGetMetricsConfig(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type MetricsGetMetricsConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof metricsGetMetricsConfig>>
+>;
+export type MetricsGetMetricsConfigQueryError = ErrorType<unknown>;
+
+export function useMetricsGetMetricsConfig<
+  TData = Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+  TError = ErrorType<unknown>,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+          TError,
+          Awaited<ReturnType<typeof metricsGetMetricsConfig>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useMetricsGetMetricsConfig<
+  TData = Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+          TError,
+          Awaited<ReturnType<typeof metricsGetMetricsConfig>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useMetricsGetMetricsConfig<
+  TData = Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get Metrics Config
+ */
+
+export function useMetricsGetMetricsConfig<
+  TData = Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetMetricsConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getMetricsGetMetricsConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
 
 /**
  * Get chip calibration metrics for visualization.

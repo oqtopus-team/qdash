@@ -13,38 +13,27 @@ import { QubitMetricsGrid } from "./QubitMetricsGrid";
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { useListChips } from "@/client/chip/chip";
 import { useMetricsGetChipMetrics } from "@/client/metrics/metrics";
+import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
 type TimeRange = "1d" | "7d" | "30d";
-
-type MetricConfig = {
-  key: string;
-  title: string;
-  unit: string;
-  scale: number;
-  colorScale: {
-    min: number;
-    max: number;
-    colors: string[];
-  };
-};
 
 type MetricOption = {
   value: string;
   label: string;
 };
 
-// Unified color scale (Viridis-like)
-const UNIFIED_COLORS = [
-  "bg-[#440154]", // Dark purple
-  "bg-[#31688e]", // Blue
-  "bg-[#35b779]", // Green
-  "bg-[#fde724]", // Yellow
-];
-
 export function MetricsPageContent() {
   const [selectedChip, setSelectedChip] = useState<string>("");
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [selectedMetric, setSelectedMetric] = useState<string>("t1");
+
+  // Load metrics configuration from backend
+  const {
+    qubitMetrics: metricsConfig,
+    colorScale,
+    isLoading: isConfigLoading,
+    isError: isConfigError,
+  } = useMetricsConfig();
 
   const { data: chipsData } = useListChips();
 
@@ -80,54 +69,23 @@ export function MetricsPageContent() {
     },
   );
 
-  // Metrics configuration with auto-adjusted colorscale
-  const metricsConfig: MetricConfig[] = [
-    {
-      key: "qubit_frequency",
-      title: "Qubit Frequency",
-      unit: "GHz",
-      scale: 1,
-      colorScale: { min: 0, max: 0, colors: UNIFIED_COLORS }, // Auto-adjusted
-    },
-    {
-      key: "anharmonicity",
-      title: "Qubit Anharmonicity",
-      unit: "MHz",
-      scale: 1e3,
-      colorScale: { min: 0, max: 0, colors: UNIFIED_COLORS }, // Auto-adjusted
-    },
-    {
-      key: "t1",
-      title: "T1",
-      unit: "μs",
-      scale: 1, // Data is already in μs
-      colorScale: { min: 0, max: 0, colors: UNIFIED_COLORS }, // Auto-adjusted
-    },
-    {
-      key: "t2_echo",
-      title: "T2 Echo",
-      unit: "μs",
-      scale: 1, // Data is already in μs
-      colorScale: { min: 0, max: 0, colors: UNIFIED_COLORS }, // Auto-adjusted
-    },
-    {
-      key: "average_readout_fidelity",
-      title: "Average Readout Fidelity",
-      unit: "%",
-      scale: 100,
-      colorScale: { min: 0, max: 0, colors: UNIFIED_COLORS }, // Auto-adjusted
-    },
-    {
-      key: "x90_gate_fidelity",
-      title: "X90 Gate Fidelity",
-      unit: "%",
-      scale: 100,
-      colorScale: { min: 0, max: 0, colors: UNIFIED_COLORS }, // Auto-adjusted
-    },
-  ];
+  // Get color scale as hex values for inline styles
+  const hexColors = useMemo(() => {
+    if (!colorScale.colors || colorScale.colors.length === 0) {
+      // Fallback to default Viridis-like colors
+      return [
+        "#440154", // Dark purple
+        "#31688e", // Blue
+        "#35b779", // Green
+        "#fde724", // Yellow
+      ];
+    }
+    return colorScale.colors;
+  }, [colorScale]);
 
-  const currentMetricConfig = metricsConfig.find(
-    (m) => m.key === selectedMetric,
+  const currentMetricConfig = useMemo(
+    () => metricsConfig.find((m) => m.key === selectedMetric),
+    [metricsConfig, selectedMetric],
   );
 
   const metricOptions: MetricOption[] = useMemo(
@@ -303,6 +261,15 @@ export function MetricsPageContent() {
           <div className="flex items-center justify-center h-96">
             <span className="loading loading-spinner loading-lg"></span>
           </div>
+        ) : isConfigLoading ? (
+          <div className="flex items-center justify-center h-96">
+            <span className="loading loading-spinner loading-lg"></span>
+            <span className="ml-2">Loading metrics configuration...</span>
+          </div>
+        ) : isConfigError ? (
+          <div className="alert alert-error">
+            <span>Failed to load metrics configuration</span>
+          </div>
         ) : isError ? (
           <div className="alert alert-error">
             <span>Failed to load metrics data</span>
@@ -313,7 +280,7 @@ export function MetricsPageContent() {
             title={currentMetricConfig.title}
             metricKey={currentMetricConfig.key}
             unit={currentMetricConfig.unit}
-            colorScale={currentMetricConfig.colorScale}
+            colorScale={{ min: 0, max: 0, colors: hexColors }}
             chipId={selectedChip}
             selectedDate="latest"
           />

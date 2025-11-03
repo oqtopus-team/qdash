@@ -1852,6 +1852,28 @@
         }
       }
     },
+    "/api/config": {
+      "get": {
+        "tags": ["metrics"],
+        "summary": "Get Metrics Config",
+        "description": "Get metrics metadata configuration.\n\nThis endpoint returns the metrics configuration loaded from YAML,\nincluding display metadata for all qubit and coupling metrics.\n\nReturns\n-------\n    Dictionary with metrics configuration including:\n    - qubit_metrics: Metadata for single-qubit metrics\n    - coupling_metrics: Metadata for two-qubit coupling metrics\n    - color_scale: Color scale configuration for visualization",
+        "operationId": "metrics-get_metrics_config",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Metrics-Get Metrics Config"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chip/{chip_id}/metrics": {
       "get": {
         "tags": ["metrics"],
