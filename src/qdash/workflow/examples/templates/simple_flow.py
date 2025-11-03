@@ -82,15 +82,19 @@ def my_custom_flow(
 
     try:
         # Initialize calibration session with GitHub integration
-        from qdash.workflow.flow import GitHubPushConfig, ConfigFileType
+        from qdash.workflow.flow import ConfigFileType, GitHubPushConfig
+
         init_calibration(
-            username, chip_id, qids, flow_name=flow_name,
+            username,
+            chip_id,
+            qids,
+            flow_name=flow_name,
             enable_github_pull=True,  # Pull latest config before calibration
             github_push_config=GitHubPushConfig(
                 enabled=True,
                 file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
-                commit_message=f"Update calibration results for {chip_id}"
-            )
+                commit_message=f"Update calibration results for {chip_id}",
+            ),
         )
 
         # TODO: Edit the tasks you want to run

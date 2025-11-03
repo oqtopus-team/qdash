@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 
-import { TaskFigure } from "@/app/components/TaskFigure";
+import { QubitMetricHistoryModal } from "./QubitMetricHistoryModal";
 
 interface MetricValue {
   value: number | null;
@@ -13,6 +13,7 @@ interface MetricValue {
 interface QubitMetricsGridProps {
   metricData: { [key: string]: MetricValue } | null;
   title: string;
+  metricKey: string;
   unit: string;
   colorScale: {
     min: number;
@@ -53,6 +54,7 @@ function getQubitGridPosition(
 export function QubitMetricsGrid({
   metricData,
   title,
+  metricKey,
   unit,
   colorScale,
   gridSize = 8,
@@ -370,17 +372,17 @@ export function QubitMetricsGrid({
           onClick={() => setSelectedQubitInfo(null)}
         >
           <div
-            className="bg-base-100 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+            className="bg-base-100 rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-base-300 flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold">
-                  Qubit {selectedQubitInfo.qid}
+                  Qubit {selectedQubitInfo.qid} - {title} History
                 </h2>
                 <p className="text-base-content/70 mt-1">
-                  {title}:{" "}
+                  Current Value:{" "}
                   {selectedQubitInfo.metric.value !== null
                     ? `${selectedQubitInfo.metric.value.toFixed(4)} ${unit}`
                     : "No data"}
@@ -396,71 +398,12 @@ export function QubitMetricsGrid({
 
             {/* Modal Content */}
             <div className="flex-1 overflow-auto p-6">
-              <div className="space-y-4">
-                <div className="stats shadow w-full">
-                  <div className="stat">
-                    <div className="stat-title">Qubit ID</div>
-                    <div className="stat-value text-2xl">
-                      {selectedQubitInfo.qid}
-                    </div>
-                  </div>
-                  <div className="stat">
-                    <div className="stat-title">{title}</div>
-                    <div className="stat-value text-2xl">
-                      {selectedQubitInfo.metric.value !== null
-                        ? `${selectedQubitInfo.metric.value.toFixed(2)} ${unit}`
-                        : "N/A"}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Task Figure - Display calibration result */}
-                {selectedQubitInfo.metric.task_id && (
-                  <div className="card bg-base-200 shadow-sm">
-                    <div className="card-body">
-                      <h3 className="card-title text-sm">Calibration Result</h3>
-                      <div className="relative h-96 w-full">
-                        <TaskFigure
-                          taskId={selectedQubitInfo.metric.task_id}
-                          qid={selectedQubitInfo.qid}
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                      <div className="text-xs text-base-content/60 mt-2">
-                        Task ID: {selectedQubitInfo.metric.task_id}
-                        {selectedQubitInfo.metric.execution_id && (
-                          <span className="ml-2">
-                            • Execution ID:{" "}
-                            {selectedQubitInfo.metric.execution_id}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {!selectedQubitInfo.metric.task_id && (
-                  <div className="alert alert-info">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      className="stroke-current shrink-0 w-6 h-6"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <span>
-                      No calibration figure available for this metric. Click
-                      "View Details" to see full qubit analysis.
-                    </span>
-                  </div>
-                )}
-              </div>
+              <QubitMetricHistoryModal
+                chipId={chipId}
+                qid={selectedQubitInfo.qid}
+                metricName={metricKey}
+                metricUnit={unit}
+              />
             </div>
 
             {/* Modal Footer */}

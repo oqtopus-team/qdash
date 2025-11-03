@@ -332,34 +332,34 @@ export function ChipPageContent() {
                 Create Chip
               </button>
               <div className="join rounded-lg overflow-hidden">
-              <button
-                className={`join-item btn btn-sm ${
-                  viewMode === "1q" ? "btn-active" : ""
-                }`}
-                onClick={() => setViewMode("1q")}
-              >
-                <BsGrid className="text-lg" />
-                <span className="ml-2">1Q View</span>
-              </button>
-              <button
-                className={`join-item btn btn-sm ${
-                  viewMode === "2q" ? "btn-active" : ""
-                }`}
-                onClick={() => setViewMode("2q")}
-              >
-                <BsGrid className="text-lg" />
-                <span className="ml-2">2Q View</span>
-              </button>
-              <button
-                className={`join-item btn btn-sm ${
-                  viewMode === "mux" ? "btn-active" : ""
-                }`}
-                onClick={() => setViewMode("mux")}
-              >
-                <BsListUl className="text-lg" />
-                <span className="ml-2">MUX View</span>
-              </button>
-            </div>
+                <button
+                  className={`join-item btn btn-sm ${
+                    viewMode === "1q" ? "btn-active" : ""
+                  }`}
+                  onClick={() => setViewMode("1q")}
+                >
+                  <BsGrid className="text-lg" />
+                  <span className="ml-2">1Q View</span>
+                </button>
+                <button
+                  className={`join-item btn btn-sm ${
+                    viewMode === "2q" ? "btn-active" : ""
+                  }`}
+                  onClick={() => setViewMode("2q")}
+                >
+                  <BsGrid className="text-lg" />
+                  <span className="ml-2">2Q View</span>
+                </button>
+                <button
+                  className={`join-item btn btn-sm ${
+                    viewMode === "mux" ? "btn-active" : ""
+                  }`}
+                  onClick={() => setViewMode("mux")}
+                >
+                  <BsListUl className="text-lg" />
+                  <span className="ml-2">MUX View</span>
+                </button>
+              </div>
             </div>
           </div>
 

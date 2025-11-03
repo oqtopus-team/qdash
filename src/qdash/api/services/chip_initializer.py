@@ -126,9 +126,7 @@ class ChipInitializer:
         return qubits
 
     @staticmethod
-    def _generate_coupling_data(
-        edges: List[Tuple[int, int]], chip_id: str, username: str
-    ) -> Dict[str, CouplingModel]:
+    def _generate_coupling_data(edges: List[Tuple[int, int]], chip_id: str, username: str) -> Dict[str, CouplingModel]:
         """Generate coupling data for ChipDocument.
 
         Args:

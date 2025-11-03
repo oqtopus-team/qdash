@@ -80,10 +80,7 @@ def calibrate_parallel_group(coupling_qids: list[str], tasks: list[str]) -> dict
     logger.info(f"Starting parallel group calibration for pairs: {coupling_qids}")
 
     # Submit all pairs for parallel execution
-    futures = [
-        execute_coupling_pair.submit(coupling_qid, tasks)
-        for coupling_qid in coupling_qids
-    ]
+    futures = [execute_coupling_pair.submit(coupling_qid, tasks) for coupling_qid in coupling_qids]
 
     # Wait for all pairs to complete
     logger.info(f"  Waiting for {len(futures)} pairs to complete in parallel...")
@@ -163,10 +160,10 @@ def two_qubit_parallel_calibration(
         # Phase 1: Cross-resonance calibration
         "CheckCrossResonance",  # Optimize cross-resonance parameters
         # Phase 2: ZX90 gate calibration
-        "CreateZX90",           # Create ZX90 gate pulse
-        "CheckZX90",            # Verify ZX90 gate performance
+        "CreateZX90",  # Create ZX90 gate pulse
+        "CheckZX90",  # Verify ZX90 gate performance
         # Phase 3: Entanglement verification
-        "CheckBellState",       # Verify Bell state fidelity
+        "CheckBellState",  # Verify Bell state fidelity
     ]
 
     # Convert coupling groups to ID format and extract all qubits
@@ -180,21 +177,26 @@ def two_qubit_parallel_calibration(
 
     try:
         # Initialize calibration session with GitHub integration
-        from qdash.workflow.flow import GitHubPushConfig, ConfigFileType
+        from qdash.workflow.flow import ConfigFileType, GitHubPushConfig
+
         init_calibration(
-            username, chip_id, all_qids, flow_name=flow_name,
+            username,
+            chip_id,
+            all_qids,
+            flow_name=flow_name,
             enable_github_pull=True,
             github_push_config=GitHubPushConfig(
-                enabled=True,
-                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
-            )
+                enabled=True, file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
+            ),
         )
 
         # Execute parallel groups sequentially (pairs within each group run in parallel)
         logger.info(f"Executing {len(coupling_qid_groups)} parallel groups sequentially...")
         results_list = []
         for group_idx, group in enumerate(coupling_qid_groups, start=1):
-            logger.info(f"  Group {group_idx}/{len(coupling_qid_groups)}: Executing {len(group)} pairs in parallel: {group}")
+            logger.info(
+                f"  Group {group_idx}/{len(coupling_qid_groups)}: Executing {len(group)} pairs in parallel: {group}"
+            )
             # Call directly (no submit) since groups execute sequentially
             result = calibrate_parallel_group(coupling_qids=group, tasks=tasks)
             results_list.append(result)

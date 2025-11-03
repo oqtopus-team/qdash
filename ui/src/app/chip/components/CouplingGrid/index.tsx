@@ -207,7 +207,8 @@ export function CouplingGrid({
   // Calculate cell size based on container width
   const updateSize = useCallback(() => {
     // Use actual container width instead of viewport width
-    const containerWidth = containerRef.current?.offsetWidth || window.innerWidth;
+    const containerWidth =
+      containerRef.current?.offsetWidth || window.innerWidth;
     // Subtract padding: px-4 on both sides (32px total) + some margin for safety
     const availableWidth = containerWidth - 64; // 64px = padding + margin
     const effectiveGridSize = zoomMode === "region" ? regionSize : gridSize;

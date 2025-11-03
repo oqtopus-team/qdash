@@ -9,8 +9,8 @@ from pydantic import BaseModel, ConfigDict
 from pymongo import ASCENDING, DESCENDING
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
 from qdash.api.schemas.auth import User
-from qdash.api.services.response_processor import response_processor
 from qdash.api.services.chip_initializer import ChipInitializer
+from qdash.api.services.response_processor import response_processor
 from qdash.datamodel.task import OutputParameterModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument

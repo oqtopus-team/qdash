@@ -180,14 +180,17 @@ def iterative_chevron_pattern_flow(
 
     try:
         # Initialize session with GitHub integration
-        from qdash.workflow.flow import GitHubPushConfig, ConfigFileType
+        from qdash.workflow.flow import ConfigFileType, GitHubPushConfig
+
         init_calibration(
-            username, chip_id, all_qids, flow_name=flow_name,
+            username,
+            chip_id,
+            all_qids,
+            flow_name=flow_name,
             enable_github_pull=True,
             github_push_config=GitHubPushConfig(
-                enabled=True,
-                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
-            )
+                enabled=True, file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
+            ),
         )
 
         # Store results from all iterations

@@ -177,22 +177,22 @@ def sequential_stage_calibration(
 
             # Initialize NEW session for this stage with GitHub integration
             # A NEW execution_id will be auto-generated (e.g., "20250102-001", "20250102-002", ...)
-            from qdash.workflow.flow import GitHubPushConfig, ConfigFileType
+            from qdash.workflow.flow import ConfigFileType, GitHubPushConfig
+
             init_calibration(
-                username, chip_id, stage_qids,
+                username,
+                chip_id,
+                stage_qids,
                 flow_name=f"{flow_name}_{stage_name}" if flow_name else stage_name,
                 enable_github_pull=True,
                 github_push_config=GitHubPushConfig(
-                    enabled=True,
-                    file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
-                )
+                    enabled=True, file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
+                ),
             )
 
             # Execute all groups in this stage in parallel
             logger.info(f"Submitting {len(stage_groups)} groups for parallel execution...")
-            stage_futures = [
-                calibrate_group.submit(qids=group, tasks=tasks) for group in stage_groups
-            ]
+            stage_futures = [calibrate_group.submit(qids=group, tasks=tasks) for group in stage_groups]
 
             logger.info(f"Waiting for all groups in {stage_name} to complete...")
             stage_results_list = [future.result() for future in stage_futures]

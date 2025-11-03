@@ -8,7 +8,6 @@ from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.initialize import initialize
-
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
 from rich.console import Console
 from rich.progress import track
