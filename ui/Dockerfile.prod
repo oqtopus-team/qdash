@@ -4,6 +4,7 @@ WORKDIR /app
 
 # Build arguments
 ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_PREFECT_URL
 
 # Copy package files
 COPY ./ui/ ./
@@ -11,6 +12,7 @@ COPY ./ui/ ./
 
 # Set build time environment variables
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_PREFECT_URL=${NEXT_PUBLIC_PREFECT_URL}
 
 # Install dependencies and build
 RUN bun install
@@ -23,6 +25,7 @@ ENV PORT=${UI_PORT:-5714}
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_PREFECT_URL=${NEXT_PUBLIC_PREFECT_URL}}
 
 # Start the application
 CMD ["bun", "run", "start"]

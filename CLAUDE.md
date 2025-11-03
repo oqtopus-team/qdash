@@ -426,6 +426,7 @@ Key environment variables (see `.env.example`):
 - `POSTGRES_PORT` - PostgreSQL port (default: 5432)
 - `PREFECT_PORT` - Prefect UI port (default: 4200)
 - `NEXT_PUBLIC_API_URL` - Frontend API URL
+- `NEXT_PUBLIC_PREFECT_URL` - Frontend Prefect/Workflow dashboard URL (default: http://localhost:4200)
 
 ## Docker Compose Services
 

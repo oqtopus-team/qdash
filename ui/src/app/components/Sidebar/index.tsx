@@ -14,10 +14,12 @@ import { IoAnalytics } from "react-icons/io5";
 
 import { useSidebar } from "@/app/contexts/SidebarContext";
 
+const PREFECT_URL =
+  process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
+
 function Sidebar() {
   const pathname = usePathname();
   const { isOpen, toggleSidebar } = useSidebar();
-
   const isActive = (path: string) => {
     return pathname === path;
   };
@@ -55,7 +57,9 @@ function Sidebar() {
         <li>
           <Link
             href="/metrics"
-            className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
+            className={`py-4 ${
+              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+            } my-2 text-base font-bold flex items-center ${
               isActive("/metrics")
                 ? "bg-neutral text-neutral-content"
                 : "text-base-content"
@@ -69,7 +73,9 @@ function Sidebar() {
         <li>
           <Link
             href="/chip"
-            className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
+            className={`py-4 ${
+              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+            } my-2 text-base font-bold flex items-center ${
               isActive("/chip")
                 ? "bg-neutral text-neutral-content"
                 : "text-base-content"
@@ -83,7 +89,9 @@ function Sidebar() {
         <li>
           <Link
             href="/flow"
-            className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
+            className={`py-4 ${
+              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+            } my-2 text-base font-bold flex items-center ${
               pathname.startsWith("/flow")
                 ? "bg-neutral text-neutral-content"
                 : "text-base-content"
@@ -97,7 +105,9 @@ function Sidebar() {
         <li>
           <Link
             href="/execution"
-            className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
+            className={`py-4 ${
+              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+            } my-2 text-base font-bold flex items-center ${
               isActive("/execution")
                 ? "bg-neutral text-neutral-content"
                 : "text-base-content"
@@ -111,7 +121,9 @@ function Sidebar() {
         <li>
           <Link
             href="/analysis"
-            className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
+            className={`py-4 ${
+              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+            } my-2 text-base font-bold flex items-center ${
               isActive("/analysis")
                 ? "bg-neutral text-neutral-content"
                 : "text-base-content"
@@ -125,7 +137,9 @@ function Sidebar() {
         <li>
           <Link
             href="/tasks"
-            className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
+            className={`py-4 ${
+              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+            } my-2 text-base font-bold flex items-center ${
               isActive("/tasks")
                 ? "bg-neutral text-neutral-content"
                 : "text-base-content"
@@ -140,7 +154,9 @@ function Sidebar() {
         <li>
           <Link
             href="/setting"
-            className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
+            className={`py-4 ${
+              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+            } my-2 text-base font-bold flex items-center ${
               isActive("/setting")
                 ? "bg-neutral text-neutral-content"
                 : "text-base-content"
@@ -154,10 +170,12 @@ function Sidebar() {
         <div className="divider"></div>
         <li>
           <a
-            href="http://127.0.0.1:4200/dashboard"
+            href={`${PREFECT_URL}/dashboard`}
             target="_blank"
             rel="noopener noreferrer"
-            className={`py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center`}
+            className={`py-4 ${
+              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+            } my-2 text-base font-bold flex items-center`}
             title="Workflow"
           >
             <GoWorkflow />
