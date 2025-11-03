@@ -439,3 +439,113 @@ async def get_qubit_metric_history(
         username=username,
         history=history_items,
     )
+
+
+@router.get("/chip/{chip_id}/coupling/{coupling_id}/metric-history", response_model=QubitMetricHistoryResponse)
+async def get_coupling_metric_history(
+    chip_id: str,
+    coupling_id: str,
+    metric: Annotated[str, Query(description="Metric name (e.g., zx90_gate_fidelity, bell_state_fidelity)")],
+    limit: Annotated[int, Query(description="Max number of history items", ge=1, le=100)] = 20,
+    within_days: Annotated[int | None, Query(description="Filter to last N days", ge=1)] = 30,
+    current_user: User | None = Depends(get_optional_current_user),
+) -> QubitMetricHistoryResponse:
+    """Get historical metric data for a specific coupling with task_id for figure display.
+
+    This endpoint queries ExecutionHistoryDocument to retrieve the calibration
+    history for a specific coupling metric, including multiple executions on the same day.
+    Each history item includes task_id for displaying calibration figures.
+
+    Args:
+    ----
+        chip_id: The chip identifier
+        coupling_id: The coupling identifier (e.g., "0-1", "2-3")
+        metric: Metric name to retrieve history for
+        limit: Maximum number of history items to return (1-100)
+        within_days: Optional filter to only include data from last N days
+        current_user: Current authenticated user
+
+    Returns:
+    -------
+        QubitMetricHistoryResponse with historical metric data and task_ids
+        (Note: qid field contains coupling_id for coupling metrics)
+
+    """
+    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+
+    username = current_user.username if current_user else "admin"
+
+    # Calculate cutoff time
+    cutoff_time = None
+    if within_days:
+        cutoff_time = pendulum.now("Asia/Tokyo").subtract(days=within_days)
+
+    # Query execution history
+    query: dict[str, Any] = {
+        "chip_id": chip_id,
+        "username": username,
+        "status": "completed",
+    }
+
+    if cutoff_time:
+        query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
+
+    executions = (
+        ExecutionHistoryDocument.find(query)
+        .sort([("start_at", -1)])
+        .limit(limit * 3)  # Get more to filter by metric availability
+        .to_list()
+    )
+
+    # Extract metric values from calib_data
+    history_items: list[MetricHistoryItem] = []
+
+    for exec_doc in executions:
+        calib_data = exec_doc.calib_data
+
+        if "coupling" in calib_data and coupling_id in calib_data["coupling"]:
+            coupling_data = calib_data["coupling"][coupling_id]
+
+            if metric in coupling_data:
+                metric_data = coupling_data[metric]
+
+                # Handle both dict and direct value formats
+                if isinstance(metric_data, dict):
+                    value = metric_data.get("value")
+                    task_id = metric_data.get("task_id")
+                    calibrated_at = metric_data.get("calibrated_at")
+                else:
+                    value = metric_data
+                    task_id = None
+                    calibrated_at = None
+
+                # Only include if value exists
+                if value is not None:
+                    history_items.append(
+                        MetricHistoryItem(
+                            value=value,
+                            execution_id=exec_doc.execution_id,
+                            task_id=task_id,
+                            timestamp=exec_doc.start_at,
+                            calibrated_at=calibrated_at,
+                        )
+                    )
+
+                    # Stop once we have enough items
+                    if len(history_items) >= limit:
+                        break
+
+        # Break execution loop if we have enough items
+        if len(history_items) >= limit:
+            break
+
+    if not history_items:
+        logger.warning(f"No history found for chip={chip_id}, coupling_id={coupling_id}, metric={metric}")
+
+    return QubitMetricHistoryResponse(
+        chip_id=chip_id,
+        qid=coupling_id,  # Reuse qid field for coupling_id
+        metric_name=metric,
+        username=username,
+        history=history_items,
+    )

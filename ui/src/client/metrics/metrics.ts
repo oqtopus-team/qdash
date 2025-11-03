@@ -22,6 +22,7 @@ import type {
   ChipMetricsResponse,
   HTTPValidationError,
   MetricsGetChipMetricsParams,
+  MetricsGetCouplingMetricHistoryParams,
   MetricsGetCurrentChip200,
   MetricsGetCurrentChipParams,
   MetricsGetMetricsConfig200,
@@ -924,6 +925,225 @@ export function useMetricsGetQubitMetricHistory<
   const queryOptions = getMetricsGetQubitMetricHistoryQueryOptions(
     chipId,
     qid,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get historical metric data for a specific coupling with task_id for figure display.
+
+This endpoint queries ExecutionHistoryDocument to retrieve the calibration
+history for a specific coupling metric, including multiple executions on the same day.
+Each history item includes task_id for displaying calibration figures.
+
+Args:
+----
+    chip_id: The chip identifier
+    coupling_id: The coupling identifier (e.g., "0-1", "2-3")
+    metric: Metric name to retrieve history for
+    limit: Maximum number of history items to return (1-100)
+    within_days: Optional filter to only include data from last N days
+    current_user: Current authenticated user
+
+Returns:
+-------
+    QubitMetricHistoryResponse with historical metric data and task_ids
+    (Note: qid field contains coupling_id for coupling metrics)
+ * @summary Get Coupling Metric History
+ */
+export const metricsGetCouplingMetricHistory = (
+  chipId: string,
+  couplingId: string,
+  params: MetricsGetCouplingMetricHistoryParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<QubitMetricHistoryResponse>(
+    {
+      url: `/api/chip/${chipId}/coupling/${couplingId}/metric-history`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getMetricsGetCouplingMetricHistoryQueryKey = (
+  chipId?: string,
+  couplingId?: string,
+  params?: MetricsGetCouplingMetricHistoryParams,
+) => {
+  return [
+    `/api/chip/${chipId}/coupling/${couplingId}/metric-history`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getMetricsGetCouplingMetricHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  couplingId: string,
+  params: MetricsGetCouplingMetricHistoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getMetricsGetCouplingMetricHistoryQueryKey(chipId, couplingId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>
+  > = ({ signal }) =>
+    metricsGetCouplingMetricHistory(
+      chipId,
+      couplingId,
+      params,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(chipId && couplingId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type MetricsGetCouplingMetricHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>
+>;
+export type MetricsGetCouplingMetricHistoryQueryError =
+  ErrorType<HTTPValidationError>;
+
+export function useMetricsGetCouplingMetricHistory<
+  TData = Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  couplingId: string,
+  params: MetricsGetCouplingMetricHistoryParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+          TError,
+          Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useMetricsGetCouplingMetricHistory<
+  TData = Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  couplingId: string,
+  params: MetricsGetCouplingMetricHistoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+          TError,
+          Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useMetricsGetCouplingMetricHistory<
+  TData = Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  couplingId: string,
+  params: MetricsGetCouplingMetricHistoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get Coupling Metric History
+ */
+
+export function useMetricsGetCouplingMetricHistory<
+  TData = Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  couplingId: string,
+  params: MetricsGetCouplingMetricHistoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetCouplingMetricHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getMetricsGetCouplingMetricHistoryQueryOptions(
+    chipId,
+    couplingId,
     params,
     options,
   );

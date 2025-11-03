@@ -8,6 +8,7 @@ import Select, {
   type StylesConfig,
 } from "react-select";
 
+import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 
 import { ChipSelector } from "@/app/components/ChipSelector";
@@ -22,18 +23,25 @@ type MetricOption = {
   label: string;
 };
 
+type MetricType = "qubit" | "coupling";
+
 export function MetricsPageContent() {
   const [selectedChip, setSelectedChip] = useState<string>("");
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
+  const [metricType, setMetricType] = useState<MetricType>("qubit");
   const [selectedMetric, setSelectedMetric] = useState<string>("t1");
 
   // Load metrics configuration from backend
   const {
-    qubitMetrics: metricsConfig,
+    qubitMetrics,
+    couplingMetrics,
     colorScale,
     isLoading: isConfigLoading,
     isError: isConfigError,
   } = useMetricsConfig();
+
+  // Select appropriate metrics config based on type
+  const metricsConfig = metricType === "qubit" ? qubitMetrics : couplingMetrics;
 
   const { data: chipsData } = useListChips();
 
@@ -132,12 +140,17 @@ export function MetricsPageContent() {
 
   // Process metric data
   const metricData = useMemo(() => {
-    if (!data?.data?.qubit_metrics || !currentMetricConfig) return null;
+    if (!data?.data || !currentMetricConfig) return null;
+
+    const metricsSource =
+      metricType === "qubit"
+        ? data.data.qubit_metrics
+        : data.data.coupling_metrics;
+
+    if (!metricsSource) return null;
 
     const rawData =
-      data.data.qubit_metrics[
-        currentMetricConfig.key as keyof typeof data.data.qubit_metrics
-      ];
+      metricsSource[currentMetricConfig.key as keyof typeof metricsSource];
 
     if (!rawData) return null;
 
@@ -150,9 +163,15 @@ export function MetricsPageContent() {
       };
     } = {};
     Object.entries(rawData).forEach(([key, metricValue]: [string, any]) => {
-      const qid = key.startsWith("Q") ? key : `Q${key.padStart(2, "0")}`;
+      // For qubit metrics, format as "Q00", for coupling metrics keep "0-1" format
+      const formattedKey =
+        metricType === "qubit"
+          ? key.startsWith("Q")
+            ? key
+            : `Q${key.padStart(2, "0")}`
+          : key;
       const value = metricValue?.value;
-      scaledData[qid] = {
+      scaledData[formattedKey] = {
         value:
           value !== null && value !== undefined && typeof value === "number"
             ? value * currentMetricConfig.scale
@@ -163,7 +182,7 @@ export function MetricsPageContent() {
     });
 
     return scaledData;
-  }, [data, currentMetricConfig]);
+  }, [data, currentMetricConfig, metricType]);
 
   return (
     <div className="w-full min-h-screen bg-base-100/50 px-4 md:px-6 py-6 md:py-8">
@@ -174,7 +193,32 @@ export function MetricsPageContent() {
             <h1 className="text-xl md:text-2xl font-bold">
               Chip Metrics Dashboard
             </h1>
+          </div>
 
+          {/* Metric Type Tabs */}
+          <div className="tabs tabs-boxed bg-base-200 w-fit">
+            <button
+              className={`tab ${metricType === "qubit" ? "tab-active" : ""}`}
+              onClick={() => {
+                setMetricType("qubit");
+                setSelectedMetric("t1"); // Reset to default qubit metric
+              }}
+            >
+              Single-Qubit Metrics
+            </button>
+            <button
+              className={`tab ${metricType === "coupling" ? "tab-active" : ""}`}
+              onClick={() => {
+                setMetricType("coupling");
+                setSelectedMetric("zx90_gate_fidelity"); // Reset to default coupling metric
+              }}
+            >
+              Two-Qubit Metrics
+            </button>
+          </div>
+
+          {/* Time Range Selector and Chip Selector Row */}
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
             {/* Time Range Selector */}
             <div className="join rounded-lg overflow-hidden flex-shrink-0">
               <button
@@ -202,10 +246,7 @@ export function MetricsPageContent() {
                 <span>Last 30 Days</span>
               </button>
             </div>
-          </div>
 
-          {/* Chip Selector and Metric Selector */}
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
             <div className="flex flex-col gap-1 w-full sm:w-auto">
               <ChipSelector
                 selectedChip={selectedChip}
@@ -275,15 +316,27 @@ export function MetricsPageContent() {
             <span>Failed to load metrics data</span>
           </div>
         ) : currentMetricConfig ? (
-          <QubitMetricsGrid
-            metricData={metricData}
-            title={currentMetricConfig.title}
-            metricKey={currentMetricConfig.key}
-            unit={currentMetricConfig.unit}
-            colorScale={{ min: 0, max: 0, colors: hexColors }}
-            chipId={selectedChip}
-            selectedDate="latest"
-          />
+          metricType === "qubit" ? (
+            <QubitMetricsGrid
+              metricData={metricData}
+              title={currentMetricConfig.title}
+              metricKey={currentMetricConfig.key}
+              unit={currentMetricConfig.unit}
+              colorScale={{ min: 0, max: 0, colors: hexColors }}
+              chipId={selectedChip}
+              selectedDate="latest"
+            />
+          ) : (
+            <CouplingMetricsGrid
+              metricData={metricData}
+              title={currentMetricConfig.title}
+              metricKey={currentMetricConfig.key}
+              unit={currentMetricConfig.unit}
+              colorScale={{ min: 0, max: 0, colors: hexColors }}
+              chipId={selectedChip}
+              selectedDate="latest"
+            />
+          )
         ) : (
           <div className="alert alert-info">
             <span>Select a metric to display</span>
