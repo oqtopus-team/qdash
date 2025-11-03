@@ -285,10 +285,7 @@ export default function ExecutionDetailClient({
 
   if (isDetailLoading) {
     return (
-      <div
-        className="w-full px-4 py-6 min-h-screen"
-        style={{ width: "calc(100vw - 20rem)" }}
-      >
+      <div className="w-full px-4 py-6 min-h-screen">
         <div className="space-y-6">
           {/* Header Skeleton with Loading Spinner */}
           <div className="flex justify-between items-center">
@@ -335,7 +332,7 @@ export default function ExecutionDetailClient({
   if (!executionDetailData || !execution) return <div>No data found.</div>;
 
   return (
-    <div className="w-full px-4 py-6" style={{ width: "calc(100vw - 20rem)" }}>
+    <div className="w-full px-4 py-6">
       <div className="space-y-6">
         {/* Back navigation */}
         <Link href="/execution" className="btn btn-ghost btn-sm gap-2 w-fit">
