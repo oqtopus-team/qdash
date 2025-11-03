@@ -2019,6 +2019,106 @@
           }
         }
       }
+    },
+    "/api/chip/{chip_id}/qubit/{qid}/metric-history": {
+      "get": {
+        "tags": ["metrics"],
+        "summary": "Get Qubit Metric History",
+        "description": "Get historical metric data for a specific qubit with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    qid: The qubit identifier (e.g., \"0\", \"Q00\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items to return (1-100)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids",
+        "operationId": "metrics-get_qubit_metric_history",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "metric",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Metric name (e.g., t1, qubit_frequency)",
+              "title": "Metric"
+            },
+            "description": "Metric name (e.g., t1, qubit_frequency)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Max number of history items",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Max number of history items"
+          },
+          {
+            "name": "within_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to last N days",
+              "default": 30,
+              "title": "Within Days"
+            },
+            "description": "Filter to last N days"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QubitMetricHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3072,6 +3172,55 @@
         "title": "MeasError",
         "description": "Measurement error of the qubit."
       },
+      "MetricHistoryItem": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "calibrated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibrated At"
+          }
+        },
+        "type": "object",
+        "required": ["value", "execution_id", "timestamp"],
+        "title": "MetricHistoryItem",
+        "description": "Single historical metric data point."
+      },
       "MetricValue": {
         "properties": {
           "value": {
@@ -3309,6 +3458,37 @@
         "required": ["t1", "t2"],
         "title": "QubitLifetime",
         "description": "Qubit lifetime of the qubit."
+      },
+      "QubitMetricHistoryResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "metric_name": {
+            "type": "string",
+            "title": "Metric Name"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/MetricHistoryItem"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "required": ["chip_id", "qid", "metric_name", "username", "history"],
+        "title": "QubitMetricHistoryResponse",
+        "description": "Historical metric data for a single qubit."
       },
       "QubitMetrics": {
         "properties": {

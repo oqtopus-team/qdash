@@ -4,14 +4,14 @@ from prefect import flow
 from prefect.logging import get_run_logger
 from qdash.config import get_settings
 from qdash.workflow._internal.slack import SlackContents, Status
-from qdash.workflow.worker.tasks.filesystem import (
-    create_directory_task,
-)
 from qdash.workflow.worker.flows.gateway_integration.task import (
     DeviceTopologyRequest,
     generate_device_topology_request,
     generate_topology_plot,
     post_device_topology,
+)
+from qdash.workflow.worker.tasks.filesystem import (
+    create_directory_task,
 )
 
 

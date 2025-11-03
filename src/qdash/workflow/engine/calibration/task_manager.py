@@ -664,7 +664,7 @@ class TaskManager(BaseModel):
         if postprocess_result.output_parameters:
             # Check if this is a randomized benchmarking task
             is_rb_task = "randomized" in task_name.lower() or "benchmarking" in task_name.lower()
-            
+
             if is_rb_task:
                 # Check all fidelity parameters for values > 1.0 (100%)
                 for param_name, param_value in postprocess_result.output_parameters.items():
@@ -675,7 +675,7 @@ class TaskManager(BaseModel):
                                 f"{task_name} failed: {param_name} = {fidelity_value:.4f} exceeds 100% "
                                 f"(physical maximum is 1.0). This indicates a fitting error."
                             )
-        
+
         # 2. Save output parameters
         if postprocess_result.output_parameters:
             # Get current task to retrieve task_id
@@ -767,7 +767,9 @@ class TaskManager(BaseModel):
         output_parameters = self.get_output_parameter_by_task_name(task_name, task_type=task_type, qid=qid)
 
         if not success:
-            logger.info("Skipping backend parameter updates for %s due to failed R² validation", task_instance.get_name())
+            logger.info(
+                "Skipping backend parameter updates for %s due to failed R² validation", task_instance.get_name()
+            )
             # Still save to database even if R² failed or doesn't exist
             # This is important for tasks like ReadoutClassification that don't have R²
             if output_parameters:

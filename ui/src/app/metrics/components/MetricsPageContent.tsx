@@ -14,7 +14,7 @@ import { ChipSelector } from "@/app/components/ChipSelector";
 import { useListChips } from "@/client/chip/chip";
 import { useMetricsGetChipMetrics } from "@/client/metrics/metrics";
 
-type TimeRange = "current" | "24h" | "48h" | "72h";
+type TimeRange = "1d" | "7d" | "30d";
 
 type MetricConfig = {
   key: string;
@@ -43,7 +43,7 @@ const UNIFIED_COLORS = [
 
 export function MetricsPageContent() {
   const [selectedChip, setSelectedChip] = useState<string>("");
-  const [timeRange, setTimeRange] = useState<TimeRange>("current");
+  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [selectedMetric, setSelectedMetric] = useState<string>("t1");
 
   const { data: chipsData } = useListChips();
@@ -61,7 +61,14 @@ export function MetricsPageContent() {
   }, [selectedChip, chipsData]);
 
   // Fetch metrics data
-  const withinHours = timeRange === "current" ? undefined : parseInt(timeRange);
+  const withinHours =
+    timeRange === "1d"
+      ? 24
+      : timeRange === "7d"
+        ? 24 * 7
+        : timeRange === "30d"
+          ? 24 * 30
+          : 24 * 7; // Default to 7 days
   const { data, isLoading, isError } = useMetricsGetChipMetrics(
     selectedChip,
     withinHours ? { within_hours: withinHours } : undefined,
@@ -214,35 +221,27 @@ export function MetricsPageContent() {
             <div className="join rounded-lg overflow-hidden flex-shrink-0">
               <button
                 className={`join-item btn btn-sm ${
-                  timeRange === "current" ? "btn-active" : ""
+                  timeRange === "1d" ? "btn-active" : ""
                 }`}
-                onClick={() => setTimeRange("current")}
+                onClick={() => setTimeRange("1d")}
               >
-                <span>Current</span>
+                <span>Last 1 Day</span>
               </button>
               <button
                 className={`join-item btn btn-sm ${
-                  timeRange === "24h" ? "btn-active" : ""
+                  timeRange === "7d" ? "btn-active" : ""
                 }`}
-                onClick={() => setTimeRange("24h")}
+                onClick={() => setTimeRange("7d")}
               >
-                <span>24 Hours</span>
+                <span>Last 7 Days</span>
               </button>
               <button
                 className={`join-item btn btn-sm ${
-                  timeRange === "48h" ? "btn-active" : ""
+                  timeRange === "30d" ? "btn-active" : ""
                 }`}
-                onClick={() => setTimeRange("48h")}
+                onClick={() => setTimeRange("30d")}
               >
-                <span>48 Hours</span>
-              </button>
-              <button
-                className={`join-item btn btn-sm ${
-                  timeRange === "72h" ? "btn-active" : ""
-                }`}
-                onClick={() => setTimeRange("72h")}
-              >
-                <span>72 Hours</span>
+                <span>Last 30 Days</span>
               </button>
             </div>
           </div>
@@ -312,6 +311,7 @@ export function MetricsPageContent() {
           <QubitMetricsGrid
             metricData={metricData}
             title={currentMetricConfig.title}
+            metricKey={currentMetricConfig.key}
             unit={currentMetricConfig.unit}
             colorScale={currentMetricConfig.colorScale}
             chipId={selectedChip}

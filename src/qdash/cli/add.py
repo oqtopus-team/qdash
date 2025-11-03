@@ -7,7 +7,6 @@ from qdash.db.init.coupling import bi_direction, generate_coupling
 from qdash.db.init.qubit import generate_dummy_data  # qubit_lattice
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
-
 from qdash.workflow.tasks.base import BaseTask
 
 logging.basicConfig(level=logging.INFO)

@@ -24,8 +24,10 @@ import type {
   MetricsGetChipMetricsParams,
   MetricsGetCurrentChip200,
   MetricsGetCurrentChipParams,
+  MetricsGetQubitMetricHistoryParams,
   MetricsListChips200,
   MetricsListChipsParams,
+  QubitMetricHistoryResponse,
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
@@ -552,6 +554,218 @@ export function useMetricsGetCurrentChip<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getMetricsGetCurrentChipQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get historical metric data for a specific qubit with task_id for figure display.
+
+This endpoint queries ExecutionHistoryDocument to retrieve the calibration
+history for a specific metric, including multiple executions on the same day.
+Each history item includes task_id for displaying calibration figures.
+
+Args:
+----
+    chip_id: The chip identifier
+    qid: The qubit identifier (e.g., "0", "Q00")
+    metric: Metric name to retrieve history for
+    limit: Maximum number of history items to return (1-100)
+    within_days: Optional filter to only include data from last N days
+    current_user: Current authenticated user
+
+Returns:
+-------
+    QubitMetricHistoryResponse with historical metric data and task_ids
+ * @summary Get Qubit Metric History
+ */
+export const metricsGetQubitMetricHistory = (
+  chipId: string,
+  qid: string,
+  params: MetricsGetQubitMetricHistoryParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<QubitMetricHistoryResponse>(
+    {
+      url: `/api/chip/${chipId}/qubit/${qid}/metric-history`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getMetricsGetQubitMetricHistoryQueryKey = (
+  chipId?: string,
+  qid?: string,
+  params?: MetricsGetQubitMetricHistoryParams,
+) => {
+  return [
+    `/api/chip/${chipId}/qubit/${qid}/metric-history`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getMetricsGetQubitMetricHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  qid: string,
+  params: MetricsGetQubitMetricHistoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getMetricsGetQubitMetricHistoryQueryKey(chipId, qid, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>
+  > = ({ signal }) =>
+    metricsGetQubitMetricHistory(chipId, qid, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(chipId && qid),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type MetricsGetQubitMetricHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>
+>;
+export type MetricsGetQubitMetricHistoryQueryError =
+  ErrorType<HTTPValidationError>;
+
+export function useMetricsGetQubitMetricHistory<
+  TData = Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  qid: string,
+  params: MetricsGetQubitMetricHistoryParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+          TError,
+          Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useMetricsGetQubitMetricHistory<
+  TData = Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  qid: string,
+  params: MetricsGetQubitMetricHistoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+          TError,
+          Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useMetricsGetQubitMetricHistory<
+  TData = Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  qid: string,
+  params: MetricsGetQubitMetricHistoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get Qubit Metric History
+ */
+
+export function useMetricsGetQubitMetricHistory<
+  TData = Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  qid: string,
+  params: MetricsGetQubitMetricHistoryParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof metricsGetQubitMetricHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getMetricsGetQubitMetricHistoryQueryOptions(
+    chipId,
+    qid,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

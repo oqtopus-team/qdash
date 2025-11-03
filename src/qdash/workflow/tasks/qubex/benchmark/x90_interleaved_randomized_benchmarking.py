@@ -4,7 +4,6 @@ from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.engine.session.qubex import QubexSession
 from qdash.workflow.tasks.base import (
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.tasks.qubex.base import QubexTask

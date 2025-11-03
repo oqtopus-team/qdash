@@ -25,12 +25,12 @@ export function CreateChipModal({
       onSuccess: (data) => {
         // Invalidate chips list to refresh
         queryClient.invalidateQueries({ queryKey: ["listChips"] });
-        
+
         // Call success callback if provided
         if (onSuccess && data.data) {
           onSuccess(data.data.chip_id);
         }
-        
+
         // Reset form and close modal
         setChipId("");
         setSize(64);
@@ -77,7 +77,7 @@ export function CreateChipModal({
     <div className="modal modal-open">
       <div className="modal-box">
         <h3 className="font-bold text-lg mb-4">Create New Chip</h3>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Chip ID Input */}
           <div className="form-control">
@@ -102,7 +102,9 @@ export function CreateChipModal({
             <select
               className="select select-bordered w-full"
               value={size}
-              onChange={(e) => setSize(Number(e.target.value) as 64 | 144 | 256 | 1024)}
+              onChange={(e) =>
+                setSize(Number(e.target.value) as 64 | 144 | 256 | 1024)
+              }
               disabled={createChipMutation.isPending}
             >
               <option value={64}>64 Qubits</option>
