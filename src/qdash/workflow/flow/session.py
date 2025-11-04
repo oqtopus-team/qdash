@@ -459,6 +459,88 @@ class FlowSession:
             self.execution_manager.calib_data.qubit[qid] = {}
         self.execution_manager.calib_data.qubit[qid][param_name] = value
 
+    def record_stage_result(self, stage_name: str, result: dict[str, Any]) -> None:
+        """Record the result of a calibration stage for tracking and history.
+
+        This method stores stage-specific results in the execution note, which is
+        persisted to MongoDB and visible in the execution history. Useful for:
+        - Recording dynamically determined values during execution
+        - Tracking intermediate decisions and metrics
+        - Multi-stage calibration workflows with clear stage boundaries
+
+        Args:
+            stage_name: Name of the stage (e.g., "stage1_frequency_scan", "stage2_optimization")
+            result: Dictionary containing stage results (any JSON-serializable data)
+                Common fields: status, metrics, decisions, qubits, timestamps, etc.
+
+        Example:
+            ```python
+            # Stage 1: Frequency characterization
+            stage1_results = {}
+            for qid in qids:
+                freq_result = session.execute_task("CheckFreq", qid)
+                stage1_results[qid] = {
+                    "frequency": freq_result.get("qubit_frequency"),
+                    "quality": "high" if freq_result.get("contrast", 0) > 0.8 else "low"
+                }
+
+            # Record stage 1 results with decision logic
+            session.record_stage_result("stage1_frequency_scan", {
+                "status": "completed",
+                "qubits": stage1_results,
+                "decision": "proceed_to_rabi" if all(r["quality"] == "high" for r in stage1_results.values()) else "retry_frequency"
+            })
+
+            # Stage 2: Use stage 1 results to determine next actions
+            stage1_data = session.get_stage_result("stage1_frequency_scan")
+            if stage1_data["decision"] == "proceed_to_rabi":
+                for qid in qids:
+                    session.execute_task("CheckRabi", qid)
+            ```
+
+        """
+        logger = get_run_logger()
+
+        # Initialize stage_results dict in note if it doesn't exist
+        if "stage_results" not in self.execution_manager.note:
+            self.execution_manager.note["stage_results"] = {}
+
+        # Store stage result with timestamp
+        self.execution_manager.note["stage_results"][stage_name] = {
+            "result": result,
+            "timestamp": pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+        }
+
+        # Persist to database immediately
+        self.execution_manager.save()
+        logger.info(f"Recorded stage result for '{stage_name}'")
+
+    def get_stage_result(self, stage_name: str) -> dict[str, Any] | None:
+        """Get the recorded result of a previous calibration stage.
+
+        Args:
+            stage_name: Name of the stage to retrieve
+
+        Returns:
+            Stage result dictionary, or None if stage not found
+
+        Example:
+            ```python
+            # Retrieve stage 1 results to determine stage 2 logic
+            stage1_data = session.get_stage_result("stage1_frequency_scan")
+            if stage1_data and stage1_data["decision"] == "proceed_to_rabi":
+                # Execute stage 2 tasks
+                pass
+            ```
+
+        """
+        stage_results = self.execution_manager.note.get("stage_results", {})
+        stage_data = stage_results.get(stage_name)
+
+        if stage_data:
+            return stage_data["result"]
+        return None
+
     def _sync_backend_params_before_push(self, logger) -> None:
         """Sync recent calibration results into backend YAML params prior to GitHub push."""
         updater_instance = get_params_updater(self.session, self.chip_id)

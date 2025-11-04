@@ -70,5 +70,13 @@
     "category": "coupling",
     "filename": "two_qubit_parallel_calibration.py",
     "function_name": "two_qubit_parallel_calibration"
+  },
+  {
+    "id": "full_calibration",
+    "name": "Full Chip Calibration",
+    "description": "Complete chip calibration workflow: 1-qubit → CR scheduling → 2-qubit with automatic candidate filtering",
+    "category": "production",
+    "filename": "full_calibration.py",
+    "function_name": "full_calibration"
   }
 ]

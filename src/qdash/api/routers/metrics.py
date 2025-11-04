@@ -364,10 +364,11 @@ async def get_qubit_metric_history(
         cutoff_time = pendulum.now("Asia/Tokyo").subtract(days=within_days)
 
     # Query execution history
+    # Note: No status filter - we want to include all executions (running, completed, failed)
+    # because individual tasks may have succeeded even if the execution as a whole failed
     query: dict[str, Any] = {
         "chip_id": chip_id,
         "username": username,
-        "status": "completed",
     }
 
     if cutoff_time:
@@ -481,10 +482,11 @@ async def get_coupling_metric_history(
         cutoff_time = pendulum.now("Asia/Tokyo").subtract(days=within_days)
 
     # Query execution history
+    # Note: No status filter - we want to include all executions (running, completed, failed)
+    # because individual tasks may have succeeded even if the execution as a whole failed
     query: dict[str, Any] = {
         "chip_id": chip_id,
         "username": username,
-        "status": "completed",
     }
 
     if cutoff_time:
