@@ -20,11 +20,13 @@ The scheduler solves the parallel CR gate scheduling problem:
 
 ### Key Features
 
+- **Design-based direction inference**: Infers CR direction from chip design without frequency calibration
 - **Frequency directionality filtering**: Only schedules CR pairs where f_control < f_target
 - **MUX conflict detection**: Prevents resource contention from shared readout/control modules
 - **Greedy graph coloring**: Uses NetworkX's graph coloring algorithms for parallel grouping
 - **Fast/slow pair separation**: Prioritizes intra-MUX pairs (fast) before inter-MUX pairs (slow)
 - **Configurable strategies**: Supports multiple coloring strategies (largest_first, smallest_last, etc.)
+- **Plugin architecture**: Extensible filter and scheduler pipeline for custom logic
 
 ## Architecture
 
@@ -246,6 +248,177 @@ result = scheduler.generate(coloring_strategy="saturation_largest_first")
 # → 10 groups, avg 5.6 pairs/group, slower execution
 ```
 
+## Plugin Architecture (New)
+
+### Overview
+
+The scheduler now supports a pluggable architecture for filters and schedulers, enabling users to customize the scheduling pipeline with their own logic.
+
+### Architecture Components
+
+**Base Interfaces:**
+
+- `CRPairFilter`: Base class for filtering CR pairs
+- `CRSchedulingStrategy`: Base class for scheduling strategies
+- `FilterContext`: Context object passed to filters (chip data, frequencies, MUX mapping)
+- `ScheduleContext`: Context object passed to schedulers (MUX configuration, conflicts)
+
+**Built-in Filters:**
+
+- `CandidateQubitFilter`: Filter by candidate qubit set
+- `FrequencyDirectionalityFilter`: Filter by frequency direction (design-based or measured)
+- `FidelityFilter`: Filter by qubit fidelity threshold
+
+**Built-in Schedulers:**
+
+- `MuxConflictScheduler`: Graph coloring based on MUX conflicts
+- `IntraThenInterMuxScheduler`: Schedule intra-MUX pairs first, then inter-MUX pairs
+
+### Plugin Usage
+
+#### Basic Plugin Usage
+
+```python
+from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
+from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+    CandidateQubitFilter,
+    FrequencyDirectionalityFilter,
+    FidelityFilter,
+    IntraThenInterMuxScheduler,
+    MuxConflictScheduler,
+)
+
+scheduler = CRScheduler(username="alice", chip_id="64Qv3")
+
+# Custom filter pipeline
+filters = [
+    CandidateQubitFilter(["0", "1", "2", "3"]),
+    FrequencyDirectionalityFilter(use_design_based=True),
+    FidelityFilter(min_fidelity=0.95),
+]
+
+# Custom scheduler
+custom_scheduler = IntraThenInterMuxScheduler(
+    inner_scheduler=MuxConflictScheduler(
+        max_parallel_ops=10,
+        coloring_strategy="saturation_largest_first"
+    )
+)
+
+# Generate with plugins
+result = scheduler.generate_with_plugins(
+    filters=filters,
+    scheduler=custom_scheduler
+)
+```
+
+#### Design-Based vs. Measured Direction
+
+```python
+# Option 1: Design-based (no frequency calibration required)
+filters = [
+    FrequencyDirectionalityFilter(use_design_based=True),
+]
+
+# Option 2: Measured (uses calibrated frequencies)
+filters = [
+    FrequencyDirectionalityFilter(use_design_based=False),
+]
+
+# Option 3: Auto-select (uses measured if available, else design-based)
+filters = None  # Default behavior
+```
+
+### Creating Custom Filters
+
+```python
+from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+    CRPairFilter,
+    FilterContext,
+)
+
+class MyCustomFilter(CRPairFilter):
+    """Custom filter example."""
+
+    def __init__(self, threshold: float):
+        self.threshold = threshold
+        self._filtered_count = 0
+        self._total_count = 0
+
+    def filter(self, pairs: list[str], context: FilterContext) -> list[str]:
+        """Apply custom filtering logic."""
+        self._total_count = len(pairs)
+
+        # Your custom logic here
+        filtered = [
+            pair for pair in pairs
+            if self._meets_criteria(pair, context)
+        ]
+
+        self._filtered_count = len(filtered)
+        return filtered
+
+    def _meets_criteria(self, pair: str, context: FilterContext) -> bool:
+        """Custom criteria logic."""
+        # Example: Check distance between qubits
+        q1, q2 = pair.split("-")
+        # ... custom logic ...
+        return True
+
+    def get_stats(self) -> dict[str, Any]:
+        """Return statistics."""
+        return {
+            "filter_name": "my_custom_filter",
+            "input_pairs": self._total_count,
+            "output_pairs": self._filtered_count,
+            "threshold": self.threshold,
+        }
+```
+
+### Creating Custom Schedulers
+
+```python
+from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+    CRSchedulingStrategy,
+    ScheduleContext,
+)
+
+class MyCustomScheduler(CRSchedulingStrategy):
+    """Custom scheduler example."""
+
+    def __init__(self, param: int):
+        self.param = param
+        self._num_groups = 0
+
+    def schedule(self, pairs: list[str], context: ScheduleContext) -> list[list[str]]:
+        """Apply custom scheduling logic."""
+        # Your custom grouping logic here
+        groups = []
+
+        # Example: Simple sequential grouping
+        for pair in pairs:
+            groups.append([pair])
+
+        self._num_groups = len(groups)
+        return groups
+
+    def get_metadata(self) -> dict[str, Any]:
+        """Return metadata."""
+        return {
+            "scheduler_name": "my_custom_scheduler",
+            "param": self.param,
+            "num_groups": self._num_groups,
+        }
+```
+
+### Plugin Benefits
+
+1. **Extensibility**: Add new filters/schedulers without modifying core code
+2. **Reusability**: Share plugins across projects
+3. **Testability**: Test components independently
+4. **Flexibility**: Users can build custom pipelines
+5. **Maintainability**: Clear separation of concerns
+
 ## Usage Examples
 
 ### Basic Usage
@@ -363,17 +536,53 @@ ValueError: No valid CR pairs after filtering
 Use the visualizer tool to inspect schedules:
 
 ```bash
+# Basic usage (legacy mode)
 python src/tools/cr_scheduler_visualizer.py
+
+# Plugin mode with design-based direction (default)
+python src/tools/cr_scheduler_visualizer.py --use-plugins
+
+# Plugin mode with measured frequency directionality
+python src/tools/cr_scheduler_visualizer.py --use-plugins --measured
+
+# Use simple MUX conflict scheduler (no intra/inter prioritization)
+python src/tools/cr_scheduler_visualizer.py --use-plugins --scheduler mux-conflict
+
+# With candidate qubits and fidelity filter
+python src/tools/cr_scheduler_visualizer.py --use-plugins \
+    --candidate-qubits 0 1 2 3 --min-fidelity 0.95
+
+# Custom chip and user
+python src/tools/cr_scheduler_visualizer.py --chip-id 144Qv1 --username alice
+
+# Show all options
+python src/tools/cr_scheduler_visualizer.py --help
 ```
 
-Output:
+**Command-line Options:**
+
+- `--chip-id CHIP_ID` - Chip ID to use (default: 64Qv3)
+- `--username USERNAME` - Username for chip data access (default: orangekame3)
+- `--use-plugins` - Use plugin architecture instead of legacy mode
+- `--candidate-qubits Q1 Q2 ...` - Candidate qubit IDs to filter
+- `--min-fidelity THRESHOLD` - Minimum fidelity threshold (e.g., 0.95)
+- `--measured` - Use measured frequency directionality (default is design-based)
+- `--scheduler {mux-conflict,intra-then-inter}` - Scheduler strategy (default: intra-then-inter)
+
+**Output:**
 
 - Console: Schedule statistics and group breakdown
-- Files: `.tmp/schedule_output/*.png` with visual representations
+- Files: Timestamped directories (e.g., `.tmp/schedule_output_20250115_143022/`) with visual representations
+  - `combined_schedule.png`: All groups with color-coded edges
+  - `schedule_group_N.png`: Individual group visualizations
+
+Each run creates a new timestamped directory, enabling easy comparison of different scheduler configurations or calibration data across multiple runs.
 
 ## References
 
-- Implementation: `src/qdash/workflow/engine/calibration/cr_scheduler.py`
-- Tests: `tests/qdash/workflow/engine/calibration/test_cr_scheduler.py`
+- Core Implementation: `src/qdash/workflow/engine/calibration/cr_scheduler.py`
+- Plugin Architecture: `src/qdash/workflow/engine/calibration/cr_scheduler_plugins.py`
+- Core Tests: `tests/qdash/workflow/engine/calibration/test_cr_scheduler.py`
+- Plugin Tests: `tests/qdash/workflow/engine/calibration/test_cr_scheduler_plugins.py`
 - Visualization: `src/tools/cr_scheduler_visualizer.py`
 - Topology: [Square Lattice Topology](./square-lattice-topology.md)

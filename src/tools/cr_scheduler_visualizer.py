@@ -8,18 +8,52 @@ This tool uses the CRScheduler class from the workflow engine and generates:
 - Console output with schedule statistics
 - Visualization images showing the schedule structure
 
+Features:
+---------
+- Supports both legacy and plugin-based scheduler modes
+- Displays design-based vs. measured frequency directionality
+- Shows filter pipeline statistics (plugin mode)
+- Visualizes MUX-aware scheduling with color-coded groups
+
 Usage:
 ------
+    # Basic usage (legacy mode)
     python src/tools/cr_scheduler_visualizer.py
+
+    # Plugin mode with design-based direction (default)
+    python src/tools/cr_scheduler_visualizer.py --use-plugins
+
+    # Plugin mode with measured frequency directionality
+    python src/tools/cr_scheduler_visualizer.py --use-plugins --measured
+
+    # Use simple MUX conflict scheduler (no intra/inter prioritization)
+    python src/tools/cr_scheduler_visualizer.py --use-plugins --scheduler mux-conflict
+
+    # With candidate qubits and fidelity filter
+    python src/tools/cr_scheduler_visualizer.py --use-plugins \
+        --candidate-qubits 0 1 2 3 --min-fidelity 0.95
+
+    # Custom chip and user
+    python src/tools/cr_scheduler_visualizer.py --chip-id 144Qv1 --username alice
+
+    # Show help
+    python src/tools/cr_scheduler_visualizer.py --help
 
 Outputs:
 --------
 - Console: Schedule statistics (number of groups, pairs per group, etc.)
-- Files: Visualization plots in schedule_output/ directory
+- Files: Visualization plots in timestamped directories (e.g., .tmp/schedule_output_20250115_143022/)
   - combined_schedule.png: All groups with color-coded edges
   - schedule_group_N.png: Individual group visualizations
+
+Note:
+-----
+Each run creates a new timestamped directory, allowing easy comparison
+of different scheduler configurations or calibration data across runs.
 """
 
+import argparse
+from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -33,10 +67,20 @@ from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
 
 DEFAULT_CHIP_ID = "64Qv3"
 DEFAULT_USERNAME = "orangekame3"
-SCHEDULE_OUTPUT_DIR = Path(".tmp/schedule_output")
+SCHEDULE_OUTPUT_BASE_DIR = Path(".tmp")
 LATTICE_DIMENSION = 4  # 4x4 unit cells
 TOTAL_QUBITS = 64
 MAX_PARALLEL_OPS = 10
+
+
+def get_timestamped_output_dir() -> Path:
+    """Generate timestamped output directory path.
+
+    Returns:
+        Path object in format: .tmp/schedule_output_YYYYMMDD_HHMMSS/
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return SCHEDULE_OUTPUT_BASE_DIR / f"schedule_output_{timestamp}"
 
 
 # ============================================================================
@@ -87,10 +131,11 @@ def visualize_combined_schedule(
     parallel_groups: list[list[tuple[str, str]]],
     qid_to_mux: dict[str, int],
     lattice_pos: dict[str, tuple[float, float]],
-    output_path: Path = SCHEDULE_OUTPUT_DIR / "combined_schedule.png"
+    output_dir: Path
 ) -> None:
     """Create combined visualization showing all schedule steps with color-coded edges."""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "combined_schedule.png"
 
     # Build graph with color-coded edges
     graph = nx.Graph()
@@ -127,7 +172,7 @@ def visualize_each_step(
     parallel_groups: list[list[tuple[str, str]]],
     qid_to_mux: dict[str, int],
     lattice_pos: dict[str, tuple[float, float]],
-    output_dir: Path = SCHEDULE_OUTPUT_DIR
+    output_dir: Path
 ) -> None:
     """Create individual visualization for each parallel group."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -166,16 +211,52 @@ def print_schedule_summary(
     print("=" * 70)
 
     print("\nFiltering Statistics:")
-    print(f"  Total coupling pairs        : {filtering_stats['all_coupling_pairs']}")
-    print(f"  Frequency-filtered pairs    : {filtering_stats['freq_directionality_filtered']}")
-    print(f"  Used candidate qubits       : {filtering_stats.get('used_candidate_qubits', False)}")
+    print(f"  Total coupling pairs        : {filtering_stats.get('all_coupling_pairs', 'N/A')}")
+
+    # Handle both old and new format
+    if 'freq_directionality_filtered' in filtering_stats:
+        print(f"  Frequency-filtered pairs    : {filtering_stats['freq_directionality_filtered']}")
+    elif 'final_filtered_pairs' in filtering_stats:
+        print(f"  Final filtered pairs        : {filtering_stats['final_filtered_pairs']}")
+
+    # Direction method (new field)
+    if 'direction_method' in filtering_stats:
+        print(f"  Direction method            : {filtering_stats['direction_method']}")
+
+    # Candidate qubits
+    used_candidates = filtering_stats.get('used_candidate_qubits', False)
+    print(f"  Used candidate qubits       : {used_candidates}")
+
+    # Filter pipeline (new plugin architecture)
+    if 'filter_pipeline' in filtering_stats:
+        print(f"\n  Filter Pipeline:")
+        for i, filter_stat in enumerate(filtering_stats['filter_pipeline'], 1):
+            filter_name = filter_stat.get('filter_name', 'unknown')
+            input_pairs = filter_stat.get('input_pairs', 0)
+            output_pairs = filter_stat.get('output_pairs', 0)
+            print(f"    {i}. {filter_name:25s}: {input_pairs:3d} → {output_pairs:3d}")
 
     print("\nSchedule Statistics:")
     print(f"  Total scheduled pairs       : {metadata['scheduled_pairs']}")
     print(f"  Number of parallel groups   : {metadata['num_groups']}")
     print(f"  Avg pairs per group         : {metadata['scheduled_pairs'] / metadata['num_groups']:.2f}")
-    print(f"  Max parallel operations     : {metadata['max_parallel_ops']}")
-    print(f"  Coloring strategy           : {metadata['coloring_strategy']}")
+
+    # Max parallel ops (may not exist in plugin mode)
+    if 'max_parallel_ops' in metadata:
+        print(f"  Max parallel operations     : {metadata['max_parallel_ops']}")
+
+    # Coloring strategy (may not exist in plugin mode)
+    if 'coloring_strategy' in metadata:
+        print(f"  Coloring strategy           : {metadata['coloring_strategy']}")
+
+    # Grid size (new field)
+    if 'grid_size' in metadata:
+        print(f"  Grid size                   : {metadata['grid_size']}x{metadata['grid_size']}")
+
+    # Scheduler info (new plugin architecture)
+    if 'scheduler' in metadata:
+        scheduler_info = metadata['scheduler']
+        print(f"  Scheduler                   : {scheduler_info.get('scheduler_name', 'N/A')}")
 
     if metadata.get('fast_pairs') is not None:
         print(f"  Fast pairs (intra-MUX)      : {metadata['fast_pairs']}")
@@ -194,21 +275,45 @@ def print_schedule_summary(
 # ============================================================================
 
 
-def main(chip_id: str = DEFAULT_CHIP_ID, username: str = DEFAULT_USERNAME) -> None:
+def main(
+    chip_id: str = DEFAULT_CHIP_ID,
+    username: str = DEFAULT_USERNAME,
+    use_plugins: bool = False,
+    candidate_qubits: list[str] | None = None,
+    min_fidelity: float | None = None,
+    use_design_based: bool = True,
+    scheduler_type: str = "intra-then-inter",
+) -> None:
     """Main execution function for CR schedule visualization.
 
     Args:
         chip_id: Chip ID to use (default: 64Qv3)
         username: Username for chip data access (default: orangekame3)
+        use_plugins: Use plugin architecture (default: False for backward compatibility)
+        candidate_qubits: Optional list of candidate qubit IDs (e.g., ["0", "1", "2", "3"])
+        min_fidelity: Optional minimum fidelity threshold (e.g., 0.95)
+        use_design_based: Use design-based frequency directionality (default: True)
+        scheduler_type: Scheduler strategy - "mux-conflict" or "intra-then-inter" (default: intra-then-inter)
     """
+    # Generate timestamped output directory
+    output_dir = get_timestamped_output_dir()
+
     print("=" * 70)
     print("CR SCHEDULER VISUALIZER")
     print("=" * 70)
     print(f"\nConfiguration:")
     print(f"  Chip ID           : {chip_id}")
     print(f"  Username          : {username}")
+    print(f"  Mode              : {'Plugin' if use_plugins else 'Legacy'}")
     print(f"  Max parallel ops  : {MAX_PARALLEL_OPS}")
-    print(f"  Output directory  : {SCHEDULE_OUTPUT_DIR}/")
+    if use_plugins:
+        print(f"  Scheduler type    : {scheduler_type}")
+    if candidate_qubits is not None:
+        print(f"  Candidate qubits  : {candidate_qubits}")
+    if min_fidelity is not None:
+        print(f"  Min fidelity      : {min_fidelity}")
+    print(f"  Direction method  : {'Design-based' if use_design_based else 'Measured'}")
+    print(f"  Output directory  : {output_dir}/")
 
     # Initialize database
     initialize()
@@ -216,7 +321,54 @@ def main(chip_id: str = DEFAULT_CHIP_ID, username: str = DEFAULT_USERNAME) -> No
     # Create scheduler and generate schedule
     print("\nGenerating CR schedule...")
     scheduler = CRScheduler(username=username, chip_id=chip_id)
-    result = scheduler.generate(max_parallel_ops=MAX_PARALLEL_OPS)
+
+    if use_plugins:
+        # Use plugin architecture with custom filters/scheduler
+        from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+            CandidateQubitFilter,
+            FidelityFilter,
+            FrequencyDirectionalityFilter,
+            IntraThenInterMuxScheduler,
+            MuxConflictScheduler,
+        )
+
+        # Build filter pipeline
+        filters = []
+
+        # Add candidate qubit filter if specified
+        if candidate_qubits is not None:
+            filters.append(CandidateQubitFilter(candidate_qubits))
+
+        # Add frequency directionality filter
+        filters.append(FrequencyDirectionalityFilter(use_design_based=use_design_based))
+
+        # Add fidelity filter if specified
+        if min_fidelity is not None:
+            filters.append(FidelityFilter(min_fidelity=min_fidelity))
+
+        # Create custom scheduler based on type
+        if scheduler_type == "mux-conflict":
+            # Simple MUX conflict resolution only
+            custom_scheduler = MuxConflictScheduler(
+                max_parallel_ops=MAX_PARALLEL_OPS,
+                coloring_strategy="largest_first"
+            )
+        else:  # "intra-then-inter"
+            # Prioritize intra-MUX pairs
+            custom_scheduler = IntraThenInterMuxScheduler(
+                inner_scheduler=MuxConflictScheduler(
+                    max_parallel_ops=MAX_PARALLEL_OPS,
+                    coloring_strategy="largest_first"
+                )
+            )
+
+        result = scheduler.generate_with_plugins(filters=filters, scheduler=custom_scheduler)
+    else:
+        # Use legacy API
+        result = scheduler.generate(
+            candidate_qubits=candidate_qubits,
+            max_parallel_ops=MAX_PARALLEL_OPS
+        )
 
     # Print summary
     print_schedule_summary(
@@ -232,18 +384,112 @@ def main(chip_id: str = DEFAULT_CHIP_ID, username: str = DEFAULT_USERNAME) -> No
     visualize_combined_schedule(
         result.parallel_groups,
         result._qid_to_mux,
-        lattice_pos
+        lattice_pos,
+        output_dir
     )
 
     visualize_each_step(
         result.parallel_groups,
         result._qid_to_mux,
-        lattice_pos
+        lattice_pos,
+        output_dir
     )
 
-    print(f"\n✓ All visualizations saved to {SCHEDULE_OUTPUT_DIR}/")
+    print(f"\n✓ All visualizations saved to {output_dir}/")
     print("=" * 70)
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="CR Scheduler Visualizer - Generate and visualize CR gate schedules",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Basic usage (legacy mode)
+  python src/tools/cr_scheduler_visualizer.py
+
+  # Plugin mode with design-based direction (default)
+  python src/tools/cr_scheduler_visualizer.py --use-plugins
+
+  # Plugin mode with measured frequency directionality
+  python src/tools/cr_scheduler_visualizer.py --use-plugins --measured
+
+  # Use simple MUX conflict scheduler (no intra/inter prioritization)
+  python src/tools/cr_scheduler_visualizer.py --use-plugins --scheduler mux-conflict
+
+  # With candidate qubits and fidelity filter
+  python src/tools/cr_scheduler_visualizer.py --use-plugins \\
+      --candidate-qubits 0 1 2 3 --min-fidelity 0.95
+
+  # Custom chip and user
+  python src/tools/cr_scheduler_visualizer.py --chip-id 144Qv1 --username alice
+        """
+    )
+
+    parser.add_argument(
+        "--chip-id",
+        type=str,
+        default=DEFAULT_CHIP_ID,
+        help=f"Chip ID to use (default: {DEFAULT_CHIP_ID})"
+    )
+
+    parser.add_argument(
+        "--username",
+        type=str,
+        default=DEFAULT_USERNAME,
+        help=f"Username for chip data access (default: {DEFAULT_USERNAME})"
+    )
+
+    parser.add_argument(
+        "--use-plugins",
+        action="store_true",
+        help="Use plugin architecture instead of legacy mode"
+    )
+
+    parser.add_argument(
+        "--candidate-qubits",
+        type=str,
+        nargs="+",
+        default=None,
+        help="Candidate qubit IDs to filter (e.g., --candidate-qubits 0 1 2 3)"
+    )
+
+    parser.add_argument(
+        "--min-fidelity",
+        type=float,
+        default=None,
+        help="Minimum fidelity threshold for filtering (e.g., 0.95)"
+    )
+
+    parser.add_argument(
+        "--measured",
+        action="store_true",
+        help="Use measured frequency directionality (requires calibration data). "
+             "Default is design-based (no calibration needed)."
+    )
+
+    parser.add_argument(
+        "--scheduler",
+        type=str,
+        choices=["mux-conflict", "intra-then-inter"],
+        default="intra-then-inter",
+        help="Scheduler strategy: 'mux-conflict' (simple MUX conflict resolution) or "
+             "'intra-then-inter' (prioritize intra-MUX pairs) (default: intra-then-inter)"
+    )
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+
+    main(
+        chip_id=args.chip_id,
+        username=args.username,
+        use_plugins=args.use_plugins,
+        candidate_qubits=args.candidate_qubits,
+        min_fidelity=args.min_fidelity,
+        use_design_based=not args.measured,  # Default is design-based (True)
+        scheduler_type=args.scheduler,
+    )

@@ -3,6 +3,18 @@
 This module provides a clean API for generating optimized CR gate execution schedules
 based on hardware constraints, qubit quality metrics, and MUX resource conflicts.
 
+Direction Inference:
+    The scheduler uses a two-tier approach for determining CR gate direction:
+
+    1. **Design-based inference (default)**: Uses the checkerboard frequency pattern
+       from chip design to infer direction without requiring calibrated frequency data.
+       This is based on the square lattice topology where frequency is determined by
+       coordinate parity: (row + col) % 2.
+
+    2. **Measured directionality (fallback)**: Uses actual calibrated qubit frequencies
+       when available. This provides more accurate direction but requires prior
+       frequency calibration.
+
 Example:
     Basic usage in a calibration flow:
 
@@ -10,10 +22,16 @@ Example:
     from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
 
     scheduler = CRScheduler(username, chip_id)
-    schedule = scheduler.generate(min_x90_fidelity=0.95, max_parallel_ops=10)
+
+    # Works without frequency calibration (uses design-based inference)
+    schedule = scheduler.generate(max_parallel_ops=10)
+
+    # Or with calibrated frequencies (uses measured directionality)
+    # Run frequency calibration first, then generate schedule
+    schedule = scheduler.generate(max_parallel_ops=10)
 
     # Use the schedule
-    parallel_groups = schedule["parallel_groups"]  # [[(c, t), ...], ...]
+    parallel_groups = schedule.parallel_groups  # [[(c, t), ...], ...]
     for group in parallel_groups:
         # Execute group in parallel
         pass
@@ -83,16 +101,26 @@ class CRScheduler:
     """CR Gate Schedule Generator.
 
     Generates optimized scheduling for cross-resonance (CR) gate operations based on:
-    - X90 gate fidelity filtering
-    - Frequency directionality constraints
+    - Frequency directionality constraints (design-based or measured)
     - MUX resource conflict detection
     - Greedy graph coloring for parallel grouping
+    - Candidate qubit filtering
+
+    Direction Determination:
+        - **Design-based (default)**: Infers direction from checkerboard frequency pattern
+          based on qubit coordinates. Works without calibrated frequency data.
+        - **Measured (fallback)**: Uses actual calibrated qubit frequencies when available.
+          Automatically selected when frequency calibration data exists.
 
     Example:
         ```python
-        # Use default wiring config path
+        # Works even without frequency calibration data
         scheduler = CRScheduler(username="alice", chip_id="64Qv3")
-        schedule = scheduler.generate()
+        schedule = scheduler.generate()  # Uses design-based inference
+
+        # After frequency calibration, automatically uses measured data
+        # (run frequency calibration first)
+        schedule = scheduler.generate()  # Uses measured directionality
 
         # Or specify custom wiring config path
         scheduler = CRScheduler(
@@ -102,6 +130,8 @@ class CRScheduler:
         )
         schedule = scheduler.generate()
 
+        # Check which method was used
+        print(f"Direction method: {schedule.metadata['direction_method']}")
         print(f"Generated {len(schedule.parallel_groups)} groups")
         for i, group in enumerate(schedule.parallel_groups, 1):
             print(f"Group {i}: {len(group)} pairs")
@@ -227,6 +257,87 @@ class CRScheduler:
         return qid_to_mux
 
     @staticmethod
+    def _qid_to_coords(qid: int, grid_size: int) -> tuple[int, int]:
+        """Convert qubit ID to (row, col) coordinates in the square lattice.
+
+        Args:
+            qid: Qubit ID (0-indexed)
+            grid_size: Grid dimension (8 for 64-qubit, 12 for 144-qubit)
+
+        Returns:
+            (row, col) tuple representing position in the grid
+
+        Example:
+            For 64-qubit chip (8x8 grid):
+            - qid=0 → (0, 0) [MUX 0, position TL]
+            - qid=1 → (0, 1) [MUX 0, position TR]
+            - qid=2 → (1, 0) [MUX 0, position BL]
+            - qid=16 → (2, 0) [MUX 4, position TL]
+        """
+        # Which MUX does this qubit belong to?
+        mux_id = qid // 4
+
+        # Position within the MUX (0=TL, 1=TR, 2=BL, 3=BR)
+        pos_in_mux = qid % 4
+
+        # MUX grid dimension (N/2 × N/2)
+        mux_grid_size = grid_size // 2
+
+        # MUX position in MUX grid
+        mux_row = mux_id // mux_grid_size
+        mux_col = mux_id % mux_grid_size
+
+        # Position within MUX (2×2 sub-grid)
+        local_row = pos_in_mux // 2  # 0 (top) or 1 (bottom)
+        local_col = pos_in_mux % 2  # 0 (left) or 1 (right)
+
+        # Combine to get global position
+        row = mux_row * 2 + local_row
+        col = mux_col * 2 + local_col
+
+        return (row, col)
+
+    @staticmethod
+    def _infer_direction_from_design(qid1: str, qid2: str, grid_size: int = 8) -> bool:
+        """Infer CR gate direction from design-based frequency pattern.
+
+        The chip follows a checkerboard frequency pattern where frequency is determined by
+        coordinate parity. This allows inferring CR direction without actual frequency measurements.
+
+        Design pattern (from docs/architecture/square-lattice-topology.md):
+        - Low frequency (~8000 MHz): (row + col) % 2 == 0
+        - High frequency (~9000 MHz): (row + col) % 2 == 1
+
+        CR gate constraint: f_control < f_target
+
+        Args:
+            qid1: First qubit ID
+            qid2: Second qubit ID
+            grid_size: Grid dimension (8 for 64-qubit, 12 for 144-qubit, default: 8)
+
+        Returns:
+            True if qid1 should be control (qid1 has lower frequency by design),
+            False otherwise
+
+        Example:
+            For 64-qubit chip:
+            - qid1=0 → (0,0) → sum=0 (even) → low freq
+            - qid2=1 → (0,1) → sum=1 (odd) → high freq
+            - Result: True (0 is control, 1 is target)
+        """
+        r1, c1 = CRScheduler._qid_to_coords(int(qid1), grid_size)
+        r2, c2 = CRScheduler._qid_to_coords(int(qid2), grid_size)
+
+        # Checkerboard pattern: (row + col) % 2 determines frequency group
+        # Even sum → low frequency, Odd sum → high frequency
+        parity1 = (r1 + c1) % 2
+        parity2 = (r2 + c2) % 2
+
+        # CR constraint: control has lower frequency
+        # parity=0 → low freq, parity=1 → high freq
+        return parity1 < parity2
+
+    @staticmethod
     def _group_cr_pairs_by_conflict(
         cr_pairs: list[str],
         qid_to_mux: dict[str, int],
@@ -312,6 +423,169 @@ class CRScheduler:
         """Convert grouped CR pairs to parallel_groups format."""
         return [[tuple(pair.split("-")) for pair in group] for group in grouped]
 
+    def generate_with_plugins(
+        self,
+        filters: list[Any] | None = None,
+        scheduler: Any | None = None,
+    ) -> CRScheduleResult:
+        """Generate CR schedule using pluggable filters and schedulers.
+
+        This method provides a flexible plugin architecture for customizing
+        the filtering and scheduling pipeline. Filters are applied sequentially,
+        and the scheduler determines parallel grouping.
+
+        Args:
+            filters: List of CRPairFilter instances to apply in order.
+                If None, uses default filters (frequency directionality only).
+            scheduler: CRSchedulingStrategy instance for scheduling.
+                If None, uses default (IntraThenInterMuxScheduler with MuxConflictScheduler).
+
+        Returns:
+            CRScheduleResult containing parallel_groups and metadata
+
+        Raises:
+            FileNotFoundError: If wiring configuration not found
+            ValueError: If no valid CR pairs after filtering
+
+        Example:
+            ```python
+            from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+                CandidateQubitFilter,
+                FrequencyDirectionalityFilter,
+                FidelityFilter,
+                IntraThenInterMuxScheduler,
+                MuxConflictScheduler,
+            )
+
+            # Custom filter pipeline
+            filters = [
+                CandidateQubitFilter(["0", "1", "2", "3"]),
+                FrequencyDirectionalityFilter(use_design_based=True),
+                FidelityFilter(min_fidelity=0.95),
+            ]
+
+            # Custom scheduler
+            scheduler = IntraThenInterMuxScheduler(
+                inner_scheduler=MuxConflictScheduler(
+                    max_parallel_ops=10,
+                    coloring_strategy="saturation_largest_first"
+                )
+            )
+
+            cr_scheduler = CRScheduler(username="alice", chip_id="64Qv3")
+            schedule = cr_scheduler.generate_with_plugins(filters=filters, scheduler=scheduler)
+            ```
+        """
+        from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+            FilterContext,
+            FrequencyDirectionalityFilter,
+            IntraThenInterMuxScheduler,
+            MuxConflictScheduler,
+            ScheduleContext,
+        )
+
+        logger.info(f"Generating CR schedule (plugin mode) for chip_id={self.chip_id}, username={self.username}")
+
+        # Load chip data
+        chip_doc = self._load_chip_data()
+        qubit_frequency = self._extract_qubit_frequency(chip_doc.qubits)
+
+        # Load MUX configuration
+        wiring_config = self._load_wiring_config()
+        mux_conflict_map = self._build_mux_conflict_map(wiring_config)
+        qid_to_mux = self._build_qubit_to_mux_map(wiring_config)
+
+        # Determine grid size
+        grid_size = 12 if "144Q" in self.chip_id else 8
+
+        # Create filter context
+        filter_context = FilterContext(
+            chip_doc=chip_doc,
+            grid_size=grid_size,
+            qubit_frequency=qubit_frequency,
+            qid_to_mux=qid_to_mux,
+        )
+
+        # Use default filters if not provided
+        if filters is None:
+            # Auto-select frequency directionality method
+            use_design_based = len(qubit_frequency) == 0
+            filters = [
+                FrequencyDirectionalityFilter(use_design_based=use_design_based),
+            ]
+
+        # Get all coupling pairs
+        all_pairs = self._get_two_qubit_pair_list(chip_doc)
+        logger.info(f"Starting with {len(all_pairs)} coupling pairs")
+
+        # Apply filters sequentially
+        filtered_pairs = all_pairs
+        filter_stats = []
+        for i, filter_obj in enumerate(filters, 1):
+            filtered_pairs = filter_obj.filter(filtered_pairs, filter_context)
+            stats = filter_obj.get_stats()
+            filter_stats.append(stats)
+            logger.info(f"  Filter {i} ({stats['filter_name']}): {stats['input_pairs']} → {stats['output_pairs']}")
+
+        if len(filtered_pairs) == 0:
+            msg = "No valid CR pairs after filtering"
+            logger.error(msg)
+            raise ValueError(msg)
+
+        # Use default scheduler if not provided
+        if scheduler is None:
+            scheduler = IntraThenInterMuxScheduler(
+                inner_scheduler=MuxConflictScheduler(max_parallel_ops=10, coloring_strategy="largest_first")
+            )
+
+        # Create schedule context
+        schedule_context = ScheduleContext(
+            qid_to_mux=qid_to_mux,
+            mux_conflict_map=mux_conflict_map,
+        )
+
+        # Apply scheduler
+        grouped = scheduler.schedule(filtered_pairs, schedule_context)
+        scheduler_metadata = scheduler.get_metadata()
+
+        # Convert to parallel_groups format
+        parallel_groups = self._convert_to_parallel_groups(grouped)
+
+        # Calculate fast/slow split for metadata
+        fast, slow = self._split_fast_slow_pairs(filtered_pairs, qid_to_mux)
+
+        logger.info(
+            f"Generated schedule: {sum(len(g) for g in parallel_groups)} pairs in {len(parallel_groups)} groups"
+        )
+        logger.info(f"  Fast pairs (intra-MUX): {len(fast)}, Slow pairs (inter-MUX): {len(slow)}")
+
+        # Build result metadata
+        metadata = {
+            "total_pairs": len(filtered_pairs),
+            "scheduled_pairs": sum(len(g) for g in parallel_groups),
+            "fast_pairs": len(fast),
+            "slow_pairs": len(slow),
+            "num_groups": len(parallel_groups),
+            "grid_size": grid_size,
+            "scheduler": scheduler_metadata,
+            "filters": [repr(f) for f in filters],
+        }
+
+        filtering_stats = {
+            "all_coupling_pairs": len(all_pairs),
+            "final_filtered_pairs": len(filtered_pairs),
+            "filter_pipeline": filter_stats,
+        }
+
+        return CRScheduleResult(
+            parallel_groups=parallel_groups,
+            metadata=metadata,
+            filtering_stats=filtering_stats,
+            cr_pairs_string=filtered_pairs,
+            qid_to_mux=qid_to_mux,
+            mux_conflict_map=mux_conflict_map,
+        )
+
     def generate(
         self,
         candidate_qubits: list[str] | None = None,
@@ -375,11 +649,8 @@ class CRScheduler:
         # Get all coupling pairs
         all_pairs = self._get_two_qubit_pair_list(chip_doc)
 
-        # Check if we have required data
-        if len(qubit_frequency) == 0:
-            msg = "No qubit frequency data found. Please run qubit frequency calibration first."
-            logger.error(msg)
-            raise ValueError(msg)
+        # Determine grid size from chip_id
+        grid_size = 12 if "144Q" in self.chip_id else 8
 
         # Filter by candidate qubits if provided
         if candidate_qubits is not None:
@@ -395,15 +666,30 @@ class CRScheduler:
             logger.info(f"Filtered to {len(all_pairs)} pairs using {len(candidate_qubits)} candidate qubits")
 
         # Filter by frequency directionality
-        cr_pairs = [
-            pair
-            for pair in all_pairs
-            if (qubits := pair.split("-"))
-            and len(qubits) == 2
-            and qubits[0] in qubit_frequency
-            and qubits[1] in qubit_frequency
-            and qubit_frequency[qubits[0]] < qubit_frequency[qubits[1]]
-        ]
+        # Default: Use design-based inference (checkerboard pattern)
+        # Fallback: Use actual frequency measurements if available
+        use_design_based = len(qubit_frequency) == 0
+
+        if use_design_based:
+            logger.info("Using design-based frequency directionality (checkerboard pattern)")
+            cr_pairs = [
+                pair
+                for pair in all_pairs
+                if (qubits := pair.split("-"))
+                and len(qubits) == 2
+                and self._infer_direction_from_design(qubits[0], qubits[1], grid_size)
+            ]
+        else:
+            logger.info("Using measured frequency directionality")
+            cr_pairs = [
+                pair
+                for pair in all_pairs
+                if (qubits := pair.split("-"))
+                and len(qubits) == 2
+                and qubits[0] in qubit_frequency
+                and qubits[1] in qubit_frequency
+                and qubit_frequency[qubits[0]] < qubit_frequency[qubits[1]]
+            ]
 
         logger.info(f"Filtering: {len(all_pairs)} total → {len(cr_pairs)} with freq directionality")
 
@@ -441,12 +727,15 @@ class CRScheduler:
             "max_parallel_ops": max_parallel_ops,
             "coloring_strategy": coloring_strategy,
             "candidate_qubits_count": len(candidate_qubits) if candidate_qubits is not None else None,
+            "direction_method": "design_based" if use_design_based else "measured",
+            "grid_size": grid_size,
         }
 
         filtering_stats = {
             "all_coupling_pairs": len(all_pairs),
             "freq_directionality_filtered": len(cr_pairs),
             "used_candidate_qubits": candidate_qubits is not None,
+            "direction_method": "design_based" if use_design_based else "measured",
         }
 
         return CRScheduleResult(

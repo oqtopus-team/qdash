@@ -132,6 +132,42 @@ def test_build_qubit_to_mux_map(mock_wiring_config):
     assert qid_to_mux["5"] == 1
 
 
+# Coordinate conversion tests
+def test_qid_to_coords():
+    """Test qubit ID to coordinate conversion."""
+    # 64-qubit chip (8x8 grid)
+    assert CRScheduler._qid_to_coords(0, 8) == (0, 0)  # MUX 0, TL
+    assert CRScheduler._qid_to_coords(1, 8) == (0, 1)  # MUX 0, TR
+    assert CRScheduler._qid_to_coords(2, 8) == (1, 0)  # MUX 0, BL
+    assert CRScheduler._qid_to_coords(3, 8) == (1, 1)  # MUX 0, BR
+    assert CRScheduler._qid_to_coords(4, 8) == (0, 2)  # MUX 1, TL
+    assert CRScheduler._qid_to_coords(16, 8) == (2, 0)  # MUX 4, TL
+
+    # 144-qubit chip (12x12 grid)
+    assert CRScheduler._qid_to_coords(0, 12) == (0, 0)
+    assert CRScheduler._qid_to_coords(1, 12) == (0, 1)
+
+
+def test_infer_direction_from_design():
+    """Test design-based CR direction inference using checkerboard pattern."""
+    # 64-qubit chip (8x8 grid)
+    # Qubit 0: (0,0) → sum=0 (even) → low freq
+    # Qubit 1: (0,1) → sum=1 (odd) → high freq
+    assert CRScheduler._infer_direction_from_design("0", "1", 8) is True  # 0→1 valid (low→high)
+
+    # Qubit 0: (0,0) → sum=0 (even) → low freq
+    # Qubit 2: (1,0) → sum=1 (odd) → high freq
+    assert CRScheduler._infer_direction_from_design("0", "2", 8) is True  # 0→2 valid (low→high)
+
+    # Qubit 1: (0,1) → sum=1 (odd) → high freq
+    # Qubit 0: (0,0) → sum=0 (even) → low freq
+    assert CRScheduler._infer_direction_from_design("1", "0", 8) is False  # 1→0 invalid (high→low)
+
+    # Qubit 2: (1,0) → sum=1 (odd) → high freq
+    # Qubit 3: (1,1) → sum=2 (even) → low freq
+    assert CRScheduler._infer_direction_from_design("2", "3", 8) is False  # 2→3 invalid (high→low)
+
+
 # Frequency filtering tests
 def test_extract_qubit_frequency(mock_chip_doc):
     """Test frequency extraction from chip document."""
@@ -242,6 +278,53 @@ def test_coloring_strategies(strategy):
 
 
 # Schedule generation tests
+@patch.object(CRScheduler, "_load_chip_data")
+def test_generate_with_design_based_direction(mock_load, scheduler):
+    """Test schedule generation using design-based direction inference."""
+    # Create chip doc without frequency data to trigger design-based inference
+    chip_doc = MagicMock()
+    chip_doc.qubits = {
+        "0": MagicMock(data=None),
+        "1": MagicMock(data=None),
+        "2": MagicMock(data=None),
+        "3": MagicMock(data=None),
+    }
+    chip_doc.couplings = {
+        "0-1": MagicMock(),  # Valid by design: 0→1
+        "1-2": MagicMock(),  # Invalid by design: 1→2
+        "2-3": MagicMock(),  # Valid by design: 2→3
+    }
+
+    mock_load.return_value = chip_doc
+
+    schedule = scheduler.generate(candidate_qubits=["0", "1", "2", "3"])
+
+    # Check that design-based method was used
+    assert schedule.metadata["direction_method"] == "design_based"
+    assert schedule.filtering_stats["direction_method"] == "design_based"
+
+    # Check that correct pairs were selected based on design pattern
+    all_pairs = [pair for group in schedule.parallel_groups for pair in group]
+    # 0-1: (0,0)→(0,1) even→odd ✓
+    # 1-2: (0,1)→(1,0) odd→odd ✗
+    # 2-3: (1,0)→(1,1) odd→even ✗
+    assert ("0", "1") in all_pairs
+    assert ("1", "2") not in all_pairs
+    assert ("2", "3") not in all_pairs
+
+
+@patch.object(CRScheduler, "_load_chip_data")
+def test_generate_with_measured_direction(mock_load, scheduler, mock_chip_doc):
+    """Test schedule generation using measured frequency directionality."""
+    mock_load.return_value = mock_chip_doc
+
+    schedule = scheduler.generate(candidate_qubits=["0", "1", "2", "3"])
+
+    # Check that measured method was used
+    assert schedule.metadata["direction_method"] == "measured"
+    assert schedule.filtering_stats["direction_method"] == "measured"
+
+
 @patch.object(CRScheduler, "_load_chip_data")
 def test_generate_full_schedule(mock_load, scheduler, mock_chip_doc):
     """Test complete schedule generation."""
