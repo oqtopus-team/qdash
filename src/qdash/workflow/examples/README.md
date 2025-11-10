@@ -76,39 +76,136 @@ results = iterative_flow(
 )
 ```
 
-## Creating Custom Flows
+### 4. Multi-Stage Adaptive Flow (`templates/multi_stage_adaptive_flow.py`) ⭐ NEW
 
-Use these templates as starting points for your own calibration flows:
+Advanced multi-stage calibration with stage result recording and conditional execution.
+
+**Features:**
+
+- Record dynamically determined values during execution
+- Use previous stage results to determine subsequent actions
+- All stage results persisted to MongoDB for tracking
+- Adaptive workflow based on quality metrics
+- Clear stage boundaries with recorded metrics and decisions
+
+**Usage:**
 
 ```python
-from prefect import flow
-from qdash.workflow.helpers import (
-    init_calibration,
-    finish_calibration,
-    get_session,
+from qdash.workflow.examples.templates.multi_stage_adaptive_flow import multi_stage_adaptive_flow
+
+results = multi_stage_adaptive_flow(
+    username="alice",
+    chip_id="chip_1",
+    qids=["0", "1", "2"]
 )
-
-@flow
-def my_custom_flow(username, chip_id, qids, flow_name=None):
-    # Initialize session (flow_name injected by API)
-    session = init_calibration(username, chip_id, qids, flow_name=flow_name)
-
-    # Your custom calibration logic
-    for qid in qids:
-        result = session.execute_task("CheckFreq", qid)
-        if result.get("qubit_frequency", 0) > 5.0:
-            session.execute_task("CheckRabi", qid)
-
-    # Complete calibration
-    finish_calibration()
-    return results
 ```
 
-## GitHub Integration
+**Example Pattern:**
 
-Python Flow Editor supports GitHub integration for configuration management:
+```python
+# Stage 1: Measure and record
+stage1_results = {}
+for qid in qids:
+    result = session.execute_task("CheckFreq", qid)
+    stage1_results[qid] = {
+        "frequency": result.get("qubit_frequency"),
+        "quality": "high" if result.get("contrast") > 0.8 else "low"
+    }
 
-### Pulling Latest Configuration
+# Record stage 1 results with decision logic
+session.record_stage_result("stage1_frequency_scan", {
+    "status": "completed",
+    "qubits": stage1_results,
+    "decision": "proceed_to_rabi" if all(r["quality"] == "high" for r in stage1_results.values()) else "retry"
+})
+
+# Stage 2: Use stage 1 results to determine actions
+stage1_data = session.get_stage_result("stage1_frequency_scan")
+if stage1_data["decision"] == "proceed_to_rabi":
+    # Execute stage 2 tasks
+    for qid in qids:
+        session.execute_task("CheckRabi", qid)
+```
+
+### 5. Full Chip Calibration with CR Scheduling (`templates/full_chip_calibration_with_cr_scheduling.py`) ⭐ NEW
+
+Complete chip calibration: 1-qubit → CR schedule generation → 2-qubit calibration.
+
+**Features:**
+
+- 1-qubit full calibration for all qubits
+- CR schedule generation using engine-side `CRScheduler`
+- 2-qubit coupling calibration following the generated schedule
+- All scheduling decisions and results recorded for tracking
+- Uses real hardware constraints (X90 fidelity, MUX conflicts)
+
+**Usage:**
+
+```python
+from qdash.workflow.examples.templates.full_chip_calibration_with_cr_scheduling import full_chip_calibration_with_cr_scheduling
+
+results = full_chip_calibration_with_cr_scheduling(
+    username="alice",
+    chip_id="64Qv3",
+    qids=["0", "1", "2", "3"]
+)
+```
+
+**Workflow:**
+
+```python
+# Stage 1: 1-qubit calibration
+for qid in qids:
+    session.execute_task("CheckRabi", qid)
+    session.execute_task("CheckT1", qid)
+    # ... more 1-qubit tasks
+
+session.record_stage_result("stage1_one_qubit_calibration", {...})
+
+# Stage 2: Generate CR schedule using engine-side CRScheduler
+# Extract candidate qubits from Stage 1 (high and medium quality only)
+stage1_data = session.get_stage_result("stage1_one_qubit_calibration")
+stage1_qubits = stage1_data["qubits"]
+
+high_quality = [qid for qid, r in stage1_qubits.items() if r.get("overall_quality") == "high"]
+medium_quality = [qid for qid, r in stage1_qubits.items() if r.get("overall_quality") == "medium"]
+candidate_qubits = high_quality + medium_quality
+
+from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
+
+scheduler = CRScheduler(username, chip_id)
+schedule_result = scheduler.generate(
+    candidate_qubits=candidate_qubits,  # Only use qubits that passed Stage 1!
+    max_parallel_ops=10
+)
+cr_schedule = schedule_result.to_dict()
+
+session.record_stage_result("stage2_cr_schedule_generation", {
+    "schedule": cr_schedule,  # Includes parallel_groups, metadata, filtering stats
+    "tool_used": "engine.calibration.CRScheduler",
+    "input_summary": {
+        "based_on_stage": "stage1_one_qubit_calibration",
+        "candidate_qubits": candidate_qubits
+    }
+})
+
+# Stage 3: Execute 2-qubit calibration according to schedule
+for group in cr_schedule["parallel_groups"]:
+    for (control, target) in group:
+        session.execute_task("CheckCrossResonance", f"{control}-{target}")
+
+session.record_stage_result("stage3_two_qubit_calibration", {...})
+```
+
+**Recorded Data:**
+
+The CR schedule includes:
+
+- `parallel_groups`: Optimized coupling groups for parallel execution
+- `metadata`: Statistics (total pairs, fast/slow split, number of groups)
+- `filtering_stats`: X90 fidelity filtering, frequency directionality
+
+$1Pulling Latest Configuration
 
 Pull latest config from GitHub before calibration:
 
@@ -213,9 +310,22 @@ See the [Python Flow Helper Documentation](../helpers/) for complete API details
 
 ### FlowSession Methods
 
+**Task Execution:**
+
 - `execute_task(task_name, qid, task_details)` - Execute a single task
+
+**Parameter Management:**
+
 - `get_parameter(qid, param_name)` - Get parameter value
 - `set_parameter(qid, param_name, value)` - Set parameter value
+
+**Stage Result Recording (New):**
+
+- `record_stage_result(stage_name, result)` - Record stage execution results
+- `get_stage_result(stage_name)` - Retrieve recorded stage results
+
+**Session Completion:**
+
 - `finish_calibration()` - Complete calibration
 
 ## Parallel Execution Examples

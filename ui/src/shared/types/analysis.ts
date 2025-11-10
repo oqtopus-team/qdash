@@ -52,24 +52,6 @@ export type ParameterKey =
 
 export type TagKey = "daily" | "weekly" | "monthly" | string; // Allow any string for backward compatibility
 
-export interface PlotConfig {
-  displaylogo: boolean;
-  responsive: boolean;
-  toImageButtonOptions: {
-    format: "svg" | "png" | "jpeg" | "webp";
-    filename: string;
-    height: number;
-    width: number;
-    scale: number;
-  };
-}
-
-export interface FetchOptions {
-  enabled?: boolean;
-  refetchInterval?: number;
-  staleTime?: number;
-}
-
 export interface CSVExportOptions {
   filename: string;
   headers: string[];

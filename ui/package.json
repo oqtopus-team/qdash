@@ -1,6 +1,6 @@
 {
   "name": "ui",
-  "homepage": "/dashboard",
+  "homepage": "/metrics",
   "private": true,
   "version": "0.0.0",
   "engines": {
@@ -19,9 +19,6 @@
     "commit": "python ../scripts/git-auto-commit.py"
   },
   "dependencies": {
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-query": "^5.59.20",
     "@tanstack/react-table": "^8.21.2",
@@ -30,13 +27,10 @@
     "@xyflow/react": "^12.4.4",
     "axios": "^1.7.7",
     "dagre": "^0.8.5",
-    "date-fns": "4.1.0",
-    "js-yaml": "^4.1.0",
     "next": "^14.2.24",
     "nuqs": "^2.4.3",
     "plotly.js": "^2.29.1",
     "react": "^18.3.1",
-    "react-datepicker": "^7.5.0",
     "react-dom": "^18.3.1",
     "react-icons": "^5.3.0",
     "react-loader-spinner": "^6.1.6",
@@ -44,13 +38,11 @@
     "react-select": "^5.8.2",
     "react-toastify": "^10.0.6",
     "react18-json-view": "0.2.9-canary.8",
-    "reagraph": "^4.21.2",
     "sharp": "^0.34.1",
     "theme-change": "^2.5.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.9",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "22.13.5",
     "@types/plotly.js": "^2.35.2",
     "@types/react": "^18.3.18",

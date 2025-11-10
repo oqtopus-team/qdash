@@ -31,6 +31,7 @@ import type {
   FetchTimeseriesTaskResultByTagAndParameterParams,
   HTTPValidationError,
   LatestTaskGroupedByChipResponse,
+  ListExecutionsByChipIdParams,
   ListMuxResponse,
   MuxDetailResponse,
   TaskHistoryResponse,
@@ -597,7 +598,7 @@ export function useFetchChip<
 }
 
 /**
- * Fetch all executions for a given chip.
+ * Fetch executions for a given chip with pagination.
 
 Parameters
 ----------
@@ -605,6 +606,10 @@ chip_id : str
     ID of the chip to fetch executions for
 current_user : str
     Current user ID from authentication
+skip : int
+    Number of items to skip (default: 0)
+limit : int
+    Number of items to return (default: 20, max: 100)
 
 Returns
 -------
@@ -614,17 +619,24 @@ list[ExecutionResponseSummary]
  */
 export const listExecutionsByChipId = (
   chipId: string,
+  params?: ListExecutionsByChipIdParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<ExecutionResponseSummary[]>(
-    { url: `/api/chip/${chipId}/execution`, method: "GET", signal },
+    { url: `/api/chip/${chipId}/execution`, method: "GET", params, signal },
     options,
   );
 };
 
-export const getListExecutionsByChipIdQueryKey = (chipId?: string) => {
-  return [`/api/chip/${chipId}/execution`] as const;
+export const getListExecutionsByChipIdQueryKey = (
+  chipId?: string,
+  params?: ListExecutionsByChipIdParams,
+) => {
+  return [
+    `/api/chip/${chipId}/execution`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getListExecutionsByChipIdQueryOptions = <
@@ -632,6 +644,7 @@ export const getListExecutionsByChipIdQueryOptions = <
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
+  params?: ListExecutionsByChipIdParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -646,11 +659,12 @@ export const getListExecutionsByChipIdQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getListExecutionsByChipIdQueryKey(chipId);
+    queryOptions?.queryKey ?? getListExecutionsByChipIdQueryKey(chipId, params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listExecutionsByChipId>>
-  > = ({ signal }) => listExecutionsByChipId(chipId, requestOptions, signal);
+  > = ({ signal }) =>
+    listExecutionsByChipId(chipId, params, requestOptions, signal);
 
   return {
     queryKey,
@@ -674,6 +688,7 @@ export function useListExecutionsByChipId<
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
+  params: undefined | ListExecutionsByChipIdParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -701,6 +716,7 @@ export function useListExecutionsByChipId<
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
+  params?: ListExecutionsByChipIdParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -726,6 +742,7 @@ export function useListExecutionsByChipId<
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
+  params?: ListExecutionsByChipIdParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -747,6 +764,7 @@ export function useListExecutionsByChipId<
   TError = ErrorType<HTTPValidationError>,
 >(
   chipId: string,
+  params?: ListExecutionsByChipIdParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -759,7 +777,11 @@ export function useListExecutionsByChipId<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListExecutionsByChipIdQueryOptions(chipId, options);
+  const queryOptions = getListExecutionsByChipIdQueryOptions(
+    chipId,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

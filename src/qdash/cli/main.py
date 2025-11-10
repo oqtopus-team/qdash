@@ -167,5 +167,42 @@ def export_note(
         raise typer.Exit(1)
 
 
+@app.command()
+def download_figures(
+    task_name: str = typer.Option(..., "--task-name", "-t", help="Task name to search for"),
+    chip_id: str = typer.Option(..., "--chip-id", "-c", help="Chip ID to filter by"),
+    username: str = typer.Option(..., "--username", "-u", help="Username to filter by"),
+    output_dir: str = typer.Option(None, "--output-dir", "-o", help="Output directory for downloaded files"),
+) -> None:
+    """Download JSON figures from completed calibration tasks.
+
+    This command retrieves the most recent completed result for EACH qubit/coupling
+    on the specified chip. It automatically downloads JSON figures for all qubits,
+    ensuring you get the latest data across the entire chip.
+
+    Examples:
+        # Download latest CheckResonatorSpectroscopy figures for all qubits
+        qdash download-figures -t CheckResonatorSpectroscopy -c 64Qv3 -u alice
+
+        # Download CheckFreq results for all qubits
+        qdash download-figures -t CheckFreq -c 64Qv3 -u alice
+
+        # Specify output directory
+        qdash download-figures -t CheckRabi -c 64Qv3 -u alice -o /path/to/output
+    """
+    try:
+        from qdash.cli.download_task_figures import download_task_figures
+
+        download_task_figures(
+            task_name=task_name,
+            chip_id=chip_id,
+            username=username,
+            output_dir=output_dir,
+        )
+    except Exception as e:
+        typer.echo(f"❌ Error downloading task figures: {e}", err=True)
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

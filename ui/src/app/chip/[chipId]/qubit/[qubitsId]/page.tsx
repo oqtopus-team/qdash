@@ -223,7 +223,7 @@ function QubitDetailPageContent() {
   const isLoading = false;
 
   return (
-    <div className="w-full px-6 py-6" style={{ width: "calc(100vw - 20rem)" }}>
+    <div className="w-full px-6 py-6">
       <div className="space-y-6">
         {/* Back navigation */}
         <Link href="/chip" className="btn btn-ghost btn-sm gap-2 w-fit">

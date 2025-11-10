@@ -285,10 +285,7 @@ export default function ExecutionDetailClient({
 
   if (isDetailLoading) {
     return (
-      <div
-        className="w-full px-4 py-6 min-h-screen"
-        style={{ width: "calc(100vw - 20rem)" }}
-      >
+      <div className="w-full px-4 py-6 min-h-screen">
         <div className="space-y-6">
           {/* Header Skeleton with Loading Spinner */}
           <div className="flex justify-between items-center">
@@ -335,7 +332,7 @@ export default function ExecutionDetailClient({
   if (!executionDetailData || !execution) return <div>No data found.</div>;
 
   return (
-    <div className="w-full px-4 py-6" style={{ width: "calc(100vw - 20rem)" }}>
+    <div className="w-full px-4 py-6">
       <div className="space-y-6">
         {/* Back navigation */}
         <Link href="/execution" className="btn btn-ghost btn-sm gap-2 w-fit">
@@ -394,6 +391,53 @@ export default function ExecutionDetailClient({
           <ExecutionDAG tasks={validTasks} />
         </div>
 
+        {/* Execution Note (if available) */}
+        {execution.note &&
+          typeof execution.note === "object" &&
+          Object.keys(execution.note).length > 0 && (
+            <div className="bg-base-100 rounded-lg shadow-md p-6">
+              <div className="collapse collapse-arrow border border-base-300">
+                <input type="checkbox" />
+                <div className="collapse-title text-lg font-semibold">
+                  Execution Note
+                </div>
+                <div className="collapse-content">
+                  <div className="pt-4 space-y-4">
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => {
+                          const jsonStr = JSON.stringify(
+                            execution.note,
+                            null,
+                            2,
+                          );
+                          const blob = new Blob([jsonStr], {
+                            type: "application/json",
+                          });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = `execution_note_${chip_id}_${execute_id}.json`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="btn btn-sm btn-primary gap-2"
+                      >
+                        <FaDownload />
+                        Download JSON
+                      </button>
+                    </div>
+                    <pre className="bg-base-200 p-4 rounded-lg overflow-x-auto text-xs max-h-96">
+                      <code>{JSON.stringify(execution.note, null, 2)}</code>
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
         <div className="bg-base-100 rounded-lg shadow-md p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">
@@ -406,14 +450,18 @@ export default function ExecutionDetailClient({
             </h2>
             <div className="btn-group">
               <button
-                className={`btn btn-sm ${taskViewMode === "list" ? "btn-active" : ""}`}
+                className={`btn btn-sm ${
+                  taskViewMode === "list" ? "btn-active" : ""
+                }`}
                 onClick={() => setTaskViewMode("list")}
               >
                 <FaList />
                 List
               </button>
               <button
-                className={`btn btn-sm ${taskViewMode === "grid" ? "btn-active" : ""}`}
+                className={`btn btn-sm ${
+                  taskViewMode === "grid" ? "btn-active" : ""
+                }`}
                 onClick={() => setTaskViewMode("grid")}
               >
                 <FaThLarge />
