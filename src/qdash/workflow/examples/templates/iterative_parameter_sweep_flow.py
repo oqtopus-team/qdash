@@ -1,21 +1,41 @@
-"""Iterative ChevronPattern calibration flow with parameter variation.
+"""Generic iterative parameter sweep flow template.
 
-NOTE: This is a ChevronPattern-specific example of the generic iterative_parameter_sweep_flow.py.
-For other tasks (CheckQubitSpectroscopy, CheckRabi, etc.), use iterative_parameter_sweep_flow.py instead.
-
-This template demonstrates how to execute ChevronPattern repeatedly with different
-parameters (e.g., readout_amplitude, qubit_frequency), which is useful for:
-- Investigating the effect of readout power on qubit bare frequency measurements
-- Finding optimal readout amplitude for chevron pattern measurements
+This template allows you to execute ANY task repeatedly with different parameter values,
+making it useful for:
+- Investigating the effect of readout power on measurements (any task)
+- Finding optimal parameters for specific experiments
 - Exploring parameter space systematically
 - Collecting data across different experimental conditions
 
-The flow uses the task_details mechanism to override input parameters, supporting:
+Supported for tasks that support parameter overrides:
 - readout_amplitude: Readout power (a.u.)
 - qubit_frequency: Qubit drive frequency (GHz)
 - control_amplitude: Control pulse amplitude (a.u.)
 - readout_frequency: Readout frequency (GHz)
-- Any combination of the above
+
+Example tasks that support these overrides:
+- CheckQubitSpectroscopy
+- ChevronPattern
+- CheckRabi
+- CheckFreq
+- And any other task inheriting from QubexTask
+
+Usage examples:
+1. Sweep readout_amplitude for CheckQubitSpectroscopy:
+   task_name = "CheckQubitSpectroscopy"
+   task_details_per_iteration = [
+       {"CheckQubitSpectroscopy": {"input_parameters": {"readout_amplitude": {"value": 0.05}}}},
+       {"CheckQubitSpectroscopy": {"input_parameters": {"readout_amplitude": {"value": 0.10}}}},
+   ]
+
+2. Sweep multiple parameters for ChevronPattern:
+   task_name = "ChevronPattern"
+   task_details_per_iteration = [
+       {"ChevronPattern": {"input_parameters": {
+           "readout_amplitude": {"value": 0.05},
+           "control_amplitude": {"value": 0.02}
+       }}},
+   ]
 """
 
 from prefect import flow, get_run_logger, task
@@ -40,9 +60,9 @@ def calibrate_group(
     Args:
     ----
         qids: List of qubit IDs to calibrate (executed in order)
-        task_name: Name of the task to execute (e.g., "ChevronPattern")
+        task_name: Name of the task to execute (e.g., "CheckQubitSpectroscopy", "ChevronPattern")
         task_details: Task configuration with input_parameters to override
-            Example: {"ChevronPattern": {"input_parameters": {"readout_amplitude": {"value": 0.15}}}}
+            Example: {"CheckQubitSpectroscopy": {"input_parameters": {"readout_amplitude": {"value": 0.15}}}}
         iteration: Current iteration number (for logging)
 
     Returns:
@@ -73,11 +93,11 @@ def calibrate_group(
             logger.info(f"    Executing {task_name}...")
             result = session.execute_task(task_name, qid, task_details=task_details)
 
-            logger.info(f"    ✓ {task_name} completed: qubit_frequency={result.get('qubit_frequency')} GHz")
+            logger.info(f"    ✓ {task_name} completed")
 
             results[qid] = {
                 "iteration": iteration,
-                "qubit_frequency": result.get("qubit_frequency"),
+                "result": result,
                 "task_id": result.get("task_id"),
                 "status": "success",
             }
@@ -96,20 +116,19 @@ def calibrate_group(
 
 
 @flow
-def iterative_chevron_pattern_flow(
+def iterative_parameter_sweep_flow(
     username: str,  # Automatically provided from UI properties
     chip_id: str,  # Automatically provided from UI properties
     qids: list[str] | None = None,
     max_iterations: int = 5,  # TODO: Adjust number of iterations
     flow_name: str | None = None,  # Automatically injected by API
 ):
-    """Iterative ChevronPattern calibration with parameter variation.
+    """Generic iterative parameter sweep calibration flow.
 
-    This flow executes ChevronPattern multiple times with different parameter configurations,
-    allowing you to systematically explore parameter space and investigate effects on
-    bare frequency measurements.
+    This flow executes a specified task multiple times with different parameter configurations,
+    allowing you to systematically explore parameter space and investigate parameter effects.
 
-    Example: With max_iterations=3 and groups=[["0", "1"], ["2", "3"]]:
+    Example: With max_iterations=3, task="CheckQubitSpectroscopy", and groups=[["0", "1"], ["2", "3"]]:
     - Iteration 1 (readout_amp=0.05): Group1 (0→1) || Group2 (2→3) in parallel
     - Iteration 2 (readout_amp=0.10): Group1 (0→1) || Group2 (2→3) in parallel
     - Iteration 3 (readout_amp=0.15): Group1 (0→1) || Group2 (2→3) in parallel
@@ -131,8 +150,8 @@ def iterative_chevron_pattern_flow(
     """
     logger = get_run_logger()
 
-    # Task name to execute (can be changed for other tasks)
-    task_name = "ChevronPattern"
+    # TODO: Define the task to execute
+    task_name = "CheckQubitSpectroscopy"  # Change to your desired task
 
     # TODO: Define your qubit groups
     groups = [
@@ -146,7 +165,7 @@ def iterative_chevron_pattern_flow(
 
     # TODO: Define task_details for each iteration
     # You can override any parameter: readout_amplitude, qubit_frequency, control_amplitude, etc.
-    # Multiple parameters can be overridden simultaneously
+    # The task name in the dictionary must match the task_name variable above
     task_details_per_iteration = [
         {
             task_name: {
@@ -245,7 +264,7 @@ def iterative_chevron_pattern_flow(
             logger.info(f"Iteration {iteration + 1} summary:")
             for qid, result in iteration_results.items():
                 if result["status"] == "success":
-                    logger.info(f"  Q{qid}: qubit_frequency = {result['qubit_frequency']} GHz")
+                    logger.info(f"  Q{qid}: completed successfully")
                 else:
                     logger.error(f"  Q{qid}: FAILED - {result.get('error')}")
 
