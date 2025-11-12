@@ -3296,16 +3296,17 @@ workflow = [
     { name = "pymongo", specifier = "==4.8.0" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "pyyaml", specifier = "==6.0.1" },
-    { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?tag=v1.4.3b3" },
+    { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?tag=v1.4.3" },
     { name = "reportlab", specifier = ">=4.4.1" },
     { name = "slack-sdk", specifier = "==3.36.0" },
 ]
 
 [[package]]
 name = "qubecalib"
-version = "3.1.15b3"
-source = { git = "https://github.com/qiqb-osaka/qube-calib.git?rev=3.1.15beta3#381fe82245475385c4f55ec154c11fc2b929b121" }
+version = "3.1.15"
+source = { git = "https://github.com/qiqb-osaka/qube-calib.git?rev=3.1.15#f991bb009f948ad426ce6bcc340b6f263740ad17" }
 dependencies = [
+    { name = "aiocoap" },
     { name = "e7awgsw" },
     { name = "jupyter" },
     { name = "matplotlib" },
@@ -3323,8 +3324,8 @@ dependencies = [
 
 [[package]]
 name = "qubex"
-version = "1.4.3b3+59d9f83"
-source = { git = "https://github.com/amachino/qubex.git?tag=v1.4.3b3#59d9f838db09429ffdccc99c0c8319feb7f77908" }
+version = "1.4.3+9c0558d"
+source = { git = "https://github.com/amachino/qubex.git?tag=v1.4.3#9c0558decf91a05e6d6c5778a43165e5bf877203" }
 dependencies = [
     { name = "cma" },
     { name = "cvxopt" },
@@ -3362,12 +3363,12 @@ backend = [
 [[package]]
 name = "quel-clock-master"
 version = "0.1.6"
-source = { git = "https://github.com/quel-inc/quelware.git?subdirectory=quel_clock_master&rev=0.8.13#de4dd6caf967b025b7d529e41a1d6e8c3029cc66" }
+source = { git = "https://github.com/quel-inc/quelware.git?subdirectory=quel_clock_master&rev=v0.8.14#c839e8b1a6fde4b4ece3d5f415015829857e775e" }
 
 [[package]]
 name = "quel-ic-config"
-version = "0.8.13"
-source = { git = "https://github.com/quel-inc/quelware.git?subdirectory=quel_ic_config&rev=0.8.13#de4dd6caf967b025b7d529e41a1d6e8c3029cc66" }
+version = "0.8.14"
+source = { git = "https://github.com/quel-inc/quelware.git?subdirectory=quel_ic_config&rev=v0.8.14#c839e8b1a6fde4b4ece3d5f415015829857e775e" }
 dependencies = [
     { name = "aiocoap" },
     { name = "e7awgsw" },
@@ -3375,9 +3376,7 @@ dependencies = [
     { name = "numpy" },
     { name = "packaging" },
     { name = "pybind11-stubgen" },
-    { name = "pycairo" },
     { name = "pydantic" },
-    { name = "pygobject" },
     { name = "pyyaml" },
     { name = "quel-clock-master" },
 ]
