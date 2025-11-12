@@ -280,7 +280,7 @@ export function TaskResultGrid({
                 length: Math.pow(Math.floor(displayGridSize / MUX_SIZE), 2),
               }).map((_, muxIndex) => (
                 <div key={muxIndex} className="relative">
-                  <div className="absolute top-0.5 right-0.5 md:top-1 md:right-1 text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
                     MUX{muxIndex}
                   </div>
                 </div>

@@ -12,7 +12,7 @@ import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 
 import { ChipSelector } from "@/app/components/ChipSelector";
-import { useListChips } from "@/client/chip/chip";
+import { useListChips, useFetchChip } from "@/client/chip/chip";
 import { useMetricsGetChipMetrics } from "@/client/metrics/metrics";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
@@ -30,6 +30,7 @@ export function MetricsPageContent() {
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [metricType, setMetricType] = useState<MetricType>("qubit");
   const [selectedMetric, setSelectedMetric] = useState<string>("t1");
+  const [gridSize, setGridSize] = useState<number>(8);
 
   // Load metrics configuration from backend
   const {
@@ -44,6 +45,7 @@ export function MetricsPageContent() {
   const metricsConfig = metricType === "qubit" ? qubitMetrics : couplingMetrics;
 
   const { data: chipsData } = useListChips();
+  const { data: chipData } = useFetchChip(selectedChip);
 
   // Set default chip when data loads
   useEffect(() => {
@@ -56,6 +58,13 @@ export function MetricsPageContent() {
       setSelectedChip(sortedChips[0].chip_id);
     }
   }, [selectedChip, chipsData]);
+
+  // Calculate grid size from chip data
+  useEffect(() => {
+    if (chipData?.data?.size) {
+      setGridSize(Math.sqrt(chipData.data.size));
+    }
+  }, [chipData?.data?.size]);
 
   // Fetch metrics data
   const withinHours =
@@ -323,6 +332,7 @@ export function MetricsPageContent() {
               metricKey={currentMetricConfig.key}
               unit={currentMetricConfig.unit}
               colorScale={{ min: 0, max: 0, colors: hexColors }}
+              gridSize={gridSize}
               chipId={selectedChip}
               selectedDate="latest"
             />
@@ -333,6 +343,7 @@ export function MetricsPageContent() {
               metricKey={currentMetricConfig.key}
               unit={currentMetricConfig.unit}
               colorScale={{ min: 0, max: 0, colors: hexColors }}
+              gridSize={gridSize}
               chipId={selectedChip}
               selectedDate="latest"
             />

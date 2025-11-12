@@ -32,12 +32,24 @@ class CheckQubitSpectroscopy(QubexTask):
         """Run the task."""
         exp = self.get_experiment(session)
         label = self.get_qubit_label(session, qid)
-        result = exp.qubit_spectroscopy(label)
+        results = {}
+
+        # Apply parameter overrides if provided via task_details
+        # Supports: qubit_frequency, readout_amplitude, control_amplitude, readout_frequency
+        with self._apply_parameter_overrides(session, qid):
+            result = exp.qubit_spectroscopy(label)
+            results[label] = result
+
         self.save_calibration(session)
-        return RunResult(raw_result=result)
+
+        return RunResult(raw_result=results)
 
     def batch_run(self, session: QubexSession, qids: list[str]) -> RunResult:
-        """Run the task for a batch of qubits."""
+        """Run the task for a batch of qubits.
+
+        Note: batch_run does not support parameter overrides via task_details.
+        Use individual run() calls if you need per-qubit parameter customization.
+        """
         exp = self.get_experiment(session)
         labels = [self.get_qubit_label(session, qid) for qid in qids]
         results = {}
