@@ -209,6 +209,7 @@ Args:
 ----
     chip_id: The chip identifier
     within_hours: Optional filter to only include data from last N hours (e.g., 24)
+    selection_mode: "latest" to get most recent values, "best" to get optimal values
     current_user: Current authenticated user
 
 Returns:

@@ -8,10 +8,16 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel
+
+
+class EvaluationConfig(BaseModel):
+    """Evaluation configuration for a metric."""
+
+    mode: Literal["maximize", "minimize", "none"]
 
 
 class MetricMetadata(BaseModel):
@@ -20,8 +26,8 @@ class MetricMetadata(BaseModel):
     title: str
     unit: str
     scale: float
-    display_order: int
     description: str | None = None
+    evaluation: EvaluationConfig
 
 
 class MetricsConfig(BaseModel):
@@ -51,9 +57,9 @@ def load_metrics_config() -> MetricsConfig:
     # Try multiple possible locations for the config file
     possible_paths = [
         # Docker environment: mounted at /app/config
-        Path("/app/config/metrics_metadata.yaml"),
+        Path("/app/config/metrics.yaml"),
         # Local development: relative to project root
-        Path(__file__).parent.parent.parent.parent.parent / "config" / "metrics_metadata.yaml",
+        Path(__file__).parent.parent.parent.parent.parent / "config" / "metrics.yaml",
         # Environment variable override
         Path(os.getenv("METRICS_CONFIG_PATH", "")) if os.getenv("METRICS_CONFIG_PATH") else None,
     ]
