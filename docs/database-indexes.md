@@ -21,6 +21,7 @@ db.execution_history.create_index([
 **Usage**: Used by `_extract_best_metrics()` for querying execution history
 
 **Query Pattern**:
+
 ```python
 ExecutionHistoryDocument.find({
     "chip_id": chip_id,
@@ -30,6 +31,7 @@ ExecutionHistoryDocument.find({
 ```
 
 **Benefits**:
+
 - Efficient filtering by chip and user
 - Fast sorting by timestamp (descending)
 - Supports time range queries with `$gte`
@@ -46,6 +48,7 @@ db.execution_history.create_index([
 **Usage**: Fallback for queries without time filter
 
 **Query Pattern**:
+
 ```python
 ExecutionHistoryDocument.find({
     "chip_id": chip_id,
@@ -56,10 +59,12 @@ ExecutionHistoryDocument.find({
 ### Performance Impact
 
 Without indexes:
+
 - Collection scan: O(n) where n = total executions
 - 1000+ executions: ~500ms+ query time
 
 With compound index:
+
 - Index scan: O(log n + k) where k = matched documents
 - 1000+ executions: ~10-50ms query time
 
@@ -93,14 +98,19 @@ db.execution_history.getIndexes();
 Analyze query performance:
 
 ```javascript
-db.execution_history.find({
-  chip_id: "test_chip",
-  username: "admin",
-  start_at: { $gte: ISODate("2025-01-01T00:00:00Z") }
-}).sort({ start_at: -1 }).limit(1000).explain("executionStats");
+db.execution_history
+  .find({
+    chip_id: "test_chip",
+    username: "admin",
+    start_at: { $gte: ISODate("2025-01-01T00:00:00Z") },
+  })
+  .sort({ start_at: -1 })
+  .limit(1000)
+  .explain("executionStats");
 ```
 
 Look for:
+
 - `executionStats.executionTimeMillis` < 50ms
 - `winningPlan.inputStage.stage` == "IXSCAN"
 - `executionStats.totalDocsExamined` ≈ `executionStats.nReturned`
@@ -114,6 +124,7 @@ _To be documented when Prefect integration requires optimization_
 ### Query Performance Alerts
 
 Set up monitoring for:
+
 - Query execution time > 100ms
 - Collection scans (COLLSCAN) on large collections
 - Index usage ratio < 95%
@@ -141,9 +152,7 @@ Frequency: Monthly or when index fragmentation > 30%
 Monitor index usage:
 
 ```javascript
-db.execution_history.aggregate([
-  { $indexStats: {} }
-]);
+db.execution_history.aggregate([{ $indexStats: {} }]);
 ```
 
 Remove unused indexes to reduce write overhead.
