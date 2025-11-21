@@ -5,15 +5,18 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
@@ -21,11 +24,18 @@ import type {
 import type {
   DownloadFileParams,
   DownloadZipFileParams,
+  FileTreeNode,
+  GetFileContent200,
+  GetFileContentParams,
   HTTPValidationError,
+  SaveFileContent200,
+  SaveFileRequest,
+  ValidateFileContent200,
+  ValidateFileRequest,
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType } from "../../lib/custom-instance";
+import type { ErrorType, BodyType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -322,3 +332,480 @@ export function useDownloadZipFile<
 
   return query;
 }
+
+/**
+ * Get file tree structure for entire config directory (all chips).
+
+Returns
+-------
+    File tree structure
+ * @summary Get file tree for entire config directory
+ */
+export const getFileTree = (
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<FileTreeNode[]>(
+    { url: `/api/file/tree`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getGetFileTreeQueryKey = () => {
+  return [`/api/file/tree`] as const;
+};
+
+export const getGetFileTreeQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFileTree>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetFileTreeQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getFileTree>>> = ({
+    signal,
+  }) => getFileTree(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFileTree>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetFileTreeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFileTree>>
+>;
+export type GetFileTreeQueryError = ErrorType<unknown>;
+
+export function useGetFileTree<
+  TData = Awaited<ReturnType<typeof getFileTree>>,
+  TError = ErrorType<unknown>,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFileTree>>,
+          TError,
+          Awaited<ReturnType<typeof getFileTree>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetFileTree<
+  TData = Awaited<ReturnType<typeof getFileTree>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFileTree>>,
+          TError,
+          Awaited<ReturnType<typeof getFileTree>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetFileTree<
+  TData = Awaited<ReturnType<typeof getFileTree>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get file tree for entire config directory
+ */
+
+export function useGetFileTree<
+  TData = Awaited<ReturnType<typeof getFileTree>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetFileTreeQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get file content for editing.
+
+Args:
+----
+    path: Relative path from CONFIG_BASE_PATH (e.g., "64Qv2/config/chip.yaml")
+
+Returns:
+-------
+    File content and metadata
+ * @summary Get file content for editing
+ */
+export const getFileContent = (
+  params: GetFileContentParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<GetFileContent200>(
+    { url: `/api/file/content`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getGetFileContentQueryKey = (params?: GetFileContentParams) => {
+  return [`/api/file/content`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetFileContentQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFileContent>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: GetFileContentParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetFileContentQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getFileContent>>> = ({
+    signal,
+  }) => getFileContent(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFileContent>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetFileContentQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFileContent>>
+>;
+export type GetFileContentQueryError = ErrorType<HTTPValidationError>;
+
+export function useGetFileContent<
+  TData = Awaited<ReturnType<typeof getFileContent>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: GetFileContentParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFileContent>>,
+          TError,
+          Awaited<ReturnType<typeof getFileContent>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetFileContent<
+  TData = Awaited<ReturnType<typeof getFileContent>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: GetFileContentParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFileContent>>,
+          TError,
+          Awaited<ReturnType<typeof getFileContent>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetFileContent<
+  TData = Awaited<ReturnType<typeof getFileContent>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: GetFileContentParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get file content for editing
+ */
+
+export function useGetFileContent<
+  TData = Awaited<ReturnType<typeof getFileContent>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: GetFileContentParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetFileContentQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Save file content.
+
+Args:
+----
+    request: Save file request with path and content
+
+Returns:
+-------
+    Success message
+ * @summary Save file content
+ */
+export const saveFileContent = (
+  saveFileRequest: BodyType<SaveFileRequest>,
+  options?: SecondParameter<typeof customInstance>,
+) => {
+  return customInstance<SaveFileContent200>(
+    {
+      url: `/api/file/content`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: saveFileRequest,
+    },
+    options,
+  );
+};
+
+export const getSaveFileContentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveFileContent>>,
+    TError,
+    { data: BodyType<SaveFileRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveFileContent>>,
+  TError,
+  { data: BodyType<SaveFileRequest> },
+  TContext
+> => {
+  const mutationKey = ["saveFileContent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveFileContent>>,
+    { data: BodyType<SaveFileRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return saveFileContent(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveFileContentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveFileContent>>
+>;
+export type SaveFileContentMutationBody = BodyType<SaveFileRequest>;
+export type SaveFileContentMutationError = ErrorType<HTTPValidationError>;
+
+/**
+ * @summary Save file content
+ */
+export const useSaveFileContent = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof saveFileContent>>,
+      TError,
+      { data: BodyType<SaveFileRequest> },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof saveFileContent>>,
+  TError,
+  { data: BodyType<SaveFileRequest> },
+  TContext
+> => {
+  const mutationOptions = getSaveFileContentMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Validate YAML or JSON content.
+
+Args:
+----
+    request: Validation request with content and file_type
+
+Returns:
+-------
+    Validation result
+ * @summary Validate file content (YAML/JSON)
+ */
+export const validateFileContent = (
+  validateFileRequest: BodyType<ValidateFileRequest>,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ValidateFileContent200>(
+    {
+      url: `/api/file/validate`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: validateFileRequest,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getValidateFileContentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof validateFileContent>>,
+    TError,
+    { data: BodyType<ValidateFileRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof validateFileContent>>,
+  TError,
+  { data: BodyType<ValidateFileRequest> },
+  TContext
+> => {
+  const mutationKey = ["validateFileContent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof validateFileContent>>,
+    { data: BodyType<ValidateFileRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return validateFileContent(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ValidateFileContentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof validateFileContent>>
+>;
+export type ValidateFileContentMutationBody = BodyType<ValidateFileRequest>;
+export type ValidateFileContentMutationError = ErrorType<HTTPValidationError>;
+
+/**
+ * @summary Validate file content (YAML/JSON)
+ */
+export const useValidateFileContent = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof validateFileContent>>,
+      TError,
+      { data: BodyType<ValidateFileRequest> },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof validateFileContent>>,
+  TError,
+  { data: BodyType<ValidateFileRequest> },
+  TContext
+> => {
+  const mutationOptions = getValidateFileContentMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
