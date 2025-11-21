@@ -1905,7 +1905,7 @@
       "get": {
         "tags": ["metrics"],
         "summary": "Get Chip Metrics",
-        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
+        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n    current_user: Current authenticated user\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
         "operationId": "metrics-get_chip_metrics",
         "security": [
           {
@@ -1939,6 +1939,19 @@
               "title": "Within Hours"
             },
             "description": "Filter to data within N hours (e.g., 24)"
+          },
+          {
+            "name": "selection_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": ["latest", "best"],
+              "type": "string",
+              "description": "Selection mode: 'latest' for most recent, 'best' for optimal values",
+              "default": "latest",
+              "title": "Selection Mode"
+            },
+            "description": "Selection mode: 'latest' for most recent, 'best' for optimal values"
           }
         ],
         "responses": {
