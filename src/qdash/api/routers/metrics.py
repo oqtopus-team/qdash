@@ -17,6 +17,32 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def normalize_qid(qid: str) -> str:
+    """Normalize qubit ID to canonical format.
+
+    Removes "Q" prefix and leading zeros, handling edge cases.
+
+    Args:
+    ----
+        qid: Qubit ID in any format (e.g., "0", "Q00", "Q01", "1")
+
+    Returns:
+    -------
+        Normalized qubit ID without prefix or leading zeros (e.g., "0", "1")
+
+    Examples:
+    --------
+        >>> normalize_qid("Q00")
+        "0"
+        >>> normalize_qid("Q01")
+        "1"
+        >>> normalize_qid("10")
+        "10"
+
+    """
+    return qid.replace("Q", "").lstrip("0") or "0"
+
+
 @router.get("/config")
 async def get_metrics_config() -> dict[str, Any]:
     """Get metrics metadata configuration.
@@ -104,16 +130,26 @@ def _extract_latest_metrics(
 ) -> dict[str, dict[str, MetricValue]]:
     """Extract latest metrics from chip document entities (qubits or couplings).
 
+    This function extracts the most recent calibration data directly from the
+    ChipDocument. If a time filter is specified, only metrics calibrated within
+    that window are included.
+
     Args:
     ----
-        entity_models: Dictionary of qubit or coupling models
-        valid_metric_keys: Set of valid metric keys from config
-        cutoff_time: Optional cutoff time for filtering
-        within_hours: Optional hours for time filtering
+        entity_models: Dictionary of qubit/coupling models from ChipDocument
+        valid_metric_keys: Set of metric keys to extract from config
+        cutoff_time: Optional pendulum datetime for filtering calibration times
+        within_hours: Number of hours for time window (used for logging)
 
     Returns:
     -------
-        Dictionary mapping metric names to entity_id -> MetricValue
+        Dictionary mapping metric_name -> entity_id -> MetricValue with latest values
+
+    Notes:
+    -----
+        - Reads from ChipDocument.qubits or ChipDocument.couplings
+        - Filters by calibrated_at timestamp if within_hours is specified
+        - Returns empty dict for metrics with no valid data
 
     """
     metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
@@ -155,24 +191,39 @@ def _extract_best_metrics(
 ) -> dict[str, dict[str, MetricValue]]:
     """Extract best metrics from execution history.
 
+    This function queries the execution history to find the optimal metric values
+    based on the evaluation mode (maximize/minimize) defined in the configuration.
+    It processes all executions within the specified time window and selects the
+    best value for each metric.
+
     Args:
     ----
-        chip: Chip document
-        entity_type: "qubit" or "coupling"
-        valid_metric_keys: Set of valid metric keys from config
-        metrics_config: Metrics configuration dict
-        cutoff_time: Optional cutoff time for filtering
+        chip: Chip document containing chip_id and username
+        entity_type: Type of entity - either "qubit" or "coupling"
+        valid_metric_keys: Set of metric keys to extract from config
+        metrics_config: Metrics configuration mapping metric_key -> MetricMetadata
+        cutoff_time: Optional pendulum datetime for filtering executions
 
     Returns:
     -------
-        Dictionary mapping metric names to entity_id -> MetricValue
+        Dictionary mapping metric_name -> entity_id -> MetricValue with best values
+
+    Raises:
+    ------
+        HTTPException: If query returns too many executions (>1000)
+
+    Notes:
+    -----
+        - Only processes metrics with evaluation.mode != "none"
+        - Limits query to 1000 executions to prevent memory issues
+        - Uses max() for "maximize" mode and min() for "minimize" mode
 
     """
     from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 
     metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
 
-    # Query execution history
+    # Query execution history with limit to prevent memory issues
     query: dict[str, Any] = {
         "chip_id": chip.chip_id,
         "username": chip.username,
@@ -180,7 +231,16 @@ def _extract_best_metrics(
     if cutoff_time:
         query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
 
-    executions = ExecutionHistoryDocument.find(query).to_list()
+    # Limit to 1000 most recent executions, sorted by start_at descending
+    try:
+        executions = ExecutionHistoryDocument.find(query).sort([("start_at", -1)]).limit(1000).to_list()
+    except Exception as e:
+        logger.error(f"Failed to query execution history: {e}")
+        raise HTTPException(status_code=500, detail=f"Database query failed: {e}") from e
+
+    if not executions:
+        logger.warning(f"No execution history found for chip={chip.chip_id}, username={chip.username}")
+        return metrics_data
 
     # Collect all values for each metric/entity_id combination
     metric_values: dict[str, dict[str, list[tuple[float, str, str, str]]]] = {key: {} for key in valid_metric_keys}
@@ -473,7 +533,7 @@ async def get_qubit_metric_history(
     username = current_user.username if current_user else "admin"
 
     # Normalize qid format (remove "Q" prefix if present)
-    normalized_qid = qid.replace("Q", "").lstrip("0") or "0"
+    normalized_qid = normalize_qid(qid)
 
     # Calculate cutoff time
     cutoff_time = None
