@@ -27,6 +27,10 @@ import type {
   FileTreeNode,
   GetFileContent200,
   GetFileContentParams,
+  GetGitStatus200,
+  GitPullConfig200,
+  GitPushConfig200,
+  GitPushRequest,
   HTTPValidationError,
   SaveFileContent200,
   SaveFileRequest,
@@ -806,6 +810,326 @@ export const useValidateFileContent = <
   TContext
 > => {
   const mutationOptions = getValidateFileContentMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Get Git status of config directory.
+
+Returns
+-------
+    Git status information
+ * @summary Get Git status of config directory
+ */
+export const getGitStatus = (
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<GetGitStatus200>(
+    { url: `/api/file/git/status`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getGetGitStatusQueryKey = () => {
+  return [`/api/file/git/status`] as const;
+};
+
+export const getGetGitStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getGitStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetGitStatusQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getGitStatus>>> = ({
+    signal,
+  }) => getGitStatus(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getGitStatus>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetGitStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getGitStatus>>
+>;
+export type GetGitStatusQueryError = ErrorType<unknown>;
+
+export function useGetGitStatus<
+  TData = Awaited<ReturnType<typeof getGitStatus>>,
+  TError = ErrorType<unknown>,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getGitStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getGitStatus>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetGitStatus<
+  TData = Awaited<ReturnType<typeof getGitStatus>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getGitStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getGitStatus>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetGitStatus<
+  TData = Awaited<ReturnType<typeof getGitStatus>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get Git status of config directory
+ */
+
+export function useGetGitStatus<
+  TData = Awaited<ReturnType<typeof getGitStatus>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetGitStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Pull latest config from Git repository.
+
+Returns
+-------
+    Pull operation result
+ * @summary Pull latest config from Git repository
+ */
+export const gitPullConfig = (
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<GitPullConfig200>(
+    { url: `/api/file/git/pull`, method: "POST", signal },
+    options,
+  );
+};
+
+export const getGitPullConfigMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof gitPullConfig>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof gitPullConfig>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["gitPullConfig"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof gitPullConfig>>,
+    void
+  > = () => {
+    return gitPullConfig(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GitPullConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof gitPullConfig>>
+>;
+
+export type GitPullConfigMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Pull latest config from Git repository
+ */
+export const useGitPullConfig = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof gitPullConfig>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof gitPullConfig>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions = getGitPullConfigMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Push config changes to Git repository.
+
+Args:
+----
+    request: Push request with commit message
+
+Returns:
+-------
+    Push operation result
+ * @summary Push config changes to Git repository
+ */
+export const gitPushConfig = (
+  gitPushRequest: BodyType<GitPushRequest>,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<GitPushConfig200>(
+    {
+      url: `/api/file/git/push`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: gitPushRequest,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getGitPushConfigMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof gitPushConfig>>,
+    TError,
+    { data: BodyType<GitPushRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof gitPushConfig>>,
+  TError,
+  { data: BodyType<GitPushRequest> },
+  TContext
+> => {
+  const mutationKey = ["gitPushConfig"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof gitPushConfig>>,
+    { data: BodyType<GitPushRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return gitPushConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GitPushConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof gitPushConfig>>
+>;
+export type GitPushConfigMutationBody = BodyType<GitPushRequest>;
+export type GitPushConfigMutationError = ErrorType<HTTPValidationError>;
+
+/**
+ * @summary Push config changes to Git repository
+ */
+export const useGitPushConfig = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof gitPushConfig>>,
+      TError,
+      { data: BodyType<GitPushRequest> },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof gitPushConfig>>,
+  TError,
+  { data: BodyType<GitPushRequest> },
+  TContext
+> => {
+  const mutationOptions = getGitPushConfigMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

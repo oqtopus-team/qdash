@@ -13,6 +13,9 @@ import {
   getFileTree,
   getFileContent,
   saveFileContent,
+  getGitStatus,
+  gitPullConfig,
+  gitPushConfig,
 } from "@/client/file/file";
 import type { FileTreeNode, SaveFileRequest } from "@/schemas";
 
@@ -28,6 +31,7 @@ export default function FilesEditorPage() {
   const [fileContent, setFileContent] = useState("");
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [commitMessage, setCommitMessage] = useState("");
 
   const {
     data: fileTreeData,
@@ -45,6 +49,12 @@ export default function FilesEditorPage() {
     enabled: !!selectedFile,
   });
 
+  const { data: gitStatusData, refetch: refetchGitStatus } = useQuery({
+    queryKey: ["gitStatus"],
+    queryFn: () => getGitStatus().then((res) => res.data),
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
+
   const saveMutation = useMutation({
     mutationFn: (request: SaveFileRequest) =>
       saveFileContent(request).then((res) => res.data),
@@ -54,9 +64,42 @@ export default function FilesEditorPage() {
       queryClient.invalidateQueries({
         queryKey: ["fileContent", selectedFile],
       });
+      refetchGitStatus();
     },
     onError: (error: any) => {
       toast.error(`Failed to save file: ${error.message}`);
+    },
+  });
+
+  const pullMutation = useMutation({
+    mutationFn: () => gitPullConfig().then((res) => res.data),
+    onSuccess: (data) => {
+      toast.success(
+        `Git pull successful! Updated to commit: ${data.commit || "unknown"}`,
+      );
+      queryClient.invalidateQueries({ queryKey: ["fileTree"] });
+      queryClient.invalidateQueries({ queryKey: ["fileContent"] });
+      refetchGitStatus();
+    },
+    onError: (error: any) => {
+      toast.error(`Git pull failed: ${error.message}`);
+    },
+  });
+
+  const pushMutation = useMutation({
+    mutationFn: (message: string) =>
+      gitPushConfig({ commit_message: message }).then((res) => res.data),
+    onSuccess: (data: any) => {
+      if (data.commit) {
+        toast.success(`Git push successful! Commit: ${data.commit}`);
+      } else {
+        toast.info(data.message || "No changes to commit");
+      }
+      setCommitMessage("");
+      refetchGitStatus();
+    },
+    onError: (error: any) => {
+      toast.error(`Git push failed: ${error.message}`);
     },
   });
 
@@ -94,6 +137,24 @@ export default function FilesEditorPage() {
       path: selectedFile,
       content: fileContent,
     });
+  };
+
+  const handlePull = () => {
+    if (hasUnsavedChanges) {
+      if (
+        !confirm(
+          "You have unsaved changes. Git pull will overwrite them. Continue?",
+        )
+      ) {
+        return;
+      }
+    }
+    pullMutation.mutate();
+  };
+
+  const handlePush = () => {
+    const message = commitMessage.trim() || "Update config files from UI";
+    pushMutation.mutate(message);
   };
 
   const handleContentChange = (value: string | undefined) => {
@@ -217,6 +278,44 @@ export default function FilesEditorPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {(gitStatusData as any)?.is_git_repo && (
+              <div className="flex items-center gap-2 px-3 py-1 text-xs bg-[#3c3c3c] border border-[#454545] rounded">
+                <span className="text-gray-400">
+                  {(gitStatusData as any).branch || "main"}
+                </span>
+                <span className="text-gray-500">@</span>
+                <span className="text-blue-400">
+                  {(gitStatusData as any).commit || "unknown"}
+                </span>
+                {(gitStatusData as any).is_dirty && (
+                  <span className="text-orange-400">● Modified</span>
+                )}
+              </div>
+            )}
+            <button
+              onClick={handlePull}
+              className="px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors disabled:opacity-50"
+              disabled={pullMutation.isPending}
+              title="Pull latest changes from Git repository"
+            >
+              {pullMutation.isPending ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : (
+                "↓ Pull"
+              )}
+            </button>
+            <button
+              onClick={handlePush}
+              className="px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors disabled:opacity-50"
+              disabled={pushMutation.isPending}
+              title="Push changes to Git repository"
+            >
+              {pushMutation.isPending ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : (
+                "↑ Push"
+              )}
+            </button>
             <button
               onClick={handleSave}
               className="px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50"

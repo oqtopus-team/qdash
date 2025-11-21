@@ -23,6 +23,12 @@ FROM python:3.10.14-slim-bookworm
 
 WORKDIR /app
 
+# Install git for GitPython operations
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /app /app
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin

@@ -1145,6 +1145,92 @@
         }
       }
     },
+    "/api/file/git/status": {
+      "get": {
+        "tags": ["file"],
+        "summary": "Get Git status of config directory",
+        "description": "Get Git status of config directory.\n\nReturns\n-------\n    Git status information",
+        "operationId": "getGitStatus",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Getgitstatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/git/pull": {
+      "post": {
+        "tags": ["file"],
+        "summary": "Pull latest config from Git repository",
+        "description": "Pull latest config from Git repository.\n\nReturns\n-------\n    Pull operation result",
+        "operationId": "gitPullConfig",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Gitpullconfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/git/push": {
+      "post": {
+        "tags": ["file"],
+        "summary": "Push config changes to Git repository",
+        "description": "Push config changes to Git repository.\n\nArgs:\n----\n    request: Push request with commit message\n\nReturns:\n-------\n    Push operation result",
+        "operationId": "gitPushConfig",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitPushRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Gitpushconfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/login": {
       "post": {
         "tags": ["auth", "authentication"],
@@ -3330,6 +3416,18 @@
         ],
         "title": "GetFlowResponse",
         "description": "Response for getting flow details."
+      },
+      "GitPushRequest": {
+        "properties": {
+          "commit_message": {
+            "type": "string",
+            "title": "Commit Message",
+            "default": "Update config files from UI"
+          }
+        },
+        "type": "object",
+        "title": "GitPushRequest",
+        "description": "Request model for Git push operation."
       },
       "HTTPValidationError": {
         "properties": {
