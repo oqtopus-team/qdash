@@ -196,7 +196,7 @@ export default function FilesEditorPage() {
     return nodes.map((node) => (
       <div key={node.path}>
         {node.type === "directory" ? (
-          <details open className="group">
+          <details className="group">
             <summary
               className="text-sm text-gray-300 hover:bg-[#2a2d2e] px-2 py-0.5 cursor-pointer select-none flex items-center list-none"
               style={{ paddingLeft: `${level * 12 + 8}px` }}
