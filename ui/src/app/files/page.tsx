@@ -7,7 +7,14 @@ import { toast } from "react-toastify";
 import { ToastContainer } from "react-toastify";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { VscFolder, VscFolderOpened, VscFile, VscJson } from "react-icons/vsc";
+import {
+  VscFolder,
+  VscFolderOpened,
+  VscFile,
+  VscJson,
+  VscLock,
+  VscUnlock,
+} from "react-icons/vsc";
 
 import {
   getFileTree,
@@ -32,6 +39,7 @@ export default function FilesEditorPage() {
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [commitMessage, setCommitMessage] = useState("");
+  const [isEditorLocked, setIsEditorLocked] = useState(true);
 
   const {
     data: fileTreeData,
@@ -125,6 +133,11 @@ export default function FilesEditorPage() {
     }
     setSelectedFile(path);
     setHasUnsavedChanges(false);
+    setIsEditorLocked(true); // Lock editor when opening new file
+  };
+
+  const toggleEditorLock = () => {
+    setIsEditorLocked(!isEditorLocked);
   };
 
   const handleSave = () => {
@@ -274,10 +287,31 @@ export default function FilesEditorPage() {
               )}
             </div>
             {hasUnsavedChanges && (
-              <span className="text-xs text-orange-400">● Unsaved changes</span>
+              <span className="text-xs text-orange-400">Unsaved changes</span>
             )}
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={toggleEditorLock}
+              className={`px-3 py-1 text-sm text-white border rounded transition-colors ${
+                isEditorLocked
+                  ? "bg-[#3c3c3c] border-[#454545] hover:bg-[#505050]"
+                  : "bg-[#0e639c] border-[#1177bb] hover:bg-[#1177bb]"
+              }`}
+              title={isEditorLocked ? "Unlock editor to edit" : "Lock editor"}
+            >
+              {isEditorLocked ? (
+                <>
+                  <VscLock className="inline-block mr-1" />
+                  Locked
+                </>
+              ) : (
+                <>
+                  <VscUnlock className="inline-block mr-1" />
+                  Unlocked
+                </>
+              )}
+            </button>
             {(gitStatusData as any)?.is_git_repo && (
               <div className="flex items-center gap-2 px-3 py-1 text-xs bg-[#3c3c3c] border border-[#454545] rounded">
                 <span className="text-gray-400">
@@ -320,7 +354,10 @@ export default function FilesEditorPage() {
               onClick={handleSave}
               className="px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50"
               disabled={
-                !selectedFile || !hasUnsavedChanges || saveMutation.isPending
+                !selectedFile ||
+                !hasUnsavedChanges ||
+                saveMutation.isPending ||
+                isEditorLocked
               }
             >
               {saveMutation.isPending ? (
@@ -370,7 +407,9 @@ export default function FilesEditorPage() {
                       editor.addCommand(
                         monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
                         () => {
-                          handleSave();
+                          if (!isEditorLocked) {
+                            handleSave();
+                          }
                         },
                       );
                     }}
@@ -386,6 +425,7 @@ export default function FilesEditorPage() {
                       renderLineHighlight: "all",
                       cursorStyle: "line",
                       cursorBlinking: "blink",
+                      readOnly: isEditorLocked,
                     }}
                   />
                 )}
