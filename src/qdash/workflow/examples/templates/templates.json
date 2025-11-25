@@ -86,5 +86,13 @@
     "category": "production",
     "filename": "full_calibration.py",
     "function_name": "full_calibration"
+  },
+  {
+    "id": "check_skew",
+    "name": "CheckSkew Calibration",
+    "description": "System-level skew measurement and calibration across MUX channels",
+    "category": "system",
+    "filename": "check_skew_flow.py",
+    "function_name": "check_skew_flow"
   }
 ]

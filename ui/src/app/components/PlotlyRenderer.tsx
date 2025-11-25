@@ -34,10 +34,14 @@ export default function PlotlyRenderer({
     <div className={className}>
       <Plot
         data={figure.data}
-        layout={{ ...figure.layout, autosize: true }}
-        config={{ displayModeBar: true, responsive: true }}
-        useResizeHandler
-        style={{ width: "100%", height: "100%" }}
+        layout={{
+          ...figure.layout,
+          autosize: false,
+          // Preserve original width/height from the figure JSON
+        }}
+        config={{ displayModeBar: true, responsive: false }}
+        useResizeHandler={false}
+        style={{ width: "auto", height: "auto" }}
       />
     </div>
   );

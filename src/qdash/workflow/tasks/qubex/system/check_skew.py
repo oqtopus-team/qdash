@@ -39,11 +39,17 @@ class CheckSkew(QubexTask):
             return yaml.safe_load(file)
 
     def run(self, session: QubexSession, qid: str) -> RunResult:  # noqa: ARG002
-        chip_id = session.config.get("chip_id", "64Qv1")
-        skew_config = self.load(f"/app/config/qubex/{chip_id}/config/skew.yaml")
+        chip_id = session.config.get("chip_id", None)
+        skew_file_path = f"/app/config/qubex/{chip_id}/config/skew.yaml"
+        box_file_path = f"/app/config/qubex/{chip_id}/config/box.yaml"
+        skew_config = self.load(skew_file_path)
         for k, v in skew_config["box_setting"].items():
             print(f"Box {k} setting: {v}")
         from qubex import Experiment
+
+        with open(skew_file_path, "r") as file:
+            config = yaml.safe_load(file)
+            ref_port = config["reference_port"].split("-")[0]
 
         exp = Experiment(
             chip_id=chip_id,
@@ -51,14 +57,16 @@ class CheckSkew(QubexTask):
             config_dir=f"/app/config/qubex/{chip_id}/config",
             params_dir=f"/app/config/qubex/{chip_id}/params",
         )
-        qc = exp.tool.get_qubecalib()
-        qc.sysdb.load_box_yaml(f"/app/config/qubex/{chip_id}/config/box.yaml")
-        setting = SkewSetting.from_yaml(f"/app/config/qubex/{chip_id}/config/skew.yaml")
-        boxes = [*list(exp.boxes), setting.monitor_box_name]
-        system = qc.sysdb.create_quel1system(*boxes)
-        system.initialize()
-        system.resync(*boxes)
-        skew = Skew.create(setting=setting, system=system, sysdb=qc.sysdb)
+        clock_master_address = exp.system_manager.experiment_system.control_system.clock_master_address
+        box_ids = exp.box_ids
+        all_box_ids = list(set(list(box_ids) + [ref_port]))
+        skew = Skew.from_yaml(
+            str(skew_file_path),
+            box_yaml=str(box_file_path),
+            clockmaster_ip=clock_master_address,
+            boxes=all_box_ids,
+        )
+        skew.system.resync()
         skew.measure()
         skew.estimate()
         for v, k in skew._estimated.items():

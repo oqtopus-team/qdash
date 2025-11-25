@@ -24,6 +24,11 @@ class QubexTask(BaseTask):
     # Only concrete subclasses with a name should be registered
 
     def preprocess(self, session: "QubexSession", qid: str) -> PreProcessResult:
+        # System tasks don't need parameter preprocessing
+        # They use qid="" and don't access qubit-specific parameters
+        if self.task_type == "system" or qid == "":
+            return PreProcessResult(input_parameters=self.input_parameters)
+
         exp = self.get_experiment(session)
 
         # Check if this is a coupling task (qid format: "0-1")

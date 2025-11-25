@@ -351,13 +351,13 @@ class TaskManager(BaseModel):
             base_path = savedir_path / base_name
 
             # Determine dimensions
-            width, height = (1200, 1500) if task_name == "CheckSkew" else (600, 300)
+            width, height = (500, 1200) if task_name == "CheckSkew" else (600, 300)
 
             # JSON path
             json_path = base_path.with_suffix(".json")
             json_path = self._resolve_conflict(json_path)
             task.json_figure_path.append(str(json_path))
-            self._write_figure_json(fig, savepath=json_path, width=1000, height=500)
+            self._write_figure_json(fig, savepath=json_path, width=width * 1.5, height=height * 1.5)
 
             # PNG path
             png_path = base_path.with_suffix(".png")

@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -8,11 +7,7 @@ import type { Task } from "@/schemas";
 import { useGetTaskResultByTaskId } from "@/client/task/task";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
-
-const PlotlyRenderer = dynamic(
-  () => import("@/app/components/PlotlyRenderer").then((mod) => mod.default),
-  { ssr: false },
-);
+import { InteractiveFigureContent } from "./InteractiveFigureContent";
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -174,7 +169,7 @@ export function TaskDetailModal({
 
   return (
     <dialog className="modal modal-open">
-      <div className="modal-box max-w-6xl w-11/12 max-h-[90vh] p-6 rounded-2xl shadow-xl bg-base-100 overflow-y-auto">
+      <div className="modal-box w-fit min-w-[500px] max-w-[95vw] h-fit max-h-[95vh] p-6 rounded-2xl shadow-xl bg-base-100 overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h3 className="font-bold text-xl">
             {variant === "detailed" && taskName
@@ -540,47 +535,17 @@ export function TaskDetailModal({
         )}
 
         {viewMode === "interactive" && currentJsonFigure && (
-          <div className="w-full h-[70vh] flex flex-col justify-center items-center space-y-4">
-            <div className="w-[70vw] h-full bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
-              <div className="w-full h-full flex justify-center items-center">
-                <div className="w-fit h-fit m-auto">
-                  <PlotlyRenderer
-                    className="w-full h-full"
-                    fullPath={`${
-                      process.env.NEXT_PUBLIC_API_URL
-                    }/api/executions/figure?path=${encodeURIComponent(
-                      currentJsonFigure,
-                    )}`}
-                  />
-                </div>
-              </div>
-            </div>
-            {jsonFigures.length > 1 && (
-              <div className="flex justify-center gap-2">
-                <button
-                  className="btn btn-xs"
-                  onClick={() =>
-                    setSubIndex(
-                      (subIndex - 1 + jsonFigures.length) % jsonFigures.length,
-                    )
-                  }
-                >
-                  ◀
-                </button>
-                <span className="text-sm">
-                  {subIndex + 1} / {jsonFigures.length}
-                </span>
-                <button
-                  className="btn btn-xs"
-                  onClick={() =>
-                    setSubIndex((subIndex + 1) % jsonFigures.length)
-                  }
-                >
-                  ▶
-                </button>
-              </div>
-            )}
-          </div>
+          <InteractiveFigureContent
+            figureJsonPath={currentJsonFigure}
+            figureIndex={subIndex}
+            totalFigures={jsonFigures.length}
+            onNavigatePrevious={() =>
+              setSubIndex((subIndex - 1 + jsonFigures.length) % jsonFigures.length)
+            }
+            onNavigateNext={() =>
+              setSubIndex((subIndex + 1) % jsonFigures.length)
+            }
+          />
         )}
 
         <div className="mt-6 flex justify-end gap-2">
