@@ -20,10 +20,10 @@ import ExecutionDAG from "./ExecutionDAG";
 import type { ExecutionResponseDetail } from "@/schemas";
 
 import { LoadingSpinner } from "@/app/components/LoadingSpinner";
-import PlotlyRenderer from "@/app/components/PlotlyRenderer";
 import { TaskFigure } from "@/app/components/TaskFigure";
 import { useFetchExecutionByChipId } from "@/client/chip/chip";
 import { TaskGridView } from "@/shared/components/TaskGridView";
+import { InteractiveFigureModal } from "@/shared/components/InteractiveFigureModal";
 
 type FilterOption = {
   value: string;
@@ -45,7 +45,6 @@ export default function ExecutionDetailClient({
     qid: string;
     index: number;
   } | null>(null);
-  const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [taskViewMode, setTaskViewMode] = useState<"list" | "grid">("list");
   const [selectedTaskIndex, setSelectedTaskIndex] = useState<number | null>(
     null,
@@ -780,7 +779,6 @@ export default function ExecutionDetailClient({
                                               qid: selectedTask.qid || "",
                                               index: idx,
                                             });
-                                            setViewMode("interactive");
                                           }}
                                         >
                                           Interactive View
@@ -917,84 +915,14 @@ export default function ExecutionDetailClient({
         </div>
       </div>
 
-      {/* Figure Expansion Modal */}
-      {expandedFigure && (
-        <dialog className="modal modal-open">
-          <div className="modal-box max-w-5xl w-11/12 max-h-[90vh] p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg">
-                Figure {expandedFigure.index + 1}
-              </h3>
-              <button
-                onClick={() => {
-                  setExpandedFigure(null);
-                  setViewMode("static");
-                }}
-                className="btn btn-sm btn-circle btn-ghost"
-              >
-                ✕
-              </button>
-            </div>
-
-            {viewMode === "static" ? (
-              <>
-                <div className="bg-white rounded-lg p-4 flex items-center justify-center max-h-[75vh]">
-                  <TaskFigure
-                    path={expandedFigure.path}
-                    qid={expandedFigure.qid}
-                    className="w-full h-full object-contain max-h-[70vh]"
-                  />
-                </div>
-                {expandedFigure.jsonPath && (
-                  <div className="mt-4 flex justify-center">
-                    <button
-                      className="btn btn-sm btn-primary"
-                      onClick={() => setViewMode("interactive")}
-                    >
-                      Interactive View
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="w-full h-[70vh] bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
-                  <div className="w-full h-full flex justify-center items-center">
-                    <div className="w-fit h-fit m-auto">
-                      <PlotlyRenderer
-                        className="w-full h-full"
-                        fullPath={`${
-                          process.env.NEXT_PUBLIC_API_URL
-                        }/api/executions/figure?path=${encodeURIComponent(
-                          expandedFigure.jsonPath || "",
-                        )}`}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4 flex justify-center">
-                  <button
-                    className="btn btn-sm"
-                    onClick={() => setViewMode("static")}
-                  >
-                    Back to Static View
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-          <form method="dialog" className="modal-backdrop">
-            <button
-              onClick={() => {
-                setExpandedFigure(null);
-                setViewMode("static");
-              }}
-            >
-              close
-            </button>
-          </form>
-        </dialog>
-      )}
+      {/* Figure Expansion Modal - Interactive View Only */}
+      <InteractiveFigureModal
+        isOpen={!!expandedFigure}
+        onClose={() => setExpandedFigure(null)}
+        figureJsonPath={expandedFigure?.jsonPath || ""}
+        title="Interactive Figure"
+        figureIndex={expandedFigure?.index}
+      />
     </div>
   );
 }

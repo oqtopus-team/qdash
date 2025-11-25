@@ -49,6 +49,7 @@ class QubexSession(BaseSession):
             self._exp = Experiment(
                 chip_id=chip_id,
                 qubits=qubits,
+                muxes=self._config.get("muxes", None),
                 config_dir=self._config.get("config_dir", f"/app/config/qubex/{chip_id}/config"),
                 params_dir=self._config.get("params_dir", f"/app/config/qubex/{chip_id}/params"),
                 classifier_dir=self._config.get("classifier_dir", "/app/.classifier"),
