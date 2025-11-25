@@ -540,7 +540,9 @@ export function TaskDetailModal({
             figureIndex={subIndex}
             totalFigures={jsonFigures.length}
             onNavigatePrevious={() =>
-              setSubIndex((subIndex - 1 + jsonFigures.length) % jsonFigures.length)
+              setSubIndex(
+                (subIndex - 1 + jsonFigures.length) % jsonFigures.length,
+              )
             }
             onNavigateNext={() =>
               setSubIndex((subIndex + 1) % jsonFigures.length)

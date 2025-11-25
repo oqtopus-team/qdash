@@ -9,7 +9,7 @@ from qdash.workflow.tasks.base import (
     RunResult,
 )
 from qdash.workflow.tasks.qubex.base import QubexTask
-from qubecalib.instrument.quel.quel1.tool.skew import Skew, SkewSetting
+from qubecalib.instrument.quel.quel1.tool.skew import Skew
 
 
 class CheckSkew(QubexTask):
@@ -47,7 +47,7 @@ class CheckSkew(QubexTask):
             print(f"Box {k} setting: {v}")
         from qubex import Experiment
 
-        with open(skew_file_path, "r") as file:
+        with open(skew_file_path) as file:
             config = yaml.safe_load(file)
             ref_port = config["reference_port"].split("-")[0]
 

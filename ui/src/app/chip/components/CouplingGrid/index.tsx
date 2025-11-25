@@ -517,41 +517,43 @@ export function CouplingGrid({
                   gridTemplateRows: `repeat(${gridSize}, minmax(0, 1fr))`,
                 }}
               >
-                {Array.from({ length: numRegions * numRegions }).map((_, index) => {
-                  const regionRow = Math.floor(index / numRegions);
-                  const regionCol = index % numRegions;
-                  const isHovered =
-                    hoveredRegion?.row === regionRow &&
-                    hoveredRegion?.col === regionCol;
+                {Array.from({ length: numRegions * numRegions }).map(
+                  (_, index) => {
+                    const regionRow = Math.floor(index / numRegions);
+                    const regionCol = index % numRegions;
+                    const isHovered =
+                      hoveredRegion?.row === regionRow &&
+                      hoveredRegion?.col === regionCol;
 
-                  return (
-                    <button
-                      key={index}
-                      className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
-                        isHovered
-                          ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
-                          : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
-                      }`}
-                      style={{
-                        gridColumn: `${regionCol * regionSize + 1} / span ${regionSize}`,
-                        gridRow: `${regionRow * regionSize + 1} / span ${regionSize}`,
-                      }}
-                      onMouseEnter={() =>
-                        setHoveredRegion({ row: regionRow, col: regionCol })
-                      }
-                      onMouseLeave={() => setHoveredRegion(null)}
-                      onClick={() => {
-                        setSelectedRegion({ row: regionRow, col: regionCol });
-                        setZoomMode("region");
-                      }}
-                      title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-                    >
-                      <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
-                        {regionRow},{regionCol}
-                      </span>
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={index}
+                        className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
+                          isHovered
+                            ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
+                            : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
+                        }`}
+                        style={{
+                          gridColumn: `${regionCol * regionSize + 1} / span ${regionSize}`,
+                          gridRow: `${regionRow * regionSize + 1} / span ${regionSize}`,
+                        }}
+                        onMouseEnter={() =>
+                          setHoveredRegion({ row: regionRow, col: regionCol })
+                        }
+                        onMouseLeave={() => setHoveredRegion(null)}
+                        onClick={() => {
+                          setSelectedRegion({ row: regionRow, col: regionCol });
+                          setZoomMode("region");
+                        }}
+                        title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
+                      >
+                        <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                          {regionRow},{regionCol}
+                        </span>
+                      </button>
+                    );
+                  },
+                )}
               </div>
             </div>
           )}

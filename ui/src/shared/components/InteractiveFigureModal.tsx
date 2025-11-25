@@ -33,10 +33,7 @@ export function InteractiveFigureModal({
       <div className="modal-box w-fit min-w-[500px] max-w-[95vw] h-fit max-h-[95vh] p-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-bold text-lg">{displayTitle}</h3>
-          <button
-            onClick={onClose}
-            className="btn btn-sm btn-circle btn-ghost"
-          >
+          <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost">
             ✕
           </button>
         </div>
