@@ -3,10 +3,12 @@
 import asyncio
 import os
 import uuid
+from datetime import datetime, timezone
 from logging import getLogger
 from typing import Annotated, Any
 
 import httpx
+from croniter import croniter
 from fastapi import APIRouter, Depends, HTTPException
 from prefect import get_client
 from prefect.client.schemas.filters import (
@@ -28,6 +30,7 @@ from qdash.api.schemas.flow import (
     UpdateScheduleResponse,
 )
 from qdash.dbmodel.flow import FlowDocument
+from zoneinfo import ZoneInfo
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
@@ -108,8 +111,6 @@ async def schedule_flow(
     if request.cron:
         # Validate cron expression
         try:
-            from croniter import croniter
-
             croniter(request.cron)  # Will raise ValueError if invalid
         except ValueError as e:
             raise HTTPException(
@@ -160,10 +161,6 @@ async def schedule_flow(
                 # Calculate next run time from cron expression
                 next_run = None
                 try:
-                    from datetime import datetime, timezone
-
-                    from croniter import croniter
-
                     now = datetime.now(timezone.utc)
                     cron_iter = croniter(request.cron, now)
                     next_run_dt = cron_iter.get_next(datetime)
@@ -201,15 +198,34 @@ async def schedule_flow(
     if request.scheduled_time:
         # Validate scheduled_time is in the future
         try:
-            from datetime import datetime, timezone
+            scheduled_time_str = request.scheduled_time
+            jst = ZoneInfo("Asia/Tokyo")
 
-            scheduled_dt = datetime.fromisoformat(request.scheduled_time.replace("Z", "+00:00"))
+            # Check if timezone info is present
+            # Formats with timezone: 2025-11-26T10:00:00+09:00, 2025-11-26T01:00:00Z
+            # Formats without timezone: 2025-11-26T10:00, 2025-11-26T10:00:00
+            has_timezone = "Z" in scheduled_time_str or (
+                "+" in scheduled_time_str[10:] or (scheduled_time_str.count("-") > 2 and "-" in scheduled_time_str[19:])
+            )
+
+            if not has_timezone:
+                # datetime-local format: YYYY-MM-DDTHH:mm or YYYY-MM-DDTHH:mm:ss
+                # Assume JST (Asia/Tokyo)
+                naive_dt = datetime.fromisoformat(scheduled_time_str)
+                scheduled_dt = naive_dt.replace(tzinfo=jst)
+                # Convert to ISO format with timezone for storage
+                scheduled_time_str = scheduled_dt.isoformat()
+            else:
+                scheduled_dt = datetime.fromisoformat(scheduled_time_str.replace("Z", "+00:00"))
+
             now = datetime.now(timezone.utc)
             if scheduled_dt <= now:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Scheduled time must be in the future. Provided: {request.scheduled_time}, Current: {now.isoformat()}",
+                    detail=f"Scheduled time must be in the future. Provided: {request.scheduled_time} (interpreted as {scheduled_dt.isoformat()}), Current UTC: {now.isoformat()}",
                 )
+            # Update request.scheduled_time with timezone-aware ISO format
+            request.scheduled_time = scheduled_time_str
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
@@ -339,8 +355,6 @@ async def list_flow_schedules(
 
         # Get one-time scheduled runs (future only)
         try:
-            from datetime import datetime, timezone
-
             state_filter = FlowRunFilterStateType(any_=[StateType.SCHEDULED])
             flow_runs = await client.read_flow_runs(
                 deployment_filter=DeploymentFilter(id={"any_": [uuid.UUID(flow.deployment_id)]}),
@@ -426,8 +440,6 @@ async def list_all_flow_schedules(
 
             # Get one-time scheduled runs (future only)
             try:
-                from datetime import datetime, timezone
-
                 state_filter = FlowRunFilterStateType(any_=[StateType.SCHEDULED])
                 flow_runs = await client.read_flow_runs(
                     deployment_filter=DeploymentFilter(id={"any_": [uuid.UUID(flow.deployment_id)]}),
@@ -602,7 +614,6 @@ async def update_flow_schedule(
             # Prepare schedule if cron is provided
             schedule_to_update = deployment.schedule
             if request.cron:
-                from croniter import croniter
                 from prefect.client.schemas.schedules import CronSchedule
 
                 # Validate cron expression

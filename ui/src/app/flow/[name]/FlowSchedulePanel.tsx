@@ -203,29 +203,80 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
 
       {/* One-time Schedule Form */}
       {scheduleType === "one-time" && (
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text text-xs text-gray-400">
-              Scheduled Time
-            </span>
-          </label>
-          <input
-            type="datetime-local"
-            className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white text-xs"
-            value={scheduledTime}
-            onChange={(e) => {
-              // Convert local datetime to ISO with JST offset
-              const localDate = new Date(e.target.value);
-              const offset = 9 * 60; // JST is UTC+9
-              const jstDate = new Date(
-                localDate.getTime() + offset * 60 * 1000,
-              );
-              setScheduledTime(jstDate.toISOString());
-            }}
-          />
-          <label className="label">
+        <div className="space-y-3">
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text text-xs text-gray-400">
+                Date (JST)
+              </span>
+            </label>
+            <input
+              type="date"
+              className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white text-xs [color-scheme:dark]"
+              value={scheduledTime.split("T")[0] || ""}
+              onChange={(e) => {
+                const timePart = scheduledTime.split("T")[1] || "00:00";
+                setScheduledTime(`${e.target.value}T${timePart}`);
+              }}
+            />
+          </div>
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text text-xs text-gray-400">
+                Time (JST)
+              </span>
+            </label>
+            <div className="flex gap-2">
+              <select
+                className="select select-bordered select-sm bg-[#3c3c3c] border-[#3e3e3e] text-white text-xs flex-1"
+                value={scheduledTime.split("T")[1]?.split(":")[0] || "00"}
+                onChange={(e) => {
+                  const date =
+                    scheduledTime.split("T")[0] ||
+                    new Date().toISOString().split("T")[0];
+                  const currentMinute =
+                    scheduledTime.split("T")[1]?.split(":")[1] || "00";
+                  setScheduledTime(
+                    `${date}T${e.target.value}:${currentMinute}`,
+                  );
+                }}
+              >
+                {Array.from({ length: 24 }, (_, i) => {
+                  const hour = i.toString().padStart(2, "0");
+                  return (
+                    <option key={hour} value={hour}>
+                      {hour}
+                    </option>
+                  );
+                })}
+              </select>
+              <span className="text-white text-lg">:</span>
+              <select
+                className="select select-bordered select-sm bg-[#3c3c3c] border-[#3e3e3e] text-white text-xs flex-1"
+                value={scheduledTime.split("T")[1]?.split(":")[1] || "00"}
+                onChange={(e) => {
+                  const date =
+                    scheduledTime.split("T")[0] ||
+                    new Date().toISOString().split("T")[0];
+                  const currentHour =
+                    scheduledTime.split("T")[1]?.split(":")[0] || "00";
+                  setScheduledTime(`${date}T${currentHour}:${e.target.value}`);
+                }}
+              >
+                {Array.from({ length: 12 }, (_, i) => {
+                  const minute = (i * 5).toString().padStart(2, "0");
+                  return (
+                    <option key={minute} value={minute}>
+                      {minute}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+          <label className="label py-0">
             <span className="label-text-alt text-xs text-gray-500">
-              Time will be converted to JST
+              Timezone: Asia/Tokyo (JST)
             </span>
           </label>
         </div>
