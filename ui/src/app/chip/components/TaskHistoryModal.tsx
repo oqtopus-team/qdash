@@ -99,11 +99,13 @@ export function TaskHistoryModal({
             <span>No history available for this task</span>
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row gap-4 h-full">
+          <div className="flex flex-col lg:flex-row gap-4 h-[70vh]">
             {/* History List (Left) */}
-            <div className="lg:w-1/3 flex flex-col">
-              <h4 className="text-md font-bold mb-3">Calibration History</h4>
-              <div className="flex-1 overflow-y-auto space-y-2 max-h-[500px]">
+            <div className="lg:w-1/3 flex flex-col min-h-0">
+              <h4 className="text-md font-bold mb-3 flex-shrink-0">
+                Calibration History
+              </h4>
+              <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
                 {historyArray.map((item, idx) => (
                   <button
                     key={item.key}
@@ -155,8 +157,8 @@ export function TaskHistoryModal({
             </div>
 
             {/* Detail View (Right) */}
-            <div className="lg:w-2/3 flex flex-col">
-              <div className="flex items-center justify-between mb-3">
+            <div className="lg:w-2/3 flex flex-col min-h-0 overflow-y-auto">
+              <div className="flex items-center justify-between mb-3 flex-shrink-0">
                 <h4 className="text-md font-bold">Calibration Result</h4>
                 <div className="text-sm text-base-content/60">
                   {selectedIndex + 1} / {historyArray.length}
@@ -164,7 +166,7 @@ export function TaskHistoryModal({
               </div>
 
               {/* Navigation Arrows */}
-              <div className="flex gap-2 mb-3">
+              <div className="flex gap-2 mb-3 flex-shrink-0">
                 <button
                   className="btn btn-sm btn-ghost"
                   disabled={selectedIndex === 0}
@@ -287,14 +289,15 @@ export function TaskHistoryModal({
                     )}
                   </div>
 
-                  {/* Output Parameters */}
-                  {selectedTask.output_parameters &&
-                    Object.keys(selectedTask.output_parameters).length > 0 && (
+                  {/* Input Parameters */}
+                  {selectedTask.input_parameters &&
+                    Object.keys(selectedTask.input_parameters).length > 0 && (
                       <div className="text-xs bg-base-200 p-3 rounded-lg">
-                        <h5 className="font-semibold mb-2">Parameters</h5>
+                        <h5 className="font-semibold mb-2">Input Parameters</h5>
                         <div className="space-y-1">
-                          {Object.entries(selectedTask.output_parameters).map(
-                            ([key, value]) => {
+                          {Object.entries(selectedTask.input_parameters)
+                            .sort(([a], [b]) => a.localeCompare(b))
+                            .map(([key, value]) => {
                               const paramValue = (
                                 typeof value === "object" &&
                                 value !== null &&
@@ -315,8 +318,43 @@ export function TaskHistoryModal({
                                   </span>
                                 </div>
                               );
-                            },
-                          )}
+                            })}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Output Parameters */}
+                  {selectedTask.output_parameters &&
+                    Object.keys(selectedTask.output_parameters).length > 0 && (
+                      <div className="text-xs bg-base-200 p-3 rounded-lg">
+                        <h5 className="font-semibold mb-2">
+                          Output Parameters
+                        </h5>
+                        <div className="space-y-1">
+                          {Object.entries(selectedTask.output_parameters)
+                            .sort(([a], [b]) => a.localeCompare(b))
+                            .map(([key, value]) => {
+                              const paramValue = (
+                                typeof value === "object" &&
+                                value !== null &&
+                                "value" in value
+                                  ? value
+                                  : { value }
+                              ) as { value: number | string; unit?: string };
+                              return (
+                                <div key={key} className="flex justify-between">
+                                  <span className="font-medium">{key}:</span>
+                                  <span>
+                                    {typeof paramValue.value === "number"
+                                      ? paramValue.value.toFixed(4)
+                                      : String(paramValue.value)}
+                                    {paramValue.unit
+                                      ? ` ${paramValue.unit}`
+                                      : ""}
+                                  </span>
+                                </div>
+                              );
+                            })}
                         </div>
                       </div>
                     )}
