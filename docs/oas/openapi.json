@@ -654,6 +654,70 @@
         }
       }
     },
+    "/api/chip/{chip_id}/task/coupling/{coupling_id}/task/{task_name}": {
+      "get": {
+        "tags": ["chip"],
+        "summary": "Fetch Coupling Task History",
+        "description": "Fetch coupling task history for a specific coupling and task.",
+        "operationId": "fetchCouplingTaskHistory",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "coupling_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Coupling Id"
+            }
+          },
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chip/{chip_id}/task/coupling/{task_name}/history/{recorded_date}": {
       "get": {
         "tags": ["chip"],
