@@ -1917,6 +1917,204 @@ export function useFetchQubitTaskHistory<
 }
 
 /**
+ * Fetch coupling task history for a specific coupling and task.
+ * @summary Fetch Coupling Task History
+ */
+export const fetchCouplingTaskHistory = (
+  chipId: string,
+  couplingId: string,
+  taskName: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<TaskHistoryResponse>(
+    {
+      url: `/api/chip/${chipId}/task/coupling/${couplingId}/task/${taskName}`,
+      method: "GET",
+      signal,
+    },
+    options,
+  );
+};
+
+export const getFetchCouplingTaskHistoryQueryKey = (
+  chipId?: string,
+  couplingId?: string,
+  taskName?: string,
+) => {
+  return [
+    `/api/chip/${chipId}/task/coupling/${couplingId}/task/${taskName}`,
+  ] as const;
+};
+
+export const getFetchCouplingTaskHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  couplingId: string,
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getFetchCouplingTaskHistoryQueryKey(chipId, couplingId, taskName);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof fetchCouplingTaskHistory>>
+  > = ({ signal }) =>
+    fetchCouplingTaskHistory(
+      chipId,
+      couplingId,
+      taskName,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(chipId && couplingId && taskName),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type FetchCouplingTaskHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof fetchCouplingTaskHistory>>
+>;
+export type FetchCouplingTaskHistoryQueryError = ErrorType<HTTPValidationError>;
+
+export function useFetchCouplingTaskHistory<
+  TData = Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  couplingId: string,
+  taskName: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+          TError,
+          Awaited<ReturnType<typeof fetchCouplingTaskHistory>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useFetchCouplingTaskHistory<
+  TData = Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  couplingId: string,
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+          TError,
+          Awaited<ReturnType<typeof fetchCouplingTaskHistory>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useFetchCouplingTaskHistory<
+  TData = Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  couplingId: string,
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Fetch Coupling Task History
+ */
+
+export function useFetchCouplingTaskHistory<
+  TData = Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  chipId: string,
+  couplingId: string,
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof fetchCouplingTaskHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getFetchCouplingTaskHistoryQueryOptions(
+    chipId,
+    couplingId,
+    taskName,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * Fetch historical task results for a specific date.
 
 Parameters

@@ -1,18 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
 
 import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
-import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import {
   useFetchLatestQubitTaskGroupedByChip,
   useFetchHistoricalQubitTaskGroupedByChip,
 } from "@/client/chip/chip";
-import { TaskDetailModal } from "@/shared/components/TaskDetailModal";
+import { TaskHistoryModal } from "../TaskHistoryModal";
 
 interface TaskResultGridProps {
   chipId: string;
@@ -24,7 +23,7 @@ interface TaskResultGridProps {
 
 interface SelectedTaskInfo {
   qid: string;
-  task: Task;
+  taskName: string;
 }
 
 const MUX_SIZE = 2;
@@ -34,7 +33,6 @@ export function TaskResultGrid({
   selectedTask,
   selectedDate,
   gridSize,
-  onDateChange,
 }: TaskResultGridProps) {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
@@ -53,34 +51,6 @@ export function TaskResultGrid({
 
   const regionSize = 4; // 4×4 qubits per region
   const numRegions = Math.floor(gridSize / regionSize);
-
-  // Use custom hook for date navigation
-  const {
-    navigateToPreviousDay: originalNavigateToPreviousDay,
-    navigateToNextDay: originalNavigateToNextDay,
-    canNavigatePrevious,
-    canNavigateNext,
-    formatDate,
-  } = useDateNavigation(chipId, selectedDate, onDateChange);
-
-  // Wrap navigation functions to track modal navigation
-  const navigateToPreviousDay = useCallback(() => {
-    if (selectedTaskInfo) {
-      // Modal navigation - don't close modal
-      originalNavigateToPreviousDay();
-    } else {
-      originalNavigateToPreviousDay();
-    }
-  }, [originalNavigateToPreviousDay, selectedTaskInfo]);
-
-  const navigateToNextDay = useCallback(() => {
-    if (selectedTaskInfo) {
-      // Modal navigation - don't close modal
-      originalNavigateToNextDay();
-    } else {
-      originalNavigateToNextDay();
-    }
-  }, [originalNavigateToNextDay, selectedTaskInfo]);
 
   const {
     data: taskResponse,
@@ -104,46 +74,6 @@ export function TaskResultGrid({
           },
         },
       );
-
-  // Track previous date to distinguish modal navigation from external navigation
-  const [previousDate, setPreviousDate] = useState(selectedDate);
-
-  // Reset modal only when date changes externally (not from modal navigation)
-  useEffect(() => {
-    if (previousDate !== selectedDate && !selectedTaskInfo) {
-      // External navigation - no modal open, safe to update
-      setPreviousDate(selectedDate);
-    } else if (previousDate !== selectedDate && selectedTaskInfo) {
-      // Date changed while modal is open - update previous date but keep modal
-      setPreviousDate(selectedDate);
-    }
-  }, [selectedDate, selectedTaskInfo, previousDate]);
-
-  // Update modal data with debounce to prevent race conditions
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-
-    if (selectedTaskInfo && taskResponse?.data?.result) {
-      timeoutId = setTimeout(() => {
-        const updatedTask = taskResponse.data.result?.[selectedTaskInfo.qid];
-        if (updatedTask) {
-          setSelectedTaskInfo((prev) => {
-            // Only update if the modal is still open and for the same qid
-            if (prev?.qid === selectedTaskInfo.qid) {
-              return { ...prev, task: updatedTask };
-            }
-            return prev;
-          });
-        }
-      }, 100); // 100ms debounce
-    }
-
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [taskResponse?.data?.result, selectedTaskInfo?.qid]);
 
   if (isLoadingTask)
     return (
@@ -327,7 +257,7 @@ export function TaskResultGrid({
                 <button
                   key={index}
                   onClick={() => {
-                    if (figurePath) setSelectedTaskInfo({ qid, task });
+                    setSelectedTaskInfo({ qid, taskName: selectedTask });
                   }}
                   className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 relative w-full ${
                     task.over_threshold
@@ -414,20 +344,12 @@ export function TaskResultGrid({
         )}
       </div>
 
-      <TaskDetailModal
-        isOpen={!!selectedTaskInfo}
-        task={selectedTaskInfo?.task || null}
-        qid={selectedTaskInfo?.qid || ""}
-        onClose={() => setSelectedTaskInfo(null)}
+      <TaskHistoryModal
         chipId={chipId}
-        selectedDate={selectedDate}
-        onNavigatePrevious={navigateToPreviousDay}
-        onNavigateNext={navigateToNextDay}
-        canNavigatePrevious={canNavigatePrevious}
-        canNavigateNext={canNavigateNext}
-        formatDate={formatDate}
-        taskName={selectedTaskInfo?.task?.name}
-        variant="detailed"
+        qid={selectedTaskInfo?.qid || ""}
+        taskName={selectedTaskInfo?.taskName || ""}
+        isOpen={!!selectedTaskInfo}
+        onClose={() => setSelectedTaskInfo(null)}
       />
     </div>
   );
