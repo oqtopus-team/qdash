@@ -65,11 +65,11 @@ from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
 # Configuration Constants
 # ============================================================================
 
-DEFAULT_CHIP_ID = "64Qv3"
-DEFAULT_USERNAME = "orangekame3"
+DEFAULT_CHIP_ID = "144Qv2"
+DEFAULT_USERNAME = "admin"
 SCHEDULE_OUTPUT_BASE_DIR = Path(".tmp")
-LATTICE_DIMENSION = 4  # 4x4 unit cells
-TOTAL_QUBITS = 64
+LATTICE_DIMENSION = 6  # 6x6 unit cells for 144 qubits (6*6*4=144) 4x4 for 64 qubits
+TOTAL_QUBITS = 144
 MAX_PARALLEL_OPS = 10
 
 
@@ -334,7 +334,10 @@ def main(
 
         # Build filter pipeline
         filters = []
+        qubits = [32,33,34,35,44,45,47,48,49,50,51,52,53,54,55,56,59,60,61,62,64,65,66,67]
 
+        candidate_qubits = [str(q) for q in qubits]
+        print(f"  Using candidate qubits: {candidate_qubits}")
         # Add candidate qubit filter if specified
         if candidate_qubits is not None:
             filters.append(CandidateQubitFilter(candidate_qubits))

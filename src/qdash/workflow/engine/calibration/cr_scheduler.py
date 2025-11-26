@@ -703,6 +703,20 @@ class CRScheduler:
         mux_conflict_map = self._build_mux_conflict_map(wiring_config)
         qid_to_mux = self._build_qubit_to_mux_map(wiring_config)
 
+        # Filter out CR pairs that have qubits without MUX mappings
+        pairs_before_mux_filter = len(cr_pairs)
+        cr_pairs = [pair for pair in cr_pairs if all(qid in qid_to_mux for qid in pair.split("-"))]
+        if pairs_before_mux_filter != len(cr_pairs):
+            logger.warning(
+                f"Filtered out {pairs_before_mux_filter - len(cr_pairs)} pairs "
+                f"with qubits missing from MUX configuration"
+            )
+
+        if len(cr_pairs) == 0:
+            msg = "No valid CR pairs after MUX configuration filtering"
+            logger.error(msg)
+            raise ValueError(msg)
+
         # Group pairs: fast (intra-MUX) first, then slow (inter-MUX)
         fast, slow = self._split_fast_slow_pairs(cr_pairs, qid_to_mux)
         grouped = self._group_cr_pairs_by_conflict(
@@ -733,7 +747,9 @@ class CRScheduler:
 
         filtering_stats = {
             "all_coupling_pairs": len(all_pairs),
-            "freq_directionality_filtered": len(cr_pairs),
+            "freq_directionality_filtered": pairs_before_mux_filter,
+            "mux_config_filtered": len(cr_pairs),
+            "mux_filtered_out": pairs_before_mux_filter - len(cr_pairs),
             "used_candidate_qubits": candidate_qubits is not None,
             "direction_method": "design_based" if use_design_based else "measured",
         }
