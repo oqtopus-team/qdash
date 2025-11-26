@@ -9,12 +9,14 @@ This document describes the design and implementation plan for the Task Editor f
 ### Current State
 
 **Tasks Page (`/ui/src/app/tasks/page.tsx`)**
+
 - Displays task metadata: name, description, task_type, input/output parameters
 - Data source: `/api/task` endpoint (fetches from TaskDocument in MongoDB)
 - UI features: Grid/List view toggle, detail modal
 - **Limitation**: Shows only parameter definitions, not actual implementation code
 
 **Actual Task Implementation (`src/qdash/workflow/tasks/`)**
+
 - Python classes inheriting from `BaseTask`
 - Contains rich information:
   - `preprocess()`, `postprocess()`, `run()`, `batch_run()` method implementations
@@ -40,6 +42,7 @@ This document describes the design and implementation plan for the Task Editor f
   ```
 
 **Files Editor (`/ui/src/app/files/page.tsx`)**
+
 - Monaco Editor with syntax highlighting
 - File tree navigation
 - Edit functionality with lock/unlock mechanism
@@ -49,6 +52,7 @@ This document describes the design and implementation plan for the Task Editor f
 ### Problem Statement
 
 Users currently have **limited visibility** into task implementations:
+
 - Can only see parameter definitions (metadata)
 - Cannot understand the actual algorithm logic
 - Difficult to debug or troubleshoot calibration issues
@@ -91,6 +95,7 @@ Users currently have **limited visibility** into task implementations:
 ### Implementation Approach: Option A (Recommended)
 
 **Extend Existing Tasks Page**
+
 - Maintain current metadata view (Grid/List)
 - Add "View Code" button to each task card
 - Click to open Monaco Editor modal or separate tab
@@ -99,6 +104,7 @@ Users currently have **limited visibility** into task implementations:
 ### Alternative: Option B
 
 **Dedicated Task Editor Page**
+
 - Create `/tasks/editor` as independent page
 - Same layout as Files Editor
 - Task-specific features (parameter highlighting, doc generation)
@@ -111,26 +117,30 @@ Users currently have **limited visibility** into task implementations:
 
 QDash uses a **hybrid approach** for configuration management:
 
-| Configuration Type | Storage | Git Managed | Edit Method | Example Use Cases |
-|-------------------|---------|-------------|-------------|-------------------|
-| **Environment-specific** | `.env` | ❌ | Manual edit | Ports, credentials, API keys |
-| **Application settings** | YAML | ✅ | UI Editor | Metrics definitions, chip configs |
+| Configuration Type       | Storage | Git Managed | Edit Method | Example Use Cases                 |
+| ------------------------ | ------- | ----------- | ----------- | --------------------------------- |
+| **Environment-specific** | `.env`  | ❌          | Manual edit | Ports, credentials, API keys      |
+| **Application settings** | YAML    | ✅          | UI Editor   | Metrics definitions, chip configs |
 
 ### Rationale
 
 **Security**
+
 - `.env`: Contains secrets (passwords, API keys) → Never commit to Git
 - YAML: Public settings → Safe to version control
 
 **Portability**
+
 - `.env`: Different values per environment (dev/staging/prod)
 - YAML: Shared across all environments
 
 **Version Control**
+
 - YAML: Track configuration change history
 - Critical for chip settings rollback and diff review
 
 **UI Editing**
+
 - Files Editor already supports YAML editing
 - Git integration (pull/push) implemented
 
@@ -139,12 +149,14 @@ QDash uses a **hybrid approach** for configuration management:
 #### Recommended: Hybrid Approach
 
 **Environment Variable (`.env`)**
+
 ```bash
 # Task Editor paths
 TASK_BASE_PATH="./src/qdash/workflow/tasks"
 ```
 
 **Application Configuration (`config/qdash.yaml`)**
+
 ```yaml
 # QDash Application Configuration
 app:
@@ -154,7 +166,7 @@ app:
 # Task Editor configuration
 task_editor:
   enabled: true
-  read_only: false  # Set to true in production
+  read_only: false # Set to true in production
 
   # Backend-specific settings
   backends:
@@ -172,7 +184,7 @@ task_editor:
 # Files Editor configuration (existing)
 files_editor:
   enabled: true
-  base_path: "config/qubex"  # Equivalent to CONFIG_PATH
+  base_path: "config/qubex" # Equivalent to CONFIG_PATH
   git_enabled: true
 
 # UI feature flags
@@ -619,20 +631,29 @@ export const getTaskFileTree = async (params?: { backend?: string }) => {
 };
 
 export const getTaskFileContent = async (params: { path: string }) => {
-  return apiClient.get<{ path: string; content: string; language: string; read_only: boolean }>(
-    "/tasks/files/content",
-    { params }
-  );
+  return apiClient.get<{
+    path: string;
+    content: string;
+    language: string;
+    read_only: boolean;
+  }>("/tasks/files/content", { params });
 };
 
-export const saveTaskFileContent = async (data: { path: string; content: string }) => {
-  return apiClient.post<{ message: string; path: string }>("/tasks/files/save", data);
+export const saveTaskFileContent = async (data: {
+  path: string;
+  content: string;
+}) => {
+  return apiClient.post<{ message: string; path: string }>(
+    "/tasks/files/save",
+    data,
+  );
 };
 ```
 
 ## Implementation Plan
 
 ### Phase 1: Backend Foundation
+
 1. ✅ Create `config/qdash.yaml` configuration file
 2. ✅ Add `TASK_BASE_PATH` to `.env.example`
 3. ✅ Implement `task_editor_config.py` loader
@@ -642,6 +663,7 @@ export const saveTaskFileContent = async (data: { path: string; content: string 
 7. ✅ Implement `validate_task_file_path()` security function
 
 ### Phase 2: Frontend Integration
+
 1. ✅ Create API client functions (`getTaskFileTree`, etc.)
 2. ✅ Add "View Code" button to TaskCard component
 3. ✅ Create `/tasks/editor` page (reuse Files Editor components)
@@ -651,6 +673,7 @@ export const saveTaskFileContent = async (data: { path: string; content: string 
 7. ✅ Add save functionality with syntax validation
 
 ### Phase 3: Testing & Documentation
+
 1. ⬜ Test with different task files (qubex, fake backends)
 2. ⬜ Test read-only mode enforcement
 3. ⬜ Test path traversal security
@@ -658,6 +681,7 @@ export const saveTaskFileContent = async (data: { path: string; content: string 
 5. ⬜ Add user guide to docs/
 
 ### Phase 4: Optional Enhancements
+
 1. ⬜ Git integration for task files (similar to Files Editor)
 2. ⬜ Syntax highlighting for task-specific patterns (parameters, etc.)
 3. ⬜ Auto-generate task documentation from code
@@ -727,7 +751,7 @@ TASK_BASE_PATH="./src/qdash/workflow/tasks"
 ```yaml
 task_editor:
   enabled: true
-  read_only: false  # Set to true in production to prevent edits
+  read_only: false # Set to true in production to prevent edits
 
   backends:
     qubex:
