@@ -471,8 +471,6 @@ pyasn1-modules==0.4.1
     # via service-identity
 pybind11-stubgen==2.5.5
     # via quel-ic-config
-pycairo==1.28.0
-    # via pygobject
 pycparser==2.22
     # via cffi
 pydantic==2.4.2
@@ -494,8 +492,6 @@ pygments==2.19.1
     #   jupyter-console
     #   nbconvert
     #   rich
-pygobject==3.50.0
-    # via qubecalib
 pylabrad==0.98.2
     # via e7awgsw
 pymongo==4.8.0
@@ -564,9 +560,9 @@ pyzmq==27.0.1
     #   jupyter-server
 qctrl-visualizer==8.0.2
     # via qubex
-qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@f991bb009f948ad426ce6bcc340b6f263740ad17
+qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@487227c1154aa087e55b9fee1eabda2a164d299c
     # via qubex
-qubex @ git+https://github.com/amachino/qubex.git@9c0558decf91a05e6d6c5778a43165e5bf877203
+qubex @ git+https://github.com/amachino/qubex.git@d20176016f4bf2f1e1dd18f24d0091e3fb8efd73
 quel-clock-master @ git+https://github.com/quel-inc/quelware.git@c839e8b1a6fde4b4ece3d5f415015829857e775e#subdirectory=quel_clock_master
     # via
     #   qubecalib

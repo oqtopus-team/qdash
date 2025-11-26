@@ -12,11 +12,9 @@ export type MetricsGetCouplingMetricHistoryParams = {
    */
   metric: string;
   /**
-   * Max number of history items
-   * @minimum 1
-   * @maximum 100
+   * Max number of history items (None for unlimited)
    */
-  limit?: number;
+  limit?: number | null;
   /**
    * Filter to last N days
    */

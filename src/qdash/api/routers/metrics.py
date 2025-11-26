@@ -208,14 +208,10 @@ def _extract_best_metrics(
     -------
         Dictionary mapping metric_name -> entity_id -> MetricValue with best values
 
-    Raises:
-    ------
-        HTTPException: If query returns too many executions (>1000)
-
     Notes:
     -----
         - Only processes metrics with evaluation.mode != "none"
-        - Limits query to 1000 executions to prevent memory issues
+        - Queries all executions within the specified time window
         - Uses max() for "maximize" mode and min() for "minimize" mode
 
     """
@@ -231,9 +227,10 @@ def _extract_best_metrics(
     if cutoff_time:
         query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
 
-    # Limit to 1000 most recent executions, sorted by start_at descending
+    # Query all executions within time window, sorted by start_at descending
+    # No limit applied - we need all data within the specified time range
     try:
-        executions = ExecutionHistoryDocument.find(query).sort([("start_at", -1)]).limit(1000).to_list()
+        executions = ExecutionHistoryDocument.find(query).sort([("start_at", -1)]).to_list()
     except Exception as e:
         logger.error(f"Failed to query execution history: {e}")
         raise HTTPException(status_code=500, detail=f"Database query failed: {e}") from e
@@ -504,7 +501,7 @@ async def get_qubit_metric_history(
     chip_id: str,
     qid: str,
     metric: Annotated[str, Query(description="Metric name (e.g., t1, qubit_frequency)")],
-    limit: Annotated[int, Query(description="Max number of history items", ge=1, le=100)] = 20,
+    limit: Annotated[int | None, Query(description="Max number of history items (None for unlimited)", ge=1)] = None,
     within_days: Annotated[int | None, Query(description="Filter to last N days", ge=1)] = 30,
     current_user: User | None = Depends(get_optional_current_user),
 ) -> QubitMetricHistoryResponse:
@@ -519,7 +516,7 @@ async def get_qubit_metric_history(
         chip_id: The chip identifier
         qid: The qubit identifier (e.g., "0", "Q00")
         metric: Metric name to retrieve history for
-        limit: Maximum number of history items to return (1-100)
+        limit: Maximum number of history items (None for unlimited within time range)
         within_days: Optional filter to only include data from last N days
         current_user: Current authenticated user
 
@@ -551,12 +548,8 @@ async def get_qubit_metric_history(
     if cutoff_time:
         query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
 
-    executions = (
-        ExecutionHistoryDocument.find(query)
-        .sort([("start_at", -1)])
-        .limit(limit * 3)  # Get more to filter by metric availability
-        .to_list()
-    )
+    # Query all executions within time window, no limit applied
+    executions = ExecutionHistoryDocument.find(query).sort([("start_at", -1)]).to_list()
 
     # Extract metric values from calib_data
     history_items: list[MetricHistoryItem] = []
@@ -584,8 +577,8 @@ async def get_qubit_metric_history(
                         task_id = None
                         calibrated_at = None
 
-                    # Only include if value exists
-                    if value is not None:
+                    # Only include if value exists and task_id is available
+                    if value is not None and task_id:
                         history_items.append(
                             MetricHistoryItem(
                                 value=value,
@@ -596,15 +589,15 @@ async def get_qubit_metric_history(
                             )
                         )
 
-                        # Stop once we have enough items
-                        if len(history_items) >= limit:
+                        # Stop if limit is specified and reached
+                        if limit is not None and len(history_items) >= limit:
                             break
 
                     # Break qid_variant loop if we found the metric
                     break
 
-        # Break execution loop if we have enough items
-        if len(history_items) >= limit:
+        # Stop if limit is specified and reached
+        if limit is not None and len(history_items) >= limit:
             break
 
     if not history_items:
@@ -624,7 +617,7 @@ async def get_coupling_metric_history(
     chip_id: str,
     coupling_id: str,
     metric: Annotated[str, Query(description="Metric name (e.g., zx90_gate_fidelity, bell_state_fidelity)")],
-    limit: Annotated[int, Query(description="Max number of history items", ge=1, le=100)] = 20,
+    limit: Annotated[int | None, Query(description="Max number of history items (None for unlimited)", ge=1)] = None,
     within_days: Annotated[int | None, Query(description="Filter to last N days", ge=1)] = 30,
     current_user: User | None = Depends(get_optional_current_user),
 ) -> QubitMetricHistoryResponse:
@@ -639,7 +632,7 @@ async def get_coupling_metric_history(
         chip_id: The chip identifier
         coupling_id: The coupling identifier (e.g., "0-1", "2-3")
         metric: Metric name to retrieve history for
-        limit: Maximum number of history items to return (1-100)
+        limit: Maximum number of history items (None for unlimited within time range)
         within_days: Optional filter to only include data from last N days
         current_user: Current authenticated user
 
@@ -669,12 +662,8 @@ async def get_coupling_metric_history(
     if cutoff_time:
         query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
 
-    executions = (
-        ExecutionHistoryDocument.find(query)
-        .sort([("start_at", -1)])
-        .limit(limit * 3)  # Get more to filter by metric availability
-        .to_list()
-    )
+    # Query all executions within time window, no limit applied
+    executions = ExecutionHistoryDocument.find(query).sort([("start_at", -1)]).to_list()
 
     # Extract metric values from calib_data
     history_items: list[MetricHistoryItem] = []
@@ -698,8 +687,8 @@ async def get_coupling_metric_history(
                     task_id = None
                     calibrated_at = None
 
-                # Only include if value exists
-                if value is not None:
+                # Only include if value exists and task_id is available
+                if value is not None and task_id:
                     history_items.append(
                         MetricHistoryItem(
                             value=value,
@@ -710,12 +699,12 @@ async def get_coupling_metric_history(
                         )
                     )
 
-                    # Stop once we have enough items
-                    if len(history_items) >= limit:
+                    # Stop if limit is specified and reached
+                    if limit is not None and len(history_items) >= limit:
                         break
 
-        # Break execution loop if we have enough items
-        if len(history_items) >= limit:
+        # Stop if limit is specified and reached
+        if limit is not None and len(history_items) >= limit:
             break
 
     if not history_items:
