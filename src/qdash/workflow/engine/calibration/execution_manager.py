@@ -13,6 +13,7 @@ from qdash.datamodel.execution import (
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.initialize import initialize
+from qdash.dbmodel.tag import TagDocument
 from qdash.workflow.engine.calibration.task_manager import TaskManager
 
 initialize()
@@ -307,6 +308,9 @@ class ExecutionManager(BaseModel):
     def save(self) -> "ExecutionManager":
         """Save the execution manager to the database."""
         ExecutionHistoryDocument.upsert_document(self.to_datamodel())
+        # Auto-register tags to TagDocument for UI tag selector
+        if self.tags:
+            TagDocument.insert_tags(self.tags, self.username)
         return self
 
     def to_datamodel(self) -> ExecutionModel:
