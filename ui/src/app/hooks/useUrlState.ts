@@ -69,11 +69,13 @@ interface UseQubitTimeSeriesUrlStateResult {
 
 interface UseCDFUrlStateResult {
   selectedChip: string;
-  selectedDate: string;
+  timeRange: TimeRange;
+  selectionMode: SelectionMode;
   selectedParameters: string[];
   showAsErrorRate: boolean;
   setSelectedChip: (chip: string) => void;
-  setSelectedDate: (date: string) => void;
+  setTimeRange: (range: TimeRange) => void;
+  setSelectionMode: (mode: SelectionMode) => void;
   setSelectedParameters: (parameters: string[]) => void;
   setShowAsErrorRate: (show: boolean) => void;
   isInitialized: boolean;
@@ -397,8 +399,10 @@ export function useCDFUrlState(): UseCDFUrlStateResult {
     parseAsString,
   );
 
-  const [selectedDate, setSelectedDateState] = useQueryState(
-    "date",
+  const [timeRange, setTimeRangeState] = useQueryState("range", parseAsString);
+
+  const [selectionMode, setSelectionModeState] = useQueryState(
+    "mode",
     parseAsString,
   );
 
@@ -431,11 +435,18 @@ export function useCDFUrlState(): UseCDFUrlStateResult {
     [setSelectedChipState],
   );
 
-  const setSelectedDate = useCallback(
-    (date: string) => {
-      setSelectedDateState(date === URL_DEFAULTS.DATE ? null : date); // Remove default from URL
+  const setTimeRange = useCallback(
+    (range: TimeRange) => {
+      setTimeRangeState(range === "7d" ? null : range); // 7d as default
     },
-    [setSelectedDateState],
+    [setTimeRangeState],
+  );
+
+  const setSelectionMode = useCallback(
+    (mode: SelectionMode) => {
+      setSelectionModeState(mode === "latest" ? null : mode); // latest as default
+    },
+    [setSelectionModeState],
   );
 
   const setSelectedParameters = useCallback(
@@ -461,11 +472,13 @@ export function useCDFUrlState(): UseCDFUrlStateResult {
 
   return {
     selectedChip: selectedChip ?? "",
-    selectedDate: selectedDate ?? URL_DEFAULTS.DATE,
+    timeRange: (timeRange as TimeRange) ?? "7d",
+    selectionMode: (selectionMode as SelectionMode) ?? "latest",
     selectedParameters: selectedParameters ?? [...URL_DEFAULTS.CDF_PARAMETERS],
     showAsErrorRate: showAsErrorRate ?? URL_DEFAULTS.SHOW_ERROR_RATE,
     setSelectedChip,
-    setSelectedDate,
+    setTimeRange,
+    setSelectionMode,
     setSelectedParameters,
     setShowAsErrorRate,
     isInitialized,
