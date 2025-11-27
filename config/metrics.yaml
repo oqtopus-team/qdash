@@ -9,7 +9,13 @@ qubit_metrics:
     scale: 1
     description: Resonance frequency of the qubit
     evaluation:
-      mode: none
+      mode: maximize
+    threshold:
+      value: 5.0
+      range:
+        min: 4.0
+        max: 6.0
+        step: 0.01
 
   anharmonicity:
     title: Qubit Anharmonicity
@@ -17,7 +23,13 @@ qubit_metrics:
     scale: 1000 # Convert GHz to MHz
     description: Anharmonicity of the qubit energy levels
     evaluation:
-      mode: none
+      mode: minimize
+    threshold:
+      value: -300
+      range:
+        min: -500
+        max: -200
+        step: 1
 
   t1:
     title: T1

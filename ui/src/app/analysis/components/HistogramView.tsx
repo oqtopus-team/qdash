@@ -27,9 +27,9 @@ type MetricOption = {
 
 type MetricType = "qubit" | "coupling";
 
-// Helper function to determine if a metric is a coherence time parameter
-function isCoherenceMetric(metricKey: string): boolean {
-  return ["t1", "t2_echo", "t2_star"].includes(metricKey);
+// Helper function to check if a metric uses percentage unit
+function isPercentageMetric(unit: string | undefined): boolean {
+  return unit === "%";
 }
 
 export function HistogramView() {
@@ -209,7 +209,7 @@ export function HistogramView() {
     },
   );
 
-  // Extract and transform raw data from metrics API
+  // Extract and transform raw data from metrics API for histogram (single metric)
   const histogramData = useMemo(() => {
     if (!metricsData?.data || !currentMetricConfig) {
       return [];
@@ -242,8 +242,8 @@ export function HistogramView() {
         // Apply scale from config
         let scaledValue = value * currentMetricConfig.scale;
 
-        // For fidelity metrics, convert to percentage or error rate
-        if (!isCoherenceMetric(selectedParameter)) {
+        // For percentage metrics, convert to error rate if needed
+        if (isPercentageMetric(currentMetricConfig.unit)) {
           if (showAsErrorRate) {
             // Convert scaled percentage to error rate
             scaledValue = 100 - scaledValue;
@@ -271,6 +271,73 @@ export function HistogramView() {
     metricType,
     showAsErrorRate,
   ]);
+
+  // Extract all metrics data for table display (all metrics for current type)
+  const allMetricsTableData = useMemo(() => {
+    if (!metricsData?.data) {
+      return [];
+    }
+
+    const isCoupling = metricType === "coupling";
+    const metricsSource = isCoupling
+      ? metricsData.data.coupling_metrics
+      : metricsData.data.qubit_metrics;
+    const metricsConfig = isCoupling ? couplingMetrics : qubitMetrics;
+
+    if (!metricsSource) return [];
+
+    // Collect all entity IDs
+    const entityIds = new Set<string>();
+    Object.values(metricsSource).forEach((metricData: any) => {
+      if (metricData) {
+        Object.keys(metricData).forEach((id) => entityIds.add(id));
+      }
+    });
+
+    // Build table data with all metrics for each entity
+    const tableData: Record<string, any>[] = [];
+
+    entityIds.forEach((entityId) => {
+      const formattedId = isCoupling
+        ? entityId
+        : entityId.startsWith("Q")
+          ? entityId
+          : `Q${entityId.padStart(2, "0")}`;
+
+      const row: Record<string, any> = { entityId: formattedId };
+
+      metricsConfig.forEach((metric) => {
+        const metricData = metricsSource[
+          metric.key as keyof typeof metricsSource
+        ] as any;
+        const value = metricData?.[entityId]?.value;
+
+        if (
+          value !== null &&
+          value !== undefined &&
+          typeof value === "number"
+        ) {
+          // Apply scale
+          let scaledValue = value * metric.scale;
+
+          // For percentage metrics with error rate display
+          if (isPercentageMetric(metric.unit) && showAsErrorRate) {
+            scaledValue = 100 - scaledValue;
+          }
+
+          row[metric.key] = scaledValue;
+        } else {
+          row[metric.key] = null;
+        }
+      });
+
+      tableData.push(row);
+    });
+
+    // Sort by entity ID
+    tableData.sort((a, b) => naturalSortQIDs(a.entityId, b.entityId));
+    return tableData;
+  }, [metricsData, metricType, qubitMetrics, couplingMetrics, showAsErrorRate]);
 
   // Calculate basic statistics
   const statistics = useMemo(() => {
@@ -302,13 +369,13 @@ export function HistogramView() {
       customThreshold ?? currentMetricConfig?.threshold?.value;
 
     if (activeThreshold !== undefined && activeThreshold !== null) {
-      const isCoherence = isCoherenceMetric(selectedParameter);
+      const isPercent = isPercentageMetric(currentMetricConfig?.unit);
 
-      if (isCoherence) {
-        // For coherence times, compare directly with threshold (in µs)
+      if (!isPercent) {
+        // For non-percentage metrics (e.g. coherence times), compare directly with threshold
         yieldCount = values.filter((v) => v >= activeThreshold).length;
       } else {
-        // For fidelities, convert threshold to display format
+        // For percentage metrics, convert threshold to display format
         const thresholdPercent = showAsErrorRate
           ? (1 - activeThreshold) * 100 // Error rate threshold
           : activeThreshold * 100; // Fidelity threshold
@@ -342,7 +409,7 @@ export function HistogramView() {
   const plotData = useMemo(() => {
     if (histogramData.length === 0) return [];
 
-    const isCoherence = isCoherenceMetric(selectedParameter);
+    const isPercent = isPercentageMetric(currentMetricConfig?.unit);
     const activeThreshold =
       customThreshold ?? currentMetricConfig?.threshold?.value;
 
@@ -356,9 +423,11 @@ export function HistogramView() {
         color: histogramData.map((item) => {
           if (!activeThreshold) return "#3b82f6"; // Default blue
 
-          if (isCoherence) {
+          if (!isPercent) {
+            // Non-percentage metrics: higher is better
             return item.value >= activeThreshold ? "#10b981" : "#ef4444";
           } else {
+            // Percentage metrics
             const thresholdPercent = showAsErrorRate
               ? (1 - activeThreshold) * 100
               : activeThreshold * 100;
@@ -395,7 +464,7 @@ export function HistogramView() {
 
     // Threshold line (if applicable)
     if (activeThreshold) {
-      const thresholdValue = isCoherence
+      const thresholdValue = !isPercent
         ? activeThreshold
         : showAsErrorRate
           ? (1 - activeThreshold) * 100
@@ -429,7 +498,7 @@ export function HistogramView() {
 
   // Plot layout
   const layout = useMemo(() => {
-    const isCoherence = isCoherenceMetric(selectedParameter);
+    const isPercent = isPercentageMetric(currentMetricConfig?.unit);
     const isCoupling = metricType === "coupling";
 
     return {
@@ -445,8 +514,8 @@ export function HistogramView() {
         automargin: true,
       },
       yaxis: {
-        title: isCoherence
-          ? `${currentMetricConfig?.title || selectedParameter} (${currentMetricConfig?.unit || "µs"})`
+        title: !isPercent
+          ? `${currentMetricConfig?.title || selectedParameter} (${currentMetricConfig?.unit || ""})`
           : showAsErrorRate
             ? "Error Rate (%)"
             : `${currentMetricConfig?.title || selectedParameter} (%)`,
@@ -454,10 +523,8 @@ export function HistogramView() {
         showgrid: true,
         zeroline: false,
         type:
-          !isCoherence && showAsErrorRate
-            ? ("log" as const)
-            : ("linear" as const),
-        tickformat: !isCoherence && showAsErrorRate ? ".1e" : undefined,
+          isPercent && showAsErrorRate ? ("log" as const) : ("linear" as const),
+        tickformat: isPercent && showAsErrorRate ? ".1e" : undefined,
       },
       hovermode: "closest" as const,
       showlegend: true,
@@ -543,10 +610,10 @@ export function HistogramView() {
     }
 
     const rawRange = currentMetricConfig.threshold.range;
-    const isCoherence = isCoherenceMetric(selectedParameter);
+    const isPercent = isPercentageMetric(currentMetricConfig.unit);
 
-    if (isCoherence) {
-      // Coherence times: use raw values directly (µs)
+    if (!isPercent) {
+      // Non-percentage metrics: use raw values directly
       return rawRange;
     }
 
@@ -566,7 +633,7 @@ export function HistogramView() {
       max: rawRange.max * 100,
       step: rawRange.step * 100,
     };
-  }, [currentMetricConfig, selectedParameter, showAsErrorRate]);
+  }, [currentMetricConfig, showAsErrorRate]);
 
   // Get current slider value from threshold
   const sliderValue = useMemo(() => {
@@ -576,9 +643,9 @@ export function HistogramView() {
       return sliderDisplayConfig.min;
     }
 
-    const isCoherence = isCoherenceMetric(selectedParameter);
+    const isPercent = isPercentageMetric(currentMetricConfig?.unit);
 
-    if (isCoherence) {
+    if (!isPercent) {
       return activeThreshold;
     }
 
@@ -590,7 +657,6 @@ export function HistogramView() {
   }, [
     customThreshold,
     currentMetricConfig,
-    selectedParameter,
     showAsErrorRate,
     sliderDisplayConfig,
   ]);
@@ -598,9 +664,9 @@ export function HistogramView() {
   // Convert slider value to threshold and update state
   const handleSliderChange = useCallback(
     (displayValue: number) => {
-      const isCoherence = isCoherenceMetric(selectedParameter);
+      const isPercent = isPercentageMetric(currentMetricConfig?.unit);
 
-      if (isCoherence) {
+      if (!isPercent) {
         setCustomThreshold(displayValue);
       } else if (showAsErrorRate) {
         // Error rate to fidelity: error 1% -> fidelity 0.99
@@ -610,7 +676,7 @@ export function HistogramView() {
         setCustomThreshold(displayValue / 100);
       }
     },
-    [selectedParameter, showAsErrorRate, setCustomThreshold],
+    [currentMetricConfig, showAsErrorRate, setCustomThreshold],
   );
 
   // Format threshold for display
@@ -619,10 +685,10 @@ export function HistogramView() {
       customThreshold ?? currentMetricConfig?.threshold?.value;
     if (activeThreshold === undefined || activeThreshold === null) return "N/A";
 
-    const isCoherence = isCoherenceMetric(selectedParameter);
+    const isPercent = isPercentageMetric(currentMetricConfig?.unit);
 
-    if (isCoherence) {
-      return `${activeThreshold.toFixed(0)} ${currentMetricConfig?.unit || "µs"}`;
+    if (!isPercent) {
+      return `${activeThreshold.toFixed(0)} ${currentMetricConfig?.unit || ""}`;
     }
 
     if (showAsErrorRate) {
@@ -630,12 +696,7 @@ export function HistogramView() {
     }
 
     return `${(activeThreshold * 100).toFixed(2)}%`;
-  }, [
-    customThreshold,
-    currentMetricConfig,
-    selectedParameter,
-    showAsErrorRate,
-  ]);
+  }, [customThreshold, currentMetricConfig, showAsErrorRate]);
 
   // Handle metric type change
   const handleMetricTypeChange = useCallback(
@@ -777,7 +838,7 @@ export function HistogramView() {
 
             {/* Right: Display Toggle + Export */}
             <div className="flex items-center gap-3 lg:ml-auto">
-              {!isCoherenceMetric(selectedParameter) && (
+              {isPercentageMetric(currentMetricConfig?.unit) && (
                 <label className="cursor-pointer flex items-center gap-2 h-9">
                   <span className="text-sm">Fidelity</span>
                   <input
@@ -806,7 +867,7 @@ export function HistogramView() {
               Threshold: {thresholdDisplayText}
             </span>
             <span className="text-xs text-base-content/60">
-              {isCoherenceMetric(selectedParameter)
+              {!isPercentageMetric(currentMetricConfig?.unit)
                 ? `${sliderDisplayConfig.min}`
                 : `${sliderDisplayConfig.min.toFixed(0)}%`}
             </span>
@@ -820,7 +881,7 @@ export function HistogramView() {
               onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
             />
             <span className="text-xs text-base-content/60">
-              {isCoherenceMetric(selectedParameter)
+              {!isPercentageMetric(currentMetricConfig?.unit)
                 ? `${sliderDisplayConfig.max}`
                 : `${sliderDisplayConfig.max.toFixed(0)}%`}
             </span>
@@ -877,30 +938,33 @@ export function HistogramView() {
         title="Parameter Distribution"
       />
 
-      {/* Data Table */}
+      {/* Data Table - All Metrics */}
       <div className="card bg-base-100 shadow-md">
         <div className="card-body">
           <DataTable
-            title="Data Points"
-            data={histogramData}
+            title={`${metricType === "coupling" ? "2Q" : "1Q"} Metrics Data`}
+            data={allMetricsTableData}
             columns={[
               {
-                key: "qid",
-                label: metricType === "coupling" ? "Coupling Pair" : "Qubit ID",
+                key: "entityId",
+                label: metricType === "coupling" ? "Coupling" : "Qubit",
                 sortable: true,
               },
-              {
-                key: "value",
-                label: `${currentMetricConfig?.title || selectedParameter} (${
-                  isCoherenceMetric(selectedParameter)
-                    ? currentMetricConfig?.unit || "µs"
-                    : showAsErrorRate
-                      ? "Error %"
-                      : "%"
-                })`,
-                sortable: true,
-                render: (v: number) => v.toFixed(6),
-              },
+              ...(metricType === "qubit" ? qubitMetrics : couplingMetrics).map(
+                (metric) => ({
+                  key: metric.key,
+                  label: `${metric.title} (${
+                    !isPercentageMetric(metric.unit)
+                      ? metric.unit
+                      : showAsErrorRate
+                        ? "Err%"
+                        : "%"
+                  })`,
+                  sortable: true,
+                  render: (v: number | null) =>
+                    v !== null ? v.toFixed(4) : "-",
+                }),
+              ),
             ]}
             pageSize={20}
           />
