@@ -9,7 +9,13 @@ qubit_metrics:
     scale: 1
     description: Resonance frequency of the qubit
     evaluation:
-      mode: none
+      mode: maximize
+    threshold:
+      value: 5.0
+      range:
+        min: 4.0
+        max: 6.0
+        step: 0.01
 
   anharmonicity:
     title: Qubit Anharmonicity
@@ -17,7 +23,13 @@ qubit_metrics:
     scale: 1000 # Convert GHz to MHz
     description: Anharmonicity of the qubit energy levels
     evaluation:
-      mode: none
+      mode: minimize
+    threshold:
+      value: -300
+      range:
+        min: -500
+        max: -200
+        step: 1
 
   t1:
     title: T1
@@ -26,6 +38,12 @@ qubit_metrics:
     description: Energy relaxation time
     evaluation:
       mode: maximize
+    threshold:
+      value: 100
+      range:
+        min: 25
+        max: 200
+        step: 1
 
   t2_echo:
     title: T2 Echo
@@ -34,6 +52,12 @@ qubit_metrics:
     description: Dephasing time measured with echo sequence
     evaluation:
       mode: maximize
+    threshold:
+      value: 200
+      range:
+        min: 50
+        max: 400
+        step: 1
 
   t2_star:
     title: T2 Star
@@ -42,6 +66,12 @@ qubit_metrics:
     description: Free induction decay time
     evaluation:
       mode: maximize
+    threshold:
+      value: 50
+      range:
+        min: 15
+        max: 100
+        step: 1
 
   average_readout_fidelity:
     title: Average Readout Fidelity
@@ -50,6 +80,12 @@ qubit_metrics:
     description: Average fidelity of readout operations
     evaluation:
       mode: maximize
+    threshold:
+      value: 0.99 # Raw value (99%)
+      range:
+        min: 0.9
+        max: 0.999
+        step: 0.001
 
   x90_gate_fidelity:
     title: X90 Gate Fidelity
@@ -58,6 +94,12 @@ qubit_metrics:
     description: Fidelity of X90 (π/2 rotation) gate
     evaluation:
       mode: maximize
+    threshold:
+      value: 0.999 # Raw value (99.9%)
+      range:
+        min: 0.9
+        max: 0.9999
+        step: 0.0001
 
   x180_gate_fidelity:
     title: X180 Gate Fidelity
@@ -66,6 +108,12 @@ qubit_metrics:
     description: Fidelity of X180 (π rotation) gate
     evaluation:
       mode: maximize
+    threshold:
+      value: 0.999 # Raw value (99.9%)
+      range:
+        min: 0.9
+        max: 0.9999
+        step: 0.0001
 
 coupling_metrics:
   zx90_gate_fidelity:
@@ -75,6 +123,12 @@ coupling_metrics:
     description: Fidelity of two-qubit ZX90 gate
     evaluation:
       mode: maximize
+    threshold:
+      value: 0.99 # Raw value (99%)
+      range:
+        min: 0.9
+        max: 0.999
+        step: 0.001
 
   bell_state_fidelity:
     title: Bell State Fidelity
@@ -83,6 +137,12 @@ coupling_metrics:
     description: Fidelity of Bell state preparation
     evaluation:
       mode: maximize
+    threshold:
+      value: 0.95 # Raw value (95%)
+      range:
+        min: 0.8
+        max: 0.999
+        step: 0.001
 
   static_zz_interaction:
     title: Static ZZ Interaction

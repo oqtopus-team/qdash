@@ -178,7 +178,6 @@ export function QubitTimeSeriesView({
 
         <div className="grid grid-cols-2 gap-12">
           <ParameterSelector
-            label="Parameter"
             parameters={parameters}
             selectedParameter={selectedParameter}
             onParameterSelect={(param) =>

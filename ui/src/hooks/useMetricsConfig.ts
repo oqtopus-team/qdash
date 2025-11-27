@@ -12,12 +12,24 @@ interface EvaluationConfig {
   mode: "maximize" | "minimize" | "none";
 }
 
+interface ThresholdRange {
+  min: number;
+  max: number;
+  step: number;
+}
+
+interface ThresholdConfig {
+  value: number;
+  range: ThresholdRange;
+}
+
 interface MetricMetadata {
   title: string;
   unit: string;
   scale: number;
   description?: string;
   evaluation: EvaluationConfig;
+  threshold?: ThresholdConfig;
 }
 
 interface MetricsConfig {
@@ -28,13 +40,17 @@ interface MetricsConfig {
   };
 }
 
-interface MetricConfig {
+export interface MetricConfig {
   key: string;
   title: string;
   unit: string;
   scale: number;
   description?: string;
   evaluationMode: "maximize" | "minimize" | "none";
+  threshold?: {
+    value: number;
+    range: ThresholdRange;
+  };
 }
 
 /**
@@ -62,6 +78,7 @@ export function useMetricsConfig() {
       return {
         qubitMetrics: [],
         couplingMetrics: [],
+        allMetrics: [],
         colorScale: { colors: [] },
       };
     }
@@ -79,6 +96,12 @@ export function useMetricsConfig() {
       scale: metadata.scale,
       description: metadata.description,
       evaluationMode: metadata.evaluation?.mode || "none",
+      threshold: metadata.threshold
+        ? {
+            value: metadata.threshold.value,
+            range: metadata.threshold.range,
+          }
+        : undefined,
     }));
 
     // Transform coupling metrics to array
@@ -91,11 +114,21 @@ export function useMetricsConfig() {
       scale: metadata.scale,
       description: metadata.description,
       evaluationMode: metadata.evaluation?.mode || "none",
+      threshold: metadata.threshold
+        ? {
+            value: metadata.threshold.value,
+            range: metadata.threshold.range,
+          }
+        : undefined,
     }));
+
+    // Combined metrics for histogram view (all metrics with thresholds)
+    const allMetrics = [...qubitMetrics, ...couplingMetrics];
 
     return {
       qubitMetrics,
       couplingMetrics,
+      allMetrics,
       colorScale: config.color_scale || { colors: [] },
     };
   }, [data]);

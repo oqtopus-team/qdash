@@ -76,11 +76,8 @@ export function DateSelector({
   // Show loading state but keep the current selection visible
   if (isLoading) {
     return (
-      <div className="w-full max-w-xs">
-        <label className="label">
-          <span className="label-text font-medium">Select Date</span>
-        </label>
-        <div className="h-10 bg-base-300 rounded-lg animate-pulse"></div>
+      <div className="w-full animate-pulse">
+        <div className="h-9 bg-base-300 rounded"></div>
       </div>
     );
   }
@@ -88,35 +85,24 @@ export function DateSelector({
   // Show error state but keep "latest" option available
   if (isError) {
     return (
-      <div className="w-full max-w-xs">
-        <label className="label">
-          <span className="label-text font-medium">Select Date</span>
-        </label>
-        <Select<DateOption>
-          options={[{ value: "latest", label: "Latest" }]}
-          value={{ value: "latest", label: "Latest" }}
-          onChange={handleChange}
-          isDisabled={disabled}
-          className="text-base-content"
-        />
-        <div className="text-error text-sm mt-2">Failed to load dates</div>
-      </div>
+      <Select<DateOption>
+        options={[{ value: "latest", label: "Latest" }]}
+        value={{ value: "latest", label: "Latest" }}
+        onChange={handleChange}
+        isDisabled={disabled}
+        className="text-base-content w-full"
+      />
     );
   }
 
   return (
-    <div className="w-full max-w-xs">
-      <label className="label">
-        <span className="label-text font-medium">Select Date</span>
-      </label>
-      <Select<DateOption>
-        options={dateOptions}
-        value={dateOptions.find((option) => option.value === selectedDate)}
-        onChange={handleChange}
-        placeholder="Select a date"
-        className="text-base-content"
-        isDisabled={disabled}
-      />
-    </div>
+    <Select<DateOption>
+      options={dateOptions}
+      value={dateOptions.find((option) => option.value === selectedDate)}
+      onChange={handleChange}
+      placeholder="Select a date"
+      className="text-base-content w-full"
+      isDisabled={disabled}
+    />
   );
 }

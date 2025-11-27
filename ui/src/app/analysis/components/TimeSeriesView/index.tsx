@@ -342,7 +342,6 @@ export function TimeSeriesView() {
             onChipSelect={setSelectedChip}
           />
           <ParameterSelector
-            label="Parameter"
             parameters={parameters.map((p) => p.name)}
             selectedParameter={selectedParameter}
             onParameterSelect={setSelectedParameter}
