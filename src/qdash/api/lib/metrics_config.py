@@ -20,6 +20,21 @@ class EvaluationConfig(BaseModel):
     mode: Literal["maximize", "minimize", "none"]
 
 
+class ThresholdRange(BaseModel):
+    """Range configuration for threshold slider."""
+
+    min: float
+    max: float
+    step: float
+
+
+class ThresholdConfig(BaseModel):
+    """Threshold configuration for a metric."""
+
+    value: float
+    range: ThresholdRange
+
+
 class MetricMetadata(BaseModel):
     """Metadata for a single metric."""
 
@@ -28,6 +43,7 @@ class MetricMetadata(BaseModel):
     scale: float
     description: str | None = None
     evaluation: EvaluationConfig
+    threshold: ThresholdConfig | None = None
 
 
 class MetricsConfig(BaseModel):

@@ -212,18 +212,14 @@ export function CorrelationView() {
             onChipSelect={setSelectedChip}
           />
           <ParameterSelector
-            label="X-Axis Parameter"
             parameters={availableParameters}
             selectedParameter={xAxis}
             onParameterSelect={(param) => setXAxis(param as ParameterKey)}
-            description={correlationData?.[0]?.xDescription}
           />
           <ParameterSelector
-            label="Y-Axis Parameter"
             parameters={availableParameters}
             selectedParameter={yAxis}
             onParameterSelect={(param) => setYAxis(param as ParameterKey)}
-            description={correlationData?.[0]?.yDescription}
           />
         </div>
       </div>

@@ -79,14 +79,19 @@ interface UseCDFUrlStateResult {
   isInitialized: boolean;
 }
 
+type TimeRange = "1d" | "7d" | "30d";
+type SelectionMode = "latest" | "best";
+
 interface UseHistogramUrlStateResult {
   selectedChip: string;
-  selectedDate: string;
+  timeRange: TimeRange;
+  selectionMode: SelectionMode;
   selectedParameter: string;
   showAsErrorRate: boolean;
   customThreshold: number | null;
   setSelectedChip: (chip: string) => void;
-  setSelectedDate: (date: string) => void;
+  setTimeRange: (range: TimeRange) => void;
+  setSelectionMode: (mode: SelectionMode) => void;
   setSelectedParameter: (parameter: string) => void;
   setShowAsErrorRate: (show: boolean) => void;
   setCustomThreshold: (threshold: number | null) => void;
@@ -476,8 +481,10 @@ export function useHistogramUrlState(): UseHistogramUrlStateResult {
     parseAsString,
   );
 
-  const [selectedDate, setSelectedDateState] = useQueryState(
-    "date",
+  const [timeRange, setTimeRangeState] = useQueryState("range", parseAsString);
+
+  const [selectionMode, setSelectionModeState] = useQueryState(
+    "mode",
     parseAsString,
   );
 
@@ -508,11 +515,18 @@ export function useHistogramUrlState(): UseHistogramUrlStateResult {
     [setSelectedChipState],
   );
 
-  const setSelectedDate = useCallback(
-    (date: string) => {
-      setSelectedDateState(date === URL_DEFAULTS.DATE ? null : date);
+  const setTimeRange = useCallback(
+    (range: TimeRange) => {
+      setTimeRangeState(range === "7d" ? null : range); // 7d as default
     },
-    [setSelectedDateState],
+    [setTimeRangeState],
+  );
+
+  const setSelectionMode = useCallback(
+    (mode: SelectionMode) => {
+      setSelectionModeState(mode === "latest" ? null : mode); // latest as default
+    },
+    [setSelectionModeState],
   );
 
   const setSelectedParameter = useCallback(
@@ -542,12 +556,14 @@ export function useHistogramUrlState(): UseHistogramUrlStateResult {
 
   return {
     selectedChip: selectedChip ?? "",
-    selectedDate: selectedDate ?? URL_DEFAULTS.DATE,
+    timeRange: (timeRange as TimeRange) ?? "7d",
+    selectionMode: (selectionMode as SelectionMode) ?? "latest",
     selectedParameter: selectedParameter ?? "t1",
     showAsErrorRate: showAsErrorRate ?? URL_DEFAULTS.SHOW_ERROR_RATE,
     customThreshold: customThreshold ?? null,
     setSelectedChip,
-    setSelectedDate,
+    setTimeRange,
+    setSelectionMode,
     setSelectedParameter,
     setShowAsErrorRate,
     setCustomThreshold,

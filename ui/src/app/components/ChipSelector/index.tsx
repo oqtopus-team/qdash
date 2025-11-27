@@ -50,18 +50,14 @@ export function ChipSelector({
 
   if (isLoading) {
     return (
-      <div className="w-full max-w-xs animate-pulse">
-        <div className="h-10 bg-base-300 rounded-lg"></div>
+      <div className="w-full animate-pulse">
+        <div className="h-9 bg-base-300 rounded"></div>
       </div>
     );
   }
 
   if (isError) {
-    return (
-      <div className="alert alert-error max-w-xs">
-        <span>Failed to load chips</span>
-      </div>
-    );
+    return <div className="text-error text-sm">Failed to load chips</div>;
   }
 
   const handleChange = (option: SingleValue<ChipOption>) => {
@@ -71,17 +67,12 @@ export function ChipSelector({
   };
 
   return (
-    <div className="w-full max-w-xs">
-      <label className="label">
-        <span className="label-text font-medium">Select Chip</span>
-      </label>
-      <Select<ChipOption>
-        options={sortedOptions}
-        value={sortedOptions.find((option) => option.value === selectedChip)}
-        onChange={handleChange}
-        placeholder="Select a chip"
-        className="text-base-content"
-      />
-    </div>
+    <Select<ChipOption>
+      options={sortedOptions}
+      value={sortedOptions.find((option) => option.value === selectedChip)}
+      onChange={handleChange}
+      placeholder="Select a chip"
+      className="text-base-content w-full"
+    />
   );
 }

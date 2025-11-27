@@ -2,139 +2,163 @@
 
 import { useMemo, useEffect, useCallback } from "react";
 
-import Select from "react-select";
+import Select, { type SingleValue, type StylesConfig } from "react-select";
 
 import { ChipSelector } from "@/app/components/ChipSelector";
-import { DateSelector } from "@/app/components/DateSelector";
-import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useHistogramUrlState } from "@/app/hooks/useUrlState";
-import {
-  useListChips,
-  useFetchLatestQubitTaskGroupedByChip,
-  useFetchHistoricalQubitTaskGroupedByChip,
-  useFetchLatestCouplingTaskGroupedByChip,
-  useFetchHistoricalCouplingTaskGroupedByChip,
-} from "@/client/chip/chip";
+import { useListChips } from "@/client/chip/chip";
+import { useMetricsGetChipMetrics } from "@/client/metrics/metrics";
+import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { DataTable } from "@/shared/components/DataTable";
 import { ErrorCard } from "@/shared/components/ErrorCard";
 import { PlotCard } from "@/shared/components/PlotCard";
-import {
-  TASK_CONFIG,
-  PARAMETER_CONFIG,
-  OUTPUT_PARAM_NAMES,
-  PARAMETER_GROUPS,
-  getParameterRange,
-  convertThresholdForDisplay,
-  convertDisplayToThreshold,
-  formatThresholdValue,
-} from "@/shared/config/analysis";
 import { useCSVExport } from "@/shared/hooks/useCSVExport";
 import { naturalSortQIDs } from "@/shared/utils/qid";
 
 interface HistogramDataPoint {
   qid: string;
   value: number;
-  error?: number;
 }
 
-// Helper functions for threshold slider configuration
-function getSliderMin(parameter: string, showAsErrorRate: boolean): number {
-  const range = getParameterRange(parameter, showAsErrorRate);
-  return range.min;
-}
+type MetricOption = {
+  value: string;
+  label: string;
+};
 
-function getSliderMax(parameter: string, showAsErrorRate: boolean): number {
-  const range = getParameterRange(parameter, showAsErrorRate);
-  return range.max;
-}
+type MetricType = "qubit" | "coupling";
 
-function getSliderStep(parameter: string, showAsErrorRate: boolean): number {
-  const range = getParameterRange(parameter, showAsErrorRate);
-  return range.step;
-}
-
-function getSliderValue(
-  parameter: string,
-  activeThreshold: number | undefined,
-  showAsErrorRate: boolean,
-): number {
-  if (!activeThreshold) return 0;
-  return convertThresholdForDisplay(
-    parameter,
-    activeThreshold,
-    showAsErrorRate,
-  );
-}
-
-function handleSliderChange(
-  parameter: string,
-  value: string,
-  showAsErrorRate: boolean,
-  setCustomThreshold: (threshold: number | null) => void,
-): void {
-  const numericValue = parseFloat(value);
-  const thresholdValue = convertDisplayToThreshold(
-    parameter,
-    numericValue,
-    showAsErrorRate,
-  );
-  setCustomThreshold(thresholdValue);
-}
-
-function formatSliderDisplay(
-  parameter: string,
-  activeThreshold: number | undefined,
-  showAsErrorRate: boolean,
-): string {
-  if (!activeThreshold) return "0";
-  return formatThresholdValue(parameter, activeThreshold, showAsErrorRate);
+// Helper function to determine if a metric is a coherence time parameter
+function isCoherenceMetric(metricKey: string): boolean {
+  return ["t1", "t2_echo", "t2_star"].includes(metricKey);
 }
 
 export function HistogramView() {
   // URL state management
   const {
     selectedChip,
-    selectedDate,
+    timeRange,
+    selectionMode,
     selectedParameter,
     showAsErrorRate,
     customThreshold,
     setSelectedChip,
-    setSelectedDate,
+    setTimeRange,
+    setSelectionMode,
     setSelectedParameter,
     setShowAsErrorRate,
     setCustomThreshold,
     isInitialized,
   } = useHistogramUrlState();
 
-  // Parameter options generated from shared configuration
-  const parameterOptions = [
-    {
-      label: "Coherence Times",
-      options: PARAMETER_GROUPS.coherence.map((key) => ({
-        value: key as string,
-        label: PARAMETER_CONFIG[key].label,
-      })),
-    },
-    {
-      label: "Gate Fidelities",
-      options: PARAMETER_GROUPS.fidelity.map((key) => ({
-        value: key as string,
-        label: PARAMETER_CONFIG[key].label,
-      })),
-    },
-  ];
+  // Load metrics configuration from backend
+  const {
+    qubitMetrics,
+    couplingMetrics,
+    isLoading: isConfigLoading,
+    isError: isConfigError,
+  } = useMetricsConfig();
+
+  // Determine metric type based on selected parameter
+  const metricType: MetricType = useMemo(() => {
+    if (couplingMetrics.some((m) => m.key === selectedParameter)) {
+      return "coupling";
+    }
+    return "qubit";
+  }, [couplingMetrics, selectedParameter]);
+
+  // Generate metric options for qubit metrics
+  const qubitMetricOptions: MetricOption[] = useMemo(
+    () =>
+      qubitMetrics
+        .filter((m) => m.threshold)
+        .map((metric) => ({
+          value: metric.key,
+          label: metric.title,
+        })),
+    [qubitMetrics],
+  );
+
+  // Generate metric options for coupling metrics
+  const couplingMetricOptions: MetricOption[] = useMemo(
+    () =>
+      couplingMetrics
+        .filter((m) => m.threshold)
+        .map((metric) => ({
+          value: metric.key,
+          label: metric.title,
+        })),
+    [couplingMetrics],
+  );
+
+  // Select appropriate metrics options based on type
+  const metricOptions =
+    metricType === "qubit" ? qubitMetricOptions : couplingMetricOptions;
+
+  // Get current metric configuration (search both qubit and coupling)
+  const currentMetricConfig = useMemo(() => {
+    return (
+      qubitMetrics.find((m) => m.key === selectedParameter) ||
+      couplingMetrics.find((m) => m.key === selectedParameter)
+    );
+  }, [qubitMetrics, couplingMetrics, selectedParameter]);
+
+  // Check if best mode is supported for current metric
+  const isBestModeSupported = useMemo(
+    () => currentMetricConfig?.evaluationMode !== "none",
+    [currentMetricConfig],
+  );
+
+  // Select styles (same as metrics page)
+  const metricSelectStyles = useMemo<StylesConfig<MetricOption, false>>(
+    () => ({
+      control: (provided) => ({
+        ...provided,
+        minHeight: 38,
+        height: 38,
+      }),
+      valueContainer: (provided) => ({
+        ...provided,
+        padding: "2px 8px",
+      }),
+      indicatorsContainer: (provided) => ({
+        ...provided,
+        height: 38,
+      }),
+      menu: (provided) => ({
+        ...provided,
+        zIndex: 50,
+      }),
+    }),
+    [],
+  );
+
+  // Auto-switch to latest mode when metric doesn't support best mode
+  useEffect(() => {
+    if (!isBestModeSupported && selectionMode === "best") {
+      setSelectionMode("latest");
+    }
+  }, [isBestModeSupported, selectionMode, setSelectionMode]);
+
+  // Set default parameter when metrics load
+  useEffect(() => {
+    if (qubitMetrics.length === 0) return;
+
+    // Check if current parameter is valid
+    const allMetricsWithThreshold = [
+      ...qubitMetrics.filter((m) => m.threshold),
+      ...couplingMetrics.filter((m) => m.threshold),
+    ];
+    const isCurrentValid = allMetricsWithThreshold.some(
+      (m) => m.key === selectedParameter,
+    );
+
+    if (!isCurrentValid && allMetricsWithThreshold.length > 0) {
+      setSelectedParameter(allMetricsWithThreshold[0].key);
+    }
+  }, [qubitMetrics, couplingMetrics, selectedParameter, setSelectedParameter]);
 
   // Fetch chips data
   const { data: chipsResponse } = useListChips();
-
-  // Date navigation
-  const {
-    navigateToPreviousDay,
-    navigateToNextDay,
-    canNavigatePrevious,
-    canNavigateNext,
-    formatDate,
-  } = useDateNavigation(selectedChip, selectedDate, setSelectedDate);
 
   // Set default chip on mount
   useEffect(() => {
@@ -151,270 +175,143 @@ export function HistogramView() {
     }
   }, [selectedChip, chipsResponse, setSelectedChip]);
 
-  const taskConfig = TASK_CONFIG[selectedParameter];
-  const taskName = taskConfig?.name;
-  const taskType = taskConfig?.type;
-
-  // Fetch data based on task type
-  const {
-    data: latestQubitResponse,
-    isLoading: latestQubitLoading,
-    error: latestQubitError,
-  } = useFetchLatestQubitTaskGroupedByChip(selectedChip, taskName || "", {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-          taskName &&
-          taskType === "qubit" &&
-          selectedDate === "latest",
-      ),
-      refetchInterval: selectedDate === "latest" ? 30000 : undefined,
-      staleTime: 25000,
-    },
-  });
-
-  const {
-    data: historicalQubitResponse,
-    isLoading: historicalQubitLoading,
-    error: historicalQubitError,
-  } = useFetchHistoricalQubitTaskGroupedByChip(
-    selectedChip,
-    taskName || "",
-    selectedDate,
-    {
-      query: {
-        enabled: Boolean(
-          selectedChip &&
-            taskName &&
-            taskType === "qubit" &&
-            selectedDate !== "latest",
-        ),
-        staleTime: 60000,
-      },
-    },
-  );
-
-  const {
-    data: latestCouplingResponse,
-    isLoading: latestCouplingLoading,
-    error: latestCouplingError,
-  } = useFetchLatestCouplingTaskGroupedByChip(selectedChip, taskName || "", {
-    query: {
-      enabled: Boolean(
-        selectedChip &&
-          taskName &&
-          taskType === "coupling" &&
-          selectedDate === "latest",
-      ),
-      refetchInterval: selectedDate === "latest" ? 30000 : undefined,
-      staleTime: 25000,
-    },
-  });
-
-  const {
-    data: historicalCouplingResponse,
-    isLoading: historicalCouplingLoading,
-    error: historicalCouplingError,
-  } = useFetchHistoricalCouplingTaskGroupedByChip(
-    selectedChip,
-    taskName || "",
-    selectedDate,
-    {
-      query: {
-        enabled: Boolean(
-          selectedChip &&
-            taskName &&
-            taskType === "coupling" &&
-            selectedDate !== "latest",
-        ),
-        staleTime: 60000,
-      },
-    },
-  );
-
-  // Combine loading and error states
-  const isLoading =
-    latestQubitLoading ||
-    historicalQubitLoading ||
-    latestCouplingLoading ||
-    historicalCouplingLoading;
-
-  const error =
-    latestQubitError ||
-    historicalQubitError ||
-    latestCouplingError ||
-    historicalCouplingError;
-
-  // Get response data based on task type and date
-  const response = useMemo(() => {
-    if (taskType === "qubit") {
-      return selectedDate === "latest"
-        ? latestQubitResponse
-        : historicalQubitResponse;
-    } else if (taskType === "coupling") {
-      return selectedDate === "latest"
-        ? latestCouplingResponse
-        : historicalCouplingResponse;
+  // Convert time range to hours
+  const withinHours = useMemo(() => {
+    switch (timeRange) {
+      case "1d":
+        return 24;
+      case "7d":
+        return 24 * 7;
+      case "30d":
+        return 24 * 30;
+      default:
+        return 24 * 7;
     }
-    return null;
-  }, [
-    taskType,
-    selectedDate,
-    latestQubitResponse,
-    historicalQubitResponse,
-    latestCouplingResponse,
-    historicalCouplingResponse,
-  ]);
+  }, [timeRange]);
 
-  // Extract and transform raw data
+  // Fetch metrics data using the same API as metrics page
+  const {
+    data: metricsData,
+    isLoading,
+    isError,
+    error,
+  } = useMetricsGetChipMetrics(
+    selectedChip,
+    {
+      within_hours: withinHours,
+      selection_mode: selectionMode,
+    },
+    {
+      query: {
+        enabled: !!selectedChip,
+        staleTime: 30000,
+      },
+    },
+  );
+
+  // Extract and transform raw data from metrics API
   const histogramData = useMemo(() => {
-    if (!response?.data?.result) {
+    if (!metricsData?.data || !currentMetricConfig) {
       return [];
     }
 
-    const outputParamName = OUTPUT_PARAM_NAMES[selectedParameter];
+    const isCoupling = metricType === "coupling";
+    const metricsSource = isCoupling
+      ? metricsData.data.coupling_metrics
+      : metricsData.data.qubit_metrics;
+
+    if (!metricsSource) return [];
+
+    const rawData =
+      metricsSource[selectedParameter as keyof typeof metricsSource];
+    if (!rawData) return [];
+
     const allValues: HistogramDataPoint[] = [];
 
-    Object.entries(response.data.result).forEach(([qid, taskResultItem]) => {
-      const taskResult = taskResultItem as any;
-      if (taskResult?.output_parameters) {
-        const paramValue = taskResult.output_parameters[outputParamName];
+    Object.entries(rawData).forEach(
+      ([entityId, metricValue]: [string, any]) => {
+        const value = metricValue?.value;
+        if (
+          value === null ||
+          value === undefined ||
+          typeof value !== "number"
+        ) {
+          return;
+        }
 
-        if (paramValue !== null && paramValue !== undefined) {
-          let value: number;
+        // Apply scale from config
+        let scaledValue = value * currentMetricConfig.scale;
 
-          // Handle different data structures
-          if (typeof paramValue === "number") {
-            value = paramValue;
-          } else if (typeof paramValue === "string") {
-            value = Number(paramValue);
-          } else if (typeof paramValue === "object" && paramValue !== null) {
-            if ("value" in paramValue && typeof paramValue.value === "number") {
-              value = paramValue.value;
-            } else if (
-              "mean" in paramValue &&
-              typeof paramValue.mean === "number"
-            ) {
-              value = paramValue.mean;
-            } else if (
-              "result" in paramValue &&
-              typeof paramValue.result === "number"
-            ) {
-              value = paramValue.result;
-            } else {
-              return;
-            }
-          } else {
-            return;
-          }
-
-          // Extract error if available
-          let errorValue: number | undefined = undefined;
-          const errorParamName = `${outputParamName}_err`;
-          if (
-            taskResult.output_parameters[errorParamName] !== null &&
-            taskResult.output_parameters[errorParamName] !== undefined
-          ) {
-            errorValue = Number(taskResult.output_parameters[errorParamName]);
-          }
-
-          // Apply conversion for display
-          const isCoherence = ["t1", "t2_echo", "t2_star"].includes(
-            selectedParameter,
-          );
-          const isFidelity = !isCoherence;
-
-          if (isFidelity) {
-            if (showAsErrorRate) {
-              value = (1 - value) * 100; // Convert to error rate percentage
-            } else {
-              value = value * 100; // Convert to fidelity percentage
-            }
-          }
-
-          if (!isNaN(value) && value >= 0) {
-            allValues.push({ qid, value, error: errorValue });
+        // For fidelity metrics, convert to percentage or error rate
+        if (!isCoherenceMetric(selectedParameter)) {
+          if (showAsErrorRate) {
+            // Convert scaled percentage to error rate
+            scaledValue = 100 - scaledValue;
           }
         }
-      }
-    });
 
-    // Sort by QID for consistent ordering using robust natural sort
+        // Format entity ID
+        const formattedId = isCoupling
+          ? entityId
+          : entityId.startsWith("Q")
+            ? entityId
+            : `Q${entityId.padStart(2, "0")}`;
+
+        allValues.push({ qid: formattedId, value: scaledValue });
+      },
+    );
+
+    // Sort by QID for consistent ordering
     allValues.sort((a, b) => naturalSortQIDs(a.qid, b.qid));
     return allValues;
-  }, [response, selectedParameter, showAsErrorRate]);
+  }, [
+    metricsData,
+    currentMetricConfig,
+    selectedParameter,
+    metricType,
+    showAsErrorRate,
+  ]);
 
   // Calculate basic statistics
-  const basicStatistics = useMemo(() => {
+  const statistics = useMemo(() => {
     if (histogramData.length === 0) {
       return {
         mean: 0,
         median: 0,
-        stdDev: 0,
         min: 0,
         max: 0,
         count: 0,
+        yieldPercent: 0,
       };
     }
 
     const values = histogramData.map((item) => item.value);
-    const mean =
-      values.length > 0
-        ? values.reduce((sum, val) => sum + val, 0) / values.length
-        : 0;
+    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
 
     const sortedValues = [...values].sort((a, b) => a - b);
     const median =
-      sortedValues.length > 0
-        ? sortedValues.length % 2 === 1
-          ? sortedValues[Math.floor(sortedValues.length / 2)]
-          : (sortedValues[Math.floor(sortedValues.length / 2) - 1] +
-              sortedValues[Math.floor(sortedValues.length / 2)]) /
-            2
-        : 0;
+      sortedValues.length % 2 === 1
+        ? sortedValues[Math.floor(sortedValues.length / 2)]
+        : (sortedValues[Math.floor(sortedValues.length / 2) - 1] +
+            sortedValues[Math.floor(sortedValues.length / 2)]) /
+          2;
 
-    const stdDev =
-      values.length > 0
-        ? Math.sqrt(
-            values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
-              values.length,
-          )
-        : 0;
-
-    return {
-      mean,
-      median,
-      stdDev,
-      min: sortedValues[0] || 0,
-      max: sortedValues[sortedValues.length - 1] || 0,
-      count: values.length,
-    };
-  }, [histogramData]);
-
-  // Calculate yield percentage
-  const yieldStatistics = useMemo(() => {
-    if (histogramData.length === 0) {
-      return { yieldPercent: 0 };
-    }
-
-    const defaultThreshold = PARAMETER_CONFIG[selectedParameter]?.threshold;
-    const activeThreshold = customThreshold ?? defaultThreshold;
+    // Calculate yield percentage
     let yieldCount = 0;
+    const activeThreshold =
+      customThreshold ?? currentMetricConfig?.threshold?.value;
 
-    if (activeThreshold) {
-      const values = histogramData.map((item) => item.value);
-      const isCoherence = ["t1", "t2_echo", "t2_star"].includes(
-        selectedParameter,
-      );
+    if (activeThreshold !== undefined && activeThreshold !== null) {
+      const isCoherence = isCoherenceMetric(selectedParameter);
 
       if (isCoherence) {
-        // For coherence times, compare directly with threshold
+        // For coherence times, compare directly with threshold (in µs)
         yieldCount = values.filter((v) => v >= activeThreshold).length;
       } else {
-        // For fidelities, convert threshold to percentage if needed
+        // For fidelities, convert threshold to display format
         const thresholdPercent = showAsErrorRate
-          ? (1 - activeThreshold) * 100 // Convert fidelity threshold to error rate
-          : activeThreshold * 100; // Convert to percentage
+          ? (1 - activeThreshold) * 100 // Error rate threshold
+          : activeThreshold * 100; // Fidelity threshold
 
         yieldCount = values.filter((v) =>
           showAsErrorRate ? v <= thresholdPercent : v >= thresholdPercent,
@@ -425,53 +322,42 @@ export function HistogramView() {
     const yieldPercent =
       histogramData.length > 0 ? (yieldCount / histogramData.length) * 100 : 0;
 
-    return { yieldPercent };
-  }, [histogramData, selectedParameter, showAsErrorRate, customThreshold]);
-
-  // Combine all data for components that need the complete structure
-  const processedData = useMemo(() => {
     return {
-      histogramData,
-      tableData: histogramData,
-      statistics: {
-        ...basicStatistics,
-        ...yieldStatistics,
-      },
+      mean,
+      median,
+      min: sortedValues[0] || 0,
+      max: sortedValues[sortedValues.length - 1] || 0,
+      count: values.length,
+      yieldPercent,
     };
-  }, [histogramData, basicStatistics, yieldStatistics]);
+  }, [
+    histogramData,
+    selectedParameter,
+    showAsErrorRate,
+    customThreshold,
+    currentMetricConfig,
+  ]);
 
   // Create Plotly traces
   const plotData = useMemo(() => {
-    if (processedData.histogramData.length === 0) return [];
+    if (histogramData.length === 0) return [];
 
-    const isCoherence = ["t1", "t2_echo", "t2_star"].includes(
-      selectedParameter,
-    );
+    const isCoherence = isCoherenceMetric(selectedParameter);
+    const activeThreshold =
+      customThreshold ?? currentMetricConfig?.threshold?.value;
 
     // Bar chart with QID on x-axis
     const barTrace = {
-      x: processedData.histogramData.map((item) => item.qid),
-      y: processedData.histogramData.map((item) => item.value),
-      error_y: processedData.histogramData.some(
-        (item) => item.error !== undefined,
-      )
-        ? {
-            type: "data" as const,
-            array: processedData.histogramData.map((item) => item.error || 0),
-            visible: true,
-          }
-        : undefined,
+      x: histogramData.map((item) => item.qid),
+      y: histogramData.map((item) => item.value),
       type: "bar" as const,
-      name: PARAMETER_CONFIG[selectedParameter].label,
+      name: currentMetricConfig?.title || selectedParameter,
       marker: {
-        color: processedData.histogramData.map((item) => {
-          const defaultThreshold =
-            PARAMETER_CONFIG[selectedParameter]?.threshold;
-          const activeThreshold = customThreshold ?? defaultThreshold;
+        color: histogramData.map((item) => {
           if (!activeThreshold) return "#3b82f6"; // Default blue
 
           if (isCoherence) {
-            return item.value >= activeThreshold ? "#10b981" : "#ef4444"; // Green if above, red if below
+            return item.value >= activeThreshold ? "#10b981" : "#ef4444";
           } else {
             const thresholdPercent = showAsErrorRate
               ? (1 - activeThreshold) * 100
@@ -487,15 +373,13 @@ export function HistogramView() {
         }),
       },
       hovertemplate:
-        "Qubit: %{x}<br>" + "Value: %{y:.4f}<br>" + "<extra></extra>",
+        "Entity: %{x}<br>" + "Value: %{y:.4f}<br>" + "<extra></extra>",
     };
 
     // Mean line
     const meanLine = {
-      x: processedData.histogramData.map((item) => item.qid),
-      y: Array(processedData.histogramData.length).fill(
-        processedData.statistics.mean,
-      ),
+      x: histogramData.map((item) => item.qid),
+      y: Array(histogramData.length).fill(statistics.mean),
       type: "scatter" as const,
       mode: "lines" as const,
       line: {
@@ -503,15 +387,13 @@ export function HistogramView() {
         width: 2,
         dash: "dash" as const,
       },
-      name: `Mean: ${processedData.statistics.mean.toFixed(4)}`,
+      name: `Mean: ${statistics.mean.toFixed(4)}`,
       hovertemplate: "Mean: %{y:.4f}<br><extra></extra>",
     };
 
-    // Threshold line (if applicable)
     const traces: any[] = [barTrace, meanLine];
-    const defaultThreshold = PARAMETER_CONFIG[selectedParameter]?.threshold;
-    const activeThreshold = customThreshold ?? defaultThreshold;
 
+    // Threshold line (if applicable)
     if (activeThreshold) {
       const thresholdValue = isCoherence
         ? activeThreshold
@@ -520,8 +402,8 @@ export function HistogramView() {
           : activeThreshold * 100;
 
       const thresholdLine = {
-        x: processedData.histogramData.map((item) => item.qid),
-        y: Array(processedData.histogramData.length).fill(thresholdValue),
+        x: histogramData.map((item) => item.qid),
+        y: Array(histogramData.length).fill(thresholdValue),
         type: "scatter" as const,
         mode: "lines" as const,
         line: {
@@ -536,22 +418,27 @@ export function HistogramView() {
     }
 
     return traces;
-  }, [processedData, selectedParameter, showAsErrorRate, customThreshold]);
+  }, [
+    histogramData,
+    selectedParameter,
+    showAsErrorRate,
+    customThreshold,
+    currentMetricConfig,
+    statistics,
+  ]);
 
   // Plot layout
   const layout = useMemo(() => {
-    const isCoherence = ["t1", "t2_echo", "t2_star"].includes(
-      selectedParameter,
-    );
-    const isFidelity = !isCoherence;
+    const isCoherence = isCoherenceMetric(selectedParameter);
+    const isCoupling = metricType === "coupling";
 
     return {
       title: {
-        text: `${PARAMETER_CONFIG[selectedParameter].label} Distribution by Qubit`,
+        text: `${currentMetricConfig?.title || selectedParameter} Distribution`,
         font: { size: 18 },
       },
       xaxis: {
-        title: taskType === "coupling" ? "Coupling Pair" : "Qubit ID",
+        title: isCoupling ? "Coupling Pair" : "Qubit ID",
         gridcolor: "#e5e7eb",
         showgrid: false,
         tickangle: -45,
@@ -559,20 +446,18 @@ export function HistogramView() {
       },
       yaxis: {
         title: isCoherence
-          ? `${PARAMETER_CONFIG[selectedParameter].label} (${PARAMETER_CONFIG[selectedParameter].displayUnit})`
-          : isFidelity
-            ? showAsErrorRate
-              ? "Gate Error Rate (%)"
-              : "Gate Fidelity (%)"
-            : "Value",
+          ? `${currentMetricConfig?.title || selectedParameter} (${currentMetricConfig?.unit || "µs"})`
+          : showAsErrorRate
+            ? "Error Rate (%)"
+            : `${currentMetricConfig?.title || selectedParameter} (%)`,
         gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
         type:
-          isFidelity && showAsErrorRate
+          !isCoherence && showAsErrorRate
             ? ("log" as const)
             : ("linear" as const),
-        tickformat: isFidelity && showAsErrorRate ? ".1e" : undefined,
+        tickformat: !isCoherence && showAsErrorRate ? ".1e" : undefined,
       },
       hovermode: "closest" as const,
       showlegend: true,
@@ -590,13 +475,7 @@ export function HistogramView() {
       bargap: 0.1,
       annotations: [
         {
-          text: `Data snapshot: ${
-            selectedDate === "latest"
-              ? "Latest calibration"
-              : `Date: ${formatDate(selectedDate)}`
-          }<br>Sample size: ${processedData.histogramData.length} ${
-            taskType === "coupling" ? "coupling pairs" : "qubits"
-          }`,
+          text: `Time range: ${timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | Mode: ${selectionMode === "latest" ? "Latest" : "Best"}<br>Sample size: ${histogramData.length} ${isCoupling ? "coupling pairs" : "qubits"}`,
           showarrow: false,
           xref: "paper" as const,
           yref: "paper" as const,
@@ -610,10 +489,11 @@ export function HistogramView() {
     };
   }, [
     selectedParameter,
-    taskType,
-    selectedDate,
-    formatDate,
-    processedData,
+    currentMetricConfig,
+    couplingMetrics,
+    timeRange,
+    selectionMode,
+    histogramData,
     showAsErrorRate,
   ]);
 
@@ -621,71 +501,175 @@ export function HistogramView() {
   const { exportToCSV } = useCSVExport();
 
   const handleExportCSV = () => {
-    if (processedData.tableData.length === 0) return;
+    if (histogramData.length === 0) return;
 
+    const isCoupling = metricType === "coupling";
     const headers = [
       "Entity_ID",
       "Value",
-      "Error",
       "Parameter",
-      "Task",
       "Entity_Type",
+      "Time_Range",
+      "Selection_Mode",
       "Timestamp",
     ];
     const timestamp = new Date().toISOString();
-    const rows = processedData.tableData.map((row: HistogramDataPoint) => [
+    const rows = histogramData.map((row: HistogramDataPoint) => [
       row.qid,
       String(row.value.toFixed(6)),
-      row.error !== undefined ? String(row.error.toFixed(6)) : "N/A",
       selectedParameter,
-      taskName,
-      taskType === "coupling" ? "coupling_pair" : "qubit",
+      isCoupling ? "coupling_pair" : "qubit",
+      timeRange,
+      selectionMode,
       timestamp,
     ]);
 
-    const dateStr = selectedDate === "latest" ? "latest" : selectedDate;
-    const filename = `histogram_${selectedParameter}_${selectedChip}_${dateStr}_${timestamp
+    const filename = `histogram_${selectedParameter}_${selectedChip}_${timeRange}_${selectionMode}_${timestamp
       .slice(0, 19)
       .replace(/[:-]/g, "")}.csv`;
 
     exportToCSV({ filename, headers, data: rows });
   };
 
-  // Improved error handling with targeted retry
+  // Error handling with retry
   const handleRetry = useCallback(() => {
-    // Clear error state and refetch data based on current parameters
-    if (taskType === "qubit") {
-      if (selectedDate === "latest") {
-        // Trigger refetch for latest qubit data
-        console.log("Retrying latest qubit data fetch");
-      } else {
-        // Trigger refetch for historical qubit data
-        console.log("Retrying historical qubit data fetch");
-      }
-    } else if (taskType === "coupling") {
-      if (selectedDate === "latest") {
-        // Trigger refetch for latest coupling data
-        console.log("Retrying latest coupling data fetch");
-      } else {
-        // Trigger refetch for historical coupling data
-        console.log("Retrying historical coupling data fetch");
-      }
-    }
-    // Note: TanStack Query automatically handles retries, this is for user-initiated retry
-    window.location.reload(); // Fallback for now, can be improved with query invalidation
-  }, [taskType, selectedDate]);
+    window.location.reload();
+  }, []);
 
-  if (error) {
+  // Get slider configuration from metrics config, converted to display units
+  const sliderDisplayConfig = useMemo(() => {
+    if (!currentMetricConfig?.threshold) {
+      return { min: 0, max: 100, step: 1 };
+    }
+
+    const rawRange = currentMetricConfig.threshold.range;
+    const isCoherence = isCoherenceMetric(selectedParameter);
+
+    if (isCoherence) {
+      // Coherence times: use raw values directly (µs)
+      return rawRange;
+    }
+
+    if (showAsErrorRate) {
+      // Error rate: convert fidelity range to error rate
+      // fidelity 0.9 -> error rate 10%, fidelity 0.999 -> error rate 0.1%
+      return {
+        min: (1 - rawRange.max) * 100,
+        max: (1 - rawRange.min) * 100,
+        step: rawRange.step * 100,
+      };
+    }
+
+    // Fidelity percentage
+    return {
+      min: rawRange.min * 100,
+      max: rawRange.max * 100,
+      step: rawRange.step * 100,
+    };
+  }, [currentMetricConfig, selectedParameter, showAsErrorRate]);
+
+  // Get current slider value from threshold
+  const sliderValue = useMemo(() => {
+    const activeThreshold =
+      customThreshold ?? currentMetricConfig?.threshold?.value;
+    if (activeThreshold === undefined || activeThreshold === null) {
+      return sliderDisplayConfig.min;
+    }
+
+    const isCoherence = isCoherenceMetric(selectedParameter);
+
+    if (isCoherence) {
+      return activeThreshold;
+    }
+
+    if (showAsErrorRate) {
+      return (1 - activeThreshold) * 100;
+    }
+
+    return activeThreshold * 100;
+  }, [
+    customThreshold,
+    currentMetricConfig,
+    selectedParameter,
+    showAsErrorRate,
+    sliderDisplayConfig,
+  ]);
+
+  // Convert slider value to threshold and update state
+  const handleSliderChange = useCallback(
+    (displayValue: number) => {
+      const isCoherence = isCoherenceMetric(selectedParameter);
+
+      if (isCoherence) {
+        setCustomThreshold(displayValue);
+      } else if (showAsErrorRate) {
+        // Error rate to fidelity: error 1% -> fidelity 0.99
+        setCustomThreshold(1 - displayValue / 100);
+      } else {
+        // Percentage to raw: 99% -> 0.99
+        setCustomThreshold(displayValue / 100);
+      }
+    },
+    [selectedParameter, showAsErrorRate, setCustomThreshold],
+  );
+
+  // Format threshold for display
+  const thresholdDisplayText = useMemo(() => {
+    const activeThreshold =
+      customThreshold ?? currentMetricConfig?.threshold?.value;
+    if (activeThreshold === undefined || activeThreshold === null) return "N/A";
+
+    const isCoherence = isCoherenceMetric(selectedParameter);
+
+    if (isCoherence) {
+      return `${activeThreshold.toFixed(0)} ${currentMetricConfig?.unit || "µs"}`;
+    }
+
+    if (showAsErrorRate) {
+      return `${((1 - activeThreshold) * 100).toFixed(2)}%`;
+    }
+
+    return `${(activeThreshold * 100).toFixed(2)}%`;
+  }, [
+    customThreshold,
+    currentMetricConfig,
+    selectedParameter,
+    showAsErrorRate,
+  ]);
+
+  // Handle metric type change
+  const handleMetricTypeChange = useCallback(
+    (newType: MetricType) => {
+      const newMetrics = newType === "qubit" ? qubitMetrics : couplingMetrics;
+      const firstMetricWithThreshold = newMetrics.find((m) => m.threshold);
+      if (firstMetricWithThreshold) {
+        setSelectedParameter(firstMetricWithThreshold.key);
+      }
+    },
+    [qubitMetrics, couplingMetrics, setSelectedParameter],
+  );
+
+  if (isConfigError) {
     return (
       <ErrorCard
-        title="Failed to load histogram data"
-        message={error.message || "An unexpected error occurred"}
+        title="Failed to load metrics configuration"
+        message="Could not load metrics configuration from server"
         onRetry={handleRetry}
       />
     );
   }
 
-  if (!isInitialized) {
+  if (isError) {
+    return (
+      <ErrorCard
+        title="Failed to load histogram data"
+        message={error?.message || "An unexpected error occurred"}
+        onRetry={handleRetry}
+      />
+    );
+  }
+
+  if (!isInitialized || isConfigLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <span className="loading loading-spinner loading-lg"></span>
@@ -697,238 +681,188 @@ export function HistogramView() {
     <div className="space-y-6">
       {/* Controls Section */}
       <div className="card bg-base-100 shadow-md">
-        <div className="card-body">
-          <div className="flex flex-wrap items-end gap-4">
-            {/* Chip Selection */}
-            <div className="form-control min-w-48">
-              <label className="label h-8">
-                <span className="label-text font-semibold">Chip</span>
-              </label>
-              <div className="h-10">
+        <div className="card-body p-4 gap-4">
+          {/* Row 1: Main Controls */}
+          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+            {/* Left: Type + Chip + Metric */}
+            <div className="flex items-center gap-3">
+              <div className="tabs tabs-boxed bg-base-200 h-9">
+                <button
+                  className={`tab h-full ${metricType === "qubit" ? "tab-active" : ""}`}
+                  onClick={() => handleMetricTypeChange("qubit")}
+                >
+                  1Q
+                </button>
+                <button
+                  className={`tab h-full ${metricType === "coupling" ? "tab-active" : ""}`}
+                  onClick={() => handleMetricTypeChange("coupling")}
+                >
+                  2Q
+                </button>
+              </div>
+
+              <div className="w-36">
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}
                 />
               </div>
-            </div>
 
-            {/* Date Selection */}
-            <div className="form-control min-w-48">
-              <div className="flex justify-center gap-1 h-8 items-center">
-                <button
-                  onClick={navigateToPreviousDay}
-                  disabled={!canNavigatePrevious}
-                  className="btn btn-xs btn-ghost"
-                  title="Previous Day"
-                >
-                  ←
-                </button>
-                <button
-                  onClick={navigateToNextDay}
-                  disabled={!canNavigateNext}
-                  className="btn btn-xs btn-ghost"
-                  title="Next Day"
-                >
-                  →
-                </button>
-              </div>
-              <div className="h-10">
-                <DateSelector
-                  chipId={selectedChip}
-                  selectedDate={selectedDate}
-                  onDateSelect={setSelectedDate}
-                  disabled={!selectedChip}
-                />
-              </div>
-            </div>
-
-            {/* Parameter Selection */}
-            <div className="form-control min-w-64">
-              <label className="label h-8">
-                <span className="label-text font-semibold">Parameter</span>
-              </label>
-              <div className="h-10">
-                <Select
-                  options={parameterOptions}
+              <div className="w-52">
+                <Select<MetricOption, false>
+                  className="text-base-content"
+                  classNamePrefix="react-select"
+                  options={metricOptions}
                   value={
-                    parameterOptions
-                      .flatMap((group) => group.options)
-                      .find((option) => option.value === selectedParameter) ||
-                    null
+                    metricOptions.find(
+                      (option) => option.value === selectedParameter,
+                    ) ?? null
                   }
-                  onChange={(option) => {
+                  onChange={(option: SingleValue<MetricOption>) => {
                     if (option) {
                       setSelectedParameter(option.value);
                     }
                   }}
-                  placeholder="Select parameter"
-                  className="text-base-content"
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      minHeight: "40px",
-                      height: "40px",
-                      borderRadius: "0.5rem",
-                    }),
-                    valueContainer: (base) => ({
-                      ...base,
-                      height: "40px",
-                      padding: "0 8px",
-                    }),
-                    input: (base) => ({
-                      ...base,
-                      margin: "0px",
-                      padding: "0px",
-                    }),
-                    indicatorsContainer: (base) => ({
-                      ...base,
-                      height: "40px",
-                    }),
-                  }}
+                  placeholder="Select metric"
+                  isSearchable={false}
+                  styles={metricSelectStyles}
                 />
               </div>
             </div>
 
-            {/* Display Format Toggle - Only for fidelity parameters */}
-            {!["t1", "t2_echo", "t2_star"].includes(selectedParameter) && (
-              <div className="form-control min-w-48">
-                <div className="flex justify-between items-center h-8">
-                  <span className="label-text font-semibold">
-                    Display Format
-                  </span>
-                </div>
-                <div className="h-10 flex items-center">
-                  <label className="cursor-pointer label flex items-center gap-2">
-                    <span className="text-sm">Fidelity %</span>
-                    <input
-                      type="checkbox"
-                      className="toggle toggle-primary"
-                      checked={showAsErrorRate}
-                      onChange={(e) => setShowAsErrorRate(e.target.checked)}
-                    />
-                    <span className="text-sm">Error Rate %</span>
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* Threshold Slider */}
-            <div className="form-control min-w-64">
-              <div className="flex justify-between items-center h-8">
-                <span className="label-text font-semibold">Threshold</span>
+            {/* Center: Time Range + Mode */}
+            <div className="flex items-center gap-3">
+              <div className="join h-9">
                 <button
-                  className="btn btn-xs btn-ghost"
-                  onClick={() => setCustomThreshold(null)}
-                  disabled={customThreshold === null}
-                  title="Reset to default threshold"
+                  className={`join-item btn btn-sm h-full ${timeRange === "1d" ? "btn-active" : ""}`}
+                  onClick={() => setTimeRange("1d")}
                 >
-                  Reset
+                  1D
+                </button>
+                <button
+                  className={`join-item btn btn-sm h-full ${timeRange === "7d" ? "btn-active" : ""}`}
+                  onClick={() => setTimeRange("7d")}
+                >
+                  7D
+                </button>
+                <button
+                  className={`join-item btn btn-sm h-full ${timeRange === "30d" ? "btn-active" : ""}`}
+                  onClick={() => setTimeRange("30d")}
+                >
+                  30D
                 </button>
               </div>
-              <div className="h-10 flex items-center gap-2">
-                <input
-                  type="range"
-                  className="range range-primary flex-1"
-                  min={getSliderMin(selectedParameter, showAsErrorRate)}
-                  max={getSliderMax(selectedParameter, showAsErrorRate)}
-                  step={getSliderStep(selectedParameter, showAsErrorRate)}
-                  value={getSliderValue(
-                    selectedParameter,
-                    customThreshold ??
-                      PARAMETER_CONFIG[selectedParameter]?.threshold,
-                    showAsErrorRate,
-                  )}
-                  onChange={(e) =>
-                    handleSliderChange(
-                      selectedParameter,
-                      e.target.value,
-                      showAsErrorRate,
-                      setCustomThreshold,
-                    )
+
+              <div className="join h-9">
+                <button
+                  className={`join-item btn btn-sm h-full ${selectionMode === "latest" ? "btn-active" : ""}`}
+                  onClick={() => setSelectionMode("latest")}
+                >
+                  Latest
+                </button>
+                <button
+                  className={`join-item btn btn-sm h-full ${selectionMode === "best" ? "btn-active" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
+                  onClick={() => setSelectionMode("best")}
+                  disabled={!isBestModeSupported}
+                  title={
+                    !isBestModeSupported
+                      ? "Best mode not available"
+                      : "Show best values"
                   }
-                />
-                <span className="text-xs min-w-16 text-center">
-                  {formatSliderDisplay(
-                    selectedParameter,
-                    customThreshold ??
-                      PARAMETER_CONFIG[selectedParameter]?.threshold,
-                    showAsErrorRate,
-                  )}
-                </span>
+                >
+                  Best
+                </button>
               </div>
             </div>
 
-            {/* Export Button */}
-            <div className="form-control min-w-32">
-              <label className="label h-8">
-                <span className="label-text font-semibold">Export</span>
-              </label>
-              <div className="h-10">
-                <button
-                  className="btn btn-outline btn-sm h-full w-full"
-                  onClick={handleExportCSV}
-                  disabled={processedData.tableData.length === 0}
-                >
-                  Export CSV
-                </button>
-              </div>
+            {/* Right: Display Toggle + Export */}
+            <div className="flex items-center gap-3 lg:ml-auto">
+              {!isCoherenceMetric(selectedParameter) && (
+                <label className="cursor-pointer flex items-center gap-2 h-9">
+                  <span className="text-sm">Fidelity</span>
+                  <input
+                    type="checkbox"
+                    className="toggle toggle-primary toggle-sm"
+                    checked={showAsErrorRate}
+                    onChange={(e) => setShowAsErrorRate(e.target.checked)}
+                  />
+                  <span className="text-sm">Error</span>
+                </label>
+              )}
+
+              <button
+                className="btn btn-outline btn-sm h-9"
+                onClick={handleExportCSV}
+                disabled={histogramData.length === 0}
+              >
+                Export
+              </button>
             </div>
           </div>
 
+          {/* Row 2: Threshold Slider */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium shrink-0">
+              Threshold: {thresholdDisplayText}
+            </span>
+            <span className="text-xs text-base-content/60">
+              {isCoherenceMetric(selectedParameter)
+                ? `${sliderDisplayConfig.min}`
+                : `${sliderDisplayConfig.min.toFixed(0)}%`}
+            </span>
+            <input
+              type="range"
+              className="range range-primary range-sm w-48"
+              min={sliderDisplayConfig.min}
+              max={sliderDisplayConfig.max}
+              step={sliderDisplayConfig.step}
+              value={sliderValue}
+              onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
+            />
+            <span className="text-xs text-base-content/60">
+              {isCoherenceMetric(selectedParameter)
+                ? `${sliderDisplayConfig.max}`
+                : `${sliderDisplayConfig.max.toFixed(0)}%`}
+            </span>
+          </div>
+
           {/* Statistics Display */}
-          {processedData.statistics.count > 0 && (
+          {statistics.count > 0 && (
             <div className="mt-4">
-              <div className="stats shadow w-full">
-                <div className="stat">
-                  <div className="stat-title">Count</div>
+              <div className="stats stats-vertical lg:stats-horizontal shadow w-full">
+                <div className="stat py-2">
+                  <div className="stat-title text-xs">Count</div>
                   <div className="stat-value text-primary text-lg">
-                    {processedData.statistics.count}
+                    {statistics.count}
                   </div>
                 </div>
-                <div className="stat">
-                  <div className="stat-title">Mean</div>
+                <div className="stat py-2">
+                  <div className="stat-title text-xs">Mean</div>
                   <div className="stat-value text-secondary text-lg">
-                    {processedData.statistics.mean.toFixed(4)}
+                    {statistics.mean.toFixed(4)}
                   </div>
                 </div>
-                <div className="stat">
-                  <div className="stat-title">Median</div>
+                <div className="stat py-2">
+                  <div className="stat-title text-xs">Median</div>
                   <div className="stat-value text-accent text-lg">
-                    {processedData.statistics.median.toFixed(4)}
+                    {statistics.median.toFixed(4)}
                   </div>
                 </div>
-                <div className="stat">
-                  <div className="stat-title">Std Dev</div>
-                  <div className="stat-value text-info text-lg">
-                    {processedData.statistics.stdDev.toFixed(4)}
+                <div className="stat py-2">
+                  <div className="stat-title text-xs">Min / Max</div>
+                  <div className="stat-value text-base">
+                    {statistics.min.toFixed(2)} / {statistics.max.toFixed(2)}
                   </div>
                 </div>
-                <div className="stat">
-                  <div className="stat-title">Min</div>
-                  <div className="stat-value text-error text-lg">
-                    {processedData.statistics.min.toFixed(4)}
+                <div className="stat py-2">
+                  <div className="stat-title text-xs">Yield</div>
+                  <div className="stat-value text-warning text-lg">
+                    {statistics.yieldPercent.toFixed(1)}%
+                  </div>
+                  <div className="stat-desc text-xs">
+                    {customThreshold !== null ? "Custom" : "Default"}
                   </div>
                 </div>
-                <div className="stat">
-                  <div className="stat-title">Max</div>
-                  <div className="stat-value text-success text-lg">
-                    {processedData.statistics.max.toFixed(4)}
-                  </div>
-                </div>
-                {(PARAMETER_CONFIG[selectedParameter].threshold ||
-                  customThreshold) && (
-                  <div className="stat">
-                    <div className="stat-title">Yield</div>
-                    <div className="stat-value text-warning text-lg">
-                      {processedData.statistics.yieldPercent.toFixed(1)}%
-                    </div>
-                    <div className="stat-desc">
-                      {customThreshold
-                        ? "Custom threshold"
-                        : "Default threshold"}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -940,7 +874,7 @@ export function HistogramView() {
         plotData={plotData}
         layout={layout}
         isLoading={isLoading}
-        title="Parameter Distribution by Qubit"
+        title="Parameter Distribution"
       />
 
       {/* Data Table */}
@@ -948,28 +882,24 @@ export function HistogramView() {
         <div className="card-body">
           <DataTable
             title="Data Points"
-            data={processedData.tableData}
+            data={histogramData}
             columns={[
               {
                 key: "qid",
-                label: taskType === "coupling" ? "Coupling Pair" : "Qubit ID",
+                label: metricType === "coupling" ? "Coupling Pair" : "Qubit ID",
                 sortable: true,
               },
               {
                 key: "value",
-                label: `${PARAMETER_CONFIG[selectedParameter].label} (${
-                  ["t1", "t2_echo", "t2_star"].includes(selectedParameter)
-                    ? PARAMETER_CONFIG[selectedParameter].displayUnit
+                label: `${currentMetricConfig?.title || selectedParameter} (${
+                  isCoherenceMetric(selectedParameter)
+                    ? currentMetricConfig?.unit || "µs"
                     : showAsErrorRate
                       ? "Error %"
                       : "%"
                 })`,
                 sortable: true,
-                render: (v: number, row: HistogramDataPoint) => {
-                  const errorStr =
-                    row.error !== undefined ? ` ± ${row.error.toFixed(6)}` : "";
-                  return `${v.toFixed(6)}${errorStr}`;
-                },
+                render: (v: number) => v.toFixed(6),
               },
             ]}
             pageSize={20}

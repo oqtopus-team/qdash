@@ -35,16 +35,13 @@ export function TagSelector({
   };
 
   return (
-    <div className="form-control">
-      <label className="label font-medium">Tag</label>
-      <Select<TagOption>
-        options={options}
-        value={options.find((option) => option.value === selectedTag)}
-        onChange={handleChange}
-        placeholder="Select tag"
-        className="text-base-content"
-        isDisabled={disabled}
-      />
-    </div>
+    <Select<TagOption>
+      options={options}
+      value={options.find((option) => option.value === selectedTag)}
+      onChange={handleChange}
+      placeholder="Select tag"
+      className="text-base-content w-full"
+      isDisabled={disabled}
+    />
   );
 }
