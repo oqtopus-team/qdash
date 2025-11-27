@@ -161,8 +161,9 @@ class FlowSession:
             self._lock_acquired = True
 
         # Set default tags and note
+        # Use name (which is flow_name or display_name) as default tag
         if tags is None:
-            tags = ["python_flow"]
+            tags = [name]
         if note is None:
             note = {}
 
