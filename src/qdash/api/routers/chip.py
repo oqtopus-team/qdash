@@ -251,7 +251,10 @@ def fetch_chip_dates(
 
 
 @router.get("/chip/{chip_id}", response_model=ChipResponse, summary="Fetch a chip", operation_id="fetchChip")
-def fetch_chip(chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]) -> ChipResponse:
+def fetch_chip(
+    chip_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> ChipResponse:
     """Fetch a chip by its ID.
 
     Parameters
@@ -266,10 +269,18 @@ def fetch_chip(chip_id: str, current_user: Annotated[User, Depends(get_current_a
     ChipResponse
         Chip information
 
+    Raises
+    ------
+    HTTPException
+        If chip is not found
+
     """
     logger.debug(f"Fetching chip {chip_id} for user: {current_user.username}")
 
     chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    if chip is None:
+        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
+
     return ChipResponse(
         chip_id=chip.chip_id,
         size=chip.size,

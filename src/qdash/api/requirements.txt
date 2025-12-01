@@ -104,8 +104,10 @@ pydantic==2.4.2
     #   bunnet
     #   fastapi
     #   lazy-model
+    #   pydantic-settings
 pydantic-core==2.10.1
     # via pydantic
+pydantic-settings==2.2.1
 pygments==2.19.1
     # via rich
 pymongo==4.8.0
@@ -119,7 +121,9 @@ python-dateutil==2.9.0.post0
     #   matplotlib
     #   pendulum
 python-dotenv==1.0.1
-    # via uvicorn
+    # via
+    #   pydantic-settings
+    #   uvicorn
 python-jose==3.4.0
 python-multipart==0.0.20
     # via fastapi
