@@ -654,6 +654,70 @@
         }
       }
     },
+    "/api/chip/{chip_id}/task/coupling/{coupling_id}/task/{task_name}": {
+      "get": {
+        "tags": ["chip"],
+        "summary": "Fetch Coupling Task History",
+        "description": "Fetch coupling task history for a specific coupling and task.",
+        "operationId": "fetchCouplingTaskHistory",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "coupling_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Coupling Id"
+            }
+          },
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chip/{chip_id}/task/coupling/{task_name}/history/{recorded_date}": {
       "get": {
         "tags": ["chip"],
@@ -980,6 +1044,243 @@
         "responses": {
           "200": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/tree": {
+      "get": {
+        "tags": ["file"],
+        "summary": "Get file tree for entire config directory",
+        "description": "Get file tree structure for entire config directory (all chips).\n\nReturns\n-------\n    File tree structure",
+        "operationId": "getFileTree",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FileTreeNode"
+                  },
+                  "type": "array",
+                  "title": "Response Getfiletree"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/content": {
+      "get": {
+        "tags": ["file"],
+        "summary": "Get file content for editing",
+        "description": "Get file content for editing.\n\nArgs:\n----\n    path: Relative path from CONFIG_BASE_PATH (e.g., \"64Qv2/config/chip.yaml\")\n\nReturns:\n-------\n    File content and metadata",
+        "operationId": "getFileContent",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Getfilecontent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["file"],
+        "summary": "Save file content",
+        "description": "Save file content.\n\nArgs:\n----\n    request: Save file request with path and content\n\nReturns:\n-------\n    Success message",
+        "operationId": "saveFileContent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveFileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Savefilecontent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/validate": {
+      "post": {
+        "tags": ["file"],
+        "summary": "Validate file content (YAML/JSON)",
+        "description": "Validate YAML or JSON content.\n\nArgs:\n----\n    request: Validation request with content and file_type\n\nReturns:\n-------\n    Validation result",
+        "operationId": "validateFileContent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateFileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Validatefilecontent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/git/status": {
+      "get": {
+        "tags": ["file"],
+        "summary": "Get Git status of config directory",
+        "description": "Get Git status of config directory.\n\nReturns\n-------\n    Git status information",
+        "operationId": "getGitStatus",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Getgitstatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/git/pull": {
+      "post": {
+        "tags": ["file"],
+        "summary": "Pull latest config from Git repository",
+        "description": "Pull latest config from Git repository.\n\nReturns\n-------\n    Pull operation result",
+        "operationId": "gitPullConfig",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Gitpullconfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/git/push": {
+      "post": {
+        "tags": ["file"],
+        "summary": "Push config changes to Git repository",
+        "description": "Push config changes to Git repository.\n\nArgs:\n----\n    request: Push request with commit message\n\nReturns:\n-------\n    Push operation result",
+        "operationId": "gitPushConfig",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitPushRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Gitpushconfig"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1905,7 +2206,7 @@
       "get": {
         "tags": ["metrics"],
         "summary": "Get Chip Metrics",
-        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
+        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n    current_user: Current authenticated user\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
         "operationId": "metrics-get_chip_metrics",
         "security": [
           {
@@ -1939,6 +2240,19 @@
               "title": "Within Hours"
             },
             "description": "Filter to data within N hours (e.g., 24)"
+          },
+          {
+            "name": "selection_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": ["latest", "best"],
+              "type": "string",
+              "description": "Selection mode: 'latest' for most recent, 'best' for optimal values",
+              "default": "latest",
+              "title": "Selection Mode"
+            },
+            "description": "Selection mode: 'latest' for most recent, 'best' for optimal values"
           }
         ],
         "responses": {
@@ -2073,7 +2387,7 @@
       "get": {
         "tags": ["metrics"],
         "summary": "Get Qubit Metric History",
-        "description": "Get historical metric data for a specific qubit with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    qid: The qubit identifier (e.g., \"0\", \"Q00\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items to return (1-100)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids",
+        "description": "Get historical metric data for a specific qubit with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    qid: The qubit identifier (e.g., \"0\", \"Q00\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids",
         "operationId": "metrics-get_qubit_metric_history",
         "security": [
           {
@@ -2115,14 +2429,19 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "description": "Max number of history items",
-              "default": 20,
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Max number of history items (None for unlimited)",
               "title": "Limit"
             },
-            "description": "Max number of history items"
+            "description": "Max number of history items (None for unlimited)"
           },
           {
             "name": "within_days",
@@ -2173,7 +2492,7 @@
       "get": {
         "tags": ["metrics"],
         "summary": "Get Coupling Metric History",
-        "description": "Get historical metric data for a specific coupling with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific coupling metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    coupling_id: The coupling identifier (e.g., \"0-1\", \"2-3\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items to return (1-100)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids\n    (Note: qid field contains coupling_id for coupling metrics)",
+        "description": "Get historical metric data for a specific coupling with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific coupling metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    coupling_id: The coupling identifier (e.g., \"0-1\", \"2-3\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids\n    (Note: qid field contains coupling_id for coupling metrics)",
         "operationId": "metrics-get_coupling_metric_history",
         "security": [
           {
@@ -2215,14 +2534,19 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "description": "Max number of history items",
-              "default": 20,
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Max number of history items (None for unlimited)",
               "title": "Limit"
             },
-            "description": "Max number of history items"
+            "description": "Max number of history items (None for unlimited)"
           },
           {
             "name": "within_days",
@@ -2847,6 +3171,40 @@
         "title": "FidelityCondition",
         "description": "Condition for fidelity filtering."
       },
+      "FileTreeNode": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "children": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FileTreeNode"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Children"
+          }
+        },
+        "type": "object",
+        "required": ["name", "path", "type"],
+        "title": "FileTreeNode",
+        "description": "File tree node model."
+      },
       "FlowScheduleSummary": {
         "properties": {
           "schedule_id": {
@@ -3132,6 +3490,18 @@
         ],
         "title": "GetFlowResponse",
         "description": "Response for getting flow details."
+      },
+      "GitPushRequest": {
+        "properties": {
+          "commit_message": {
+            "type": "string",
+            "title": "Commit Message",
+            "default": "Update config files from UI"
+          }
+        },
+        "type": "object",
+        "title": "GitPushRequest",
+        "description": "Request model for Git push operation."
       },
       "HTTPValidationError": {
         "properties": {
@@ -3757,6 +4127,22 @@
         "type": "object",
         "title": "QubitMetrics",
         "description": "Single qubit metrics data."
+      },
+      "SaveFileRequest": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": ["path", "content"],
+        "title": "SaveFileRequest",
+        "description": "Request model for saving file content."
       },
       "SaveFlowRequest": {
         "properties": {
@@ -4600,6 +4986,22 @@
         "required": ["username", "password"],
         "title": "UserCreate",
         "description": "User creation model for registration."
+      },
+      "ValidateFileRequest": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "file_type": {
+            "type": "string",
+            "title": "File Type"
+          }
+        },
+        "type": "object",
+        "required": ["content", "file_type"],
+        "title": "ValidateFileRequest",
+        "description": "Request model for validating file content."
       },
       "ValidationError": {
         "properties": {

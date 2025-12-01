@@ -2,18 +2,19 @@
 
 import { useMemo, useEffect } from "react";
 
+import Select from "react-select";
+
 import type { ParameterKey, TagKey } from "@/shared/types/analysis";
 import type { Layout } from "plotly.js";
 
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { DateTimePicker } from "@/app/components/DateTimePicker";
-import { ParameterSelector } from "@/app/components/ParameterSelector";
 import { TagSelector } from "@/app/components/TagSelector";
 import { useAnalysisUrlState } from "@/app/hooks/useUrlState";
 import { useFetchTimeseriesTaskResultByTagAndParameter } from "@/client/chip/chip";
 import { useListChips } from "@/client/chip/chip";
-import { useFetchAllParameters } from "@/client/parameter/parameter";
 import { useListAllTag } from "@/client/tag/tag";
+import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { DataTable } from "@/shared/components/DataTable";
 import { ErrorCard } from "@/shared/components/ErrorCard";
 import { PlotCard } from "@/shared/components/PlotCard";
@@ -42,12 +43,50 @@ export function TimeSeriesView() {
     getLockStatusDescription,
   } = useTimeRange({ initialDays: 7 });
 
+  // Load metrics configuration from backend
+  const {
+    qubitMetrics,
+    couplingMetrics,
+    isLoading: isConfigLoading,
+    isError: isConfigError,
+  } = useMetricsConfig();
+
+  // Available parameter options for selection (grouped by type)
+  const availableParameters = useMemo(() => {
+    if (qubitMetrics.length === 0 && couplingMetrics.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        label: "1Q Metrics",
+        options: qubitMetrics.map((metric) => ({
+          value: metric.key,
+          label: metric.title,
+        })),
+      },
+      {
+        label: "2Q Metrics",
+        options: couplingMetrics.map((metric) => ({
+          value: metric.key,
+          label: metric.title,
+        })),
+      },
+    ];
+  }, [qubitMetrics, couplingMetrics]);
+
+  // Get current metric configuration for selected parameter
+  const currentMetricConfig = useMemo(() => {
+    return (
+      qubitMetrics.find((m) => m.key === selectedParameter) ||
+      couplingMetrics.find((m) => m.key === selectedParameter)
+    );
+  }, [qubitMetrics, couplingMetrics, selectedParameter]);
+
   // Fetch chips data for default selection
   const { data: chipsResponse } = useListChips();
 
-  // Fetch parameters and tags
-  const { data: parametersResponse, isLoading: isLoadingParameters } =
-    useFetchAllParameters();
+  // Fetch tags
   const { data: tagsResponse, isLoading: isLoadingTags } = useListAllTag();
 
   // Set default chip when URL is initialized and no chip is selected
@@ -67,6 +106,25 @@ export function TimeSeriesView() {
       setSelectedChip(sortedChips[0].chip_id);
     }
   }, [isInitialized, selectedChip, chipsResponse, setSelectedChip]);
+
+  // Set default parameter when metrics load
+  useEffect(() => {
+    if (qubitMetrics.length === 0) return;
+
+    // Check if current parameter is valid
+    const allMetrics = [...qubitMetrics, ...couplingMetrics];
+    const isCurrentValid = allMetrics.some((m) => m.key === selectedParameter);
+
+    if (!isCurrentValid && allMetrics.length > 0) {
+      // Set default: t1 if available, otherwise first metric
+      const t1Metric = qubitMetrics.find((m) => m.key === "t1");
+      if (t1Metric) {
+        setSelectedParameter("t1");
+      } else {
+        setSelectedParameter(allMetrics[0].key);
+      }
+    }
+  }, [qubitMetrics, couplingMetrics, selectedParameter, setSelectedParameter]);
 
   // Fetch time series data directly (Analysis page doesn't have qubitId)
   const {
@@ -202,7 +260,7 @@ export function TimeSeriesView() {
   const layout = useMemo<Partial<Layout>>(
     () => ({
       title: {
-        text: `${selectedParameter} Time Series by QID`,
+        text: `${currentMetricConfig?.title || selectedParameter} Time Series by QID`,
         font: { size: 24 },
       },
       xaxis: {
@@ -213,7 +271,7 @@ export function TimeSeriesView() {
         zeroline: false,
       },
       yaxis: {
-        title: `${metadata.description} [${metadata.unit}]`,
+        title: `${currentMetricConfig?.title || metadata.description} [${currentMetricConfig?.unit || metadata.unit}]`,
         type: "linear",
         gridcolor: "#eee",
         zeroline: false,
@@ -233,10 +291,9 @@ export function TimeSeriesView() {
       paper_bgcolor: "white",
       hovermode: "closest",
     }),
-    [selectedParameter, metadata],
+    [selectedParameter, metadata, currentMetricConfig],
   );
 
-  const parameters = parametersResponse?.data?.parameters || [];
   const tags = tagsResponse?.data?.tags || [];
 
   // Handle CSV download
@@ -256,6 +313,16 @@ export function TimeSeriesView() {
   };
 
   // Error handling
+  if (isConfigError) {
+    return (
+      <ErrorCard
+        title="Configuration Error"
+        message="Failed to load metrics configuration"
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
+
   if (error) {
     return (
       <ErrorCard
@@ -263,6 +330,15 @@ export function TimeSeriesView() {
         message={error.message || "Failed to load time series data"}
         onRetry={() => window.location.reload()}
       />
+    );
+  }
+
+  // Show loading state while config is loading
+  if (isConfigLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
     );
   }
 
@@ -312,9 +388,7 @@ export function TimeSeriesView() {
           </h2>
           <button
             onClick={handleRefresh}
-            disabled={
-              isLoadingTimeseries || isLoadingParameters || isLoadingTags
-            }
+            disabled={isLoadingTimeseries || isLoadingTags}
             className="btn btn-sm btn-outline gap-2"
             title="Refresh data and time range"
           >
@@ -341,12 +415,39 @@ export function TimeSeriesView() {
             selectedChip={selectedChip}
             onChipSelect={setSelectedChip}
           />
-          <ParameterSelector
-            label="Parameter"
-            parameters={parameters.map((p) => p.name)}
-            selectedParameter={selectedParameter}
-            onParameterSelect={setSelectedParameter}
-            disabled={isLoadingParameters}
+          <Select<{ value: string; label: string }, false>
+            options={availableParameters}
+            value={
+              currentMetricConfig
+                ? {
+                    value: currentMetricConfig.key,
+                    label: currentMetricConfig.title,
+                  }
+                : null
+            }
+            onChange={(option) => {
+              if (option) {
+                setSelectedParameter(option.value);
+              }
+            }}
+            placeholder="Select parameter"
+            className="text-base-content"
+            styles={{
+              control: (base) => ({
+                ...base,
+                minHeight: "36px",
+                height: "auto",
+                borderRadius: "0.5rem",
+              }),
+              valueContainer: (base) => ({
+                ...base,
+                padding: "2px 8px",
+              }),
+              menu: (base) => ({
+                ...base,
+                zIndex: 50,
+              }),
+            }}
           />
           <TagSelector
             tags={tags}
@@ -489,9 +590,9 @@ export function TimeSeriesView() {
         isLoading={isLoadingTimeseries}
         hasData={Boolean(
           selectedChip &&
-            selectedParameter &&
-            selectedTag &&
-            plotData.length > 0,
+          selectedParameter &&
+          selectedTag &&
+          plotData.length > 0,
         )}
         emptyStateMessage={
           !selectedChip || !selectedParameter || !selectedTag

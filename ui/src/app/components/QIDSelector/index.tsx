@@ -24,7 +24,7 @@ export function QIDSelector({
 }: QIDSelectorProps) {
   const options: QIDOption[] = qids.map((qid) => ({
     value: qid,
-    label: `QID: ${qid}`,
+    label: `Q${qid}`,
   }));
 
   const handleChange = (option: SingleValue<QIDOption>) => {
@@ -34,16 +34,13 @@ export function QIDSelector({
   };
 
   return (
-    <div className="form-control">
-      <label className="label font-medium">QID</label>
-      <Select<QIDOption>
-        options={options}
-        value={options.find((option) => option.value === selectedQid)}
-        onChange={handleChange}
-        placeholder="Select QID"
-        className="text-base-content"
-        isDisabled={disabled}
-      />
-    </div>
+    <Select<QIDOption>
+      options={options}
+      value={options.find((option) => option.value === selectedQid)}
+      onChange={handleChange}
+      placeholder="Select QID"
+      className="text-base-content w-full"
+      isDisabled={disabled}
+    />
   );
 }

@@ -1,5 +1,8 @@
 """Iterative ChevronPattern calibration flow with parameter variation.
 
+NOTE: This is a ChevronPattern-specific example of the generic iterative_parameter_sweep_flow.py.
+For other tasks (CheckQubitSpectroscopy, CheckRabi, etc.), use iterative_parameter_sweep_flow.py instead.
+
 This template demonstrates how to execute ChevronPattern repeatedly with different
 parameters (e.g., readout_amplitude, qubit_frequency), which is useful for:
 - Investigating the effect of readout power on qubit bare frequency measurements
@@ -22,13 +25,14 @@ from qdash.workflow.flow import finish_calibration, get_session, init_calibratio
 @task
 def calibrate_group(
     qids: list[str],
+    task_name: str,
     task_details: dict | None,
     iteration: int,
 ) -> dict:
-    """Execute ChevronPattern for a group of qubits with custom parameters.
+    """Execute a task for a group of qubits with custom parameters.
 
     This task uses task_details to pass parameters (e.g., readout_amplitude, qubit_frequency)
-    to the ChevronPattern task, allowing flexible parameter exploration.
+    to the specified task, allowing flexible parameter exploration.
 
     If a qubit fails during calibration, it will be skipped and the next qubit
     will be processed. Failed qubits are logged and marked in the results.
@@ -36,6 +40,7 @@ def calibrate_group(
     Args:
     ----
         qids: List of qubit IDs to calibrate (executed in order)
+        task_name: Name of the task to execute (e.g., "ChevronPattern")
         task_details: Task configuration with input_parameters to override
             Example: {"ChevronPattern": {"input_parameters": {"readout_amplitude": {"value": 0.15}}}}
         iteration: Current iteration number (for logging)
@@ -46,11 +51,11 @@ def calibrate_group(
 
     """
     logger = get_run_logger()
-    logger.info(f"Iteration {iteration + 1}: Starting ChevronPattern for qubits: {qids}")
+    logger.info(f"Iteration {iteration + 1}: Starting {task_name} for qubits: {qids}")
 
     # Log parameter overrides
-    if task_details and "ChevronPattern" in task_details:
-        params = task_details["ChevronPattern"].get("input_parameters", {})
+    if task_details and task_name in task_details:
+        params = task_details[task_name].get("input_parameters", {})
         if params:
             logger.info(f"  Parameter overrides: {list(params.keys())}")
             for param_name, param_value in params.items():
@@ -64,11 +69,11 @@ def calibrate_group(
         logger.info(f"  Calibrating qubit {qid}...")
 
         try:
-            # Execute ChevronPattern task with parameter overrides
-            logger.info("    Executing ChevronPattern...")
-            result = session.execute_task("ChevronPattern", qid, task_details=task_details)
+            # Execute task with parameter overrides
+            logger.info(f"    Executing {task_name}...")
+            result = session.execute_task(task_name, qid, task_details=task_details)
 
-            logger.info(f"    ✓ ChevronPattern completed: qubit_frequency={result.get('qubit_frequency')} GHz")
+            logger.info(f"    ✓ {task_name} completed: qubit_frequency={result.get('qubit_frequency')} GHz")
 
             results[qid] = {
                 "iteration": iteration,
@@ -79,7 +84,7 @@ def calibrate_group(
 
         except Exception as e:
             # Log the error and continue with next qubit
-            logger.error(f"    ✗ Failed to execute ChevronPattern for Q{qid}: {e}")
+            logger.error(f"    ✗ Failed to execute {task_name} for Q{qid}: {e}")
             logger.warning(f"    Skipping qubit {qid}")
             results[qid] = {
                 "iteration": iteration,
@@ -121,9 +126,13 @@ def iterative_chevron_pattern_flow(
         chip_id: Target chip ID (from UI)
         qids: List of qubit IDs (not used, groups are defined explicitly)
         max_iterations: Number of iterations with different parameter configurations
+        flow_name: Flow name (automatically injected by API)
 
     """
     logger = get_run_logger()
+
+    # Task name to execute (can be changed for other tasks)
+    task_name = "ChevronPattern"
 
     # TODO: Define your qubit groups
     groups = [
@@ -140,21 +149,21 @@ def iterative_chevron_pattern_flow(
     # Multiple parameters can be overridden simultaneously
     task_details_per_iteration = [
         {
-            "ChevronPattern": {
+            task_name: {
                 "input_parameters": {
                     "readout_amplitude": {"value": 0.05}  # Iteration 1: 0.05 a.u.
                 }
             }
         },
         {
-            "ChevronPattern": {
+            task_name: {
                 "input_parameters": {
                     "readout_amplitude": {"value": 0.10}  # Iteration 2: 0.10 a.u.
                 }
             }
         },
         {
-            "ChevronPattern": {
+            task_name: {
                 "input_parameters": {
                     "readout_amplitude": {"value": 0.15}  # Iteration 3: 0.15 a.u.
                 }
@@ -162,7 +171,7 @@ def iterative_chevron_pattern_flow(
         },
         # Example: Override multiple parameters simultaneously
         # {
-        #     "ChevronPattern": {
+        #     task_name: {
         #         "input_parameters": {
         #             "readout_amplitude": {"value": 0.20},
         #             "qubit_frequency": {"value": 5.2}
@@ -171,7 +180,7 @@ def iterative_chevron_pattern_flow(
         # },
     ]
 
-    logger.info(f"Starting iterative ChevronPattern calibration for user={username}, chip_id={chip_id}")
+    logger.info(f"Starting iterative {task_name} calibration for user={username}, chip_id={chip_id}")
     for i, group in enumerate(groups, start=1):
         logger.info(f"Group {i}: {group} (sequential)")
     logger.info(f"Max iterations: {max_iterations}")
@@ -213,6 +222,7 @@ def iterative_chevron_pattern_flow(
             futures = [
                 calibrate_group.submit(
                     qids=group,
+                    task_name=task_name,
                     task_details=task_details,
                     iteration=iteration,
                 )
@@ -242,13 +252,13 @@ def iterative_chevron_pattern_flow(
         finish_calibration()
 
         logger.info("=" * 60)
-        logger.info("Iterative ChevronPattern calibration completed successfully!")
+        logger.info(f"Iterative {task_name} calibration completed successfully!")
         logger.info("=" * 60)
 
         return all_iterations_results
 
     except Exception as e:
-        logger.error(f"Iterative ChevronPattern calibration failed: {e}")
+        logger.error(f"Iterative {task_name} calibration failed: {e}")
         try:
             session = get_session()
             session.fail_calibration(str(e))

@@ -1,18 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
 
 import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
-import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import {
   useFetchLatestQubitTaskGroupedByChip,
   useFetchHistoricalQubitTaskGroupedByChip,
 } from "@/client/chip/chip";
-import { TaskDetailModal } from "@/shared/components/TaskDetailModal";
+import { TaskHistoryModal } from "../TaskHistoryModal";
 
 interface TaskResultGridProps {
   chipId: string;
@@ -24,7 +23,7 @@ interface TaskResultGridProps {
 
 interface SelectedTaskInfo {
   qid: string;
-  task: Task;
+  taskName: string;
 }
 
 const MUX_SIZE = 2;
@@ -34,7 +33,6 @@ export function TaskResultGrid({
   selectedTask,
   selectedDate,
   gridSize,
-  onDateChange,
 }: TaskResultGridProps) {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
@@ -53,34 +51,6 @@ export function TaskResultGrid({
 
   const regionSize = 4; // 4×4 qubits per region
   const numRegions = Math.floor(gridSize / regionSize);
-
-  // Use custom hook for date navigation
-  const {
-    navigateToPreviousDay: originalNavigateToPreviousDay,
-    navigateToNextDay: originalNavigateToNextDay,
-    canNavigatePrevious,
-    canNavigateNext,
-    formatDate,
-  } = useDateNavigation(chipId, selectedDate, onDateChange);
-
-  // Wrap navigation functions to track modal navigation
-  const navigateToPreviousDay = useCallback(() => {
-    if (selectedTaskInfo) {
-      // Modal navigation - don't close modal
-      originalNavigateToPreviousDay();
-    } else {
-      originalNavigateToPreviousDay();
-    }
-  }, [originalNavigateToPreviousDay, selectedTaskInfo]);
-
-  const navigateToNextDay = useCallback(() => {
-    if (selectedTaskInfo) {
-      // Modal navigation - don't close modal
-      originalNavigateToNextDay();
-    } else {
-      originalNavigateToNextDay();
-    }
-  }, [originalNavigateToNextDay, selectedTaskInfo]);
 
   const {
     data: taskResponse,
@@ -104,46 +74,6 @@ export function TaskResultGrid({
           },
         },
       );
-
-  // Track previous date to distinguish modal navigation from external navigation
-  const [previousDate, setPreviousDate] = useState(selectedDate);
-
-  // Reset modal only when date changes externally (not from modal navigation)
-  useEffect(() => {
-    if (previousDate !== selectedDate && !selectedTaskInfo) {
-      // External navigation - no modal open, safe to update
-      setPreviousDate(selectedDate);
-    } else if (previousDate !== selectedDate && selectedTaskInfo) {
-      // Date changed while modal is open - update previous date but keep modal
-      setPreviousDate(selectedDate);
-    }
-  }, [selectedDate, selectedTaskInfo, previousDate]);
-
-  // Update modal data with debounce to prevent race conditions
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-
-    if (selectedTaskInfo && taskResponse?.data?.result) {
-      timeoutId = setTimeout(() => {
-        const updatedTask = taskResponse.data.result?.[selectedTaskInfo.qid];
-        if (updatedTask) {
-          setSelectedTaskInfo((prev) => {
-            // Only update if the modal is still open and for the same qid
-            if (prev?.qid === selectedTaskInfo.qid) {
-              return { ...prev, task: updatedTask };
-            }
-            return prev;
-          });
-        }
-      }, 100); // 100ms debounce
-    }
-
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [taskResponse?.data?.result, selectedTaskInfo?.qid]);
 
   if (isLoadingTask)
     return (
@@ -280,7 +210,7 @@ export function TaskResultGrid({
                 length: Math.pow(Math.floor(displayGridSize / MUX_SIZE), 2),
               }).map((_, muxIndex) => (
                 <div key={muxIndex} className="relative">
-                  <div className="absolute top-0.5 right-0.5 md:top-1 md:right-1 text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
                     MUX{muxIndex}
                   </div>
                 </div>
@@ -327,7 +257,7 @@ export function TaskResultGrid({
                 <button
                   key={index}
                   onClick={() => {
-                    if (figurePath) setSelectedTaskInfo({ qid, task });
+                    setSelectedTaskInfo({ qid, taskName: selectedTask });
                   }}
                   className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 relative w-full ${
                     task.over_threshold
@@ -364,61 +294,62 @@ export function TaskResultGrid({
 
         {/* Region selection overlay - only when enabled and in full view mode */}
         {zoomMode === "full" && regionSelectionEnabled && (
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="relative w-full h-full p-4">
-              <div
-                className="grid gap-2 w-full h-full"
-                style={{ gridTemplateColumns: `repeat(${numRegions}, 1fr)` }}
-              >
-                {Array.from({ length: numRegions * numRegions }).map(
-                  (_, index) => {
-                    const regionRow = Math.floor(index / numRegions);
-                    const regionCol = index % numRegions;
-                    const isHovered =
-                      hoveredRegion?.row === regionRow &&
-                      hoveredRegion?.col === regionCol;
+          <div className="absolute inset-0 pointer-events-none p-4 z-20">
+            <div
+              className="grid gap-2 w-full h-full"
+              style={{
+                gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,
+                gridTemplateRows: `repeat(${gridSize}, minmax(0, 1fr))`,
+              }}
+            >
+              {Array.from({ length: numRegions * numRegions }).map(
+                (_, index) => {
+                  const regionRow = Math.floor(index / numRegions);
+                  const regionCol = index % numRegions;
+                  const isHovered =
+                    hoveredRegion?.row === regionRow &&
+                    hoveredRegion?.col === regionCol;
 
-                    return (
-                      <button
-                        key={index}
-                        className={`pointer-events-auto transition-all duration-200 rounded-lg ${
-                          isHovered
-                            ? "bg-primary/20 border-2 border-primary"
-                            : "bg-transparent border-2 border-transparent hover:border-primary/50"
-                        }`}
-                        onMouseEnter={() =>
-                          setHoveredRegion({ row: regionRow, col: regionCol })
-                        }
-                        onMouseLeave={() => setHoveredRegion(null)}
-                        onClick={() => {
-                          setSelectedRegion({ row: regionRow, col: regionCol });
-                          setZoomMode("region");
-                        }}
-                        title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-                      />
-                    );
-                  },
-                )}
-              </div>
+                  return (
+                    <button
+                      key={index}
+                      className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
+                        isHovered
+                          ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
+                          : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
+                      }`}
+                      style={{
+                        gridColumn: `${regionCol * regionSize + 1} / span ${regionSize}`,
+                        gridRow: `${regionRow * regionSize + 1} / span ${regionSize}`,
+                      }}
+                      onMouseEnter={() =>
+                        setHoveredRegion({ row: regionRow, col: regionCol })
+                      }
+                      onMouseLeave={() => setHoveredRegion(null)}
+                      onClick={() => {
+                        setSelectedRegion({ row: regionRow, col: regionCol });
+                        setZoomMode("region");
+                      }}
+                      title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
+                    >
+                      <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                        {regionRow},{regionCol}
+                      </span>
+                    </button>
+                  );
+                },
+              )}
             </div>
           </div>
         )}
       </div>
 
-      <TaskDetailModal
-        isOpen={!!selectedTaskInfo}
-        task={selectedTaskInfo?.task || null}
-        qid={selectedTaskInfo?.qid || ""}
-        onClose={() => setSelectedTaskInfo(null)}
+      <TaskHistoryModal
         chipId={chipId}
-        selectedDate={selectedDate}
-        onNavigatePrevious={navigateToPreviousDay}
-        onNavigateNext={navigateToNextDay}
-        canNavigatePrevious={canNavigatePrevious}
-        canNavigateNext={canNavigateNext}
-        formatDate={formatDate}
-        taskName={selectedTaskInfo?.task?.name}
-        variant="detailed"
+        qid={selectedTaskInfo?.qid || ""}
+        taskName={selectedTaskInfo?.taskName || ""}
+        isOpen={!!selectedTaskInfo}
+        onClose={() => setSelectedTaskInfo(null)}
       />
     </div>
   );

@@ -327,7 +327,7 @@ export function QubitMetricsGrid({
                 length: Math.pow(Math.floor(displayGridSize / MUX_SIZE), 2),
               }).map((_, muxIndex) => (
                 <div key={muxIndex} className="relative">
-                  <div className="absolute top-0.5 right-0.5 md:top-1 md:right-1 text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
                     MUX{muxIndex}
                   </div>
                 </div>
@@ -421,47 +421,54 @@ export function QubitMetricsGrid({
 
         {/* Region selection overlay - only when enabled and in full view mode */}
         {zoomMode === "full" && regionSelectionEnabled && (
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="relative w-full h-full p-2 md:p-4">
-              <div className="relative w-full h-full p-3 md:p-4 lg:p-6">
-                <div
-                  className="grid gap-1 md:gap-2 lg:gap-3 w-full h-full"
-                  style={{ gridTemplateColumns: `repeat(${numRegions}, 1fr)` }}
-                >
-                  {Array.from({ length: numRegions * numRegions }).map(
-                    (_, index) => {
-                      const regionRow = Math.floor(index / numRegions);
-                      const regionCol = index % numRegions;
-                      const isHovered =
-                        hoveredRegion?.row === regionRow &&
-                        hoveredRegion?.col === regionCol;
+          <div className="absolute inset-0 pointer-events-none p-3 md:p-4 lg:p-6 z-20">
+            <div
+              className="grid gap-1 md:gap-2 lg:gap-3 w-full h-full"
+              style={{
+                gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,
+                gridTemplateRows: `repeat(${gridSize}, minmax(0, 1fr))`,
+              }}
+            >
+              {Array.from({ length: numRegions * numRegions }).map(
+                (_, index) => {
+                  const regionRow = Math.floor(index / numRegions);
+                  const regionCol = index % numRegions;
+                  const isHovered =
+                    hoveredRegion?.row === regionRow &&
+                    hoveredRegion?.col === regionCol;
 
-                      return (
-                        <button
-                          key={index}
-                          className={`pointer-events-auto transition-all duration-200 rounded-lg ${
-                            isHovered
-                              ? "bg-primary/20 border-2 border-primary"
-                              : "bg-transparent border-2 border-transparent hover:border-primary/50"
-                          }`}
-                          onMouseEnter={() =>
-                            setHoveredRegion({ row: regionRow, col: regionCol })
-                          }
-                          onMouseLeave={() => setHoveredRegion(null)}
-                          onClick={() => {
-                            setSelectedRegion({
-                              row: regionRow,
-                              col: regionCol,
-                            });
-                            setZoomMode("region");
-                          }}
-                          title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-                        />
-                      );
-                    },
-                  )}
-                </div>
-              </div>
+                  return (
+                    <button
+                      key={index}
+                      className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
+                        isHovered
+                          ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
+                          : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
+                      }`}
+                      style={{
+                        gridColumn: `${regionCol * regionSize + 1} / span ${regionSize}`,
+                        gridRow: `${regionRow * regionSize + 1} / span ${regionSize}`,
+                      }}
+                      onMouseEnter={() =>
+                        setHoveredRegion({ row: regionRow, col: regionCol })
+                      }
+                      onMouseLeave={() => setHoveredRegion(null)}
+                      onClick={() => {
+                        setSelectedRegion({
+                          row: regionRow,
+                          col: regionCol,
+                        });
+                        setZoomMode("region");
+                      }}
+                      title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
+                    >
+                      <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                        {regionRow},{regionCol}
+                      </span>
+                    </button>
+                  );
+                },
+              )}
             </div>
           </div>
         )}

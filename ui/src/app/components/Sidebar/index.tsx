@@ -11,6 +11,7 @@ import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { GoWorkflow } from "react-icons/go";
 import { IoMdSettings } from "react-icons/io";
 import { IoAnalytics } from "react-icons/io5";
+import { VscFiles } from "react-icons/vsc";
 
 import { useSidebar } from "@/app/contexts/SidebarContext";
 
@@ -96,10 +97,10 @@ function Sidebar() {
                 ? "bg-neutral text-neutral-content"
                 : "text-base-content"
             }`}
-            title="Flow Editor"
+            title="Editor"
           >
             <FaCode />
-            {isOpen && <span className="ml-2">Flow Editor</span>}
+            {isOpen && <span className="ml-2">Editor</span>}
           </Link>
         </li>
         <li>
@@ -148,6 +149,22 @@ function Sidebar() {
           >
             <BsListTask />
             {isOpen && <span className="ml-2">Tasks</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/files"
+            className={`py-4 ${
+              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+            } my-2 text-base font-bold flex items-center ${
+              pathname.startsWith("/files")
+                ? "bg-neutral text-neutral-content"
+                : "text-base-content"
+            }`}
+            title="Files"
+          >
+            <VscFiles />
+            {isOpen && <span className="ml-2">Files</span>}
           </Link>
         </li>
 

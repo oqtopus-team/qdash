@@ -5,10 +5,15 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { MetricsGetChipMetricsSelectionMode } from "./metricsGetChipMetricsSelectionMode";
 
 export type MetricsGetChipMetricsParams = {
   /**
    * Filter to data within N hours (e.g., 24)
    */
   within_hours?: number | null;
+  /**
+   * Selection mode: 'latest' for most recent, 'best' for optimal values
+   */
+  selection_mode?: MetricsGetChipMetricsSelectionMode;
 };

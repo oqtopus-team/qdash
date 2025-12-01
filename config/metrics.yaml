@@ -1,0 +1,200 @@
+# Metrics Configuration
+# This file defines display metadata for calibration metrics.
+# Backend Pydantic models define the actual fields, this file only provides UI metadata.
+
+qubit_metrics:
+  qubit_frequency:
+    title: Qubit Frequency
+    unit: GHz
+    scale: 1
+    description: Resonance frequency of the qubit
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 5.0
+      range:
+        min: 4.0
+        max: 6.0
+        step: 0.01
+
+  anharmonicity:
+    title: Qubit Anharmonicity
+    unit: MHz
+    scale: 1000 # Convert GHz to MHz
+    description: Anharmonicity of the qubit energy levels
+    evaluation:
+      mode: minimize
+    threshold:
+      value: -300
+      range:
+        min: -500
+        max: -200
+        step: 1
+
+  t1:
+    title: T1
+    unit: μs
+    scale: 1
+    description: Energy relaxation time
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 100
+      range:
+        min: 25
+        max: 200
+        step: 1
+
+  t2_echo:
+    title: T2 Echo
+    unit: μs
+    scale: 1
+    description: Dephasing time measured with echo sequence
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 200
+      range:
+        min: 50
+        max: 400
+        step: 1
+
+  t2_star:
+    title: T2 Star
+    unit: μs
+    scale: 1
+    description: Free induction decay time
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 50
+      range:
+        min: 15
+        max: 100
+        step: 1
+
+  average_readout_fidelity:
+    title: Average Readout Fidelity
+    unit: "%"
+    scale: 100
+    description: Average fidelity of readout operations
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 0.99 # Raw value (99%)
+      range:
+        min: 0.9
+        max: 0.999
+        step: 0.001
+
+  x90_gate_fidelity:
+    title: X90 Gate Fidelity
+    unit: "%"
+    scale: 100
+    description: Fidelity of X90 (π/2 rotation) gate
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 0.999 # Raw value (99.9%)
+      range:
+        min: 0.9
+        max: 0.9999
+        step: 0.0001
+
+  x180_gate_fidelity:
+    title: X180 Gate Fidelity
+    unit: "%"
+    scale: 100
+    description: Fidelity of X180 (π rotation) gate
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 0.999 # Raw value (99.9%)
+      range:
+        min: 0.9
+        max: 0.9999
+        step: 0.0001
+
+coupling_metrics:
+  zx90_gate_fidelity:
+    title: ZX90 Gate Fidelity
+    unit: "%"
+    scale: 100
+    description: Fidelity of two-qubit ZX90 gate
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 0.99 # Raw value (99%)
+      range:
+        min: 0.9
+        max: 0.999
+        step: 0.001
+
+  bell_state_fidelity:
+    title: Bell State Fidelity
+    unit: "%"
+    scale: 100
+    description: Fidelity of Bell state preparation
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 0.95 # Raw value (95%)
+      range:
+        min: 0.8
+        max: 0.999
+        step: 0.001
+
+  static_zz_interaction:
+    title: Static ZZ Interaction
+    unit: MHz
+    scale: 1000 # Convert GHz to MHz
+    description: Static ZZ coupling strength between qubits
+    evaluation:
+      mode: minimize
+
+# Color scale configuration (Viridis palette with very smooth gradations)
+# 21-color high-resolution Viridis colormap for maximum color discrimination
+# Especially useful for metrics with narrow value ranges (e.g., 99.0% - 99.9%)
+color_scale:
+  colors:
+    - "#440154" # 0 - Dark purple (lowest values)
+    - "#46085c" # 1
+    - "#481467" # 2
+    - "#482173" # 3
+    - "#472d7b" # 4
+    - "#453882" # 5
+    - "#424086" # 6
+    - "#3f4889" # 7
+    - "#3d4e8a" # 8
+    - "#3a538b" # 9
+    - "#37588c" # 10 - Blue (mid-low values)
+    - "#345d8d" # 11
+    - "#31688e" # 12
+    - "#2e6e8e" # 13
+    - "#2c728e" # 14
+    - "#2a788e" # 15
+    - "#287d8e" # 16
+    - "#25828e" # 17
+    - "#23878e" # 18
+    - "#218c8d" # 19
+    - "#21918c" # 20 - Teal (mid values)
+    - "#22968b" # 21
+    - "#239b89" # 22
+    - "#25a186" # 23
+    - "#29a783" # 24
+    - "#2fac80" # 25
+    - "#35b179" # 26
+    - "#3db771" # 27
+    - "#46bd6a" # 28
+    - "#51c362" # 29
+    - "#5ec962" # 30 - Green (mid-high values)
+    - "#6ed05b" # 31
+    - "#7ed655" # 32
+    - "#8fdc4f" # 33
+    - "#a0e249" # 34
+    - "#b1e745" # 35
+    - "#c2eb42" # 36
+    - "#d4ef40" # 37
+    - "#e5f03f" # 38
+    - "#f5ee3f" # 39
+    - "#fde724" # 40 - Yellow (highest values)

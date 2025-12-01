@@ -24,6 +24,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 COPY ./src/qdash/workflow/requirements.txt ./
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+ENV UV_HTTP_TIMEOUT=300
 RUN uv pip install --system --no-cache-dir -r requirements.txt
 ## for update pydantic ignoring quel-ic-config dependency
 RUN uv pip install --upgrade --system --no-cache-dir pydantic

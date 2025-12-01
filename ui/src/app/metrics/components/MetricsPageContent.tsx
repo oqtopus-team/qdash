@@ -12,11 +12,12 @@ import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 
 import { ChipSelector } from "@/app/components/ChipSelector";
-import { useListChips } from "@/client/chip/chip";
+import { useListChips, useFetchChip } from "@/client/chip/chip";
 import { useMetricsGetChipMetrics } from "@/client/metrics/metrics";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
 type TimeRange = "1d" | "7d" | "30d";
+type SelectionMode = "latest" | "best";
 
 type MetricOption = {
   value: string;
@@ -28,8 +29,10 @@ type MetricType = "qubit" | "coupling";
 export function MetricsPageContent() {
   const [selectedChip, setSelectedChip] = useState<string>("");
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>("latest");
   const [metricType, setMetricType] = useState<MetricType>("qubit");
   const [selectedMetric, setSelectedMetric] = useState<string>("t1");
+  const [gridSize, setGridSize] = useState<number>(8);
 
   // Load metrics configuration from backend
   const {
@@ -44,6 +47,7 @@ export function MetricsPageContent() {
   const metricsConfig = metricType === "qubit" ? qubitMetrics : couplingMetrics;
 
   const { data: chipsData } = useListChips();
+  const { data: chipData } = useFetchChip(selectedChip);
 
   // Set default chip when data loads
   useEffect(() => {
@@ -57,6 +61,13 @@ export function MetricsPageContent() {
     }
   }, [selectedChip, chipsData]);
 
+  // Calculate grid size from chip data
+  useEffect(() => {
+    if (chipData?.data?.size) {
+      setGridSize(Math.sqrt(chipData.data.size));
+    }
+  }, [chipData?.data?.size]);
+
   // Fetch metrics data
   const withinHours =
     timeRange === "1d"
@@ -68,7 +79,10 @@ export function MetricsPageContent() {
           : 24 * 7; // Default to 7 days
   const { data, isLoading, isError } = useMetricsGetChipMetrics(
     selectedChip,
-    withinHours ? { within_hours: withinHours } : undefined,
+    {
+      within_hours: withinHours,
+      selection_mode: selectionMode,
+    },
     {
       query: {
         enabled: !!selectedChip,
@@ -95,6 +109,19 @@ export function MetricsPageContent() {
     () => metricsConfig.find((m) => m.key === selectedMetric),
     [metricsConfig, selectedMetric],
   );
+
+  // Check if current metric supports best mode
+  const isBestModeSupported = useMemo(
+    () => currentMetricConfig?.evaluationMode !== "none",
+    [currentMetricConfig],
+  );
+
+  // Auto-switch to latest mode when metric doesn't support best mode
+  useEffect(() => {
+    if (!isBestModeSupported && selectionMode === "best") {
+      setSelectionMode("latest");
+    }
+  }, [isBestModeSupported, selectionMode]);
 
   const metricOptions: MetricOption[] = useMemo(
     () =>
@@ -217,34 +244,62 @@ export function MetricsPageContent() {
             </button>
           </div>
 
-          {/* Time Range Selector and Chip Selector Row */}
+          {/* Time Range and Selection Mode Row */}
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            {/* Time Range Selector */}
-            <div className="join rounded-lg overflow-hidden flex-shrink-0">
-              <button
-                className={`join-item btn btn-sm ${
-                  timeRange === "1d" ? "btn-active" : ""
-                }`}
-                onClick={() => setTimeRange("1d")}
-              >
-                <span>Last 1 Day</span>
-              </button>
-              <button
-                className={`join-item btn btn-sm ${
-                  timeRange === "7d" ? "btn-active" : ""
-                }`}
-                onClick={() => setTimeRange("7d")}
-              >
-                <span>Last 7 Days</span>
-              </button>
-              <button
-                className={`join-item btn btn-sm ${
-                  timeRange === "30d" ? "btn-active" : ""
-                }`}
-                onClick={() => setTimeRange("30d")}
-              >
-                <span>Last 30 Days</span>
-              </button>
+            <div className="flex flex-col sm:flex-row gap-4 flex-shrink-0">
+              {/* Time Range Selector */}
+              <div className="join rounded-lg overflow-hidden">
+                <button
+                  className={`join-item btn btn-sm ${
+                    timeRange === "1d" ? "btn-active" : ""
+                  }`}
+                  onClick={() => setTimeRange("1d")}
+                >
+                  <span>Last 1 Day</span>
+                </button>
+                <button
+                  className={`join-item btn btn-sm ${
+                    timeRange === "7d" ? "btn-active" : ""
+                  }`}
+                  onClick={() => setTimeRange("7d")}
+                >
+                  <span>Last 7 Days</span>
+                </button>
+                <button
+                  className={`join-item btn btn-sm ${
+                    timeRange === "30d" ? "btn-active" : ""
+                  }`}
+                  onClick={() => setTimeRange("30d")}
+                >
+                  <span>Last 30 Days</span>
+                </button>
+              </div>
+
+              {/* Latest/Best Toggle */}
+              <div className="join rounded-lg overflow-hidden">
+                <button
+                  className={`join-item btn btn-sm ${
+                    selectionMode === "latest" ? "btn-active" : ""
+                  }`}
+                  onClick={() => setSelectionMode("latest")}
+                >
+                  <span>Latest</span>
+                </button>
+                <button
+                  className={`join-item btn btn-sm ${
+                    selectionMode === "best" ? "btn-active" : ""
+                  } ${!isBestModeSupported ? "btn-disabled" : ""}`}
+                  onClick={() => setSelectionMode("best")}
+                  disabled={!isBestModeSupported}
+                  title={
+                    !isBestModeSupported
+                      ? "Best mode not available for this metric"
+                      : "Show best values within time range"
+                  }
+                >
+                  <span>Best</span>
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col gap-1 w-full sm:w-auto">
@@ -323,6 +378,7 @@ export function MetricsPageContent() {
               metricKey={currentMetricConfig.key}
               unit={currentMetricConfig.unit}
               colorScale={{ min: 0, max: 0, colors: hexColors }}
+              gridSize={gridSize}
               chipId={selectedChip}
               selectedDate="latest"
             />
@@ -333,6 +389,7 @@ export function MetricsPageContent() {
               metricKey={currentMetricConfig.key}
               unit={currentMetricConfig.unit}
               colorScale={{ min: 0, max: 0, colors: hexColors }}
+              gridSize={gridSize}
               chipId={selectedChip}
               selectedDate="latest"
             />

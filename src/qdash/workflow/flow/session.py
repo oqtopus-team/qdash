@@ -105,6 +105,7 @@ class FlowSession:
         note: dict[str, Any] | None = None,
         enable_github_pull: bool = False,
         github_push_config: GitHubPushConfig | None = None,
+        muxes: list[int] | None = None,
     ) -> None:
         """Initialize a new calibration flow session.
 
@@ -121,6 +122,7 @@ class FlowSession:
             note: Additional notes to store with execution (default: {})
             enable_github_pull: Whether to pull latest config from GitHub before starting (default: False)
             github_push_config: Configuration for GitHub push operations (default: disabled)
+            muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
 
         Raises:
             RuntimeError: If use_lock=True and another calibration is already running
@@ -129,6 +131,7 @@ class FlowSession:
         self.username = username
         self.chip_id = chip_id
         self.qids = qids
+        self.muxes = muxes
         self.backend = backend
         self.use_lock = use_lock
         self._lock_acquired = False
@@ -158,8 +161,9 @@ class FlowSession:
             self._lock_acquired = True
 
         # Set default tags and note
+        # Use name (which is flow_name or display_name) as default tag
         if tags is None:
-            tags = ["python_flow"]
+            tags = [name]
         if note is None:
             note = {}
 
@@ -216,16 +220,22 @@ class FlowSession:
         # Note: For qubex backend, qids must be provided for proper box selection
         # Use task_manager.id for note_path (same as setup_calibration)
         note_path = f"{calib_data_path}/calib_note/{self.task_manager.id}.json"
+        session_config = {
+            "task_type": "qubit",
+            "username": username,
+            "qids": qids,
+            "note_path": note_path,
+            "chip_id": chip_id,
+            "classifier_dir": classifier_dir,
+        }
+
+        # Add muxes if provided
+        if muxes is not None:
+            session_config["muxes"] = muxes
+
         self.session = create_session(
             backend=backend,
-            config={
-                "task_type": "qubit",
-                "username": username,
-                "qids": qids,
-                "note_path": note_path,
-                "chip_id": chip_id,
-                "classifier_dir": classifier_dir,
-            },
+            config=session_config,
         )
 
         # Save calibration_note before connecting (loads parameter overrides)
@@ -710,6 +720,7 @@ def init_calibration(
     note: dict[str, Any] | None = None,
     enable_github_pull: bool = False,
     github_push_config: GitHubPushConfig | None = None,
+    muxes: list[int] | None = None,
 ) -> FlowSession:
     """Initialize a calibration session for use in Prefect flows.
 
@@ -732,6 +743,7 @@ def init_calibration(
         note: Additional notes to store with execution
         enable_github_pull: Whether to pull latest config from GitHub before starting (default: False)
         github_push_config: Configuration for GitHub push operations (default: disabled)
+        muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
 
     Returns:
         Initialized FlowSession instance
@@ -764,6 +776,18 @@ def init_calibration(
             finish_calibration()
         ```
 
+        ```python
+        # For system-level tasks like CheckSkew
+        @flow
+        def skew_calibration(username, chip_id, muxes):
+            session = init_calibration(
+                username, chip_id, qids=[],
+                muxes=muxes
+            )
+            # ... execute CheckSkew task
+            finish_calibration()
+        ```
+
     """
     global _current_session  # noqa: PLW0603
 
@@ -792,6 +816,7 @@ def init_calibration(
         note=note,
         enable_github_pull=enable_github_pull,
         github_push_config=github_push_config,
+        muxes=muxes,
     )
     return _current_session
 

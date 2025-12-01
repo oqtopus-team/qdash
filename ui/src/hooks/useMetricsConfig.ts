@@ -8,12 +8,28 @@
 import { useMemo } from "react";
 import { useMetricsGetMetricsConfig } from "@/client/metrics/metrics";
 
+interface EvaluationConfig {
+  mode: "maximize" | "minimize" | "none";
+}
+
+interface ThresholdRange {
+  min: number;
+  max: number;
+  step: number;
+}
+
+interface ThresholdConfig {
+  value: number;
+  range: ThresholdRange;
+}
+
 interface MetricMetadata {
   title: string;
   unit: string;
   scale: number;
-  display_order: number;
   description?: string;
+  evaluation: EvaluationConfig;
+  threshold?: ThresholdConfig;
 }
 
 interface MetricsConfig {
@@ -24,13 +40,17 @@ interface MetricsConfig {
   };
 }
 
-interface MetricConfig {
+export interface MetricConfig {
   key: string;
   title: string;
   unit: string;
   scale: number;
-  displayOrder: number;
   description?: string;
+  evaluationMode: "maximize" | "minimize" | "none";
+  threshold?: {
+    value: number;
+    range: ThresholdRange;
+  };
 }
 
 /**
@@ -58,43 +78,57 @@ export function useMetricsConfig() {
       return {
         qubitMetrics: [],
         couplingMetrics: [],
+        allMetrics: [],
         colorScale: { colors: [] },
       };
     }
 
     const config = data.data as unknown as MetricsConfig;
 
-    // Transform qubit metrics to array and sort by display_order
+    // Transform qubit metrics to array
+    // Note: Object.entries() preserves insertion order in modern JS (ES2015+)
     const qubitMetrics: MetricConfig[] = Object.entries(
       config.qubit_metrics || {},
-    )
-      .map(([key, metadata]) => ({
-        key,
-        title: metadata.title,
-        unit: metadata.unit,
-        scale: metadata.scale,
-        displayOrder: metadata.display_order,
-        description: metadata.description,
-      }))
-      .sort((a, b) => a.displayOrder - b.displayOrder);
+    ).map(([key, metadata]) => ({
+      key,
+      title: metadata.title,
+      unit: metadata.unit,
+      scale: metadata.scale,
+      description: metadata.description,
+      evaluationMode: metadata.evaluation?.mode || "none",
+      threshold: metadata.threshold
+        ? {
+            value: metadata.threshold.value,
+            range: metadata.threshold.range,
+          }
+        : undefined,
+    }));
 
-    // Transform coupling metrics to array and sort by display_order
+    // Transform coupling metrics to array
     const couplingMetrics: MetricConfig[] = Object.entries(
       config.coupling_metrics || {},
-    )
-      .map(([key, metadata]) => ({
-        key,
-        title: metadata.title,
-        unit: metadata.unit,
-        scale: metadata.scale,
-        displayOrder: metadata.display_order,
-        description: metadata.description,
-      }))
-      .sort((a, b) => a.displayOrder - b.displayOrder);
+    ).map(([key, metadata]) => ({
+      key,
+      title: metadata.title,
+      unit: metadata.unit,
+      scale: metadata.scale,
+      description: metadata.description,
+      evaluationMode: metadata.evaluation?.mode || "none",
+      threshold: metadata.threshold
+        ? {
+            value: metadata.threshold.value,
+            range: metadata.threshold.range,
+          }
+        : undefined,
+    }));
+
+    // Combined metrics for histogram view (all metrics with thresholds)
+    const allMetrics = [...qubitMetrics, ...couplingMetrics];
 
     return {
       qubitMetrics,
       couplingMetrics,
+      allMetrics,
       colorScale: config.color_scale || { colors: [] },
     };
   }, [data]);

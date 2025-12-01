@@ -222,9 +222,10 @@ src/qdash/workflow/.system_note.json
 src/qdash/workflow/*.json
 src/qdash/workflow/.calibration/*.json
 src/qdash/workflow/.classifier/*/*
-/config
-# Exception: Keep metrics configuration in git
-!/config/metrics_metadata.yaml
+# Ignore all files in config directory except metrics.yaml
+/config/*
+!/config/
+!/config/metrics.yaml
 src/tools/schedule/*
 .serena/cache/*
 .mcp.json

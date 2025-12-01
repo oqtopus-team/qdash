@@ -5,7 +5,9 @@ absl-py==2.3.1
     #   chex
     #   optax
 aiocoap==0.4.14
-    # via quel-ic-config
+    # via
+    #   qubecalib
+    #   quel-ic-config
 aiohappyeyeballs==2.6.1
     # via aiohttp
 aiohttp==3.12.15
@@ -469,10 +471,6 @@ pyasn1-modules==0.4.1
     # via service-identity
 pybind11-stubgen==2.5.5
     # via quel-ic-config
-pycairo==1.28.0
-    # via
-    #   pygobject
-    #   quel-ic-config
 pycparser==2.22
     # via cffi
 pydantic==2.4.2
@@ -494,10 +492,6 @@ pygments==2.19.1
     #   jupyter-console
     #   nbconvert
     #   rich
-pygobject==3.50.0
-    # via
-    #   qubecalib
-    #   quel-ic-config
 pylabrad==0.98.2
     # via e7awgsw
 pymongo==4.8.0
@@ -566,14 +560,14 @@ pyzmq==27.0.1
     #   jupyter-server
 qctrl-visualizer==8.0.2
     # via qubex
-qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@381fe82245475385c4f55ec154c11fc2b929b121
+qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@487227c1154aa087e55b9fee1eabda2a164d299c
     # via qubex
-qubex @ git+https://github.com/amachino/qubex.git@59d9f838db09429ffdccc99c0c8319feb7f77908
-quel-clock-master @ git+https://github.com/quel-inc/quelware.git@de4dd6caf967b025b7d529e41a1d6e8c3029cc66#subdirectory=quel_clock_master
+qubex @ git+https://github.com/amachino/qubex.git@d20176016f4bf2f1e1dd18f24d0091e3fb8efd73
+quel-clock-master @ git+https://github.com/quel-inc/quelware.git@c839e8b1a6fde4b4ece3d5f415015829857e775e#subdirectory=quel_clock_master
     # via
     #   qubecalib
     #   quel-ic-config
-quel-ic-config @ git+https://github.com/quel-inc/quelware.git@de4dd6caf967b025b7d529e41a1d6e8c3029cc66#subdirectory=quel_ic_config
+quel-ic-config @ git+https://github.com/quel-inc/quelware.git@c839e8b1a6fde4b4ece3d5f415015829857e775e#subdirectory=quel_ic_config
     # via qubecalib
 qutip==5.2.0
     # via qubex

@@ -893,6 +893,63 @@ def fetch_qubit_task_history(
 
 
 @router.get(
+    "/chip/{chip_id}/task/coupling/{coupling_id}/task/{task_name}",
+    summary="Fetch Coupling Task History",
+    operation_id="fetchCouplingTaskHistory",
+    response_model=TaskHistoryResponse,
+    response_model_exclude_none=True,
+)
+def fetch_coupling_task_history(
+    chip_id: str, coupling_id: str, task_name: str, current_user: Annotated[User, Depends(get_optional_current_user)]
+) -> TaskHistoryResponse:
+    """Fetch coupling task history for a specific coupling and task."""
+    logger.debug(f"Fetching coupling tasks for chip {chip_id}, coupling {coupling_id}, user: {current_user.username}")
+
+    # Get chip info
+    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    if chip is None:
+        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+
+    # Fetch all task results in one query
+    all_results = (
+        TaskResultHistoryDocument.find(
+            {
+                "username": current_user.username,
+                "chip_id": chip_id,
+                "name": task_name,
+                "qid": coupling_id,
+            }
+        )
+        .sort([("end_at", DESCENDING)])
+        .run()
+    )
+
+    # Organize results by task_id
+    data = {}
+    for result in all_results:
+        data[result.task_id] = Task(
+            task_id=result.task_id,
+            name=result.name,
+            status=result.status,
+            message=result.message,
+            input_parameters=result.input_parameters,
+            output_parameters=result.output_parameters,
+            output_parameter_names=result.output_parameter_names,
+            note=result.note,
+            figure_path=result.figure_path,
+            json_figure_path=result.json_figure_path,
+            raw_data_path=result.raw_data_path,
+            start_at=result.start_at,
+            end_at=result.end_at,
+            elapsed_time=result.elapsed_time,
+            task_type=result.task_type,
+            over_threshold=False,
+        )
+
+    return TaskHistoryResponse(name=task_name, data=data)
+
+
+@router.get(
     "/chip/{chip_id}/task/coupling/{task_name}/history/{recorded_date}",
     summary="Fetch historical task results",
     operation_id="fetchHistoricalCouplingTaskGroupedByChip",
