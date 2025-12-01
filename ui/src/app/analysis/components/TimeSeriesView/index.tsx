@@ -44,7 +44,8 @@ export function TimeSeriesView() {
   } = useAnalysisUrlState();
 
   // Secondary axis state (derived from URL state)
-  const secondaryParameter = selectedParameters.length > 0 ? selectedParameters[0] : null;
+  const secondaryParameter =
+    selectedParameters.length > 0 ? selectedParameters[0] : null;
   const showSecondaryAxis = secondaryParameter !== null;
   // Time range management with manual refresh
   const {
@@ -331,123 +332,130 @@ export function TimeSeriesView() {
   }, [timeseriesResponse, selectedParameter, currentMetricConfig]);
 
   // Process secondary data
-  const { secondaryTableData, secondaryTraces, secondaryMetadata } = useMemo(() => {
-    if (!secondaryTimeseriesResponse?.data?.data || !secondaryParameter) {
-      return {
-        secondaryTableData: [],
-        secondaryTraces: [],
-        secondaryMetadata: { unit: "a.u.", description: "" },
-      };
-    }
+  const { secondaryTableData, secondaryTraces, secondaryMetadata } =
+    useMemo(() => {
+      if (!secondaryTimeseriesResponse?.data?.data || !secondaryParameter) {
+        return {
+          secondaryTableData: [],
+          secondaryTraces: [],
+          secondaryMetadata: { unit: "a.u.", description: "" },
+        };
+      }
 
-    // Table data processing
-    const tableRows: any[] = [];
-    Object.entries(secondaryTimeseriesResponse.data.data).forEach(
-      ([qid, dataPoints]) => {
-        if (Array.isArray(dataPoints)) {
-          dataPoints.forEach((point: any) => {
-            tableRows.push({
-              qid,
-              time: point.calibrated_at || "",
-              parameter: secondaryParameter,
-              value: point.value || 0,
-              error: point.error,
-              unit: point.unit || "a.u.",
+      // Table data processing
+      const tableRows: any[] = [];
+      Object.entries(secondaryTimeseriesResponse.data.data).forEach(
+        ([qid, dataPoints]) => {
+          if (Array.isArray(dataPoints)) {
+            dataPoints.forEach((point: any) => {
+              tableRows.push({
+                qid,
+                time: point.calibrated_at || "",
+                parameter: secondaryParameter,
+                value: point.value || 0,
+                error: point.error,
+                unit: point.unit || "a.u.",
+              });
             });
-          });
-        }
-      },
-    );
+          }
+        },
+      );
 
-    // Sort by QID and time
-    const sortedTableData = tableRows.sort((a, b) => {
-      const qidCompare = parseInt(a.qid) - parseInt(b.qid);
-      if (qidCompare !== 0) return qidCompare;
-      return a.time.localeCompare(b.time);
-    });
+      // Sort by QID and time
+      const sortedTableData = tableRows.sort((a, b) => {
+        const qidCompare = parseInt(a.qid) - parseInt(b.qid);
+        if (qidCompare !== 0) return qidCompare;
+        return a.time.localeCompare(b.time);
+      });
 
-    // Plot data processing
-    const qidData: Record<
-      string,
-      { x: string[]; y: number[]; error: number[] }
-    > = {};
+      // Plot data processing
+      const qidData: Record<
+        string,
+        { x: string[]; y: number[]; error: number[] }
+      > = {};
 
-    Object.entries(secondaryTimeseriesResponse.data.data).forEach(
-      ([qid, dataPoints]) => {
-        if (Array.isArray(dataPoints)) {
-          qidData[qid] = {
-            x: dataPoints.map((point: any) => point.calibrated_at || ""),
-            y: dataPoints.map((point: any) => {
-              const value = point.value;
-              if (typeof value === "number") return value;
-              if (typeof value === "string") return Number(value) || 0;
-              return 0;
-            }),
-            error: dataPoints.map((point: any) => point.error || 0),
-          };
-        }
-      },
-    );
+      Object.entries(secondaryTimeseriesResponse.data.data).forEach(
+        ([qid, dataPoints]) => {
+          if (Array.isArray(dataPoints)) {
+            qidData[qid] = {
+              x: dataPoints.map((point: any) => point.calibrated_at || ""),
+              y: dataPoints.map((point: any) => {
+                const value = point.value;
+                if (typeof value === "number") return value;
+                if (typeof value === "string") return Number(value) || 0;
+                return 0;
+              }),
+              error: dataPoints.map((point: any) => point.error || 0),
+            };
+          }
+        },
+      );
 
-    // Sort QIDs numerically and create traces for secondary axis
-    const sortedQids = Object.keys(qidData).sort(
-      (a, b) => parseInt(a) - parseInt(b),
-    );
-    const traces = sortedQids.map((qid, index) => ({
-      x: qidData[qid].x,
-      y: qidData[qid].y,
-      error_y: {
-        type: "data" as const,
-        array: qidData[qid].error as Plotly.Datum[],
-        visible: true,
-        color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
-      },
-      type: "scatter" as const,
-      mode: "lines+markers" as const,
-      name: `${secondaryMetricConfig?.title || secondaryParameter} Q${qid}`,
-      legendgroup: "secondary",
-      yaxis: "y2",
-      line: {
-        shape: "linear" as const,
-        width: 2,
-        dash: "dash" as const,
-        color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
-      },
-      marker: {
-        size: 8,
-        symbol: "diamond",
-        color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
-      },
-      hovertemplate:
-        `<b>${secondaryMetricConfig?.title || secondaryParameter}</b><br>` +
-        "Time: %{x}<br>Value: %{y:.6g}" +
-        (qidData[qid].error[0] ? "<br>Error: ±%{error_y.array:.6g}" : "") +
-        "<br>QID: " +
-        qid +
-        "<extra></extra>",
-    }));
+      // Sort QIDs numerically and create traces for secondary axis
+      const sortedQids = Object.keys(qidData).sort(
+        (a, b) => parseInt(a) - parseInt(b),
+      );
+      const traces = sortedQids.map((qid, index) => ({
+        x: qidData[qid].x,
+        y: qidData[qid].y,
+        error_y: {
+          type: "data" as const,
+          array: qidData[qid].error as Plotly.Datum[],
+          visible: true,
+          color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
+        },
+        type: "scatter" as const,
+        mode: "lines+markers" as const,
+        name: `${secondaryMetricConfig?.title || secondaryParameter} Q${qid}`,
+        legendgroup: "secondary",
+        yaxis: "y2",
+        line: {
+          shape: "linear" as const,
+          width: 2,
+          dash: "dash" as const,
+          color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
+        },
+        marker: {
+          size: 8,
+          symbol: "diamond",
+          color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
+        },
+        hovertemplate:
+          `<b>${secondaryMetricConfig?.title || secondaryParameter}</b><br>` +
+          "Time: %{x}<br>Value: %{y:.6g}" +
+          (qidData[qid].error[0] ? "<br>Error: ±%{error_y.array:.6g}" : "") +
+          "<br>QID: " +
+          qid +
+          "<extra></extra>",
+      }));
 
-    // Extract metadata
-    const firstEntry = Object.entries(secondaryTimeseriesResponse.data.data)[0];
-    let metaInfo = { unit: "a.u.", description: "" };
-    if (
-      firstEntry &&
-      Array.isArray(firstEntry[1]) &&
-      firstEntry[1].length > 0
-    ) {
-      const firstPoint = firstEntry[1][0] as any;
-      metaInfo = {
-        unit: firstPoint.unit || "a.u.",
-        description: firstPoint.description || "",
+      // Extract metadata
+      const firstEntry = Object.entries(
+        secondaryTimeseriesResponse.data.data,
+      )[0];
+      let metaInfo = { unit: "a.u.", description: "" };
+      if (
+        firstEntry &&
+        Array.isArray(firstEntry[1]) &&
+        firstEntry[1].length > 0
+      ) {
+        const firstPoint = firstEntry[1][0] as any;
+        metaInfo = {
+          unit: firstPoint.unit || "a.u.",
+          description: firstPoint.description || "",
+        };
+      }
+
+      return {
+        secondaryTableData: sortedTableData,
+        secondaryTraces: traces,
+        secondaryMetadata: metaInfo,
       };
-    }
-
-    return {
-      secondaryTableData: sortedTableData,
-      secondaryTraces: traces,
-      secondaryMetadata: metaInfo,
-    };
-  }, [secondaryTimeseriesResponse, secondaryParameter, secondaryMetricConfig]);
+    }, [
+      secondaryTimeseriesResponse,
+      secondaryParameter,
+      secondaryMetricConfig,
+    ]);
 
   // Combined plot data
   const plotData = useMemo(() => {
@@ -589,7 +597,9 @@ export function TimeSeriesView() {
     return (
       <ErrorCard
         title="Secondary Axis Data Error"
-        message={secondaryError.message || "Failed to load secondary parameter data"}
+        message={
+          secondaryError.message || "Failed to load secondary parameter data"
+        }
         onRetry={() => window.location.reload()}
       />
     );
@@ -690,7 +700,9 @@ export function TimeSeriesView() {
         </div>
         <div className="grid grid-cols-3 gap-6">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-base-content/70">Chip</label>
+            <label className="text-sm font-medium text-base-content/70">
+              Chip
+            </label>
             <ChipSelector
               selectedChip={selectedChip}
               onChipSelect={setSelectedChip}
@@ -743,7 +755,9 @@ export function TimeSeriesView() {
             />
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-base-content/70">Tag</label>
+            <label className="text-sm font-medium text-base-content/70">
+              Tag
+            </label>
             <TagSelector
               tags={tags}
               selectedTag={selectedTag}
@@ -759,7 +773,9 @@ export function TimeSeriesView() {
             <div className="space-y-1">
               <label className="text-sm font-medium text-base-content/70">
                 Secondary Parameter
-                <span className="ml-1 text-xs" style={{ color: "#e377c2" }}>(Right Y)</span>
+                <span className="ml-1 text-xs" style={{ color: "#e377c2" }}>
+                  (Right Y)
+                </span>
               </label>
               {!showSecondaryAxis ? (
                 <Select<{ value: string; label: string }, false>
@@ -1042,7 +1058,9 @@ export function TimeSeriesView() {
           <button
             className="btn btn-sm btn-outline gap-2"
             onClick={handleDownloadCSV}
-            disabled={(showSecondaryAxis ? combinedTableData : tableData).length === 0}
+            disabled={
+              (showSecondaryAxis ? combinedTableData : tableData).length === 0
+            }
             title="Download all data as CSV"
           >
             <svg
