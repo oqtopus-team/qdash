@@ -1,3 +1,4 @@
+import secrets
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, status
@@ -7,38 +8,47 @@ from qdash.api.lib.auth import (
     get_current_active_user,
     get_password_hash,
 )
-from qdash.api.schemas.auth import User, UserCreate
+from qdash.api.schemas.auth import TokenResponse, User, UserCreate, UserWithToken
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.user import UserDocument
 
+
+def generate_access_token() -> str:
+    """Generate a secure random access token."""
+    return secrets.token_urlsafe(32)
+
+
 router = APIRouter(
     prefix="/auth",
-    tags=["authentication"],
     responses={404: {"description": "Not found"}},
 )
 
 
-@router.post("/login")
+@router.post("/login", response_model=TokenResponse)
 def login(
     username: str = Form(),
     password: str = Form(),
-) -> dict[str, str]:
-    """Login endpoint to authenticate user and return username."""
+) -> TokenResponse:
+    """Login endpoint to authenticate user and return access token."""
     logger.debug(f"Login attempt for user: {username}")
     user = authenticate_user(username, password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "ApiKey"},
+            headers={"WWW-Authenticate": "Bearer"},
         )
     logger.debug(f"Login successful for user: {user.username}")
-    return {"username": user.username}
+    return TokenResponse(
+        access_token=user.access_token,
+        token_type="bearer",
+        username=user.username,
+    )
 
 
-@router.post("/register", response_model=User)
-def register_user(user_data: UserCreate) -> User:
-    """Register a new user."""
+@router.post("/register", response_model=UserWithToken)
+def register_user(user_data: UserCreate) -> UserWithToken:
+    """Register a new user and return access token."""
     logger.debug(f"Registration attempt for user: {user_data.username}")
     # Check if username already exists
     query = UserDocument.find_one({"username": user_data.username}).run()
@@ -49,21 +59,24 @@ def register_user(user_data: UserCreate) -> User:
             detail="Username already registered",
         )
 
-    # Create new user
+    # Create new user with access token
     hashed_password = get_password_hash(user_data.password)
+    access_token = generate_access_token()
     user = UserDocument(
         username=user_data.username,
         hashed_password=hashed_password,
+        access_token=access_token,
         full_name=user_data.full_name,
         system_info=SystemInfoModel(),
     )
     user.insert()
     logger.debug(f"New user created: {user_data.username}")
 
-    return User(
+    return UserWithToken(
         username=user.username,
         full_name=user.full_name,
         disabled=user.disabled,
+        access_token=user.access_token,
     )
 
 

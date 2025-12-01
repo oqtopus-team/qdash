@@ -22,12 +22,13 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
-  AuthLogin200,
   AuthLogout200,
   BodyAuthLogin,
   HTTPValidationError,
+  TokenResponse,
   User,
   UserCreate,
+  UserWithToken,
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
@@ -36,7 +37,7 @@ import type { ErrorType, BodyType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Login endpoint to authenticate user and return username.
+ * Login endpoint to authenticate user and return access token.
  * @summary Login
  */
 export const authLogin = (
@@ -48,7 +49,7 @@ export const authLogin = (
   formUrlEncoded.append(`username`, bodyAuthLogin.username);
   formUrlEncoded.append(`password`, bodyAuthLogin.password);
 
-  return customInstance<AuthLogin200>(
+  return customInstance<TokenResponse>(
     {
       url: `/api/auth/login`,
       method: "POST",
@@ -132,7 +133,7 @@ export const useAuthLogin = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Register a new user.
+ * Register a new user and return access token.
  * @summary Register User
  */
 export const authRegisterUser = (
@@ -140,7 +141,7 @@ export const authRegisterUser = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
-  return customInstance<User>(
+  return customInstance<UserWithToken>(
     {
       url: `/api/auth/register`,
       method: "POST",

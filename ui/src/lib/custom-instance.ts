@@ -6,27 +6,22 @@ export const AXIOS_INSTANCE = Axios.create();
 
 // リクエストインターセプターを追加
 AXIOS_INSTANCE.interceptors.request.use((config) => {
-  // クッキーからユーザー名を取得
-  const username = document.cookie
+  // クッキーからトークンを取得
+  const token = document.cookie
     .split("; ")
-    .find((row) => row.startsWith("username="))
+    .find((row) => row.startsWith("access_token="))
     ?.split("=")[1];
 
-  if (username) {
-    // ユーザー名をデコード
-    const decodedUsername = decodeURIComponent(username);
-    // X-Usernameヘッダーを設定
+  if (token) {
+    // トークンをデコード
+    const decodedToken = decodeURIComponent(token);
+    // Authorization: Bearer ヘッダーを設定
     if (!config.headers) {
       config.headers = new AxiosHeaders();
     }
     if (config.headers instanceof AxiosHeaders) {
-      config.headers.set("X-Username", decodedUsername);
-      console.debug(
-        "Setting X-Username header:",
-        decodedUsername,
-        "for URL:",
-        config.url,
-      );
+      config.headers.set("Authorization", `Bearer ${decodedToken}`);
+      console.debug("Setting Authorization header for URL:", config.url);
     }
   }
 

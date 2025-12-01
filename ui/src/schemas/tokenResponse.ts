@@ -5,11 +5,12 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { Tag } from "./tag";
 
 /**
- * Response model for a list of tags.
+ * Token response model for login.
  */
-export interface ListTagResponse {
-  tags: Tag[];
+export interface TokenResponse {
+  access_token: string;
+  token_type?: string;
+  username: string;
 }

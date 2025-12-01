@@ -21,6 +21,7 @@ import {
 interface AuthContextType {
   user: User | null;
   username: string | null;
+  accessToken: string | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
@@ -32,28 +33,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // 認証情報の保存
-  const saveAuth = useCallback((username: string) => {
-    const maxAge = 7 * 24 * 60 * 60; // 7 days
-    // Save both token and username cookies
-    document.cookie = `token=${encodeURIComponent(
-      username,
+  const saveAuth = useCallback((token: string, user: string) => {
+    const maxAge = 365 * 24 * 60 * 60; // 1 year (long-term token)
+    // Save access token and username cookies
+    document.cookie = `access_token=${encodeURIComponent(
+      token,
     )}; path=/; max-age=${maxAge}; SameSite=Lax`;
     document.cookie = `username=${encodeURIComponent(
-      username,
+      user,
     )}; path=/; max-age=${maxAge}; SameSite=Lax`;
-    setUsername(username);
+    setAccessToken(token);
+    setUsername(user);
   }, []);
 
   // 認証情報の削除
   const removeAuth = useCallback(() => {
-    // Remove both token and username cookies
+    // Remove access token and username cookies
     document.cookie =
-      "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+      "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
     document.cookie =
       "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+    setAccessToken(null);
     setUsername(null);
   }, []);
 
@@ -66,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ユーザー情報の取得
   const { data: userData, error: userError } = useAuthReadUsersMe({
     query: {
-      enabled: !!username,
+      enabled: !!accessToken,
       retry: false,
     },
   });
@@ -91,13 +95,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const token = document.cookie
       .split("; ")
-      .find((row) => row.startsWith("token="))
+      .find((row) => row.startsWith("access_token="))
       ?.split("=")[1];
 
-    if (token) {
+    const user = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("username="))
+      ?.split("=")[1];
+
+    if (token && user) {
       try {
-        const username = decodeURIComponent(token);
-        setUsername(username);
+        const decodedToken = decodeURIComponent(token);
+        const decodedUser = decodeURIComponent(user);
+        setAccessToken(decodedToken);
+        setUsername(decodedUser);
       } catch (error) {
         console.error("Failed to decode token:", error);
         removeAuth();
@@ -117,8 +128,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
 
-        // 認証情報を保存
-        saveAuth(response.data.username);
+        // 認証情報を保存 (access_token と username)
+        saveAuth(response.data.access_token, response.data.username);
 
         // 即座にリダイレクト
         router.replace("/execution");
@@ -157,7 +168,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logoutMutation, removeAuth, loginMutation]);
 
   return (
-    <AuthContext.Provider value={{ user, username, login, logout, loading }}>
+    <AuthContext.Provider
+      value={{ user, username, accessToken, login, logout, loading }}
+    >
       {children}
     </AuthContext.Provider>
   );

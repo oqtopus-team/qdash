@@ -5,14 +5,16 @@ import os
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import yaml
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.logger import logger
 from fastapi.responses import FileResponse
 from git import Repo
 from git.exc import GitCommandError
+from qdash.api.lib.auth import get_current_active_user
+from qdash.api.schemas.auth import User
 from qdash.api.schemas.file import (
     FileTreeNode,
     GitPushRequest,
@@ -260,7 +262,10 @@ def get_file_content(path: str) -> dict[str, Any]:
     summary="Save file content",
     operation_id="saveFileContent",
 )
-def save_file_content(request: SaveFileRequest) -> dict[str, str]:
+def save_file_content(
+    request: SaveFileRequest,
+    _current_user: Annotated[User, Depends(get_current_active_user)],
+) -> dict[str, str]:
     """Save file content.
 
     Args:
@@ -397,7 +402,9 @@ def get_git_status() -> dict[str, Any]:
     summary="Pull latest config from Git repository",
     operation_id="gitPullConfig",
 )
-def git_pull_config() -> dict[str, Any]:
+def git_pull_config(
+    _current_user: Annotated[User, Depends(get_current_active_user)],
+) -> dict[str, Any]:
     """Pull latest config from Git repository.
 
     Returns
@@ -494,7 +501,10 @@ def git_pull_config() -> dict[str, Any]:
     summary="Push config changes to Git repository",
     operation_id="gitPushConfig",
 )
-def git_push_config(request: GitPushRequest) -> dict[str, Any]:
+def git_push_config(
+    request: GitPushRequest,
+    _current_user: Annotated[User, Depends(get_current_active_user)],
+) -> dict[str, Any]:
     """Push config changes to Git repository.
 
     Args:

@@ -15,19 +15,42 @@
     "version": "0.0.1"
   },
   "paths": {
-    "/api/calibration/note": {
-      "get": {
-        "tags": ["calibration"],
-        "summary": "Fetches all the cron schedules.",
-        "description": "Get the calibration note.",
-        "operationId": "listCronSchedules",
+    "/api/auth/login": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Login",
+        "description": "Login endpoint to authenticate user and return access token.",
+        "operationId": "auth-login",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_auth-login"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CalibrationNoteResponse"
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -35,22 +58,95 @@
         }
       }
     },
-    "/api/settings": {
-      "get": {
-        "tags": ["settings"],
-        "summary": "Get settings",
-        "description": "Get settings from the server",
-        "operationId": "fetch_config",
+    "/api/auth/register": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Register User",
+        "description": "Register a new user and return access token.",
+        "operationId": "auth-register_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Settings"
+                  "$ref": "#/components/schemas/UserWithToken"
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Read Users Me",
+        "description": "Get current user information.",
+        "operationId": "auth-read_users_me",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Logout",
+        "description": "Logout endpoint.\n\nThis endpoint doesn't need to do anything on the backend since the username is managed client-side.\nThe client will remove the username from cookies.",
+        "operationId": "auth-logout",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Auth-Logout"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
           }
         }
       }
@@ -119,6 +215,351 @@
         }
       }
     },
+    "/api/file/raw_data": {
+      "get": {
+        "tags": ["file"],
+        "summary": "download file",
+        "description": "Download a file.",
+        "operationId": "downloadFile",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/zip": {
+      "get": {
+        "tags": ["file"],
+        "summary": "download file or directory as zip",
+        "description": "Download a file or directory as zip.",
+        "operationId": "downloadZipFile",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/tree": {
+      "get": {
+        "tags": ["file"],
+        "summary": "Get file tree for entire config directory",
+        "description": "Get file tree structure for entire config directory (all chips).\n\nReturns\n-------\n    File tree structure",
+        "operationId": "getFileTree",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FileTreeNode"
+                  },
+                  "type": "array",
+                  "title": "Response Getfiletree"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/content": {
+      "get": {
+        "tags": ["file"],
+        "summary": "Get file content for editing",
+        "description": "Get file content for editing.\n\nArgs:\n----\n    path: Relative path from CONFIG_BASE_PATH (e.g., \"64Qv2/config/chip.yaml\")\n\nReturns:\n-------\n    File content and metadata",
+        "operationId": "getFileContent",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Getfilecontent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["file"],
+        "summary": "Save file content",
+        "description": "Save file content.\n\nArgs:\n----\n    request: Save file request with path and content\n\nReturns:\n-------\n    Success message",
+        "operationId": "saveFileContent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveFileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Savefilecontent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/validate": {
+      "post": {
+        "tags": ["file"],
+        "summary": "Validate file content (YAML/JSON)",
+        "description": "Validate YAML or JSON content.\n\nArgs:\n----\n    request: Validation request with content and file_type\n\nReturns:\n-------\n    Validation result",
+        "operationId": "validateFileContent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateFileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Validatefilecontent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/git/status": {
+      "get": {
+        "tags": ["file"],
+        "summary": "Get Git status of config directory",
+        "description": "Get Git status of config directory.\n\nReturns\n-------\n    Git status information",
+        "operationId": "getGitStatus",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Getgitstatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/git/pull": {
+      "post": {
+        "tags": ["file"],
+        "summary": "Pull latest config from Git repository",
+        "description": "Pull latest config from Git repository.\n\nReturns\n-------\n    Pull operation result",
+        "operationId": "gitPullConfig",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Gitpullconfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file/git/push": {
+      "post": {
+        "tags": ["file"],
+        "summary": "Push config changes to Git repository",
+        "description": "Push config changes to Git repository.\n\nArgs:\n----\n    request: Push request with commit message\n\nReturns:\n-------\n    Push operation result",
+        "operationId": "gitPushConfig",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitPushRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Gitpushconfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calibration/note": {
+      "get": {
+        "tags": ["calibration"],
+        "summary": "Fetches all the cron schedules.",
+        "description": "Get the calibration note.",
+        "operationId": "listCronSchedules",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationNoteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": ["settings"],
+        "summary": "Get settings",
+        "description": "Get settings from the server",
+        "operationId": "fetch_config",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chip": {
       "get": {
         "tags": ["chip"],
@@ -143,7 +584,7 @@
         },
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ]
       },
@@ -231,7 +672,7 @@
       "get": {
         "tags": ["chip"],
         "summary": "Fetch a chip",
-        "description": "Fetch a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Chip information",
+        "description": "Fetch a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Chip information\n\nRaises\n------\nHTTPException\n    If chip is not found",
         "operationId": "fetchChip",
         "parameters": [
           {
@@ -598,7 +1039,7 @@
         "operationId": "fetchQubitTaskHistory",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -662,7 +1103,7 @@
         "operationId": "fetchCouplingTaskHistory",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -990,451 +1431,6 @@
         }
       }
     },
-    "/api/file/raw_data": {
-      "get": {
-        "tags": ["file"],
-        "summary": "download file",
-        "description": "Download a file.",
-        "operationId": "downloadFile",
-        "parameters": [
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/file/zip": {
-      "get": {
-        "tags": ["file"],
-        "summary": "download file or directory as zip",
-        "description": "Download a file or directory as zip.",
-        "operationId": "downloadZipFile",
-        "parameters": [
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/file/tree": {
-      "get": {
-        "tags": ["file"],
-        "summary": "Get file tree for entire config directory",
-        "description": "Get file tree structure for entire config directory (all chips).\n\nReturns\n-------\n    File tree structure",
-        "operationId": "getFileTree",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/FileTreeNode"
-                  },
-                  "type": "array",
-                  "title": "Response Getfiletree"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/file/content": {
-      "get": {
-        "tags": ["file"],
-        "summary": "Get file content for editing",
-        "description": "Get file content for editing.\n\nArgs:\n----\n    path: Relative path from CONFIG_BASE_PATH (e.g., \"64Qv2/config/chip.yaml\")\n\nReturns:\n-------\n    File content and metadata",
-        "operationId": "getFileContent",
-        "parameters": [
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Getfilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": ["file"],
-        "summary": "Save file content",
-        "description": "Save file content.\n\nArgs:\n----\n    request: Save file request with path and content\n\nReturns:\n-------\n    Success message",
-        "operationId": "saveFileContent",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SaveFileRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Savefilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/file/validate": {
-      "post": {
-        "tags": ["file"],
-        "summary": "Validate file content (YAML/JSON)",
-        "description": "Validate YAML or JSON content.\n\nArgs:\n----\n    request: Validation request with content and file_type\n\nReturns:\n-------\n    Validation result",
-        "operationId": "validateFileContent",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ValidateFileRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Validatefilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/file/git/status": {
-      "get": {
-        "tags": ["file"],
-        "summary": "Get Git status of config directory",
-        "description": "Get Git status of config directory.\n\nReturns\n-------\n    Git status information",
-        "operationId": "getGitStatus",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Getgitstatus"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/file/git/pull": {
-      "post": {
-        "tags": ["file"],
-        "summary": "Pull latest config from Git repository",
-        "description": "Pull latest config from Git repository.\n\nReturns\n-------\n    Pull operation result",
-        "operationId": "gitPullConfig",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Gitpullconfig"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/file/git/push": {
-      "post": {
-        "tags": ["file"],
-        "summary": "Push config changes to Git repository",
-        "description": "Push config changes to Git repository.\n\nArgs:\n----\n    request: Push request with commit message\n\nReturns:\n-------\n    Push operation result",
-        "operationId": "gitPushConfig",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GitPushRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Gitpushconfig"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/login": {
-      "post": {
-        "tags": ["auth", "authentication"],
-        "summary": "Login",
-        "description": "Login endpoint to authenticate user and return username.",
-        "operationId": "auth-login",
-        "requestBody": {
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_auth-login"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Auth-Login"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/register": {
-      "post": {
-        "tags": ["auth", "authentication"],
-        "summary": "Register User",
-        "description": "Register a new user.",
-        "operationId": "auth-register_user",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UserCreate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/me": {
-      "get": {
-        "tags": ["auth", "authentication"],
-        "summary": "Read Users Me",
-        "description": "Get current user information.",
-        "operationId": "auth-read_users_me",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found"
-          }
-        }
-      }
-    },
-    "/api/auth/logout": {
-      "post": {
-        "tags": ["auth", "authentication"],
-        "summary": "Logout",
-        "description": "Logout endpoint.\n\nThis endpoint doesn't need to do anything on the backend since the username is managed client-side.\nThe client will remove the username from cookies.",
-        "operationId": "auth-logout",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Auth-Logout"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found"
-          }
-        }
-      }
-    },
     "/api/tasks": {
       "get": {
         "tags": ["task"],
@@ -1663,7 +1659,7 @@
         },
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ]
       }
@@ -2210,7 +2206,7 @@
         "operationId": "metrics-get_chip_metrics",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -2287,7 +2283,7 @@
         "operationId": "metrics-list_chips",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -2338,7 +2334,7 @@
         "operationId": "metrics-get_current_chip",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -2391,7 +2387,7 @@
         "operationId": "metrics-get_qubit_metric_history",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -2496,7 +2492,7 @@
         "operationId": "metrics-get_coupling_metric_history",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -3650,7 +3646,7 @@
         "type": "object",
         "required": ["tags"],
         "title": "ListTagResponse",
-        "description": "Response model for a list of tasks."
+        "description": "Response model for a list of tags."
       },
       "ListTaskResponse": {
         "properties": {
@@ -4491,7 +4487,7 @@
         "type": "object",
         "required": ["name"],
         "title": "Tag",
-        "description": "Response model for a task."
+        "description": "Response model for a tag."
       },
       "Task": {
         "properties": {
@@ -4716,7 +4712,8 @@
         },
         "type": "object",
         "required": ["name", "data"],
-        "title": "TaskHistoryResponse"
+        "title": "TaskHistoryResponse",
+        "description": "TaskHistoryResponse is a Pydantic model that represents the response for fetching task history."
       },
       "TaskResponse": {
         "properties": {
@@ -4864,6 +4861,27 @@
         "title": "TimeSeriesData",
         "description": "TimeSeriesData is a Pydantic model that represents the time series data."
       },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "required": ["access_token", "username"],
+        "title": "TokenResponse",
+        "description": "Token response model for login."
+      },
       "UpdateScheduleRequest": {
         "properties": {
           "active": {
@@ -4987,6 +5005,44 @@
         "title": "UserCreate",
         "description": "User creation model for registration."
       },
+      "UserWithToken": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "disabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled"
+          },
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          }
+        },
+        "type": "object",
+        "required": ["username", "access_token"],
+        "title": "UserWithToken",
+        "description": "User model with access token for login/register responses."
+      },
       "ValidateFileRequest": {
         "properties": {
           "content": {
@@ -5034,10 +5090,9 @@
       }
     },
     "securitySchemes": {
-      "APIKeyHeader": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-Username"
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
       }
     }
   }
