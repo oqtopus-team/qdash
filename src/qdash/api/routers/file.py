@@ -13,7 +13,7 @@ from fastapi.logger import logger
 from fastapi.responses import FileResponse
 from git import Repo
 from git.exc import GitCommandError
-from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
+from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.file import (
     FileTreeNode,
@@ -127,10 +127,7 @@ def build_file_tree(directory: Path, base_path: Path) -> list[FileTreeNode]:
     operation_id="downloadFile",
     response_class=FileResponse,
 )
-def download_file(
-    path: str,
-    _current_user: Annotated[User | None, Depends(get_optional_current_user)] = None,
-) -> FileResponse:
+def download_file(path: str) -> FileResponse:
     """Download a file."""
     if not Path(path).exists():
         raise HTTPException(status_code=404, detail=f"File not found: {path}")
@@ -144,10 +141,7 @@ def download_file(
     operation_id="downloadZipFile",
     response_class=FileResponse,
 )
-def download_zip_file(
-    path: str,
-    _current_user: Annotated[User | None, Depends(get_optional_current_user)] = None,
-) -> FileResponse:
+def download_zip_file(path: str) -> FileResponse:
     """Download a file or directory as zip."""
     import shutil
     import tempfile
@@ -208,9 +202,7 @@ def download_zip_file(
     operation_id="getFileTree",
     response_model=list[FileTreeNode],
 )
-def get_file_tree(
-    _current_user: Annotated[User | None, Depends(get_optional_current_user)] = None,
-) -> list[FileTreeNode]:
+def get_file_tree() -> list[FileTreeNode]:
     """Get file tree structure for entire config directory (all chips).
 
     Returns
@@ -229,10 +221,7 @@ def get_file_tree(
     summary="Get file content for editing",
     operation_id="getFileContent",
 )
-def get_file_content(
-    path: str,
-    _current_user: Annotated[User | None, Depends(get_optional_current_user)] = None,
-) -> dict[str, Any]:
+def get_file_content(path: str) -> dict[str, Any]:
     """Get file content for editing.
 
     Args:
@@ -275,7 +264,7 @@ def get_file_content(
 )
 def save_file_content(
     request: SaveFileRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    _current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> dict[str, str]:
     """Save file content.
 
@@ -312,10 +301,7 @@ def save_file_content(
     summary="Validate file content (YAML/JSON)",
     operation_id="validateFileContent",
 )
-def validate_file_content(
-    request: ValidateFileRequest,
-    _current_user: Annotated[User | None, Depends(get_optional_current_user)] = None,
-) -> dict[str, Any]:
+def validate_file_content(request: ValidateFileRequest) -> dict[str, Any]:
     """Validate YAML or JSON content.
 
     Args:
@@ -362,9 +348,7 @@ def validate_file_content(
     summary="Get Git status of config directory",
     operation_id="getGitStatus",
 )
-def get_git_status(
-    _current_user: Annotated[User | None, Depends(get_optional_current_user)] = None,
-) -> dict[str, Any]:
+def get_git_status() -> dict[str, Any]:
     """Get Git status of config directory.
 
     Returns
@@ -419,7 +403,7 @@ def get_git_status(
     operation_id="gitPullConfig",
 )
 def git_pull_config(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    _current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> dict[str, Any]:
     """Pull latest config from Git repository.
 
@@ -519,7 +503,7 @@ def git_pull_config(
 )
 def git_push_config(
     request: GitPushRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    _current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> dict[str, Any]:
     """Push config changes to Git repository.
 
