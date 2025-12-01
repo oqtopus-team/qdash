@@ -1,14 +1,27 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 
 import pendulum
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict
 from pymongo import ASCENDING, DESCENDING
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
 from qdash.api.schemas.auth import User
+from qdash.api.schemas.chip import (
+    ChipDatesResponse,
+    ChipResponse,
+    CreateChipRequest,
+    ExecutionResponseDetail,
+    ExecutionResponseSummary,
+    LatestTaskGroupedByChipResponse,
+    ListMuxResponse,
+    MuxDetailResponse,
+    Task,
+    TaskHistoryResponse,
+    TimeSeriesData,
+    TimeSeriesProjection,
+)
 from qdash.api.services.chip_initializer import ChipInitializer
 from qdash.api.services.response_processor import response_processor
 from qdash.datamodel.task import OutputParameterModel
@@ -26,104 +39,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 QUBIT_FIDELITY_THRESHOLD = 0.99
 COUPLING_FIDELITY_THRESHOLD = 0.75
-
-
-class ExecutionResponseSummary(BaseModel):
-    """ExecutionResponseSummaryV2 is a Pydantic model that represents the summary of an execution response.
-
-    Attributes
-    ----------
-        name (str): The name of the execution.
-        status (str): The current status of the execution.
-        start_at (str): The start time of the execution.
-        end_at (str): The end time of the execution.
-        elapsed_time (str): The total elapsed time of the execution.
-
-    """
-
-    name: str
-    execution_id: str
-    status: str
-    start_at: str
-    end_at: str
-    elapsed_time: str
-    tags: list[str]
-    note: dict
-
-
-class Task(BaseModel):
-    """Task is a Pydantic model that represents a task."""
-
-    task_id: str | None = None
-    qid: str | None = None
-    name: str = ""  # Default empty string for name
-    upstream_id: str | None = None
-    status: str = "pending"  # Default status
-    message: str | None = None
-    input_parameters: dict[str, Any] | None = None
-    output_parameters: dict[str, Any] | None = None
-    output_parameter_names: list[str] | None = None
-    note: dict[str, Any] | None = None
-    figure_path: list[str] | None = None
-    json_figure_path: list[str] | None = None
-    raw_data_path: list[str] | None = None
-    start_at: str | None = None
-    end_at: str | None = None
-    elapsed_time: str | None = None
-    task_type: str | None = None
-    default_view: bool = True
-    over_threshold: bool = False
-
-
-class ExecutionResponseDetail(BaseModel):
-    """ExecutionResponseDetailV2 is a Pydantic model that represents the detail of an execution response.
-
-    Attributes
-    ----------
-        name (str): The name of the execution.
-        status (str): The current status of the execution.
-        start_at (str): The start time
-
-    """
-
-    name: str
-    status: str
-    start_at: str
-    end_at: str
-    elapsed_time: str
-    task: list[Task]
-    note: dict
-
-
-class ChipResponse(BaseModel):
-    """Chip is a Pydantic model that represents a chip.
-
-    Attributes
-    ----------
-        chip_id (str): The ID of the chip.
-        name (str): The name of the chip.
-
-    """
-
-    chip_id: str
-    size: int = 64
-    qubits: dict[str, Any] = {}
-    couplings: dict[str, Any] = {}
-    installed_at: str = ""
-
-
-class CreateChipRequest(BaseModel):
-    """Request model for creating a new chip.
-
-    Attributes
-    ----------
-        chip_id (str): The ID of the chip to create.
-        size (int): The size of the chip (64, 144, 256, or 1024).
-
-    """
-
-    chip_id: str
-    size: int = 64
 
 
 @router.get("/chip", response_model=list[ChipResponse], summary="Fetch all chips", operation_id="listChips")
@@ -206,12 +121,6 @@ def create_chip(
     except Exception as e:
         logger.error(f"Error creating chip {request.chip_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create chip: {str(e)}") from e
-
-
-class ChipDatesResponse(BaseModel):
-    """Response model for chip dates."""
-
-    data: list[str]
 
 
 @router.get(
@@ -466,19 +375,6 @@ def fetch_execution_by_chip_id(
     )
 
 
-class MuxDetailResponse(BaseModel):
-    """MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details."""
-
-    mux_id: int
-    detail: dict[str, dict[str, Task]]
-
-
-class ListMuxResponse(BaseModel):
-    """ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers."""
-
-    muxes: dict[int, MuxDetailResponse]
-
-
 def _build_mux_detail(
     mux_id: int,
     tasks: list,
@@ -643,13 +539,6 @@ def list_muxes(chip_id: str, current_user: Annotated[User, Depends(get_current_a
         muxes[mux_id] = _build_mux_detail(mux_id, tasks, task_results=task_results)
 
     return ListMuxResponse(muxes=muxes)
-
-
-class LatestTaskGroupedByChipResponse(BaseModel):
-    """ChipTaskResponse is a Pydantic model that represents the response for fetching the tasks of a chip."""
-
-    task_name: str
-    result: dict[str, Task]
 
 
 @router.get(
@@ -840,11 +729,6 @@ def fetch_latest_qubit_task_grouped_by_chip(
 
     response = LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
     return response_processor.process_task_response(response, task_name)
-
-
-class TaskHistoryResponse(BaseModel):
-    name: str
-    data: dict[str, Task]
 
 
 @router.get(
@@ -1153,22 +1037,6 @@ def fetch_latest_coupling_task_grouped_by_chip(
 
     response = LatestTaskGroupedByChipResponse(task_name=task_name, result=results)
     return response_processor.process_task_response(response, task_name)
-
-
-class TimeSeriesProjection(BaseModel):
-    """TimeSeriesProjection is a Pydantic model that represents the projection for time series data."""
-
-    qid: str
-    output_parameters: dict[str, Any]
-    start_at: str
-
-
-class TimeSeriesData(BaseModel):
-    """TimeSeriesData is a Pydantic model that represents the time series data."""
-
-    data: dict[str, list[OutputParameterModel]] = {}
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 def _fetch_timeseries_data(

@@ -5,10 +5,10 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi.logger import logger
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 from qdash.api.schemas.error import (
     Detail,
 )
+from qdash.api.schemas.execution import ExecutionLockStatusResponse
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from starlette.exceptions import HTTPException
 
@@ -38,12 +38,6 @@ def fetch_figure_by_path(path: str):
     with Path(path).open("rb") as file:
         image_data = file.read()
     return StreamingResponse(BytesIO(image_data), media_type="image/png")
-
-
-class ExecutionLockStatusResponse(BaseModel):
-    """Response model for the fetch_execution_lock_status endpoint."""
-
-    lock: bool
 
 
 @router.get(

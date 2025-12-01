@@ -2,25 +2,14 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from qdash.api.lib.auth import get_optional_current_user
 from qdash.api.schemas.auth import User
+from qdash.api.schemas.backend import BackendResponseModel
 from qdash.dbmodel.backend import BackendDocument
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
-
-class BackendResponseModel(BaseModel):
-    """Response model for backend operations.
-
-    Inherits from BackendModel and is used to format the response
-    for backend-related API endpoints.
-    """
-
-    name: str
-    username: str
 
 
 @router.get(

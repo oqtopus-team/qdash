@@ -5,9 +5,9 @@ from typing import Annotated
 import dateutil.tz
 import pendulum
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
+from qdash.api.schemas.calibration import CalibrationNoteResponse
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 
@@ -31,16 +31,6 @@ def generate_execution_id(username: str, chip_id: str) -> str:
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
     execution_index = ExecutionCounterDocument.get_next_index(date_str, username, chip_id)
     return f"{date_str}-{execution_index:03d}"
-
-
-class CalibrationNoteResponse(BaseModel):
-    """CalibrationNote is a subclass of BaseModel."""
-
-    username: str
-    execution_id: str
-    task_id: str
-    note: dict
-    timestamp: str
 
 
 @router.get(

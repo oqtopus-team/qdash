@@ -14,6 +14,8 @@ from qdash.api.schemas.auth import User
 from qdash.api.schemas.flow import (
     ExecuteFlowRequest,
     ExecuteFlowResponse,
+    FlowTemplate,
+    FlowTemplateWithCode,
     GetFlowResponse,
     ListFlowsResponse,
     SaveFlowRequest,
@@ -519,26 +521,6 @@ async def delete_flow(
 # ============================================================================
 # Flow Templates Endpoints
 # ============================================================================
-
-
-from pydantic import BaseModel, Field
-
-
-class FlowTemplate(BaseModel):
-    """Flow template metadata."""
-
-    id: str = Field(..., description="Template ID")
-    name: str = Field(..., description="Template name")
-    description: str = Field(..., description="Template description")
-    category: str = Field(..., description="Template category")
-    filename: str = Field(..., description="Python filename")
-    function_name: str = Field(..., description="Flow function name")
-
-
-class FlowTemplateWithCode(FlowTemplate):
-    """Flow template with code content."""
-
-    code: str = Field(..., description="Python code content")
 
 
 @router.get(

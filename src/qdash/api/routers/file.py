@@ -13,7 +13,12 @@ from fastapi.logger import logger
 from fastapi.responses import FileResponse
 from git import Repo
 from git.exc import GitCommandError
-from pydantic import BaseModel
+from qdash.api.schemas.file import (
+    FileTreeNode,
+    GitPushRequest,
+    SaveFileRequest,
+    ValidateFileRequest,
+)
 
 router = APIRouter()
 gunicorn_logger = logging.getLogger("gunicorn.error")
@@ -31,35 +36,6 @@ CONFIG_BASE_PATH = Path(os.getenv("CONFIG_PATH", "./config/qubex"))
 # If running in Docker (check if /app exists), use absolute path
 if Path("/app").exists() and not CONFIG_BASE_PATH.is_absolute():
     CONFIG_BASE_PATH = Path("/app") / "config" / "qubex"
-
-
-class FileTreeNode(BaseModel):
-    """File tree node model."""
-
-    name: str
-    path: str
-    type: str  # "file" or "directory"
-    children: list[FileTreeNode] | None = None
-
-
-class SaveFileRequest(BaseModel):
-    """Request model for saving file content."""
-
-    path: str  # Relative path from CONFIG_BASE_PATH (e.g., "64Qv2/config/chip.yaml")
-    content: str
-
-
-class ValidateFileRequest(BaseModel):
-    """Request model for validating file content."""
-
-    content: str
-    file_type: str  # "yaml" or "json"
-
-
-class GitPushRequest(BaseModel):
-    """Request model for Git push operation."""
-
-    commit_message: str = "Update config files from UI"
 
 
 def validate_config_path(relative_path: str) -> Path:
