@@ -219,6 +219,16 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
                     is_schedule_active=request.active,
                 )
                 logger.info("Successfully updated deployment schedule")
+
+                # Update parameters via direct API call if provided
+                if request.parameters:
+                    logger.info(f"Updating deployment parameters: {request.parameters}")
+                    response = await client._client.patch(
+                        f"/deployments/{request.deployment_id}",
+                        json={"parameters": request.parameters},
+                    )
+                    response.raise_for_status()
+                    logger.info("Successfully updated deployment parameters")
             except Exception as e:
                 logger.error(f"Failed to update deployment: {e}")
                 raise HTTPException(status_code=500, detail=f"Failed to update deployment: {str(e)}")

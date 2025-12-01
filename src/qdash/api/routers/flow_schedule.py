@@ -100,12 +100,16 @@ async def schedule_flow(
             detail=f"Flow '{name}' deployment not found in Prefect. Please re-save the flow. Error: {str(e)}",
         )
 
-    # Merge parameters
+    # Merge parameters - include username and chip_id from flow metadata
     parameters: dict[str, Any] = {
+        "username": username,
+        "chip_id": flow.chip_id,
         **flow.default_parameters,
         **request.parameters,
         "flow_name": name,
     }
+
+    logger.info(f"Scheduling flow '{name}' with parameters: {parameters}")
 
     # Handle cron schedule
     if request.cron:
