@@ -7,6 +7,9 @@
  */
 import type { TaskHistoryResponseData } from "./taskHistoryResponseData";
 
+/**
+ * TaskHistoryResponse is a Pydantic model that represents the response for fetching task history.
+ */
 export interface TaskHistoryResponse {
   name: string;
   data: TaskHistoryResponseData;

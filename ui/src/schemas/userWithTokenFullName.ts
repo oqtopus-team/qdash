@@ -6,9 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-/**
- * Response model for a tag.
- */
-export interface Tag {
-  name: string;
-}
+export type UserWithTokenFullName = string | null;

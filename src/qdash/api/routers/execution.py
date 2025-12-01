@@ -1,10 +1,13 @@
 import logging
 from io import BytesIO
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.logger import logger
 from fastapi.responses import StreamingResponse
+from qdash.api.lib.auth import get_optional_current_user
+from qdash.api.schemas.auth import User
 from qdash.api.schemas.error import (
     Detail,
 )
@@ -28,7 +31,10 @@ else:
     summary="Fetches a calibration figure by its path",
     operation_id="fetchFigureByPath",
 )
-def fetch_figure_by_path(path: str):
+def fetch_figure_by_path(
+    path: str,
+    _current_user: Annotated[User | None, Depends(get_optional_current_user)] = None,
+):
     """Fetch a calibration figure by its path."""
     if not Path(path).exists():
         raise HTTPException(
@@ -46,7 +52,9 @@ def fetch_figure_by_path(path: str):
     operation_id="fetchExecutionLockStatus",
     response_model=ExecutionLockStatusResponse,
 )
-def fetch_execution_lock_status() -> ExecutionLockStatusResponse:
+def fetch_execution_lock_status(
+    _current_user: Annotated[User | None, Depends(get_optional_current_user)] = None,
+) -> ExecutionLockStatusResponse:
     """Fetch the status of the execution lock."""
     status = ExecutionLockDocument.get_lock_status()
     if status is None:

@@ -459,6 +459,11 @@ Returns
 -------
 ChipResponse
     Chip information
+
+Raises
+------
+HTTPException
+    If chip is not found
  * @summary Fetch a chip
  */
 export const fetchChip = (

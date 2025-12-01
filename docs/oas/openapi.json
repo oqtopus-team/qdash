@@ -52,7 +52,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/executions/figure": {
@@ -61,6 +66,11 @@
         "summary": "Fetches a calibration figure by its path",
         "description": "Fetch a calibration figure by its path.",
         "operationId": "fetchFigureByPath",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "path",
@@ -116,7 +126,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/chip": {
@@ -143,7 +158,7 @@
         },
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ]
       },
@@ -231,7 +246,7 @@
       "get": {
         "tags": ["chip"],
         "summary": "Fetch a chip",
-        "description": "Fetch a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Chip information",
+        "description": "Fetch a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Chip information\n\nRaises\n------\nHTTPException\n    If chip is not found",
         "operationId": "fetchChip",
         "parameters": [
           {
@@ -598,7 +613,7 @@
         "operationId": "fetchQubitTaskHistory",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -662,7 +677,7 @@
         "operationId": "fetchCouplingTaskHistory",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -996,6 +1011,11 @@
         "summary": "download file",
         "description": "Download a file.",
         "operationId": "downloadFile",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "path",
@@ -1030,6 +1050,11 @@
         "summary": "download file or directory as zip",
         "description": "Download a file or directory as zip.",
         "operationId": "downloadZipFile",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "path",
@@ -1079,7 +1104,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/file/content": {
@@ -1088,6 +1118,11 @@
         "summary": "Get file content for editing",
         "description": "Get file content for editing.\n\nArgs:\n----\n    path: Relative path from CONFIG_BASE_PATH (e.g., \"64Qv2/config/chip.yaml\")\n\nReturns:\n-------\n    File content and metadata",
         "operationId": "getFileContent",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "path",
@@ -1206,7 +1241,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/file/git/status": {
@@ -1228,7 +1268,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/file/git/pull": {
@@ -1297,9 +1342,9 @@
     },
     "/api/auth/login": {
       "post": {
-        "tags": ["auth", "authentication"],
+        "tags": ["auth"],
         "summary": "Login",
-        "description": "Login endpoint to authenticate user and return username.",
+        "description": "Login endpoint to authenticate user and return access token.",
         "operationId": "auth-login",
         "requestBody": {
           "content": {
@@ -1317,11 +1362,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Auth-Login"
+                  "$ref": "#/components/schemas/TokenResponse"
                 }
               }
             }
@@ -1344,9 +1385,9 @@
     },
     "/api/auth/register": {
       "post": {
-        "tags": ["auth", "authentication"],
+        "tags": ["auth"],
         "summary": "Register User",
-        "description": "Register a new user.",
+        "description": "Register a new user and return access token.",
         "operationId": "auth-register_user",
         "requestBody": {
           "content": {
@@ -1364,7 +1405,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/User"
+                  "$ref": "#/components/schemas/UserWithToken"
                 }
               }
             }
@@ -1387,7 +1428,7 @@
     },
     "/api/auth/me": {
       "get": {
-        "tags": ["auth", "authentication"],
+        "tags": ["auth"],
         "summary": "Read Users Me",
         "description": "Get current user information.",
         "operationId": "auth-read_users_me",
@@ -1410,7 +1451,7 @@
     },
     "/api/auth/logout": {
       "post": {
-        "tags": ["auth", "authentication"],
+        "tags": ["auth"],
         "summary": "Logout",
         "description": "Logout endpoint.\n\nThis endpoint doesn't need to do anything on the backend since the username is managed client-side.\nThe client will remove the username from cookies.",
         "operationId": "auth-logout",
@@ -1663,7 +1704,7 @@
         },
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ]
       }
@@ -2210,7 +2251,7 @@
         "operationId": "metrics-get_chip_metrics",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -2287,7 +2328,7 @@
         "operationId": "metrics-list_chips",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -2338,7 +2379,7 @@
         "operationId": "metrics-get_current_chip",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -2391,7 +2432,7 @@
         "operationId": "metrics-get_qubit_metric_history",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -2496,7 +2537,7 @@
         "operationId": "metrics-get_coupling_metric_history",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -3650,7 +3691,7 @@
         "type": "object",
         "required": ["tags"],
         "title": "ListTagResponse",
-        "description": "Response model for a list of tasks."
+        "description": "Response model for a list of tags."
       },
       "ListTaskResponse": {
         "properties": {
@@ -4491,7 +4532,7 @@
         "type": "object",
         "required": ["name"],
         "title": "Tag",
-        "description": "Response model for a task."
+        "description": "Response model for a tag."
       },
       "Task": {
         "properties": {
@@ -4716,7 +4757,8 @@
         },
         "type": "object",
         "required": ["name", "data"],
-        "title": "TaskHistoryResponse"
+        "title": "TaskHistoryResponse",
+        "description": "TaskHistoryResponse is a Pydantic model that represents the response for fetching task history."
       },
       "TaskResponse": {
         "properties": {
@@ -4864,6 +4906,27 @@
         "title": "TimeSeriesData",
         "description": "TimeSeriesData is a Pydantic model that represents the time series data."
       },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "required": ["access_token", "username"],
+        "title": "TokenResponse",
+        "description": "Token response model for login."
+      },
       "UpdateScheduleRequest": {
         "properties": {
           "active": {
@@ -4987,6 +5050,44 @@
         "title": "UserCreate",
         "description": "User creation model for registration."
       },
+      "UserWithToken": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "disabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled"
+          },
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          }
+        },
+        "type": "object",
+        "required": ["username", "access_token"],
+        "title": "UserWithToken",
+        "description": "User model with access token for login/register responses."
+      },
       "ValidateFileRequest": {
         "properties": {
           "content": {
@@ -5034,10 +5135,9 @@
       }
     },
     "securitySchemes": {
-      "APIKeyHeader": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-Username"
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
       }
     }
   }

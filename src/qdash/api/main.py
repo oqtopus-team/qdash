@@ -45,15 +45,14 @@ app = FastAPI(
     openapi_extra={
         "components": {
             "securitySchemes": {
-                "APIKeyHeader": {
-                    "type": "apiKey",
-                    "in": "header",
-                    "name": "X-Username",
-                    "description": "Username header for authentication",
+                "BearerAuth": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "description": "Bearer token authentication. Use the access_token from login response.",
                 }
             }
         },
-        "security": [{"APIKeyHeader": []}],
+        "security": [{"BearerAuth": []}],
     },
 )
 

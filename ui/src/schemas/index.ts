@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export * from "./authLogin200";
 export * from "./authLogout200";
 export * from "./backendResponseModel";
 export * from "./bodyAuthLogin";
@@ -170,6 +169,7 @@ export * from "./taskTaskType";
 export * from "./taskUpstreamId";
 export * from "./timeSeriesData";
 export * from "./timeSeriesDataData";
+export * from "./tokenResponse";
 export * from "./updateScheduleRequest";
 export * from "./updateScheduleRequestCron";
 export * from "./updateScheduleRequestParameters";
@@ -180,6 +180,9 @@ export * from "./userCreate";
 export * from "./userCreateFullName";
 export * from "./userDisabled";
 export * from "./userFullName";
+export * from "./userWithToken";
+export * from "./userWithTokenDisabled";
+export * from "./userWithTokenFullName";
 export * from "./validateFileContent200";
 export * from "./validateFileRequest";
 export * from "./validationError";
