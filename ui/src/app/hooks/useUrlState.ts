@@ -49,16 +49,6 @@ interface UseAnalysisUrlStateResult {
   isInitialized: boolean;
 }
 
-interface UseCorrelationUrlStateResult {
-  selectedChip: string;
-  xAxis: string;
-  yAxis: string;
-  setSelectedChip: (chip: string) => void;
-  setXAxis: (parameter: string) => void;
-  setYAxis: (parameter: string) => void;
-  isInitialized: boolean;
-}
-
 interface UseQubitTimeSeriesUrlStateResult {
   selectedParameter: string;
   selectedTag: string;
@@ -292,7 +282,21 @@ export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
   };
 }
 
-export function useCorrelationUrlState(): UseCorrelationUrlStateResult {
+interface UseCorrelationUrlStateResultNew {
+  selectedChip: string;
+  timeRange: TimeRange;
+  selectionMode: SelectionMode;
+  xParameter: string;
+  yParameter: string;
+  setSelectedChip: (chip: string) => void;
+  setTimeRange: (range: TimeRange) => void;
+  setSelectionMode: (mode: SelectionMode) => void;
+  setXParameter: (parameter: string) => void;
+  setYParameter: (parameter: string) => void;
+  isInitialized: boolean;
+}
+
+export function useCorrelationUrlState(): UseCorrelationUrlStateResultNew {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // URL state management for correlation view
@@ -301,9 +305,22 @@ export function useCorrelationUrlState(): UseCorrelationUrlStateResult {
     parseAsString,
   );
 
-  const [xAxis, setXAxisState] = useQueryState("xAxis", parseAsString);
+  const [timeRange, setTimeRangeState] = useQueryState("range", parseAsString);
 
-  const [yAxis, setYAxisState] = useQueryState("yAxis", parseAsString);
+  const [selectionMode, setSelectionModeState] = useQueryState(
+    "mode",
+    parseAsString,
+  );
+
+  const [xParameter, setXParameterState] = useQueryState(
+    "xParam",
+    parseAsString,
+  );
+
+  const [yParameter, setYParameterState] = useQueryState(
+    "yParam",
+    parseAsString,
+  );
 
   // Mark as initialized after first render
   useEffect(() => {
@@ -318,29 +335,45 @@ export function useCorrelationUrlState(): UseCorrelationUrlStateResult {
     [setSelectedChipState],
   );
 
-  const setXAxis = useCallback(
-    (parameter: string) => {
-      // Always include parameter in URL for complete state management
-      setXAxisState(parameter);
+  const setTimeRange = useCallback(
+    (range: TimeRange) => {
+      setTimeRangeState(range === "7d" ? null : range); // 7d as default
     },
-    [setXAxisState],
+    [setTimeRangeState],
   );
 
-  const setYAxis = useCallback(
-    (parameter: string) => {
-      // Always include parameter in URL for complete state management
-      setYAxisState(parameter);
+  const setSelectionMode = useCallback(
+    (mode: SelectionMode) => {
+      setSelectionModeState(mode === "latest" ? null : mode); // latest as default
     },
-    [setYAxisState],
+    [setSelectionModeState],
+  );
+
+  const setXParameter = useCallback(
+    (parameter: string) => {
+      setXParameterState(parameter === "t1" ? null : parameter); // t1 as default
+    },
+    [setXParameterState],
+  );
+
+  const setYParameter = useCallback(
+    (parameter: string) => {
+      setYParameterState(parameter === "t2_echo" ? null : parameter); // t2_echo as default
+    },
+    [setYParameterState],
   );
 
   return {
     selectedChip: selectedChip ?? "",
-    xAxis: xAxis ?? "t1",
-    yAxis: yAxis ?? "t2_echo",
+    timeRange: (timeRange as TimeRange) ?? "7d",
+    selectionMode: (selectionMode as SelectionMode) ?? "latest",
+    xParameter: xParameter ?? "t1",
+    yParameter: yParameter ?? "t2_echo",
     setSelectedChip,
-    setXAxis,
-    setYAxis,
+    setTimeRange,
+    setSelectionMode,
+    setXParameter,
+    setYParameter,
     isInitialized,
   };
 }
