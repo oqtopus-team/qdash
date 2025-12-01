@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
 import httpx
 from croniter import croniter
@@ -30,7 +31,6 @@ from qdash.api.schemas.flow import (
     UpdateScheduleResponse,
 )
 from qdash.dbmodel.flow import FlowDocument
-from zoneinfo import ZoneInfo
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
