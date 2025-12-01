@@ -30,8 +30,7 @@ from qdash.api.schemas.device_topology import (
     QubitGateDuration,
     QubitLifetime,
 )
-from qdash.api.schemas.error import Detail
-from qdash.api.schemas.exception import InternalSeverError
+from qdash.api.schemas.error import Detail, InternalServerError
 from qdash.api.schemas.execution import ExecutionLockStatusResponse
 from qdash.api.schemas.file import (
     FileTreeNode,
@@ -110,8 +109,7 @@ __all__ = [
     "QubitLifetime",
     # error
     "Detail",
-    # exception
-    "InternalSeverError",
+    "InternalServerError",
     # execution
     "ExecutionLockStatusResponse",
     # file
