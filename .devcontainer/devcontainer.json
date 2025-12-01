@@ -1,6 +1,6 @@
 {
   "name": "${localWorkspaceFolderBasename}",
-  "dockerComposeFile": ["../compose.dev.yaml"],
+  "dockerComposeFile": ["../compose.devcontainer.yaml"],
   "service": "devcontainer",
   "workspaceFolder": "/workspace/qdash",
 
