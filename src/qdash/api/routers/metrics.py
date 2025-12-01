@@ -7,10 +7,17 @@ from typing import Annotated, Any, Literal
 
 import pendulum
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
 from qdash.api.lib.auth import get_optional_current_user
 from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.schemas.auth import User
+from qdash.api.schemas.metrics import (
+    ChipMetricsResponse,
+    CouplingMetrics,
+    MetricHistoryItem,
+    MetricValue,
+    QubitMetricHistoryResponse,
+    QubitMetrics,
+)
 from qdash.dbmodel.chip import ChipDocument
 
 router = APIRouter()
@@ -60,66 +67,6 @@ async def get_metrics_config() -> dict[str, Any]:
     """
     config = load_metrics_config()
     return config.model_dump()
-
-
-class MetricValue(BaseModel):
-    """Single metric value with metadata."""
-
-    value: float | None = None
-    task_id: str | None = None
-    execution_id: str | None = None
-
-
-class QubitMetrics(BaseModel):
-    """Single qubit metrics data."""
-
-    qubit_frequency: dict[str, MetricValue] | None = None
-    anharmonicity: dict[str, MetricValue] | None = None
-    t1: dict[str, MetricValue] | None = None
-    t2_echo: dict[str, MetricValue] | None = None
-    t2_star: dict[str, MetricValue] | None = None
-    average_readout_fidelity: dict[str, MetricValue] | None = None
-    x90_gate_fidelity: dict[str, MetricValue] | None = None
-    x180_gate_fidelity: dict[str, MetricValue] | None = None
-
-
-class CouplingMetrics(BaseModel):
-    """Two-qubit coupling metrics data."""
-
-    zx90_gate_fidelity: dict[str, MetricValue] | None = None
-    bell_state_fidelity: dict[str, MetricValue] | None = None
-    static_zz_interaction: dict[str, MetricValue] | None = None
-
-
-class ChipMetricsResponse(BaseModel):
-    """Complete chip metrics response."""
-
-    chip_id: str
-    username: str
-    qubit_count: int
-    within_hours: int | None = None
-    qubit_metrics: QubitMetrics
-    coupling_metrics: CouplingMetrics
-
-
-class MetricHistoryItem(BaseModel):
-    """Single historical metric data point."""
-
-    value: float | None
-    execution_id: str
-    task_id: str | None = None
-    timestamp: str
-    calibrated_at: str | None = None
-
-
-class QubitMetricHistoryResponse(BaseModel):
-    """Historical metric data for a single qubit."""
-
-    chip_id: str
-    qid: str
-    metric_name: str
-    username: str
-    history: list[MetricHistoryItem]
 
 
 def _extract_latest_metrics(

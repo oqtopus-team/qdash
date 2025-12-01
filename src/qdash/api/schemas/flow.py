@@ -179,3 +179,20 @@ class UpdateScheduleResponse(BaseModel):
 
     message: str = Field(..., description="Success message")
     schedule_id: str = Field(..., description="Updated schedule ID")
+
+
+class FlowTemplate(BaseModel):
+    """Flow template metadata."""
+
+    id: str = Field(..., description="Template ID")
+    name: str = Field(..., description="Template name")
+    description: str = Field(..., description="Template description")
+    category: str = Field(..., description="Template category")
+    filename: str = Field(..., description="Python filename")
+    function_name: str = Field(..., description="Flow function name")
+
+
+class FlowTemplateWithCode(FlowTemplate):
+    """Flow template with code content."""
+
+    code: str = Field(..., description="Python code content")

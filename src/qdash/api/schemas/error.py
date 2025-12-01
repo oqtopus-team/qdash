@@ -1,13 +1,28 @@
+"""Error response schemas for API endpoints."""
+
 from __future__ import (
     annotations,
 )
 
+from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 
 class ErrorResponse(JSONResponse):
+    """Base class for error responses."""
+
     pass
+
+
+class InternalServerError(HTTPException):
+    """Internal server error exception.
+
+    Use this to raise a 500 error from within endpoint handlers.
+    """
+
+    def __init__(self, detail: str):
+        super().__init__(status_code=500, detail=detail)
 
 
 class Detail(BaseModel):

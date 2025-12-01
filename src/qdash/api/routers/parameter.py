@@ -4,9 +4,9 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
+from qdash.api.schemas.parameter import ListParameterResponse
 from qdash.datamodel.parameter import ParameterModel
 from qdash.dbmodel.parameter import ParameterDocument
 
@@ -15,12 +15,6 @@ router = APIRouter()
 # ロガーの設定
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
-
-class ListParameterResponse(BaseModel):
-    """Response model for a list of parameters."""
-
-    parameters: list[ParameterModel]
 
 
 @router.get(
