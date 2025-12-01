@@ -31,22 +31,37 @@ tasks:
 
   test:
     cmds:
-      - uv run pytest tests/
+      - python -m pytest tests/ -v
     desc: Run all tests with pytest
+
+  test-api:
+    cmds:
+      - python -m pytest tests/qdash/api/ -v
+    desc: Run API router tests
 
   test-dbmodel:
     cmds:
-      - uv run pytest tests/qdash/dbmodel/
+      - python -m pytest tests/qdash/dbmodel/ -v
     desc: Run database model tests
+
+  test-workflow:
+    cmds:
+      - python -m pytest tests/qdash/workflow/ -v
+    desc: Run workflow tests
 
   test-coverage:
     cmds:
-      - uv run pytest tests/ --cov=src/qdash --cov-report=term --cov-report=html
+      - python -m pytest tests/ --cov=src/qdash --cov-report=term --cov-report=html
     desc: Run tests with coverage report
+
+  test-fast:
+    cmds:
+      - python -m pytest tests/ -v -x --tb=short
+    desc: Run tests, stop on first failure
 
   test-mypy:
     cmds:
-      - uv run mypy tests/
+      - python -m mypy tests/
     desc: Run mypy type checking on tests
 
   build:
