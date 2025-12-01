@@ -590,9 +590,9 @@ export function TimeSeriesView() {
         isLoading={isLoadingTimeseries}
         hasData={Boolean(
           selectedChip &&
-            selectedParameter &&
-            selectedTag &&
-            plotData.length > 0,
+          selectedParameter &&
+          selectedTag &&
+          plotData.length > 0,
         )}
         emptyStateMessage={
           !selectedChip || !selectedParameter || !selectedTag
