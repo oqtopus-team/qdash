@@ -1627,31 +1627,6 @@
         }
       }
     },
-    "/parameter": {
-      "get": {
-        "tags": ["parameter"],
-        "summary": "Fetch all parameters",
-        "description": "Fetch all parameters.\n\nArgs:\n----\n    current_user (User): The current user.\n\nReturns: ListParameterResponse\n-------",
-        "operationId": "fetchAllParameters",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListParameterResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
     "/tag": {
       "get": {
         "tags": ["tag"],
@@ -3704,21 +3679,6 @@
         "title": "ListMuxResponse",
         "description": "ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers."
       },
-      "ListParameterResponse": {
-        "properties": {
-          "parameters": {
-            "items": {
-              "$ref": "#/components/schemas/ParameterModel"
-            },
-            "type": "array",
-            "title": "Parameters"
-          }
-        },
-        "type": "object",
-        "required": ["parameters"],
-        "title": "ListParameterResponse",
-        "description": "Response model for a list of parameters."
-      },
       "ListTagResponse": {
         "properties": {
           "tags": {
@@ -3937,36 +3897,6 @@
         "type": "object",
         "title": "OutputParameterModel",
         "description": "Data model.\n\nAttributes\n----------\n    qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.\n    coupling (dict[str, dict[str, float | int]]): The calibration data for couplings."
-      },
-      "ParameterModel": {
-        "properties": {
-          "username": {
-            "type": "string",
-            "title": "Username",
-            "description": "The username of the user who created the parameter"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "The name of the parameter"
-          },
-          "unit": {
-            "type": "string",
-            "title": "Unit",
-            "description": "The unit of the parameter",
-            "default": ""
-          },
-          "description": {
-            "type": "string",
-            "title": "Description",
-            "description": "Detailed description of the parameter",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": ["username", "name"],
-        "title": "ParameterModel",
-        "description": "Data model for a parameter.\n\nAttributes\n----------\n    name (str): The name of the parameter.\n    unit (str): The unit of the parameter.\n    description (str): Detailed description of the parameter."
       },
       "Position": {
         "properties": {

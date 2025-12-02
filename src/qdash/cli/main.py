@@ -6,7 +6,6 @@ from qdash.db.init import (
     init_task_document,
 )
 from qdash.dbmodel.initialize import initialize
-from qdash.dbmodel.parameter import ParameterDocument
 
 app = typer.Typer(
     name="qdash",
@@ -43,29 +42,6 @@ def add_new_chip(
         typer.echo(f"New chip added successfully (username: {username}, chip_id: {chip_id}, size: {size})")
     except Exception as e:
         typer.echo(f"Error adding new chip: {e}", err=True)
-        raise typer.Exit(1)
-
-
-@app.command()
-def update_active_output_parameters(
-    username: str = typer.Option(..., "--username", "-u", help="Username for initialization"),
-) -> None:
-    """Update active output parameters."""
-    typer.echo(f"Updating active output parameters for username: {username}")
-    if not typer.confirm("Do you want to proceed?"):
-        typer.echo("Update cancelled.")
-        typer.echo("No changes made to active output parameters.")
-        typer.echo("Exiting without changes.")
-        raise typer.Exit(0)
-    try:
-        from qdash.cli.add import update_active_output_parameters
-
-        params = update_active_output_parameters(username=username)
-        initialize()
-        ParameterDocument.insert_parameters(params, username=username)
-        typer.echo(f"Active output parameters updated successfully (username: {username})")
-    except Exception as e:
-        typer.echo(f"Error updating active output parameters: {e}", err=True)
         raise typer.Exit(1)
 
 

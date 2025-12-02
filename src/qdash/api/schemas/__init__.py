@@ -64,7 +64,6 @@ from qdash.api.schemas.metrics import (
     QubitMetricHistoryResponse,
     QubitMetrics,
 )
-from qdash.api.schemas.parameter import ListParameterResponse
 from qdash.api.schemas.success import SuccessResponse
 from qdash.api.schemas.tag import ListTagResponse, Tag
 from qdash.api.schemas.task import (
@@ -141,8 +140,6 @@ __all__ = [
     "MetricValue",
     "QubitMetricHistoryResponse",
     "QubitMetrics",
-    # parameter
-    "ListParameterResponse",
     # success
     "SuccessResponse",
     # tag
