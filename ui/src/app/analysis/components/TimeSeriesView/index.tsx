@@ -11,8 +11,8 @@ import { ChipSelector } from "@/app/components/ChipSelector";
 import { DateTimePicker } from "@/app/components/DateTimePicker";
 import { TagSelector } from "@/app/components/TagSelector";
 import { useAnalysisUrlState } from "@/app/hooks/useUrlState";
-import { useFetchTimeseriesTaskResultByTagAndParameter } from "@/client/chip/chip";
 import { useListChips } from "@/client/chip/chip";
+import { useFetchTimeseriesTaskResults } from "@/client/task-result/task-result";
 import { useListAllTag } from "@/client/tag/tag";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { DataTable } from "@/shared/components/DataTable";
@@ -184,10 +184,10 @@ export function TimeSeriesView() {
     isLoading: isLoadingTimeseries,
     error,
     refetch,
-  } = useFetchTimeseriesTaskResultByTagAndParameter(
-    selectedChip,
-    selectedParameter as ParameterKey,
+  } = useFetchTimeseriesTaskResults(
     {
+      chip_id: selectedChip,
+      parameter: selectedParameter as ParameterKey,
       tag: selectedTag as TagKey,
       start_at: timeRange.startAt,
       end_at: timeRange.endAt,
@@ -206,10 +206,10 @@ export function TimeSeriesView() {
     isLoading: isLoadingSecondary,
     error: secondaryError,
     refetch: refetchSecondary,
-  } = useFetchTimeseriesTaskResultByTagAndParameter(
-    selectedChip,
-    secondaryParameter as ParameterKey,
+  } = useFetchTimeseriesTaskResults(
     {
+      chip_id: selectedChip,
+      parameter: secondaryParameter as ParameterKey,
       tag: selectedTag as TagKey,
       start_at: timeRange.startAt,
       end_at: timeRange.endAt,

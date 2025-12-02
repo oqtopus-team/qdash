@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
-import { useFetchQubitTaskHistory } from "@/client/chip/chip";
+import { useFetchQubitTaskHistory } from "@/client/task-result/task-result";
 
 interface TaskHistoryModalProps {
   chipId: string;
@@ -26,9 +26,8 @@ export function TaskHistoryModal({
   const [subIndex, setSubIndex] = useState(0);
 
   const { data, isLoading, isError } = useFetchQubitTaskHistory(
-    chipId,
     qid,
-    taskName,
+    { chip_id: chipId, task: taskName },
     {
       query: {
         enabled: isOpen && !!chipId && !!qid && !!taskName,

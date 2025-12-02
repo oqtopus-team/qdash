@@ -5,6 +5,5 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { Task } from "./task";
 
-export type LatestTaskGroupedByChipResponseResult = { [key: string]: Task };
+export type TaskResultOutputParametersAnyOf = { [key: string]: unknown };

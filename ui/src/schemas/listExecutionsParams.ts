@@ -6,7 +6,11 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type ListExecutionsByChipIdParams = {
+export type ListExecutionsParams = {
+  /**
+   * Chip ID to filter executions
+   */
+  chip_id: string;
   /**
    * Number of items to skip
    * @minimum 0

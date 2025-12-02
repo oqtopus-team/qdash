@@ -8,9 +8,9 @@ import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
 import {
-  useFetchLatestCouplingTaskGroupedByChip,
-  useFetchHistoricalCouplingTaskGroupedByChip,
-} from "@/client/chip/chip";
+  useFetchLatestCouplingTaskResults,
+  useFetchHistoricalCouplingTaskResults,
+} from "@/client/task-result/task-result";
 import { CouplingTaskHistoryModal } from "../CouplingTaskHistoryModal";
 
 interface CouplingGridProps {
@@ -85,16 +85,17 @@ export function CouplingGrid({
     isLoading,
     isError,
   } = selectedDate === "latest"
-    ? useFetchLatestCouplingTaskGroupedByChip(chipId, selectedTask, {
-        query: {
-          placeholderData: keepPreviousData,
-          staleTime: 30000, // 30 seconds
+    ? useFetchLatestCouplingTaskResults(
+        { chip_id: chipId, task: selectedTask },
+        {
+          query: {
+            placeholderData: keepPreviousData,
+            staleTime: 30000, // 30 seconds
+          },
         },
-      })
-    : useFetchHistoricalCouplingTaskGroupedByChip(
-        chipId,
-        selectedTask,
-        selectedDate,
+      )
+    : useFetchHistoricalCouplingTaskResults(
+        { chip_id: chipId, task: selectedTask, date: selectedDate },
         {
           query: {
             placeholderData: keepPreviousData,

@@ -7,9 +7,9 @@ import { TaskFigure } from "./TaskFigure";
 import type { Task } from "@/schemas";
 
 import {
-  useFetchLatestQubitTaskGroupedByChip,
-  useFetchHistoricalQubitTaskGroupedByChip,
-} from "@/client/chip/chip";
+  useFetchLatestQubitTaskResults,
+  useFetchHistoricalQubitTaskResults,
+} from "@/client/task-result/task-result";
 
 interface TaskResultGridProps {
   chipId: string;
@@ -36,20 +36,21 @@ export function TaskResultGrid({
     data: latestData,
     isLoading: isLoadingLatest,
     isError: isLatestError,
-  } = useFetchLatestQubitTaskGroupedByChip(chipId, selectedTask, {
-    query: {
-      enabled: selectedDate === "latest",
+  } = useFetchLatestQubitTaskResults(
+    { chip_id: chipId, task: selectedTask },
+    {
+      query: {
+        enabled: selectedDate === "latest",
+      },
     },
-  });
+  );
 
   const {
     data: historicalData,
     isLoading: isLoadingHistorical,
     isError: isHistoricalError,
-  } = useFetchHistoricalQubitTaskGroupedByChip(
-    chipId,
-    selectedTask,
-    selectedDate,
+  } = useFetchHistoricalQubitTaskResults(
+    { chip_id: chipId, task: selectedTask, date: selectedDate },
     {
       query: {
         enabled: selectedDate !== "latest",

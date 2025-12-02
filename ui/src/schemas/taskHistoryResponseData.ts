@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { Task } from "./task";
+import type { TaskResult } from "./taskResult";
 
-export type TaskHistoryResponseData = { [key: string]: Task };
+export type TaskHistoryResponseData = { [key: string]: TaskResult };

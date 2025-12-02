@@ -21,7 +21,7 @@ import type { ExecutionResponseDetail } from "@/schemas";
 
 import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 import { TaskFigure } from "@/app/components/TaskFigure";
-import { useFetchExecutionByChipId } from "@/client/chip/chip";
+import { useFetchExecution } from "@/client/execution/execution";
 import { TaskGridView } from "@/shared/components/TaskGridView";
 import { InteractiveFigureModal } from "@/shared/components/InteractiveFigureModal";
 
@@ -75,7 +75,7 @@ export default function ExecutionDetailClient({
     data: executionDetailData,
     isLoading: isDetailLoading,
     isError: isDetailError,
-  } = useFetchExecutionByChipId(chip_id, execute_id, {
+  } = useFetchExecution(execute_id, {
     query: {
       // Refresh every 5 seconds
       refetchInterval: 5000,

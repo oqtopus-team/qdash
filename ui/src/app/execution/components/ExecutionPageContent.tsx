@@ -14,11 +14,11 @@ import { DateSelector } from "@/app/components/DateSelector";
 import { TaskFigure } from "@/app/components/TaskFigure";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/app/hooks/useUrlState";
+import { useListChips } from "@/client/chip/chip";
 import {
-  useListExecutionsByChipId,
-  useFetchExecutionByChipId,
-  useListChips,
-} from "@/client/chip/chip";
+  useListExecutions,
+  useFetchExecution,
+} from "@/client/execution/execution";
 
 export function ExecutionPageContent() {
   // URL state management
@@ -84,9 +84,9 @@ export function ExecutionPageContent() {
     data: executionData,
     isError,
     isLoading,
-  } = useListExecutionsByChipId(
-    selectedChip || "",
+  } = useListExecutions(
     {
+      chip_id: selectedChip || "",
       skip: (currentPage - 1) * itemsPerPage,
       limit: itemsPerPage,
     },
@@ -96,6 +96,7 @@ export function ExecutionPageContent() {
         refetchInterval: 5000,
         // Keep polling even when the window is in the background
         refetchIntervalInBackground: true,
+        enabled: !!selectedChip,
       },
     },
   );
@@ -105,20 +106,16 @@ export function ExecutionPageContent() {
     data: executionDetailData,
     isLoading: isDetailLoading,
     isError: isDetailError,
-  } = useFetchExecutionByChipId(
-    selectedChip || "",
-    selectedExecutionId ? selectedExecutionId : "",
-    {
-      query: {
-        // Refresh every 5 seconds
-        refetchInterval: 5000,
-        // Keep polling even when the window is in the background
-        refetchIntervalInBackground: true,
-        // Only enable polling when an execution is selected
-        enabled: !!selectedExecutionId,
-      },
+  } = useFetchExecution(selectedExecutionId || "", {
+    query: {
+      // Refresh every 5 seconds
+      refetchInterval: 5000,
+      // Keep polling even when the window is in the background
+      refetchIntervalInBackground: true,
+      // Only enable polling when an execution is selected
+      enabled: !!selectedExecutionId,
     },
-  );
+  });
 
   // Set card data when execution data is fetched (filter by date)
   useEffect(() => {
