@@ -198,6 +198,11 @@ async def register_flow_deployment(
         )
 
 
+# ============================================================================
+# Static Path Endpoints (MUST be defined before /flow/{name} to avoid conflicts)
+# ============================================================================
+
+
 @router.post(
     "/flow",
     response_model=SaveFlowResponse,
@@ -373,6 +378,356 @@ async def list_flows(
         raise HTTPException(status_code=500, detail=f"Failed to list flows: {e}")
 
 
+# ============================================================================
+# Flow Templates Endpoints (static paths - before /flow/{name})
+# ============================================================================
+
+
+@router.get(
+    "/flow/templates",
+    response_model=list[FlowTemplate],
+    summary="List Flow Templates",
+    operation_id="list_flow_templates",
+)
+async def list_flow_templates() -> list[FlowTemplate]:
+    """List all available flow templates.
+
+    Returns metadata only (no code content for performance).
+    """
+    try:
+        if not TEMPLATES_METADATA_FILE.exists():
+            logger.error(f"Templates metadata file not found: {TEMPLATES_METADATA_FILE}")
+            return []
+
+        with open(TEMPLATES_METADATA_FILE, encoding="utf-8") as f:
+            templates_data = json.load(f)
+
+        templates = [FlowTemplate(**t) for t in templates_data]
+        logger.info(f"Listed {len(templates)} flow templates")
+
+        return templates
+
+    except Exception as e:
+        logger.error(f"Failed to list flow templates: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list flow templates: {e}")
+
+
+@router.get(
+    "/flow/templates/{template_id}",
+    response_model=FlowTemplateWithCode,
+    summary="Get Flow Template",
+    operation_id="get_flow_template",
+)
+async def get_flow_template(template_id: str) -> FlowTemplateWithCode:
+    """Get flow template details including code content.
+
+    Steps:
+    1. Find template metadata
+    2. Read Python file content
+    3. Return combined data
+    """
+    try:
+        # Load metadata
+        if not TEMPLATES_METADATA_FILE.exists():
+            raise HTTPException(status_code=404, detail="Templates metadata file not found")
+
+        with open(TEMPLATES_METADATA_FILE, encoding="utf-8") as f:
+            templates_data = json.load(f)
+
+        # Find template
+        template_data = next((t for t in templates_data if t["id"] == template_id), None)
+        if not template_data:
+            raise HTTPException(status_code=404, detail=f"Template '{template_id}' not found")
+
+        # Read code file
+        code_file = TEMPLATES_DIR / template_data["filename"]
+        if not code_file.exists():
+            logger.error(f"Template file not found: {code_file}")
+            raise HTTPException(status_code=404, detail=f"Template file not found: {code_file}")
+
+        code = code_file.read_text(encoding="utf-8")
+
+        return FlowTemplateWithCode(**template_data, code=code)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get flow template: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get flow template: {e}")
+
+
+# ============================================================================
+# Flow Schedules Endpoints (static paths - before /flow/{name})
+# ============================================================================
+
+
+@router.get(
+    "/flow/schedules",
+    response_model=ListFlowSchedulesResponse,
+    summary="List all Flow schedules for current user",
+    operation_id="list_all_flow_schedules",
+)
+async def list_all_flow_schedules(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    limit: int = 50,
+    offset: int = 0,
+) -> ListFlowSchedulesResponse:
+    """List all Flow schedules (cron and one-time) for the current user.
+
+    Args:
+    ----
+        current_user: Current authenticated user
+        limit: Maximum number of schedules to return (max 100)
+        offset: Number of schedules to skip
+
+    Returns:
+    -------
+        List of all flow schedules
+
+    """
+    limit = min(limit, 100)
+    username = current_user.username
+    flows = FlowDocument.list_by_user(username)
+
+    all_schedules: list[FlowScheduleSummary] = []
+
+    async with get_client() as client:
+        for flow in flows:
+            if not flow.deployment_id:
+                continue
+
+            # Get cron schedule (show all, including inactive)
+            try:
+                deployment = await client.read_deployment(flow.deployment_id)
+                # Show all schedules that exist (active and inactive)
+                if deployment.schedule and hasattr(deployment.schedule, "cron"):
+                    all_schedules.append(
+                        FlowScheduleSummary(
+                            schedule_id=flow.deployment_id,
+                            flow_name=flow.name,
+                            schedule_type="cron",
+                            cron=deployment.schedule.cron,
+                            next_run=None,
+                            active=deployment.is_schedule_active,
+                            created_at=deployment.created.isoformat() if deployment.created else "",
+                        )
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to read deployment schedule for {flow.name}: {e}")
+
+            # Get one-time scheduled runs (future only)
+            try:
+                state_filter = FlowRunFilterStateType(any_=[StateType.SCHEDULED])
+                flow_runs = await client.read_flow_runs(
+                    deployment_filter=DeploymentFilter(id={"any_": [uuid.UUID(flow.deployment_id)]}),
+                    flow_run_filter=FlowRunFilter(state=FlowRunFilterState(type=state_filter)),
+                    limit=limit,  # Use pagination limit
+                )
+
+                now = datetime.now(timezone.utc)
+                for flow_run in flow_runs:
+                    # Only show future scheduled runs
+                    if flow_run.next_scheduled_start_time and flow_run.next_scheduled_start_time > now:
+                        all_schedules.append(
+                            FlowScheduleSummary(
+                                schedule_id=str(flow_run.id),
+                                flow_name=flow.name,
+                                schedule_type="one-time",
+                                cron=None,
+                                next_run=flow_run.next_scheduled_start_time.isoformat(),
+                                active=True,
+                                created_at=flow_run.created.isoformat() if flow_run.created else "",
+                            )
+                        )
+            except Exception as e:
+                logger.warning(f"Failed to read scheduled flow runs for {flow.name}: {e}")
+
+    # Sort by next_run time
+    all_schedules.sort(key=lambda x: x.next_run or "")
+
+    # Apply offset and limit to sorted results
+    paginated_schedules = all_schedules[offset : offset + limit]
+
+    return ListFlowSchedulesResponse(schedules=paginated_schedules)
+
+
+@router.delete(
+    "/flow/schedule/{schedule_id}",
+    response_model=DeleteScheduleResponse,
+    summary="Delete a Flow schedule",
+    operation_id="delete_flow_schedule",
+)
+async def delete_flow_schedule(
+    schedule_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> DeleteScheduleResponse:
+    """Delete a Flow schedule (cron or one-time).
+
+    Schedule ID Types:
+    - **Cron schedules**: schedule_id is the deployment_id (UUID format)
+    - **One-time schedules**: schedule_id is the flow_run_id (UUID format)
+
+    The API automatically determines the type and handles accordingly:
+    - Cron: Removes the schedule from the deployment (schedule=None)
+    - One-time: Deletes the scheduled flow run
+
+    Args:
+    ----
+        schedule_id: Schedule ID (deployment_id for cron, flow_run_id for one-time)
+        current_user: Current authenticated user
+
+    Returns:
+    -------
+        Standardized response with schedule type information
+
+    """
+    username = current_user.username
+
+    async with get_client() as client:
+        # Try as deployment ID (cron schedule)
+        try:
+            _ = await client.read_deployment(schedule_id)
+
+            # Verify ownership
+            flow = FlowDocument.find_one({"deployment_id": schedule_id, "username": username}).run()
+            if not flow:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You don't have permission to delete this schedule",
+                )
+
+            # Remove schedule completely
+            deployment = await client.read_deployment(schedule_id)
+
+            await client.update_deployment(
+                deployment=deployment,
+                schedule=None,  # Remove the schedule
+                is_schedule_active=False,
+            )
+
+            logger.info(f"Deleted cron schedule: {schedule_id}")
+            return DeleteScheduleResponse(
+                message="Cron schedule deleted successfully",
+                schedule_id=schedule_id,
+                schedule_type="cron",
+            )
+
+        except HTTPException:
+            raise  # Re-raise permission errors
+        except Exception as e:
+            # Not a deployment ID (could be 404 or other Prefect error), try as flow_run_id
+            logger.debug(f"Not a deployment ID, trying as flow_run_id: {e}")
+
+        # Try as flow_run_id (one-time schedule)
+        try:
+            flow_run_id = uuid.UUID(schedule_id)
+            flow_run = await client.read_flow_run(flow_run_id)
+
+            # Verify ownership through deployment
+            if flow_run.deployment_id:
+                flow = FlowDocument.find_one({"deployment_id": str(flow_run.deployment_id), "username": username}).run()
+                if not flow:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="You don't have permission to delete this schedule",
+                    )
+
+            await client.delete_flow_run(flow_run_id)
+            logger.info(f"Deleted one-time schedule: {schedule_id}")
+            return DeleteScheduleResponse(
+                message="One-time schedule deleted successfully",
+                schedule_id=schedule_id,
+                schedule_type="one-time",
+            )
+
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid schedule_id format")
+        except Exception as e:
+            logger.error(f"Failed to delete schedule: {e}")
+            raise HTTPException(status_code=404, detail="Schedule not found")
+
+
+@router.patch(
+    "/flow/schedule/{schedule_id}",
+    response_model=UpdateScheduleResponse,
+    summary="Update a Flow schedule",
+    operation_id="update_flow_schedule",
+)
+async def update_flow_schedule(
+    schedule_id: str,
+    request: UpdateScheduleRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> UpdateScheduleResponse:
+    """Update a Flow schedule (cron schedules only).
+
+    Can update: active status, cron expression, parameters.
+
+    Args:
+    ----
+        schedule_id: Schedule ID (deployment_id)
+        request: Update request
+        current_user: Current authenticated user
+
+    Returns:
+    -------
+        Success message
+
+    """
+    username = current_user.username
+
+    async with get_client() as client:
+        try:
+            # Verify ownership
+            flow = FlowDocument.find_one({"deployment_id": schedule_id, "username": username}).run()
+            if not flow:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You don't have permission to update this schedule",
+                )
+
+            # Read deployment for update
+            deployment = await client.read_deployment(schedule_id)
+
+            # Prepare schedule if cron is provided
+            schedule_to_update = deployment.schedule
+            if request.cron:
+                from prefect.client.schemas.schedules import CronSchedule
+
+                # Validate cron expression
+                try:
+                    croniter(request.cron)
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid cron expression '{request.cron}': {str(e)}",
+                    )
+
+                # Use timezone from request (defaults to Asia/Tokyo in schema)
+                schedule_to_update = CronSchedule(cron=request.cron, timezone=request.timezone)
+
+            # Update deployment directly without creating new Deployment object
+            await client.update_deployment(
+                deployment=deployment,
+                schedule=schedule_to_update,
+                is_schedule_active=request.active,
+            )
+
+            logger.info(f"Updated schedule: {schedule_id}")
+            return UpdateScheduleResponse(
+                message="Schedule updated successfully",
+                schedule_id=schedule_id,
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to update schedule: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to update schedule: {e}")
+
+
+# ============================================================================
+# Dynamic Path Endpoints (/flow/{name} - MUST be after static paths)
+# ============================================================================
+
+
 @router.get(
     "/flow/{name}",
     response_model=GetFlowResponse,
@@ -536,89 +891,6 @@ async def delete_flow(
         raise HTTPException(status_code=500, detail=f"Failed to delete flow metadata: {e}")
 
     return {"message": f"Flow '{name}' deleted successfully"}
-
-
-# ============================================================================
-# Flow Templates Endpoints
-# ============================================================================
-
-
-@router.get(
-    "/flow-templates",
-    response_model=list[FlowTemplate],
-    summary="List Flow Templates",
-    operation_id="list_flow_templates",
-)
-async def list_flow_templates() -> list[FlowTemplate]:
-    """List all available flow templates.
-
-    Returns metadata only (no code content for performance).
-    """
-    try:
-        if not TEMPLATES_METADATA_FILE.exists():
-            logger.error(f"Templates metadata file not found: {TEMPLATES_METADATA_FILE}")
-            return []
-
-        with open(TEMPLATES_METADATA_FILE, encoding="utf-8") as f:
-            templates_data = json.load(f)
-
-        templates = [FlowTemplate(**t) for t in templates_data]
-        logger.info(f"Listed {len(templates)} flow templates")
-
-        return templates
-
-    except Exception as e:
-        logger.error(f"Failed to list flow templates: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to list flow templates: {e}")
-
-
-@router.get(
-    "/flow-templates/{template_id}",
-    response_model=FlowTemplateWithCode,
-    summary="Get Flow Template",
-    operation_id="get_flow_template",
-)
-async def get_flow_template(template_id: str) -> FlowTemplateWithCode:
-    """Get flow template details including code content.
-
-    Steps:
-    1. Find template metadata
-    2. Read Python file content
-    3. Return combined data
-    """
-    try:
-        # Load metadata
-        if not TEMPLATES_METADATA_FILE.exists():
-            raise HTTPException(status_code=404, detail="Templates metadata file not found")
-
-        with open(TEMPLATES_METADATA_FILE, encoding="utf-8") as f:
-            templates_data = json.load(f)
-
-        # Find template
-        template_data = next((t for t in templates_data if t["id"] == template_id), None)
-        if not template_data:
-            raise HTTPException(status_code=404, detail=f"Template '{template_id}' not found")
-
-        # Read code file
-        code_file = TEMPLATES_DIR / template_data["filename"]
-        if not code_file.exists():
-            logger.error(f"Template file not found: {code_file}")
-            raise HTTPException(status_code=404, detail=f"Template file not found: {code_file}")
-
-        code = code_file.read_text(encoding="utf-8")
-
-        return FlowTemplateWithCode(**template_data, code=code)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get flow template: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get flow template: {e}")
-
-
-# ============================================================================
-# Flow Scheduling Endpoints
-# ============================================================================
 
 
 @router.post(
@@ -968,265 +1240,3 @@ async def list_flow_schedules(
             logger.warning(f"Failed to read scheduled flow runs: {e}")
 
     return ListFlowSchedulesResponse(schedules=schedules)
-
-
-@router.get(
-    "/flow-schedules",
-    response_model=ListFlowSchedulesResponse,
-    summary="List all Flow schedules for current user",
-    operation_id="list_all_flow_schedules",
-)
-async def list_all_flow_schedules(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    limit: int = 50,
-    offset: int = 0,
-) -> ListFlowSchedulesResponse:
-    """List all Flow schedules (cron and one-time) for the current user.
-
-    Args:
-    ----
-        current_user: Current authenticated user
-        limit: Maximum number of schedules to return (max 100)
-        offset: Number of schedules to skip
-
-    Returns:
-    -------
-        List of all flow schedules
-
-    """
-    limit = min(limit, 100)
-    username = current_user.username
-    flows = FlowDocument.list_by_user(username)
-
-    all_schedules: list[FlowScheduleSummary] = []
-
-    async with get_client() as client:
-        for flow in flows:
-            if not flow.deployment_id:
-                continue
-
-            # Get cron schedule (show all, including inactive)
-            try:
-                deployment = await client.read_deployment(flow.deployment_id)
-                # Show all schedules that exist (active and inactive)
-                if deployment.schedule and hasattr(deployment.schedule, "cron"):
-                    all_schedules.append(
-                        FlowScheduleSummary(
-                            schedule_id=flow.deployment_id,
-                            flow_name=flow.name,
-                            schedule_type="cron",
-                            cron=deployment.schedule.cron,
-                            next_run=None,
-                            active=deployment.is_schedule_active,
-                            created_at=deployment.created.isoformat() if deployment.created else "",
-                        )
-                    )
-            except Exception as e:
-                logger.warning(f"Failed to read deployment schedule for {flow.name}: {e}")
-
-            # Get one-time scheduled runs (future only)
-            try:
-                state_filter = FlowRunFilterStateType(any_=[StateType.SCHEDULED])
-                flow_runs = await client.read_flow_runs(
-                    deployment_filter=DeploymentFilter(id={"any_": [uuid.UUID(flow.deployment_id)]}),
-                    flow_run_filter=FlowRunFilter(state=FlowRunFilterState(type=state_filter)),
-                    limit=limit,  # Use pagination limit
-                )
-
-                now = datetime.now(timezone.utc)
-                for flow_run in flow_runs:
-                    # Only show future scheduled runs
-                    if flow_run.next_scheduled_start_time and flow_run.next_scheduled_start_time > now:
-                        all_schedules.append(
-                            FlowScheduleSummary(
-                                schedule_id=str(flow_run.id),
-                                flow_name=flow.name,
-                                schedule_type="one-time",
-                                cron=None,
-                                next_run=flow_run.next_scheduled_start_time.isoformat(),
-                                active=True,
-                                created_at=flow_run.created.isoformat() if flow_run.created else "",
-                            )
-                        )
-            except Exception as e:
-                logger.warning(f"Failed to read scheduled flow runs for {flow.name}: {e}")
-
-    # Sort by next_run time
-    all_schedules.sort(key=lambda x: x.next_run or "")
-
-    # Apply offset and limit to sorted results
-    paginated_schedules = all_schedules[offset : offset + limit]
-
-    return ListFlowSchedulesResponse(schedules=paginated_schedules)
-
-
-@router.delete(
-    "/flow-schedule/{schedule_id}",
-    response_model=DeleteScheduleResponse,
-    summary="Delete a Flow schedule",
-    operation_id="delete_flow_schedule",
-)
-async def delete_flow_schedule(
-    schedule_id: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-) -> DeleteScheduleResponse:
-    """Delete a Flow schedule (cron or one-time).
-
-    Schedule ID Types:
-    - **Cron schedules**: schedule_id is the deployment_id (UUID format)
-    - **One-time schedules**: schedule_id is the flow_run_id (UUID format)
-
-    The API automatically determines the type and handles accordingly:
-    - Cron: Removes the schedule from the deployment (schedule=None)
-    - One-time: Deletes the scheduled flow run
-
-    Args:
-    ----
-        schedule_id: Schedule ID (deployment_id for cron, flow_run_id for one-time)
-        current_user: Current authenticated user
-
-    Returns:
-    -------
-        Standardized response with schedule type information
-
-    """
-    username = current_user.username
-
-    async with get_client() as client:
-        # Try as deployment ID (cron schedule)
-        try:
-            _ = await client.read_deployment(schedule_id)
-
-            # Verify ownership
-            flow = FlowDocument.find_one({"deployment_id": schedule_id, "username": username}).run()
-            if not flow:
-                raise HTTPException(
-                    status_code=403,
-                    detail="You don't have permission to delete this schedule",
-                )
-
-            # Remove schedule completely
-            deployment = await client.read_deployment(schedule_id)
-
-            await client.update_deployment(
-                deployment=deployment,
-                schedule=None,  # Remove the schedule
-                is_schedule_active=False,
-            )
-
-            logger.info(f"Deleted cron schedule: {schedule_id}")
-            return DeleteScheduleResponse(
-                message="Cron schedule deleted successfully",
-                schedule_id=schedule_id,
-                schedule_type="cron",
-            )
-
-        except HTTPException:
-            raise  # Re-raise permission errors
-        except Exception as e:
-            # Not a deployment ID (could be 404 or other Prefect error), try as flow_run_id
-            logger.debug(f"Not a deployment ID, trying as flow_run_id: {e}")
-
-        # Try as flow_run_id (one-time schedule)
-        try:
-            flow_run_id = uuid.UUID(schedule_id)
-            flow_run = await client.read_flow_run(flow_run_id)
-
-            # Verify ownership through deployment
-            if flow_run.deployment_id:
-                flow = FlowDocument.find_one({"deployment_id": str(flow_run.deployment_id), "username": username}).run()
-                if not flow:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="You don't have permission to delete this schedule",
-                    )
-
-            await client.delete_flow_run(flow_run_id)
-            logger.info(f"Deleted one-time schedule: {schedule_id}")
-            return DeleteScheduleResponse(
-                message="One-time schedule deleted successfully",
-                schedule_id=schedule_id,
-                schedule_type="one-time",
-            )
-
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid schedule_id format")
-        except Exception as e:
-            logger.error(f"Failed to delete schedule: {e}")
-            raise HTTPException(status_code=404, detail="Schedule not found")
-
-
-@router.patch(
-    "/flow-schedule/{schedule_id}",
-    response_model=UpdateScheduleResponse,
-    summary="Update a Flow schedule",
-    operation_id="update_flow_schedule",
-)
-async def update_flow_schedule(
-    schedule_id: str,
-    request: UpdateScheduleRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-) -> UpdateScheduleResponse:
-    """Update a Flow schedule (cron schedules only).
-
-    Can update: active status, cron expression, parameters.
-
-    Args:
-    ----
-        schedule_id: Schedule ID (deployment_id)
-        request: Update request
-        current_user: Current authenticated user
-
-    Returns:
-    -------
-        Success message
-
-    """
-    username = current_user.username
-
-    async with get_client() as client:
-        try:
-            # Verify ownership
-            flow = FlowDocument.find_one({"deployment_id": schedule_id, "username": username}).run()
-            if not flow:
-                raise HTTPException(
-                    status_code=403,
-                    detail="You don't have permission to update this schedule",
-                )
-
-            # Read deployment for update
-            deployment = await client.read_deployment(schedule_id)
-
-            # Prepare schedule if cron is provided
-            schedule_to_update = deployment.schedule
-            if request.cron:
-                from prefect.client.schemas.schedules import CronSchedule
-
-                # Validate cron expression
-                try:
-                    croniter(request.cron)
-                except ValueError as e:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Invalid cron expression '{request.cron}': {str(e)}",
-                    )
-
-                # Use timezone from request (defaults to Asia/Tokyo in schema)
-                schedule_to_update = CronSchedule(cron=request.cron, timezone=request.timezone)
-
-            # Update deployment directly without creating new Deployment object
-            await client.update_deployment(
-                deployment=deployment,
-                schedule=schedule_to_update,
-                is_schedule_active=request.active,
-            )
-
-            logger.info(f"Updated schedule: {schedule_id}")
-            return UpdateScheduleResponse(
-                message="Schedule updated successfully",
-                schedule_id=schedule_id,
-            )
-
-        except Exception as e:
-            logger.error(f"Failed to update schedule: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to update schedule: {e}")
