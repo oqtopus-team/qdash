@@ -26,9 +26,5 @@ export interface Settings {
   prefect_port?: number;
   api_port?: number;
   ui_port?: number;
-  slack_app_token: string;
-  openai_api_key: string;
-  openai_model?: string;
-  agent_max_steps?: number;
   log_level?: string;
 }

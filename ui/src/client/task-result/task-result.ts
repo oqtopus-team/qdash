@@ -38,7 +38,7 @@ import type { ErrorType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Fetch the latest qubit task results for all qubits on a chip.
+ * Get the latest qubit task results for all qubits on a chip.
 
 Retrieves the most recent task result for each qubit on the specified chip.
 Results include fidelity threshold status based on x90 gate fidelity.
@@ -224,7 +224,7 @@ export function useGetLatestQubitTaskResults<
 }
 
 /**
- * Fetch historical qubit task results for a specific date.
+ * Get historical qubit task results for a specific date.
 
 Retrieves task results from a specific historical date using chip history
 snapshots. Results are filtered to tasks executed within the specified
@@ -414,7 +414,7 @@ export function useGetHistoricalQubitTaskResults<
 }
 
 /**
- * Fetch complete task history for a specific qubit.
+ * Get complete task history for a specific qubit.
 
 Retrieves all historical task results for a specific qubit, sorted by
 end time in descending order. Useful for tracking calibration trends
@@ -619,7 +619,7 @@ export function useGetQubitTaskHistory<
 }
 
 /**
- * Fetch the latest coupling task results for all couplings on a chip.
+ * Get the latest coupling task results for all couplings on a chip.
 
 Retrieves the most recent task result for each coupling (qubit pair) on
 the specified chip. Results include fidelity threshold status based on
@@ -810,7 +810,7 @@ export function useGetLatestCouplingTaskResults<
 }
 
 /**
- * Fetch historical coupling task results for a specific date.
+ * Get historical coupling task results for a specific date.
 
 Retrieves task results from a specific historical date using chip history
 snapshots. Results are filtered to tasks executed within the specified
@@ -1004,7 +1004,7 @@ export function useGetHistoricalCouplingTaskResults<
 }
 
 /**
- * Fetch complete task history for a specific coupling.
+ * Get complete task history for a specific coupling.
 
 Retrieves all historical task results for a specific coupling (qubit pair),
 sorted by end time in descending order. Useful for tracking two-qubit
@@ -1215,7 +1215,7 @@ export function useGetCouplingTaskHistory<
 }
 
 /**
- * Fetch timeseries task results filtered by tag and parameter.
+ * Get timeseries task results filtered by tag and parameter.
 
 Retrieves time series data for calibration parameters, optionally filtered
 to a specific qubit. Useful for plotting parameter trends over time.
