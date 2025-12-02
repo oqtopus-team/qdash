@@ -7,7 +7,7 @@ import Select, { type SingleValue, type StylesConfig } from "react-select";
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { useCorrelationUrlState } from "@/app/hooks/useUrlState";
 import { useListChips } from "@/client/chip/chip";
-import { useMetricsGetChipMetrics } from "@/client/metrics/metrics";
+import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { DataTable } from "@/shared/components/DataTable";
 import { ErrorCard } from "@/shared/components/ErrorCard";
@@ -206,8 +206,12 @@ export function CorrelationView() {
 
   // Set default chip on mount
   useEffect(() => {
-    if (!selectedChip && chipsResponse?.data && chipsResponse.data.length > 0) {
-      const sortedChips = [...chipsResponse.data].sort((a, b) => {
+    if (
+      !selectedChip &&
+      chipsResponse?.data?.chips &&
+      chipsResponse.data.chips.length > 0
+    ) {
+      const sortedChips = [...chipsResponse.data.chips].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;
@@ -239,7 +243,7 @@ export function CorrelationView() {
     isLoading,
     isError,
     error,
-  } = useMetricsGetChipMetrics(
+  } = useGetChipMetrics(
     selectedChip,
     {
       within_hours: withinHours,

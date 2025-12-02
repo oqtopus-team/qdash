@@ -1,6 +1,6 @@
 "use client";
 
-import { useGetTaskResultByTaskId } from "@/client/task/task";
+import { useGetTaskResult } from "@/client/task/task";
 
 interface TaskFigureProps {
   path?: string | string[];
@@ -22,7 +22,7 @@ export function TaskFigure({
     data: taskResultResponse,
     isLoading: loading,
     error: fetchError,
-  } = useGetTaskResultByTaskId(taskId!, {
+  } = useGetTaskResult(taskId!, {
     query: {
       enabled: !!taskId && !path,
     },

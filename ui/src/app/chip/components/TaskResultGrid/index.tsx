@@ -8,8 +8,8 @@ import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
 import {
-  useFetchLatestQubitTaskResults,
-  useFetchHistoricalQubitTaskResults,
+  useGetLatestQubitTaskResults,
+  useGetHistoricalQubitTaskResults,
 } from "@/client/task-result/task-result";
 import { TaskHistoryModal } from "../TaskHistoryModal";
 
@@ -57,7 +57,7 @@ export function TaskResultGrid({
     isLoading: isLoadingTask,
     isError: isTaskError,
   } = selectedDate === "latest"
-    ? useFetchLatestQubitTaskResults(
+    ? useGetLatestQubitTaskResults(
         { chip_id: chipId, task: selectedTask },
         {
           query: {
@@ -66,7 +66,7 @@ export function TaskResultGrid({
           },
         },
       )
-    : useFetchHistoricalQubitTaskResults(
+    : useGetHistoricalQubitTaskResults(
         { chip_id: chipId, task: selectedTask, date: selectedDate },
         {
           query: {

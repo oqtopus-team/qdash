@@ -140,7 +140,7 @@ def split_q_string(cr_label: str) -> tuple[str, str]:
 
 
 @router.post(
-    "/device_topology",
+    "/device-topology",
     response_model=Device,
     summary="Get the device topology",
     description="Get the device topology.",
@@ -442,7 +442,7 @@ def generate_device_plot(data: dict) -> bytes:
 
 
 @router.post(
-    "/device_topology/plot",
+    "/device-topology/plot",
     response_class=Response,
     summary="Get the device topology plot",
     description="Get the device topology as a PNG image.",

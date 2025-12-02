@@ -6,9 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type FetchAllTasksParams = {
-  /**
-   * Optional backend name to filter tasks by
-   */
-  backend?: string | null;
-};
+export type ListExecutionsResponseLimit = number | null;

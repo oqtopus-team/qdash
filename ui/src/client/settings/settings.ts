@@ -29,7 +29,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * Get settings from the server
  * @summary Get settings
  */
-export const fetchConfig = (
+export const getSettings = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -39,52 +39,52 @@ export const fetchConfig = (
   );
 };
 
-export const getFetchConfigQueryKey = () => {
+export const getGetSettingsQueryKey = () => {
   return [`/settings`] as const;
 };
 
-export const getFetchConfigQueryOptions = <
-  TData = Awaited<ReturnType<typeof fetchConfig>>,
+export const getGetSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSettings>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof fetchConfig>>, TError, TData>
+    UseQueryOptions<Awaited<ReturnType<typeof getSettings>>, TError, TData>
   >;
   request?: SecondParameter<typeof customInstance>;
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getFetchConfigQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getGetSettingsQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchConfig>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getSettings>>> = ({
     signal,
-  }) => fetchConfig(requestOptions, signal);
+  }) => getSettings(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof fetchConfig>>,
+    Awaited<ReturnType<typeof getSettings>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type FetchConfigQueryResult = NonNullable<
-  Awaited<ReturnType<typeof fetchConfig>>
+export type GetSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSettings>>
 >;
-export type FetchConfigQueryError = ErrorType<unknown>;
+export type GetSettingsQueryError = ErrorType<unknown>;
 
-export function useFetchConfig<
-  TData = Awaited<ReturnType<typeof fetchConfig>>,
+export function useGetSettings<
+  TData = Awaited<ReturnType<typeof getSettings>>,
   TError = ErrorType<unknown>,
 >(
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchConfig>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof getSettings>>, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchConfig>>,
+          Awaited<ReturnType<typeof getSettings>>,
           TError,
-          Awaited<ReturnType<typeof fetchConfig>>
+          Awaited<ReturnType<typeof getSettings>>
         >,
         "initialData"
       >;
@@ -94,19 +94,19 @@ export function useFetchConfig<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useFetchConfig<
-  TData = Awaited<ReturnType<typeof fetchConfig>>,
+export function useGetSettings<
+  TData = Awaited<ReturnType<typeof getSettings>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchConfig>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof getSettings>>, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchConfig>>,
+          Awaited<ReturnType<typeof getSettings>>,
           TError,
-          Awaited<ReturnType<typeof fetchConfig>>
+          Awaited<ReturnType<typeof getSettings>>
         >,
         "initialData"
       >;
@@ -114,13 +114,13 @@ export function useFetchConfig<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useFetchConfig<
-  TData = Awaited<ReturnType<typeof fetchConfig>>,
+export function useGetSettings<
+  TData = Awaited<ReturnType<typeof getSettings>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchConfig>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof getSettings>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -130,19 +130,19 @@ export function useFetchConfig<
  * @summary Get settings
  */
 
-export function useFetchConfig<
-  TData = Awaited<ReturnType<typeof fetchConfig>>,
+export function useGetSettings<
+  TData = Awaited<ReturnType<typeof getSettings>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchConfig>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof getSettings>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getFetchConfigQueryOptions(options);
+  const queryOptions = getGetSettingsQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

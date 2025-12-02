@@ -25,14 +25,14 @@ logger.setLevel(logging.DEBUG)
 @router.get(
     "/tasks",
     response_model=ListTaskResponse,
-    summary="Fetch all tasks",
-    operation_id="fetch_all_tasks",
+    summary="List all tasks",
+    operation_id="listTasks",
 )
-def fetch_all_tasks(
+def list_tasks(
     current_user: Annotated[User, Depends(get_current_active_user)],
     backend: str | None = Query(None, description="Optional backend name to filter tasks by"),
 ) -> ListTaskResponse:
-    """Fetch all tasks.
+    """List all tasks.
 
     Args:
     ----
@@ -70,12 +70,12 @@ def fetch_all_tasks(
 
 
 @router.get(
-    "/task/{task_id}",
+    "/tasks/{task_id}/result",
     response_model=TaskResultResponse,
     summary="Get task result by task ID",
-    operation_id="get_task_result_by_task_id",
+    operation_id="getTaskResult",
 )
-def get_task_result_by_task_id(
+def get_task_result(
     task_id: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> TaskResultResponse:

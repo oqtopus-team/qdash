@@ -21,7 +21,7 @@ import type { ExecutionResponseDetail } from "@/schemas";
 
 import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 import { TaskFigure } from "@/app/components/TaskFigure";
-import { useFetchExecution } from "@/client/execution/execution";
+import { useGetExecution } from "@/client/execution/execution";
 import { TaskGridView } from "@/shared/components/TaskGridView";
 import { InteractiveFigureModal } from "@/shared/components/InteractiveFigureModal";
 
@@ -75,7 +75,7 @@ export default function ExecutionDetailClient({
     data: executionDetailData,
     isLoading: isDetailLoading,
     isError: isDetailError,
-  } = useFetchExecution(execute_id, {
+  } = useGetExecution(execute_id, {
     query: {
       // Refresh every 5 seconds
       refetchInterval: 5000,

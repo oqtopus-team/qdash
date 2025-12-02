@@ -12,8 +12,8 @@ import { DateTimePicker } from "@/app/components/DateTimePicker";
 import { TagSelector } from "@/app/components/TagSelector";
 import { useAnalysisUrlState } from "@/app/hooks/useUrlState";
 import { useListChips } from "@/client/chip/chip";
-import { useFetchTimeseriesTaskResults } from "@/client/task-result/task-result";
-import { useListAllTag } from "@/client/tag/tag";
+import { useGetTimeseriesTaskResults } from "@/client/task-result/task-result";
+import { useListTags } from "@/client/tag/tag";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { DataTable } from "@/shared/components/DataTable";
 import { ErrorCard } from "@/shared/components/ErrorCard";
@@ -139,18 +139,18 @@ export function TimeSeriesView() {
   const { data: chipsResponse } = useListChips();
 
   // Fetch tags
-  const { data: tagsResponse, isLoading: isLoadingTags } = useListAllTag();
+  const { data: tagsResponse, isLoading: isLoadingTags } = useListTags();
 
   // Set default chip when URL is initialized and no chip is selected
   useEffect(() => {
     if (
       isInitialized &&
       !selectedChip &&
-      chipsResponse?.data &&
-      chipsResponse.data.length > 0
+      chipsResponse?.data?.chips &&
+      chipsResponse.data.chips.length > 0
     ) {
       // Sort chips by installation date and select the most recent one
-      const sortedChips = [...chipsResponse.data].sort((a, b) => {
+      const sortedChips = [...chipsResponse.data.chips].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;
@@ -184,7 +184,7 @@ export function TimeSeriesView() {
     isLoading: isLoadingTimeseries,
     error,
     refetch,
-  } = useFetchTimeseriesTaskResults(
+  } = useGetTimeseriesTaskResults(
     {
       chip_id: selectedChip,
       parameter: selectedParameter as ParameterKey,
@@ -206,7 +206,7 @@ export function TimeSeriesView() {
     isLoading: isLoadingSecondary,
     error: secondaryError,
     refetch: refetchSecondary,
-  } = useFetchTimeseriesTaskResults(
+  } = useGetTimeseriesTaskResults(
     {
       chip_id: selectedChip,
       parameter: secondaryParameter as ParameterKey,

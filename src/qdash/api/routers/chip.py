@@ -13,6 +13,7 @@ from qdash.api.schemas.chip import (
     ChipDatesResponse,
     ChipResponse,
     CreateChipRequest,
+    ListChipsResponse,
     ListMuxResponse,
     MuxDetailResponse,
     MuxTask,
@@ -34,11 +35,11 @@ logger.setLevel(logging.DEBUG)
 # =============================================================================
 
 
-@router.get("/chip", response_model=list[ChipResponse], summary="Fetch all chips", operation_id="listChips")
+@router.get("/chips", response_model=ListChipsResponse, summary="List all chips", operation_id="listChips")
 def list_chips(
     current_user: Annotated[User, Depends(get_optional_current_user)],
-) -> list[ChipResponse]:
-    """Fetch all chips.
+) -> ListChipsResponse:
+    """List all chips.
 
     Parameters
     ----------
@@ -47,25 +48,27 @@ def list_chips(
 
     Returns
     -------
-    list[ChipResponse]
-        List of available chips
+    ListChipsResponse
+        Wrapped list of available chips
 
     """
     logger.debug(f"Listing chips for user: {current_user.username}")
     chips = ChipDocument.find({"username": current_user.username}).run()
-    return [
-        ChipResponse(
-            chip_id=chip.chip_id,
-            size=chip.size,
-            qubits=chip.qubits,
-            couplings=chip.couplings,
-            installed_at=chip.installed_at,
-        )
-        for chip in chips
-    ]
+    return ListChipsResponse(
+        chips=[
+            ChipResponse(
+                chip_id=chip.chip_id,
+                size=chip.size,
+                qubits=chip.qubits,
+                couplings=chip.couplings,
+                installed_at=chip.installed_at,
+            )
+            for chip in chips
+        ]
+    )
 
 
-@router.post("/chip", response_model=ChipResponse, summary="Create a new chip", operation_id="createChip")
+@router.post("/chips", response_model=ChipResponse, summary="Create a new chip", operation_id="createChip")
 def create_chip(
     request: CreateChipRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -117,14 +120,12 @@ def create_chip(
 
 
 @router.get(
-    "/chip/{chip_id}/dates",
+    "/chips/{chip_id}/dates",
     response_model=ChipDatesResponse,
-    summary="Fetch available dates for a chip",
-    operation_id="fetchChipDates",
+    summary="Get available dates for a chip",
+    operation_id="getChipDates",
 )
-def fetch_chip_dates(
-    chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]
-) -> ChipDatesResponse:
+def get_chip_dates(chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]) -> ChipDatesResponse:
     """Fetch available dates for a chip from execution counter.
 
     Parameters
@@ -152,12 +153,12 @@ def fetch_chip_dates(
     return ChipDatesResponse(data=dates)
 
 
-@router.get("/chip/{chip_id}", response_model=ChipResponse, summary="Fetch a chip", operation_id="fetchChip")
-def fetch_chip(
+@router.get("/chips/{chip_id}", response_model=ChipResponse, summary="Get a chip", operation_id="getChip")
+def get_chip(
     chip_id: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> ChipResponse:
-    """Fetch a chip by its ID.
+    """Get a chip by its ID.
 
     Parameters
     ----------
@@ -238,15 +239,15 @@ def _build_mux_detail(
 
 
 @router.get(
-    "/chip/{chip_id}/mux/{mux_id}",
+    "/chips/{chip_id}/muxes/{mux_id}",
     response_model=MuxDetailResponse,
-    summary="Fetch the multiplexer details",
-    operation_id="fetchMuxDetails",
+    summary="Get multiplexer details",
+    operation_id="getChipMux",
 )
-def fetch_mux_detail(
+def get_chip_mux(
     chip_id: str, mux_id: int, current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> MuxDetailResponse:
-    """Fetch the multiplexer details.
+    """Get the multiplexer details.
 
     Parameters
     ----------
@@ -299,14 +300,14 @@ def fetch_mux_detail(
 
 
 @router.get(
-    "/chip/{chip_id}/mux",
+    "/chips/{chip_id}/muxes",
     response_model=ListMuxResponse,
-    summary="Fetch the multiplexers",
-    operation_id="listMuxes",
+    summary="List all multiplexers for a chip",
+    operation_id="listChipMuxes",
     response_model_exclude_none=True,
 )
-def list_muxes(chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]) -> ListMuxResponse:
-    """Fetch the multiplexers.
+def list_chip_muxes(chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]) -> ListMuxResponse:
+    """List all multiplexers for a chip.
 
     Parameters
     ----------

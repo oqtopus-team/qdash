@@ -34,10 +34,10 @@ def generate_execution_id(username: str, chip_id: str) -> str:
 
 
 @router.get(
-    "/calibration/note",
+    "/calibrations/note",
     response_model=CalibrationNoteResponse,
-    summary="Fetches all the cron schedules.",
-    operation_id="listCronSchedules",
+    summary="Get the calibration note",
+    operation_id="getCalibrationNote",
 )
 def get_calibration_note(
     current_user: Annotated[User, Depends(get_current_active_user)],

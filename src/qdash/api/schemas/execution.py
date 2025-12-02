@@ -83,3 +83,15 @@ class ExecutionResponseDetail(BaseModel):
     elapsed_time: str
     task: list[Task]
     note: dict
+
+
+class ListExecutionsResponse(BaseModel):
+    """Response model for listing executions.
+
+    Wraps list of executions for API consistency and future extensibility (e.g., pagination).
+    """
+
+    executions: list[ExecutionResponseSummary]
+    total: int | None = None
+    skip: int | None = None
+    limit: int | None = None

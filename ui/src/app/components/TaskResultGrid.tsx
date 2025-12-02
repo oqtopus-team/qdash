@@ -7,8 +7,8 @@ import { TaskFigure } from "./TaskFigure";
 import type { Task } from "@/schemas";
 
 import {
-  useFetchLatestQubitTaskResults,
-  useFetchHistoricalQubitTaskResults,
+  useGetLatestQubitTaskResults,
+  useGetHistoricalQubitTaskResults,
 } from "@/client/task-result/task-result";
 
 interface TaskResultGridProps {
@@ -36,7 +36,7 @@ export function TaskResultGrid({
     data: latestData,
     isLoading: isLoadingLatest,
     isError: isLatestError,
-  } = useFetchLatestQubitTaskResults(
+  } = useGetLatestQubitTaskResults(
     { chip_id: chipId, task: selectedTask },
     {
       query: {
@@ -49,7 +49,7 @@ export function TaskResultGrid({
     data: historicalData,
     isLoading: isLoadingHistorical,
     isError: isHistoricalError,
-  } = useFetchHistoricalQubitTaskResults(
+  } = useGetHistoricalQubitTaskResults(
     { chip_id: chipId, task: selectedTask, date: selectedDate },
     {
       query: {

@@ -12,7 +12,7 @@ import {
 import type { TaskResponse } from "@/schemas";
 
 import { BackendSelector } from "@/app/components/BackendSelector";
-import { useFetchAllTasks } from "@/client/task/task";
+import { useListTasks } from "@/client/task/task";
 
 type ViewMode = "grid" | "list";
 
@@ -153,7 +153,7 @@ const TaskDetailModal = ({ task, onClose }: TaskDetailModalProps) => {
 
 export default function TasksPage() {
   const [selectedBackend, setSelectedBackend] = useState<string | null>(null);
-  const { data: tasksData } = useFetchAllTasks({
+  const { data: tasksData } = useListTasks({
     backend: selectedBackend,
   });
   const [viewMode, setViewMode] = useState<ViewMode>("grid");

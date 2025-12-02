@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type FetchLatestCouplingTaskResultsParams = {
+export type GetCouplingTaskHistoryParams = {
   /**
    * Chip ID
    */

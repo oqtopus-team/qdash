@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type FetchLatestQubitTaskResultsParams = {
+export type GetHistoricalQubitTaskResultsParams = {
   /**
    * Chip ID
    */
@@ -15,4 +15,8 @@ export type FetchLatestQubitTaskResultsParams = {
    * Task name
    */
   task: string;
+  /**
+   * Date in YYYYMMDD format
+   */
+  date: string;
 };

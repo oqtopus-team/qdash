@@ -50,7 +50,7 @@ def normalize_qid(qid: str) -> str:
     return qid.replace("Q", "").lstrip("0") or "0"
 
 
-@router.get("/config")
+@router.get("/config", operation_id="getMetricsConfig")
 async def get_metrics_config() -> dict[str, Any]:
     """Get metrics metadata configuration.
 
@@ -333,7 +333,7 @@ def extract_coupling_metrics(
     )
 
 
-@router.get("/chip/{chip_id}/metrics", response_model=ChipMetricsResponse)
+@router.get("/chips/{chip_id}/metrics", response_model=ChipMetricsResponse, operation_id="getChipMetrics")
 async def get_chip_metrics(
     chip_id: str,
     within_hours: Annotated[int | None, Query(description="Filter to data within N hours (e.g., 24)")] = None,
@@ -385,7 +385,11 @@ async def get_chip_metrics(
     )
 
 
-@router.get("/chip/{chip_id}/qubit/{qid}/history", response_model=QubitMetricHistoryResponse)
+@router.get(
+    "/chips/{chip_id}/qubits/{qid}/history",
+    response_model=QubitMetricHistoryResponse,
+    operation_id="getQubitMetricHistory",
+)
 async def get_qubit_metric_history(
     chip_id: str,
     qid: str,
@@ -501,7 +505,11 @@ async def get_qubit_metric_history(
     )
 
 
-@router.get("/chip/{chip_id}/coupling/{coupling_id}/history", response_model=QubitMetricHistoryResponse)
+@router.get(
+    "/chips/{chip_id}/couplings/{coupling_id}/history",
+    response_model=QubitMetricHistoryResponse,
+    operation_id="getCouplingMetricHistory",
+)
 async def get_coupling_metric_history(
     chip_id: str,
     coupling_id: str,

@@ -122,8 +122,8 @@ def build_file_tree(directory: Path, base_path: Path) -> list[FileTreeNode]:
 
 
 @router.get(
-    "/file/raw_data",
-    summary="download file",
+    "/files/raw-data",
+    summary="Download file",
     operation_id="downloadFile",
     response_class=FileResponse,
 )
@@ -136,8 +136,8 @@ def download_file(path: str) -> FileResponse:
 
 
 @router.get(
-    "/file/zip",
-    summary="download file or directory as zip",
+    "/files/zip",
+    summary="Download file or directory as zip",
     operation_id="downloadZipFile",
     response_class=FileResponse,
 )
@@ -197,7 +197,7 @@ def download_zip_file(path: str) -> FileResponse:
 
 
 @router.get(
-    "/file/tree",
+    "/files/tree",
     summary="Get file tree for entire config directory",
     operation_id="getFileTree",
     response_model=list[FileTreeNode],
@@ -217,7 +217,7 @@ def get_file_tree() -> list[FileTreeNode]:
 
 
 @router.get(
-    "/file/content",
+    "/files/content",
     summary="Get file content for editing",
     operation_id="getFileContent",
 )
@@ -258,7 +258,7 @@ def get_file_content(path: str) -> dict[str, Any]:
 
 
 @router.put(
-    "/file/content",
+    "/files/content",
     summary="Save file content",
     operation_id="saveFileContent",
 )
@@ -297,7 +297,7 @@ def save_file_content(
 
 
 @router.post(
-    "/file/validate",
+    "/files/validate",
     summary="Validate file content (YAML/JSON)",
     operation_id="validateFileContent",
 )
@@ -344,7 +344,7 @@ def validate_file_content(request: ValidateFileRequest) -> dict[str, Any]:
 
 
 @router.get(
-    "/file/git/status",
+    "/files/git/status",
     summary="Get Git status of config directory",
     operation_id="getGitStatus",
 )
@@ -398,7 +398,7 @@ def get_git_status() -> dict[str, Any]:
 
 
 @router.post(
-    "/file/git/pull",
+    "/files/git/pull",
     summary="Pull latest config from Git repository",
     operation_id="gitPullConfig",
 )
@@ -497,7 +497,7 @@ def git_pull_config(
 
 
 @router.post(
-    "/file/git/push",
+    "/files/git/push",
     summary="Push config changes to Git repository",
     operation_id="gitPushConfig",
 )

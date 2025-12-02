@@ -17,8 +17,8 @@ import { TaskFigure } from "@/app/components/TaskFigure";
 import { TaskSelector } from "@/app/components/TaskSelector";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useChipUrlState } from "@/app/hooks/useUrlState";
-import { useListMuxes, useFetchChip, useListChips } from "@/client/chip/chip";
-import { useFetchAllTasks } from "@/client/task/task";
+import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
+import { useListTasks } from "@/client/task/task";
 import { TaskDetailModal } from "@/shared/components/TaskDetailModal";
 import { CreateChipModal } from "./CreateChipModal";
 
@@ -44,7 +44,7 @@ export function ChipPageContent() {
 
   const [gridSize, setGridSize] = useState<number>(8);
 
-  const { data: chipData } = useFetchChip(selectedChip);
+  const { data: chipData } = useGetChip(selectedChip);
   const { data: chipsData } = useListChips();
 
   // Set default chip only when URL is initialized and no chip is selected from URL
@@ -52,11 +52,11 @@ export function ChipPageContent() {
     if (
       isInitialized &&
       !selectedChip &&
-      chipsData?.data &&
-      chipsData.data.length > 0
+      chipsData?.data?.chips &&
+      chipsData.data.chips.length > 0
     ) {
       // Sort chips by installation date and select the most recent one
-      const sortedChips = [...chipsData.data].sort((a, b) => {
+      const sortedChips = [...chipsData.data.chips].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;
@@ -80,7 +80,7 @@ export function ChipPageContent() {
   // Track previous date to distinguish modal navigation from external navigation
   const [previousDate, setPreviousDate] = useState(selectedDate);
 
-  const { data: tasks } = useFetchAllTasks();
+  const { data: tasks } = useListTasks();
 
   // Use custom hook for date navigation
   const {
@@ -144,7 +144,7 @@ export function ChipPageContent() {
     data: muxData,
     isLoading: isLoadingMux,
     isError: isMuxError,
-  } = useListMuxes(selectedChip || "", {
+  } = useListChipMuxes(selectedChip || "", {
     query: {
       placeholderData: keepPreviousData,
       staleTime: 30000, // 30 seconds

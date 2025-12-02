@@ -19,12 +19,12 @@ import { TaskFigure } from "@/app/components/TaskFigure";
 import { TaskSelector } from "@/app/components/TaskSelector";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useChipUrlState } from "@/app/hooks/useUrlState";
-import { useFetchChip } from "@/client/chip/chip";
+import { useGetChip } from "@/client/chip/chip";
 import {
-  useFetchLatestQubitTaskResults,
-  useFetchHistoricalQubitTaskResults,
+  useGetLatestQubitTaskResults,
+  useGetHistoricalQubitTaskResults,
 } from "@/client/task-result/task-result";
-import { useFetchAllTasks } from "@/client/task/task";
+import { useListTasks } from "@/client/task/task";
 
 function QubitDetailPageContent() {
   const params = useParams();
@@ -51,8 +51,8 @@ function QubitDetailPageContent() {
     | "history";
   const setViewMode = setQubitViewMode;
 
-  const { data: chipData } = useFetchChip(chipId);
-  const { data: tasks } = useFetchAllTasks();
+  const { data: chipData } = useGetChip(chipId);
+  const { data: tasks } = useListTasks();
 
   // Update selected chip if different from URL
   useEffect(() => {
@@ -78,7 +78,7 @@ function QubitDetailPageContent() {
   // Get data for common qubit tasks for dashboard
   const { data: rabiData } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskResults(
+      ? useGetLatestQubitTaskResults(
           { chip_id: chipId, task: "CheckRabi" },
           {
             query: {
@@ -86,7 +86,7 @@ function QubitDetailPageContent() {
             },
           },
         )
-      : useFetchHistoricalQubitTaskResults(
+      : useGetHistoricalQubitTaskResults(
           {
             chip_id: chipId,
             task: "CheckRabi",
@@ -105,7 +105,7 @@ function QubitDetailPageContent() {
 
   const { data: ramseyData } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskResults(
+      ? useGetLatestQubitTaskResults(
           { chip_id: chipId, task: "CheckRamsey" },
           {
             query: {
@@ -113,7 +113,7 @@ function QubitDetailPageContent() {
             },
           },
         )
-      : useFetchHistoricalQubitTaskResults(
+      : useGetHistoricalQubitTaskResults(
           {
             chip_id: chipId,
             task: "CheckRamsey",
@@ -132,7 +132,7 @@ function QubitDetailPageContent() {
 
   const { data: t1Data } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskResults(
+      ? useGetLatestQubitTaskResults(
           { chip_id: chipId, task: "CheckT1" },
           {
             query: {
@@ -140,7 +140,7 @@ function QubitDetailPageContent() {
             },
           },
         )
-      : useFetchHistoricalQubitTaskResults(
+      : useGetHistoricalQubitTaskResults(
           {
             chip_id: chipId,
             task: "CheckT1",
@@ -160,7 +160,7 @@ function QubitDetailPageContent() {
   // Additional data for radar chart
   const { data: t2EchoData } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskResults(
+      ? useGetLatestQubitTaskResults(
           { chip_id: chipId, task: "CheckT2Echo" },
           {
             query: {
@@ -168,7 +168,7 @@ function QubitDetailPageContent() {
             },
           },
         )
-      : useFetchHistoricalQubitTaskResults(
+      : useGetHistoricalQubitTaskResults(
           {
             chip_id: chipId,
             task: "CheckT2Echo",
@@ -187,7 +187,7 @@ function QubitDetailPageContent() {
 
   const { data: gateFidelityData } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskResults(
+      ? useGetLatestQubitTaskResults(
           { chip_id: chipId, task: "RandomizedBenchmarking" },
           {
             query: {
@@ -195,7 +195,7 @@ function QubitDetailPageContent() {
             },
           },
         )
-      : useFetchHistoricalQubitTaskResults(
+      : useGetHistoricalQubitTaskResults(
           {
             chip_id: chipId,
             task: "RandomizedBenchmarking",
@@ -214,7 +214,7 @@ function QubitDetailPageContent() {
 
   const { data: readoutFidelityData } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskResults(
+      ? useGetLatestQubitTaskResults(
           { chip_id: chipId, task: "ReadoutClassification" },
           {
             query: {
@@ -222,7 +222,7 @@ function QubitDetailPageContent() {
             },
           },
         )
-      : useFetchHistoricalQubitTaskResults(
+      : useGetHistoricalQubitTaskResults(
           {
             chip_id: chipId,
             task: "ReadoutClassification",

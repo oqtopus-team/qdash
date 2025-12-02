@@ -22,10 +22,10 @@ import type {
   Detail,
   ExecutionLockStatusResponse,
   ExecutionResponseDetail,
-  ExecutionResponseSummary,
-  FetchFigureByPathParams,
+  GetFigureByPathParams,
   HTTPValidationError,
   ListExecutionsParams,
+  ListExecutionsResponse,
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
@@ -35,10 +35,10 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
  * Fetch a calibration figure by its path.
- * @summary Fetches a calibration figure by its path
+ * @summary Get a calibration figure by its path
  */
-export const fetchFigureByPath = (
-  params: FetchFigureByPathParams,
+export const getFigureByPath = (
+  params: GetFigureByPathParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -48,21 +48,19 @@ export const fetchFigureByPath = (
   );
 };
 
-export const getFetchFigureByPathQueryKey = (
-  params?: FetchFigureByPathParams,
-) => {
+export const getGetFigureByPathQueryKey = (params?: GetFigureByPathParams) => {
   return [`/executions/figure`, ...(params ? [params] : [])] as const;
 };
 
-export const getFetchFigureByPathQueryOptions = <
-  TData = Awaited<ReturnType<typeof fetchFigureByPath>>,
+export const getGetFigureByPathQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFigureByPath>>,
   TError = ErrorType<Detail | HTTPValidationError>,
 >(
-  params: FetchFigureByPathParams,
+  params: GetFigureByPathParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchFigureByPath>>,
+        Awaited<ReturnType<typeof getFigureByPath>>,
         TError,
         TData
       >
@@ -72,45 +70,42 @@ export const getFetchFigureByPathQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getFetchFigureByPathQueryKey(params);
+  const queryKey = queryOptions?.queryKey ?? getGetFigureByPathQueryKey(params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof fetchFigureByPath>>
-  > = ({ signal }) => fetchFigureByPath(params, requestOptions, signal);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getFigureByPath>>> = ({
+    signal,
+  }) => getFigureByPath(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof fetchFigureByPath>>,
+    Awaited<ReturnType<typeof getFigureByPath>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type FetchFigureByPathQueryResult = NonNullable<
-  Awaited<ReturnType<typeof fetchFigureByPath>>
+export type GetFigureByPathQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFigureByPath>>
 >;
-export type FetchFigureByPathQueryError = ErrorType<
-  Detail | HTTPValidationError
->;
+export type GetFigureByPathQueryError = ErrorType<Detail | HTTPValidationError>;
 
-export function useFetchFigureByPath<
-  TData = Awaited<ReturnType<typeof fetchFigureByPath>>,
+export function useGetFigureByPath<
+  TData = Awaited<ReturnType<typeof getFigureByPath>>,
   TError = ErrorType<Detail | HTTPValidationError>,
 >(
-  params: FetchFigureByPathParams,
+  params: GetFigureByPathParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchFigureByPath>>,
+        Awaited<ReturnType<typeof getFigureByPath>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchFigureByPath>>,
+          Awaited<ReturnType<typeof getFigureByPath>>,
           TError,
-          Awaited<ReturnType<typeof fetchFigureByPath>>
+          Awaited<ReturnType<typeof getFigureByPath>>
         >,
         "initialData"
       >;
@@ -120,24 +115,24 @@ export function useFetchFigureByPath<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useFetchFigureByPath<
-  TData = Awaited<ReturnType<typeof fetchFigureByPath>>,
+export function useGetFigureByPath<
+  TData = Awaited<ReturnType<typeof getFigureByPath>>,
   TError = ErrorType<Detail | HTTPValidationError>,
 >(
-  params: FetchFigureByPathParams,
+  params: GetFigureByPathParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchFigureByPath>>,
+        Awaited<ReturnType<typeof getFigureByPath>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchFigureByPath>>,
+          Awaited<ReturnType<typeof getFigureByPath>>,
           TError,
-          Awaited<ReturnType<typeof fetchFigureByPath>>
+          Awaited<ReturnType<typeof getFigureByPath>>
         >,
         "initialData"
       >;
@@ -145,15 +140,15 @@ export function useFetchFigureByPath<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useFetchFigureByPath<
-  TData = Awaited<ReturnType<typeof fetchFigureByPath>>,
+export function useGetFigureByPath<
+  TData = Awaited<ReturnType<typeof getFigureByPath>>,
   TError = ErrorType<Detail | HTTPValidationError>,
 >(
-  params: FetchFigureByPathParams,
+  params: GetFigureByPathParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchFigureByPath>>,
+        Awaited<ReturnType<typeof getFigureByPath>>,
         TError,
         TData
       >
@@ -163,18 +158,18 @@ export function useFetchFigureByPath<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary Fetches a calibration figure by its path
+ * @summary Get a calibration figure by its path
  */
 
-export function useFetchFigureByPath<
-  TData = Awaited<ReturnType<typeof fetchFigureByPath>>,
+export function useGetFigureByPath<
+  TData = Awaited<ReturnType<typeof getFigureByPath>>,
   TError = ErrorType<Detail | HTTPValidationError>,
 >(
-  params: FetchFigureByPathParams,
+  params: GetFigureByPathParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchFigureByPath>>,
+        Awaited<ReturnType<typeof getFigureByPath>>,
         TError,
         TData
       >
@@ -183,7 +178,7 @@ export function useFetchFigureByPath<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getFetchFigureByPathQueryOptions(params, options);
+  const queryOptions = getGetFigureByPathQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -197,29 +192,29 @@ export function useFetchFigureByPath<
 
 /**
  * Fetch the status of the execution lock.
- * @summary Fetches the status of a calibration.
+ * @summary Get the execution lock status
  */
-export const fetchExecutionLockStatus = (
+export const getExecutionLockStatus = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<ExecutionLockStatusResponse>(
-    { url: `/executions/lock_status`, method: "GET", signal },
+    { url: `/executions/lock-status`, method: "GET", signal },
     options,
   );
 };
 
-export const getFetchExecutionLockStatusQueryKey = () => {
-  return [`/executions/lock_status`] as const;
+export const getGetExecutionLockStatusQueryKey = () => {
+  return [`/executions/lock-status`] as const;
 };
 
-export const getFetchExecutionLockStatusQueryOptions = <
-  TData = Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+export const getGetExecutionLockStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
-      Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+      Awaited<ReturnType<typeof getExecutionLockStatus>>,
       TError,
       TData
     >
@@ -229,41 +224,41 @@ export const getFetchExecutionLockStatusQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getFetchExecutionLockStatusQueryKey();
+    queryOptions?.queryKey ?? getGetExecutionLockStatusQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof fetchExecutionLockStatus>>
-  > = ({ signal }) => fetchExecutionLockStatus(requestOptions, signal);
+    Awaited<ReturnType<typeof getExecutionLockStatus>>
+  > = ({ signal }) => getExecutionLockStatus(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+    Awaited<ReturnType<typeof getExecutionLockStatus>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type FetchExecutionLockStatusQueryResult = NonNullable<
-  Awaited<ReturnType<typeof fetchExecutionLockStatus>>
+export type GetExecutionLockStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getExecutionLockStatus>>
 >;
-export type FetchExecutionLockStatusQueryError = ErrorType<unknown>;
+export type GetExecutionLockStatusQueryError = ErrorType<unknown>;
 
-export function useFetchExecutionLockStatus<
-  TData = Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+export function useGetExecutionLockStatus<
+  TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
   TError = ErrorType<unknown>,
 >(
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+        Awaited<ReturnType<typeof getExecutionLockStatus>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+          Awaited<ReturnType<typeof getExecutionLockStatus>>,
           TError,
-          Awaited<ReturnType<typeof fetchExecutionLockStatus>>
+          Awaited<ReturnType<typeof getExecutionLockStatus>>
         >,
         "initialData"
       >;
@@ -273,23 +268,23 @@ export function useFetchExecutionLockStatus<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useFetchExecutionLockStatus<
-  TData = Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+export function useGetExecutionLockStatus<
+  TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+        Awaited<ReturnType<typeof getExecutionLockStatus>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+          Awaited<ReturnType<typeof getExecutionLockStatus>>,
           TError,
-          Awaited<ReturnType<typeof fetchExecutionLockStatus>>
+          Awaited<ReturnType<typeof getExecutionLockStatus>>
         >,
         "initialData"
       >;
@@ -297,14 +292,14 @@ export function useFetchExecutionLockStatus<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useFetchExecutionLockStatus<
-  TData = Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+export function useGetExecutionLockStatus<
+  TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+        Awaited<ReturnType<typeof getExecutionLockStatus>>,
         TError,
         TData
       >
@@ -314,17 +309,17 @@ export function useFetchExecutionLockStatus<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary Fetches the status of a calibration.
+ * @summary Get the execution lock status
  */
 
-export function useFetchExecutionLockStatus<
-  TData = Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+export function useGetExecutionLockStatus<
+  TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof fetchExecutionLockStatus>>,
+        Awaited<ReturnType<typeof getExecutionLockStatus>>,
         TError,
         TData
       >
@@ -333,7 +328,7 @@ export function useFetchExecutionLockStatus<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getFetchExecutionLockStatusQueryOptions(options);
+  const queryOptions = getGetExecutionLockStatusQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -346,7 +341,7 @@ export function useFetchExecutionLockStatus<
 }
 
 /**
- * Fetch executions for a given chip with pagination.
+ * List executions for a given chip with pagination.
 
 Parameters
 ----------
@@ -361,16 +356,16 @@ limit : int
 
 Returns
 -------
-list[ExecutionResponseSummary]
-    List of executions for the chip
- * @summary Fetch executions
+ListExecutionsResponse
+    Wrapped list of executions for the chip
+ * @summary List executions
  */
 export const listExecutions = (
   params: ListExecutionsParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
-  return customInstance<ExecutionResponseSummary[]>(
+  return customInstance<ListExecutionsResponse>(
     { url: `/executions`, method: "GET", params, signal },
     options,
   );
@@ -470,7 +465,7 @@ export function useListExecutions<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary Fetch executions
+ * @summary List executions
  */
 
 export function useListExecutions<
@@ -512,9 +507,9 @@ Returns
 -------
 ExecutionResponseDetail
     Detailed execution information
- * @summary Fetch an execution by its ID
+ * @summary Get an execution by its ID
  */
-export const fetchExecution = (
+export const getExecution = (
   executionId: string,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
@@ -525,18 +520,18 @@ export const fetchExecution = (
   );
 };
 
-export const getFetchExecutionQueryKey = (executionId?: string) => {
+export const getGetExecutionQueryKey = (executionId?: string) => {
   return [`/executions/${executionId}`] as const;
 };
 
-export const getFetchExecutionQueryOptions = <
-  TData = Awaited<ReturnType<typeof fetchExecution>>,
+export const getGetExecutionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getExecution>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   executionId: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchExecution>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -544,11 +539,11 @@ export const getFetchExecutionQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getFetchExecutionQueryKey(executionId);
+    queryOptions?.queryKey ?? getGetExecutionQueryKey(executionId);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchExecution>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getExecution>>> = ({
     signal,
-  }) => fetchExecution(executionId, requestOptions, signal);
+  }) => getExecution(executionId, requestOptions, signal);
 
   return {
     queryKey,
@@ -556,31 +551,31 @@ export const getFetchExecutionQueryOptions = <
     enabled: !!executionId,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof fetchExecution>>,
+    Awaited<ReturnType<typeof getExecution>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type FetchExecutionQueryResult = NonNullable<
-  Awaited<ReturnType<typeof fetchExecution>>
+export type GetExecutionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getExecution>>
 >;
-export type FetchExecutionQueryError = ErrorType<HTTPValidationError>;
+export type GetExecutionQueryError = ErrorType<HTTPValidationError>;
 
-export function useFetchExecution<
-  TData = Awaited<ReturnType<typeof fetchExecution>>,
+export function useGetExecution<
+  TData = Awaited<ReturnType<typeof getExecution>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   executionId: string,
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchExecution>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchExecution>>,
+          Awaited<ReturnType<typeof getExecution>>,
           TError,
-          Awaited<ReturnType<typeof fetchExecution>>
+          Awaited<ReturnType<typeof getExecution>>
         >,
         "initialData"
       >;
@@ -590,20 +585,20 @@ export function useFetchExecution<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useFetchExecution<
-  TData = Awaited<ReturnType<typeof fetchExecution>>,
+export function useGetExecution<
+  TData = Awaited<ReturnType<typeof getExecution>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   executionId: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchExecution>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchExecution>>,
+          Awaited<ReturnType<typeof getExecution>>,
           TError,
-          Awaited<ReturnType<typeof fetchExecution>>
+          Awaited<ReturnType<typeof getExecution>>
         >,
         "initialData"
       >;
@@ -611,37 +606,37 @@ export function useFetchExecution<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useFetchExecution<
-  TData = Awaited<ReturnType<typeof fetchExecution>>,
+export function useGetExecution<
+  TData = Awaited<ReturnType<typeof getExecution>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   executionId: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchExecution>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary Fetch an execution by its ID
+ * @summary Get an execution by its ID
  */
 
-export function useFetchExecution<
-  TData = Awaited<ReturnType<typeof fetchExecution>>,
+export function useGetExecution<
+  TData = Awaited<ReturnType<typeof getExecution>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   executionId: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchExecution>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getFetchExecutionQueryOptions(executionId, options);
+  const queryOptions = getGetExecutionQueryOptions(executionId, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

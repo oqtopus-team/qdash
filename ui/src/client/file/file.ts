@@ -45,7 +45,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
  * Download a file.
- * @summary download file
+ * @summary Download file
  */
 export const downloadFile = (
   params: DownloadFileParams,
@@ -53,13 +53,13 @@ export const downloadFile = (
   signal?: AbortSignal,
 ) => {
   return customInstance<void>(
-    { url: `/file/raw_data`, method: "GET", params, signal },
+    { url: `/files/raw-data`, method: "GET", params, signal },
     options,
   );
 };
 
 export const getDownloadFileQueryKey = (params?: DownloadFileParams) => {
-  return [`/file/raw_data`, ...(params ? [params] : [])] as const;
+  return [`/files/raw-data`, ...(params ? [params] : [])] as const;
 };
 
 export const getDownloadFileQueryOptions = <
@@ -152,7 +152,7 @@ export function useDownloadFile<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary download file
+ * @summary Download file
  */
 
 export function useDownloadFile<
@@ -182,7 +182,7 @@ export function useDownloadFile<
 
 /**
  * Download a file or directory as zip.
- * @summary download file or directory as zip
+ * @summary Download file or directory as zip
  */
 export const downloadZipFile = (
   params: DownloadZipFileParams,
@@ -190,13 +190,13 @@ export const downloadZipFile = (
   signal?: AbortSignal,
 ) => {
   return customInstance<void>(
-    { url: `/file/zip`, method: "GET", params, signal },
+    { url: `/files/zip`, method: "GET", params, signal },
     options,
   );
 };
 
 export const getDownloadZipFileQueryKey = (params?: DownloadZipFileParams) => {
-  return [`/file/zip`, ...(params ? [params] : [])] as const;
+  return [`/files/zip`, ...(params ? [params] : [])] as const;
 };
 
 export const getDownloadZipFileQueryOptions = <
@@ -305,7 +305,7 @@ export function useDownloadZipFile<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary download file or directory as zip
+ * @summary Download file or directory as zip
  */
 
 export function useDownloadZipFile<
@@ -350,13 +350,13 @@ export const getFileTree = (
   signal?: AbortSignal,
 ) => {
   return customInstance<FileTreeNode[]>(
-    { url: `/file/tree`, method: "GET", signal },
+    { url: `/files/tree`, method: "GET", signal },
     options,
   );
 };
 
 export const getGetFileTreeQueryKey = () => {
-  return [`/file/tree`] as const;
+  return [`/files/tree`] as const;
 };
 
 export const getGetFileTreeQueryOptions = <
@@ -488,13 +488,13 @@ export const getFileContent = (
   signal?: AbortSignal,
 ) => {
   return customInstance<GetFileContent200>(
-    { url: `/file/content`, method: "GET", params, signal },
+    { url: `/files/content`, method: "GET", params, signal },
     options,
   );
 };
 
 export const getGetFileContentQueryKey = (params?: GetFileContentParams) => {
-  return [`/file/content`, ...(params ? [params] : [])] as const;
+  return [`/files/content`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetFileContentQueryOptions = <
@@ -633,7 +633,7 @@ export const saveFileContent = (
 ) => {
   return customInstance<SaveFileContent200>(
     {
-      url: `/file/content`,
+      url: `/files/content`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       data: saveFileRequest,
@@ -732,7 +732,7 @@ export const validateFileContent = (
 ) => {
   return customInstance<ValidateFileContent200>(
     {
-      url: `/file/validate`,
+      url: `/files/validate`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: validateFileRequest,
@@ -826,13 +826,13 @@ export const getGitStatus = (
   signal?: AbortSignal,
 ) => {
   return customInstance<GetGitStatus200>(
-    { url: `/file/git/status`, method: "GET", signal },
+    { url: `/files/git/status`, method: "GET", signal },
     options,
   );
 };
 
 export const getGetGitStatusQueryKey = () => {
-  return [`/file/git/status`] as const;
+  return [`/files/git/status`] as const;
 };
 
 export const getGetGitStatusQueryOptions = <
@@ -959,7 +959,7 @@ export const gitPullConfig = (
   signal?: AbortSignal,
 ) => {
   return customInstance<GitPullConfig200>(
-    { url: `/file/git/pull`, method: "POST", signal },
+    { url: `/files/git/pull`, method: "POST", signal },
     options,
   );
 };
@@ -1052,7 +1052,7 @@ export const gitPushConfig = (
 ) => {
   return customInstance<GitPushConfig200>(
     {
-      url: `/file/git/push`,
+      url: `/files/git/push`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: gitPushRequest,
