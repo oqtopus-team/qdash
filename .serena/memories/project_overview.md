@@ -31,12 +31,6 @@ QDash is a comprehensive web platform for managing and monitoring qubit calibrat
 - **Purpose**: Manages qubit calibration workflows
 - **Integration**: Uses qubex library (v1.4.1b1) for quantum experiments
 
-### Slack Agent (New Feature)
-
-- **Location**: `/src/qdash/slack_agent/`
-- **Technology**: Slack Bolt, OpenAI API
-- **Purpose**: AI-powered Slack assistant for QDash operations
-
 ## Architecture
 
 QDash follows a microservices architecture with Docker Compose orchestration:
@@ -46,7 +40,6 @@ QDash follows a microservices architecture with Docker Compose orchestration:
 - FastAPI backend with OpenAPI documentation
 - Next.js frontend with auto-generated API client
 - Prefect workflow engine for quantum experiments
-- Slack agent for AI-assisted operations
 
 ## Development Environment
 

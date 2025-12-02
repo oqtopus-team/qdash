@@ -41,7 +41,7 @@ jobs:
         run: uv python install 3.10
 
       - name: Install dependencies (excluding workflow group)
-        run: uv sync --group dev --group api --group agent
+        run: uv sync --group dev --group api
 
       - name: Run linting and format check
         run: |
@@ -84,7 +84,7 @@ jobs:
   #       run: uv python install ${{ matrix.python-version }}
 
   #     - name: Install dependencies (excluding workflow group)
-  #       run: uv sync --group dev --group api --group agent
+  #       run: uv sync --group dev --group api
 
   #     - name: Run tests using Task
   #       run: task test

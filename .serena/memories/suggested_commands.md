@@ -21,7 +21,6 @@ task fmt-ui
 task export-all
 task export-api
 task export-workflow
-task export-agent
 
 # Build Docker images
 task build-api

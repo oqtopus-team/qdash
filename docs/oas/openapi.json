@@ -1077,7 +1077,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get latest qubit task results",
-        "description": "Fetch the latest qubit task results for all qubits on a chip.\n\nRetrieves the most recent task result for each qubit on the specified chip.\nResults include fidelity threshold status based on x90 gate fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
+        "description": "Get the latest qubit task results for all qubits on a chip.\n\nRetrieves the most recent task result for each qubit on the specified chip.\nResults include fidelity threshold status based on x90 gate fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
         "operationId": "getLatestQubitTaskResults",
         "security": [
           {
@@ -1136,7 +1136,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get historical qubit task results",
-        "description": "Fetch historical qubit task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
+        "description": "Get historical qubit task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
         "operationId": "getHistoricalQubitTaskResults",
         "security": [
           {
@@ -1206,7 +1206,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get qubit task history",
-        "description": "Fetch complete task history for a specific qubit.\n\nRetrieves all historical task results for a specific qubit, sorted by\nend time in descending order. Useful for tracking calibration trends\nover time.\n\nParameters\n----------\nqid : str\n    Qubit ID to fetch history for\nchip_id : str\n    ID of the chip containing the qubit\ntask : str\n    Name of the task to fetch history for\ncurrent_user : User\n    Current authenticated user (optional)\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
+        "description": "Get complete task history for a specific qubit.\n\nRetrieves all historical task results for a specific qubit, sorted by\nend time in descending order. Useful for tracking calibration trends\nover time.\n\nParameters\n----------\nqid : str\n    Qubit ID to fetch history for\nchip_id : str\n    ID of the chip containing the qubit\ntask : str\n    Name of the task to fetch history for\ncurrent_user : User\n    Current authenticated user (optional)\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
         "operationId": "getQubitTaskHistory",
         "security": [
           {
@@ -1274,7 +1274,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get latest coupling task results",
-        "description": "Fetch the latest coupling task results for all couplings on a chip.\n\nRetrieves the most recent task result for each coupling (qubit pair) on\nthe specified chip. Results include fidelity threshold status based on\nBell state fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all couplings, keyed by coupling ID (e.g., \"0-1\")\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
+        "description": "Get the latest coupling task results for all couplings on a chip.\n\nRetrieves the most recent task result for each coupling (qubit pair) on\nthe specified chip. Results include fidelity threshold status based on\nBell state fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all couplings, keyed by coupling ID (e.g., \"0-1\")\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
         "operationId": "getLatestCouplingTaskResults",
         "security": [
           {
@@ -1333,7 +1333,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get historical coupling task results",
-        "description": "Fetch historical coupling task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all couplings, keyed by coupling ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
+        "description": "Get historical coupling task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all couplings, keyed by coupling ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
         "operationId": "getHistoricalCouplingTaskResults",
         "security": [
           {
@@ -1403,7 +1403,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get coupling task history",
-        "description": "Fetch complete task history for a specific coupling.\n\nRetrieves all historical task results for a specific coupling (qubit pair),\nsorted by end time in descending order. Useful for tracking two-qubit\ncalibration trends over time.\n\nParameters\n----------\ncoupling_id : str\n    Coupling ID to fetch history for (e.g., \"0-1\")\nchip_id : str\n    ID of the chip containing the coupling\ntask : str\n    Name of the task to fetch history for\ncurrent_user : User\n    Current authenticated user (optional)\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
+        "description": "Get complete task history for a specific coupling.\n\nRetrieves all historical task results for a specific coupling (qubit pair),\nsorted by end time in descending order. Useful for tracking two-qubit\ncalibration trends over time.\n\nParameters\n----------\ncoupling_id : str\n    Coupling ID to fetch history for (e.g., \"0-1\")\nchip_id : str\n    ID of the chip containing the coupling\ntask : str\n    Name of the task to fetch history for\ncurrent_user : User\n    Current authenticated user (optional)\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
         "operationId": "getCouplingTaskHistory",
         "security": [
           {
@@ -1471,7 +1471,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get timeseries task results by tag and parameter",
-        "description": "Fetch timeseries task results filtered by tag and parameter.\n\nRetrieves time series data for calibration parameters, optionally filtered\nto a specific qubit. Useful for plotting parameter trends over time.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntag : str\n    Tag to filter tasks by (e.g., calibration category)\nparameter : str\n    Name of the output parameter to retrieve\nstart_at : str\n    Start time in ISO format for the time range\nend_at : str\n    End time in ISO format for the time range\ncurrent_user : User\n    Current authenticated user\nqid : str | None\n    Optional qubit ID to filter results to a specific qubit\n\nReturns\n-------\nTimeSeriesData\n    Time series data keyed by qubit ID, each containing a list of\n    parameter values with timestamps",
+        "description": "Get timeseries task results filtered by tag and parameter.\n\nRetrieves time series data for calibration parameters, optionally filtered\nto a specific qubit. Useful for plotting parameter trends over time.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntag : str\n    Tag to filter tasks by (e.g., calibration category)\nparameter : str\n    Name of the output parameter to retrieve\nstart_at : str\n    Start time in ISO format for the time range\nend_at : str\n    End time in ISO format for the time range\ncurrent_user : User\n    Current authenticated user\nqid : str | None\n    Optional qubit ID to filter results to a specific qubit\n\nReturns\n-------\nTimeSeriesData\n    Time series data keyed by qubit ID, each containing a list of\n    parameter values with timestamps",
         "operationId": "getTimeseriesTaskResults",
         "security": [
           {
@@ -4672,24 +4672,6 @@
             "title": "Ui Port",
             "default": 5714
           },
-          "slack_app_token": {
-            "type": "string",
-            "title": "Slack App Token"
-          },
-          "openai_api_key": {
-            "type": "string",
-            "title": "Openai Api Key"
-          },
-          "openai_model": {
-            "type": "string",
-            "title": "Openai Model",
-            "default": "gpt-4o-mini"
-          },
-          "agent_max_steps": {
-            "type": "integer",
-            "title": "Agent Max Steps",
-            "default": 10
-          },
           "log_level": {
             "type": "string",
             "title": "Log Level",
@@ -4707,9 +4689,7 @@
           "postgres_data_path",
           "mongo_data_path",
           "calib_data_path",
-          "qpu_data_path",
-          "slack_app_token",
-          "openai_api_key"
+          "qpu_data_path"
         ],
         "title": "Settings",
         "description": "Settings for the QDash application."

@@ -192,7 +192,6 @@ ui:
   features:
     task_editor: true
     python_flow_editor: true
-    slack_agent: true
 ```
 
 #### Why This Approach?

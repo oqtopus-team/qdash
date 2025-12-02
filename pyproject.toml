@@ -121,13 +121,5 @@ dev = [
     "typer==0.14.0",
     "go-task-bin>=3.41.0",
 ]
-agent = [
-    "aiohttp>=3.8.0,<4.0.0",
-    "openai>=1.98.0",
-    "slack-bolt>=1.18.0",
-    "pydantic-settings",
-]
-
 [tool.uv.sources]
 qubex = { git = "https://github.com/amachino/qubex.git", tag = "develop" }
-strands-agents = { git = "https://github.com/strands-agents/sdk-python.git" }
