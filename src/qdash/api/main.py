@@ -12,7 +12,6 @@ from qdash.api.routers import (
     execution,
     file,
     flow,
-    flow_schedule,
     metrics,
     settings,
     tag,
@@ -84,5 +83,4 @@ app.include_router(tag.router, tags=["tag"], dependencies=auth_dependency)
 app.include_router(device_topology.router, tags=["device_topology"], dependencies=auth_dependency)
 app.include_router(backend.router, tags=["backend"], dependencies=auth_dependency)
 app.include_router(flow.router, tags=["flow"], dependencies=auth_dependency)
-app.include_router(flow_schedule.router, tags=["flow_schedule"], dependencies=auth_dependency)
 app.include_router(metrics.router, prefix="/metrics", tags=["metrics"], dependencies=auth_dependency)

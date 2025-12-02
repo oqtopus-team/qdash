@@ -385,7 +385,7 @@ async def get_chip_metrics(
     )
 
 
-@router.get("/chip/{chip_id}/qubit/{qid}/metric-history", response_model=QubitMetricHistoryResponse)
+@router.get("/chip/{chip_id}/qubit/{qid}/history", response_model=QubitMetricHistoryResponse)
 async def get_qubit_metric_history(
     chip_id: str,
     qid: str,
@@ -501,7 +501,7 @@ async def get_qubit_metric_history(
     )
 
 
-@router.get("/chip/{chip_id}/coupling/{coupling_id}/metric-history", response_model=QubitMetricHistoryResponse)
+@router.get("/chip/{chip_id}/coupling/{coupling_id}/history", response_model=QubitMetricHistoryResponse)
 async def get_coupling_metric_history(
     chip_id: str,
     coupling_id: str,

@@ -23,15 +23,23 @@ import type {
 
 import type {
   DeleteFlow200,
+  DeleteScheduleResponse,
   ExecuteFlowRequest,
   ExecuteFlowResponse,
   FlowTemplate,
   FlowTemplateWithCode,
   GetFlowResponse,
   HTTPValidationError,
+  ListAllFlowSchedulesParams,
+  ListFlowSchedulesParams,
+  ListFlowSchedulesResponse,
   ListFlowsResponse,
   SaveFlowRequest,
   SaveFlowResponse,
+  ScheduleFlowRequest,
+  ScheduleFlowResponse,
+  UpdateScheduleRequest,
+  UpdateScheduleResponse,
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
@@ -267,6 +275,700 @@ export const useSaveFlow = <
   TContext
 > => {
   const mutationOptions = getSaveFlowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * List all available flow templates.
+
+Returns metadata only (no code content for performance).
+ * @summary List Flow Templates
+ */
+export const listFlowTemplates = (
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<FlowTemplate[]>(
+    { url: `/flow/templates`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getListFlowTemplatesQueryKey = () => {
+  return [`/flow/templates`] as const;
+};
+
+export const getListFlowTemplatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof listFlowTemplates>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListFlowTemplatesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listFlowTemplates>>
+  > = ({ signal }) => listFlowTemplates(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFlowTemplates>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type ListFlowTemplatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFlowTemplates>>
+>;
+export type ListFlowTemplatesQueryError = ErrorType<unknown>;
+
+export function useListFlowTemplates<
+  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
+  TError = ErrorType<unknown>,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listFlowTemplates>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listFlowTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof listFlowTemplates>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useListFlowTemplates<
+  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listFlowTemplates>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listFlowTemplates>>,
+          TError,
+          Awaited<ReturnType<typeof listFlowTemplates>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useListFlowTemplates<
+  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listFlowTemplates>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary List Flow Templates
+ */
+
+export function useListFlowTemplates<
+  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listFlowTemplates>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getListFlowTemplatesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get flow template details including code content.
+
+Steps:
+1. Find template metadata
+2. Read Python file content
+3. Return combined data
+ * @summary Get Flow Template
+ */
+export const getFlowTemplate = (
+  templateId: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<FlowTemplateWithCode>(
+    { url: `/flow/templates/${templateId}`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getGetFlowTemplateQueryKey = (templateId?: string) => {
+  return [`/flow/templates/${templateId}`] as const;
+};
+
+export const getGetFlowTemplateQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  templateId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFlowTemplate>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetFlowTemplateQueryKey(templateId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getFlowTemplate>>> = ({
+    signal,
+  }) => getFlowTemplate(templateId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!templateId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFlowTemplate>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetFlowTemplateQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFlowTemplate>>
+>;
+export type GetFlowTemplateQueryError = ErrorType<HTTPValidationError>;
+
+export function useGetFlowTemplate<
+  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  templateId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFlowTemplate>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFlowTemplate>>,
+          TError,
+          Awaited<ReturnType<typeof getFlowTemplate>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetFlowTemplate<
+  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  templateId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFlowTemplate>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFlowTemplate>>,
+          TError,
+          Awaited<ReturnType<typeof getFlowTemplate>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetFlowTemplate<
+  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  templateId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFlowTemplate>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get Flow Template
+ */
+
+export function useGetFlowTemplate<
+  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  templateId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFlowTemplate>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetFlowTemplateQueryOptions(templateId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * List all Flow schedules (cron and one-time) for the current user.
+
+Args:
+----
+    current_user: Current authenticated user
+    limit: Maximum number of schedules to return (max 100)
+    offset: Number of schedules to skip
+
+Returns:
+-------
+    List of all flow schedules
+ * @summary List all Flow schedules for current user
+ */
+export const listAllFlowSchedules = (
+  params?: ListAllFlowSchedulesParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ListFlowSchedulesResponse>(
+    { url: `/flow/schedules`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getListAllFlowSchedulesQueryKey = (
+  params?: ListAllFlowSchedulesParams,
+) => {
+  return [`/flow/schedules`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAllFlowSchedulesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params?: ListAllFlowSchedulesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listAllFlowSchedules>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAllFlowSchedulesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAllFlowSchedules>>
+  > = ({ signal }) => listAllFlowSchedules(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAllFlowSchedules>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type ListAllFlowSchedulesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAllFlowSchedules>>
+>;
+export type ListAllFlowSchedulesQueryError = ErrorType<HTTPValidationError>;
+
+export function useListAllFlowSchedules<
+  TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: undefined | ListAllFlowSchedulesParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listAllFlowSchedules>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAllFlowSchedules>>,
+          TError,
+          Awaited<ReturnType<typeof listAllFlowSchedules>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useListAllFlowSchedules<
+  TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params?: ListAllFlowSchedulesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listAllFlowSchedules>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listAllFlowSchedules>>,
+          TError,
+          Awaited<ReturnType<typeof listAllFlowSchedules>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useListAllFlowSchedules<
+  TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params?: ListAllFlowSchedulesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listAllFlowSchedules>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary List all Flow schedules for current user
+ */
+
+export function useListAllFlowSchedules<
+  TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params?: ListAllFlowSchedulesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listAllFlowSchedules>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getListAllFlowSchedulesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Delete a Flow schedule (cron or one-time).
+
+Schedule ID Types:
+- **Cron schedules**: schedule_id is the deployment_id (UUID format)
+- **One-time schedules**: schedule_id is the flow_run_id (UUID format)
+
+The API automatically determines the type and handles accordingly:
+- Cron: Removes the schedule from the deployment (schedule=None)
+- One-time: Deletes the scheduled flow run
+
+Args:
+----
+    schedule_id: Schedule ID (deployment_id for cron, flow_run_id for one-time)
+    current_user: Current authenticated user
+
+Returns:
+-------
+    Standardized response with schedule type information
+ * @summary Delete a Flow schedule
+ */
+export const deleteFlowSchedule = (
+  scheduleId: string,
+  options?: SecondParameter<typeof customInstance>,
+) => {
+  return customInstance<DeleteScheduleResponse>(
+    { url: `/flow/schedule/${scheduleId}`, method: "DELETE" },
+    options,
+  );
+};
+
+export const getDeleteFlowScheduleMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteFlowSchedule>>,
+    TError,
+    { scheduleId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteFlowSchedule>>,
+  TError,
+  { scheduleId: string },
+  TContext
+> => {
+  const mutationKey = ["deleteFlowSchedule"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteFlowSchedule>>,
+    { scheduleId: string }
+  > = (props) => {
+    const { scheduleId } = props ?? {};
+
+    return deleteFlowSchedule(scheduleId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteFlowScheduleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteFlowSchedule>>
+>;
+
+export type DeleteFlowScheduleMutationError = ErrorType<HTTPValidationError>;
+
+/**
+ * @summary Delete a Flow schedule
+ */
+export const useDeleteFlowSchedule = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteFlowSchedule>>,
+      TError,
+      { scheduleId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof deleteFlowSchedule>>,
+  TError,
+  { scheduleId: string },
+  TContext
+> => {
+  const mutationOptions = getDeleteFlowScheduleMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Update a Flow schedule (cron schedules only).
+
+Can update: active status, cron expression, parameters.
+
+Args:
+----
+    schedule_id: Schedule ID (deployment_id)
+    request: Update request
+    current_user: Current authenticated user
+
+Returns:
+-------
+    Success message
+ * @summary Update a Flow schedule
+ */
+export const updateFlowSchedule = (
+  scheduleId: string,
+  updateScheduleRequest: BodyType<UpdateScheduleRequest>,
+  options?: SecondParameter<typeof customInstance>,
+) => {
+  return customInstance<UpdateScheduleResponse>(
+    {
+      url: `/flow/schedule/${scheduleId}`,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      data: updateScheduleRequest,
+    },
+    options,
+  );
+};
+
+export const getUpdateFlowScheduleMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateFlowSchedule>>,
+    TError,
+    { scheduleId: string; data: BodyType<UpdateScheduleRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateFlowSchedule>>,
+  TError,
+  { scheduleId: string; data: BodyType<UpdateScheduleRequest> },
+  TContext
+> => {
+  const mutationKey = ["updateFlowSchedule"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateFlowSchedule>>,
+    { scheduleId: string; data: BodyType<UpdateScheduleRequest> }
+  > = (props) => {
+    const { scheduleId, data } = props ?? {};
+
+    return updateFlowSchedule(scheduleId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateFlowScheduleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateFlowSchedule>>
+>;
+export type UpdateFlowScheduleMutationBody = BodyType<UpdateScheduleRequest>;
+export type UpdateFlowScheduleMutationError = ErrorType<HTTPValidationError>;
+
+/**
+ * @summary Update a Flow schedule
+ */
+export const useUpdateFlowSchedule = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateFlowSchedule>>,
+      TError,
+      { scheduleId: string; data: BodyType<UpdateScheduleRequest> },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof updateFlowSchedule>>,
+  TError,
+  { scheduleId: string; data: BodyType<UpdateScheduleRequest> },
+  TContext
+> => {
+  const mutationOptions = getUpdateFlowScheduleMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
@@ -604,189 +1306,152 @@ export const useExecuteFlow = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * List all available flow templates.
+ * Schedule a Flow execution with cron or one-time schedule.
 
-Returns metadata only (no code content for performance).
- * @summary List Flow Templates
+Args:
+----
+    name: Flow name
+    request: Schedule request (must provide either cron or scheduled_time)
+    current_user: Current authenticated user
+
+Returns:
+-------
+    Schedule response with schedule_id and details
+ * @summary Schedule a Flow execution (cron or one-time)
  */
-export const listFlowTemplates = (
+export const scheduleFlow = (
+  name: string,
+  scheduleFlowRequest: BodyType<ScheduleFlowRequest>,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
-  return customInstance<FlowTemplate[]>(
-    { url: `/flow-templates`, method: "GET", signal },
+  return customInstance<ScheduleFlowResponse>(
+    {
+      url: `/flow/${name}/schedule`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: scheduleFlowRequest,
+      signal,
+    },
     options,
   );
 };
 
-export const getListFlowTemplatesQueryKey = () => {
-  return [`/flow-templates`] as const;
-};
-
-export const getListFlowTemplatesQueryOptions = <
-  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = ErrorType<unknown>,
+export const getScheduleFlowMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
 >(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof listFlowTemplates>>,
-      TError,
-      TData
-    >
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof scheduleFlow>>,
+    TError,
+    { name: string; data: BodyType<ScheduleFlowRequest> },
+    TContext
   >;
   request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof scheduleFlow>>,
+  TError,
+  { name: string; data: BodyType<ScheduleFlowRequest> },
+  TContext
+> => {
+  const mutationKey = ["scheduleFlow"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
 
-  const queryKey = queryOptions?.queryKey ?? getListFlowTemplatesQueryKey();
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof scheduleFlow>>,
+    { name: string; data: BodyType<ScheduleFlowRequest> }
+  > = (props) => {
+    const { name, data } = props ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listFlowTemplates>>
-  > = ({ signal }) => listFlowTemplates(requestOptions, signal);
+    return scheduleFlow(name, data, requestOptions);
+  };
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listFlowTemplates>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
+  return { mutationFn, ...mutationOptions };
 };
 
-export type ListFlowTemplatesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listFlowTemplates>>
+export type ScheduleFlowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof scheduleFlow>>
 >;
-export type ListFlowTemplatesQueryError = ErrorType<unknown>;
+export type ScheduleFlowMutationBody = BodyType<ScheduleFlowRequest>;
+export type ScheduleFlowMutationError = ErrorType<HTTPValidationError>;
 
-export function useListFlowTemplates<
-  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = ErrorType<unknown>,
+/**
+ * @summary Schedule a Flow execution (cron or one-time)
+ */
+export const useScheduleFlow = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
 >(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowTemplates>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listFlowTemplates>>,
-          TError,
-          Awaited<ReturnType<typeof listFlowTemplates>>
-        >,
-        "initialData"
-      >;
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof scheduleFlow>>,
+      TError,
+      { name: string; data: BodyType<ScheduleFlowRequest> },
+      TContext
+    >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
+): UseMutationResult<
+  Awaited<ReturnType<typeof scheduleFlow>>,
+  TError,
+  { name: string; data: BodyType<ScheduleFlowRequest> },
+  TContext
+> => {
+  const mutationOptions = getScheduleFlowMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
 };
-export function useListFlowTemplates<
-  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = ErrorType<unknown>,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowTemplates>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listFlowTemplates>>,
-          TError,
-          Awaited<ReturnType<typeof listFlowTemplates>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListFlowTemplates<
-  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = ErrorType<unknown>,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowTemplates>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary List Flow Templates
+ * List all schedules (cron and one-time) for a specific Flow.
+
+Args:
+----
+    name: Flow name
+    current_user: Current authenticated user
+    limit: Maximum number of schedules to return (max 100)
+    offset: Number of schedules to skip
+
+Returns:
+-------
+    List of schedules for the flow
+ * @summary List schedules for a specific Flow
  */
-
-export function useListFlowTemplates<
-  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = ErrorType<unknown>,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowTemplates>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListFlowTemplatesQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
- * Get flow template details including code content.
-
-Steps:
-1. Find template metadata
-2. Read Python file content
-3. Return combined data
- * @summary Get Flow Template
- */
-export const getFlowTemplate = (
-  templateId: string,
+export const listFlowSchedules = (
+  name: string,
+  params?: ListFlowSchedulesParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
-  return customInstance<FlowTemplateWithCode>(
-    { url: `/flow-templates/${templateId}`, method: "GET", signal },
+  return customInstance<ListFlowSchedulesResponse>(
+    { url: `/flow/${name}/schedules`, method: "GET", params, signal },
     options,
   );
 };
 
-export const getGetFlowTemplateQueryKey = (templateId?: string) => {
-  return [`/flow-templates/${templateId}`] as const;
+export const getListFlowSchedulesQueryKey = (
+  name?: string,
+  params?: ListFlowSchedulesParams,
+) => {
+  return [`/flow/${name}/schedules`, ...(params ? [params] : [])] as const;
 };
 
-export const getGetFlowTemplateQueryOptions = <
-  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
+export const getListFlowSchedulesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFlowSchedules>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  templateId: string,
+  name: string,
+  params?: ListFlowSchedulesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowTemplate>>,
+        Awaited<ReturnType<typeof listFlowSchedules>>,
         TError,
         TData
       >
@@ -797,47 +1462,48 @@ export const getGetFlowTemplateQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getGetFlowTemplateQueryKey(templateId);
+    queryOptions?.queryKey ?? getListFlowSchedulesQueryKey(name, params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getFlowTemplate>>> = ({
-    signal,
-  }) => getFlowTemplate(templateId, requestOptions, signal);
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listFlowSchedules>>
+  > = ({ signal }) => listFlowSchedules(name, params, requestOptions, signal);
 
   return {
     queryKey,
     queryFn,
-    enabled: !!templateId,
+    enabled: !!name,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof getFlowTemplate>>,
+    Awaited<ReturnType<typeof listFlowSchedules>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type GetFlowTemplateQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getFlowTemplate>>
+export type ListFlowSchedulesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFlowSchedules>>
 >;
-export type GetFlowTemplateQueryError = ErrorType<HTTPValidationError>;
+export type ListFlowSchedulesQueryError = ErrorType<HTTPValidationError>;
 
-export function useGetFlowTemplate<
-  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
+export function useListFlowSchedules<
+  TData = Awaited<ReturnType<typeof listFlowSchedules>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  templateId: string,
+  name: string,
+  params: undefined | ListFlowSchedulesParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowTemplate>>,
+        Awaited<ReturnType<typeof listFlowSchedules>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getFlowTemplate>>,
+          Awaited<ReturnType<typeof listFlowSchedules>>,
           TError,
-          Awaited<ReturnType<typeof getFlowTemplate>>
+          Awaited<ReturnType<typeof listFlowSchedules>>
         >,
         "initialData"
       >;
@@ -847,24 +1513,25 @@ export function useGetFlowTemplate<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useGetFlowTemplate<
-  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
+export function useListFlowSchedules<
+  TData = Awaited<ReturnType<typeof listFlowSchedules>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  templateId: string,
+  name: string,
+  params?: ListFlowSchedulesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowTemplate>>,
+        Awaited<ReturnType<typeof listFlowSchedules>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getFlowTemplate>>,
+          Awaited<ReturnType<typeof listFlowSchedules>>,
           TError,
-          Awaited<ReturnType<typeof getFlowTemplate>>
+          Awaited<ReturnType<typeof listFlowSchedules>>
         >,
         "initialData"
       >;
@@ -872,15 +1539,16 @@ export function useGetFlowTemplate<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetFlowTemplate<
-  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
+export function useListFlowSchedules<
+  TData = Awaited<ReturnType<typeof listFlowSchedules>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  templateId: string,
+  name: string,
+  params?: ListFlowSchedulesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowTemplate>>,
+        Awaited<ReturnType<typeof listFlowSchedules>>,
         TError,
         TData
       >
@@ -890,18 +1558,19 @@ export function useGetFlowTemplate<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary Get Flow Template
+ * @summary List schedules for a specific Flow
  */
 
-export function useGetFlowTemplate<
-  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
+export function useListFlowSchedules<
+  TData = Awaited<ReturnType<typeof listFlowSchedules>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  templateId: string,
+  name: string,
+  params?: ListFlowSchedulesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowTemplate>>,
+        Awaited<ReturnType<typeof listFlowSchedules>>,
         TError,
         TData
       >
@@ -910,7 +1579,7 @@ export function useGetFlowTemplate<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetFlowTemplateQueryOptions(templateId, options);
+  const queryOptions = getListFlowSchedulesQueryOptions(name, params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

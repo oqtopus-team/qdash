@@ -9,7 +9,7 @@ import {
   listFlowSchedules,
   deleteFlowSchedule,
   updateFlowSchedule,
-} from "@/client/flow-schedule/flow-schedule";
+} from "@/client/flow/flow";
 import type { ScheduleFlowRequest, FlowScheduleSummary } from "@/schemas";
 
 interface FlowSchedulePanelProps {

@@ -419,7 +419,7 @@ export const metricsGetQubitMetricHistory = (
 ) => {
   return customInstance<QubitMetricHistoryResponse>(
     {
-      url: `/metrics/chip/${chipId}/qubit/${qid}/metric-history`,
+      url: `/metrics/chip/${chipId}/qubit/${qid}/history`,
       method: "GET",
       params,
       signal,
@@ -434,7 +434,7 @@ export const getMetricsGetQubitMetricHistoryQueryKey = (
   params?: MetricsGetQubitMetricHistoryParams,
 ) => {
   return [
-    `/metrics/chip/${chipId}/qubit/${qid}/metric-history`,
+    `/metrics/chip/${chipId}/qubit/${qid}/history`,
     ...(params ? [params] : []),
   ] as const;
 };
@@ -632,7 +632,7 @@ export const metricsGetCouplingMetricHistory = (
 ) => {
   return customInstance<QubitMetricHistoryResponse>(
     {
-      url: `/metrics/chip/${chipId}/coupling/${couplingId}/metric-history`,
+      url: `/metrics/chip/${chipId}/coupling/${couplingId}/history`,
       method: "GET",
       params,
       signal,
@@ -647,7 +647,7 @@ export const getMetricsGetCouplingMetricHistoryQueryKey = (
   params?: MetricsGetCouplingMetricHistoryParams,
 ) => {
   return [
-    `/metrics/chip/${chipId}/coupling/${couplingId}/metric-history`,
+    `/metrics/chip/${chipId}/coupling/${couplingId}/history`,
     ...(params ? [params] : []),
   ] as const;
 };

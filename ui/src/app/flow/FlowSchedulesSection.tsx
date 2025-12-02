@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
-import { listAllFlowSchedules } from "@/client/flow-schedule/flow-schedule";
+import { listAllFlowSchedules } from "@/client/flow/flow";
 
 export function FlowSchedulesSection() {
   const { data, isLoading, error } = useQuery({

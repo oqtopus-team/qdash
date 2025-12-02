@@ -5,7 +5,6 @@ from qdash.db.init import (
     init_chip_document,
     init_task_document,
 )
-from qdash.dbmodel.initialize import initialize
 
 app = typer.Typer(
     name="qdash",
