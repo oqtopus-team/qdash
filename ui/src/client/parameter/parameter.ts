@@ -41,13 +41,13 @@ export const fetchAllParameters = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ListParameterResponse>(
-    { url: `/api/parameter`, method: "GET", signal },
+    { url: `/parameter`, method: "GET", signal },
     options,
   );
 };
 
 export const getFetchAllParametersQueryKey = () => {
-  return [`/api/parameter`] as const;
+  return [`/parameter`] as const;
 };
 
 export const getFetchAllParametersQueryOptions = <

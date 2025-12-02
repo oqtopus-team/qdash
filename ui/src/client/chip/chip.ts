@@ -62,13 +62,13 @@ export const listChips = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ChipResponse[]>(
-    { url: `/api/chip`, method: "GET", signal },
+    { url: `/chip`, method: "GET", signal },
     options,
   );
 };
 
 export const getListChipsQueryKey = () => {
-  return [`/api/chip`] as const;
+  return [`/chip`] as const;
 };
 
 export const getListChipsQueryOptions = <
@@ -210,7 +210,7 @@ export const createChip = (
 ) => {
   return customInstance<ChipResponse>(
     {
-      url: `/api/chip`,
+      url: `/chip`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: createChipRequest,
@@ -313,13 +313,13 @@ export const fetchChipDates = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ChipDatesResponse>(
-    { url: `/api/chip/${chipId}/dates`, method: "GET", signal },
+    { url: `/chip/${chipId}/dates`, method: "GET", signal },
     options,
   );
 };
 
 export const getFetchChipDatesQueryKey = (chipId?: string) => {
-  return [`/api/chip/${chipId}/dates`] as const;
+  return [`/chip/${chipId}/dates`] as const;
 };
 
 export const getFetchChipDatesQueryOptions = <
@@ -472,13 +472,13 @@ export const fetchChip = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ChipResponse>(
-    { url: `/api/chip/${chipId}`, method: "GET", signal },
+    { url: `/chip/${chipId}`, method: "GET", signal },
     options,
   );
 };
 
 export const getFetchChipQueryKey = (chipId?: string) => {
-  return [`/api/chip/${chipId}`] as const;
+  return [`/chip/${chipId}`] as const;
 };
 
 export const getFetchChipQueryOptions = <
@@ -629,7 +629,7 @@ export const listExecutionsByChipId = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ExecutionResponseSummary[]>(
-    { url: `/api/chip/${chipId}/execution`, method: "GET", params, signal },
+    { url: `/chip/${chipId}/execution`, method: "GET", params, signal },
     options,
   );
 };
@@ -638,10 +638,7 @@ export const getListExecutionsByChipIdQueryKey = (
   chipId?: string,
   params?: ListExecutionsByChipIdParams,
 ) => {
-  return [
-    `/api/chip/${chipId}/execution`,
-    ...(params ? [params] : []),
-  ] as const;
+  return [`/chip/${chipId}/execution`, ...(params ? [params] : [])] as const;
 };
 
 export const getListExecutionsByChipIdQueryOptions = <
@@ -823,11 +820,7 @@ export const fetchExecutionByChipId = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ExecutionResponseDetail>(
-    {
-      url: `/api/chip/${chipId}/execution/${executionId}`,
-      method: "GET",
-      signal,
-    },
+    { url: `/chip/${chipId}/execution/${executionId}`, method: "GET", signal },
     options,
   );
 };
@@ -836,7 +829,7 @@ export const getFetchExecutionByChipIdQueryKey = (
   chipId?: string,
   executionId?: string,
 ) => {
-  return [`/api/chip/${chipId}/execution/${executionId}`] as const;
+  return [`/chip/${chipId}/execution/${executionId}`] as const;
 };
 
 export const getFetchExecutionByChipIdQueryOptions = <
@@ -1019,13 +1012,13 @@ export const fetchMuxDetails = (
   signal?: AbortSignal,
 ) => {
   return customInstance<MuxDetailResponse>(
-    { url: `/api/chip/${chipId}/mux/${muxId}`, method: "GET", signal },
+    { url: `/chip/${chipId}/mux/${muxId}`, method: "GET", signal },
     options,
   );
 };
 
 export const getFetchMuxDetailsQueryKey = (chipId?: string, muxId?: number) => {
-  return [`/api/chip/${chipId}/mux/${muxId}`] as const;
+  return [`/chip/${chipId}/mux/${muxId}`] as const;
 };
 
 export const getFetchMuxDetailsQueryOptions = <
@@ -1199,13 +1192,13 @@ export const listMuxes = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ListMuxResponse>(
-    { url: `/api/chip/${chipId}/mux`, method: "GET", signal },
+    { url: `/chip/${chipId}/mux`, method: "GET", signal },
     options,
   );
 };
 
 export const getListMuxesQueryKey = (chipId?: string) => {
-  return [`/api/chip/${chipId}/mux`] as const;
+  return [`/chip/${chipId}/mux`] as const;
 };
 
 export const getListMuxesQueryOptions = <
@@ -1358,7 +1351,7 @@ export const fetchHistoricalQubitTaskGroupedByChip = (
 ) => {
   return customInstance<LatestTaskGroupedByChipResponse>(
     {
-      url: `/api/chip/${chipId}/task/qubit/${taskName}/history/${recordedDate}`,
+      url: `/chip/${chipId}/task/qubit/${taskName}/history/${recordedDate}`,
       method: "GET",
       signal,
     },
@@ -1372,7 +1365,7 @@ export const getFetchHistoricalQubitTaskGroupedByChipQueryKey = (
   recordedDate?: string,
 ) => {
   return [
-    `/api/chip/${chipId}/task/qubit/${taskName}/history/${recordedDate}`,
+    `/chip/${chipId}/task/qubit/${taskName}/history/${recordedDate}`,
   ] as const;
 };
 
@@ -1560,7 +1553,7 @@ export const fetchLatestQubitTaskGroupedByChip = (
 ) => {
   return customInstance<LatestTaskGroupedByChipResponse>(
     {
-      url: `/api/chip/${chipId}/task/qubit/${taskName}/latest`,
+      url: `/chip/${chipId}/task/qubit/${taskName}/latest`,
       method: "GET",
       signal,
     },
@@ -1572,7 +1565,7 @@ export const getFetchLatestQubitTaskGroupedByChipQueryKey = (
   chipId?: string,
   taskName?: string,
 ) => {
-  return [`/api/chip/${chipId}/task/qubit/${taskName}/latest`] as const;
+  return [`/chip/${chipId}/task/qubit/${taskName}/latest`] as const;
 };
 
 export const getFetchLatestQubitTaskGroupedByChipQueryOptions = <
@@ -1744,7 +1737,7 @@ export const fetchQubitTaskHistory = (
 ) => {
   return customInstance<TaskHistoryResponse>(
     {
-      url: `/api/chip/${chipId}/task/qubit/${qid}/task/${taskName}`,
+      url: `/chip/${chipId}/task/qubit/${qid}/task/${taskName}`,
       method: "GET",
       signal,
     },
@@ -1757,7 +1750,7 @@ export const getFetchQubitTaskHistoryQueryKey = (
   qid?: string,
   taskName?: string,
 ) => {
-  return [`/api/chip/${chipId}/task/qubit/${qid}/task/${taskName}`] as const;
+  return [`/chip/${chipId}/task/qubit/${qid}/task/${taskName}`] as const;
 };
 
 export const getFetchQubitTaskHistoryQueryOptions = <
@@ -1934,7 +1927,7 @@ export const fetchCouplingTaskHistory = (
 ) => {
   return customInstance<TaskHistoryResponse>(
     {
-      url: `/api/chip/${chipId}/task/coupling/${couplingId}/task/${taskName}`,
+      url: `/chip/${chipId}/task/coupling/${couplingId}/task/${taskName}`,
       method: "GET",
       signal,
     },
@@ -1948,7 +1941,7 @@ export const getFetchCouplingTaskHistoryQueryKey = (
   taskName?: string,
 ) => {
   return [
-    `/api/chip/${chipId}/task/coupling/${couplingId}/task/${taskName}`,
+    `/chip/${chipId}/task/coupling/${couplingId}/task/${taskName}`,
   ] as const;
 };
 
@@ -2148,7 +2141,7 @@ export const fetchHistoricalCouplingTaskGroupedByChip = (
 ) => {
   return customInstance<LatestTaskGroupedByChipResponse>(
     {
-      url: `/api/chip/${chipId}/task/coupling/${taskName}/history/${recordedDate}`,
+      url: `/chip/${chipId}/task/coupling/${taskName}/history/${recordedDate}`,
       method: "GET",
       signal,
     },
@@ -2162,7 +2155,7 @@ export const getFetchHistoricalCouplingTaskGroupedByChipQueryKey = (
   recordedDate?: string,
 ) => {
   return [
-    `/api/chip/${chipId}/task/coupling/${taskName}/history/${recordedDate}`,
+    `/chip/${chipId}/task/coupling/${taskName}/history/${recordedDate}`,
   ] as const;
 };
 
@@ -2350,7 +2343,7 @@ export const fetchLatestCouplingTaskGroupedByChip = (
 ) => {
   return customInstance<LatestTaskGroupedByChipResponse>(
     {
-      url: `/api/chip/${chipId}/task/coupling/${taskName}/latest`,
+      url: `/chip/${chipId}/task/coupling/${taskName}/latest`,
       method: "GET",
       signal,
     },
@@ -2362,7 +2355,7 @@ export const getFetchLatestCouplingTaskGroupedByChipQueryKey = (
   chipId?: string,
   taskName?: string,
 ) => {
-  return [`/api/chip/${chipId}/task/coupling/${taskName}/latest`] as const;
+  return [`/chip/${chipId}/task/coupling/${taskName}/latest`] as const;
 };
 
 export const getFetchLatestCouplingTaskGroupedByChipQueryOptions = <
@@ -2544,7 +2537,7 @@ export const fetchTimeseriesTaskResultByTagAndParameterAndQid = (
 ) => {
   return customInstance<TimeSeriesData>(
     {
-      url: `/api/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
+      url: `/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
       method: "GET",
       params,
       signal,
@@ -2560,7 +2553,7 @@ export const getFetchTimeseriesTaskResultByTagAndParameterAndQidQueryKey = (
   params?: FetchTimeseriesTaskResultByTagAndParameterAndQidParams,
 ) => {
   return [
-    `/api/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
+    `/chip/${chipId}/parameter/${parameter}/qid/${qid}`,
     ...(params ? [params] : []),
   ] as const;
 };
@@ -2794,7 +2787,7 @@ export const fetchTimeseriesTaskResultByTagAndParameter = (
 ) => {
   return customInstance<TimeSeriesData>(
     {
-      url: `/api/chip/${chipId}/parameter/${parameter}`,
+      url: `/chip/${chipId}/parameter/${parameter}`,
       method: "GET",
       params,
       signal,
@@ -2809,7 +2802,7 @@ export const getFetchTimeseriesTaskResultByTagAndParameterQueryKey = (
   params?: FetchTimeseriesTaskResultByTagAndParameterParams,
 ) => {
   return [
-    `/api/chip/${chipId}/parameter/${parameter}`,
+    `/chip/${chipId}/parameter/${parameter}`,
     ...(params ? [params] : []),
   ] as const;
 };

@@ -53,13 +53,13 @@ export const downloadFile = (
   signal?: AbortSignal,
 ) => {
   return customInstance<void>(
-    { url: `/api/file/raw_data`, method: "GET", params, signal },
+    { url: `/file/raw_data`, method: "GET", params, signal },
     options,
   );
 };
 
 export const getDownloadFileQueryKey = (params?: DownloadFileParams) => {
-  return [`/api/file/raw_data`, ...(params ? [params] : [])] as const;
+  return [`/file/raw_data`, ...(params ? [params] : [])] as const;
 };
 
 export const getDownloadFileQueryOptions = <
@@ -190,13 +190,13 @@ export const downloadZipFile = (
   signal?: AbortSignal,
 ) => {
   return customInstance<void>(
-    { url: `/api/file/zip`, method: "GET", params, signal },
+    { url: `/file/zip`, method: "GET", params, signal },
     options,
   );
 };
 
 export const getDownloadZipFileQueryKey = (params?: DownloadZipFileParams) => {
-  return [`/api/file/zip`, ...(params ? [params] : [])] as const;
+  return [`/file/zip`, ...(params ? [params] : [])] as const;
 };
 
 export const getDownloadZipFileQueryOptions = <
@@ -350,13 +350,13 @@ export const getFileTree = (
   signal?: AbortSignal,
 ) => {
   return customInstance<FileTreeNode[]>(
-    { url: `/api/file/tree`, method: "GET", signal },
+    { url: `/file/tree`, method: "GET", signal },
     options,
   );
 };
 
 export const getGetFileTreeQueryKey = () => {
-  return [`/api/file/tree`] as const;
+  return [`/file/tree`] as const;
 };
 
 export const getGetFileTreeQueryOptions = <
@@ -488,13 +488,13 @@ export const getFileContent = (
   signal?: AbortSignal,
 ) => {
   return customInstance<GetFileContent200>(
-    { url: `/api/file/content`, method: "GET", params, signal },
+    { url: `/file/content`, method: "GET", params, signal },
     options,
   );
 };
 
 export const getGetFileContentQueryKey = (params?: GetFileContentParams) => {
-  return [`/api/file/content`, ...(params ? [params] : [])] as const;
+  return [`/file/content`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetFileContentQueryOptions = <
@@ -633,7 +633,7 @@ export const saveFileContent = (
 ) => {
   return customInstance<SaveFileContent200>(
     {
-      url: `/api/file/content`,
+      url: `/file/content`,
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       data: saveFileRequest,
@@ -732,7 +732,7 @@ export const validateFileContent = (
 ) => {
   return customInstance<ValidateFileContent200>(
     {
-      url: `/api/file/validate`,
+      url: `/file/validate`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: validateFileRequest,
@@ -826,13 +826,13 @@ export const getGitStatus = (
   signal?: AbortSignal,
 ) => {
   return customInstance<GetGitStatus200>(
-    { url: `/api/file/git/status`, method: "GET", signal },
+    { url: `/file/git/status`, method: "GET", signal },
     options,
   );
 };
 
 export const getGetGitStatusQueryKey = () => {
-  return [`/api/file/git/status`] as const;
+  return [`/file/git/status`] as const;
 };
 
 export const getGetGitStatusQueryOptions = <
@@ -959,7 +959,7 @@ export const gitPullConfig = (
   signal?: AbortSignal,
 ) => {
   return customInstance<GitPullConfig200>(
-    { url: `/api/file/git/pull`, method: "POST", signal },
+    { url: `/file/git/pull`, method: "POST", signal },
     options,
   );
 };
@@ -1052,7 +1052,7 @@ export const gitPushConfig = (
 ) => {
   return customInstance<GitPushConfig200>(
     {
-      url: `/api/file/git/push`,
+      url: `/file/git/push`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: gitPushRequest,

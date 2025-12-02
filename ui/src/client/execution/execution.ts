@@ -40,7 +40,7 @@ export const fetchFigureByPath = (
   signal?: AbortSignal,
 ) => {
   return customInstance<void>(
-    { url: `/api/executions/figure`, method: "GET", params, signal },
+    { url: `/executions/figure`, method: "GET", params, signal },
     options,
   );
 };
@@ -48,7 +48,7 @@ export const fetchFigureByPath = (
 export const getFetchFigureByPathQueryKey = (
   params?: FetchFigureByPathParams,
 ) => {
-  return [`/api/executions/figure`, ...(params ? [params] : [])] as const;
+  return [`/executions/figure`, ...(params ? [params] : [])] as const;
 };
 
 export const getFetchFigureByPathQueryOptions = <
@@ -201,13 +201,13 @@ export const fetchExecutionLockStatus = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ExecutionLockStatusResponse>(
-    { url: `/api/executions/lock_status`, method: "GET", signal },
+    { url: `/executions/lock_status`, method: "GET", signal },
     options,
   );
 };
 
 export const getFetchExecutionLockStatusQueryKey = () => {
-  return [`/api/executions/lock_status`] as const;
+  return [`/executions/lock_status`] as const;
 };
 
 export const getFetchExecutionLockStatusQueryOptions = <

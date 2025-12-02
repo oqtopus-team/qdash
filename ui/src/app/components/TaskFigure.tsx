@@ -59,7 +59,7 @@ export function TaskFigure({
         {figurePaths.map((p, i) => (
           <img
             key={i}
-            src={`${apiUrl}/api/executions/figure?path=${encodeURIComponent(
+            src={`${apiUrl}/executions/figure?path=${encodeURIComponent(
               p,
             )}`}
             alt={`Result for QID ${qid}`}
@@ -73,7 +73,7 @@ export function TaskFigure({
   if (typeof figurePaths === "string") {
     return (
       <img
-        src={`${apiUrl}/api/executions/figure?path=${encodeURIComponent(figurePaths)}`}
+        src={`${apiUrl}/executions/figure?path=${encodeURIComponent(figurePaths)}`}
         alt={`Result for QID ${qid}`}
         className={className}
       />

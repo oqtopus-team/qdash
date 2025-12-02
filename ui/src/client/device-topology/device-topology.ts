@@ -35,7 +35,7 @@ export const getDeviceTopology = (
 ) => {
   return customInstance<Device>(
     {
-      url: `/api/device_topology`,
+      url: `/device_topology`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: deviceTopologyRequest,
@@ -127,7 +127,7 @@ export const getDeviceTopologyPlot = (
 ) => {
   return customInstance<void>(
     {
-      url: `/api/device_topology/plot`,
+      url: `/device_topology/plot`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: device,

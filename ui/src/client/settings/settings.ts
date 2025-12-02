@@ -34,13 +34,13 @@ export const fetchConfig = (
   signal?: AbortSignal,
 ) => {
   return customInstance<Settings>(
-    { url: `/api/settings`, method: "GET", signal },
+    { url: `/settings`, method: "GET", signal },
     options,
   );
 };
 
 export const getFetchConfigQueryKey = () => {
-  return [`/api/settings`] as const;
+  return [`/settings`] as const;
 };
 
 export const getFetchConfigQueryOptions = <

@@ -15,7 +15,7 @@
     "version": "0.0.1"
   },
   "paths": {
-    "/api/auth/login": {
+    "/auth/login": {
       "post": {
         "tags": ["auth"],
         "summary": "Login",
@@ -58,7 +58,7 @@
         }
       }
     },
-    "/api/auth/register": {
+    "/auth/register": {
       "post": {
         "tags": ["auth"],
         "summary": "Register User",
@@ -101,7 +101,7 @@
         }
       }
     },
-    "/api/auth/me": {
+    "/auth/me": {
       "get": {
         "tags": ["auth"],
         "summary": "Read Users Me",
@@ -124,7 +124,7 @@
         }
       }
     },
-    "/api/auth/logout": {
+    "/auth/logout": {
       "post": {
         "tags": ["auth"],
         "summary": "Logout",
@@ -151,7 +151,7 @@
         }
       }
     },
-    "/api/executions/figure": {
+    "/executions/figure": {
       "get": {
         "tags": ["execution"],
         "summary": "Fetches a calibration figure by its path",
@@ -195,7 +195,7 @@
         }
       }
     },
-    "/api/executions/lock_status": {
+    "/executions/lock_status": {
       "get": {
         "tags": ["execution"],
         "summary": "Fetches the status of a calibration.",
@@ -215,7 +215,7 @@
         }
       }
     },
-    "/api/file/raw_data": {
+    "/file/raw_data": {
       "get": {
         "tags": ["file"],
         "summary": "download file",
@@ -249,7 +249,7 @@
         }
       }
     },
-    "/api/file/zip": {
+    "/file/zip": {
       "get": {
         "tags": ["file"],
         "summary": "download file or directory as zip",
@@ -283,7 +283,7 @@
         }
       }
     },
-    "/api/file/tree": {
+    "/file/tree": {
       "get": {
         "tags": ["file"],
         "summary": "Get file tree for entire config directory",
@@ -307,7 +307,7 @@
         }
       }
     },
-    "/api/file/content": {
+    "/file/content": {
       "get": {
         "tags": ["file"],
         "summary": "Get file content for editing",
@@ -392,7 +392,7 @@
         }
       }
     },
-    "/api/file/validate": {
+    "/file/validate": {
       "post": {
         "tags": ["file"],
         "summary": "Validate file content (YAML/JSON)",
@@ -434,7 +434,7 @@
         }
       }
     },
-    "/api/file/git/status": {
+    "/file/git/status": {
       "get": {
         "tags": ["file"],
         "summary": "Get Git status of config directory",
@@ -456,7 +456,7 @@
         }
       }
     },
-    "/api/file/git/pull": {
+    "/file/git/pull": {
       "post": {
         "tags": ["file"],
         "summary": "Pull latest config from Git repository",
@@ -478,7 +478,7 @@
         }
       }
     },
-    "/api/file/git/push": {
+    "/file/git/push": {
       "post": {
         "tags": ["file"],
         "summary": "Push config changes to Git repository",
@@ -520,7 +520,7 @@
         }
       }
     },
-    "/api/calibration/note": {
+    "/calibration/note": {
       "get": {
         "tags": ["calibration"],
         "summary": "Fetches all the cron schedules.",
@@ -540,7 +540,7 @@
         }
       }
     },
-    "/api/settings": {
+    "/settings": {
       "get": {
         "tags": ["settings"],
         "summary": "Get settings",
@@ -560,7 +560,7 @@
         }
       }
     },
-    "/api/chip": {
+    "/chip": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch all chips",
@@ -627,7 +627,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/dates": {
+    "/chip/{chip_id}/dates": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch available dates for a chip",
@@ -668,7 +668,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}": {
+    "/chip/{chip_id}": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch a chip",
@@ -709,7 +709,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/execution": {
+    "/chip/{chip_id}/execution": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch executions",
@@ -781,7 +781,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/execution/{execution_id}": {
+    "/chip/{chip_id}/execution/{execution_id}": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch an execution by its ID",
@@ -831,7 +831,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/mux/{mux_id}": {
+    "/chip/{chip_id}/mux/{mux_id}": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch the multiplexer details",
@@ -881,7 +881,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/mux": {
+    "/chip/{chip_id}/mux": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch the multiplexers",
@@ -922,7 +922,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/qubit/{task_name}/history/{recorded_date}": {
+    "/chip/{chip_id}/task/qubit/{task_name}/history/{recorded_date}": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch historical task results",
@@ -981,7 +981,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/qubit/{task_name}/latest": {
+    "/chip/{chip_id}/task/qubit/{task_name}/latest": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch latest qubit task results with optional outlier filtering",
@@ -1031,7 +1031,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/qubit/{qid}/task/{task_name}": {
+    "/chip/{chip_id}/task/qubit/{qid}/task/{task_name}": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch Qubit Task History",
@@ -1095,7 +1095,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/coupling/{coupling_id}/task/{task_name}": {
+    "/chip/{chip_id}/task/coupling/{coupling_id}/task/{task_name}": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch Coupling Task History",
@@ -1159,7 +1159,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/coupling/{task_name}/history/{recorded_date}": {
+    "/chip/{chip_id}/task/coupling/{task_name}/history/{recorded_date}": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch historical task results",
@@ -1218,7 +1218,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/task/coupling/{task_name}/latest": {
+    "/chip/{chip_id}/task/coupling/{task_name}/latest": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch the multiplexers",
@@ -1268,7 +1268,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/parameter/{parameter}/qid/{qid}": {
+    "/chip/{chip_id}/parameter/{parameter}/qid/{qid}": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch the timeseries task result by tag and parameter for a specific qid",
@@ -1354,7 +1354,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/parameter/{parameter}": {
+    "/chip/{chip_id}/parameter/{parameter}": {
       "get": {
         "tags": ["chip"],
         "summary": "Fetch the timeseries task result by tag and parameter for all qids",
@@ -1431,7 +1431,7 @@
         }
       }
     },
-    "/api/tasks": {
+    "/tasks": {
       "get": {
         "tags": ["task"],
         "summary": "Fetch all tasks",
@@ -1481,7 +1481,7 @@
         }
       }
     },
-    "/api/task/{task_id}": {
+    "/task/{task_id}": {
       "get": {
         "tags": ["task"],
         "summary": "Get task result by task ID",
@@ -1522,7 +1522,7 @@
         }
       }
     },
-    "/api/parameter": {
+    "/parameter": {
       "get": {
         "tags": ["parameter"],
         "summary": "Fetch all parameters",
@@ -1542,7 +1542,7 @@
         }
       }
     },
-    "/api/tag": {
+    "/tag": {
       "get": {
         "tags": ["tag"],
         "summary": "list all tag",
@@ -1562,7 +1562,7 @@
         }
       }
     },
-    "/api/device_topology": {
+    "/device_topology": {
       "post": {
         "tags": ["device_topology"],
         "summary": "Get the device topology",
@@ -1602,7 +1602,7 @@
         }
       }
     },
-    "/api/device_topology/plot": {
+    "/device_topology/plot": {
       "post": {
         "tags": ["device_topology"],
         "summary": "Get the device topology plot",
@@ -1635,7 +1635,7 @@
         }
       }
     },
-    "/api/backend": {
+    "/backend": {
       "get": {
         "tags": ["backend"],
         "summary": "Get all backends",
@@ -1664,7 +1664,7 @@
         ]
       }
     },
-    "/api/flow": {
+    "/flow": {
       "get": {
         "tags": ["flow"],
         "summary": "List Flows",
@@ -1722,7 +1722,7 @@
         }
       }
     },
-    "/api/flow/{name}": {
+    "/flow/{name}": {
       "get": {
         "tags": ["flow"],
         "summary": "Get Flow details",
@@ -1806,7 +1806,7 @@
         }
       }
     },
-    "/api/flow/{name}/execute": {
+    "/flow/{name}/execute": {
       "post": {
         "tags": ["flow"],
         "summary": "Execute a Flow",
@@ -1857,7 +1857,7 @@
         }
       }
     },
-    "/api/flow-templates": {
+    "/flow-templates": {
       "get": {
         "tags": ["flow"],
         "summary": "List Flow Templates",
@@ -1881,7 +1881,7 @@
         }
       }
     },
-    "/api/flow-templates/{template_id}": {
+    "/flow-templates/{template_id}": {
       "get": {
         "tags": ["flow"],
         "summary": "Get Flow Template",
@@ -1922,7 +1922,7 @@
         }
       }
     },
-    "/api/flow/{name}/schedule": {
+    "/flow/{name}/schedule": {
       "post": {
         "tags": ["flow_schedule"],
         "summary": "Schedule a Flow execution (cron or one-time)",
@@ -1973,7 +1973,7 @@
         }
       }
     },
-    "/api/flow/{name}/schedules": {
+    "/flow/{name}/schedules": {
       "get": {
         "tags": ["flow_schedule"],
         "summary": "List schedules for a specific Flow",
@@ -2034,7 +2034,7 @@
         }
       }
     },
-    "/api/flow-schedules": {
+    "/flow-schedules": {
       "get": {
         "tags": ["flow_schedule"],
         "summary": "List all Flow schedules for current user",
@@ -2086,7 +2086,7 @@
         }
       }
     },
-    "/api/flow-schedule/{schedule_id}": {
+    "/flow-schedule/{schedule_id}": {
       "delete": {
         "tags": ["flow_schedule"],
         "summary": "Delete a Flow schedule",
@@ -2176,7 +2176,7 @@
         }
       }
     },
-    "/api/config": {
+    "/config": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Metrics Config",
@@ -2198,7 +2198,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/metrics": {
+    "/chip/{chip_id}/metrics": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Chip Metrics",
@@ -2275,7 +2275,7 @@
         }
       }
     },
-    "/api/chips": {
+    "/chips": {
       "get": {
         "tags": ["metrics"],
         "summary": "List Chips",
@@ -2326,7 +2326,7 @@
         }
       }
     },
-    "/api/chip/current": {
+    "/chip/current": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Current Chip",
@@ -2379,7 +2379,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/qubit/{qid}/metric-history": {
+    "/chip/{chip_id}/qubit/{qid}/metric-history": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Qubit Metric History",
@@ -2484,7 +2484,7 @@
         }
       }
     },
-    "/api/chip/{chip_id}/coupling/{coupling_id}/metric-history": {
+    "/chip/{chip_id}/coupling/{coupling_id}/metric-history": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Coupling Metric History",

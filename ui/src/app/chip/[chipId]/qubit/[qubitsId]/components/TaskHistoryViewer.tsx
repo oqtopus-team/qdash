@@ -552,7 +552,7 @@ export function TaskHistoryViewer({
                           className="w-full h-full"
                           fullPath={`${
                             process.env.NEXT_PUBLIC_API_URL
-                          }/api/executions/figure?path=${encodeURIComponent(
+                          }/executions/figure?path=${encodeURIComponent(
                             selectedTask.json_figure_path?.[
                               expandedFigureIdx
                             ] || "",

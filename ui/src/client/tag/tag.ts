@@ -42,13 +42,13 @@ export const listAllTag = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ListTagResponse>(
-    { url: `/api/tag`, method: "GET", signal },
+    { url: `/tag`, method: "GET", signal },
     options,
   );
 };
 
 export const getListAllTagQueryKey = () => {
-  return [`/api/tag`] as const;
+  return [`/tag`] as const;
 };
 
 export const getListAllTagQueryOptions = <

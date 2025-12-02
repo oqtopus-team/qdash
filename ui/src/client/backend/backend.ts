@@ -34,13 +34,13 @@ export const fetchAllBackends = (
   signal?: AbortSignal,
 ) => {
   return customInstance<BackendResponseModel[]>(
-    { url: `/api/backend`, method: "GET", signal },
+    { url: `/backend`, method: "GET", signal },
     options,
   );
 };
 
 export const getFetchAllBackendsQueryKey = () => {
-  return [`/api/backend`] as const;
+  return [`/backend`] as const;
 };
 
 export const getFetchAllBackendsQueryOptions = <

@@ -61,7 +61,7 @@ export default function SettingsPage() {
 
   const handleCopyCurl = async () => {
     const token = accessToken || "<your-token>";
-    const curlCommand = `curl -H "Authorization: Bearer ${token}" ${apiUrl}/api/auth/me`;
+    const curlCommand = `curl -H "Authorization: Bearer ${token}" ${apiUrl}/auth/me`;
     await navigator.clipboard.writeText(curlCommand);
     setCopiedCurl(true);
     setTimeout(() => setCopiedCurl(false), 2000);
@@ -326,7 +326,7 @@ export default function SettingsPage() {
                           </code>
                         </pre>
                         <pre>
-                          <code> {apiUrl}/api/auth/me</code>
+                          <code> {apiUrl}/auth/me</code>
                         </pre>
                       </div>
                       <button
