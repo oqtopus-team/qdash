@@ -37,7 +37,27 @@ import type { ErrorType, BodyType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Login endpoint to authenticate user and return access token.
+ * Authenticate user and return access token.
+
+Validates user credentials against the database and returns an access token
+for subsequent authenticated requests.
+
+Parameters
+----------
+username : str
+    User's username provided via form data
+password : str
+    User's password provided via form data
+
+Returns
+-------
+TokenResponse
+    Response containing access_token, token_type, and username
+
+Raises
+------
+HTTPException
+    401 if authentication fails due to incorrect username or password
  * @summary Login user
  */
 export const login = (
@@ -133,7 +153,25 @@ export const useLogin = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Register a new user and return access token.
+ * Register a new user account.
+
+Creates a new user in the database with hashed password and generates
+an access token for immediate use.
+
+Parameters
+----------
+user_data : UserCreate
+    User registration data including username, password, and optional full_name
+
+Returns
+-------
+UserWithToken
+    Newly created user information including access_token
+
+Raises
+------
+HTTPException
+    400 if the username is already registered
  * @summary Register a new user
  */
 export const registerUser = (
@@ -225,7 +263,21 @@ export const useRegisterUser = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Get current user information.
+ * Get current authenticated user information.
+
+Returns the profile information of the currently authenticated user
+based on the provided access token.
+
+Parameters
+----------
+current_user : User
+    Current authenticated user injected via dependency
+
+Returns
+-------
+User
+    Current user's profile information including username, full_name,
+    and disabled status
  * @summary Get current user
  */
 export const getCurrentUser = (
@@ -354,10 +406,16 @@ export function useGetCurrentUser<
 }
 
 /**
- * Logout endpoint.
+ * Logout the current user.
 
-This endpoint doesn't need to do anything on the backend since the username is managed client-side.
-The client will remove the username from cookies.
+This endpoint serves as a logout confirmation. Since authentication tokens
+are managed client-side (via cookies), no server-side session invalidation
+is required. The client is responsible for removing the stored credentials.
+
+Returns
+-------
+dict[str, str]
+    Success message confirming logout
  * @summary Logout user
  */
 export const logout = (

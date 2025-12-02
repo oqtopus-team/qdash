@@ -44,12 +44,12 @@ COUPLING_FIDELITY_THRESHOLD = 0.75
     response_model=LatestTaskResultResponse,
     response_model_exclude_none=True,
 )
-def fetch_latest_qubit_task_results(
+def get_latest_qubit_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> LatestTaskResultResponse:
-    """Fetch the latest qubit task results for all qubits on a chip.
+    """Get the latest qubit task results for all qubits on a chip.
 
     Retrieves the most recent task result for each qubit on the specified chip.
     Results include fidelity threshold status based on x90 gate fidelity.
@@ -74,7 +74,7 @@ def fetch_latest_qubit_task_results(
         If the chip is not found for the current user
 
     """
-    logger.debug(f"Fetching qubit tasks for chip {chip_id}, task {task}, user: {current_user.username}")
+    logger.debug(f"Getting latest qubit task results for chip {chip_id}, task {task}, user: {current_user.username}")
 
     # Get chip info
     chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
@@ -145,13 +145,13 @@ def fetch_latest_qubit_task_results(
     response_model=LatestTaskResultResponse,
     response_model_exclude_none=True,
 )
-def fetch_historical_qubit_task_results(
+def get_historical_qubit_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
     date: Annotated[str, Query(description="Date in YYYYMMDD format")],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> LatestTaskResultResponse:
-    """Fetch historical qubit task results for a specific date.
+    """Get historical qubit task results for a specific date.
 
     Retrieves task results from a specific historical date using chip history
     snapshots. Results are filtered to tasks executed within the specified
@@ -179,7 +179,7 @@ def fetch_historical_qubit_task_results(
         If the chip history is not found for the specified date
 
     """
-    logger.debug(f"Fetching historical task results for chip {chip_id}, task {task}, date {date}")
+    logger.debug(f"Getting historical qubit task results for chip {chip_id}, task {task}, date {date}")
 
     # Get chip info
     chip = ChipHistoryDocument.find_one(
@@ -269,13 +269,13 @@ def fetch_historical_qubit_task_results(
     response_model=TaskHistoryResponse,
     response_model_exclude_none=True,
 )
-def fetch_qubit_task_history(
+def get_qubit_task_history(
     qid: str,
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
     current_user: Annotated[User, Depends(get_optional_current_user)],
 ) -> TaskHistoryResponse:
-    """Fetch complete task history for a specific qubit.
+    """Get complete task history for a specific qubit.
 
     Retrieves all historical task results for a specific qubit, sorted by
     end time in descending order. Useful for tracking calibration trends
@@ -303,7 +303,7 @@ def fetch_qubit_task_history(
         If the chip is not found for the current user
 
     """
-    logger.debug(f"Fetching qubit task history for chip {chip_id}, qid {qid}, task {task}")
+    logger.debug(f"Getting qubit task history for chip {chip_id}, qid {qid}, task {task}")
 
     # Get chip info
     chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
@@ -360,12 +360,12 @@ def fetch_qubit_task_history(
     response_model=LatestTaskResultResponse,
     response_model_exclude_none=True,
 )
-def fetch_latest_coupling_task_results(
+def get_latest_coupling_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> LatestTaskResultResponse:
-    """Fetch the latest coupling task results for all couplings on a chip.
+    """Get the latest coupling task results for all couplings on a chip.
 
     Retrieves the most recent task result for each coupling (qubit pair) on
     the specified chip. Results include fidelity threshold status based on
@@ -391,7 +391,7 @@ def fetch_latest_coupling_task_results(
         If the chip is not found for the current user
 
     """
-    logger.debug(f"Fetching coupling tasks for chip {chip_id}, task {task}, user: {current_user.username}")
+    logger.debug(f"Getting latest coupling task results for chip {chip_id}, task {task}, user: {current_user.username}")
 
     # Get chip info
     chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
@@ -463,13 +463,13 @@ def fetch_latest_coupling_task_results(
     response_model=LatestTaskResultResponse,
     response_model_exclude_none=True,
 )
-def fetch_historical_coupling_task_results(
+def get_historical_coupling_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
     date: Annotated[str, Query(description="Date in YYYYMMDD format")],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> LatestTaskResultResponse:
-    """Fetch historical coupling task results for a specific date.
+    """Get historical coupling task results for a specific date.
 
     Retrieves task results from a specific historical date using chip history
     snapshots. Results are filtered to tasks executed within the specified
@@ -497,7 +497,7 @@ def fetch_historical_coupling_task_results(
         If the chip history is not found for the specified date
 
     """
-    logger.debug(f"Fetching historical coupling task results for chip {chip_id}, task {task}, date {date}")
+    logger.debug(f"Getting historical coupling task results for chip {chip_id}, task {task}, date {date}")
 
     # Get chip info
     chip = ChipHistoryDocument.find_one(
@@ -591,13 +591,13 @@ def fetch_historical_coupling_task_results(
     response_model=TaskHistoryResponse,
     response_model_exclude_none=True,
 )
-def fetch_coupling_task_history(
+def get_coupling_task_history(
     coupling_id: str,
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
     current_user: Annotated[User, Depends(get_optional_current_user)],
 ) -> TaskHistoryResponse:
-    """Fetch complete task history for a specific coupling.
+    """Get complete task history for a specific coupling.
 
     Retrieves all historical task results for a specific coupling (qubit pair),
     sorted by end time in descending order. Useful for tracking two-qubit
@@ -625,7 +625,7 @@ def fetch_coupling_task_history(
         If the chip is not found for the current user
 
     """
-    logger.debug(f"Fetching coupling task history for chip {chip_id}, coupling {coupling_id}, task {task}")
+    logger.debug(f"Getting coupling task history for chip {chip_id}, coupling {coupling_id}, task {task}")
 
     # Get chip info
     chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
@@ -757,7 +757,7 @@ def _fetch_timeseries_data(
     response_model=TimeSeriesData,
     operation_id="getTimeseriesTaskResults",
 )
-def fetch_timeseries_task_results(
+def get_timeseries_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],
     tag: Annotated[str, Query(description="Tag to filter by")],
     parameter: Annotated[str, Query(description="Parameter name")],
@@ -766,7 +766,7 @@ def fetch_timeseries_task_results(
     current_user: Annotated[User, Depends(get_current_active_user)],
     qid: Annotated[str | None, Query(description="Optional qubit ID to filter by")] = None,
 ) -> TimeSeriesData:
-    """Fetch timeseries task results filtered by tag and parameter.
+    """Get timeseries task results filtered by tag and parameter.
 
     Retrieves time series data for calibration parameters, optionally filtered
     to a specific qubit. Useful for plotting parameter trends over time.
@@ -795,5 +795,5 @@ def fetch_timeseries_task_results(
         parameter values with timestamps
 
     """
-    logger.debug(f"Fetching timeseries task result for chip {chip_id}, tag {tag}, parameter {parameter}, qid {qid}")
+    logger.debug(f"Getting timeseries task results for chip {chip_id}, tag {tag}, parameter {parameter}, qid {qid}")
     return _fetch_timeseries_data(chip_id, tag, parameter, current_user, qid, start_at, end_at)

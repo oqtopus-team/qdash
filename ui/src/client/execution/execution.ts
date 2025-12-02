@@ -34,7 +34,25 @@ import type { ErrorType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Fetch a calibration figure by its path.
+ * Fetch a calibration figure by its file path.
+
+Retrieves a PNG image file from the server's filesystem and returns it
+as a streaming response.
+
+Parameters
+----------
+path : str
+    Absolute file path to the calibration figure image
+
+Returns
+-------
+StreamingResponse
+    PNG image data as a streaming response with media type "image/png"
+
+Raises
+------
+HTTPException
+    404 if the file does not exist at the specified path
  * @summary Get a calibration figure by its path
  */
 export const getFigureByPath = (
@@ -191,7 +209,15 @@ export function useGetFigureByPath<
 }
 
 /**
- * Fetch the status of the execution lock.
+ * Fetch the current status of the execution lock.
+
+The execution lock prevents concurrent calibration workflows from running
+simultaneously. This endpoint checks whether a lock is currently held.
+
+Returns
+-------
+ExecutionLockStatusResponse
+    Response containing lock status (True if locked, False if available)
  * @summary Get the execution lock status
  */
 export const getExecutionLockStatus = (

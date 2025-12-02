@@ -125,7 +125,7 @@ def register_user(user_data: UserCreate) -> UserWithToken:
 
 
 @router.get("/me", response_model=User, summary="Get current user", operation_id="getCurrentUser")
-def read_users_me(current_user: Annotated[User, Depends(get_current_active_user)]) -> User:
+def get_current_user(current_user: Annotated[User, Depends(get_current_active_user)]) -> User:
     """Get current authenticated user information.
 
     Returns the profile information of the currently authenticated user

@@ -26,7 +26,22 @@ import type { ErrorType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Get the calibration note.
+ * Get the latest calibration note for the master task.
+
+Retrieves the most recent calibration note from the database, sorted by timestamp
+in descending order. The note contains metadata about calibration parameters
+and configuration.
+
+Parameters
+----------
+current_user : User
+    Current authenticated user
+
+Returns
+-------
+CalibrationNoteResponse
+    The latest calibration note containing username, execution_id, task_id,
+    note content, and timestamp
  * @summary Get the calibration note
  */
 export const getCalibrationNote = (

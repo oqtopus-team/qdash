@@ -44,7 +44,25 @@ import type { ErrorType, BodyType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Download a file.
+ * Download a raw data file from the server.
+
+Retrieves a file from the server's filesystem and returns it as a downloadable
+response.
+
+Parameters
+----------
+path : str
+    Absolute file path to the file to download
+
+Returns
+-------
+FileResponse
+    The file as a downloadable response
+
+Raises
+------
+HTTPException
+    404 if the file does not exist at the specified path
  * @summary Download file
  */
 export const downloadFile = (
@@ -181,7 +199,27 @@ export function useDownloadFile<
 }
 
 /**
- * Download a file or directory as zip.
+ * Download a file or directory as a ZIP archive.
+
+Creates a ZIP archive of the specified file or directory and returns it
+as a downloadable response. The archive is created in a temporary directory
+and cleaned up after the response is sent.
+
+Parameters
+----------
+path : str
+    Absolute path to the file or directory to archive
+
+Returns
+-------
+FileResponse
+    ZIP archive as a downloadable response with media type "application/zip"
+
+Raises
+------
+HTTPException
+    404 if the path does not exist
+    500 if there is an error creating the ZIP archive
  * @summary Download file or directory as zip
  */
 export const downloadZipFile = (

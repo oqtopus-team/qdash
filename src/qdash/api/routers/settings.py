@@ -4,7 +4,8 @@ from logging import getLogger
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from qdash.config import Settings, get_settings
+from qdash.config import Settings
+from qdash.config import get_settings as get_settings_dependency
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
@@ -17,7 +18,7 @@ logger = getLogger("uvicorn.app")
     description="Get settings from the server",
     operation_id="getSettings",
 )
-def get_settings_endpoint(settings: Annotated[Settings, Depends(get_settings)]):
+def get_settings(settings: Annotated[Settings, Depends(get_settings_dependency)]):
     """Get server configuration settings.
 
     Retrieves the current server configuration including API ports, database
