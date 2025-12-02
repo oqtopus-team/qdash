@@ -23,11 +23,6 @@ class Settings(BaseSettings):
     prefect_port: int = 4200
     api_port: int = 5715
     ui_port: int = 5714
-    # Agent settings
-    slack_app_token: str
-    openai_api_key: str
-    openai_model: str = "gpt-4o-mini"
-    agent_max_steps: int = 10
     # Logging
     log_level: str = "INFO"
 

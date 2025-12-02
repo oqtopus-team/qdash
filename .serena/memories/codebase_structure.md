@@ -23,10 +23,6 @@ qdash/
 │   │   ├── dbmodel/        # Database models (MongoDB/PostgreSQL)
 │   │   ├── datamodel/      # Data models and schemas
 │   │   ├── cli/            # CLI tools
-│   │   ├── slack_agent/    # Slack AI assistant
-│   │   │   ├── agent.py    # Main agent logic
-│   │   │   ├── tools.py    # Agent tools
-│   │   │   └── main.py     # Slack app entry
 │   │   └── config.py       # Configuration management
 ├── tests/                   # Test files
 ├── docs/                    # Documentation
@@ -59,7 +55,6 @@ qdash/
 - `workflow` - QDash workflow worker
 - `api` - FastAPI backend (port 5715)
 - `ui` - Next.js frontend (port 3000)
-- `slack-agent` - Slack AI assistant
 
 ### Database Collections
 
