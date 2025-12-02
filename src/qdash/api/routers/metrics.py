@@ -385,64 +385,6 @@ async def get_chip_metrics(
     )
 
 
-@router.get("/chips")
-async def list_chips(
-    username: Annotated[str, Query(description="Username")] = "admin",
-    _current_user: User | None = Depends(get_optional_current_user),
-) -> dict[str, Any]:
-    """Get list of available chips for a user.
-
-    Args:
-    ----
-        username: Username to filter by
-        _current_user: Current authenticated user
-
-    Returns:
-    -------
-        Dictionary with list of chips
-
-    """
-    chips = ChipDocument.find({"username": username}).to_list()
-
-    return {
-        "chips": [
-            {
-                "chip_id": chip.chip_id,
-                "username": chip.username,
-                "size": chip.size,
-                "installed_at": chip.installed_at,
-                "qubit_count": len(chip.qubits),
-                "coupling_count": len(chip.couplings),
-            }
-            for chip in chips
-        ]
-    }
-
-
-@router.get("/chip/current")
-async def get_current_chip(
-    username: Annotated[str, Query(description="Username")] = "admin",
-    _current_user: User | None = Depends(get_optional_current_user),
-) -> dict[str, str]:
-    """Get current chip for a user.
-
-    Args:
-    ----
-        username: Username to filter by
-        _current_user: Current authenticated user
-
-    Returns:
-    -------
-        Dictionary with current chip_id
-
-    """
-    try:
-        chip = ChipDocument.get_current_chip(username)
-        return {"chip_id": chip.chip_id}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
 @router.get("/chip/{chip_id}/qubit/{qid}/metric-history", response_model=QubitMetricHistoryResponse)
 async def get_qubit_metric_history(
     chip_id: str,
