@@ -252,15 +252,15 @@ def fetch_latest_qubit_task_results():          # Should be get_latest_qubit_tas
 
 Use the same verb in both operation_id and function name:
 
-| operation_id verb | Function name verb | Notes                         |
-| ----------------- | ------------------ | ----------------------------- |
-| `list`            | `list_`            | For collections               |
-| `get`             | `get_`             | For single resources          |
-| `create`          | `create_`          | For creating resources        |
-| `update`          | `update_`          | For modifying resources       |
-| `delete`          | `delete_`          | For removing resources        |
-| `execute`         | `execute_`         | For action endpoints          |
-| `schedule`        | `schedule_`        | For scheduling endpoints      |
+| operation_id verb | Function name verb | Notes                    |
+| ----------------- | ------------------ | ------------------------ |
+| `list`            | `list_`            | For collections          |
+| `get`             | `get_`             | For single resources     |
+| `create`          | `create_`          | For creating resources   |
+| `update`          | `update_`          | For modifying resources  |
+| `delete`          | `delete_`          | For removing resources   |
+| `execute`         | `execute_`         | For action endpoints     |
+| `schedule`        | `schedule_`        | For scheduling endpoints |
 
 **Avoid these inconsistencies:**
 
@@ -662,8 +662,8 @@ def list_chips_v2():
 ### Function Naming Checklist
 
 - [ ] Function name is snake_case version of operation_id
-- [ ] Same verb used in both (get→get_, list→list_, not fetch→get_)
-- [ ] No unnecessary suffixes (_endpoint, _handler, etc.)
+- [ ] Same verb used in both (get→get*, list→list*, not fetch→get\_)
+- [ ] No unnecessary suffixes (\_endpoint, \_handler, etc.)
 - [ ] Helper functions prefixed with underscore
 
 ### Response Model Checklist
