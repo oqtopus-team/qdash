@@ -1,3 +1,5 @@
+"""Device topology router for QDash API."""
+
 import io
 import re
 from typing import Annotated
@@ -150,7 +152,27 @@ def get_device_topology(
     current_user: Annotated[User, Depends(get_current_active_user)],
     request: DeviceTopologyRequest,
 ) -> Device:
-    """Get the device topology."""
+    """Get the quantum device topology with filtered qubits and couplings.
+
+    Constructs a device topology based on calibration data, applying filters
+    for qubit/coupling fidelity thresholds and optional time windows. Can
+    optionally return only the largest connected component of the device.
+
+    Parameters
+    ----------
+    current_user : User
+        Current authenticated user
+    request : DeviceTopologyRequest
+        Request containing qubit list, device name/id, filtering conditions,
+        and optional list of couplings to exclude
+
+    Returns
+    -------
+    Device
+        Device topology containing filtered qubits with positions, fidelities,
+        lifetimes, gate durations, and couplings with their fidelities
+
+    """
     logger.info(f"current user: {current_user.username}")
     qubits = []
     couplings = []

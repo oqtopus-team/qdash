@@ -1,3 +1,5 @@
+"""Backend router for QDash API."""
+
 import logging
 from typing import Annotated
 
@@ -22,12 +24,21 @@ logger.setLevel(logging.DEBUG)
 def list_backends(
     current_user: Annotated[User, Depends(get_optional_current_user)],
 ) -> ListBackendsResponse:
-    """List all backends.
+    """List all registered backends.
+
+    Retrieves all backend configurations from the database. Backends represent
+    quantum hardware or simulator configurations available for calibration
+    workflows.
+
+    Parameters
+    ----------
+    current_user : User
+        Current authenticated user (optional)
 
     Returns
     -------
     ListBackendsResponse
-        Wrapped list of backend response models.
+        Wrapped list of all registered backend response models
 
     """
     logger.info(f"User {current_user.username} is listing all backends.")

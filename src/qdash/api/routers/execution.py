@@ -115,7 +115,27 @@ def flatten_tasks(task_results: dict) -> list[dict]:
     operation_id="getFigureByPath",
 )
 def get_figure_by_path(path: str):
-    """Fetch a calibration figure by its path."""
+    """Fetch a calibration figure by its file path.
+
+    Retrieves a PNG image file from the server's filesystem and returns it
+    as a streaming response.
+
+    Parameters
+    ----------
+    path : str
+        Absolute file path to the calibration figure image
+
+    Returns
+    -------
+    StreamingResponse
+        PNG image data as a streaming response with media type "image/png"
+
+    Raises
+    ------
+    HTTPException
+        404 if the file does not exist at the specified path
+
+    """
     if not Path(path).exists():
         raise HTTPException(
             status_code=404,
@@ -133,7 +153,17 @@ def get_figure_by_path(path: str):
     response_model=ExecutionLockStatusResponse,
 )
 def get_execution_lock_status() -> ExecutionLockStatusResponse:
-    """Fetch the status of the execution lock."""
+    """Fetch the current status of the execution lock.
+
+    The execution lock prevents concurrent calibration workflows from running
+    simultaneously. This endpoint checks whether a lock is currently held.
+
+    Returns
+    -------
+    ExecutionLockStatusResponse
+        Response containing lock status (True if locked, False if available)
+
+    """
     status = ExecutionLockDocument.get_lock_status()
     if status is None:
         return ExecutionLockStatusResponse(lock=False)

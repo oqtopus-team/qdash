@@ -1,3 +1,5 @@
+"""Tag router for QDash API."""
+
 from __future__ import annotations
 
 import logging
@@ -25,15 +27,20 @@ logger.setLevel(logging.DEBUG)
 def list_tags(
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> ListTagResponse:
-    """List all tags.
+    """List all tags for the current user.
 
-    Args:
-    ----
-        current_user (User): The current user.
+    Retrieves all tags associated with the current user's calibration data.
+    Tags are used to categorize and filter task results.
 
-    Returns:
+    Parameters
+    ----------
+    current_user : User
+        Current authenticated user
+
+    Returns
     -------
-        ListTaskResponse: The list of tasks.
+    ListTagResponse
+        Wrapped list of tag names
 
     """
     tags = TagDocument.find({"username": current_user.username}).run()
