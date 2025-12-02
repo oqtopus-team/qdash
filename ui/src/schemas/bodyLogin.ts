@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export interface BodyAuthLogin {
+export interface BodyLogin {
   username: string;
   password: string;
 }

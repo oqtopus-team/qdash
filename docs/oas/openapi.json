@@ -18,14 +18,14 @@
     "/auth/login": {
       "post": {
         "tags": ["auth"],
-        "summary": "Login",
+        "summary": "Login user",
         "description": "Login endpoint to authenticate user and return access token.",
-        "operationId": "auth-login",
+        "operationId": "login",
         "requestBody": {
           "content": {
             "application/x-www-form-urlencoded": {
               "schema": {
-                "$ref": "#/components/schemas/Body_auth-login"
+                "$ref": "#/components/schemas/Body_login"
               }
             }
           },
@@ -61,9 +61,9 @@
     "/auth/register": {
       "post": {
         "tags": ["auth"],
-        "summary": "Register User",
+        "summary": "Register a new user",
         "description": "Register a new user and return access token.",
-        "operationId": "auth-register_user",
+        "operationId": "registerUser",
         "requestBody": {
           "content": {
             "application/json": {
@@ -104,9 +104,9 @@
     "/auth/me": {
       "get": {
         "tags": ["auth"],
-        "summary": "Read Users Me",
+        "summary": "Get current user",
         "description": "Get current user information.",
-        "operationId": "auth-read_users_me",
+        "operationId": "getCurrentUser",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -132,9 +132,9 @@
     "/auth/logout": {
       "post": {
         "tags": ["auth"],
-        "summary": "Logout",
+        "summary": "Logout user",
         "description": "Logout endpoint.\n\nThis endpoint doesn't need to do anything on the backend since the username is managed client-side.\nThe client will remove the username from cookies.",
-        "operationId": "auth-logout",
+        "operationId": "logout",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -145,7 +145,7 @@
                     "type": "string"
                   },
                   "type": "object",
-                  "title": "Response Auth-Logout"
+                  "title": "Response Logout"
                 }
               }
             }
@@ -1075,7 +1075,7 @@
     },
     "/task-results/qubits/latest": {
       "get": {
-        "tags": ["task_result"],
+        "tags": ["task-result"],
         "summary": "Get latest qubit task results",
         "description": "Fetch latest qubit task results with optional defensive outlier filtering.",
         "operationId": "getLatestQubitTaskResults",
@@ -1134,7 +1134,7 @@
     },
     "/task-results/qubits/history": {
       "get": {
-        "tags": ["task_result"],
+        "tags": ["task-result"],
         "summary": "Get historical qubit task results",
         "description": "Fetch historical qubit task results for a specific date.",
         "operationId": "getHistoricalQubitTaskResults",
@@ -1204,7 +1204,7 @@
     },
     "/task-results/qubits/{qid}/history": {
       "get": {
-        "tags": ["task_result"],
+        "tags": ["task-result"],
         "summary": "Get qubit task history",
         "description": "Fetch task history for a specific qubit.",
         "operationId": "getQubitTaskHistory",
@@ -1272,7 +1272,7 @@
     },
     "/task-results/couplings/latest": {
       "get": {
-        "tags": ["task_result"],
+        "tags": ["task-result"],
         "summary": "Get latest coupling task results",
         "description": "Fetch latest coupling task results.",
         "operationId": "getLatestCouplingTaskResults",
@@ -1331,7 +1331,7 @@
     },
     "/task-results/couplings/history": {
       "get": {
-        "tags": ["task_result"],
+        "tags": ["task-result"],
         "summary": "Get historical coupling task results",
         "description": "Fetch historical coupling task results for a specific date.",
         "operationId": "getHistoricalCouplingTaskResults",
@@ -1401,7 +1401,7 @@
     },
     "/task-results/couplings/{coupling_id}/history": {
       "get": {
-        "tags": ["task_result"],
+        "tags": ["task-result"],
         "summary": "Get coupling task history",
         "description": "Fetch task history for a specific coupling.",
         "operationId": "getCouplingTaskHistory",
@@ -1469,7 +1469,7 @@
     },
     "/task-results/timeseries": {
       "get": {
-        "tags": ["task_result"],
+        "tags": ["task-result"],
         "summary": "Get timeseries task results by tag and parameter",
         "description": "Fetch timeseries task results by tag and parameter.\n\nIf qid is provided, returns data only for that specific qubit.\nOtherwise, returns data for all qubits.\n\nReturns\n-------\n    TimeSeriesData: Time series data for the specified parameters.",
         "operationId": "getTimeseriesTaskResults",
@@ -1604,7 +1604,7 @@
     },
     "/device-topology": {
       "post": {
-        "tags": ["device_topology"],
+        "tags": ["device-topology"],
         "summary": "Get the device topology",
         "description": "Get the device topology.",
         "operationId": "getDeviceTopology",
@@ -1649,7 +1649,7 @@
     },
     "/device-topology/plot": {
       "post": {
-        "tags": ["device_topology"],
+        "tags": ["device-topology"],
         "summary": "Get the device topology plot",
         "description": "Get the device topology as a PNG image.",
         "operationId": "getDeviceTopologyPlot",
@@ -2285,7 +2285,7 @@
     "/metrics/config": {
       "get": {
         "tags": ["metrics"],
-        "summary": "Get Metrics Config",
+        "summary": "Get metrics configuration",
         "description": "Get metrics metadata configuration.\n\nThis endpoint returns the metrics configuration loaded from YAML,\nincluding display metadata for all qubit and coupling metrics.\n\nReturns\n-------\n    Dictionary with metrics configuration including:\n    - qubit_metrics: Metadata for single-qubit metrics\n    - coupling_metrics: Metadata for two-qubit coupling metrics\n    - color_scale: Color scale configuration for visualization",
         "operationId": "getMetricsConfig",
         "responses": {
@@ -2615,7 +2615,7 @@
         "title": "BackendResponseModel",
         "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
       },
-      "Body_auth-login": {
+      "Body_login": {
         "properties": {
           "username": {
             "type": "string",
@@ -2628,7 +2628,7 @@
         },
         "type": "object",
         "required": ["username", "password"],
-        "title": "Body_auth-login"
+        "title": "Body_login"
       },
       "CalibrationNoteResponse": {
         "properties": {

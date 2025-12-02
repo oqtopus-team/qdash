@@ -45,7 +45,7 @@ Returns
     - qubit_metrics: Metadata for single-qubit metrics
     - coupling_metrics: Metadata for two-qubit coupling metrics
     - color_scale: Color scale configuration for visualization
- * @summary Get Metrics Config
+ * @summary Get metrics configuration
  */
 export const getMetricsConfig = (
   options?: SecondParameter<typeof customInstance>,
@@ -157,7 +157,7 @@ export function useGetMetricsConfig<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary Get Metrics Config
+ * @summary Get metrics configuration
  */
 
 export function useGetMetricsConfig<

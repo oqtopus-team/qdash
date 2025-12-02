@@ -50,7 +50,7 @@ def normalize_qid(qid: str) -> str:
     return qid.replace("Q", "").lstrip("0") or "0"
 
 
-@router.get("/config", operation_id="getMetricsConfig")
+@router.get("/config", summary="Get metrics configuration", operation_id="getMetricsConfig")
 async def get_metrics_config() -> dict[str, Any]:
     """Get metrics metadata configuration.
 
