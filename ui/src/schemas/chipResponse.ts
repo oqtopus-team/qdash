@@ -14,7 +14,10 @@ import type { ChipResponseCouplings } from "./chipResponseCouplings";
 Attributes
 ----------
     chip_id (str): The ID of the chip.
-    name (str): The name of the chip.
+    size (int): The size of the chip.
+    qubits (dict): Qubit information.
+    couplings (dict): Coupling information.
+    installed_at (str): Installation timestamp.
  */
 export interface ChipResponse {
   chip_id: string;

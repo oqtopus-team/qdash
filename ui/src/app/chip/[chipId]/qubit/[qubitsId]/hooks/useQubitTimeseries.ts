@@ -8,7 +8,7 @@ import type {
 } from "../types";
 import type { OutputParameterModel } from "@/schemas";
 
-import { useFetchTimeseriesTaskResultByTagAndParameterAndQid } from "@/client/chip/chip";
+import { useFetchTimeseriesTaskResults } from "@/client/task-result/task-result";
 import { useListAllTag } from "@/client/tag/tag";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
@@ -40,14 +40,14 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
     isLoading,
     error,
     refetch,
-  } = useFetchTimeseriesTaskResultByTagAndParameterAndQid(
-    chipId,
-    parameter,
-    qubitId,
+  } = useFetchTimeseriesTaskResults(
     {
+      chip_id: chipId,
+      parameter,
       tag,
       start_at: timeRange.startAt,
       end_at: timeRange.endAt,
+      qid: qubitId,
     },
     {
       query: {

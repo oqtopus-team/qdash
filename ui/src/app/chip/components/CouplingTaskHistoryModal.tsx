@@ -6,7 +6,7 @@ import React, { useState } from "react";
 import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
-import { useFetchCouplingTaskHistory } from "@/client/chip/chip";
+import { useFetchCouplingTaskHistory } from "@/client/task-result/task-result";
 
 const PlotlyRenderer = dynamic(
   () => import("@/app/components/PlotlyRenderer").then((mod) => mod.default),
@@ -38,9 +38,8 @@ export function CouplingTaskHistoryModal({
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
 
   const { data, isLoading, isError } = useFetchCouplingTaskHistory(
-    chipId,
     couplingId,
-    taskName,
+    { chip_id: chipId, task: taskName },
     {
       query: {
         enabled: isOpen && !!chipId && !!couplingId && !!taskName,

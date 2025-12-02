@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { Task } from "./task";
+import type { MuxTask } from "./muxTask";
 
 export type MuxDetailResponseDetail = {
-  [key: string]: { [key: string]: Task };
+  [key: string]: { [key: string]: MuxTask };
 };

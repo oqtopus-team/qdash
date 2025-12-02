@@ -19,11 +19,11 @@ import { TaskFigure } from "@/app/components/TaskFigure";
 import { TaskSelector } from "@/app/components/TaskSelector";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useChipUrlState } from "@/app/hooks/useUrlState";
+import { useFetchChip } from "@/client/chip/chip";
 import {
-  useFetchLatestQubitTaskGroupedByChip,
-  useFetchHistoricalQubitTaskGroupedByChip,
-  useFetchChip,
-} from "@/client/chip/chip";
+  useFetchLatestQubitTaskResults,
+  useFetchHistoricalQubitTaskResults,
+} from "@/client/task-result/task-result";
 import { useFetchAllTasks } from "@/client/task/task";
 
 function QubitDetailPageContent() {
@@ -78,17 +78,23 @@ function QubitDetailPageContent() {
   // Get data for common qubit tasks for dashboard
   const { data: rabiData } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskGroupedByChip(chipId, "CheckRabi", {
-          query: {
-            staleTime: 30000,
+      ? useFetchLatestQubitTaskResults(
+          { chip_id: chipId, task: "CheckRabi" },
+          {
+            query: {
+              staleTime: 30000,
+            },
           },
-        })
-      : useFetchHistoricalQubitTaskGroupedByChip(
-          chipId,
-          "CheckRabi",
-          selectedDate === "latest"
-            ? new Date().toISOString().split("T")[0]
-            : selectedDate,
+        )
+      : useFetchHistoricalQubitTaskResults(
+          {
+            chip_id: chipId,
+            task: "CheckRabi",
+            date:
+              selectedDate === "latest"
+                ? new Date().toISOString().split("T")[0]
+                : selectedDate,
+          },
           {
             query: {
               staleTime: 30000,
@@ -99,17 +105,23 @@ function QubitDetailPageContent() {
 
   const { data: ramseyData } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskGroupedByChip(chipId, "CheckRamsey", {
-          query: {
-            staleTime: 30000,
+      ? useFetchLatestQubitTaskResults(
+          { chip_id: chipId, task: "CheckRamsey" },
+          {
+            query: {
+              staleTime: 30000,
+            },
           },
-        })
-      : useFetchHistoricalQubitTaskGroupedByChip(
-          chipId,
-          "CheckRamsey",
-          selectedDate === "latest"
-            ? new Date().toISOString().split("T")[0]
-            : selectedDate,
+        )
+      : useFetchHistoricalQubitTaskResults(
+          {
+            chip_id: chipId,
+            task: "CheckRamsey",
+            date:
+              selectedDate === "latest"
+                ? new Date().toISOString().split("T")[0]
+                : selectedDate,
+          },
           {
             query: {
               staleTime: 30000,
@@ -120,17 +132,23 @@ function QubitDetailPageContent() {
 
   const { data: t1Data } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskGroupedByChip(chipId, "CheckT1", {
-          query: {
-            staleTime: 30000,
+      ? useFetchLatestQubitTaskResults(
+          { chip_id: chipId, task: "CheckT1" },
+          {
+            query: {
+              staleTime: 30000,
+            },
           },
-        })
-      : useFetchHistoricalQubitTaskGroupedByChip(
-          chipId,
-          "CheckT1",
-          selectedDate === "latest"
-            ? new Date().toISOString().split("T")[0]
-            : selectedDate,
+        )
+      : useFetchHistoricalQubitTaskResults(
+          {
+            chip_id: chipId,
+            task: "CheckT1",
+            date:
+              selectedDate === "latest"
+                ? new Date().toISOString().split("T")[0]
+                : selectedDate,
+          },
           {
             query: {
               staleTime: 30000,
@@ -142,17 +160,23 @@ function QubitDetailPageContent() {
   // Additional data for radar chart
   const { data: t2EchoData } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskGroupedByChip(chipId, "CheckT2Echo", {
-          query: {
-            staleTime: 30000,
+      ? useFetchLatestQubitTaskResults(
+          { chip_id: chipId, task: "CheckT2Echo" },
+          {
+            query: {
+              staleTime: 30000,
+            },
           },
-        })
-      : useFetchHistoricalQubitTaskGroupedByChip(
-          chipId,
-          "CheckT2Echo",
-          selectedDate === "latest"
-            ? new Date().toISOString().split("T")[0]
-            : selectedDate,
+        )
+      : useFetchHistoricalQubitTaskResults(
+          {
+            chip_id: chipId,
+            task: "CheckT2Echo",
+            date:
+              selectedDate === "latest"
+                ? new Date().toISOString().split("T")[0]
+                : selectedDate,
+          },
           {
             query: {
               staleTime: 30000,
@@ -163,17 +187,23 @@ function QubitDetailPageContent() {
 
   const { data: gateFidelityData } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskGroupedByChip(chipId, "RandomizedBenchmarking", {
-          query: {
-            staleTime: 30000,
+      ? useFetchLatestQubitTaskResults(
+          { chip_id: chipId, task: "RandomizedBenchmarking" },
+          {
+            query: {
+              staleTime: 30000,
+            },
           },
-        })
-      : useFetchHistoricalQubitTaskGroupedByChip(
-          chipId,
-          "RandomizedBenchmarking",
-          selectedDate === "latest"
-            ? new Date().toISOString().split("T")[0]
-            : selectedDate,
+        )
+      : useFetchHistoricalQubitTaskResults(
+          {
+            chip_id: chipId,
+            task: "RandomizedBenchmarking",
+            date:
+              selectedDate === "latest"
+                ? new Date().toISOString().split("T")[0]
+                : selectedDate,
+          },
           {
             query: {
               staleTime: 30000,
@@ -184,17 +214,23 @@ function QubitDetailPageContent() {
 
   const { data: readoutFidelityData } =
     selectedDate === "latest"
-      ? useFetchLatestQubitTaskGroupedByChip(chipId, "ReadoutClassification", {
-          query: {
-            staleTime: 30000,
+      ? useFetchLatestQubitTaskResults(
+          { chip_id: chipId, task: "ReadoutClassification" },
+          {
+            query: {
+              staleTime: 30000,
+            },
           },
-        })
-      : useFetchHistoricalQubitTaskGroupedByChip(
-          chipId,
-          "ReadoutClassification",
-          selectedDate === "latest"
-            ? new Date().toISOString().split("T")[0]
-            : selectedDate,
+        )
+      : useFetchHistoricalQubitTaskResults(
+          {
+            chip_id: chipId,
+            task: "ReadoutClassification",
+            date:
+              selectedDate === "latest"
+                ? new Date().toISOString().split("T")[0]
+                : selectedDate,
+          },
           {
             query: {
               staleTime: 30000,

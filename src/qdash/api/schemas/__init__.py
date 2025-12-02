@@ -7,15 +7,9 @@ from qdash.api.schemas.chip import (
     ChipDatesResponse,
     ChipResponse,
     CreateChipRequest,
-    ExecutionResponseDetail,
-    ExecutionResponseSummary,
-    LatestTaskGroupedByChipResponse,
     ListMuxResponse,
     MuxDetailResponse,
-    Task,
-    TaskHistoryResponse,
-    TimeSeriesData,
-    TimeSeriesProjection,
+    MuxTask,
 )
 from qdash.api.schemas.device_topology import (
     Condition,
@@ -31,7 +25,12 @@ from qdash.api.schemas.device_topology import (
     QubitLifetime,
 )
 from qdash.api.schemas.error import Detail, InternalServerError
-from qdash.api.schemas.execution import ExecutionLockStatusResponse
+from qdash.api.schemas.execution import (
+    ExecutionLockStatusResponse,
+    ExecutionResponseDetail,
+    ExecutionResponseSummary,
+    Task,
+)
 from qdash.api.schemas.file import (
     FileTreeNode,
     GitPushRequest,
@@ -72,6 +71,13 @@ from qdash.api.schemas.task import (
     TaskResponse,
     TaskResultResponse,
 )
+from qdash.api.schemas.task_result import (
+    LatestTaskResultResponse,
+    TaskHistoryResponse,
+    TaskResult,
+    TimeSeriesData,
+    TimeSeriesProjection,
+)
 
 __all__ = [
     # auth
@@ -85,15 +91,9 @@ __all__ = [
     "ChipDatesResponse",
     "ChipResponse",
     "CreateChipRequest",
-    "ExecutionResponseDetail",
-    "ExecutionResponseSummary",
-    "LatestTaskGroupedByChipResponse",
     "ListMuxResponse",
     "MuxDetailResponse",
-    "Task",
-    "TaskHistoryResponse",
-    "TimeSeriesData",
-    "TimeSeriesProjection",
+    "MuxTask",
     # device_topology
     "Condition",
     "Coupling",
@@ -111,6 +111,9 @@ __all__ = [
     "InternalServerError",
     # execution
     "ExecutionLockStatusResponse",
+    "ExecutionResponseDetail",
+    "ExecutionResponseSummary",
+    "Task",
     # file
     "FileTreeNode",
     "GitPushRequest",
@@ -150,4 +153,10 @@ __all__ = [
     "ListTaskResponse",
     "TaskResponse",
     "TaskResultResponse",
+    # task_result
+    "LatestTaskResultResponse",
+    "TaskHistoryResponse",
+    "TaskResult",
+    "TimeSeriesData",
+    "TimeSeriesProjection",
 ]

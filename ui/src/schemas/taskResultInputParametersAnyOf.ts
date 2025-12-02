@@ -6,8 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type FetchTimeseriesTaskResultByTagAndParameterParams = {
-  tag: string;
-  start_at: string;
-  end_at: string;
-};
+export type TaskResultInputParametersAnyOf = { [key: string]: unknown };
