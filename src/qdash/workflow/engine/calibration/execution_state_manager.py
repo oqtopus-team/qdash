@@ -4,6 +4,8 @@ This module provides the ExecutionStateManager class that handles execution stat
 transitions without any database or I/O operations.
 """
 
+from typing import Any
+
 import pendulum
 from pydantic import BaseModel
 
@@ -163,6 +165,52 @@ class ExecutionStateManager(BaseModel):
         for controller_id, info in controller_info.items():
             self.controller_info[controller_id] = info
         self.system_info.update_time()
+
+    def get_qubit_parameter(self, qid: str, param_name: str) -> Any:
+        """Get a qubit parameter from calibration data.
+
+        Parameters
+        ----------
+        qid : str
+            The qubit ID
+        param_name : str
+            The parameter name
+
+        Returns
+        -------
+        any
+            The parameter value, or None if not found
+
+        """
+        qubit_data = self.calib_data.qubit.get(qid, {})
+        param = qubit_data.get(param_name)
+        if param is None:
+            return None
+        # Handle OutputParameterModel
+        return param.value if hasattr(param, "value") else param
+
+    def get_coupling_parameter(self, qid_pair: str, param_name: str) -> Any:
+        """Get a coupling parameter from calibration data.
+
+        Parameters
+        ----------
+        qid_pair : str
+            The coupling pair ID (e.g., "0-1")
+        param_name : str
+            The parameter name
+
+        Returns
+        -------
+        any
+            The parameter value, or None if not found
+
+        """
+        coupling_data = self.calib_data.coupling.get(qid_pair, {})
+        param = coupling_data.get(param_name)
+        if param is None:
+            return None
+        # Handle OutputParameterModel
+        return param.value if hasattr(param, "value") else param
 
     def _calculate_elapsed_time(self, start_at: str, end_at: str) -> str:
         """Calculate elapsed time between two timestamps.

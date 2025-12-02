@@ -1,5 +1,19 @@
 """Workflow helper functions and utilities for Python Flow Editor."""
 
+from qdash.workflow.flow.config import (
+    CalibrationPaths,
+    FlowSessionConfig,
+)
+from qdash.workflow.flow.factory import (
+    DefaultExecutionManagerFactory,
+    DefaultSessionFactory,
+    DefaultTaskManagerFactory,
+    ExecutionManagerFactory,
+    FlowSessionDependencies,
+    SessionFactory,
+    TaskManagerFactory,
+    create_flow_session,
+)
 from qdash.workflow.flow.github import (
     ConfigFileType,
     GitHubIntegration,
@@ -20,6 +34,18 @@ __all__ = [
     "get_session",
     "finish_calibration",
     "generate_execution_id",
+    # === Configuration ===
+    "FlowSessionConfig",
+    "CalibrationPaths",
+    # === Factory ===
+    "create_flow_session",
+    "FlowSessionDependencies",
+    "SessionFactory",
+    "ExecutionManagerFactory",
+    "TaskManagerFactory",
+    "DefaultSessionFactory",
+    "DefaultExecutionManagerFactory",
+    "DefaultTaskManagerFactory",
     # === GitHub Integration ===
     "GitHubIntegration",
     "GitHubPushConfig",
