@@ -1,3 +1,5 @@
+"""Authentication router for QDash API."""
+
 import secrets
 from typing import Annotated
 
@@ -29,7 +31,29 @@ def login(
     username: str = Form(),
     password: str = Form(),
 ) -> TokenResponse:
-    """Login endpoint to authenticate user and return access token."""
+    """Authenticate user and return access token.
+
+    Validates user credentials against the database and returns an access token
+    for subsequent authenticated requests.
+
+    Parameters
+    ----------
+    username : str
+        User's username provided via form data
+    password : str
+        User's password provided via form data
+
+    Returns
+    -------
+    TokenResponse
+        Response containing access_token, token_type, and username
+
+    Raises
+    ------
+    HTTPException
+        401 if authentication fails due to incorrect username or password
+
+    """
     logger.debug(f"Login attempt for user: {username}")
     user = authenticate_user(username, password)
     if not user:
@@ -48,7 +72,27 @@ def login(
 
 @router.post("/register", response_model=UserWithToken, summary="Register a new user", operation_id="registerUser")
 def register_user(user_data: UserCreate) -> UserWithToken:
-    """Register a new user and return access token."""
+    """Register a new user account.
+
+    Creates a new user in the database with hashed password and generates
+    an access token for immediate use.
+
+    Parameters
+    ----------
+    user_data : UserCreate
+        User registration data including username, password, and optional full_name
+
+    Returns
+    -------
+    UserWithToken
+        Newly created user information including access_token
+
+    Raises
+    ------
+    HTTPException
+        400 if the username is already registered
+
+    """
     logger.debug(f"Registration attempt for user: {user_data.username}")
     # Check if username already exists
     query = UserDocument.find_one({"username": user_data.username}).run()
@@ -81,17 +125,40 @@ def register_user(user_data: UserCreate) -> UserWithToken:
 
 
 @router.get("/me", response_model=User, summary="Get current user", operation_id="getCurrentUser")
-def read_users_me(current_user: Annotated[User, Depends(get_current_active_user)]) -> User:
-    """Get current user information."""
+def get_current_user(current_user: Annotated[User, Depends(get_current_active_user)]) -> User:
+    """Get current authenticated user information.
+
+    Returns the profile information of the currently authenticated user
+    based on the provided access token.
+
+    Parameters
+    ----------
+    current_user : User
+        Current authenticated user injected via dependency
+
+    Returns
+    -------
+    User
+        Current user's profile information including username, full_name,
+        and disabled status
+
+    """
     logger.debug(f"Reading user info for: {current_user.username}")
     return current_user
 
 
 @router.post("/logout", summary="Logout user", operation_id="logout")
 def logout() -> dict[str, str]:
-    """Logout endpoint.
+    """Logout the current user.
 
-    This endpoint doesn't need to do anything on the backend since the username is managed client-side.
-    The client will remove the username from cookies.
+    This endpoint serves as a logout confirmation. Since authentication tokens
+    are managed client-side (via cookies), no server-side session invalidation
+    is required. The client is responsible for removing the stored credentials.
+
+    Returns
+    -------
+    dict[str, str]
+        Success message confirming logout
+
     """
     return {"message": "Successfully logged out"}

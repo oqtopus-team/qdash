@@ -52,17 +52,18 @@ def normalize_qid(qid: str) -> str:
 
 @router.get("/config", summary="Get metrics configuration", operation_id="getMetricsConfig")
 async def get_metrics_config() -> dict[str, Any]:
-    """Get metrics metadata configuration.
+    """Get metrics metadata configuration for visualization.
 
-    This endpoint returns the metrics configuration loaded from YAML,
-    including display metadata for all qubit and coupling metrics.
+    Retrieves the metrics configuration loaded from YAML, including display
+    metadata for all qubit and coupling metrics used in the dashboard.
 
     Returns
     -------
+    dict[str, Any]
         Dictionary with metrics configuration including:
-        - qubit_metrics: Metadata for single-qubit metrics
-        - coupling_metrics: Metadata for two-qubit coupling metrics
-        - color_scale: Color scale configuration for visualization
+        - qubit_metrics: Metadata for single-qubit metrics (frequency, T1, T2, fidelities)
+        - coupling_metrics: Metadata for two-qubit coupling metrics (ZX90, Bell state)
+        - color_scale: Color scale configuration for heatmap visualization
 
     """
     config = load_metrics_config()

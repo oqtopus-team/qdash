@@ -26,15 +26,20 @@ import type { ErrorType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * List all tags.
+ * List all tags for the current user.
 
-Args:
-----
-    current_user (User): The current user.
+Retrieves all tags associated with the current user's calibration data.
+Tags are used to categorize and filter task results.
 
-Returns:
+Parameters
+----------
+current_user : User
+    Current authenticated user
+
+Returns
 -------
-    ListTaskResponse: The list of tasks.
+ListTagResponse
+    Wrapped list of tag names
  * @summary List all tags
  */
 export const listTags = (

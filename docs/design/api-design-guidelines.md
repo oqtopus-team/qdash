@@ -7,14 +7,15 @@ This document defines the API design conventions and standards for the QDash pro
 1. [URL Path Design](#url-path-design)
 2. [HTTP Methods](#http-methods)
 3. [Operation ID Naming](#operation-id-naming)
-4. [Response Model Design](#response-model-design)
-5. [Query Parameters](#query-parameters)
-6. [Error Handling](#error-handling)
-7. [Documentation](#documentation)
-8. [Resource Naming](#resource-naming)
-9. [Router Tags](#router-tags)
-10. [File Naming](#file-naming)
-11. [Migration Strategy](#migration-strategy)
+4. [Function Naming](#function-naming)
+5. [Response Model Design](#response-model-design)
+6. [Query Parameters](#query-parameters)
+7. [Error Handling](#error-handling)
+8. [Documentation](#documentation)
+9. [Resource Naming](#resource-naming)
+10. [Router Tags](#router-tags)
+11. [File Naming](#file-naming)
+12. [Migration Strategy](#migration-strategy)
 
 ---
 
@@ -196,6 +197,102 @@ operation_id="listFlowSchedules"              # Schedules for a flow
 # For deeply nested or context-heavy endpoints
 operation_id="getQubitTaskHistory"            # Task history for qubit
 operation_id="getCouplingTaskHistory"         # Task history for coupling
+```
+
+---
+
+## Function Naming
+
+### Alignment with Operation ID
+
+**Function names must align with their `operation_id`**. The function name should be the **snake_case version** of the `operation_id`. This ensures:
+
+1. **Predictability**: Developers can easily find functions by operation_id and vice versa
+2. **Code generation compatibility**: Generated SDKs use operation_id as method names
+3. **Consistency**: Reduces cognitive load when switching between API docs and code
+
+```python
+# ✅ Good - Function name matches operation_id (snake_case ↔ camelCase)
+@router.get("/chips", operation_id="listChips")
+def list_chips():                               # listChips → list_chips
+    pass
+
+@router.get("/chips/{chip_id}", operation_id="getChip")
+def get_chip(chip_id: str):                     # getChip → get_chip
+    pass
+
+@router.post("/flows/{name}/execute", operation_id="executeFlow")
+async def execute_flow(name: str):              # executeFlow → execute_flow
+    pass
+
+# ❌ Bad - Function name doesn't match operation_id
+@router.get("/me", operation_id="getCurrentUser")
+def read_users_me():                            # Should be get_current_user
+
+@router.get("/settings", operation_id="getSettings")
+def get_settings_endpoint():                    # Should be get_settings (no suffix)
+
+@router.get("/task-results", operation_id="getLatestQubitTaskResults")
+def fetch_latest_qubit_task_results():          # Should be get_latest_qubit_task_results
+```
+
+### Conversion Rules
+
+| operation_id (camelCase) | Function name (snake_case) |
+| ------------------------ | -------------------------- |
+| `listChips`              | `list_chips`               |
+| `getChip`                | `get_chip`                 |
+| `createChip`             | `create_chip`              |
+| `updateChip`             | `update_chip`              |
+| `deleteChip`             | `delete_chip`              |
+| `executeFlow`            | `execute_flow`             |
+| `getQubitTaskHistory`    | `get_qubit_task_history`   |
+
+### Verb Consistency
+
+Use the same verb in both operation_id and function name:
+
+| operation_id verb | Function name verb | Notes                    |
+| ----------------- | ------------------ | ------------------------ |
+| `list`            | `list_`            | For collections          |
+| `get`             | `get_`             | For single resources     |
+| `create`          | `create_`          | For creating resources   |
+| `update`          | `update_`          | For modifying resources  |
+| `delete`          | `delete_`          | For removing resources   |
+| `execute`         | `execute_`         | For action endpoints     |
+| `schedule`        | `schedule_`        | For scheduling endpoints |
+
+**Avoid these inconsistencies:**
+
+```python
+# ❌ Bad - Verb mismatch
+operation_id="getTaskResults"
+def fetch_task_results():          # 'fetch' vs 'get' - use get_task_results
+
+operation_id="listExecutions"
+def read_executions():             # 'read' vs 'list' - use list_executions
+
+# ❌ Bad - Unnecessary suffixes
+operation_id="getSettings"
+def get_settings_endpoint():       # '_endpoint' suffix - use get_settings
+
+operation_id="listFlows"
+def list_flows_handler():          # '_handler' suffix - use list_flows
+```
+
+### Private/Helper Functions
+
+Helper functions that are not endpoints should use a leading underscore:
+
+```python
+# ✅ Good - Clear distinction between endpoints and helpers
+@router.get("/muxes/{mux_id}", operation_id="getChipMux")
+def get_chip_mux(mux_id: int) -> MuxDetailResponse:
+    return _build_mux_detail(mux_id, tasks, task_results)
+
+def _build_mux_detail(mux_id: int, tasks: list, task_results: dict) -> MuxDetailResponse:
+    """Helper function - not an endpoint."""
+    pass
 ```
 
 ---
@@ -561,6 +658,13 @@ def list_chips_v2():
 - [ ] Follows verb + noun pattern
 - [ ] Uses consistent verbs (list, get, create, update, delete)
 - [ ] Includes resource name
+
+### Function Naming Checklist
+
+- [ ] Function name is snake_case version of operation_id
+- [ ] Same verb used in both (get→get*, list→list*, not fetch→get\_)
+- [ ] No unnecessary suffixes (\_endpoint, \_handler, etc.)
+- [ ] Helper functions prefixed with underscore
 
 ### Response Model Checklist
 

@@ -1,3 +1,5 @@
+"""File router for QDash API."""
+
 from __future__ import annotations
 
 import logging
@@ -128,7 +130,27 @@ def build_file_tree(directory: Path, base_path: Path) -> list[FileTreeNode]:
     response_class=FileResponse,
 )
 def download_file(path: str) -> FileResponse:
-    """Download a file."""
+    """Download a raw data file from the server.
+
+    Retrieves a file from the server's filesystem and returns it as a downloadable
+    response.
+
+    Parameters
+    ----------
+    path : str
+        Absolute file path to the file to download
+
+    Returns
+    -------
+    FileResponse
+        The file as a downloadable response
+
+    Raises
+    ------
+    HTTPException
+        404 if the file does not exist at the specified path
+
+    """
     if not Path(path).exists():
         raise HTTPException(status_code=404, detail=f"File not found: {path}")
 
@@ -142,7 +164,29 @@ def download_file(path: str) -> FileResponse:
     response_class=FileResponse,
 )
 def download_zip_file(path: str) -> FileResponse:
-    """Download a file or directory as zip."""
+    """Download a file or directory as a ZIP archive.
+
+    Creates a ZIP archive of the specified file or directory and returns it
+    as a downloadable response. The archive is created in a temporary directory
+    and cleaned up after the response is sent.
+
+    Parameters
+    ----------
+    path : str
+        Absolute path to the file or directory to archive
+
+    Returns
+    -------
+    FileResponse
+        ZIP archive as a downloadable response with media type "application/zip"
+
+    Raises
+    ------
+    HTTPException
+        404 if the path does not exist
+        500 if there is an error creating the ZIP archive
+
+    """
     import shutil
     import tempfile
 

@@ -19,7 +19,7 @@
       "post": {
         "tags": ["auth"],
         "summary": "Login user",
-        "description": "Login endpoint to authenticate user and return access token.",
+        "description": "Authenticate user and return access token.\n\nValidates user credentials against the database and returns an access token\nfor subsequent authenticated requests.\n\nParameters\n----------\nusername : str\n    User's username provided via form data\npassword : str\n    User's password provided via form data\n\nReturns\n-------\nTokenResponse\n    Response containing access_token, token_type, and username\n\nRaises\n------\nHTTPException\n    401 if authentication fails due to incorrect username or password",
         "operationId": "login",
         "requestBody": {
           "content": {
@@ -62,7 +62,7 @@
       "post": {
         "tags": ["auth"],
         "summary": "Register a new user",
-        "description": "Register a new user and return access token.",
+        "description": "Register a new user account.\n\nCreates a new user in the database with hashed password and generates\nan access token for immediate use.\n\nParameters\n----------\nuser_data : UserCreate\n    User registration data including username, password, and optional full_name\n\nReturns\n-------\nUserWithToken\n    Newly created user information including access_token\n\nRaises\n------\nHTTPException\n    400 if the username is already registered",
         "operationId": "registerUser",
         "requestBody": {
           "content": {
@@ -105,7 +105,7 @@
       "get": {
         "tags": ["auth"],
         "summary": "Get current user",
-        "description": "Get current user information.",
+        "description": "Get current authenticated user information.\n\nReturns the profile information of the currently authenticated user\nbased on the provided access token.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user injected via dependency\n\nReturns\n-------\nUser\n    Current user's profile information including username, full_name,\n    and disabled status",
         "operationId": "getCurrentUser",
         "responses": {
           "200": {
@@ -133,7 +133,7 @@
       "post": {
         "tags": ["auth"],
         "summary": "Logout user",
-        "description": "Logout endpoint.\n\nThis endpoint doesn't need to do anything on the backend since the username is managed client-side.\nThe client will remove the username from cookies.",
+        "description": "Logout the current user.\n\nThis endpoint serves as a logout confirmation. Since authentication tokens\nare managed client-side (via cookies), no server-side session invalidation\nis required. The client is responsible for removing the stored credentials.\n\nReturns\n-------\ndict[str, str]\n    Success message confirming logout",
         "operationId": "logout",
         "responses": {
           "200": {
@@ -160,7 +160,7 @@
       "get": {
         "tags": ["execution"],
         "summary": "Get a calibration figure by its path",
-        "description": "Fetch a calibration figure by its path.",
+        "description": "Fetch a calibration figure by its file path.\n\nRetrieves a PNG image file from the server's filesystem and returns it\nas a streaming response.\n\nParameters\n----------\npath : str\n    Absolute file path to the calibration figure image\n\nReturns\n-------\nStreamingResponse\n    PNG image data as a streaming response with media type \"image/png\"\n\nRaises\n------\nHTTPException\n    404 if the file does not exist at the specified path",
         "operationId": "getFigureByPath",
         "parameters": [
           {
@@ -204,7 +204,7 @@
       "get": {
         "tags": ["execution"],
         "summary": "Get the execution lock status",
-        "description": "Fetch the status of the execution lock.",
+        "description": "Fetch the current status of the execution lock.\n\nThe execution lock prevents concurrent calibration workflows from running\nsimultaneously. This endpoint checks whether a lock is currently held.\n\nReturns\n-------\nExecutionLockStatusResponse\n    Response containing lock status (True if locked, False if available)",
         "operationId": "getExecutionLockStatus",
         "responses": {
           "200": {
@@ -345,7 +345,7 @@
       "get": {
         "tags": ["file"],
         "summary": "Download file",
-        "description": "Download a file.",
+        "description": "Download a raw data file from the server.\n\nRetrieves a file from the server's filesystem and returns it as a downloadable\nresponse.\n\nParameters\n----------\npath : str\n    Absolute file path to the file to download\n\nReturns\n-------\nFileResponse\n    The file as a downloadable response\n\nRaises\n------\nHTTPException\n    404 if the file does not exist at the specified path",
         "operationId": "downloadFile",
         "parameters": [
           {
@@ -379,7 +379,7 @@
       "get": {
         "tags": ["file"],
         "summary": "Download file or directory as zip",
-        "description": "Download a file or directory as zip.",
+        "description": "Download a file or directory as a ZIP archive.\n\nCreates a ZIP archive of the specified file or directory and returns it\nas a downloadable response. The archive is created in a temporary directory\nand cleaned up after the response is sent.\n\nParameters\n----------\npath : str\n    Absolute path to the file or directory to archive\n\nReturns\n-------\nFileResponse\n    ZIP archive as a downloadable response with media type \"application/zip\"\n\nRaises\n------\nHTTPException\n    404 if the path does not exist\n    500 if there is an error creating the ZIP archive",
         "operationId": "downloadZipFile",
         "parameters": [
           {
@@ -665,7 +665,7 @@
       "get": {
         "tags": ["calibration"],
         "summary": "Get the calibration note",
-        "description": "Get the calibration note.",
+        "description": "Get the latest calibration note for the master task.\n\nRetrieves the most recent calibration note from the database, sorted by timestamp\nin descending order. The note contains metadata about calibration parameters\nand configuration.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nCalibrationNoteResponse\n    The latest calibration note containing username, execution_id, task_id,\n    note content, and timestamp",
         "operationId": "getCalibrationNote",
         "responses": {
           "200": {
@@ -1077,7 +1077,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get latest qubit task results",
-        "description": "Fetch latest qubit task results with optional defensive outlier filtering.",
+        "description": "Fetch the latest qubit task results for all qubits on a chip.\n\nRetrieves the most recent task result for each qubit on the specified chip.\nResults include fidelity threshold status based on x90 gate fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
         "operationId": "getLatestQubitTaskResults",
         "security": [
           {
@@ -1136,7 +1136,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get historical qubit task results",
-        "description": "Fetch historical qubit task results for a specific date.",
+        "description": "Fetch historical qubit task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
         "operationId": "getHistoricalQubitTaskResults",
         "security": [
           {
@@ -1206,7 +1206,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get qubit task history",
-        "description": "Fetch task history for a specific qubit.",
+        "description": "Fetch complete task history for a specific qubit.\n\nRetrieves all historical task results for a specific qubit, sorted by\nend time in descending order. Useful for tracking calibration trends\nover time.\n\nParameters\n----------\nqid : str\n    Qubit ID to fetch history for\nchip_id : str\n    ID of the chip containing the qubit\ntask : str\n    Name of the task to fetch history for\ncurrent_user : User\n    Current authenticated user (optional)\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
         "operationId": "getQubitTaskHistory",
         "security": [
           {
@@ -1274,7 +1274,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get latest coupling task results",
-        "description": "Fetch latest coupling task results.",
+        "description": "Fetch the latest coupling task results for all couplings on a chip.\n\nRetrieves the most recent task result for each coupling (qubit pair) on\nthe specified chip. Results include fidelity threshold status based on\nBell state fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all couplings, keyed by coupling ID (e.g., \"0-1\")\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
         "operationId": "getLatestCouplingTaskResults",
         "security": [
           {
@@ -1333,7 +1333,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get historical coupling task results",
-        "description": "Fetch historical coupling task results for a specific date.",
+        "description": "Fetch historical coupling task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all couplings, keyed by coupling ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
         "operationId": "getHistoricalCouplingTaskResults",
         "security": [
           {
@@ -1403,7 +1403,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get coupling task history",
-        "description": "Fetch task history for a specific coupling.",
+        "description": "Fetch complete task history for a specific coupling.\n\nRetrieves all historical task results for a specific coupling (qubit pair),\nsorted by end time in descending order. Useful for tracking two-qubit\ncalibration trends over time.\n\nParameters\n----------\ncoupling_id : str\n    Coupling ID to fetch history for (e.g., \"0-1\")\nchip_id : str\n    ID of the chip containing the coupling\ntask : str\n    Name of the task to fetch history for\ncurrent_user : User\n    Current authenticated user (optional)\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
         "operationId": "getCouplingTaskHistory",
         "security": [
           {
@@ -1471,7 +1471,7 @@
       "get": {
         "tags": ["task-result"],
         "summary": "Get timeseries task results by tag and parameter",
-        "description": "Fetch timeseries task results by tag and parameter.\n\nIf qid is provided, returns data only for that specific qubit.\nOtherwise, returns data for all qubits.\n\nReturns\n-------\n    TimeSeriesData: Time series data for the specified parameters.",
+        "description": "Fetch timeseries task results filtered by tag and parameter.\n\nRetrieves time series data for calibration parameters, optionally filtered\nto a specific qubit. Useful for plotting parameter trends over time.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntag : str\n    Tag to filter tasks by (e.g., calibration category)\nparameter : str\n    Name of the output parameter to retrieve\nstart_at : str\n    Start time in ISO format for the time range\nend_at : str\n    End time in ISO format for the time range\ncurrent_user : User\n    Current authenticated user\nqid : str | None\n    Optional qubit ID to filter results to a specific qubit\n\nReturns\n-------\nTimeSeriesData\n    Time series data keyed by qubit ID, each containing a list of\n    parameter values with timestamps",
         "operationId": "getTimeseriesTaskResults",
         "security": [
           {
@@ -1581,7 +1581,7 @@
       "get": {
         "tags": ["tag"],
         "summary": "List all tags",
-        "description": "List all tags.\n\nArgs:\n----\n    current_user (User): The current user.\n\nReturns:\n-------\n    ListTaskResponse: The list of tasks.",
+        "description": "List all tags for the current user.\n\nRetrieves all tags associated with the current user's calibration data.\nTags are used to categorize and filter task results.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListTagResponse\n    Wrapped list of tag names",
         "operationId": "listTags",
         "responses": {
           "200": {
@@ -2286,7 +2286,7 @@
       "get": {
         "tags": ["metrics"],
         "summary": "Get metrics configuration",
-        "description": "Get metrics metadata configuration.\n\nThis endpoint returns the metrics configuration loaded from YAML,\nincluding display metadata for all qubit and coupling metrics.\n\nReturns\n-------\n    Dictionary with metrics configuration including:\n    - qubit_metrics: Metadata for single-qubit metrics\n    - coupling_metrics: Metadata for two-qubit coupling metrics\n    - color_scale: Color scale configuration for visualization",
+        "description": "Get metrics metadata configuration for visualization.\n\nRetrieves the metrics configuration loaded from YAML, including display\nmetadata for all qubit and coupling metrics used in the dashboard.\n\nReturns\n-------\ndict[str, Any]\n    Dictionary with metrics configuration including:\n    - qubit_metrics: Metadata for single-qubit metrics (frequency, T1, T2, fidelities)\n    - coupling_metrics: Metadata for two-qubit coupling metrics (ZX90, Bell state)\n    - color_scale: Color scale configuration for heatmap visualization",
         "operationId": "getMetricsConfig",
         "responses": {
           "200": {

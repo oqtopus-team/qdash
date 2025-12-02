@@ -1,3 +1,5 @@
+"""Calibration router for QDash API."""
+
 from datetime import datetime
 from logging import getLogger
 from typing import Annotated
@@ -42,7 +44,24 @@ def generate_execution_id(username: str, chip_id: str) -> str:
 def get_calibration_note(
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> CalibrationNoteResponse:
-    """Get the calibration note."""
+    """Get the latest calibration note for the master task.
+
+    Retrieves the most recent calibration note from the database, sorted by timestamp
+    in descending order. The note contains metadata about calibration parameters
+    and configuration.
+
+    Parameters
+    ----------
+    current_user : User
+        Current authenticated user
+
+    Returns
+    -------
+    CalibrationNoteResponse
+        The latest calibration note containing username, execution_id, task_id,
+        note content, and timestamp
+
+    """
     logger.info(f"current user: {current_user.username}")
     latest = (
         CalibrationNoteDocument.find({"task_id": "master"})

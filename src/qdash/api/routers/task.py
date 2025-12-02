@@ -1,3 +1,5 @@
+"""Task router for QDash API."""
+
 from __future__ import annotations
 
 import logging
