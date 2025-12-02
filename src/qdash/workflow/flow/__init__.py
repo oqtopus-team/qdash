@@ -4,6 +4,14 @@ from qdash.workflow.flow.config import (
     CalibrationPaths,
     FlowSessionConfig,
 )
+from qdash.workflow.flow.context import (
+    SessionContext,
+    clear_current_session,
+    get_current_session,
+    get_session_context,
+    has_current_session,
+    set_current_session,
+)
 from qdash.workflow.flow.factory import (
     DefaultExecutionManagerFactory,
     DefaultSessionFactory,
@@ -50,4 +58,11 @@ __all__ = [
     "GitHubIntegration",
     "GitHubPushConfig",
     "ConfigFileType",
+    # === Context Management ===
+    "SessionContext",
+    "get_session_context",
+    "set_current_session",
+    "get_current_session",
+    "clear_current_session",
+    "has_current_session",
 ]

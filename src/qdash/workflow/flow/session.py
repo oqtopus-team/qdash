@@ -747,7 +747,16 @@ class FlowSession:
 
 
 # Global session storage for Prefect context
-_current_session: FlowSession | None = None
+# Note: Using SessionContext for thread-safe management while maintaining
+# backward compatibility with direct _current_session access
+from qdash.workflow.flow.context import (
+    get_session_context,
+    set_current_session,
+    get_current_session,
+    clear_current_session,
+)
+
+_current_session: FlowSession | None = None  # Backward compatibility alias
 
 
 def init_calibration(
@@ -847,7 +856,7 @@ def init_calibration(
             # Fallback if context is not available (e.g., running outside Prefect)
             display_name = "Python Flow Execution"
 
-    _current_session = FlowSession(
+    session = FlowSession(
         username=username,
         chip_id=chip_id,
         qids=qids,
@@ -861,7 +870,11 @@ def init_calibration(
         github_push_config=github_push_config,
         muxes=muxes,
     )
-    return _current_session
+
+    # Use SessionContext for thread-safe management
+    set_current_session(session)
+    _current_session = session  # Backward compatibility
+    return session
 
 
 def get_session() -> FlowSession:
@@ -880,10 +893,11 @@ def get_session() -> FlowSession:
         ```
 
     """
-    if _current_session is None:
+    session = get_current_session()
+    if session is None:
         msg = "No active calibration session. Call init_calibration() first."
         raise RuntimeError(msg)
-    return _current_session
+    return session
 
 
 def finish_calibration(
@@ -916,9 +930,17 @@ def finish_calibration(
         ```
 
     """
+    global _current_session  # noqa: PLW0603
+
     session = get_session()
-    return session.finish_calibration(
+    result = session.finish_calibration(
         update_chip_history=update_chip_history,
         push_to_github=push_to_github,
         export_note_to_file=export_note_to_file,
     )
+
+    # Clear session after completion
+    clear_current_session()
+    _current_session = None  # Backward compatibility
+
+    return result
