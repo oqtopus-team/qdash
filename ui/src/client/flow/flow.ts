@@ -50,13 +50,13 @@ export const listFlows = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ListFlowsResponse>(
-    { url: `/api/flow`, method: "GET", signal },
+    { url: `/flow`, method: "GET", signal },
     options,
   );
 };
 
 export const getListFlowsQueryKey = () => {
-  return [`/api/flow`] as const;
+  return [`/flow`] as const;
 };
 
 export const getListFlowsQueryOptions = <
@@ -189,7 +189,7 @@ export const saveFlow = (
 ) => {
   return customInstance<SaveFlowResponse>(
     {
-      url: `/api/flow`,
+      url: `/flow`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: saveFlowRequest,
@@ -285,13 +285,13 @@ export const getFlow = (
   signal?: AbortSignal,
 ) => {
   return customInstance<GetFlowResponse>(
-    { url: `/api/flow/${name}`, method: "GET", signal },
+    { url: `/flow/${name}`, method: "GET", signal },
     options,
   );
 };
 
 export const getGetFlowQueryKey = (name?: string) => {
-  return [`/api/flow/${name}`] as const;
+  return [`/flow/${name}`] as const;
 };
 
 export const getGetFlowQueryOptions = <
@@ -428,7 +428,7 @@ export const deleteFlow = (
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<DeleteFlow200>(
-    { url: `/api/flow/${name}`, method: "DELETE" },
+    { url: `/flow/${name}`, method: "DELETE" },
     options,
   );
 };
@@ -522,7 +522,7 @@ export const executeFlow = (
 ) => {
   return customInstance<ExecuteFlowResponse>(
     {
-      url: `/api/flow/${name}/execute`,
+      url: `/flow/${name}/execute`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: executeFlowRequest,
@@ -614,13 +614,13 @@ export const listFlowTemplates = (
   signal?: AbortSignal,
 ) => {
   return customInstance<FlowTemplate[]>(
-    { url: `/api/flow-templates`, method: "GET", signal },
+    { url: `/flow-templates`, method: "GET", signal },
     options,
   );
 };
 
 export const getListFlowTemplatesQueryKey = () => {
-  return [`/api/flow-templates`] as const;
+  return [`/flow-templates`] as const;
 };
 
 export const getListFlowTemplatesQueryOptions = <
@@ -769,13 +769,13 @@ export const getFlowTemplate = (
   signal?: AbortSignal,
 ) => {
   return customInstance<FlowTemplateWithCode>(
-    { url: `/api/flow-templates/${templateId}`, method: "GET", signal },
+    { url: `/flow-templates/${templateId}`, method: "GET", signal },
     options,
   );
 };
 
 export const getGetFlowTemplateQueryKey = (templateId?: string) => {
-  return [`/api/flow-templates/${templateId}`] as const;
+  return [`/flow-templates/${templateId}`] as const;
 };
 
 export const getGetFlowTemplateQueryOptions = <

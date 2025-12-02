@@ -51,7 +51,7 @@ export const authLogin = (
 
   return customInstance<TokenResponse>(
     {
-      url: `/api/auth/login`,
+      url: `/auth/login`,
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       data: formUrlEncoded,
@@ -143,7 +143,7 @@ export const authRegisterUser = (
 ) => {
   return customInstance<UserWithToken>(
     {
-      url: `/api/auth/register`,
+      url: `/auth/register`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: userCreate,
@@ -234,13 +234,13 @@ export const authReadUsersMe = (
   signal?: AbortSignal,
 ) => {
   return customInstance<User>(
-    { url: `/api/auth/me`, method: "GET", signal },
+    { url: `/auth/me`, method: "GET", signal },
     options,
   );
 };
 
 export const getAuthReadUsersMeQueryKey = () => {
-  return [`/api/auth/me`] as const;
+  return [`/auth/me`] as const;
 };
 
 export const getAuthReadUsersMeQueryOptions = <
@@ -382,7 +382,7 @@ export const authLogout = (
   signal?: AbortSignal,
 ) => {
   return customInstance<AuthLogout200>(
-    { url: `/api/auth/logout`, method: "POST", signal },
+    { url: `/auth/logout`, method: "POST", signal },
     options,
   );
 };

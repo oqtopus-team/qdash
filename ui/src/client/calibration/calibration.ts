@@ -34,13 +34,13 @@ export const listCronSchedules = (
   signal?: AbortSignal,
 ) => {
   return customInstance<CalibrationNoteResponse>(
-    { url: `/api/calibration/note`, method: "GET", signal },
+    { url: `/calibration/note`, method: "GET", signal },
     options,
   );
 };
 
 export const getListCronSchedulesQueryKey = () => {
-  return [`/api/calibration/note`] as const;
+  return [`/calibration/note`] as const;
 };
 
 export const getListCronSchedulesQueryOptions = <

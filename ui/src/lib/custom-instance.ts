@@ -2,7 +2,9 @@ import Axios, { AxiosHeaders } from "axios";
 
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 
-export const AXIOS_INSTANCE = Axios.create();
+export const AXIOS_INSTANCE = Axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5715",
+});
 
 // リクエストインターセプターを追加
 AXIOS_INSTANCE.interceptors.request.use((config) => {

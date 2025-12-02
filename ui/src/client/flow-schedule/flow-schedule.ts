@@ -60,7 +60,7 @@ export const scheduleFlow = (
 ) => {
   return customInstance<ScheduleFlowResponse>(
     {
-      url: `/api/flow/${name}/schedule`,
+      url: `/flow/${name}/schedule`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: scheduleFlowRequest,
@@ -163,7 +163,7 @@ export const listFlowSchedules = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ListFlowSchedulesResponse>(
-    { url: `/api/flow/${name}/schedules`, method: "GET", params, signal },
+    { url: `/flow/${name}/schedules`, method: "GET", params, signal },
     options,
   );
 };
@@ -172,7 +172,7 @@ export const getListFlowSchedulesQueryKey = (
   name?: string,
   params?: ListFlowSchedulesParams,
 ) => {
-  return [`/api/flow/${name}/schedules`, ...(params ? [params] : [])] as const;
+  return [`/flow/${name}/schedules`, ...(params ? [params] : [])] as const;
 };
 
 export const getListFlowSchedulesQueryOptions = <
@@ -344,7 +344,7 @@ export const listAllFlowSchedules = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ListFlowSchedulesResponse>(
-    { url: `/api/flow-schedules`, method: "GET", params, signal },
+    { url: `/flow-schedules`, method: "GET", params, signal },
     options,
   );
 };
@@ -352,7 +352,7 @@ export const listAllFlowSchedules = (
 export const getListAllFlowSchedulesQueryKey = (
   params?: ListAllFlowSchedulesParams,
 ) => {
-  return [`/api/flow-schedules`, ...(params ? [params] : [])] as const;
+  return [`/flow-schedules`, ...(params ? [params] : [])] as const;
 };
 
 export const getListAllFlowSchedulesQueryOptions = <
@@ -520,7 +520,7 @@ export const deleteFlowSchedule = (
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<DeleteScheduleResponse>(
-    { url: `/api/flow-schedule/${scheduleId}`, method: "DELETE" },
+    { url: `/flow-schedule/${scheduleId}`, method: "DELETE" },
     options,
   );
 };
@@ -619,7 +619,7 @@ export const updateFlowSchedule = (
 ) => {
   return customInstance<UpdateScheduleResponse>(
     {
-      url: `/api/flow-schedule/${scheduleId}`,
+      url: `/flow-schedule/${scheduleId}`,
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       data: updateScheduleRequest,

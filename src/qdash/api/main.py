@@ -68,23 +68,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # Auth router without global auth dependency (login/register/logout need to be public)
-app.include_router(auth.router, prefix="/api", tags=["auth"])
+app.include_router(auth.router, tags=["auth"])
 
 # Routers without auth (for direct browser access like images, file downloads)
 # These routers handle their own auth for write operations
-app.include_router(execution.router, prefix="/api", tags=["execution"])
-app.include_router(file.router, prefix="/api", tags=["file"])
+app.include_router(execution.router, tags=["execution"])
+app.include_router(file.router, tags=["file"])
 
 # All other routers with global auth dependency
 auth_dependency = [Depends(get_current_active_user)]
-app.include_router(calibration.router, prefix="/api", tags=["calibration"], dependencies=auth_dependency)
-app.include_router(settings.router, prefix="/api", tags=["settings"], dependencies=auth_dependency)
-app.include_router(chip.router, prefix="/api", tags=["chip"], dependencies=auth_dependency)
-app.include_router(task.router, prefix="/api", tags=["task"], dependencies=auth_dependency)
-app.include_router(parameter.router, prefix="/api", tags=["parameter"], dependencies=auth_dependency)
-app.include_router(tag.router, prefix="/api", tags=["tag"], dependencies=auth_dependency)
-app.include_router(device_topology.router, prefix="/api", tags=["device_topology"], dependencies=auth_dependency)
-app.include_router(backend.router, prefix="/api", tags=["backend"], dependencies=auth_dependency)
-app.include_router(flow.router, prefix="/api", tags=["flow"], dependencies=auth_dependency)
-app.include_router(flow_schedule.router, prefix="/api", tags=["flow_schedule"], dependencies=auth_dependency)
-app.include_router(metrics.router, prefix="/api", tags=["metrics"], dependencies=auth_dependency)
+app.include_router(calibration.router, tags=["calibration"], dependencies=auth_dependency)
+app.include_router(settings.router, tags=["settings"], dependencies=auth_dependency)
+app.include_router(chip.router, tags=["chip"], dependencies=auth_dependency)
+app.include_router(task.router, tags=["task"], dependencies=auth_dependency)
+app.include_router(parameter.router, tags=["parameter"], dependencies=auth_dependency)
+app.include_router(tag.router, tags=["tag"], dependencies=auth_dependency)
+app.include_router(device_topology.router, tags=["device_topology"], dependencies=auth_dependency)
+app.include_router(backend.router, tags=["backend"], dependencies=auth_dependency)
+app.include_router(flow.router, tags=["flow"], dependencies=auth_dependency)
+app.include_router(flow_schedule.router, tags=["flow_schedule"], dependencies=auth_dependency)
+app.include_router(metrics.router, tags=["metrics"], dependencies=auth_dependency)

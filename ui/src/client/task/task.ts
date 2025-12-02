@@ -49,13 +49,13 @@ export const fetchAllTasks = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ListTaskResponse>(
-    { url: `/api/tasks`, method: "GET", params, signal },
+    { url: `/tasks`, method: "GET", params, signal },
     options,
   );
 };
 
 export const getFetchAllTasksQueryKey = (params?: FetchAllTasksParams) => {
-  return [`/api/tasks`, ...(params ? [params] : [])] as const;
+  return [`/tasks`, ...(params ? [params] : [])] as const;
 };
 
 export const getFetchAllTasksQueryOptions = <
@@ -195,13 +195,13 @@ export const getTaskResultByTaskId = (
   signal?: AbortSignal,
 ) => {
   return customInstance<TaskResultResponse>(
-    { url: `/api/task/${taskId}`, method: "GET", signal },
+    { url: `/task/${taskId}`, method: "GET", signal },
     options,
   );
 };
 
 export const getGetTaskResultByTaskIdQueryKey = (taskId?: string) => {
-  return [`/api/task/${taskId}`] as const;
+  return [`/task/${taskId}`] as const;
 };
 
 export const getGetTaskResultByTaskIdQueryOptions = <
