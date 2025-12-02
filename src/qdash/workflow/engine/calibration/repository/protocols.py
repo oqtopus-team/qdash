@@ -1,0 +1,164 @@
+"""Repository layer protocols for TaskManager refactoring.
+
+This module defines abstract interfaces (protocols) for data access operations
+to decouple TaskManager from specific database implementations.
+"""
+
+from typing import Protocol, runtime_checkable
+
+from qdash.datamodel.execution import ExecutionModel
+from qdash.datamodel.task import BaseTaskResultModel, CalibDataModel
+
+
+@runtime_checkable
+class TaskResultHistoryRepository(Protocol):
+    """Protocol for task result history persistence operations."""
+
+    def save(self, task: BaseTaskResultModel, execution_model: ExecutionModel) -> None:
+        """Save a task result to the history.
+
+        Parameters
+        ----------
+        task : BaseTaskResultModel
+            The task result to save
+        execution_model : ExecutionModel
+            The parent execution context
+
+        """
+        ...
+
+
+@runtime_checkable
+class ChipRepository(Protocol):
+    """Protocol for chip data access operations."""
+
+    def get_current_chip(self, chip_id: str) -> dict:
+        """Get the current chip data.
+
+        Parameters
+        ----------
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        dict
+            The chip data including qubit and coupling parameters
+
+        """
+        ...
+
+    def update_chip_data(
+        self,
+        chip_id: str,
+        calib_data: CalibDataModel,
+        username: str,
+    ) -> None:
+        """Update chip calibration data.
+
+        Parameters
+        ----------
+        chip_id : str
+            The chip identifier
+        calib_data : CalibDataModel
+            The calibration data to merge
+        username : str
+            The user performing the update
+
+        """
+        ...
+
+
+@runtime_checkable
+class ChipHistoryRepository(Protocol):
+    """Protocol for chip history recording operations."""
+
+    def create_history(self, username: str) -> None:
+        """Create a chip history snapshot from the current chip state.
+
+        Parameters
+        ----------
+        username : str
+            The username to look up the chip
+
+        """
+        ...
+
+
+@runtime_checkable
+class CalibDataSaver(Protocol):
+    """Protocol for saving calibration artifacts (figures, raw data, JSON)."""
+
+    def save_figures(
+        self,
+        figures: list,
+        task_name: str,
+        task_type: str,
+        qid: str,
+    ) -> tuple[list[str], list[str]]:
+        """Save figures as PNG and JSON.
+
+        Parameters
+        ----------
+        figures : list
+            List of plotly figures to save
+        task_name : str
+            The name of the task
+        task_type : str
+            The type of task (qubit, coupling, global, system)
+        qid : str
+            The qubit identifier (empty for global/system tasks)
+
+        Returns
+        -------
+        tuple[list[str], list[str]]
+            Tuple of (png_paths, json_paths)
+
+        """
+        ...
+
+    def save_raw_data(
+        self,
+        raw_data: list,
+        task_name: str,
+        task_type: str,
+        qid: str,
+    ) -> list[str]:
+        """Save raw data as CSV files.
+
+        Parameters
+        ----------
+        raw_data : list
+            List of numpy arrays to save
+        task_name : str
+            The name of the task
+        task_type : str
+            The type of task
+        qid : str
+            The qubit identifier
+
+        Returns
+        -------
+        list[str]
+            List of saved file paths
+
+        """
+        ...
+
+    def save_task_json(self, task_id: str, task_data: dict) -> str:
+        """Save task data as JSON.
+
+        Parameters
+        ----------
+        task_id : str
+            The task identifier
+        task_data : dict
+            The task data to save
+
+        Returns
+        -------
+        str
+            Path to the saved JSON file
+
+        """
+        ...
