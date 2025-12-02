@@ -22,9 +22,9 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
-  AuthLogout200,
-  BodyAuthLogin,
+  BodyLogin,
   HTTPValidationError,
+  Logout200,
   TokenResponse,
   User,
   UserCreate,
@@ -38,16 +38,16 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
  * Login endpoint to authenticate user and return access token.
- * @summary Login
+ * @summary Login user
  */
-export const authLogin = (
-  bodyAuthLogin: BodyType<BodyAuthLogin>,
+export const login = (
+  bodyLogin: BodyType<BodyLogin>,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   const formUrlEncoded = new URLSearchParams();
-  formUrlEncoded.append(`username`, bodyAuthLogin.username);
-  formUrlEncoded.append(`password`, bodyAuthLogin.password);
+  formUrlEncoded.append(`username`, bodyLogin.username);
+  formUrlEncoded.append(`password`, bodyLogin.password);
 
   return customInstance<TokenResponse>(
     {
@@ -61,24 +61,24 @@ export const authLogin = (
   );
 };
 
-export const getAuthLoginMutationOptions = <
+export const getLoginMutationOptions = <
   TError = ErrorType<void | HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof authLogin>>,
+    Awaited<ReturnType<typeof login>>,
     TError,
-    { data: BodyType<BodyAuthLogin> },
+    { data: BodyType<BodyLogin> },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof authLogin>>,
+  Awaited<ReturnType<typeof login>>,
   TError,
-  { data: BodyType<BodyAuthLogin> },
+  { data: BodyType<BodyLogin> },
   TContext
 > => {
-  const mutationKey = ["authLogin"];
+  const mutationKey = ["login"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -88,55 +88,55 @@ export const getAuthLoginMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof authLogin>>,
-    { data: BodyType<BodyAuthLogin> }
+    Awaited<ReturnType<typeof login>>,
+    { data: BodyType<BodyLogin> }
   > = (props) => {
     const { data } = props ?? {};
 
-    return authLogin(data, requestOptions);
+    return login(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type AuthLoginMutationResult = NonNullable<
-  Awaited<ReturnType<typeof authLogin>>
+export type LoginMutationResult = NonNullable<
+  Awaited<ReturnType<typeof login>>
 >;
-export type AuthLoginMutationBody = BodyType<BodyAuthLogin>;
-export type AuthLoginMutationError = ErrorType<void | HTTPValidationError>;
+export type LoginMutationBody = BodyType<BodyLogin>;
+export type LoginMutationError = ErrorType<void | HTTPValidationError>;
 
 /**
- * @summary Login
+ * @summary Login user
  */
-export const useAuthLogin = <
+export const useLogin = <
   TError = ErrorType<void | HTTPValidationError>,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof authLogin>>,
+      Awaited<ReturnType<typeof login>>,
       TError,
-      { data: BodyType<BodyAuthLogin> },
+      { data: BodyType<BodyLogin> },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof authLogin>>,
+  Awaited<ReturnType<typeof login>>,
   TError,
-  { data: BodyType<BodyAuthLogin> },
+  { data: BodyType<BodyLogin> },
   TContext
 > => {
-  const mutationOptions = getAuthLoginMutationOptions(options);
+  const mutationOptions = getLoginMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
 /**
  * Register a new user and return access token.
- * @summary Register User
+ * @summary Register a new user
  */
-export const authRegisterUser = (
+export const registerUser = (
   userCreate: BodyType<UserCreate>,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
@@ -153,24 +153,24 @@ export const authRegisterUser = (
   );
 };
 
-export const getAuthRegisterUserMutationOptions = <
+export const getRegisterUserMutationOptions = <
   TError = ErrorType<void | HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof authRegisterUser>>,
+    Awaited<ReturnType<typeof registerUser>>,
     TError,
     { data: BodyType<UserCreate> },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof authRegisterUser>>,
+  Awaited<ReturnType<typeof registerUser>>,
   TError,
   { data: BodyType<UserCreate> },
   TContext
 > => {
-  const mutationKey = ["authRegisterUser"];
+  const mutationKey = ["registerUser"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -180,34 +180,33 @@ export const getAuthRegisterUserMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof authRegisterUser>>,
+    Awaited<ReturnType<typeof registerUser>>,
     { data: BodyType<UserCreate> }
   > = (props) => {
     const { data } = props ?? {};
 
-    return authRegisterUser(data, requestOptions);
+    return registerUser(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type AuthRegisterUserMutationResult = NonNullable<
-  Awaited<ReturnType<typeof authRegisterUser>>
+export type RegisterUserMutationResult = NonNullable<
+  Awaited<ReturnType<typeof registerUser>>
 >;
-export type AuthRegisterUserMutationBody = BodyType<UserCreate>;
-export type AuthRegisterUserMutationError =
-  ErrorType<void | HTTPValidationError>;
+export type RegisterUserMutationBody = BodyType<UserCreate>;
+export type RegisterUserMutationError = ErrorType<void | HTTPValidationError>;
 
 /**
- * @summary Register User
+ * @summary Register a new user
  */
-export const useAuthRegisterUser = <
+export const useRegisterUser = <
   TError = ErrorType<void | HTTPValidationError>,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof authRegisterUser>>,
+      Awaited<ReturnType<typeof registerUser>>,
       TError,
       { data: BodyType<UserCreate> },
       TContext
@@ -216,20 +215,20 @@ export const useAuthRegisterUser = <
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof authRegisterUser>>,
+  Awaited<ReturnType<typeof registerUser>>,
   TError,
   { data: BodyType<UserCreate> },
   TContext
 > => {
-  const mutationOptions = getAuthRegisterUserMutationOptions(options);
+  const mutationOptions = getRegisterUserMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
 /**
  * Get current user information.
- * @summary Read Users Me
+ * @summary Get current user
  */
-export const authReadUsersMe = (
+export const getCurrentUser = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -239,56 +238,52 @@ export const authReadUsersMe = (
   );
 };
 
-export const getAuthReadUsersMeQueryKey = () => {
+export const getGetCurrentUserQueryKey = () => {
   return [`/auth/me`] as const;
 };
 
-export const getAuthReadUsersMeQueryOptions = <
-  TData = Awaited<ReturnType<typeof authReadUsersMe>>,
+export const getGetCurrentUserQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCurrentUser>>,
   TError = ErrorType<void>,
 >(options?: {
   query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof authReadUsersMe>>, TError, TData>
+    UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>
   >;
   request?: SecondParameter<typeof customInstance>;
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getAuthReadUsersMeQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getGetCurrentUserQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof authReadUsersMe>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentUser>>> = ({
     signal,
-  }) => authReadUsersMe(requestOptions, signal);
+  }) => getCurrentUser(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof authReadUsersMe>>,
+    Awaited<ReturnType<typeof getCurrentUser>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type AuthReadUsersMeQueryResult = NonNullable<
-  Awaited<ReturnType<typeof authReadUsersMe>>
+export type GetCurrentUserQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCurrentUser>>
 >;
-export type AuthReadUsersMeQueryError = ErrorType<void>;
+export type GetCurrentUserQueryError = ErrorType<void>;
 
-export function useAuthReadUsersMe<
-  TData = Awaited<ReturnType<typeof authReadUsersMe>>,
+export function useGetCurrentUser<
+  TData = Awaited<ReturnType<typeof getCurrentUser>>,
   TError = ErrorType<void>,
 >(
   options: {
     query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof authReadUsersMe>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof authReadUsersMe>>,
+          Awaited<ReturnType<typeof getCurrentUser>>,
           TError,
-          Awaited<ReturnType<typeof authReadUsersMe>>
+          Awaited<ReturnType<typeof getCurrentUser>>
         >,
         "initialData"
       >;
@@ -298,23 +293,19 @@ export function useAuthReadUsersMe<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useAuthReadUsersMe<
-  TData = Awaited<ReturnType<typeof authReadUsersMe>>,
+export function useGetCurrentUser<
+  TData = Awaited<ReturnType<typeof getCurrentUser>>,
   TError = ErrorType<void>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof authReadUsersMe>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof authReadUsersMe>>,
+          Awaited<ReturnType<typeof getCurrentUser>>,
           TError,
-          Awaited<ReturnType<typeof authReadUsersMe>>
+          Awaited<ReturnType<typeof getCurrentUser>>
         >,
         "initialData"
       >;
@@ -322,43 +313,35 @@ export function useAuthReadUsersMe<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useAuthReadUsersMe<
-  TData = Awaited<ReturnType<typeof authReadUsersMe>>,
+export function useGetCurrentUser<
+  TData = Awaited<ReturnType<typeof getCurrentUser>>,
   TError = ErrorType<void>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof authReadUsersMe>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary Read Users Me
+ * @summary Get current user
  */
 
-export function useAuthReadUsersMe<
-  TData = Awaited<ReturnType<typeof authReadUsersMe>>,
+export function useGetCurrentUser<
+  TData = Awaited<ReturnType<typeof getCurrentUser>>,
   TError = ErrorType<void>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof authReadUsersMe>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getAuthReadUsersMeQueryOptions(options);
+  const queryOptions = getGetCurrentUserQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -375,36 +358,36 @@ export function useAuthReadUsersMe<
 
 This endpoint doesn't need to do anything on the backend since the username is managed client-side.
 The client will remove the username from cookies.
- * @summary Logout
+ * @summary Logout user
  */
-export const authLogout = (
+export const logout = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
-  return customInstance<AuthLogout200>(
+  return customInstance<Logout200>(
     { url: `/auth/logout`, method: "POST", signal },
     options,
   );
 };
 
-export const getAuthLogoutMutationOptions = <
+export const getLogoutMutationOptions = <
   TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof authLogout>>,
+    Awaited<ReturnType<typeof logout>>,
     TError,
     void,
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof authLogout>>,
+  Awaited<ReturnType<typeof logout>>,
   TError,
   void,
   TContext
 > => {
-  const mutationKey = ["authLogout"];
+  const mutationKey = ["logout"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -414,28 +397,28 @@ export const getAuthLogoutMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof authLogout>>,
+    Awaited<ReturnType<typeof logout>>,
     void
   > = () => {
-    return authLogout(requestOptions);
+    return logout(requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type AuthLogoutMutationResult = NonNullable<
-  Awaited<ReturnType<typeof authLogout>>
+export type LogoutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof logout>>
 >;
 
-export type AuthLogoutMutationError = ErrorType<void>;
+export type LogoutMutationError = ErrorType<void>;
 
 /**
- * @summary Logout
+ * @summary Logout user
  */
-export const useAuthLogout = <TError = ErrorType<void>, TContext = unknown>(
+export const useLogout = <TError = ErrorType<void>, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof authLogout>>,
+      Awaited<ReturnType<typeof logout>>,
       TError,
       void,
       TContext
@@ -444,12 +427,12 @@ export const useAuthLogout = <TError = ErrorType<void>, TContext = unknown>(
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof authLogout>>,
+  Awaited<ReturnType<typeof logout>>,
   TError,
   void,
   TContext
 > => {
-  const mutationOptions = getAuthLogoutMutationOptions(options);
+  const mutationOptions = getLogoutMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

@@ -394,36 +394,20 @@ task: Annotated[str, Query(description="Name of the task to filter by")]
 
 ### Domain Resources
 
-Resource names should be clear, domain-specific nouns that represent the entities in the QDash system.
-
-| Resource       | Description                        | URL Path                     | Example                                |
-| -------------- | ---------------------------------- | ---------------------------- | -------------------------------------- |
-| `chips`        | Quantum chip configurations        | `/chips`                     | `GET /chips/{chip_id}`                 |
-| `qubits`       | Individual qubit units             | `/chips/{chip_id}/qubits`    | Nested under chips                     |
-| `couplings`    | Qubit-to-qubit connections         | `/chips/{chip_id}/couplings` | Nested under chips                     |
-| `muxes`        | Multiplexer groups (4 qubits each) | `/chips/{chip_id}/muxes`     | Nested under chips                     |
-| `tasks`        | Calibration task definitions       | `/tasks`                     | `GET /tasks`                           |
-| `task-results` | Task execution results             | `/task-results`              | `GET /task-results/qubits/latest`      |
-| `executions`   | Workflow execution records         | `/executions`                | `GET /executions/{execution_id}`       |
-| `flows`        | User-defined workflow scripts      | `/flows`                     | `GET /flows/{name}`                    |
-| `tags`         | Labels for categorization          | `/tags`                      | `GET /tags`                            |
-| `backends`     | Quantum backend configurations     | `/backends`                  | `GET /backends`                        |
-| `settings`     | Application settings (singleton)   | `/settings`                  | `GET /settings`                        |
-| `calibrations` | Calibration operations             | `/calibrations`              | `GET /calibrations/note`               |
-| `metrics`      | Chip calibration metrics           | `/metrics`                   | `GET /metrics/chips/{chip_id}/metrics` |
-| `files`        | Configuration file operations      | `/files`                     | `GET /files/tree`                      |
+Resource names should be clear, domain-specific nouns that represent the entities in the system.
 
 ### Nested Resource Patterns
 
 When resources have parent-child relationships, use nesting to express hierarchy:
 
-```
-/chips/{chip_id}/muxes                    # All muxes for a chip
-/chips/{chip_id}/muxes/{mux_id}           # Specific mux
-/task-results/qubits/{qid}/history        # Qubit task history
-/task-results/couplings/{coupling_id}/history  # Coupling task history
-/flows/{name}/schedules                   # Schedules for a flow
-/metrics/chips/{chip_id}/qubits/{qid}/history  # Metric history for qubit
+```python
+# ✅ Good - Clear hierarchy
+GET /resources/{id}/sub-resources                    # All sub-resources for a resource
+GET /resources/{id}/sub-resources/{sub_id}           # Specific sub-resource
+GET /results/items/{item_id}/history                 # Item history
+
+# ❌ Bad - Too deeply nested
+GET /users/{user_id}/resources/{id}/items/{item_id}/results/{result_id}
 ```
 
 ### Resource Naming Rules
@@ -443,34 +427,14 @@ Router tags are used for OpenAPI documentation grouping and should use **lowerca
 
 ```python
 # ✅ Good - Consistent tag naming
-app.include_router(chip.router, tags=["chip"])
-app.include_router(task.router, tags=["task"])
-app.include_router(task_result.router, tags=["task-result"])
-app.include_router(device_topology.router, tags=["device-topology"])
+app.include_router(resource.router, tags=["resource"])
+app.include_router(sub_resource.router, tags=["sub-resource"])
 
 # ❌ Bad - Inconsistent
-app.include_router(chip.router, tags=["chips"])          # Plural
-app.include_router(task.router, tags=["Task"])           # PascalCase
-app.include_router(device_topology.router, tags=["device_topology"])  # Underscore
+app.include_router(resource.router, tags=["resources"])          # Plural
+app.include_router(resource.router, tags=["Resource"])           # PascalCase
+app.include_router(sub_resource.router, tags=["sub_resource"])   # Underscore
 ```
-
-### Standard Tags
-
-| Tag               | Router                   | Description              |
-| ----------------- | ------------------------ | ------------------------ |
-| `auth`            | `auth.router`            | Authentication endpoints |
-| `chip`            | `chip.router`            | Chip management          |
-| `task`            | `task.router`            | Task definitions         |
-| `task-result`     | `task_result.router`     | Task execution results   |
-| `execution`       | `execution.router`       | Workflow executions      |
-| `flow`            | `flow.router`            | User-defined flows       |
-| `tag`             | `tag.router`             | Tag management           |
-| `backend`         | `backend.router`         | Backend configurations   |
-| `settings`        | `settings.router`        | Application settings     |
-| `calibration`     | `calibration.router`     | Calibration operations   |
-| `metrics`         | `metrics.router`         | Calibration metrics      |
-| `file`            | `file.router`            | File operations          |
-| `device-topology` | `device_topology.router` | Device topology          |
 
 ### Tag Organization in OpenAPI
 
@@ -478,17 +442,16 @@ Tags appear in the order they are registered. Group related tags together:
 
 ```python
 # Core resources
-app.include_router(chip.router, tags=["chip"])
-app.include_router(task.router, tags=["task"])
-app.include_router(task_result.router, tags=["task-result"])
+app.include_router(resource.router, tags=["resource"])
+app.include_router(item.router, tags=["item"])
 
-# Workflow
+# Operations
 app.include_router(execution.router, tags=["execution"])
-app.include_router(flow.router, tags=["flow"])
+app.include_router(workflow.router, tags=["workflow"])
 
 # Configuration
 app.include_router(settings.router, tags=["settings"])
-app.include_router(backend.router, tags=["backend"])
+app.include_router(config.router, tags=["config"])
 ```
 
 ---
@@ -500,20 +463,11 @@ app.include_router(backend.router, tags=["backend"])
 Router files should use **snake_case** matching the resource name:
 
 ```
-src/qdash/api/routers/
-├── chip.py              # Chip endpoints
-├── task.py              # Task endpoints
-├── task_result.py       # Task result endpoints (multi-word)
-├── execution.py         # Execution endpoints
-├── flow.py              # Flow endpoints
-├── tag.py               # Tag endpoints
-├── backend.py           # Backend endpoints
-├── settings.py          # Settings endpoints
-├── calibration.py       # Calibration endpoints
-├── metrics.py           # Metrics endpoints
-├── file.py              # File endpoints
-├── device_topology.py   # Device topology endpoints (multi-word)
-└── auth.py              # Authentication endpoints
+src/project/api/routers/
+├── resource.py           # Resource endpoints
+├── sub_resource.py       # Multi-word resource endpoints
+├── auth.py               # Authentication endpoints
+└── settings.py           # Settings endpoints
 ```
 
 ### Schema Files
@@ -521,20 +475,11 @@ src/qdash/api/routers/
 Schema files should match their corresponding router:
 
 ```
-src/qdash/api/schemas/
-├── chip.py              # ChipResponse, ListChipsResponse, etc.
-├── task.py              # TaskResponse, ListTasksResponse, etc.
-├── task_result.py       # TaskResultResponse, etc.
-├── execution.py         # ExecutionResponseSummary, ListExecutionsResponse, etc.
-├── flow.py              # FlowSummary, ListFlowsResponse, etc.
-├── tag.py               # Tag, ListTagResponse
-├── backend.py           # BackendResponseModel, ListBackendsResponse
-├── calibration.py       # CalibrationNoteResponse
-├── metrics.py           # ChipMetricsResponse, QubitMetrics, etc.
-├── file.py              # FileTreeNode, SaveFileRequest, etc.
-├── device_topology.py   # Device, Qubit, Coupling, etc.
-├── auth.py              # User, TokenResponse, etc.
-└── error.py             # ErrorResponse, Detail
+src/project/api/schemas/
+├── resource.py           # ResourceResponse, ListResourcesResponse, etc.
+├── sub_resource.py       # SubResourceResponse, etc.
+├── auth.py               # User, TokenResponse, etc.
+└── error.py              # ErrorResponse, Detail
 ```
 
 ### Naming Rules
@@ -551,27 +496,18 @@ src/qdash/api/schemas/
 
 ```python
 # In main.py - import router modules
-from qdash.api.routers import (
+from project.api.routers import (
     auth,
-    backend,
-    calibration,
-    chip,
-    device_topology,
-    execution,
-    file,
-    flow,
-    metrics,
+    resource,
+    sub_resource,
     settings,
-    tag,
-    task,
-    task_result,
 )
 
 # In router files - import schemas
-from qdash.api.schemas.chip import (
-    ChipResponse,
-    CreateChipRequest,
-    ListChipsResponse,
+from project.api.schemas.resource import (
+    ResourceResponse,
+    CreateResourceRequest,
+    ListResourcesResponse,
 )
 ```
 

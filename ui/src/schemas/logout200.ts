@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type AuthLogout200 = { [key: string]: string };
+export type Logout200 = { [key: string]: string };

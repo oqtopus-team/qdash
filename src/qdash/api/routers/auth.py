@@ -24,7 +24,7 @@ router = APIRouter(
 )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, summary="Login user", operation_id="login")
 def login(
     username: str = Form(),
     password: str = Form(),
@@ -46,7 +46,7 @@ def login(
     )
 
 
-@router.post("/register", response_model=UserWithToken)
+@router.post("/register", response_model=UserWithToken, summary="Register a new user", operation_id="registerUser")
 def register_user(user_data: UserCreate) -> UserWithToken:
     """Register a new user and return access token."""
     logger.debug(f"Registration attempt for user: {user_data.username}")
@@ -80,14 +80,14 @@ def register_user(user_data: UserCreate) -> UserWithToken:
     )
 
 
-@router.get("/me", response_model=User)
+@router.get("/me", response_model=User, summary="Get current user", operation_id="getCurrentUser")
 def read_users_me(current_user: Annotated[User, Depends(get_current_active_user)]) -> User:
     """Get current user information."""
     logger.debug(f"Reading user info for: {current_user.username}")
     return current_user
 
 
-@router.post("/logout")
+@router.post("/logout", summary="Logout user", operation_id="logout")
 def logout() -> dict[str, str]:
     """Logout endpoint.
 
