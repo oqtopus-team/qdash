@@ -2440,7 +2440,7 @@
         }
       }
     },
-    "/metrics/chip/{chip_id}/qubit/{qid}/metric-history": {
+    "/metrics/chip/{chip_id}/qubit/{qid}/history": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Qubit Metric History",
@@ -2545,7 +2545,7 @@
         }
       }
     },
-    "/metrics/chip/{chip_id}/coupling/{coupling_id}/metric-history": {
+    "/metrics/chip/{chip_id}/coupling/{coupling_id}/history": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Coupling Metric History",

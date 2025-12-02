@@ -15,14 +15,9 @@ tasks:
     cmds:
       - curl http://api:$API_PORT/openapi.json | jq > ../docs/oas/openapi.json
       - bunx orval@7.14.0 --config ./orval.config.cjs
-      - task fmt-ui
+      - bunx prettier . --write
+      - bunx eslint . --fix -c eslint.config.js
     desc: Generate the TypeScript client
-
-  generate-python-client:
-    dotenv: [.env]
-    cmds:
-      - python -m qdash.scripts.generate_client
-    desc: Generate Python client from OpenAPI spec
 
   docs:
     dir: docs
