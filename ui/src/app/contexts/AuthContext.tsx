@@ -12,11 +12,7 @@ import {
 
 import type { User } from "../../schemas";
 
-import {
-  useGetCurrentUser,
-  useLogin,
-  useLogout,
-} from "@/client/auth/auth";
+import { useGetCurrentUser, useLogin, useLogout } from "@/client/auth/auth";
 
 interface AuthContextType {
   user: User | null;
