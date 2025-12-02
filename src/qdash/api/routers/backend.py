@@ -1,10 +1,12 @@
+"""Backend router for QDash API."""
+
 import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from qdash.api.lib.auth import get_optional_current_user
 from qdash.api.schemas.auth import User
+from qdash.api.schemas.backend import BackendResponseModel, ListBackendsResponse
 from qdash.dbmodel.backend import BackendDocument
 
 router = APIRouter()
@@ -12,36 +14,34 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-class BackendResponseModel(BaseModel):
-    """Response model for backend operations.
-
-    Inherits from BackendModel and is used to format the response
-    for backend-related API endpoints.
-    """
-
-    name: str
-    username: str
-
-
 @router.get(
-    "/backend",
-    response_model=list[BackendResponseModel],
-    summary="Get all backends",
+    "/backends",
+    response_model=ListBackendsResponse,
+    summary="List all backends",
     description="Retrieve a list of all registered backends",
-    operation_id="fetchAllBackends",
+    operation_id="listBackends",
 )
-def get_backends(
+def list_backends(
     current_user: Annotated[User, Depends(get_optional_current_user)],
-) -> list[BackendResponseModel]:
-    """Get all backends.
+) -> ListBackendsResponse:
+    """List all registered backends.
+
+    Retrieves all backend configurations from the database. Backends represent
+    quantum hardware or simulator configurations available for calibration
+    workflows.
+
+    Parameters
+    ----------
+    current_user : User
+        Current authenticated user (optional)
 
     Returns
     -------
-    list[BackendResponseModel]
-        A list of backend response models.
+    ListBackendsResponse
+        Wrapped list of all registered backend response models
 
     """
-    logger.info(f"User {current_user.username} is fetching all backends.")
+    logger.info(f"User {current_user.username} is listing all backends.")
     # Fetch all backend documents from the database
     backends = BackendDocument.find_all().to_list()
-    return [BackendResponseModel(**backend.dict()) for backend in backends]
+    return ListBackendsResponse(backends=[BackendResponseModel(**backend.dict()) for backend in backends])

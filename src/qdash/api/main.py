@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from qdash.api.db.session import lifespan
+from qdash.api.lib.auth import get_current_active_user
 from qdash.api.routers import (
     auth,
     backend,
@@ -11,12 +12,11 @@ from qdash.api.routers import (
     execution,
     file,
     flow,
-    flow_schedule,
     metrics,
-    parameter,
     settings,
     tag,
     task,
+    task_result,
 )
 
 
@@ -45,15 +45,14 @@ app = FastAPI(
     openapi_extra={
         "components": {
             "securitySchemes": {
-                "APIKeyHeader": {
-                    "type": "apiKey",
-                    "in": "header",
-                    "name": "X-Username",
-                    "description": "Username header for authentication",
+                "BearerAuth": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "description": "Bearer token authentication. Use the access_token from login response.",
                 }
             }
         },
-        "security": [{"APIKeyHeader": []}],
+        "security": [{"BearerAuth": []}],
     },
 )
 
@@ -67,17 +66,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(calibration.router, prefix="/api", tags=["calibration"])
-app.include_router(settings.router, prefix="/api", tags=["settings"])
-app.include_router(execution.router, prefix="/api", tags=["execution"])
-app.include_router(chip.router, prefix="/api", tags=["chip"])
-app.include_router(file.router, prefix="/api", tags=["file"])
-app.include_router(auth.router, prefix="/api", tags=["auth"])
-app.include_router(task.router, prefix="/api", tags=["task"])
-app.include_router(parameter.router, prefix="/api", tags=["parameter"])
-app.include_router(tag.router, prefix="/api", tags=["tag"])
-app.include_router(device_topology.router, prefix="/api", tags=["device_topology"])
-app.include_router(backend.router, prefix="/api", tags=["backend"])
-app.include_router(flow.router, prefix="/api", tags=["flow"])
-app.include_router(flow_schedule.router, prefix="/api", tags=["flow_schedule"])
-app.include_router(metrics.router, prefix="/api", tags=["metrics"])
+# Auth router without global auth dependency (login/register/logout need to be public)
+app.include_router(auth.router, tags=["auth"])
+
+# Routers without auth (for direct browser access like images, file downloads)
+# These routers handle their own auth for write operations
+app.include_router(execution.router, tags=["execution"])
+app.include_router(file.router, tags=["file"])
+
+# All other routers with global auth dependency
+auth_dependency = [Depends(get_current_active_user)]
+app.include_router(calibration.router, tags=["calibration"], dependencies=auth_dependency)
+app.include_router(settings.router, tags=["settings"], dependencies=auth_dependency)
+app.include_router(chip.router, tags=["chip"], dependencies=auth_dependency)
+app.include_router(task.router, tags=["task"], dependencies=auth_dependency)
+app.include_router(task_result.router, tags=["task-result"], dependencies=auth_dependency)
+app.include_router(tag.router, tags=["tag"], dependencies=auth_dependency)
+app.include_router(device_topology.router, tags=["device-topology"], dependencies=auth_dependency)
+app.include_router(backend.router, tags=["backend"], dependencies=auth_dependency)
+app.include_router(flow.router, tags=["flow"], dependencies=auth_dependency)
+app.include_router(metrics.router, prefix="/metrics", tags=["metrics"], dependencies=auth_dependency)

@@ -26,73 +26,78 @@ import type { ErrorType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Fetch all tasks.
+ * List all tags for the current user.
 
-Args:
-----
-    current_user (User): The current user.
+Retrieves all tags associated with the current user's calibration data.
+Tags are used to categorize and filter task results.
 
-Returns:
+Parameters
+----------
+current_user : User
+    Current authenticated user
+
+Returns
 -------
-    ListTaskResponse: The list of tasks.
- * @summary list all tag
+ListTagResponse
+    Wrapped list of tag names
+ * @summary List all tags
  */
-export const listAllTag = (
+export const listTags = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<ListTagResponse>(
-    { url: `/api/tag`, method: "GET", signal },
+    { url: `/tags`, method: "GET", signal },
     options,
   );
 };
 
-export const getListAllTagQueryKey = () => {
-  return [`/api/tag`] as const;
+export const getListTagsQueryKey = () => {
+  return [`/tags`] as const;
 };
 
-export const getListAllTagQueryOptions = <
-  TData = Awaited<ReturnType<typeof listAllTag>>,
+export const getListTagsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTags>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof listAllTag>>, TError, TData>
+    UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>
   >;
   request?: SecondParameter<typeof customInstance>;
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListAllTagQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getListTagsQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAllTag>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTags>>> = ({
     signal,
-  }) => listAllTag(requestOptions, signal);
+  }) => listTags(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listAllTag>>,
+    Awaited<ReturnType<typeof listTags>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type ListAllTagQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listAllTag>>
+export type ListTagsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTags>>
 >;
-export type ListAllTagQueryError = ErrorType<unknown>;
+export type ListTagsQueryError = ErrorType<unknown>;
 
-export function useListAllTag<
-  TData = Awaited<ReturnType<typeof listAllTag>>,
+export function useListTags<
+  TData = Awaited<ReturnType<typeof listTags>>,
   TError = ErrorType<unknown>,
 >(
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listAllTag>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listAllTag>>,
+          Awaited<ReturnType<typeof listTags>>,
           TError,
-          Awaited<ReturnType<typeof listAllTag>>
+          Awaited<ReturnType<typeof listTags>>
         >,
         "initialData"
       >;
@@ -102,19 +107,19 @@ export function useListAllTag<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useListAllTag<
-  TData = Awaited<ReturnType<typeof listAllTag>>,
+export function useListTags<
+  TData = Awaited<ReturnType<typeof listTags>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listAllTag>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listAllTag>>,
+          Awaited<ReturnType<typeof listTags>>,
           TError,
-          Awaited<ReturnType<typeof listAllTag>>
+          Awaited<ReturnType<typeof listTags>>
         >,
         "initialData"
       >;
@@ -122,35 +127,35 @@ export function useListAllTag<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListAllTag<
-  TData = Awaited<ReturnType<typeof listAllTag>>,
+export function useListTags<
+  TData = Awaited<ReturnType<typeof listTags>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listAllTag>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary list all tag
+ * @summary List all tags
  */
 
-export function useListAllTag<
-  TData = Awaited<ReturnType<typeof listAllTag>>,
+export function useListTags<
+  TData = Awaited<ReturnType<typeof listTags>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listAllTag>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListAllTagQueryOptions(options);
+  const queryOptions = getListTagsQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

@@ -1,3 +1,5 @@
+"""File router for QDash API."""
+
 from __future__ import annotations
 
 import logging
@@ -5,15 +7,22 @@ import os
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import yaml
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.logger import logger
 from fastapi.responses import FileResponse
 from git import Repo
 from git.exc import GitCommandError
-from pydantic import BaseModel
+from qdash.api.lib.auth import get_current_active_user
+from qdash.api.schemas.auth import User
+from qdash.api.schemas.file import (
+    FileTreeNode,
+    GitPushRequest,
+    SaveFileRequest,
+    ValidateFileRequest,
+)
 
 router = APIRouter()
 gunicorn_logger = logging.getLogger("gunicorn.error")
@@ -31,35 +40,6 @@ CONFIG_BASE_PATH = Path(os.getenv("CONFIG_PATH", "./config/qubex"))
 # If running in Docker (check if /app exists), use absolute path
 if Path("/app").exists() and not CONFIG_BASE_PATH.is_absolute():
     CONFIG_BASE_PATH = Path("/app") / "config" / "qubex"
-
-
-class FileTreeNode(BaseModel):
-    """File tree node model."""
-
-    name: str
-    path: str
-    type: str  # "file" or "directory"
-    children: list[FileTreeNode] | None = None
-
-
-class SaveFileRequest(BaseModel):
-    """Request model for saving file content."""
-
-    path: str  # Relative path from CONFIG_BASE_PATH (e.g., "64Qv2/config/chip.yaml")
-    content: str
-
-
-class ValidateFileRequest(BaseModel):
-    """Request model for validating file content."""
-
-    content: str
-    file_type: str  # "yaml" or "json"
-
-
-class GitPushRequest(BaseModel):
-    """Request model for Git push operation."""
-
-    commit_message: str = "Update config files from UI"
 
 
 def validate_config_path(relative_path: str) -> Path:
@@ -144,13 +124,33 @@ def build_file_tree(directory: Path, base_path: Path) -> list[FileTreeNode]:
 
 
 @router.get(
-    "/file/raw_data",
-    summary="download file",
+    "/files/raw-data",
+    summary="Download file",
     operation_id="downloadFile",
     response_class=FileResponse,
 )
 def download_file(path: str) -> FileResponse:
-    """Download a file."""
+    """Download a raw data file from the server.
+
+    Retrieves a file from the server's filesystem and returns it as a downloadable
+    response.
+
+    Parameters
+    ----------
+    path : str
+        Absolute file path to the file to download
+
+    Returns
+    -------
+    FileResponse
+        The file as a downloadable response
+
+    Raises
+    ------
+    HTTPException
+        404 if the file does not exist at the specified path
+
+    """
     if not Path(path).exists():
         raise HTTPException(status_code=404, detail=f"File not found: {path}")
 
@@ -158,13 +158,35 @@ def download_file(path: str) -> FileResponse:
 
 
 @router.get(
-    "/file/zip",
-    summary="download file or directory as zip",
+    "/files/zip",
+    summary="Download file or directory as zip",
     operation_id="downloadZipFile",
     response_class=FileResponse,
 )
 def download_zip_file(path: str) -> FileResponse:
-    """Download a file or directory as zip."""
+    """Download a file or directory as a ZIP archive.
+
+    Creates a ZIP archive of the specified file or directory and returns it
+    as a downloadable response. The archive is created in a temporary directory
+    and cleaned up after the response is sent.
+
+    Parameters
+    ----------
+    path : str
+        Absolute path to the file or directory to archive
+
+    Returns
+    -------
+    FileResponse
+        ZIP archive as a downloadable response with media type "application/zip"
+
+    Raises
+    ------
+    HTTPException
+        404 if the path does not exist
+        500 if there is an error creating the ZIP archive
+
+    """
     import shutil
     import tempfile
 
@@ -219,7 +241,7 @@ def download_zip_file(path: str) -> FileResponse:
 
 
 @router.get(
-    "/file/tree",
+    "/files/tree",
     summary="Get file tree for entire config directory",
     operation_id="getFileTree",
     response_model=list[FileTreeNode],
@@ -239,7 +261,7 @@ def get_file_tree() -> list[FileTreeNode]:
 
 
 @router.get(
-    "/file/content",
+    "/files/content",
     summary="Get file content for editing",
     operation_id="getFileContent",
 )
@@ -280,11 +302,14 @@ def get_file_content(path: str) -> dict[str, Any]:
 
 
 @router.put(
-    "/file/content",
+    "/files/content",
     summary="Save file content",
     operation_id="saveFileContent",
 )
-def save_file_content(request: SaveFileRequest) -> dict[str, str]:
+def save_file_content(
+    request: SaveFileRequest,
+    _current_user: Annotated[User, Depends(get_current_active_user)],
+) -> dict[str, str]:
     """Save file content.
 
     Args:
@@ -316,7 +341,7 @@ def save_file_content(request: SaveFileRequest) -> dict[str, str]:
 
 
 @router.post(
-    "/file/validate",
+    "/files/validate",
     summary="Validate file content (YAML/JSON)",
     operation_id="validateFileContent",
 )
@@ -363,7 +388,7 @@ def validate_file_content(request: ValidateFileRequest) -> dict[str, Any]:
 
 
 @router.get(
-    "/file/git/status",
+    "/files/git/status",
     summary="Get Git status of config directory",
     operation_id="getGitStatus",
 )
@@ -417,11 +442,13 @@ def get_git_status() -> dict[str, Any]:
 
 
 @router.post(
-    "/file/git/pull",
+    "/files/git/pull",
     summary="Pull latest config from Git repository",
     operation_id="gitPullConfig",
 )
-def git_pull_config() -> dict[str, Any]:
+def git_pull_config(
+    _current_user: Annotated[User, Depends(get_current_active_user)],
+) -> dict[str, Any]:
     """Pull latest config from Git repository.
 
     Returns
@@ -514,11 +541,14 @@ def git_pull_config() -> dict[str, Any]:
 
 
 @router.post(
-    "/file/git/push",
+    "/files/git/push",
     summary="Push config changes to Git repository",
     operation_id="gitPushConfig",
 )
-def git_push_config(request: GitPushRequest) -> dict[str, Any]:
+def git_push_config(
+    request: GitPushRequest,
+    _current_user: Annotated[User, Depends(get_current_active_user)],
+) -> dict[str, Any]:
     """Push config changes to Git repository.
 
     Args:

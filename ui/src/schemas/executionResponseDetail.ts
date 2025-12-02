@@ -9,13 +9,17 @@ import type { Task } from "./task";
 import type { ExecutionResponseDetailNote } from "./executionResponseDetailNote";
 
 /**
- * ExecutionResponseDetailV2 is a Pydantic model that represents the detail of an execution response.
+ * ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.
 
 Attributes
 ----------
     name (str): The name of the execution.
     status (str): The current status of the execution.
-    start_at (str): The start time
+    start_at (str): The start time of the execution.
+    end_at (str): The end time of the execution.
+    elapsed_time (str): The total elapsed time of the execution.
+    task (list[Task]): List of tasks in the execution.
+    note (dict): Notes for the execution.
  */
 export interface ExecutionResponseDetail {
   name: string;

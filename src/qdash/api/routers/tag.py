@@ -1,12 +1,14 @@
+"""Tag router for QDash API."""
+
 from __future__ import annotations
 
 import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
+from qdash.api.schemas.tag import ListTagResponse, Tag
 from qdash.dbmodel.tag import TagDocument
 
 router = APIRouter()
@@ -16,36 +18,29 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-class Tag(BaseModel):
-    """Response model for a task."""
-
-    name: str
-
-
-class ListTagResponse(BaseModel):
-    """Response model for a list of tasks."""
-
-    tags: list[Tag]
-
-
 @router.get(
-    "/tag",
+    "/tags",
     response_model=ListTagResponse,
-    summary="list all tag",
-    operation_id="listAllTag",
+    summary="List all tags",
+    operation_id="listTags",
 )
-def list_all_tag(
+def list_tags(
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> ListTagResponse:
-    """Fetch all tasks.
+    """List all tags for the current user.
 
-    Args:
-    ----
-        current_user (User): The current user.
+    Retrieves all tags associated with the current user's calibration data.
+    Tags are used to categorize and filter task results.
 
-    Returns:
+    Parameters
+    ----------
+    current_user : User
+        Current authenticated user
+
+    Returns
     -------
-        ListTaskResponse: The list of tasks.
+    ListTagResponse
+        Wrapped list of tag names
 
     """
     tags = TagDocument.find({"username": current_user.username}).run()

@@ -40,10 +40,12 @@ interface UseExecutionUrlStateResult {
 interface UseAnalysisUrlStateResult {
   selectedChip: string;
   selectedParameter: string;
+  selectedParameters: string[];
   selectedTag: string;
   analysisViewType: string;
   setSelectedChip: (chip: string) => void;
   setSelectedParameter: (parameter: string) => void;
+  setSelectedParameters: (parameters: string[]) => void;
   setSelectedTag: (tag: string) => void;
   setAnalysisViewType: (type: string) => void;
   isInitialized: boolean;
@@ -222,6 +224,12 @@ export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
     parseAsString,
   );
 
+  // Multiple parameters for dual-axis timeseries
+  const [selectedParameters, setSelectedParametersState] = useQueryState(
+    "params",
+    parseAsArrayOf(parseAsString),
+  );
+
   const [selectedTag, setSelectedTagState] = useQueryState(
     "tag",
     parseAsString,
@@ -253,6 +261,18 @@ export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
     [setSelectedParameterState],
   );
 
+  const setSelectedParameters = useCallback(
+    (parameters: string[]) => {
+      // Store multiple parameters for dual-axis view
+      if (parameters.length === 0) {
+        setSelectedParametersState(null);
+      } else {
+        setSelectedParametersState(parameters);
+      }
+    },
+    [setSelectedParametersState],
+  );
+
   const setSelectedTag = useCallback(
     (tag: string) => {
       // Always include tag in URL for complete state management
@@ -272,10 +292,12 @@ export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
   return {
     selectedChip: selectedChip ?? "",
     selectedParameter: selectedParameter ?? "t1",
+    selectedParameters: selectedParameters ?? [],
     selectedTag: selectedTag ?? "daily",
     analysisViewType: analysisViewType ?? "timeseries",
     setSelectedChip,
     setSelectedParameter,
+    setSelectedParameters,
     setSelectedTag,
     setAnalysisViewType,
     isInitialized,

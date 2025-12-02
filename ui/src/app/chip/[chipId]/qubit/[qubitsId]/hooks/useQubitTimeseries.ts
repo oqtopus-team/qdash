@@ -8,9 +8,9 @@ import type {
 } from "../types";
 import type { OutputParameterModel } from "@/schemas";
 
-import { useFetchTimeseriesTaskResultByTagAndParameterAndQid } from "@/client/chip/chip";
-import { useFetchAllParameters } from "@/client/parameter/parameter";
-import { useListAllTag } from "@/client/tag/tag";
+import { useGetTimeseriesTaskResults } from "@/client/task-result/task-result";
+import { useListTags } from "@/client/tag/tag";
+import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
 interface UseQubitTimeseriesOptions {
   chipId: string;
@@ -40,14 +40,14 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
     isLoading,
     error,
     refetch,
-  } = useFetchTimeseriesTaskResultByTagAndParameterAndQid(
-    chipId,
-    parameter,
-    qubitId,
+  } = useGetTimeseriesTaskResults(
     {
+      chip_id: chipId,
+      parameter,
       tag,
       start_at: timeRange.startAt,
       end_at: timeRange.endAt,
+      qid: qubitId,
     },
     {
       query: {
@@ -168,29 +168,30 @@ interface UseQubitParametersOptions {
 
 /**
  * Custom hook for fetching available parameters and tags
+ * Uses useMetricsConfig for parameters (consistent with analysis views)
  */
 export function useQubitParameters(options: UseQubitParametersOptions = {}) {
   const { enabled = true } = options;
 
   const {
-    data: parametersResponse,
-    isLoading: isLoadingParameters,
-    error: parametersError,
-  } = useFetchAllParameters({
-    query: { enabled },
-  });
+    qubitMetrics,
+    isLoading: isLoadingConfig,
+    isError: isConfigError,
+    error: configError,
+  } = useMetricsConfig();
 
   const {
     data: tagsResponse,
     isLoading: isLoadingTags,
     error: tagsError,
-  } = useListAllTag({
+  } = useListTags({
     query: { enabled },
   });
 
+  // Extract parameter names from qubit metrics config
   const parameters = useMemo(() => {
-    return parametersResponse?.data?.parameters?.map((p) => p.name) || [];
-  }, [parametersResponse?.data?.parameters]);
+    return qubitMetrics.map((m) => m.key);
+  }, [qubitMetrics]);
 
   const tags = useMemo(() => {
     return tagsResponse?.data?.tags || [];
@@ -199,7 +200,7 @@ export function useQubitParameters(options: UseQubitParametersOptions = {}) {
   return {
     parameters,
     tags,
-    isLoading: isLoadingParameters || isLoadingTags,
-    error: parametersError || tagsError,
+    isLoading: isLoadingConfig || isLoadingTags,
+    error: isConfigError ? configError : tagsError,
   };
 }

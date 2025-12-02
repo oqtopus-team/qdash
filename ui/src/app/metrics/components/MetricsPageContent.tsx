@@ -12,8 +12,8 @@ import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 
 import { ChipSelector } from "@/app/components/ChipSelector";
-import { useListChips, useFetchChip } from "@/client/chip/chip";
-import { useMetricsGetChipMetrics } from "@/client/metrics/metrics";
+import { useListChips, useGetChip } from "@/client/chip/chip";
+import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
 type TimeRange = "1d" | "7d" | "30d";
@@ -47,12 +47,16 @@ export function MetricsPageContent() {
   const metricsConfig = metricType === "qubit" ? qubitMetrics : couplingMetrics;
 
   const { data: chipsData } = useListChips();
-  const { data: chipData } = useFetchChip(selectedChip);
+  const { data: chipData } = useGetChip(selectedChip);
 
   // Set default chip when data loads
   useEffect(() => {
-    if (!selectedChip && chipsData?.data && chipsData.data.length > 0) {
-      const sortedChips = [...chipsData.data].sort((a, b) => {
+    if (
+      !selectedChip &&
+      chipsData?.data?.chips &&
+      chipsData.data.chips.length > 0
+    ) {
+      const sortedChips = [...chipsData.data.chips].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;
@@ -77,7 +81,7 @@ export function MetricsPageContent() {
         : timeRange === "30d"
           ? 24 * 30
           : 24 * 7; // Default to 7 days
-  const { data, isLoading, isError } = useMetricsGetChipMetrics(
+  const { data, isLoading, isError } = useGetChipMetrics(
     selectedChip,
     {
       within_hours: withinHours,

@@ -26,30 +26,45 @@ import type { ErrorType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Get the calibration note.
- * @summary Fetches all the cron schedules.
+ * Get the latest calibration note for the master task.
+
+Retrieves the most recent calibration note from the database, sorted by timestamp
+in descending order. The note contains metadata about calibration parameters
+and configuration.
+
+Parameters
+----------
+current_user : User
+    Current authenticated user
+
+Returns
+-------
+CalibrationNoteResponse
+    The latest calibration note containing username, execution_id, task_id,
+    note content, and timestamp
+ * @summary Get the calibration note
  */
-export const listCronSchedules = (
+export const getCalibrationNote = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<CalibrationNoteResponse>(
-    { url: `/api/calibration/note`, method: "GET", signal },
+    { url: `/calibrations/note`, method: "GET", signal },
     options,
   );
 };
 
-export const getListCronSchedulesQueryKey = () => {
-  return [`/api/calibration/note`] as const;
+export const getGetCalibrationNoteQueryKey = () => {
+  return [`/calibrations/note`] as const;
 };
 
-export const getListCronSchedulesQueryOptions = <
-  TData = Awaited<ReturnType<typeof listCronSchedules>>,
+export const getGetCalibrationNoteQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCalibrationNote>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
-      Awaited<ReturnType<typeof listCronSchedules>>,
+      Awaited<ReturnType<typeof getCalibrationNote>>,
       TError,
       TData
     >
@@ -58,41 +73,41 @@ export const getListCronSchedulesQueryOptions = <
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListCronSchedulesQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getGetCalibrationNoteQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listCronSchedules>>
-  > = ({ signal }) => listCronSchedules(requestOptions, signal);
+    Awaited<ReturnType<typeof getCalibrationNote>>
+  > = ({ signal }) => getCalibrationNote(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listCronSchedules>>,
+    Awaited<ReturnType<typeof getCalibrationNote>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type ListCronSchedulesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listCronSchedules>>
+export type GetCalibrationNoteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCalibrationNote>>
 >;
-export type ListCronSchedulesQueryError = ErrorType<unknown>;
+export type GetCalibrationNoteQueryError = ErrorType<unknown>;
 
-export function useListCronSchedules<
-  TData = Awaited<ReturnType<typeof listCronSchedules>>,
+export function useGetCalibrationNote<
+  TData = Awaited<ReturnType<typeof getCalibrationNote>>,
   TError = ErrorType<unknown>,
 >(
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof listCronSchedules>>,
+        Awaited<ReturnType<typeof getCalibrationNote>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listCronSchedules>>,
+          Awaited<ReturnType<typeof getCalibrationNote>>,
           TError,
-          Awaited<ReturnType<typeof listCronSchedules>>
+          Awaited<ReturnType<typeof getCalibrationNote>>
         >,
         "initialData"
       >;
@@ -102,23 +117,23 @@ export function useListCronSchedules<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useListCronSchedules<
-  TData = Awaited<ReturnType<typeof listCronSchedules>>,
+export function useGetCalibrationNote<
+  TData = Awaited<ReturnType<typeof getCalibrationNote>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof listCronSchedules>>,
+        Awaited<ReturnType<typeof getCalibrationNote>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listCronSchedules>>,
+          Awaited<ReturnType<typeof getCalibrationNote>>,
           TError,
-          Awaited<ReturnType<typeof listCronSchedules>>
+          Awaited<ReturnType<typeof getCalibrationNote>>
         >,
         "initialData"
       >;
@@ -126,14 +141,14 @@ export function useListCronSchedules<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListCronSchedules<
-  TData = Awaited<ReturnType<typeof listCronSchedules>>,
+export function useGetCalibrationNote<
+  TData = Awaited<ReturnType<typeof getCalibrationNote>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof listCronSchedules>>,
+        Awaited<ReturnType<typeof getCalibrationNote>>,
         TError,
         TData
       >
@@ -143,17 +158,17 @@ export function useListCronSchedules<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary Fetches all the cron schedules.
+ * @summary Get the calibration note
  */
 
-export function useListCronSchedules<
-  TData = Awaited<ReturnType<typeof listCronSchedules>>,
+export function useGetCalibrationNote<
+  TData = Awaited<ReturnType<typeof getCalibrationNote>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof listCronSchedules>>,
+        Awaited<ReturnType<typeof getCalibrationNote>>,
         TError,
         TData
       >
@@ -162,7 +177,7 @@ export function useListCronSchedules<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListCronSchedulesQueryOptions(options);
+  const queryOptions = getGetCalibrationNoteQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

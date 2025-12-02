@@ -7,7 +7,6 @@ from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
 from qdash.datamodel.qubit import NodeInfoModel, PositionModel, QubitModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.coupling import CouplingDocument
-from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.qubit import QubitDocument
 
 logger = logging.getLogger(__name__)
@@ -261,9 +260,6 @@ class ChipInitializer:
             raise ValueError(msg)
 
         try:
-            # Initialize database
-            initialize()
-
             # Get dimension
             d = cls.SIZE_TO_DIMENSION[size]
 

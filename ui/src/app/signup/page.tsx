@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { useAuthRegisterUser } from "@/client/auth/auth";
+import { useRegisterUser } from "@/client/auth/auth";
+
+// Cookie保存ヘルパー
+const saveAuthCookies = (token: string, username: string) => {
+  const maxAge = 365 * 24 * 60 * 60; // 1 year
+  document.cookie = `access_token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+  document.cookie = `username=${encodeURIComponent(username)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+};
 
 export default function SignupPage() {
   const [username, setUsername] = useState("");
@@ -13,21 +20,23 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const registerMutation = useAuthRegisterUser();
+  const registerMutation = useRegisterUser();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     try {
-      await registerMutation.mutateAsync({
+      const response = await registerMutation.mutateAsync({
         data: {
           username: username,
           password,
           full_name: fullName || undefined,
         },
       });
-      router.push("/login"); // Redirect to login page after successful registration
+      // Save token and redirect to execution page (auto-login after registration)
+      saveAuthCookies(response.data.access_token, response.data.username);
+      router.push("/execution");
     } catch (err) {
       console.error("Registration failed:", err);
       setError("Registration failed. Please check your input.");

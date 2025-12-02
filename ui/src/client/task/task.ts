@@ -19,9 +19,9 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
-  FetchAllTasksParams,
   HTTPValidationError,
   ListTaskResponse,
+  ListTasksParams,
   TaskResultResponse,
 } from "../../schemas";
 
@@ -31,7 +31,7 @@ import type { ErrorType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Fetch all tasks.
+ * List all tasks.
 
 Args:
 ----
@@ -41,69 +41,69 @@ Args:
 Returns:
 -------
     list[TaskResponse]: The list of tasks.
- * @summary Fetch all tasks
+ * @summary List all tasks
  */
-export const fetchAllTasks = (
-  params?: FetchAllTasksParams,
+export const listTasks = (
+  params?: ListTasksParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<ListTaskResponse>(
-    { url: `/api/tasks`, method: "GET", params, signal },
+    { url: `/tasks`, method: "GET", params, signal },
     options,
   );
 };
 
-export const getFetchAllTasksQueryKey = (params?: FetchAllTasksParams) => {
-  return [`/api/tasks`, ...(params ? [params] : [])] as const;
+export const getListTasksQueryKey = (params?: ListTasksParams) => {
+  return [`/tasks`, ...(params ? [params] : [])] as const;
 };
 
-export const getFetchAllTasksQueryOptions = <
-  TData = Awaited<ReturnType<typeof fetchAllTasks>>,
+export const getListTasksQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTasks>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params?: FetchAllTasksParams,
+  params?: ListTasksParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchAllTasks>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getFetchAllTasksQueryKey(params);
+  const queryKey = queryOptions?.queryKey ?? getListTasksQueryKey(params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchAllTasks>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTasks>>> = ({
     signal,
-  }) => fetchAllTasks(params, requestOptions, signal);
+  }) => listTasks(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof fetchAllTasks>>,
+    Awaited<ReturnType<typeof listTasks>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type FetchAllTasksQueryResult = NonNullable<
-  Awaited<ReturnType<typeof fetchAllTasks>>
+export type ListTasksQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTasks>>
 >;
-export type FetchAllTasksQueryError = ErrorType<HTTPValidationError>;
+export type ListTasksQueryError = ErrorType<HTTPValidationError>;
 
-export function useFetchAllTasks<
-  TData = Awaited<ReturnType<typeof fetchAllTasks>>,
+export function useListTasks<
+  TData = Awaited<ReturnType<typeof listTasks>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params: undefined | FetchAllTasksParams,
+  params: undefined | ListTasksParams,
   options: {
     query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchAllTasks>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchAllTasks>>,
+          Awaited<ReturnType<typeof listTasks>>,
           TError,
-          Awaited<ReturnType<typeof fetchAllTasks>>
+          Awaited<ReturnType<typeof listTasks>>
         >,
         "initialData"
       >;
@@ -113,20 +113,20 @@ export function useFetchAllTasks<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useFetchAllTasks<
-  TData = Awaited<ReturnType<typeof fetchAllTasks>>,
+export function useListTasks<
+  TData = Awaited<ReturnType<typeof listTasks>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params?: FetchAllTasksParams,
+  params?: ListTasksParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchAllTasks>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchAllTasks>>,
+          Awaited<ReturnType<typeof listTasks>>,
           TError,
-          Awaited<ReturnType<typeof fetchAllTasks>>
+          Awaited<ReturnType<typeof listTasks>>
         >,
         "initialData"
       >;
@@ -134,37 +134,37 @@ export function useFetchAllTasks<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useFetchAllTasks<
-  TData = Awaited<ReturnType<typeof fetchAllTasks>>,
+export function useListTasks<
+  TData = Awaited<ReturnType<typeof listTasks>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params?: FetchAllTasksParams,
+  params?: ListTasksParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchAllTasks>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary Fetch all tasks
+ * @summary List all tasks
  */
 
-export function useFetchAllTasks<
-  TData = Awaited<ReturnType<typeof fetchAllTasks>>,
+export function useListTasks<
+  TData = Awaited<ReturnType<typeof listTasks>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params?: FetchAllTasksParams,
+  params?: ListTasksParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof fetchAllTasks>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getFetchAllTasksQueryOptions(params, options);
+  const queryOptions = getListTasksQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -189,45 +189,40 @@ Returns:
     TaskResultResponse: The task result information including figure paths.
  * @summary Get task result by task ID
  */
-export const getTaskResultByTaskId = (
+export const getTaskResult = (
   taskId: string,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<TaskResultResponse>(
-    { url: `/api/task/${taskId}`, method: "GET", signal },
+    { url: `/tasks/${taskId}/result`, method: "GET", signal },
     options,
   );
 };
 
-export const getGetTaskResultByTaskIdQueryKey = (taskId?: string) => {
-  return [`/api/task/${taskId}`] as const;
+export const getGetTaskResultQueryKey = (taskId?: string) => {
+  return [`/tasks/${taskId}/result`] as const;
 };
 
-export const getGetTaskResultByTaskIdQueryOptions = <
-  TData = Awaited<ReturnType<typeof getTaskResultByTaskId>>,
+export const getGetTaskResultQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTaskResult>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   taskId: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTaskResultByTaskId>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof getTaskResult>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetTaskResultByTaskIdQueryKey(taskId);
+  const queryKey = queryOptions?.queryKey ?? getGetTaskResultQueryKey(taskId);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getTaskResultByTaskId>>
-  > = ({ signal }) => getTaskResultByTaskId(taskId, requestOptions, signal);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getTaskResult>>> = ({
+    signal,
+  }) => getTaskResult(taskId, requestOptions, signal);
 
   return {
     queryKey,
@@ -235,35 +230,31 @@ export const getGetTaskResultByTaskIdQueryOptions = <
     enabled: !!taskId,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof getTaskResultByTaskId>>,
+    Awaited<ReturnType<typeof getTaskResult>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type GetTaskResultByTaskIdQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getTaskResultByTaskId>>
+export type GetTaskResultQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTaskResult>>
 >;
-export type GetTaskResultByTaskIdQueryError = ErrorType<HTTPValidationError>;
+export type GetTaskResultQueryError = ErrorType<HTTPValidationError>;
 
-export function useGetTaskResultByTaskId<
-  TData = Awaited<ReturnType<typeof getTaskResultByTaskId>>,
+export function useGetTaskResult<
+  TData = Awaited<ReturnType<typeof getTaskResult>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   taskId: string,
   options: {
     query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTaskResultByTaskId>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof getTaskResult>>, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTaskResultByTaskId>>,
+          Awaited<ReturnType<typeof getTaskResult>>,
           TError,
-          Awaited<ReturnType<typeof getTaskResultByTaskId>>
+          Awaited<ReturnType<typeof getTaskResult>>
         >,
         "initialData"
       >;
@@ -273,24 +264,20 @@ export function useGetTaskResultByTaskId<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useGetTaskResultByTaskId<
-  TData = Awaited<ReturnType<typeof getTaskResultByTaskId>>,
+export function useGetTaskResult<
+  TData = Awaited<ReturnType<typeof getTaskResult>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   taskId: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTaskResultByTaskId>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof getTaskResult>>, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTaskResultByTaskId>>,
+          Awaited<ReturnType<typeof getTaskResult>>,
           TError,
-          Awaited<ReturnType<typeof getTaskResultByTaskId>>
+          Awaited<ReturnType<typeof getTaskResult>>
         >,
         "initialData"
       >;
@@ -298,18 +285,14 @@ export function useGetTaskResultByTaskId<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetTaskResultByTaskId<
-  TData = Awaited<ReturnType<typeof getTaskResultByTaskId>>,
+export function useGetTaskResult<
+  TData = Awaited<ReturnType<typeof getTaskResult>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   taskId: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTaskResultByTaskId>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof getTaskResult>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
@@ -319,24 +302,20 @@ export function useGetTaskResultByTaskId<
  * @summary Get task result by task ID
  */
 
-export function useGetTaskResultByTaskId<
-  TData = Awaited<ReturnType<typeof getTaskResultByTaskId>>,
+export function useGetTaskResult<
+  TData = Awaited<ReturnType<typeof getTaskResult>>,
   TError = ErrorType<HTTPValidationError>,
 >(
   taskId: string,
   options?: {
     query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTaskResultByTaskId>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof getTaskResult>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetTaskResultByTaskIdQueryOptions(taskId, options);
+  const queryOptions = getGetTaskResultQueryOptions(taskId, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

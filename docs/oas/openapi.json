@@ -15,19 +15,42 @@
     "version": "0.0.1"
   },
   "paths": {
-    "/api/calibration/note": {
-      "get": {
-        "tags": ["calibration"],
-        "summary": "Fetches all the cron schedules.",
-        "description": "Get the calibration note.",
-        "operationId": "listCronSchedules",
+    "/auth/login": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Login user",
+        "description": "Authenticate user and return access token.\n\nValidates user credentials against the database and returns an access token\nfor subsequent authenticated requests.\n\nParameters\n----------\nusername : str\n    User's username provided via form data\npassword : str\n    User's password provided via form data\n\nReturns\n-------\nTokenResponse\n    Response containing access_token, token_type, and username\n\nRaises\n------\nHTTPException\n    401 if authentication fails due to incorrect username or password",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_login"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CalibrationNoteResponse"
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -35,19 +58,42 @@
         }
       }
     },
-    "/api/settings": {
-      "get": {
-        "tags": ["settings"],
-        "summary": "Get settings",
-        "description": "Get settings from the server",
-        "operationId": "fetch_config",
+    "/auth/register": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Register a new user",
+        "description": "Register a new user account.\n\nCreates a new user in the database with hashed password and generates\nan access token for immediate use.\n\nParameters\n----------\nuser_data : UserCreate\n    User registration data including username, password, and optional full_name\n\nReturns\n-------\nUserWithToken\n    Newly created user information including access_token\n\nRaises\n------\nHTTPException\n    400 if the username is already registered",
+        "operationId": "registerUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Settings"
+                  "$ref": "#/components/schemas/UserWithToken"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -55,12 +101,67 @@
         }
       }
     },
-    "/api/executions/figure": {
+    "/auth/me": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Get current user",
+        "description": "Get current authenticated user information.\n\nReturns the profile information of the currently authenticated user\nbased on the provided access token.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user injected via dependency\n\nReturns\n-------\nUser\n    Current user's profile information including username, full_name,\n    and disabled status",
+        "operationId": "getCurrentUser",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Logout user",
+        "description": "Logout the current user.\n\nThis endpoint serves as a logout confirmation. Since authentication tokens\nare managed client-side (via cookies), no server-side session invalidation\nis required. The client is responsible for removing the stored credentials.\n\nReturns\n-------\ndict[str, str]\n    Success message confirming logout",
+        "operationId": "logout",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Logout"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/executions/figure": {
       "get": {
         "tags": ["execution"],
-        "summary": "Fetches a calibration figure by its path",
-        "description": "Fetch a calibration figure by its path.",
-        "operationId": "fetchFigureByPath",
+        "summary": "Get a calibration figure by its path",
+        "description": "Fetch a calibration figure by its file path.\n\nRetrieves a PNG image file from the server's filesystem and returns it\nas a streaming response.\n\nParameters\n----------\npath : str\n    Absolute file path to the calibration figure image\n\nReturns\n-------\nStreamingResponse\n    PNG image data as a streaming response with media type \"image/png\"\n\nRaises\n------\nHTTPException\n    404 if the file does not exist at the specified path",
+        "operationId": "getFigureByPath",
         "parameters": [
           {
             "name": "path",
@@ -99,12 +200,12 @@
         }
       }
     },
-    "/api/executions/lock_status": {
+    "/executions/lock-status": {
       "get": {
         "tags": ["execution"],
-        "summary": "Fetches the status of a calibration.",
-        "description": "Fetch the status of the execution lock.",
-        "operationId": "fetchExecutionLockStatus",
+        "summary": "Get the execution lock status",
+        "description": "Fetch the current status of the execution lock.\n\nThe execution lock prevents concurrent calibration workflows from running\nsimultaneously. This endpoint checks whether a lock is currently held.\n\nReturns\n-------\nExecutionLockStatusResponse\n    Response containing lock status (True if locked, False if available)",
+        "operationId": "getExecutionLockStatus",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -119,170 +220,28 @@
         }
       }
     },
-    "/api/chip": {
+    "/executions": {
       "get": {
-        "tags": ["chip"],
-        "summary": "Fetch all chips",
-        "description": "Fetch all chips.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nlist[ChipResponse]\n    List of available chips",
-        "operationId": "listChips",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ChipResponse"
-                  },
-                  "type": "array",
-                  "title": "Response Listchips"
-                }
-              }
-            }
-          }
-        },
+        "tags": ["execution"],
+        "summary": "List executions",
+        "description": "List executions for a given chip with pagination.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
+        "operationId": "listExecutions",
         "security": [
           {
-            "APIKeyHeader": []
-          }
-        ]
-      },
-      "post": {
-        "tags": ["chip"],
-        "summary": "Create a new chip",
-        "description": "Create a new chip.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
-        "operationId": "createChip",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateChipRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChipResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}/dates": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch available dates for a chip",
-        "description": "Fetch available dates for a chip from execution counter.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nlist[str]\n    List of available dates in ISO format",
-        "operationId": "fetchChipDates",
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
+            "HTTPBearer": []
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChipDatesResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch a chip",
-        "description": "Fetch a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Chip information",
-        "operationId": "fetchChip",
         "parameters": [
           {
             "name": "chip_id",
-            "in": "path",
+            "in": "query",
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Chip ID to filter executions",
               "title": "Chip Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChipResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}/execution": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch executions",
-        "description": "Fetch executions for a given chip with pagination.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch executions for\ncurrent_user : str\n    Current user ID from authentication\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nlist[ExecutionResponseSummary]\n    List of executions for the chip",
-        "operationId": "listExecutionsByChipId",
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
+            },
+            "description": "Chip ID to filter executions"
           },
           {
             "name": "skip",
@@ -318,11 +277,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ExecutionResponseSummary"
-                  },
-                  "title": "Response Listexecutionsbychipid"
+                  "$ref": "#/components/schemas/ListExecutionsResponse"
                 }
               }
             }
@@ -340,22 +295,18 @@
         }
       }
     },
-    "/api/chip/{chip_id}/execution/{execution_id}": {
+    "/executions/{execution_id}": {
       "get": {
-        "tags": ["chip"],
-        "summary": "Fetch an execution by its ID",
-        "description": "Return the execution detail by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nexecution_id : str\n    ID of the execution to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
-        "operationId": "fetchExecutionByChipId",
-        "parameters": [
+        "tags": ["execution"],
+        "summary": "Get an execution by its ID",
+        "description": "Return the execution detail by its ID.\n\nParameters\n----------\nexecution_id : str\n    ID of the execution to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
+        "operationId": "getExecution",
+        "security": [
           {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
           {
             "name": "execution_id",
             "in": "path",
@@ -390,611 +341,11 @@
         }
       }
     },
-    "/api/chip/{chip_id}/mux/{mux_id}": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch the multiplexer details",
-        "description": "Fetch the multiplexer details.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmux_id : int\n    ID of the multiplexer\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nMuxDetailResponse\n    Multiplexer details",
-        "operationId": "fetchMuxDetails",
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "mux_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Mux Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MuxDetailResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}/mux": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch the multiplexers",
-        "description": "Fetch the multiplexers.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListMuxResponse\n    Multiplexdetails",
-        "operationId": "listMuxes",
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListMuxResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}/task/qubit/{task_name}/history/{recorded_date}": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch historical task results",
-        "description": "Fetch historical task results for a specific date.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ntask_name : str\n    Name of the task to fetch\nrecorded_date : str\n    Date to fetch history for (ISO format YYYY-MM-DD)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskGroupedByChipResponse\n    Historical task results for all qubits on the specified date",
-        "operationId": "fetchHistoricalQubitTaskGroupedByChip",
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "task_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Task Name"
-            }
-          },
-          {
-            "name": "recorded_date",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Recorded Date"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LatestTaskGroupedByChipResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}/task/qubit/{task_name}/latest": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch latest qubit task results with optional outlier filtering",
-        "description": "Fetch latest qubit task results with optional defensive outlier filtering.",
-        "operationId": "fetchLatestQubitTaskGroupedByChip",
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "task_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Task Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LatestTaskGroupedByChipResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}/task/qubit/{qid}/task/{task_name}": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch Qubit Task History",
-        "description": "Fetch latest qubit task results with optional defensive outlier filtering.",
-        "operationId": "fetchQubitTaskHistory",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "qid",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Qid"
-            }
-          },
-          {
-            "name": "task_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Task Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskHistoryResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}/task/coupling/{coupling_id}/task/{task_name}": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch Coupling Task History",
-        "description": "Fetch coupling task history for a specific coupling and task.",
-        "operationId": "fetchCouplingTaskHistory",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "coupling_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Coupling Id"
-            }
-          },
-          {
-            "name": "task_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Task Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskHistoryResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}/task/coupling/{task_name}/history/{recorded_date}": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch historical task results",
-        "description": "Fetch historical task results for a specific date.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ntask_name : str\n    Name of the task to fetch\nrecorded_date : str\n    Date to fetch history for (ISO format YYYY-MM-DD)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskGroupedByChipResponse\n    Historical task results for all qubits on the specified date",
-        "operationId": "fetchHistoricalCouplingTaskGroupedByChip",
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "task_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Task Name"
-            }
-          },
-          {
-            "name": "recorded_date",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Recorded Date"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LatestTaskGroupedByChipResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}/task/coupling/{task_name}/latest": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch the multiplexers",
-        "description": "Fetch the multiplexers.",
-        "operationId": "fetchLatestCouplingTaskGroupedByChip",
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "task_name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Task Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LatestTaskGroupedByChipResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}/parameter/{parameter}/qid/{qid}": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch the timeseries task result by tag and parameter for a specific qid",
-        "description": "Fetch the timeseries task result by tag and parameter for a specific qid.\n\nReturns\n-------\n    TimeSeriesData: Time series data for the specified qid.",
-        "operationId": "fetchTimeseriesTaskResultByTagAndParameterAndQid",
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "parameter",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Parameter"
-            }
-          },
-          {
-            "name": "qid",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Qid"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Tag"
-            }
-          },
-          {
-            "name": "start_at",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Start At"
-            }
-          },
-          {
-            "name": "end_at",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "End At"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TimeSeriesData"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}/parameter/{parameter}": {
-      "get": {
-        "tags": ["chip"],
-        "summary": "Fetch the timeseries task result by tag and parameter for all qids",
-        "description": "Fetch the timeseries task result by tag and parameter for all qids.\n\nReturns\n-------\n    TimeSeriesData: Time series data for all qids.",
-        "operationId": "fetchTimeseriesTaskResultByTagAndParameter",
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "parameter",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Parameter"
-            }
-          },
-          {
-            "name": "tag",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Tag"
-            }
-          },
-          {
-            "name": "start_at",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Start At"
-            }
-          },
-          {
-            "name": "end_at",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "End At"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TimeSeriesData"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/file/raw_data": {
+    "/files/raw-data": {
       "get": {
         "tags": ["file"],
-        "summary": "download file",
-        "description": "Download a file.",
+        "summary": "Download file",
+        "description": "Download a raw data file from the server.\n\nRetrieves a file from the server's filesystem and returns it as a downloadable\nresponse.\n\nParameters\n----------\npath : str\n    Absolute file path to the file to download\n\nReturns\n-------\nFileResponse\n    The file as a downloadable response\n\nRaises\n------\nHTTPException\n    404 if the file does not exist at the specified path",
         "operationId": "downloadFile",
         "parameters": [
           {
@@ -1024,11 +375,11 @@
         }
       }
     },
-    "/api/file/zip": {
+    "/files/zip": {
       "get": {
         "tags": ["file"],
-        "summary": "download file or directory as zip",
-        "description": "Download a file or directory as zip.",
+        "summary": "Download file or directory as zip",
+        "description": "Download a file or directory as a ZIP archive.\n\nCreates a ZIP archive of the specified file or directory and returns it\nas a downloadable response. The archive is created in a temporary directory\nand cleaned up after the response is sent.\n\nParameters\n----------\npath : str\n    Absolute path to the file or directory to archive\n\nReturns\n-------\nFileResponse\n    ZIP archive as a downloadable response with media type \"application/zip\"\n\nRaises\n------\nHTTPException\n    404 if the path does not exist\n    500 if there is an error creating the ZIP archive",
         "operationId": "downloadZipFile",
         "parameters": [
           {
@@ -1058,7 +409,7 @@
         }
       }
     },
-    "/api/file/tree": {
+    "/files/tree": {
       "get": {
         "tags": ["file"],
         "summary": "Get file tree for entire config directory",
@@ -1082,7 +433,7 @@
         }
       }
     },
-    "/api/file/content": {
+    "/files/content": {
       "get": {
         "tags": ["file"],
         "summary": "Get file content for editing",
@@ -1129,6 +480,11 @@
         "summary": "Save file content",
         "description": "Save file content.\n\nArgs:\n----\n    request: Save file request with path and content\n\nReturns:\n-------\n    Success message",
         "operationId": "saveFileContent",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1167,7 +523,7 @@
         }
       }
     },
-    "/api/file/validate": {
+    "/files/validate": {
       "post": {
         "tags": ["file"],
         "summary": "Validate file content (YAML/JSON)",
@@ -1209,7 +565,7 @@
         }
       }
     },
-    "/api/file/git/status": {
+    "/files/git/status": {
       "get": {
         "tags": ["file"],
         "summary": "Get Git status of config directory",
@@ -1231,7 +587,7 @@
         }
       }
     },
-    "/api/file/git/pull": {
+    "/files/git/pull": {
       "post": {
         "tags": ["file"],
         "summary": "Pull latest config from Git repository",
@@ -1250,10 +606,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
-    "/api/file/git/push": {
+    "/files/git/push": {
       "post": {
         "tags": ["file"],
         "summary": "Push config changes to Git repository",
@@ -1292,67 +653,98 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
-    "/api/auth/login": {
-      "post": {
-        "tags": ["auth", "authentication"],
-        "summary": "Login",
-        "description": "Login endpoint to authenticate user and return username.",
-        "operationId": "auth-login",
-        "requestBody": {
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_auth-login"
-              }
-            }
-          },
-          "required": true
-        },
+    "/calibrations/note": {
+      "get": {
+        "tags": ["calibration"],
+        "summary": "Get the calibration note",
+        "description": "Get the latest calibration note for the master task.\n\nRetrieves the most recent calibration note from the database, sorted by timestamp\nin descending order. The note contains metadata about calibration parameters\nand configuration.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nCalibrationNoteResponse\n    The latest calibration note containing username, execution_id, task_id,\n    note content, and timestamp",
+        "operationId": "getCalibrationNote",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Auth-Login"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/CalibrationNoteResponse"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
-    "/api/auth/register": {
+    "/settings": {
+      "get": {
+        "tags": ["settings"],
+        "summary": "Get settings",
+        "description": "Get settings from the server",
+        "operationId": "getSettings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/chips": {
+      "get": {
+        "tags": ["chip"],
+        "summary": "List all chips",
+        "description": "List all chips.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListChipsResponse\n    Wrapped list of available chips",
+        "operationId": "listChips",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListChipsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
       "post": {
-        "tags": ["auth", "authentication"],
-        "summary": "Register User",
-        "description": "Register a new user.",
-        "operationId": "auth-register_user",
+        "tags": ["chip"],
+        "summary": "Create a new chip",
+        "description": "Create a new chip.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
+        "operationId": "createChip",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UserCreate"
+                "$ref": "#/components/schemas/CreateChipRequest"
               }
             }
           },
@@ -1364,13 +756,61 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/User"
+                  "$ref": "#/components/schemas/ChipResponse"
                 }
               }
             }
           },
-          "404": {
-            "description": "Not found"
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/chips/{chip_id}/dates": {
+      "get": {
+        "tags": ["chip"],
+        "summary": "Get available dates for a chip",
+        "description": "Fetch available dates for a chip from execution counter.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipDatesResponse\n    List of available dates",
+        "operationId": "getChipDates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipDatesResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1385,62 +825,164 @@
         }
       }
     },
-    "/api/auth/me": {
+    "/chips/{chip_id}": {
       "get": {
-        "tags": ["auth", "authentication"],
-        "summary": "Read Users Me",
-        "description": "Get current user information.",
-        "operationId": "auth-read_users_me",
+        "tags": ["chip"],
+        "summary": "Get a chip",
+        "description": "Get a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Chip information\n\nRaises\n------\nHTTPException\n    If chip is not found",
+        "operationId": "getChip",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/User"
+                  "$ref": "#/components/schemas/ChipResponse"
                 }
               }
             }
           },
-          "404": {
-            "description": "Not found"
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
     },
-    "/api/auth/logout": {
-      "post": {
-        "tags": ["auth", "authentication"],
-        "summary": "Logout",
-        "description": "Logout endpoint.\n\nThis endpoint doesn't need to do anything on the backend since the username is managed client-side.\nThe client will remove the username from cookies.",
-        "operationId": "auth-logout",
+    "/chips/{chip_id}/muxes/{mux_id}": {
+      "get": {
+        "tags": ["chip"],
+        "summary": "Get multiplexer details",
+        "description": "Get the multiplexer details.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmux_id : int\n    ID of the multiplexer\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nMuxDetailResponse\n    Multiplexer details",
+        "operationId": "getChipMux",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "mux_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mux Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Auth-Logout"
+                  "$ref": "#/components/schemas/MuxDetailResponse"
                 }
               }
             }
           },
-          "404": {
-            "description": "Not found"
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
     },
-    "/api/tasks": {
+    "/chips/{chip_id}/muxes": {
+      "get": {
+        "tags": ["chip"],
+        "summary": "List all multiplexers for a chip",
+        "description": "List all multiplexers for a chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListMuxResponse\n    List of multiplexer details",
+        "operationId": "listChipMuxes",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListMuxResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks": {
       "get": {
         "tags": ["task"],
-        "summary": "Fetch all tasks",
-        "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n    backend (Optional[str]): Optional backend name to filter tasks by.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
-        "operationId": "fetch_all_tasks",
+        "summary": "List all tasks",
+        "description": "List all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n    backend (Optional[str]): Optional backend name to filter tasks by.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
+        "operationId": "listTasks",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "backend",
@@ -1485,12 +1027,17 @@
         }
       }
     },
-    "/api/task/{task_id}": {
+    "/tasks/{task_id}/result": {
       "get": {
         "tags": ["task"],
         "summary": "Get task result by task ID",
         "description": "Get task result by task_id.\n\nArgs:\n----\n    task_id: The task ID to search for.\n    current_user: The current authenticated user.\n\nReturns:\n-------\n    TaskResultResponse: The task result information including figure paths.",
-        "operationId": "get_task_result_by_task_id",
+        "operationId": "getTaskResult",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "task_id",
@@ -1526,19 +1073,58 @@
         }
       }
     },
-    "/api/parameter": {
+    "/task-results/qubits/latest": {
       "get": {
-        "tags": ["parameter"],
-        "summary": "Fetch all parameters",
-        "description": "Fetch all parameters.\n\nArgs:\n----\n    current_user (User): The current user.\n\nReturns: ListParameterResponse\n-------",
-        "operationId": "fetchAllParameters",
+        "tags": ["task-result"],
+        "summary": "Get latest qubit task results",
+        "description": "Fetch the latest qubit task results for all qubits on a chip.\n\nRetrieves the most recent task result for each qubit on the specified chip.\nResults include fidelity threshold status based on x90 gate fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
+        "operationId": "getLatestQubitTaskResults",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Chip ID",
+              "title": "Chip Id"
+            },
+            "description": "Chip ID"
+          },
+          {
+            "name": "task",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Task name",
+              "title": "Task"
+            },
+            "description": "Task name"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListParameterResponse"
+                  "$ref": "#/components/schemas/LatestTaskResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1546,12 +1132,457 @@
         }
       }
     },
-    "/api/tag": {
+    "/task-results/qubits/history": {
+      "get": {
+        "tags": ["task-result"],
+        "summary": "Get historical qubit task results",
+        "description": "Fetch historical qubit task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
+        "operationId": "getHistoricalQubitTaskResults",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Chip ID",
+              "title": "Chip Id"
+            },
+            "description": "Chip ID"
+          },
+          {
+            "name": "task",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Task name",
+              "title": "Task"
+            },
+            "description": "Task name"
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Date in YYYYMMDD format",
+              "title": "Date"
+            },
+            "description": "Date in YYYYMMDD format"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestTaskResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/qubits/{qid}/history": {
+      "get": {
+        "tags": ["task-result"],
+        "summary": "Get qubit task history",
+        "description": "Fetch complete task history for a specific qubit.\n\nRetrieves all historical task results for a specific qubit, sorted by\nend time in descending order. Useful for tracking calibration trends\nover time.\n\nParameters\n----------\nqid : str\n    Qubit ID to fetch history for\nchip_id : str\n    ID of the chip containing the qubit\ntask : str\n    Name of the task to fetch history for\ncurrent_user : User\n    Current authenticated user (optional)\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
+        "operationId": "getQubitTaskHistory",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Chip ID",
+              "title": "Chip Id"
+            },
+            "description": "Chip ID"
+          },
+          {
+            "name": "task",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Task name",
+              "title": "Task"
+            },
+            "description": "Task name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/couplings/latest": {
+      "get": {
+        "tags": ["task-result"],
+        "summary": "Get latest coupling task results",
+        "description": "Fetch the latest coupling task results for all couplings on a chip.\n\nRetrieves the most recent task result for each coupling (qubit pair) on\nthe specified chip. Results include fidelity threshold status based on\nBell state fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all couplings, keyed by coupling ID (e.g., \"0-1\")\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
+        "operationId": "getLatestCouplingTaskResults",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Chip ID",
+              "title": "Chip Id"
+            },
+            "description": "Chip ID"
+          },
+          {
+            "name": "task",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Task name",
+              "title": "Task"
+            },
+            "description": "Task name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestTaskResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/couplings/history": {
+      "get": {
+        "tags": ["task-result"],
+        "summary": "Get historical coupling task results",
+        "description": "Fetch historical coupling task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all couplings, keyed by coupling ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
+        "operationId": "getHistoricalCouplingTaskResults",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Chip ID",
+              "title": "Chip Id"
+            },
+            "description": "Chip ID"
+          },
+          {
+            "name": "task",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Task name",
+              "title": "Task"
+            },
+            "description": "Task name"
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Date in YYYYMMDD format",
+              "title": "Date"
+            },
+            "description": "Date in YYYYMMDD format"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestTaskResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/couplings/{coupling_id}/history": {
+      "get": {
+        "tags": ["task-result"],
+        "summary": "Get coupling task history",
+        "description": "Fetch complete task history for a specific coupling.\n\nRetrieves all historical task results for a specific coupling (qubit pair),\nsorted by end time in descending order. Useful for tracking two-qubit\ncalibration trends over time.\n\nParameters\n----------\ncoupling_id : str\n    Coupling ID to fetch history for (e.g., \"0-1\")\nchip_id : str\n    ID of the chip containing the coupling\ntask : str\n    Name of the task to fetch history for\ncurrent_user : User\n    Current authenticated user (optional)\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
+        "operationId": "getCouplingTaskHistory",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "coupling_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Coupling Id"
+            }
+          },
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Chip ID",
+              "title": "Chip Id"
+            },
+            "description": "Chip ID"
+          },
+          {
+            "name": "task",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Task name",
+              "title": "Task"
+            },
+            "description": "Task name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/timeseries": {
+      "get": {
+        "tags": ["task-result"],
+        "summary": "Get timeseries task results by tag and parameter",
+        "description": "Fetch timeseries task results filtered by tag and parameter.\n\nRetrieves time series data for calibration parameters, optionally filtered\nto a specific qubit. Useful for plotting parameter trends over time.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntag : str\n    Tag to filter tasks by (e.g., calibration category)\nparameter : str\n    Name of the output parameter to retrieve\nstart_at : str\n    Start time in ISO format for the time range\nend_at : str\n    End time in ISO format for the time range\ncurrent_user : User\n    Current authenticated user\nqid : str | None\n    Optional qubit ID to filter results to a specific qubit\n\nReturns\n-------\nTimeSeriesData\n    Time series data keyed by qubit ID, each containing a list of\n    parameter values with timestamps",
+        "operationId": "getTimeseriesTaskResults",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Chip ID",
+              "title": "Chip Id"
+            },
+            "description": "Chip ID"
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Tag to filter by",
+              "title": "Tag"
+            },
+            "description": "Tag to filter by"
+          },
+          {
+            "name": "parameter",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Parameter name",
+              "title": "Parameter"
+            },
+            "description": "Parameter name"
+          },
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Start time in ISO format",
+              "title": "Start At"
+            },
+            "description": "Start time in ISO format"
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "End time in ISO format",
+              "title": "End At"
+            },
+            "description": "End time in ISO format"
+          },
+          {
+            "name": "qid",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional qubit ID to filter by",
+              "title": "Qid"
+            },
+            "description": "Optional qubit ID to filter by"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeSeriesData"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tags": {
       "get": {
         "tags": ["tag"],
-        "summary": "list all tag",
-        "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n\nReturns:\n-------\n    ListTaskResponse: The list of tasks.",
-        "operationId": "listAllTag",
+        "summary": "List all tags",
+        "description": "List all tags for the current user.\n\nRetrieves all tags associated with the current user's calibration data.\nTags are used to categorize and filter task results.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListTagResponse\n    Wrapped list of tag names",
+        "operationId": "listTags",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1563,12 +1594,17 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
-    "/api/device_topology": {
+    "/device-topology": {
       "post": {
-        "tags": ["device_topology"],
+        "tags": ["device-topology"],
         "summary": "Get the device topology",
         "description": "Get the device topology.",
         "operationId": "getDeviceTopology",
@@ -1603,12 +1639,17 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
-    "/api/device_topology/plot": {
+    "/device-topology/plot": {
       "post": {
-        "tags": ["device_topology"],
+        "tags": ["device-topology"],
         "summary": "Get the device topology plot",
         "description": "Get the device topology as a PNG image.",
         "operationId": "getDeviceTopologyPlot",
@@ -1636,26 +1677,27 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
-    "/api/backend": {
+    "/backends": {
       "get": {
         "tags": ["backend"],
-        "summary": "Get all backends",
+        "summary": "List all backends",
         "description": "Retrieve a list of all registered backends",
-        "operationId": "fetchAllBackends",
+        "operationId": "listBackends",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/BackendResponseModel"
-                  },
-                  "type": "array",
-                  "title": "Response Fetchallbackends"
+                  "$ref": "#/components/schemas/ListBackendsResponse"
                 }
               }
             }
@@ -1663,17 +1705,17 @@
         },
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ]
       }
     },
-    "/api/flow": {
+    "/flows": {
       "get": {
         "tags": ["flow"],
-        "summary": "List Flows",
+        "summary": "List all flows",
         "description": "List all Flows for the current user.\n\nReturns metadata only (no code content for performance).",
-        "operationId": "list_flows",
+        "operationId": "listFlows",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1685,13 +1727,18 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "post": {
         "tags": ["flow"],
-        "summary": "Save a Flow",
+        "summary": "Save a flow",
         "description": "Save a Flow to file system and MongoDB.\n\nSteps:\n1. Validate flow name\n2. Validate flow code contains expected function\n3. Create user directory if not exists\n4. Write code to file: user_flows/{username}/{name}.py\n5. Upsert metadata to MongoDB\n6. Return file path and success message",
-        "operationId": "save_flow",
+        "operationId": "saveFlow",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1723,150 +1770,20 @@
               }
             }
           }
-        }
-      }
-    },
-    "/api/flow/{name}": {
-      "get": {
-        "tags": ["flow"],
-        "summary": "Get Flow details",
-        "description": "Get Flow details including code content.\n\nSteps:\n1. Find metadata in MongoDB\n2. Read code from file\n3. Return combined data",
-        "operationId": "get_flow",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GetFlowResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": ["flow"],
-        "summary": "Delete a Flow",
-        "description": "Delete a Flow.\n\nSteps:\n1. Delete file from user_flows/{username}/{name}.py\n2. Delete metadata from MongoDB",
-        "operationId": "delete_flow",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Delete Flow"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/flow/{name}/execute": {
-      "post": {
-        "tags": ["flow"],
-        "summary": "Execute a Flow",
-        "description": "Execute a Flow via Prefect deployment.\n\nSteps:\n1. Find flow metadata in MongoDB\n2. Merge request parameters with default_parameters\n3. Create flow run via Prefect Client\n4. Return execution_id and URLs",
-        "operationId": "execute_flow",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ExecuteFlowRequest"
-              }
-            }
-          }
         },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExecuteFlowResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+        "security": [
+          {
+            "HTTPBearer": []
           }
-        }
+        ]
       }
     },
-    "/api/flow-templates": {
+    "/flows/templates": {
       "get": {
         "tags": ["flow"],
-        "summary": "List Flow Templates",
+        "summary": "List all flow templates",
         "description": "List all available flow templates.\n\nReturns metadata only (no code content for performance).",
-        "operationId": "list_flow_templates",
+        "operationId": "listFlowTemplates",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1877,20 +1794,30 @@
                     "$ref": "#/components/schemas/FlowTemplate"
                   },
                   "type": "array",
-                  "title": "Response List Flow Templates"
+                  "title": "Response Listflowtemplates"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
-    "/api/flow-templates/{template_id}": {
+    "/flows/templates/{template_id}": {
       "get": {
         "tags": ["flow"],
-        "summary": "Get Flow Template",
+        "summary": "Get a flow template",
         "description": "Get flow template details including code content.\n\nSteps:\n1. Find template metadata\n2. Read Python file content\n3. Return combined data",
-        "operationId": "get_flow_template",
+        "operationId": "getFlowTemplate",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "template_id",
@@ -1926,124 +1853,17 @@
         }
       }
     },
-    "/api/flow/{name}/schedule": {
-      "post": {
-        "tags": ["flow_schedule"],
-        "summary": "Schedule a Flow execution (cron or one-time)",
-        "description": "Schedule a Flow execution with cron or one-time schedule.\n\nArgs:\n----\n    name: Flow name\n    request: Schedule request (must provide either cron or scheduled_time)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Schedule response with schedule_id and details",
-        "operationId": "schedule_flow",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ScheduleFlowRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScheduleFlowResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/flow/{name}/schedules": {
+    "/flows/schedules": {
       "get": {
-        "tags": ["flow_schedule"],
-        "summary": "List schedules for a specific Flow",
-        "description": "List all schedules (cron and one-time) for a specific Flow.\n\nArgs:\n----\n    name: Flow name\n    current_user: Current authenticated user\n    limit: Maximum number of schedules to return (max 100)\n    offset: Number of schedules to skip\n\nReturns:\n-------\n    List of schedules for the flow",
-        "operationId": "list_flow_schedules",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 50,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 0,
-              "title": "Offset"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListFlowSchedulesResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/flow-schedules": {
-      "get": {
-        "tags": ["flow_schedule"],
-        "summary": "List all Flow schedules for current user",
+        "tags": ["flow"],
+        "summary": "List all flow schedules for current user",
         "description": "List all Flow schedules (cron and one-time) for the current user.\n\nArgs:\n----\n    current_user: Current authenticated user\n    limit: Maximum number of schedules to return (max 100)\n    offset: Number of schedules to skip\n\nReturns:\n-------\n    List of all flow schedules",
-        "operationId": "list_all_flow_schedules",
+        "operationId": "listAllFlowSchedules",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "limit",
@@ -2090,12 +1910,17 @@
         }
       }
     },
-    "/api/flow-schedule/{schedule_id}": {
+    "/flows/schedules/{schedule_id}": {
       "delete": {
-        "tags": ["flow_schedule"],
-        "summary": "Delete a Flow schedule",
+        "tags": ["flow"],
+        "summary": "Delete a flow schedule",
         "description": "Delete a Flow schedule (cron or one-time).\n\nSchedule ID Types:\n- **Cron schedules**: schedule_id is the deployment_id (UUID format)\n- **One-time schedules**: schedule_id is the flow_run_id (UUID format)\n\nThe API automatically determines the type and handles accordingly:\n- Cron: Removes the schedule from the deployment (schedule=None)\n- One-time: Deletes the scheduled flow run\n\nArgs:\n----\n    schedule_id: Schedule ID (deployment_id for cron, flow_run_id for one-time)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Standardized response with schedule type information",
-        "operationId": "delete_flow_schedule",
+        "operationId": "deleteFlowSchedule",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "schedule_id",
@@ -2131,10 +1956,15 @@
         }
       },
       "patch": {
-        "tags": ["flow_schedule"],
-        "summary": "Update a Flow schedule",
+        "tags": ["flow"],
+        "summary": "Update a flow schedule",
         "description": "Update a Flow schedule (cron schedules only).\n\nCan update: active status, cron expression, parameters.\n\nArgs:\n----\n    schedule_id: Schedule ID (deployment_id)\n    request: Update request\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Success message",
-        "operationId": "update_flow_schedule",
+        "operationId": "updateFlowSchedule",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "schedule_id",
@@ -2180,12 +2010,284 @@
         }
       }
     },
-    "/api/config": {
+    "/flows/{name}": {
+      "get": {
+        "tags": ["flow"],
+        "summary": "Get flow details",
+        "description": "Get Flow details including code content.\n\nSteps:\n1. Find metadata in MongoDB\n2. Read code from file\n3. Return combined data",
+        "operationId": "getFlow",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["flow"],
+        "summary": "Delete a flow",
+        "description": "Delete a Flow.\n\nSteps:\n1. Delete file from user_flows/{username}/{name}.py\n2. Delete metadata from MongoDB",
+        "operationId": "deleteFlow",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Deleteflow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{name}/execute": {
+      "post": {
+        "tags": ["flow"],
+        "summary": "Execute a flow",
+        "description": "Execute a Flow via Prefect deployment.\n\nSteps:\n1. Find flow metadata in MongoDB\n2. Merge request parameters with default_parameters\n3. Create flow run via Prefect Client\n4. Return execution_id and URLs",
+        "operationId": "executeFlow",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteFlowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{name}/schedule": {
+      "post": {
+        "tags": ["flow"],
+        "summary": "Schedule a flow execution (cron or one-time)",
+        "description": "Schedule a Flow execution with cron or one-time schedule.\n\nArgs:\n----\n    name: Flow name\n    request: Schedule request (must provide either cron or scheduled_time)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Schedule response with schedule_id and details",
+        "operationId": "scheduleFlow",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleFlowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{name}/schedules": {
+      "get": {
+        "tags": ["flow"],
+        "summary": "List schedules for a specific flow",
+        "description": "List all schedules (cron and one-time) for a specific Flow.\n\nArgs:\n----\n    name: Flow name\n    current_user: Current authenticated user\n    limit: Maximum number of schedules to return (max 100)\n    offset: Number of schedules to skip\n\nReturns:\n-------\n    List of schedules for the flow",
+        "operationId": "listFlowSchedules",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListFlowSchedulesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics/config": {
       "get": {
         "tags": ["metrics"],
-        "summary": "Get Metrics Config",
-        "description": "Get metrics metadata configuration.\n\nThis endpoint returns the metrics configuration loaded from YAML,\nincluding display metadata for all qubit and coupling metrics.\n\nReturns\n-------\n    Dictionary with metrics configuration including:\n    - qubit_metrics: Metadata for single-qubit metrics\n    - coupling_metrics: Metadata for two-qubit coupling metrics\n    - color_scale: Color scale configuration for visualization",
-        "operationId": "metrics-get_metrics_config",
+        "summary": "Get metrics configuration",
+        "description": "Get metrics metadata configuration for visualization.\n\nRetrieves the metrics configuration loaded from YAML, including display\nmetadata for all qubit and coupling metrics used in the dashboard.\n\nReturns\n-------\ndict[str, Any]\n    Dictionary with metrics configuration including:\n    - qubit_metrics: Metadata for single-qubit metrics (frequency, T1, T2, fidelities)\n    - coupling_metrics: Metadata for two-qubit coupling metrics (ZX90, Bell state)\n    - color_scale: Color scale configuration for heatmap visualization",
+        "operationId": "getMetricsConfig",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2194,23 +2296,28 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Metrics-Get Metrics Config"
+                  "title": "Response Getmetricsconfig"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
-    "/api/chip/{chip_id}/metrics": {
+    "/metrics/chips/{chip_id}/metrics": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Chip Metrics",
         "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n    current_user: Current authenticated user\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
-        "operationId": "metrics-get_chip_metrics",
+        "operationId": "getChipMetrics",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -2279,119 +2386,15 @@
         }
       }
     },
-    "/api/chips": {
-      "get": {
-        "tags": ["metrics"],
-        "summary": "List Chips",
-        "description": "Get list of available chips for a user.\n\nArgs:\n----\n    username: Username to filter by\n    _current_user: Current authenticated user\n\nReturns:\n-------\n    Dictionary with list of chips",
-        "operationId": "metrics-list_chips",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "username",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Username",
-              "default": "admin",
-              "title": "Username"
-            },
-            "description": "Username"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Metrics-List Chips"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/current": {
-      "get": {
-        "tags": ["metrics"],
-        "summary": "Get Current Chip",
-        "description": "Get current chip for a user.\n\nArgs:\n----\n    username: Username to filter by\n    _current_user: Current authenticated user\n\nReturns:\n-------\n    Dictionary with current chip_id",
-        "operationId": "metrics-get_current_chip",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "username",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Username",
-              "default": "admin",
-              "title": "Username"
-            },
-            "description": "Username"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Metrics-Get Current Chip"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chip/{chip_id}/qubit/{qid}/metric-history": {
+    "/metrics/chips/{chip_id}/qubits/{qid}/history": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Qubit Metric History",
         "description": "Get historical metric data for a specific qubit with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    qid: The qubit identifier (e.g., \"0\", \"Q00\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids",
-        "operationId": "metrics-get_qubit_metric_history",
+        "operationId": "getQubitMetricHistory",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -2488,15 +2491,15 @@
         }
       }
     },
-    "/api/chip/{chip_id}/coupling/{coupling_id}/metric-history": {
+    "/metrics/chips/{chip_id}/couplings/{coupling_id}/history": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Coupling Metric History",
         "description": "Get historical metric data for a specific coupling with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific coupling metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    coupling_id: The coupling identifier (e.g., \"0-1\", \"2-3\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids\n    (Note: qid field contains coupling_id for coupling metrics)",
-        "operationId": "metrics-get_coupling_metric_history",
+        "operationId": "getCouplingMetricHistory",
         "security": [
           {
-            "APIKeyHeader": []
+            "HTTPBearer": []
           }
         ],
         "parameters": [
@@ -2612,7 +2615,7 @@
         "title": "BackendResponseModel",
         "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
       },
-      "Body_auth-login": {
+      "Body_login": {
         "properties": {
           "username": {
             "type": "string",
@@ -2625,7 +2628,7 @@
         },
         "type": "object",
         "required": ["username", "password"],
-        "title": "Body_auth-login"
+        "title": "Body_login"
       },
       "CalibrationNoteResponse": {
         "properties": {
@@ -2752,7 +2755,7 @@
         "type": "object",
         "required": ["chip_id"],
         "title": "ChipResponse",
-        "description": "Chip is a Pydantic model that represents a chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    name (str): The name of the chip."
+        "description": "Chip is a Pydantic model that represents a chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    qubits (dict): Qubit information.\n    couplings (dict): Coupling information.\n    installed_at (str): Installation timestamp."
       },
       "Condition": {
         "properties": {
@@ -3095,7 +3098,7 @@
           "note"
         ],
         "title": "ExecutionResponseDetail",
-        "description": "ExecutionResponseDetailV2 is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time"
+        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution."
       },
       "ExecutionResponseSummary": {
         "properties": {
@@ -3148,7 +3151,7 @@
           "note"
         ],
         "title": "ExecutionResponseSummary",
-        "description": "ExecutionResponseSummaryV2 is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution."
+        "description": "ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    execution_id (str): The ID of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution.\n    tags (list[str]): Tags associated with the execution.\n    note (dict): Notes for the execution."
       },
       "FidelityCondition": {
         "properties": {
@@ -3556,7 +3559,7 @@
         "title": "InputParameterModel",
         "description": "Input parameter class."
       },
-      "LatestTaskGroupedByChipResponse": {
+      "LatestTaskResultResponse": {
         "properties": {
           "task_name": {
             "type": "string",
@@ -3564,7 +3567,7 @@
           },
           "result": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/Task"
+              "$ref": "#/components/schemas/TaskResult"
             },
             "type": "object",
             "title": "Result"
@@ -3572,8 +3575,86 @@
         },
         "type": "object",
         "required": ["task_name", "result"],
-        "title": "LatestTaskGroupedByChipResponse",
-        "description": "ChipTaskResponse is a Pydantic model that represents the response for fetching the tasks of a chip."
+        "title": "LatestTaskResultResponse",
+        "description": "Response model for fetching the latest tasks grouped by qid/coupling_id."
+      },
+      "ListBackendsResponse": {
+        "properties": {
+          "backends": {
+            "items": {
+              "$ref": "#/components/schemas/BackendResponseModel"
+            },
+            "type": "array",
+            "title": "Backends"
+          }
+        },
+        "type": "object",
+        "required": ["backends"],
+        "title": "ListBackendsResponse",
+        "description": "Response model for listing all backends.\n\nWraps list of backends for API consistency and future extensibility."
+      },
+      "ListChipsResponse": {
+        "properties": {
+          "chips": {
+            "items": {
+              "$ref": "#/components/schemas/ChipResponse"
+            },
+            "type": "array",
+            "title": "Chips"
+          }
+        },
+        "type": "object",
+        "required": ["chips"],
+        "title": "ListChipsResponse",
+        "description": "Response model for listing all chips.\n\nWraps list of chips for API consistency and future extensibility (e.g., pagination)."
+      },
+      "ListExecutionsResponse": {
+        "properties": {
+          "executions": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionResponseSummary"
+            },
+            "type": "array",
+            "title": "Executions"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "skip": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skip"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": ["executions"],
+        "title": "ListExecutionsResponse",
+        "description": "Response model for listing executions.\n\nWraps list of executions for API consistency and future extensibility (e.g., pagination)."
       },
       "ListFlowSchedulesResponse": {
         "properties": {
@@ -3622,21 +3703,6 @@
         "title": "ListMuxResponse",
         "description": "ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers."
       },
-      "ListParameterResponse": {
-        "properties": {
-          "parameters": {
-            "items": {
-              "$ref": "#/components/schemas/ParameterModel"
-            },
-            "type": "array",
-            "title": "Parameters"
-          }
-        },
-        "type": "object",
-        "required": ["parameters"],
-        "title": "ListParameterResponse",
-        "description": "Response model for a list of parameters."
-      },
       "ListTagResponse": {
         "properties": {
           "tags": {
@@ -3650,7 +3716,7 @@
         "type": "object",
         "required": ["tags"],
         "title": "ListTagResponse",
-        "description": "Response model for a list of tasks."
+        "description": "Response model for a list of tags."
       },
       "ListTaskResponse": {
         "properties": {
@@ -3789,7 +3855,7 @@
           "detail": {
             "additionalProperties": {
               "additionalProperties": {
-                "$ref": "#/components/schemas/Task"
+                "$ref": "#/components/schemas/MuxTask"
               },
               "type": "object"
             },
@@ -3801,6 +3867,203 @@
         "required": ["mux_id", "detail"],
         "title": "MuxDetailResponse",
         "description": "MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details."
+      },
+      "MuxTask": {
+        "properties": {
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "qid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "upstream_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "pending"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "input_parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Parameters"
+          },
+          "output_parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Parameters"
+          },
+          "output_parameter_names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Parameter Names"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "figure_path": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Figure Path"
+          },
+          "json_figure_path": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Figure Path"
+          },
+          "raw_data_path": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Data Path"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Time"
+          },
+          "task_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Type"
+          }
+        },
+        "type": "object",
+        "title": "MuxTask",
+        "description": "Task information for mux display."
       },
       "OutputParameterModel": {
         "properties": {
@@ -3855,36 +4118,6 @@
         "type": "object",
         "title": "OutputParameterModel",
         "description": "Data model.\n\nAttributes\n----------\n    qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.\n    coupling (dict[str, dict[str, float | int]]): The calibration data for couplings."
-      },
-      "ParameterModel": {
-        "properties": {
-          "username": {
-            "type": "string",
-            "title": "Username",
-            "description": "The username of the user who created the parameter"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "The name of the parameter"
-          },
-          "unit": {
-            "type": "string",
-            "title": "Unit",
-            "description": "The unit of the parameter",
-            "default": ""
-          },
-          "description": {
-            "type": "string",
-            "title": "Description",
-            "description": "Detailed description of the parameter",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": ["username", "name"],
-        "title": "ParameterModel",
-        "description": "Data model for a parameter.\n\nAttributes\n----------\n    name (str): The name of the parameter.\n    unit (str): The unit of the parameter.\n    description (str): Detailed description of the parameter."
       },
       "Position": {
         "properties": {
@@ -4491,7 +4724,7 @@
         "type": "object",
         "required": ["name"],
         "title": "Tag",
-        "description": "Response model for a task."
+        "description": "Response model for a tag."
       },
       "Task": {
         "properties": {
@@ -4708,7 +4941,7 @@
           },
           "data": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/Task"
+              "$ref": "#/components/schemas/TaskResult"
             },
             "type": "object",
             "title": "Data"
@@ -4716,7 +4949,8 @@
         },
         "type": "object",
         "required": ["name", "data"],
-        "title": "TaskHistoryResponse"
+        "title": "TaskHistoryResponse",
+        "description": "Response model for fetching task history."
       },
       "TaskResponse": {
         "properties": {
@@ -4768,6 +5002,213 @@
         ],
         "title": "TaskResponse",
         "description": "Response model for a task."
+      },
+      "TaskResult": {
+        "properties": {
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "qid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "upstream_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upstream Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "pending"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "input_parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Parameters"
+          },
+          "output_parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Parameters"
+          },
+          "output_parameter_names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Parameter Names"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "figure_path": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Figure Path"
+          },
+          "json_figure_path": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Figure Path"
+          },
+          "raw_data_path": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Data Path"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Time"
+          },
+          "task_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Type"
+          },
+          "default_view": {
+            "type": "boolean",
+            "title": "Default View",
+            "default": true
+          },
+          "over_threshold": {
+            "type": "boolean",
+            "title": "Over Threshold",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "TaskResult",
+        "description": "TaskResult is a Pydantic model that represents a task result."
       },
       "TaskResultResponse": {
         "properties": {
@@ -4862,7 +5303,28 @@
         },
         "type": "object",
         "title": "TimeSeriesData",
-        "description": "TimeSeriesData is a Pydantic model that represents the time series data."
+        "description": "Response model for time series data."
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "required": ["access_token", "username"],
+        "title": "TokenResponse",
+        "description": "Token response model for login."
       },
       "UpdateScheduleRequest": {
         "properties": {
@@ -4987,6 +5449,44 @@
         "title": "UserCreate",
         "description": "User creation model for registration."
       },
+      "UserWithToken": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "disabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled"
+          },
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          }
+        },
+        "type": "object",
+        "required": ["username", "access_token"],
+        "title": "UserWithToken",
+        "description": "User model with access token for login/register responses."
+      },
       "ValidateFileRequest": {
         "properties": {
           "content": {
@@ -5034,10 +5534,9 @@
       }
     },
     "securitySchemes": {
-      "APIKeyHeader": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-Username"
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
       }
     }
   }

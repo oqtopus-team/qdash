@@ -14,7 +14,7 @@ import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
 import PlotlyRenderer from "@/app/components/PlotlyRenderer";
-import { useFetchQubitTaskHistory } from "@/client/chip/chip";
+import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { TaskGridView } from "@/shared/components/TaskGridView";
 
 interface TaskHistoryViewerProps {
@@ -41,10 +41,9 @@ export function TaskHistoryViewer({
   );
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
 
-  const { data, isLoading, error } = useFetchQubitTaskHistory(
-    chipId,
+  const { data, isLoading, error } = useGetQubitTaskHistory(
     qubitId,
-    taskName,
+    { chip_id: chipId, task: taskName },
     {
       query: {
         staleTime: 30000,
@@ -552,7 +551,7 @@ export function TaskHistoryViewer({
                           className="w-full h-full"
                           fullPath={`${
                             process.env.NEXT_PUBLIC_API_URL
-                          }/api/executions/figure?path=${encodeURIComponent(
+                          }/executions/figure?path=${encodeURIComponent(
                             selectedTask.json_figure_path?.[
                               expandedFigureIdx
                             ] || "",

@@ -35,7 +35,7 @@ export function InteractiveFigureContent({
         <PlotlyRenderer
           fullPath={`${
             process.env.NEXT_PUBLIC_API_URL
-          }/api/executions/figure?path=${encodeURIComponent(figureJsonPath)}`}
+          }/executions/figure?path=${encodeURIComponent(figureJsonPath)}`}
         />
       </div>
       {showNavigation && (

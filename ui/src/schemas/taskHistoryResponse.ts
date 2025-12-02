@@ -7,6 +7,9 @@
  */
 import type { TaskHistoryResponseData } from "./taskHistoryResponseData";
 
+/**
+ * Response model for fetching task history.
+ */
 export interface TaskHistoryResponse {
   name: string;
   data: TaskHistoryResponseData;

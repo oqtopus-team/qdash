@@ -2,7 +2,6 @@ import re
 
 from prefect import task
 from pydantic import BaseModel
-from qdash.datamodel.parameter import ParameterModel
 from qdash.datamodel.task import TaskModel
 from qdash.workflow.tasks.base import BaseTask
 
@@ -34,47 +33,6 @@ def pydantic_serializer(obj: BaseModel) -> dict:
     if isinstance(obj, BaseModel):
         return obj.model_dump()
     raise TypeError(f"Type {type(obj)} not serializable")
-
-
-def convert_output_parameters(username: str, outputs: dict[str, any]) -> dict[str, dict]:  # type: ignore # noqa: PGH003
-    """Convert the output parameters to the Parameter class."""
-    converted = {}
-    for param_name, output in outputs.items():
-        param = ParameterModel(username=username, name=param_name, unit=output.unit, description=output.description)  # type: ignore # noqa: PGH003
-        converted[param_name] = param.model_dump()
-    return converted
-
-
-@task
-def update_active_output_parameters(username: str, backend: str) -> list[ParameterModel]:
-    """Update the active output parameters in the input file.
-
-    Args:
-    ----
-        file_path: The path to the input file.
-
-    """
-    task_cls = BaseTask.registry.get(backend)
-    all_outputs = {cls.name: cls.output_parameters for cls in task_cls.values()}
-    converted_outputs = {
-        task_name: convert_output_parameters(username=username, outputs=outputs)
-        for task_name, outputs in all_outputs.items()
-    }
-
-    unique_parameter_names = {param_name for outputs in converted_outputs.values() for param_name in outputs}
-    return [
-        ParameterModel(
-            username=username,
-            name=name,
-            unit=converted_outputs[next(task for task in converted_outputs if name in converted_outputs[task])][name][
-                "unit"
-            ],
-            description=converted_outputs[next(task for task in converted_outputs if name in converted_outputs[task])][
-                name
-            ]["description"],
-        )
-        for name in unique_parameter_names
-    ]
 
 
 @task

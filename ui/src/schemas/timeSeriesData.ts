@@ -8,7 +8,7 @@
 import type { TimeSeriesDataData } from "./timeSeriesDataData";
 
 /**
- * TimeSeriesData is a Pydantic model that represents the time series data.
+ * Response model for time series data.
  */
 export interface TimeSeriesData {
   data?: TimeSeriesDataData;

@@ -8,7 +8,7 @@
 import type { Tag } from "./tag";
 
 /**
- * Response model for a list of tasks.
+ * Response model for a list of tags.
  */
 export interface ListTagResponse {
   tags: Tag[];

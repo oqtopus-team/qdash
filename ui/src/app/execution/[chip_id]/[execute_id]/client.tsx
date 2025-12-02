@@ -21,7 +21,7 @@ import type { ExecutionResponseDetail } from "@/schemas";
 
 import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 import { TaskFigure } from "@/app/components/TaskFigure";
-import { useFetchExecutionByChipId } from "@/client/chip/chip";
+import { useGetExecution } from "@/client/execution/execution";
 import { TaskGridView } from "@/shared/components/TaskGridView";
 import { InteractiveFigureModal } from "@/shared/components/InteractiveFigureModal";
 
@@ -75,7 +75,7 @@ export default function ExecutionDetailClient({
     data: executionDetailData,
     isLoading: isDetailLoading,
     isError: isDetailError,
-  } = useFetchExecutionByChipId(chip_id, execute_id, {
+  } = useGetExecution(execute_id, {
     query: {
       // Refresh every 5 seconds
       refetchInterval: 5000,
@@ -710,7 +710,7 @@ export default function ExecutionDetailClient({
                                           : `/${path}`;
                                         const apiUrl =
                                           process.env.NEXT_PUBLIC_API_URL;
-                                        link.href = `${apiUrl}/api/file/raw_data?path=${encodeURIComponent(
+                                        link.href = `${apiUrl}/file/raw_data?path=${encodeURIComponent(
                                           normalizedPath,
                                         )}`;
                                         const filename =

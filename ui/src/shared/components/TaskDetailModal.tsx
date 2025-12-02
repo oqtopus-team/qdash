@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { Task } from "@/schemas";
-import { useGetTaskResultByTaskId } from "@/client/task/task";
+import { useGetTaskResult } from "@/client/task/task";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
 import { InteractiveFigureContent } from "./InteractiveFigureContent";
@@ -54,7 +54,7 @@ export function TaskDetailModal({
     data: fetchedResponse,
     isLoading: loading,
     error: fetchError,
-  } = useGetTaskResultByTaskId(taskId!, {
+  } = useGetTaskResult(taskId!, {
     query: {
       enabled: isOpen && !!taskId && !taskProp,
     },

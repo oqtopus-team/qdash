@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
-import { useMetricsGetCouplingMetricHistory } from "@/client/metrics/metrics";
+import { useGetCouplingMetricHistory } from "@/client/metrics/metrics";
 
 interface MetricHistoryItem {
   value: number | null;
@@ -28,7 +28,7 @@ export function CouplingMetricHistoryModal({
 }: CouplingMetricHistoryModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const { data, isLoading, isError } = useMetricsGetCouplingMetricHistory(
+  const { data, isLoading, isError } = useGetCouplingMetricHistory(
     chipId,
     couplingId,
     { metric: metricName, limit: 20, within_days: 30 },

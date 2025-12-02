@@ -7,7 +7,7 @@
  */
 
 /**
- * Response model for a task.
+ * Response model for a tag.
  */
 export interface Tag {
   name: string;

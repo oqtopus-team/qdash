@@ -8,15 +8,18 @@
 import type { ExecutionResponseSummaryNote } from "./executionResponseSummaryNote";
 
 /**
- * ExecutionResponseSummaryV2 is a Pydantic model that represents the summary of an execution response.
+ * ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.
 
 Attributes
 ----------
     name (str): The name of the execution.
+    execution_id (str): The ID of the execution.
     status (str): The current status of the execution.
     start_at (str): The start time of the execution.
     end_at (str): The end time of the execution.
     elapsed_time (str): The total elapsed time of the execution.
+    tags (list[str]): Tags associated with the execution.
+    note (dict): Notes for the execution.
  */
 export interface ExecutionResponseSummary {
   name: string;

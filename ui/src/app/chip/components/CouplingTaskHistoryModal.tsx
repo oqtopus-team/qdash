@@ -6,7 +6,7 @@ import React, { useState } from "react";
 import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
-import { useFetchCouplingTaskHistory } from "@/client/chip/chip";
+import { useGetCouplingTaskHistory } from "@/client/task-result/task-result";
 
 const PlotlyRenderer = dynamic(
   () => import("@/app/components/PlotlyRenderer").then((mod) => mod.default),
@@ -37,10 +37,9 @@ export function CouplingTaskHistoryModal({
   const [subIndex, setSubIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
 
-  const { data, isLoading, isError } = useFetchCouplingTaskHistory(
-    chipId,
+  const { data, isLoading, isError } = useGetCouplingTaskHistory(
     couplingId,
-    taskName,
+    { chip_id: chipId, task: taskName },
     {
       query: {
         enabled: isOpen && !!chipId && !!couplingId && !!taskName,
@@ -263,7 +262,7 @@ export function CouplingTaskHistoryModal({
                         className="w-full h-full"
                         fullPath={`${
                           process.env.NEXT_PUBLIC_API_URL
-                        }/api/executions/figure?path=${encodeURIComponent(
+                        }/executions/figure?path=${encodeURIComponent(
                           currentJsonFigure,
                         )}`}
                       />

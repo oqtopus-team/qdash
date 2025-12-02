@@ -6,7 +6,7 @@
  */
 
 import { useMemo } from "react";
-import { useMetricsGetMetricsConfig } from "@/client/metrics/metrics";
+import { useGetMetricsConfig } from "@/client/metrics/metrics";
 
 interface EvaluationConfig {
   mode: "maximize" | "minimize" | "none";
@@ -65,7 +65,7 @@ export interface MetricConfig {
  *   - error: Error object if failed
  */
 export function useMetricsConfig() {
-  const { data, isLoading, isError, error } = useMetricsGetMetricsConfig({
+  const { data, isLoading, isError, error } = useGetMetricsConfig({
     query: {
       staleTime: Infinity, // Config rarely changes, cache indefinitely
       gcTime: Infinity, // Keep in cache forever

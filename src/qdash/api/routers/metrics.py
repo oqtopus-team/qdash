@@ -7,10 +7,17 @@ from typing import Annotated, Any, Literal
 
 import pendulum
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
 from qdash.api.lib.auth import get_optional_current_user
 from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.schemas.auth import User
+from qdash.api.schemas.metrics import (
+    ChipMetricsResponse,
+    CouplingMetrics,
+    MetricHistoryItem,
+    MetricValue,
+    QubitMetricHistoryResponse,
+    QubitMetrics,
+)
 from qdash.dbmodel.chip import ChipDocument
 
 router = APIRouter()
@@ -43,83 +50,24 @@ def normalize_qid(qid: str) -> str:
     return qid.replace("Q", "").lstrip("0") or "0"
 
 
-@router.get("/config")
+@router.get("/config", summary="Get metrics configuration", operation_id="getMetricsConfig")
 async def get_metrics_config() -> dict[str, Any]:
-    """Get metrics metadata configuration.
+    """Get metrics metadata configuration for visualization.
 
-    This endpoint returns the metrics configuration loaded from YAML,
-    including display metadata for all qubit and coupling metrics.
+    Retrieves the metrics configuration loaded from YAML, including display
+    metadata for all qubit and coupling metrics used in the dashboard.
 
     Returns
     -------
+    dict[str, Any]
         Dictionary with metrics configuration including:
-        - qubit_metrics: Metadata for single-qubit metrics
-        - coupling_metrics: Metadata for two-qubit coupling metrics
-        - color_scale: Color scale configuration for visualization
+        - qubit_metrics: Metadata for single-qubit metrics (frequency, T1, T2, fidelities)
+        - coupling_metrics: Metadata for two-qubit coupling metrics (ZX90, Bell state)
+        - color_scale: Color scale configuration for heatmap visualization
 
     """
     config = load_metrics_config()
     return config.model_dump()
-
-
-class MetricValue(BaseModel):
-    """Single metric value with metadata."""
-
-    value: float | None = None
-    task_id: str | None = None
-    execution_id: str | None = None
-
-
-class QubitMetrics(BaseModel):
-    """Single qubit metrics data."""
-
-    qubit_frequency: dict[str, MetricValue] | None = None
-    anharmonicity: dict[str, MetricValue] | None = None
-    t1: dict[str, MetricValue] | None = None
-    t2_echo: dict[str, MetricValue] | None = None
-    t2_star: dict[str, MetricValue] | None = None
-    average_readout_fidelity: dict[str, MetricValue] | None = None
-    x90_gate_fidelity: dict[str, MetricValue] | None = None
-    x180_gate_fidelity: dict[str, MetricValue] | None = None
-
-
-class CouplingMetrics(BaseModel):
-    """Two-qubit coupling metrics data."""
-
-    zx90_gate_fidelity: dict[str, MetricValue] | None = None
-    bell_state_fidelity: dict[str, MetricValue] | None = None
-    static_zz_interaction: dict[str, MetricValue] | None = None
-
-
-class ChipMetricsResponse(BaseModel):
-    """Complete chip metrics response."""
-
-    chip_id: str
-    username: str
-    qubit_count: int
-    within_hours: int | None = None
-    qubit_metrics: QubitMetrics
-    coupling_metrics: CouplingMetrics
-
-
-class MetricHistoryItem(BaseModel):
-    """Single historical metric data point."""
-
-    value: float | None
-    execution_id: str
-    task_id: str | None = None
-    timestamp: str
-    calibrated_at: str | None = None
-
-
-class QubitMetricHistoryResponse(BaseModel):
-    """Historical metric data for a single qubit."""
-
-    chip_id: str
-    qid: str
-    metric_name: str
-    username: str
-    history: list[MetricHistoryItem]
 
 
 def _extract_latest_metrics(
@@ -386,7 +334,7 @@ def extract_coupling_metrics(
     )
 
 
-@router.get("/chip/{chip_id}/metrics", response_model=ChipMetricsResponse)
+@router.get("/chips/{chip_id}/metrics", response_model=ChipMetricsResponse, operation_id="getChipMetrics")
 async def get_chip_metrics(
     chip_id: str,
     within_hours: Annotated[int | None, Query(description="Filter to data within N hours (e.g., 24)")] = None,
@@ -438,65 +386,11 @@ async def get_chip_metrics(
     )
 
 
-@router.get("/chips")
-async def list_chips(
-    username: Annotated[str, Query(description="Username")] = "admin",
-    _current_user: User | None = Depends(get_optional_current_user),
-) -> dict[str, Any]:
-    """Get list of available chips for a user.
-
-    Args:
-    ----
-        username: Username to filter by
-        _current_user: Current authenticated user
-
-    Returns:
-    -------
-        Dictionary with list of chips
-
-    """
-    chips = ChipDocument.find({"username": username}).to_list()
-
-    return {
-        "chips": [
-            {
-                "chip_id": chip.chip_id,
-                "username": chip.username,
-                "size": chip.size,
-                "installed_at": chip.installed_at,
-                "qubit_count": len(chip.qubits),
-                "coupling_count": len(chip.couplings),
-            }
-            for chip in chips
-        ]
-    }
-
-
-@router.get("/chip/current")
-async def get_current_chip(
-    username: Annotated[str, Query(description="Username")] = "admin",
-    _current_user: User | None = Depends(get_optional_current_user),
-) -> dict[str, str]:
-    """Get current chip for a user.
-
-    Args:
-    ----
-        username: Username to filter by
-        _current_user: Current authenticated user
-
-    Returns:
-    -------
-        Dictionary with current chip_id
-
-    """
-    try:
-        chip = ChipDocument.get_current_chip(username)
-        return {"chip_id": chip.chip_id}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@router.get("/chip/{chip_id}/qubit/{qid}/metric-history", response_model=QubitMetricHistoryResponse)
+@router.get(
+    "/chips/{chip_id}/qubits/{qid}/history",
+    response_model=QubitMetricHistoryResponse,
+    operation_id="getQubitMetricHistory",
+)
 async def get_qubit_metric_history(
     chip_id: str,
     qid: str,
@@ -612,7 +506,11 @@ async def get_qubit_metric_history(
     )
 
 
-@router.get("/chip/{chip_id}/coupling/{coupling_id}/metric-history", response_model=QubitMetricHistoryResponse)
+@router.get(
+    "/chips/{chip_id}/couplings/{coupling_id}/history",
+    response_model=QubitMetricHistoryResponse,
+    operation_id="getCouplingMetricHistory",
+)
 async def get_coupling_metric_history(
     chip_id: str,
     coupling_id: str,

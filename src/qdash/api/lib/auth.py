@@ -1,7 +1,7 @@
 import logging
 
-from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import APIKeyHeader
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from qdash.api.schemas.auth import User, UserInDB
 from qdash.dbmodel.initialize import initialize
@@ -23,31 +23,8 @@ pwd_context = CryptContext(
     truncate_error=False,  # パスワードの長さチェックを無効化
 )
 
-# Optional authentication scheme
-# Simple username header authentication
-username_header = APIKeyHeader(name="X-Username", auto_error=False)
-
-
-def get_optional_current_user(username: str = Depends(username_header)) -> User:
-    """Get user from username header if provided, otherwise return default user.
-
-    Parameters
-    ----------
-    username : str
-        Username from request header (optional)
-
-    Returns
-    -------
-    User
-        User information based on provided username or default user
-
-    """
-    if not username:
-        logger.debug("No username provided, using default user")
-        return User(username="default", full_name="Default User", disabled=False)
-
-    logger.debug(f"Using provided username: {username}")
-    return User(username=username, full_name=f"User {username}", disabled=False)
+# Bearer Token authentication scheme
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -67,7 +44,6 @@ def get_password_hash(password: str) -> str:
         msg = "Password cannot be empty"
         logger.error(msg)
         raise ValueError(msg)
-    # hash関数は既にstrを返すため、キャストは不要
     return str(pwd_context.hash(password))
 
 
@@ -84,6 +60,25 @@ def get_user(username: str) -> UserInDB | None:
             full_name=user.full_name,
             disabled=user.disabled,
             hashed_password=user.hashed_password,
+            access_token=user.access_token,
+        )
+    return None
+
+
+def get_user_by_token(access_token: str) -> UserInDB | None:
+    """Retrieve a user from the database by access token."""
+    logger.debug("Looking up user by access token")
+    query = UserDocument.find_one({"access_token": access_token}).run()
+    user = query
+    logger.debug(f"Database lookup result: {user is not None}")
+
+    if user:
+        return UserInDB(
+            username=user.username,
+            full_name=user.full_name,
+            disabled=user.disabled,
+            hashed_password=user.hashed_password,
+            access_token=user.access_token,
         )
     return None
 
@@ -102,13 +97,15 @@ def authenticate_user(username: str, password: str) -> UserInDB | None:
     return user
 
 
-def get_current_user(username: str = Depends(username_header)) -> User:
-    """Get user from username header.
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> User:
+    """Get user from Bearer token.
 
     Parameters
     ----------
-    username : str
-        Username from request header
+    credentials : HTTPAuthorizationCredentials
+        Bearer token credentials from Authorization header
 
     Returns
     -------
@@ -118,28 +115,108 @@ def get_current_user(username: str = Depends(username_header)) -> User:
     Raises
     ------
     HTTPException
-        If username is not provided
+        If token is not provided or invalid
 
     """
-    if not username:
+    if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Username header is required",
-            headers={"WWW-Authenticate": "ApiKey"},
+            detail="Authorization header is required",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # ユーザー情報をキャッシュから取得（実際のユーザー情報は不要なため、シンプルなオブジェクトを返す）
-    return User(username=username, full_name=username, disabled=False)
+    token = credentials.credentials
+    user = get_user_by_token(token)
 
-
-def get_current_active_user(request: Request) -> User:
-    """Get the currently active user."""
-    username = request.headers.get("X-Username")
-    if not username:
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Username header is required",
-            headers={"WWW-Authenticate": "ApiKey"},
+            detail="Invalid access token",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    # ユーザー情報を直接生成（get_current_userを呼び出さない）
-    return User(username=username, full_name=username, disabled=False)
+
+    if user.disabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled",
+        )
+
+    return User(username=user.username, full_name=user.full_name, disabled=user.disabled)
+
+
+def get_optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> User:
+    """Get user from Bearer token if provided, otherwise return default user.
+
+    Parameters
+    ----------
+    credentials : HTTPAuthorizationCredentials
+        Bearer token credentials from Authorization header (optional)
+
+    Returns
+    -------
+    User
+        User information based on provided token or default user
+
+    """
+    if not credentials:
+        logger.debug("No token provided, using default user")
+        return User(username="default", full_name="Default User", disabled=False)
+
+    token = credentials.credentials
+    user = get_user_by_token(token)
+
+    if not user:
+        logger.debug("Invalid token, using default user")
+        return User(username="default", full_name="Default User", disabled=False)
+
+    logger.debug(f"Using authenticated user: {user.username}")
+    return User(username=user.username, full_name=user.full_name, disabled=user.disabled)
+
+
+def get_current_active_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> User:
+    """Get the currently active user from Bearer token.
+
+    Parameters
+    ----------
+    credentials : HTTPAuthorizationCredentials
+        Bearer token credentials from Authorization header
+
+    Returns
+    -------
+    User
+        User information
+
+    Raises
+    ------
+    HTTPException
+        If token is not provided or invalid
+
+    """
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header with Bearer token is required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = credentials.credentials
+    user = get_user_by_token(token)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid access token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if user.disabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled",
+        )
+
+    return User(username=user.username, full_name=user.full_name, disabled=user.disabled)

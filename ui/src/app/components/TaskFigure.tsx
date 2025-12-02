@@ -1,6 +1,6 @@
 "use client";
 
-import { useGetTaskResultByTaskId } from "@/client/task/task";
+import { useGetTaskResult } from "@/client/task/task";
 
 interface TaskFigureProps {
   path?: string | string[];
@@ -22,7 +22,7 @@ export function TaskFigure({
     data: taskResultResponse,
     isLoading: loading,
     error: fetchError,
-  } = useGetTaskResultByTaskId(taskId!, {
+  } = useGetTaskResult(taskId!, {
     query: {
       enabled: !!taskId && !path,
     },
@@ -59,9 +59,7 @@ export function TaskFigure({
         {figurePaths.map((p, i) => (
           <img
             key={i}
-            src={`${apiUrl}/api/executions/figure?path=${encodeURIComponent(
-              p,
-            )}`}
+            src={`${apiUrl}/executions/figure?path=${encodeURIComponent(p)}`}
             alt={`Result for QID ${qid}`}
             className={className}
           />
@@ -73,7 +71,7 @@ export function TaskFigure({
   if (typeof figurePaths === "string") {
     return (
       <img
-        src={`${apiUrl}/api/executions/figure?path=${encodeURIComponent(figurePaths)}`}
+        src={`${apiUrl}/executions/figure?path=${encodeURIComponent(figurePaths)}`}
         alt={`Result for QID ${qid}`}
         className={className}
       />
