@@ -54,21 +54,6 @@ prefect server start --host 0.0.0.0
 docker compose up workflow
 ```
 
-### 4. Slack Agent
-
-**Location**: `src/qdash/slack_agent/main.py`
-**Purpose**: AI-powered Slack assistant
-
-**Run Commands**:
-
-```bash
-# Direct execution
-python src/qdash/slack_agent/main.py
-
-# Via Docker Compose
-docker compose up slack-agent
-```
-
 ## CLI Tools
 
 ### 1. QDash CLI
@@ -125,7 +110,6 @@ docker compose -f compose.dev.yaml up
 - **api**: FastAPI backend (port 5715)
 - **ui**: Next.js frontend (port 3000)
 - **workflow**: Prefect workflow worker
-- **slack-agent**: Slack AI assistant
 
 ### Service Dependencies
 
@@ -135,7 +119,6 @@ docker compose -f compose.dev.yaml up
 4. **workflow** - Depends on mongo, prefect-server
 5. **api** - Depends on mongo, prefect-server
 6. **ui** - Depends on api
-7. **slack-agent** - Depends on api
 
 ## Development Servers
 

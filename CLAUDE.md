@@ -36,21 +36,7 @@ QDash follows a microservices architecture with three major components:
 - **Purpose**: Manages qubit calibration workflows
 - **Integration**: Uses qubex library for quantum experiments
 
-### 4. Slack Agent (New Feature)
-
-- **Location**: `/src/qdash/slack_agent/`
-- **Technology**: Slack Bolt, OpenAI API
-- **Purpose**: AI-powered Slack assistant for QDash operations
-- **Available Tools**:
-  - `get_current_time`: Get current date/time
-  - `calculate`: Perform mathematical calculations
-  - `get_string_length`: Measure text length
-  - `web_search`: Execute web search (demo mode)
-  - `get_current_chip`: Get current chip ID
-  - `investigate_calibration`: Investigate calibration results and execution history
-  - `get_chip_parameters`: Get chip parameter information including fidelity statistics
-
-### 5. Python Flow Editor (New Feature)
+### 4. Python Flow Editor (New Feature)
 
 - **Location**: `/src/qdash/workflow/helpers/`
 - **Purpose**: High-level API for creating custom calibration workflows in Python
@@ -263,8 +249,7 @@ qdash/
 │   │   │   └── examples/   # 🆕 Example Python Flows
 │   │   ├── dbmodel/        # Database models
 │   │   ├── datamodel/      # Data models
-│   │   ├── cli/            # CLI tools
-│   │   └── slack_agent/    # Slack AI assistant
+│   │   └── cli/            # CLI tools
 ├── docs/                    # Documentation
 ├── tests/                   # Test files
 ├── calib_data/             # Calibration data storage
@@ -437,7 +422,6 @@ Key environment variables (see `.env.example`):
 - `workflow` - QDash workflow worker
 - `api` - FastAPI backend
 - `ui` - Next.js frontend
-- `slack-agent` - Slack AI assistant
 
 ## Contributing
 
@@ -493,7 +477,6 @@ If you prefer running scripts manually:
 - The project follows Python and TypeScript best practices
 - All Docker services are configured to work within a custom network
 - Authentication uses a simple X-Username header (development mode)
-- The Slack agent feature is newly implemented on the feat/slack-agent branch
 
 ## Problem-Solving Process
 
