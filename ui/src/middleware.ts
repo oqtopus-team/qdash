@@ -26,7 +26,7 @@ export function middleware(request: NextRequest) {
 // 認証が必要なパスを指定
 export const config = {
   matcher: [
-/*
+    /*
      * 以下のパスに対してミドルウェアを適用:
      * - すべてのパス（/:path*）
      * - ルートパス（/）

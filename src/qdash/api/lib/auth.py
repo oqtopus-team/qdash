@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from qdash.api.schemas.auth import User, UserInDB
@@ -175,17 +175,35 @@ def get_optional_current_user(
     return User(username=user.username, full_name=user.full_name, disabled=user.disabled)
 
 
-def get_current_active_user(request: Request) -> User:
-    """Get the currently active user from Bearer token."""
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
+def get_current_active_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> User:
+    """Get the currently active user from Bearer token.
+
+    Parameters
+    ----------
+    credentials : HTTPAuthorizationCredentials
+        Bearer token credentials from Authorization header
+
+    Returns
+    -------
+    User
+        User information
+
+    Raises
+    ------
+    HTTPException
+        If token is not provided or invalid
+
+    """
+    if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authorization header with Bearer token is required",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = auth_header.split(" ", 1)[1]
+    token = credentials.credentials
     user = get_user_by_token(token)
 
     if not user:
