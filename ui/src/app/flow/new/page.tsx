@@ -11,7 +11,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 import type { SaveFlowRequest } from "@/schemas";
 
-import { useAuthReadUsersMe } from "@/client/auth/auth";
+import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
 import {
   getFlowTemplate,
@@ -41,7 +41,7 @@ export default function NewFlowPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
   // Fetch current user
-  const { data: userData } = useAuthReadUsersMe();
+  const { data: userData } = useGetCurrentUser();
 
   // Fetch chips
   const { data: chipsData } = useListChips();

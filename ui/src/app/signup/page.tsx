@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { useAuthRegisterUser } from "@/client/auth/auth";
+import { useRegisterUser } from "@/client/auth/auth";
 
 // Cookie保存ヘルパー
 const saveAuthCookies = (token: string, username: string) => {
@@ -20,7 +20,7 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const registerMutation = useAuthRegisterUser();
+  const registerMutation = useRegisterUser();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
