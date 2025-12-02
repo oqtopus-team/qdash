@@ -9,6 +9,7 @@ from qdash.workflow.engine.calibration.task_result_processor import (
     R2ValidationError,
     FidelityValidationError,
 )
+from qdash.workflow.engine.calibration.execution_state_manager import ExecutionStateManager
 
 __all__ = [
     "CRScheduler",
@@ -20,4 +21,5 @@ __all__ = [
     "TaskResultProcessor",
     "R2ValidationError",
     "FidelityValidationError",
+    "ExecutionStateManager",
 ]

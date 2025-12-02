@@ -162,3 +162,60 @@ class CalibDataSaver(Protocol):
 
         """
         ...
+
+
+@runtime_checkable
+class ExecutionRepository(Protocol):
+    """Protocol for execution state persistence operations."""
+
+    def save(self, execution: ExecutionModel) -> None:
+        """Save execution state to the database.
+
+        Parameters
+        ----------
+        execution : ExecutionModel
+            The execution model to save
+
+        """
+        ...
+
+    def find_by_id(self, execution_id: str) -> ExecutionModel | None:
+        """Find execution by ID.
+
+        Parameters
+        ----------
+        execution_id : str
+            The execution identifier
+
+        Returns
+        -------
+        ExecutionModel | None
+            The execution model if found, None otherwise
+
+        """
+        ...
+
+    def update_with_optimistic_lock(
+        self,
+        execution_id: str,
+        update_func: callable,
+    ) -> ExecutionModel:
+        """Update execution with optimistic locking.
+
+        This method reads the current state, applies the update function,
+        and saves with version checking to handle concurrent modifications.
+
+        Parameters
+        ----------
+        execution_id : str
+            The execution identifier
+        update_func : callable
+            Function that takes ExecutionModel and modifies it in place
+
+        Returns
+        -------
+        ExecutionModel
+            The updated execution model
+
+        """
+        ...

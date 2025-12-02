@@ -17,7 +17,11 @@ from qdash.workflow.engine.calibration.repository.protocols import (
     CalibDataSaver,
     ChipHistoryRepository,
     ChipRepository,
+    ExecutionRepository,
     TaskResultHistoryRepository,
+)
+from qdash.workflow.engine.calibration.repository.mongo_execution import (
+    MongoExecutionRepository,
 )
 
 __all__ = [
@@ -26,10 +30,12 @@ __all__ = [
     "ChipRepository",
     "ChipHistoryRepository",
     "CalibDataSaver",
+    "ExecutionRepository",
     # MongoDB implementations
     "MongoTaskResultHistoryRepository",
     "MongoChipRepository",
     "MongoChipHistoryRepository",
+    "MongoExecutionRepository",
     "create_default_repositories",
     # Filesystem implementations
     "FilesystemCalibDataSaver",
