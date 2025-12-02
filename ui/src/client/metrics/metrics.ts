@@ -56,13 +56,13 @@ export const metricsGetMetricsConfig = (
   signal?: AbortSignal,
 ) => {
   return customInstance<MetricsGetMetricsConfig200>(
-    { url: `/config`, method: "GET", signal },
+    { url: `/metrics/config`, method: "GET", signal },
     options,
   );
 };
 
 export const getMetricsGetMetricsConfigQueryKey = () => {
-  return [`/config`] as const;
+  return [`/metrics/config`] as const;
 };
 
 export const getMetricsGetMetricsConfigQueryOptions = <
@@ -224,7 +224,7 @@ export const metricsGetChipMetrics = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ChipMetricsResponse>(
-    { url: `/chip/${chipId}/metrics`, method: "GET", params, signal },
+    { url: `/metrics/chip/${chipId}/metrics`, method: "GET", params, signal },
     options,
   );
 };
@@ -233,7 +233,10 @@ export const getMetricsGetChipMetricsQueryKey = (
   chipId?: string,
   params?: MetricsGetChipMetricsParams,
 ) => {
-  return [`/chip/${chipId}/metrics`, ...(params ? [params] : [])] as const;
+  return [
+    `/metrics/chip/${chipId}/metrics`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getMetricsGetChipMetricsQueryOptions = <
@@ -409,7 +412,7 @@ export const metricsListChips = (
   signal?: AbortSignal,
 ) => {
   return customInstance<MetricsListChips200>(
-    { url: `/chips`, method: "GET", params, signal },
+    { url: `/metrics/chips`, method: "GET", params, signal },
     options,
   );
 };
@@ -417,7 +420,7 @@ export const metricsListChips = (
 export const getMetricsListChipsQueryKey = (
   params?: MetricsListChipsParams,
 ) => {
-  return [`/chips`, ...(params ? [params] : [])] as const;
+  return [`/metrics/chips`, ...(params ? [params] : [])] as const;
 };
 
 export const getMetricsListChipsQueryOptions = <
@@ -578,7 +581,7 @@ export const metricsGetCurrentChip = (
   signal?: AbortSignal,
 ) => {
   return customInstance<MetricsGetCurrentChip200>(
-    { url: `/chip/current`, method: "GET", params, signal },
+    { url: `/metrics/chip/current`, method: "GET", params, signal },
     options,
   );
 };
@@ -586,7 +589,7 @@ export const metricsGetCurrentChip = (
 export const getMetricsGetCurrentChipQueryKey = (
   params?: MetricsGetCurrentChipParams,
 ) => {
-  return [`/chip/current`, ...(params ? [params] : [])] as const;
+  return [`/metrics/chip/current`, ...(params ? [params] : [])] as const;
 };
 
 export const getMetricsGetCurrentChipQueryOptions = <
@@ -758,7 +761,7 @@ export const metricsGetQubitMetricHistory = (
 ) => {
   return customInstance<QubitMetricHistoryResponse>(
     {
-      url: `/chip/${chipId}/qubit/${qid}/metric-history`,
+      url: `/metrics/chip/${chipId}/qubit/${qid}/metric-history`,
       method: "GET",
       params,
       signal,
@@ -773,7 +776,7 @@ export const getMetricsGetQubitMetricHistoryQueryKey = (
   params?: MetricsGetQubitMetricHistoryParams,
 ) => {
   return [
-    `/chip/${chipId}/qubit/${qid}/metric-history`,
+    `/metrics/chip/${chipId}/qubit/${qid}/metric-history`,
     ...(params ? [params] : []),
   ] as const;
 };
@@ -971,7 +974,7 @@ export const metricsGetCouplingMetricHistory = (
 ) => {
   return customInstance<QubitMetricHistoryResponse>(
     {
-      url: `/chip/${chipId}/coupling/${couplingId}/metric-history`,
+      url: `/metrics/chip/${chipId}/coupling/${couplingId}/metric-history`,
       method: "GET",
       params,
       signal,
@@ -986,7 +989,7 @@ export const getMetricsGetCouplingMetricHistoryQueryKey = (
   params?: MetricsGetCouplingMetricHistoryParams,
 ) => {
   return [
-    `/chip/${chipId}/coupling/${couplingId}/metric-history`,
+    `/metrics/chip/${chipId}/coupling/${couplingId}/metric-history`,
     ...(params ? [params] : []),
   ] as const;
 };

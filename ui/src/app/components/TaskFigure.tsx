@@ -59,9 +59,7 @@ export function TaskFigure({
         {figurePaths.map((p, i) => (
           <img
             key={i}
-            src={`${apiUrl}/executions/figure?path=${encodeURIComponent(
-              p,
-            )}`}
+            src={`${apiUrl}/executions/figure?path=${encodeURIComponent(p)}`}
             alt={`Result for QID ${qid}`}
             className={className}
           />
