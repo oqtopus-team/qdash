@@ -13,9 +13,9 @@ import {
 import type { User } from "../../schemas";
 
 import {
-  useAuthReadUsersMe,
-  useAuthLogin,
-  useAuthLogout,
+  useGetCurrentUser,
+  useLogin,
+  useLogout,
 } from "@/client/auth/auth";
 
 interface AuthContextType {
@@ -62,13 +62,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ログイン処理
-  const loginMutation = useAuthLogin();
+  const loginMutation = useLogin();
 
   // ログアウト処理
-  const logoutMutation = useAuthLogout();
+  const logoutMutation = useLogout();
 
   // ユーザー情報の取得
-  const { data: userData, error: userError } = useAuthReadUsersMe({
+  const { data: userData, error: userError } = useGetCurrentUser({
     query: {
       enabled: !!accessToken,
       retry: false,

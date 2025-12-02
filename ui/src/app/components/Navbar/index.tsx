@@ -6,7 +6,7 @@ import { useCallback, useRef } from "react";
 import type { User } from "@/schemas";
 
 import { useAuth } from "@/app/contexts/AuthContext";
-import { useAuthLogout } from "@/client/auth/auth";
+import { useLogout } from "@/client/auth/auth";
 
 function HiddenIcon() {
   return (
@@ -67,7 +67,7 @@ function Navbar() {
     modalRef.current?.showModal();
   }, []);
 
-  const logoutMutation = useAuthLogout();
+  const logoutMutation = useLogout();
   const handleLogout = useCallback(async () => {
     try {
       await logoutMutation.mutateAsync();

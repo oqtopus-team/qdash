@@ -14,7 +14,7 @@ import {
   useExecuteFlow,
 } from "@/client/flow/flow";
 import { useListChips } from "@/client/chip/chip";
-import { useAuthReadUsersMe } from "@/client/auth/auth";
+import { useGetCurrentUser } from "@/client/auth/auth";
 import { useGetExecutionLockStatus } from "@/client/execution/execution";
 import type { SaveFlowRequest } from "@/schemas";
 
@@ -43,7 +43,7 @@ export default function EditFlowPage() {
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
 
   // Fetch current user
-  const { data: userData } = useAuthReadUsersMe();
+  const { data: userData } = useGetCurrentUser();
 
   // Fetch chips
   const { data: chipsData } = useListChips();
