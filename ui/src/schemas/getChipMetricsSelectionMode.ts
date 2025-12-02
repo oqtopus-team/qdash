@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type MetricsGetChipMetricsSelectionMode =
-  (typeof MetricsGetChipMetricsSelectionMode)[keyof typeof MetricsGetChipMetricsSelectionMode];
+export type GetChipMetricsSelectionMode =
+  (typeof GetChipMetricsSelectionMode)[keyof typeof GetChipMetricsSelectionMode];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const MetricsGetChipMetricsSelectionMode = {
+export const GetChipMetricsSelectionMode = {
   latest: "latest",
   best: "best",
 } as const;

@@ -17,6 +17,7 @@ from qdash.api.schemas.execution import (
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
     ExecutionResponseSummary,
+    ListExecutionsResponse,
     Task,
 )
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
@@ -110,10 +111,10 @@ def flatten_tasks(task_results: dict) -> list[dict]:
     "/executions/figure",
     responses={404: {"model": Detail}},
     response_class=StreamingResponse,
-    summary="Fetches a calibration figure by its path",
-    operation_id="fetchFigureByPath",
+    summary="Get a calibration figure by its path",
+    operation_id="getFigureByPath",
 )
-def fetch_figure_by_path(path: str):
+def get_figure_by_path(path: str):
     """Fetch a calibration figure by its path."""
     if not Path(path).exists():
         raise HTTPException(
@@ -126,12 +127,12 @@ def fetch_figure_by_path(path: str):
 
 
 @router.get(
-    "/executions/lock_status",
-    summary="Fetches the status of a calibration.",
-    operation_id="fetchExecutionLockStatus",
+    "/executions/lock-status",
+    summary="Get the execution lock status",
+    operation_id="getExecutionLockStatus",
     response_model=ExecutionLockStatusResponse,
 )
-def fetch_execution_lock_status() -> ExecutionLockStatusResponse:
+def get_execution_lock_status() -> ExecutionLockStatusResponse:
     """Fetch the status of the execution lock."""
     status = ExecutionLockDocument.get_lock_status()
     if status is None:
@@ -141,8 +142,8 @@ def fetch_execution_lock_status() -> ExecutionLockStatusResponse:
 
 @router.get(
     "/executions",
-    response_model=list[ExecutionResponseSummary],
-    summary="Fetch executions",
+    response_model=ListExecutionsResponse,
+    summary="List executions",
     operation_id="listExecutions",
 )
 def list_executions(
@@ -150,8 +151,8 @@ def list_executions(
     chip_id: Annotated[str, Query(description="Chip ID to filter executions")],
     skip: Annotated[int, Query(ge=0, description="Number of items to skip")] = 0,
     limit: Annotated[int, Query(ge=1, le=100, description="Number of items to return")] = 20,
-) -> list[ExecutionResponseSummary]:
-    """Fetch executions for a given chip with pagination.
+) -> ListExecutionsResponse:
+    """List executions for a given chip with pagination.
 
     Parameters
     ----------
@@ -166,8 +167,8 @@ def list_executions(
 
     Returns
     -------
-    list[ExecutionResponseSummary]
-        List of executions for the chip
+    ListExecutionsResponse
+        Wrapped list of executions for the chip
 
     """
     logger.debug(f"Listing executions for chip {chip_id}, user: {current_user.username}, skip: {skip}, limit: {limit}")
@@ -179,28 +180,32 @@ def list_executions(
         .limit(limit)
         .run()
     )
-    return [
-        ExecutionResponseSummary(
-            name=f"{execution.name}-{execution.execution_id}",
-            execution_id=execution.execution_id,
-            status=execution.status,
-            start_at=execution.start_at,
-            end_at=execution.end_at,
-            elapsed_time=execution.elapsed_time,
-            tags=execution.tags,
-            note=execution.note,
-        )
-        for execution in executions
-    ]
+    return ListExecutionsResponse(
+        executions=[
+            ExecutionResponseSummary(
+                name=f"{execution.name}-{execution.execution_id}",
+                execution_id=execution.execution_id,
+                status=execution.status,
+                start_at=execution.start_at,
+                end_at=execution.end_at,
+                elapsed_time=execution.elapsed_time,
+                tags=execution.tags,
+                note=execution.note,
+            )
+            for execution in executions
+        ],
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.get(
     "/executions/{execution_id}",
     response_model=ExecutionResponseDetail,
-    summary="Fetch an execution by its ID",
-    operation_id="fetchExecution",
+    summary="Get an execution by its ID",
+    operation_id="getExecution",
 )
-def fetch_execution(
+def get_execution(
     execution_id: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> ExecutionResponseDetail:

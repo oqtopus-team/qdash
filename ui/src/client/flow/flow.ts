@@ -51,20 +51,20 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * List all Flows for the current user.
 
 Returns metadata only (no code content for performance).
- * @summary List Flows
+ * @summary List all flows
  */
 export const listFlows = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<ListFlowsResponse>(
-    { url: `/flow`, method: "GET", signal },
+    { url: `/flows`, method: "GET", signal },
     options,
   );
 };
 
 export const getListFlowsQueryKey = () => {
-  return [`/flow`] as const;
+  return [`/flows`] as const;
 };
 
 export const getListFlowsQueryOptions = <
@@ -151,7 +151,7 @@ export function useListFlows<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary List Flows
+ * @summary List all flows
  */
 
 export function useListFlows<
@@ -188,7 +188,7 @@ Steps:
 4. Write code to file: user_flows/{username}/{name}.py
 5. Upsert metadata to MongoDB
 6. Return file path and success message
- * @summary Save a Flow
+ * @summary Save a flow
  */
 export const saveFlow = (
   saveFlowRequest: BodyType<SaveFlowRequest>,
@@ -197,7 +197,7 @@ export const saveFlow = (
 ) => {
   return customInstance<SaveFlowResponse>(
     {
-      url: `/flow`,
+      url: `/flows`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: saveFlowRequest,
@@ -252,7 +252,7 @@ export type SaveFlowMutationBody = BodyType<SaveFlowRequest>;
 export type SaveFlowMutationError = ErrorType<HTTPValidationError>;
 
 /**
- * @summary Save a Flow
+ * @summary Save a flow
  */
 export const useSaveFlow = <
   TError = ErrorType<HTTPValidationError>,
@@ -282,20 +282,20 @@ export const useSaveFlow = <
  * List all available flow templates.
 
 Returns metadata only (no code content for performance).
- * @summary List Flow Templates
+ * @summary List all flow templates
  */
 export const listFlowTemplates = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<FlowTemplate[]>(
-    { url: `/flow/templates`, method: "GET", signal },
+    { url: `/flows/templates`, method: "GET", signal },
     options,
   );
 };
 
 export const getListFlowTemplatesQueryKey = () => {
-  return [`/flow/templates`] as const;
+  return [`/flows/templates`] as const;
 };
 
 export const getListFlowTemplatesQueryOptions = <
@@ -398,7 +398,7 @@ export function useListFlowTemplates<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary List Flow Templates
+ * @summary List all flow templates
  */
 
 export function useListFlowTemplates<
@@ -436,7 +436,7 @@ Steps:
 1. Find template metadata
 2. Read Python file content
 3. Return combined data
- * @summary Get Flow Template
+ * @summary Get a flow template
  */
 export const getFlowTemplate = (
   templateId: string,
@@ -444,13 +444,13 @@ export const getFlowTemplate = (
   signal?: AbortSignal,
 ) => {
   return customInstance<FlowTemplateWithCode>(
-    { url: `/flow/templates/${templateId}`, method: "GET", signal },
+    { url: `/flows/templates/${templateId}`, method: "GET", signal },
     options,
   );
 };
 
 export const getGetFlowTemplateQueryKey = (templateId?: string) => {
-  return [`/flow/templates/${templateId}`] as const;
+  return [`/flows/templates/${templateId}`] as const;
 };
 
 export const getGetFlowTemplateQueryOptions = <
@@ -565,7 +565,7 @@ export function useGetFlowTemplate<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary Get Flow Template
+ * @summary Get a flow template
  */
 
 export function useGetFlowTemplate<
@@ -609,7 +609,7 @@ Args:
 Returns:
 -------
     List of all flow schedules
- * @summary List all Flow schedules for current user
+ * @summary List all flow schedules for current user
  */
 export const listAllFlowSchedules = (
   params?: ListAllFlowSchedulesParams,
@@ -617,7 +617,7 @@ export const listAllFlowSchedules = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ListFlowSchedulesResponse>(
-    { url: `/flow/schedules`, method: "GET", params, signal },
+    { url: `/flows/schedules`, method: "GET", params, signal },
     options,
   );
 };
@@ -625,7 +625,7 @@ export const listAllFlowSchedules = (
 export const getListAllFlowSchedulesQueryKey = (
   params?: ListAllFlowSchedulesParams,
 ) => {
-  return [`/flow/schedules`, ...(params ? [params] : [])] as const;
+  return [`/flows/schedules`, ...(params ? [params] : [])] as const;
 };
 
 export const getListAllFlowSchedulesQueryOptions = <
@@ -735,7 +735,7 @@ export function useListAllFlowSchedules<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary List all Flow schedules for current user
+ * @summary List all flow schedules for current user
  */
 
 export function useListAllFlowSchedules<
@@ -786,14 +786,14 @@ Args:
 Returns:
 -------
     Standardized response with schedule type information
- * @summary Delete a Flow schedule
+ * @summary Delete a flow schedule
  */
 export const deleteFlowSchedule = (
   scheduleId: string,
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<DeleteScheduleResponse>(
-    { url: `/flow/schedule/${scheduleId}`, method: "DELETE" },
+    { url: `/flows/schedules/${scheduleId}`, method: "DELETE" },
     options,
   );
 };
@@ -843,7 +843,7 @@ export type DeleteFlowScheduleMutationResult = NonNullable<
 export type DeleteFlowScheduleMutationError = ErrorType<HTTPValidationError>;
 
 /**
- * @summary Delete a Flow schedule
+ * @summary Delete a flow schedule
  */
 export const useDeleteFlowSchedule = <
   TError = ErrorType<HTTPValidationError>,
@@ -883,7 +883,7 @@ Args:
 Returns:
 -------
     Success message
- * @summary Update a Flow schedule
+ * @summary Update a flow schedule
  */
 export const updateFlowSchedule = (
   scheduleId: string,
@@ -892,7 +892,7 @@ export const updateFlowSchedule = (
 ) => {
   return customInstance<UpdateScheduleResponse>(
     {
-      url: `/flow/schedule/${scheduleId}`,
+      url: `/flows/schedules/${scheduleId}`,
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       data: updateScheduleRequest,
@@ -946,7 +946,7 @@ export type UpdateFlowScheduleMutationBody = BodyType<UpdateScheduleRequest>;
 export type UpdateFlowScheduleMutationError = ErrorType<HTTPValidationError>;
 
 /**
- * @summary Update a Flow schedule
+ * @summary Update a flow schedule
  */
 export const useUpdateFlowSchedule = <
   TError = ErrorType<HTTPValidationError>,
@@ -979,7 +979,7 @@ Steps:
 1. Find metadata in MongoDB
 2. Read code from file
 3. Return combined data
- * @summary Get Flow details
+ * @summary Get flow details
  */
 export const getFlow = (
   name: string,
@@ -987,13 +987,13 @@ export const getFlow = (
   signal?: AbortSignal,
 ) => {
   return customInstance<GetFlowResponse>(
-    { url: `/flow/${name}`, method: "GET", signal },
+    { url: `/flows/${name}`, method: "GET", signal },
     options,
   );
 };
 
 export const getGetFlowQueryKey = (name?: string) => {
-  return [`/flow/${name}`] as const;
+  return [`/flows/${name}`] as const;
 };
 
 export const getGetFlowQueryOptions = <
@@ -1089,7 +1089,7 @@ export function useGetFlow<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary Get Flow details
+ * @summary Get flow details
  */
 
 export function useGetFlow<
@@ -1123,14 +1123,14 @@ export function useGetFlow<
 Steps:
 1. Delete file from user_flows/{username}/{name}.py
 2. Delete metadata from MongoDB
- * @summary Delete a Flow
+ * @summary Delete a flow
  */
 export const deleteFlow = (
   name: string,
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<DeleteFlow200>(
-    { url: `/flow/${name}`, method: "DELETE" },
+    { url: `/flows/${name}`, method: "DELETE" },
     options,
   );
 };
@@ -1180,7 +1180,7 @@ export type DeleteFlowMutationResult = NonNullable<
 export type DeleteFlowMutationError = ErrorType<HTTPValidationError>;
 
 /**
- * @summary Delete a Flow
+ * @summary Delete a flow
  */
 export const useDeleteFlow = <
   TError = ErrorType<HTTPValidationError>,
@@ -1214,7 +1214,7 @@ Steps:
 2. Merge request parameters with default_parameters
 3. Create flow run via Prefect Client
 4. Return execution_id and URLs
- * @summary Execute a Flow
+ * @summary Execute a flow
  */
 export const executeFlow = (
   name: string,
@@ -1224,7 +1224,7 @@ export const executeFlow = (
 ) => {
   return customInstance<ExecuteFlowResponse>(
     {
-      url: `/flow/${name}/execute`,
+      url: `/flows/${name}/execute`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: executeFlowRequest,
@@ -1279,7 +1279,7 @@ export type ExecuteFlowMutationBody = BodyType<ExecuteFlowRequest>;
 export type ExecuteFlowMutationError = ErrorType<HTTPValidationError>;
 
 /**
- * @summary Execute a Flow
+ * @summary Execute a flow
  */
 export const useExecuteFlow = <
   TError = ErrorType<HTTPValidationError>,
@@ -1317,7 +1317,7 @@ Args:
 Returns:
 -------
     Schedule response with schedule_id and details
- * @summary Schedule a Flow execution (cron or one-time)
+ * @summary Schedule a flow execution (cron or one-time)
  */
 export const scheduleFlow = (
   name: string,
@@ -1327,7 +1327,7 @@ export const scheduleFlow = (
 ) => {
   return customInstance<ScheduleFlowResponse>(
     {
-      url: `/flow/${name}/schedule`,
+      url: `/flows/${name}/schedule`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: scheduleFlowRequest,
@@ -1382,7 +1382,7 @@ export type ScheduleFlowMutationBody = BodyType<ScheduleFlowRequest>;
 export type ScheduleFlowMutationError = ErrorType<HTTPValidationError>;
 
 /**
- * @summary Schedule a Flow execution (cron or one-time)
+ * @summary Schedule a flow execution (cron or one-time)
  */
 export const useScheduleFlow = <
   TError = ErrorType<HTTPValidationError>,
@@ -1421,7 +1421,7 @@ Args:
 Returns:
 -------
     List of schedules for the flow
- * @summary List schedules for a specific Flow
+ * @summary List schedules for a specific flow
  */
 export const listFlowSchedules = (
   name: string,
@@ -1430,7 +1430,7 @@ export const listFlowSchedules = (
   signal?: AbortSignal,
 ) => {
   return customInstance<ListFlowSchedulesResponse>(
-    { url: `/flow/${name}/schedules`, method: "GET", params, signal },
+    { url: `/flows/${name}/schedules`, method: "GET", params, signal },
     options,
   );
 };
@@ -1439,7 +1439,7 @@ export const getListFlowSchedulesQueryKey = (
   name?: string,
   params?: ListFlowSchedulesParams,
 ) => {
-  return [`/flow/${name}/schedules`, ...(params ? [params] : [])] as const;
+  return [`/flows/${name}/schedules`, ...(params ? [params] : [])] as const;
 };
 
 export const getListFlowSchedulesQueryOptions = <
@@ -1558,7 +1558,7 @@ export function useListFlowSchedules<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary List schedules for a specific Flow
+ * @summary List schedules for a specific flow
  */
 
 export function useListFlowSchedules<

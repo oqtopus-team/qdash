@@ -204,10 +204,10 @@ async def register_flow_deployment(
 
 
 @router.post(
-    "/flow",
+    "/flows",
     response_model=SaveFlowResponse,
-    summary="Save a Flow",
-    operation_id="save_flow",
+    summary="Save a flow",
+    operation_id="saveFlow",
 )
 async def save_flow(
     request: SaveFlowRequest,
@@ -338,10 +338,10 @@ async def save_flow(
 
 
 @router.get(
-    "/flow",
+    "/flows",
     response_model=ListFlowsResponse,
-    summary="List Flows",
-    operation_id="list_flows",
+    summary="List all flows",
+    operation_id="listFlows",
 )
 async def list_flows(
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -384,10 +384,10 @@ async def list_flows(
 
 
 @router.get(
-    "/flow/templates",
+    "/flows/templates",
     response_model=list[FlowTemplate],
-    summary="List Flow Templates",
-    operation_id="list_flow_templates",
+    summary="List all flow templates",
+    operation_id="listFlowTemplates",
 )
 async def list_flow_templates() -> list[FlowTemplate]:
     """List all available flow templates.
@@ -413,10 +413,10 @@ async def list_flow_templates() -> list[FlowTemplate]:
 
 
 @router.get(
-    "/flow/templates/{template_id}",
+    "/flows/templates/{template_id}",
     response_model=FlowTemplateWithCode,
-    summary="Get Flow Template",
-    operation_id="get_flow_template",
+    summary="Get a flow template",
+    operation_id="getFlowTemplate",
 )
 async def get_flow_template(template_id: str) -> FlowTemplateWithCode:
     """Get flow template details including code content.
@@ -462,10 +462,10 @@ async def get_flow_template(template_id: str) -> FlowTemplateWithCode:
 
 
 @router.get(
-    "/flow/schedules",
+    "/flows/schedules",
     response_model=ListFlowSchedulesResponse,
-    summary="List all Flow schedules for current user",
-    operation_id="list_all_flow_schedules",
+    summary="List all flow schedules for current user",
+    operation_id="listAllFlowSchedules",
 )
 async def list_all_flow_schedules(
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -552,10 +552,10 @@ async def list_all_flow_schedules(
 
 
 @router.delete(
-    "/flow/schedule/{schedule_id}",
+    "/flows/schedules/{schedule_id}",
     response_model=DeleteScheduleResponse,
-    summary="Delete a Flow schedule",
-    operation_id="delete_flow_schedule",
+    summary="Delete a flow schedule",
+    operation_id="deleteFlowSchedule",
 )
 async def delete_flow_schedule(
     schedule_id: str,
@@ -648,10 +648,10 @@ async def delete_flow_schedule(
 
 
 @router.patch(
-    "/flow/schedule/{schedule_id}",
+    "/flows/schedules/{schedule_id}",
     response_model=UpdateScheduleResponse,
-    summary="Update a Flow schedule",
-    operation_id="update_flow_schedule",
+    summary="Update a flow schedule",
+    operation_id="updateFlowSchedule",
 )
 async def update_flow_schedule(
     schedule_id: str,
@@ -729,10 +729,10 @@ async def update_flow_schedule(
 
 
 @router.get(
-    "/flow/{name}",
+    "/flows/{name}",
     response_model=GetFlowResponse,
-    summary="Get Flow details",
-    operation_id="get_flow",
+    summary="Get flow details",
+    operation_id="getFlow",
 )
 async def get_flow(
     name: str,
@@ -779,10 +779,10 @@ async def get_flow(
 
 
 @router.post(
-    "/flow/{name}/execute",
+    "/flows/{name}/execute",
     response_model=ExecuteFlowResponse,
-    summary="Execute a Flow",
-    operation_id="execute_flow",
+    summary="Execute a flow",
+    operation_id="executeFlow",
 )
 async def execute_flow(
     name: str,
@@ -851,9 +851,9 @@ async def execute_flow(
 
 
 @router.delete(
-    "/flow/{name}",
-    summary="Delete a Flow",
-    operation_id="delete_flow",
+    "/flows/{name}",
+    summary="Delete a flow",
+    operation_id="deleteFlow",
 )
 async def delete_flow(
     name: str,
@@ -894,10 +894,10 @@ async def delete_flow(
 
 
 @router.post(
-    "/flow/{name}/schedule",
+    "/flows/{name}/schedule",
     response_model=ScheduleFlowResponse,
-    summary="Schedule a Flow execution (cron or one-time)",
-    operation_id="schedule_flow",
+    summary="Schedule a flow execution (cron or one-time)",
+    operation_id="scheduleFlow",
 )
 async def schedule_flow(
     name: str,
@@ -1152,10 +1152,10 @@ async def schedule_flow(
 
 
 @router.get(
-    "/flow/{name}/schedules",
+    "/flows/{name}/schedules",
     response_model=ListFlowSchedulesResponse,
-    summary="List schedules for a specific Flow",
-    operation_id="list_flow_schedules",
+    summary="List schedules for a specific flow",
+    operation_id="listFlowSchedules",
 )
 async def list_flow_schedules(
     name: str,

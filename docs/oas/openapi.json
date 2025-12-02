@@ -159,9 +159,9 @@
     "/executions/figure": {
       "get": {
         "tags": ["execution"],
-        "summary": "Fetches a calibration figure by its path",
+        "summary": "Get a calibration figure by its path",
         "description": "Fetch a calibration figure by its path.",
-        "operationId": "fetchFigureByPath",
+        "operationId": "getFigureByPath",
         "parameters": [
           {
             "name": "path",
@@ -200,12 +200,12 @@
         }
       }
     },
-    "/executions/lock_status": {
+    "/executions/lock-status": {
       "get": {
         "tags": ["execution"],
-        "summary": "Fetches the status of a calibration.",
+        "summary": "Get the execution lock status",
         "description": "Fetch the status of the execution lock.",
-        "operationId": "fetchExecutionLockStatus",
+        "operationId": "getExecutionLockStatus",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -223,8 +223,8 @@
     "/executions": {
       "get": {
         "tags": ["execution"],
-        "summary": "Fetch executions",
-        "description": "Fetch executions for a given chip with pagination.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nlist[ExecutionResponseSummary]\n    List of executions for the chip",
+        "summary": "List executions",
+        "description": "List executions for a given chip with pagination.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
         "operationId": "listExecutions",
         "security": [
           {
@@ -277,11 +277,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ExecutionResponseSummary"
-                  },
-                  "title": "Response Listexecutions"
+                  "$ref": "#/components/schemas/ListExecutionsResponse"
                 }
               }
             }
@@ -302,9 +298,9 @@
     "/executions/{execution_id}": {
       "get": {
         "tags": ["execution"],
-        "summary": "Fetch an execution by its ID",
+        "summary": "Get an execution by its ID",
         "description": "Return the execution detail by its ID.\n\nParameters\n----------\nexecution_id : str\n    ID of the execution to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
-        "operationId": "fetchExecution",
+        "operationId": "getExecution",
         "security": [
           {
             "HTTPBearer": []
@@ -345,10 +341,10 @@
         }
       }
     },
-    "/file/raw_data": {
+    "/files/raw-data": {
       "get": {
         "tags": ["file"],
-        "summary": "download file",
+        "summary": "Download file",
         "description": "Download a file.",
         "operationId": "downloadFile",
         "parameters": [
@@ -379,10 +375,10 @@
         }
       }
     },
-    "/file/zip": {
+    "/files/zip": {
       "get": {
         "tags": ["file"],
-        "summary": "download file or directory as zip",
+        "summary": "Download file or directory as zip",
         "description": "Download a file or directory as zip.",
         "operationId": "downloadZipFile",
         "parameters": [
@@ -413,7 +409,7 @@
         }
       }
     },
-    "/file/tree": {
+    "/files/tree": {
       "get": {
         "tags": ["file"],
         "summary": "Get file tree for entire config directory",
@@ -437,7 +433,7 @@
         }
       }
     },
-    "/file/content": {
+    "/files/content": {
       "get": {
         "tags": ["file"],
         "summary": "Get file content for editing",
@@ -527,7 +523,7 @@
         }
       }
     },
-    "/file/validate": {
+    "/files/validate": {
       "post": {
         "tags": ["file"],
         "summary": "Validate file content (YAML/JSON)",
@@ -569,7 +565,7 @@
         }
       }
     },
-    "/file/git/status": {
+    "/files/git/status": {
       "get": {
         "tags": ["file"],
         "summary": "Get Git status of config directory",
@@ -591,7 +587,7 @@
         }
       }
     },
-    "/file/git/pull": {
+    "/files/git/pull": {
       "post": {
         "tags": ["file"],
         "summary": "Pull latest config from Git repository",
@@ -618,7 +614,7 @@
         ]
       }
     },
-    "/file/git/push": {
+    "/files/git/push": {
       "post": {
         "tags": ["file"],
         "summary": "Push config changes to Git repository",
@@ -665,12 +661,12 @@
         ]
       }
     },
-    "/calibration/note": {
+    "/calibrations/note": {
       "get": {
         "tags": ["calibration"],
-        "summary": "Fetches all the cron schedules.",
+        "summary": "Get the calibration note",
         "description": "Get the calibration note.",
-        "operationId": "listCronSchedules",
+        "operationId": "getCalibrationNote",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -695,7 +691,7 @@
         "tags": ["settings"],
         "summary": "Get settings",
         "description": "Get settings from the server",
-        "operationId": "fetch_config",
+        "operationId": "getSettings",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -715,11 +711,11 @@
         ]
       }
     },
-    "/chip": {
+    "/chips": {
       "get": {
         "tags": ["chip"],
-        "summary": "Fetch all chips",
-        "description": "Fetch all chips.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nlist[ChipResponse]\n    List of available chips",
+        "summary": "List all chips",
+        "description": "List all chips.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListChipsResponse\n    Wrapped list of available chips",
         "operationId": "listChips",
         "responses": {
           "200": {
@@ -727,11 +723,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ChipResponse"
-                  },
-                  "type": "array",
-                  "title": "Response Listchips"
+                  "$ref": "#/components/schemas/ListChipsResponse"
                 }
               }
             }
@@ -787,12 +779,12 @@
         ]
       }
     },
-    "/chip/{chip_id}/dates": {
+    "/chips/{chip_id}/dates": {
       "get": {
         "tags": ["chip"],
-        "summary": "Fetch available dates for a chip",
+        "summary": "Get available dates for a chip",
         "description": "Fetch available dates for a chip from execution counter.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipDatesResponse\n    List of available dates",
-        "operationId": "fetchChipDates",
+        "operationId": "getChipDates",
         "security": [
           {
             "HTTPBearer": []
@@ -833,12 +825,12 @@
         }
       }
     },
-    "/chip/{chip_id}": {
+    "/chips/{chip_id}": {
       "get": {
         "tags": ["chip"],
-        "summary": "Fetch a chip",
-        "description": "Fetch a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Chip information\n\nRaises\n------\nHTTPException\n    If chip is not found",
-        "operationId": "fetchChip",
+        "summary": "Get a chip",
+        "description": "Get a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Chip information\n\nRaises\n------\nHTTPException\n    If chip is not found",
+        "operationId": "getChip",
         "security": [
           {
             "HTTPBearer": []
@@ -879,12 +871,12 @@
         }
       }
     },
-    "/chip/{chip_id}/mux/{mux_id}": {
+    "/chips/{chip_id}/muxes/{mux_id}": {
       "get": {
         "tags": ["chip"],
-        "summary": "Fetch the multiplexer details",
-        "description": "Fetch the multiplexer details.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmux_id : int\n    ID of the multiplexer\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nMuxDetailResponse\n    Multiplexer details",
-        "operationId": "fetchMuxDetails",
+        "summary": "Get multiplexer details",
+        "description": "Get the multiplexer details.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmux_id : int\n    ID of the multiplexer\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nMuxDetailResponse\n    Multiplexer details",
+        "operationId": "getChipMux",
         "security": [
           {
             "HTTPBearer": []
@@ -934,12 +926,12 @@
         }
       }
     },
-    "/chip/{chip_id}/mux": {
+    "/chips/{chip_id}/muxes": {
       "get": {
         "tags": ["chip"],
-        "summary": "Fetch the multiplexers",
-        "description": "Fetch the multiplexers.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListMuxResponse\n    List of multiplexer details",
-        "operationId": "listMuxes",
+        "summary": "List all multiplexers for a chip",
+        "description": "List all multiplexers for a chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListMuxResponse\n    List of multiplexer details",
+        "operationId": "listChipMuxes",
         "security": [
           {
             "HTTPBearer": []
@@ -983,9 +975,9 @@
     "/tasks": {
       "get": {
         "tags": ["task"],
-        "summary": "Fetch all tasks",
-        "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n    backend (Optional[str]): Optional backend name to filter tasks by.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
-        "operationId": "fetch_all_tasks",
+        "summary": "List all tasks",
+        "description": "List all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n    backend (Optional[str]): Optional backend name to filter tasks by.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
+        "operationId": "listTasks",
         "security": [
           {
             "HTTPBearer": []
@@ -1035,12 +1027,12 @@
         }
       }
     },
-    "/task/{task_id}": {
+    "/tasks/{task_id}/result": {
       "get": {
         "tags": ["task"],
         "summary": "Get task result by task ID",
         "description": "Get task result by task_id.\n\nArgs:\n----\n    task_id: The task ID to search for.\n    current_user: The current authenticated user.\n\nReturns:\n-------\n    TaskResultResponse: The task result information including figure paths.",
-        "operationId": "get_task_result_by_task_id",
+        "operationId": "getTaskResult",
         "security": [
           {
             "HTTPBearer": []
@@ -1081,12 +1073,12 @@
         }
       }
     },
-    "/task-results/qubit/latest": {
+    "/task-results/qubits/latest": {
       "get": {
         "tags": ["task_result"],
-        "summary": "Fetch latest qubit task results",
+        "summary": "Get latest qubit task results",
         "description": "Fetch latest qubit task results with optional defensive outlier filtering.",
-        "operationId": "fetchLatestQubitTaskResults",
+        "operationId": "getLatestQubitTaskResults",
         "security": [
           {
             "HTTPBearer": []
@@ -1140,12 +1132,12 @@
         }
       }
     },
-    "/task-results/qubit/history": {
+    "/task-results/qubits/history": {
       "get": {
         "tags": ["task_result"],
-        "summary": "Fetch historical qubit task results",
+        "summary": "Get historical qubit task results",
         "description": "Fetch historical qubit task results for a specific date.",
-        "operationId": "fetchHistoricalQubitTaskResults",
+        "operationId": "getHistoricalQubitTaskResults",
         "security": [
           {
             "HTTPBearer": []
@@ -1210,12 +1202,12 @@
         }
       }
     },
-    "/task-results/qubit/{qid}/history": {
+    "/task-results/qubits/{qid}/history": {
       "get": {
         "tags": ["task_result"],
-        "summary": "Fetch qubit task history",
+        "summary": "Get qubit task history",
         "description": "Fetch task history for a specific qubit.",
-        "operationId": "fetchQubitTaskHistory",
+        "operationId": "getQubitTaskHistory",
         "security": [
           {
             "HTTPBearer": []
@@ -1278,12 +1270,12 @@
         }
       }
     },
-    "/task-results/coupling/latest": {
+    "/task-results/couplings/latest": {
       "get": {
         "tags": ["task_result"],
-        "summary": "Fetch latest coupling task results",
+        "summary": "Get latest coupling task results",
         "description": "Fetch latest coupling task results.",
-        "operationId": "fetchLatestCouplingTaskResults",
+        "operationId": "getLatestCouplingTaskResults",
         "security": [
           {
             "HTTPBearer": []
@@ -1337,12 +1329,12 @@
         }
       }
     },
-    "/task-results/coupling/history": {
+    "/task-results/couplings/history": {
       "get": {
         "tags": ["task_result"],
-        "summary": "Fetch historical coupling task results",
+        "summary": "Get historical coupling task results",
         "description": "Fetch historical coupling task results for a specific date.",
-        "operationId": "fetchHistoricalCouplingTaskResults",
+        "operationId": "getHistoricalCouplingTaskResults",
         "security": [
           {
             "HTTPBearer": []
@@ -1407,12 +1399,12 @@
         }
       }
     },
-    "/task-results/coupling/{coupling_id}/history": {
+    "/task-results/couplings/{coupling_id}/history": {
       "get": {
         "tags": ["task_result"],
-        "summary": "Fetch coupling task history",
+        "summary": "Get coupling task history",
         "description": "Fetch task history for a specific coupling.",
-        "operationId": "fetchCouplingTaskHistory",
+        "operationId": "getCouplingTaskHistory",
         "security": [
           {
             "HTTPBearer": []
@@ -1478,9 +1470,9 @@
     "/task-results/timeseries": {
       "get": {
         "tags": ["task_result"],
-        "summary": "Fetch timeseries task results by tag and parameter",
+        "summary": "Get timeseries task results by tag and parameter",
         "description": "Fetch timeseries task results by tag and parameter.\n\nIf qid is provided, returns data only for that specific qubit.\nOtherwise, returns data for all qubits.\n\nReturns\n-------\n    TimeSeriesData: Time series data for the specified parameters.",
-        "operationId": "fetchTimeseriesTaskResults",
+        "operationId": "getTimeseriesTaskResults",
         "security": [
           {
             "HTTPBearer": []
@@ -1585,12 +1577,12 @@
         }
       }
     },
-    "/tag": {
+    "/tags": {
       "get": {
         "tags": ["tag"],
-        "summary": "list all tag",
-        "description": "Fetch all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n\nReturns:\n-------\n    ListTaskResponse: The list of tasks.",
-        "operationId": "listAllTag",
+        "summary": "List all tags",
+        "description": "List all tags.\n\nArgs:\n----\n    current_user (User): The current user.\n\nReturns:\n-------\n    ListTaskResponse: The list of tasks.",
+        "operationId": "listTags",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1610,7 +1602,7 @@
         ]
       }
     },
-    "/device_topology": {
+    "/device-topology": {
       "post": {
         "tags": ["device_topology"],
         "summary": "Get the device topology",
@@ -1655,7 +1647,7 @@
         ]
       }
     },
-    "/device_topology/plot": {
+    "/device-topology/plot": {
       "post": {
         "tags": ["device_topology"],
         "summary": "Get the device topology plot",
@@ -1693,23 +1685,19 @@
         ]
       }
     },
-    "/backend": {
+    "/backends": {
       "get": {
         "tags": ["backend"],
-        "summary": "Get all backends",
+        "summary": "List all backends",
         "description": "Retrieve a list of all registered backends",
-        "operationId": "fetchAllBackends",
+        "operationId": "listBackends",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/BackendResponseModel"
-                  },
-                  "type": "array",
-                  "title": "Response Fetchallbackends"
+                  "$ref": "#/components/schemas/ListBackendsResponse"
                 }
               }
             }
@@ -1722,12 +1710,12 @@
         ]
       }
     },
-    "/flow": {
+    "/flows": {
       "get": {
         "tags": ["flow"],
-        "summary": "List Flows",
+        "summary": "List all flows",
         "description": "List all Flows for the current user.\n\nReturns metadata only (no code content for performance).",
-        "operationId": "list_flows",
+        "operationId": "listFlows",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1748,9 +1736,9 @@
       },
       "post": {
         "tags": ["flow"],
-        "summary": "Save a Flow",
+        "summary": "Save a flow",
         "description": "Save a Flow to file system and MongoDB.\n\nSteps:\n1. Validate flow name\n2. Validate flow code contains expected function\n3. Create user directory if not exists\n4. Write code to file: user_flows/{username}/{name}.py\n5. Upsert metadata to MongoDB\n6. Return file path and success message",
-        "operationId": "save_flow",
+        "operationId": "saveFlow",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1790,12 +1778,12 @@
         ]
       }
     },
-    "/flow/templates": {
+    "/flows/templates": {
       "get": {
         "tags": ["flow"],
-        "summary": "List Flow Templates",
+        "summary": "List all flow templates",
         "description": "List all available flow templates.\n\nReturns metadata only (no code content for performance).",
-        "operationId": "list_flow_templates",
+        "operationId": "listFlowTemplates",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1806,7 +1794,7 @@
                     "$ref": "#/components/schemas/FlowTemplate"
                   },
                   "type": "array",
-                  "title": "Response List Flow Templates"
+                  "title": "Response Listflowtemplates"
                 }
               }
             }
@@ -1819,12 +1807,12 @@
         ]
       }
     },
-    "/flow/templates/{template_id}": {
+    "/flows/templates/{template_id}": {
       "get": {
         "tags": ["flow"],
-        "summary": "Get Flow Template",
+        "summary": "Get a flow template",
         "description": "Get flow template details including code content.\n\nSteps:\n1. Find template metadata\n2. Read Python file content\n3. Return combined data",
-        "operationId": "get_flow_template",
+        "operationId": "getFlowTemplate",
         "security": [
           {
             "HTTPBearer": []
@@ -1865,12 +1853,12 @@
         }
       }
     },
-    "/flow/schedules": {
+    "/flows/schedules": {
       "get": {
         "tags": ["flow"],
-        "summary": "List all Flow schedules for current user",
+        "summary": "List all flow schedules for current user",
         "description": "List all Flow schedules (cron and one-time) for the current user.\n\nArgs:\n----\n    current_user: Current authenticated user\n    limit: Maximum number of schedules to return (max 100)\n    offset: Number of schedules to skip\n\nReturns:\n-------\n    List of all flow schedules",
-        "operationId": "list_all_flow_schedules",
+        "operationId": "listAllFlowSchedules",
         "security": [
           {
             "HTTPBearer": []
@@ -1922,12 +1910,12 @@
         }
       }
     },
-    "/flow/schedule/{schedule_id}": {
+    "/flows/schedules/{schedule_id}": {
       "delete": {
         "tags": ["flow"],
-        "summary": "Delete a Flow schedule",
+        "summary": "Delete a flow schedule",
         "description": "Delete a Flow schedule (cron or one-time).\n\nSchedule ID Types:\n- **Cron schedules**: schedule_id is the deployment_id (UUID format)\n- **One-time schedules**: schedule_id is the flow_run_id (UUID format)\n\nThe API automatically determines the type and handles accordingly:\n- Cron: Removes the schedule from the deployment (schedule=None)\n- One-time: Deletes the scheduled flow run\n\nArgs:\n----\n    schedule_id: Schedule ID (deployment_id for cron, flow_run_id for one-time)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Standardized response with schedule type information",
-        "operationId": "delete_flow_schedule",
+        "operationId": "deleteFlowSchedule",
         "security": [
           {
             "HTTPBearer": []
@@ -1969,9 +1957,9 @@
       },
       "patch": {
         "tags": ["flow"],
-        "summary": "Update a Flow schedule",
+        "summary": "Update a flow schedule",
         "description": "Update a Flow schedule (cron schedules only).\n\nCan update: active status, cron expression, parameters.\n\nArgs:\n----\n    schedule_id: Schedule ID (deployment_id)\n    request: Update request\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Success message",
-        "operationId": "update_flow_schedule",
+        "operationId": "updateFlowSchedule",
         "security": [
           {
             "HTTPBearer": []
@@ -2022,12 +2010,12 @@
         }
       }
     },
-    "/flow/{name}": {
+    "/flows/{name}": {
       "get": {
         "tags": ["flow"],
-        "summary": "Get Flow details",
+        "summary": "Get flow details",
         "description": "Get Flow details including code content.\n\nSteps:\n1. Find metadata in MongoDB\n2. Read code from file\n3. Return combined data",
-        "operationId": "get_flow",
+        "operationId": "getFlow",
         "security": [
           {
             "HTTPBearer": []
@@ -2069,9 +2057,9 @@
       },
       "delete": {
         "tags": ["flow"],
-        "summary": "Delete a Flow",
+        "summary": "Delete a flow",
         "description": "Delete a Flow.\n\nSteps:\n1. Delete file from user_flows/{username}/{name}.py\n2. Delete metadata from MongoDB",
-        "operationId": "delete_flow",
+        "operationId": "deleteFlow",
         "security": [
           {
             "HTTPBearer": []
@@ -2098,7 +2086,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response Delete Flow"
+                  "title": "Response Deleteflow"
                 }
               }
             }
@@ -2116,12 +2104,12 @@
         }
       }
     },
-    "/flow/{name}/execute": {
+    "/flows/{name}/execute": {
       "post": {
         "tags": ["flow"],
-        "summary": "Execute a Flow",
+        "summary": "Execute a flow",
         "description": "Execute a Flow via Prefect deployment.\n\nSteps:\n1. Find flow metadata in MongoDB\n2. Merge request parameters with default_parameters\n3. Create flow run via Prefect Client\n4. Return execution_id and URLs",
-        "operationId": "execute_flow",
+        "operationId": "executeFlow",
         "security": [
           {
             "HTTPBearer": []
@@ -2172,12 +2160,12 @@
         }
       }
     },
-    "/flow/{name}/schedule": {
+    "/flows/{name}/schedule": {
       "post": {
         "tags": ["flow"],
-        "summary": "Schedule a Flow execution (cron or one-time)",
+        "summary": "Schedule a flow execution (cron or one-time)",
         "description": "Schedule a Flow execution with cron or one-time schedule.\n\nArgs:\n----\n    name: Flow name\n    request: Schedule request (must provide either cron or scheduled_time)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Schedule response with schedule_id and details",
-        "operationId": "schedule_flow",
+        "operationId": "scheduleFlow",
         "security": [
           {
             "HTTPBearer": []
@@ -2228,12 +2216,12 @@
         }
       }
     },
-    "/flow/{name}/schedules": {
+    "/flows/{name}/schedules": {
       "get": {
         "tags": ["flow"],
-        "summary": "List schedules for a specific Flow",
+        "summary": "List schedules for a specific flow",
         "description": "List all schedules (cron and one-time) for a specific Flow.\n\nArgs:\n----\n    name: Flow name\n    current_user: Current authenticated user\n    limit: Maximum number of schedules to return (max 100)\n    offset: Number of schedules to skip\n\nReturns:\n-------\n    List of schedules for the flow",
-        "operationId": "list_flow_schedules",
+        "operationId": "listFlowSchedules",
         "security": [
           {
             "HTTPBearer": []
@@ -2299,7 +2287,7 @@
         "tags": ["metrics"],
         "summary": "Get Metrics Config",
         "description": "Get metrics metadata configuration.\n\nThis endpoint returns the metrics configuration loaded from YAML,\nincluding display metadata for all qubit and coupling metrics.\n\nReturns\n-------\n    Dictionary with metrics configuration including:\n    - qubit_metrics: Metadata for single-qubit metrics\n    - coupling_metrics: Metadata for two-qubit coupling metrics\n    - color_scale: Color scale configuration for visualization",
-        "operationId": "metrics-get_metrics_config",
+        "operationId": "getMetricsConfig",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2308,7 +2296,7 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Metrics-Get Metrics Config"
+                  "title": "Response Getmetricsconfig"
                 }
               }
             }
@@ -2321,12 +2309,12 @@
         ]
       }
     },
-    "/metrics/chip/{chip_id}/metrics": {
+    "/metrics/chips/{chip_id}/metrics": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Chip Metrics",
         "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n    current_user: Current authenticated user\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
-        "operationId": "metrics-get_chip_metrics",
+        "operationId": "getChipMetrics",
         "security": [
           {
             "HTTPBearer": []
@@ -2398,12 +2386,12 @@
         }
       }
     },
-    "/metrics/chip/{chip_id}/qubit/{qid}/history": {
+    "/metrics/chips/{chip_id}/qubits/{qid}/history": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Qubit Metric History",
         "description": "Get historical metric data for a specific qubit with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    qid: The qubit identifier (e.g., \"0\", \"Q00\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids",
-        "operationId": "metrics-get_qubit_metric_history",
+        "operationId": "getQubitMetricHistory",
         "security": [
           {
             "HTTPBearer": []
@@ -2503,12 +2491,12 @@
         }
       }
     },
-    "/metrics/chip/{chip_id}/coupling/{coupling_id}/history": {
+    "/metrics/chips/{chip_id}/couplings/{coupling_id}/history": {
       "get": {
         "tags": ["metrics"],
         "summary": "Get Coupling Metric History",
         "description": "Get historical metric data for a specific coupling with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific coupling metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    coupling_id: The coupling identifier (e.g., \"0-1\", \"2-3\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids\n    (Note: qid field contains coupling_id for coupling metrics)",
-        "operationId": "metrics-get_coupling_metric_history",
+        "operationId": "getCouplingMetricHistory",
         "security": [
           {
             "HTTPBearer": []
@@ -3589,6 +3577,84 @@
         "required": ["task_name", "result"],
         "title": "LatestTaskResultResponse",
         "description": "Response model for fetching the latest tasks grouped by qid/coupling_id."
+      },
+      "ListBackendsResponse": {
+        "properties": {
+          "backends": {
+            "items": {
+              "$ref": "#/components/schemas/BackendResponseModel"
+            },
+            "type": "array",
+            "title": "Backends"
+          }
+        },
+        "type": "object",
+        "required": ["backends"],
+        "title": "ListBackendsResponse",
+        "description": "Response model for listing all backends.\n\nWraps list of backends for API consistency and future extensibility."
+      },
+      "ListChipsResponse": {
+        "properties": {
+          "chips": {
+            "items": {
+              "$ref": "#/components/schemas/ChipResponse"
+            },
+            "type": "array",
+            "title": "Chips"
+          }
+        },
+        "type": "object",
+        "required": ["chips"],
+        "title": "ListChipsResponse",
+        "description": "Response model for listing all chips.\n\nWraps list of chips for API consistency and future extensibility (e.g., pagination)."
+      },
+      "ListExecutionsResponse": {
+        "properties": {
+          "executions": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionResponseSummary"
+            },
+            "type": "array",
+            "title": "Executions"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "skip": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skip"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": ["executions"],
+        "title": "ListExecutionsResponse",
+        "description": "Response model for listing executions.\n\nWraps list of executions for API consistency and future extensibility (e.g., pagination)."
       },
       "ListFlowSchedulesResponse": {
         "properties": {

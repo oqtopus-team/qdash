@@ -4,7 +4,7 @@ import React, { useMemo } from "react";
 
 import dynamic from "next/dynamic";
 
-import { useMetricsGetChipMetrics } from "@/client/metrics/metrics";
+import { useGetChipMetrics } from "@/client/metrics/metrics";
 
 const Plot = dynamic(() => import("react-plotly.js"), {
   ssr: false,
@@ -52,7 +52,7 @@ export function CouplingGraphCard({
 }: CouplingGraphCardProps) {
   // Fetch metrics data
   const withinHours = timeRange === "current" ? undefined : parseInt(timeRange);
-  const { data, isLoading, isError } = useMetricsGetChipMetrics(
+  const { data, isLoading, isError } = useGetChipMetrics(
     chipId,
     withinHours ? { within_hours: withinHours } : undefined,
     {

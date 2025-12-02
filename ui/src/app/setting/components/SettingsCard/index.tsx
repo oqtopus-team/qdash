@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 
-import { useFetchConfig } from "@/client/settings/settings";
+import { useGetSettings } from "@/client/settings/settings";
 
 interface Settings {
   env: string;
@@ -16,7 +16,7 @@ import { Toast } from "../Toast";
 export function SettingsCard() {
   const [setting, setSetting] = useState<Settings | null>(null);
   const [showToast, setShowToast] = useState(false);
-  const { data, isError, isLoading } = useFetchConfig();
+  const { data, isError, isLoading } = useGetSettings();
 
   const handleCopy = useCallback((value: string) => {
     navigator.clipboard.writeText(value);

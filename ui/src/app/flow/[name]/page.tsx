@@ -15,7 +15,7 @@ import {
 } from "@/client/flow/flow";
 import { useListChips } from "@/client/chip/chip";
 import { useAuthReadUsersMe } from "@/client/auth/auth";
-import { useFetchExecutionLockStatus } from "@/client/execution/execution";
+import { useGetExecutionLockStatus } from "@/client/execution/execution";
 import type { SaveFlowRequest } from "@/schemas";
 
 import "react-toastify/dist/ReactToastify.css";
@@ -50,7 +50,7 @@ export default function EditFlowPage() {
 
   // Fetch execution lock status (refresh every 5 seconds)
   const { data: lockStatus, isLoading: isLockStatusLoading } =
-    useFetchExecutionLockStatus({
+    useGetExecutionLockStatus({
       query: {
         refetchInterval: 5000,
       },
@@ -116,13 +116,13 @@ export default function EditFlowPage() {
   // Set default chip_id if not set by flow data
   useEffect(() => {
     if (
-      chipsData?.data &&
-      chipsData.data.length > 0 &&
+      chipsData?.data?.chips &&
+      chipsData.data.chips.length > 0 &&
       !chipId &&
       !data?.data
     ) {
       // Get the latest chip (sort by installed_at descending)
-      const sortedChips = [...chipsData.data].sort((a, b) => {
+      const sortedChips = [...chipsData.data.chips].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;

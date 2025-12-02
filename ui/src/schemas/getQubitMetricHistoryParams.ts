@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type MetricsGetCouplingMetricHistoryParams = {
+export type GetQubitMetricHistoryParams = {
   /**
-   * Metric name (e.g., zx90_gate_fidelity, bell_state_fidelity)
+   * Metric name (e.g., t1, qubit_frequency)
    */
   metric: string;
   /**

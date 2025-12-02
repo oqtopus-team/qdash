@@ -8,8 +8,8 @@ import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
 import {
-  useFetchLatestCouplingTaskResults,
-  useFetchHistoricalCouplingTaskResults,
+  useGetLatestCouplingTaskResults,
+  useGetHistoricalCouplingTaskResults,
 } from "@/client/task-result/task-result";
 import { CouplingTaskHistoryModal } from "../CouplingTaskHistoryModal";
 
@@ -85,7 +85,7 @@ export function CouplingGrid({
     isLoading,
     isError,
   } = selectedDate === "latest"
-    ? useFetchLatestCouplingTaskResults(
+    ? useGetLatestCouplingTaskResults(
         { chip_id: chipId, task: selectedTask },
         {
           query: {
@@ -94,7 +94,7 @@ export function CouplingGrid({
           },
         },
       )
-    : useFetchHistoricalCouplingTaskResults(
+    : useGetHistoricalCouplingTaskResults(
         { chip_id: chipId, task: selectedTask, date: selectedDate },
         {
           query: {

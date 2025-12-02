@@ -18,7 +18,7 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { BackendResponseModel } from "../../schemas";
+import type { ListBackendsResponse } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
 import type { ErrorType } from "../../lib/custom-instance";
@@ -27,68 +27,64 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
  * Retrieve a list of all registered backends
- * @summary Get all backends
+ * @summary List all backends
  */
-export const fetchAllBackends = (
+export const listBackends = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
-  return customInstance<BackendResponseModel[]>(
-    { url: `/backend`, method: "GET", signal },
+  return customInstance<ListBackendsResponse>(
+    { url: `/backends`, method: "GET", signal },
     options,
   );
 };
 
-export const getFetchAllBackendsQueryKey = () => {
-  return [`/backend`] as const;
+export const getListBackendsQueryKey = () => {
+  return [`/backends`] as const;
 };
 
-export const getFetchAllBackendsQueryOptions = <
-  TData = Awaited<ReturnType<typeof fetchAllBackends>>,
+export const getListBackendsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBackends>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof fetchAllBackends>>, TError, TData>
+    UseQueryOptions<Awaited<ReturnType<typeof listBackends>>, TError, TData>
   >;
   request?: SecondParameter<typeof customInstance>;
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getFetchAllBackendsQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getListBackendsQueryKey();
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof fetchAllBackends>>
-  > = ({ signal }) => fetchAllBackends(requestOptions, signal);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listBackends>>> = ({
+    signal,
+  }) => listBackends(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof fetchAllBackends>>,
+    Awaited<ReturnType<typeof listBackends>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData> };
 };
 
-export type FetchAllBackendsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof fetchAllBackends>>
+export type ListBackendsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listBackends>>
 >;
-export type FetchAllBackendsQueryError = ErrorType<unknown>;
+export type ListBackendsQueryError = ErrorType<unknown>;
 
-export function useFetchAllBackends<
-  TData = Awaited<ReturnType<typeof fetchAllBackends>>,
+export function useListBackends<
+  TData = Awaited<ReturnType<typeof listBackends>>,
   TError = ErrorType<unknown>,
 >(
   options: {
     query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof fetchAllBackends>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof listBackends>>, TError, TData>
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchAllBackends>>,
+          Awaited<ReturnType<typeof listBackends>>,
           TError,
-          Awaited<ReturnType<typeof fetchAllBackends>>
+          Awaited<ReturnType<typeof listBackends>>
         >,
         "initialData"
       >;
@@ -98,23 +94,19 @@ export function useFetchAllBackends<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData>;
 };
-export function useFetchAllBackends<
-  TData = Awaited<ReturnType<typeof fetchAllBackends>>,
+export function useListBackends<
+  TData = Awaited<ReturnType<typeof listBackends>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof fetchAllBackends>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof listBackends>>, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof fetchAllBackends>>,
+          Awaited<ReturnType<typeof listBackends>>,
           TError,
-          Awaited<ReturnType<typeof fetchAllBackends>>
+          Awaited<ReturnType<typeof listBackends>>
         >,
         "initialData"
       >;
@@ -122,43 +114,35 @@ export function useFetchAllBackends<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useFetchAllBackends<
-  TData = Awaited<ReturnType<typeof fetchAllBackends>>,
+export function useListBackends<
+  TData = Awaited<ReturnType<typeof listBackends>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof fetchAllBackends>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof listBackends>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary Get all backends
+ * @summary List all backends
  */
 
-export function useFetchAllBackends<
-  TData = Awaited<ReturnType<typeof fetchAllBackends>>,
+export function useListBackends<
+  TData = Awaited<ReturnType<typeof listBackends>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof fetchAllBackends>>,
-        TError,
-        TData
-      >
+      UseQueryOptions<Awaited<ReturnType<typeof listBackends>>, TError, TData>
     >;
     request?: SecondParameter<typeof customInstance>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getFetchAllBackendsQueryOptions(options);
+  const queryOptions = getListBackendsQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from "react";
 
-import { useFetchChipDates } from "@/client/chip/chip";
+import { useGetChipDates } from "@/client/chip/chip";
 
 interface UseDateNavigationResult {
   availableDates: string[];
@@ -23,7 +23,7 @@ export function useDateNavigation(
     data: datesResponse,
     isLoading,
     isError,
-  } = useFetchChipDates(chipId, {
+  } = useGetChipDates(chipId, {
     query: {
       enabled: !!chipId,
       staleTime: 300000, // 5 minutes - dates don't change frequently

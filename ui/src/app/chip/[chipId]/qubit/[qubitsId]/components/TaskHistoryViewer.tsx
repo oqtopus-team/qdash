@@ -14,7 +14,7 @@ import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
 import PlotlyRenderer from "@/app/components/PlotlyRenderer";
-import { useFetchQubitTaskHistory } from "@/client/task-result/task-result";
+import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { TaskGridView } from "@/shared/components/TaskGridView";
 
 interface TaskHistoryViewerProps {
@@ -41,7 +41,7 @@ export function TaskHistoryViewer({
   );
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
 
-  const { data, isLoading, error } = useFetchQubitTaskHistory(
+  const { data, isLoading, error } = useGetQubitTaskHistory(
     qubitId,
     { chip_id: chipId, task: taskName },
     {

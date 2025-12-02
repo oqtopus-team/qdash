@@ -6,6 +6,13 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type FetchFigureByPathParams = {
-  path: string;
+export type GetQubitTaskHistoryParams = {
+  /**
+   * Chip ID
+   */
+  chip_id: string;
+  /**
+   * Task name
+   */
+  task: string;
 };

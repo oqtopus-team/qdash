@@ -17,15 +17,15 @@ logger.setLevel(logging.DEBUG)
 
 
 @router.get(
-    "/tag",
+    "/tags",
     response_model=ListTagResponse,
-    summary="list all tag",
-    operation_id="listAllTag",
+    summary="List all tags",
+    operation_id="listTags",
 )
-def list_all_tag(
+def list_tags(
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> ListTagResponse:
-    """Fetch all tasks.
+    """List all tags.
 
     Args:
     ----

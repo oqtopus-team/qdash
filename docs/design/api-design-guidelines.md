@@ -11,7 +11,10 @@ This document defines the API design conventions and standards for the QDash pro
 5. [Query Parameters](#query-parameters)
 6. [Error Handling](#error-handling)
 7. [Documentation](#documentation)
-8. [Current State and Migration](#current-state-and-migration)
+8. [Resource Naming](#resource-naming)
+9. [Router Tags](#router-tags)
+10. [File Naming](#file-naming)
+11. [Migration Strategy](#migration-strategy)
 
 ---
 
@@ -98,13 +101,13 @@ POST /flowExecute/{name}                      # camelCase, poor structure
 
 Use HTTP methods according to their semantic meaning:
 
-| Method | Purpose | Idempotent | Response |
-|--------|---------|------------|----------|
-| `GET` | Retrieve resource(s) | Yes | 200 OK |
-| `POST` | Create new resource | No | 201 Created |
-| `PUT` | Replace entire resource | Yes | 200 OK |
-| `PATCH` | Partial update | No | 200 OK |
-| `DELETE` | Remove resource | Yes | 204 No Content or 200 OK |
+| Method   | Purpose                 | Idempotent | Response                 |
+| -------- | ----------------------- | ---------- | ------------------------ |
+| `GET`    | Retrieve resource(s)    | Yes        | 200 OK                   |
+| `POST`   | Create new resource     | No         | 201 Created              |
+| `PUT`    | Replace entire resource | Yes        | 200 OK                   |
+| `PATCH`  | Partial update          | No         | 200 OK                   |
+| `DELETE` | Remove resource         | Yes        | 204 No Content or 200 OK |
 
 ### Guidelines
 
@@ -147,14 +150,14 @@ operation_id="get_chip"
 
 Follow the **verb + noun** pattern consistently:
 
-| Action | Verb | Example |
-|--------|------|---------|
-| List collection | `list` | `listChips`, `listExecutions` |
-| Get single resource | `get` | `getChip`, `getExecution` |
-| Create resource | `create` | `createChip`, `createFlow` |
-| Update resource | `update` | `updateChip`, `updateSchedule` |
-| Delete resource | `delete` | `deleteChip`, `deleteFlow` |
-| Custom action | descriptive verb | `executeFlow`, `scheduleFlow` |
+| Action              | Verb             | Example                        |
+| ------------------- | ---------------- | ------------------------------ |
+| List collection     | `list`           | `listChips`, `listExecutions`  |
+| Get single resource | `get`            | `getChip`, `getExecution`      |
+| Create resource     | `create`         | `createChip`, `createFlow`     |
+| Update resource     | `update`         | `updateChip`, `updateSchedule` |
+| Delete resource     | `delete`         | `deleteChip`, `deleteFlow`     |
+| Custom action       | descriptive verb | `executeFlow`, `scheduleFlow`  |
 
 ### Consistency Rules
 
@@ -207,7 +210,7 @@ Always wrap collection responses in a response object with a descriptive field n
 # ✅ Good - Wrapped response
 class ListChipsResponse(BaseModel):
     chips: list[ChipResponse]
-    
+
 @router.get("/chips", response_model=ListChipsResponse)
 def list_chips() -> ListChipsResponse:
     return ListChipsResponse(chips=[...])
@@ -235,12 +238,12 @@ class ListChipsResponse(BaseModel):
 
 ### Naming Conventions for Response Models
 
-| Type | Pattern | Example |
-|------|---------|---------|
-| List response | `List{Resource}sResponse` | `ListChipsResponse`, `ListTasksResponse` |
-| Single resource | `{Resource}Response` | `ChipResponse`, `TaskResponse` |
-| Detail response | `{Resource}DetailResponse` | `ExecutionDetailResponse` |
-| Create/Update response | `{Action}{Resource}Response` | `CreateChipResponse` |
+| Type                   | Pattern                      | Example                                  |
+| ---------------------- | ---------------------------- | ---------------------------------------- |
+| List response          | `List{Resource}sResponse`    | `ListChipsResponse`, `ListTasksResponse` |
+| Single resource        | `{Resource}Response`         | `ChipResponse`, `TaskResponse`           |
+| Detail response        | `{Resource}DetailResponse`   | `ExecutionDetailResponse`                |
+| Create/Update response | `{Action}{Resource}Response` | `CreateChipResponse`                     |
 
 ---
 
@@ -298,14 +301,14 @@ filter: str = Query(...)      # Too generic
 
 ### Use Appropriate HTTP Status Codes
 
-| Status | Use Case |
-|--------|----------|
-| 400 Bad Request | Invalid input, validation errors |
-| 401 Unauthorized | Authentication required |
-| 403 Forbidden | Authenticated but not authorized |
-| 404 Not Found | Resource doesn't exist |
-| 409 Conflict | Resource conflict (e.g., duplicate) |
-| 500 Internal Server Error | Server-side errors |
+| Status                    | Use Case                            |
+| ------------------------- | ----------------------------------- |
+| 400 Bad Request           | Invalid input, validation errors    |
+| 401 Unauthorized          | Authentication required             |
+| 403 Forbidden             | Authenticated but not authorized    |
+| 404 Not Found             | Resource doesn't exist              |
+| 409 Conflict              | Resource conflict (e.g., duplicate) |
+| 500 Internal Server Error | Server-side errors                  |
 
 ### Error Response Format
 
@@ -316,7 +319,7 @@ from fastapi import HTTPException
 
 # ✅ Good - Descriptive error
 raise HTTPException(
-    status_code=404, 
+    status_code=404,
     detail=f"Chip '{chip_id}' not found for user '{username}'"
 )
 
@@ -369,7 +372,7 @@ Provide detailed descriptions for complex endpoints:
     summary="Get latest qubit task results",
     description="""
     Fetch the most recent task results for all qubits in a chip.
-    
+
     Results are filtered by the specified task name and include
     output parameters and execution metadata.
     """,
@@ -387,56 +390,220 @@ task: Annotated[str, Query(description="Name of the task to filter by")]
 
 ---
 
-## Current State and Migration
+## Resource Naming
 
-### Current Inconsistencies
+### Domain Resources
 
-The existing API has the following inconsistencies that should be addressed during refactoring:
+Resource names should be clear, domain-specific nouns that represent the entities in the QDash system.
 
-#### 1. Endpoint Paths (Singular vs Plural)
+| Resource       | Description                        | URL Path                     | Example                                |
+| -------------- | ---------------------------------- | ---------------------------- | -------------------------------------- |
+| `chips`        | Quantum chip configurations        | `/chips`                     | `GET /chips/{chip_id}`                 |
+| `qubits`       | Individual qubit units             | `/chips/{chip_id}/qubits`    | Nested under chips                     |
+| `couplings`    | Qubit-to-qubit connections         | `/chips/{chip_id}/couplings` | Nested under chips                     |
+| `muxes`        | Multiplexer groups (4 qubits each) | `/chips/{chip_id}/muxes`     | Nested under chips                     |
+| `tasks`        | Calibration task definitions       | `/tasks`                     | `GET /tasks`                           |
+| `task-results` | Task execution results             | `/task-results`              | `GET /task-results/qubits/latest`      |
+| `executions`   | Workflow execution records         | `/executions`                | `GET /executions/{execution_id}`       |
+| `flows`        | User-defined workflow scripts      | `/flows`                     | `GET /flows/{name}`                    |
+| `tags`         | Labels for categorization          | `/tags`                      | `GET /tags`                            |
+| `backends`     | Quantum backend configurations     | `/backends`                  | `GET /backends`                        |
+| `settings`     | Application settings (singleton)   | `/settings`                  | `GET /settings`                        |
+| `calibrations` | Calibration operations             | `/calibrations`              | `GET /calibrations/note`               |
+| `metrics`      | Chip calibration metrics           | `/metrics`                   | `GET /metrics/chips/{chip_id}/metrics` |
+| `files`        | Configuration file operations      | `/files`                     | `GET /files/tree`                      |
 
-| Current | Should Be |
-|---------|-----------|
-| `/chip` | `/chips` |
-| `/tag` | `/tags` |
-| `/backend` | `/backends` |
-| `/task/{task_id}` | `/tasks/{task_id}` |
-| `/flow` | `/flows` |
+### Nested Resource Patterns
 
-#### 2. Operation IDs (snake_case → camelCase)
+When resources have parent-child relationships, use nesting to express hierarchy:
 
-| Current | Should Be |
-|---------|-----------|
-| `fetch_all_tasks` | `listTasks` |
-| `get_task_result_by_task_id` | `getTaskResult` |
-| `save_flow` | `createFlow` or `saveFlow` |
-| `list_flows` | `listFlows` |
-| `fetch_config` | `getSettings` |
+```
+/chips/{chip_id}/muxes                    # All muxes for a chip
+/chips/{chip_id}/muxes/{mux_id}           # Specific mux
+/task-results/qubits/{qid}/history        # Qubit task history
+/task-results/couplings/{coupling_id}/history  # Coupling task history
+/flows/{name}/schedules                   # Schedules for a flow
+/metrics/chips/{chip_id}/qubits/{qid}/history  # Metric history for qubit
+```
 
-#### 3. Response Models (Raw List → Wrapped)
+### Resource Naming Rules
 
-| Current | Should Be |
-|---------|-----------|
-| `list[ChipResponse]` | `ListChipsResponse` |
-| `list[BackendResponseModel]` | `ListBackendsResponse` |
+1. **Use domain terminology**: Use terms familiar to quantum computing (qubits, couplings, fidelity)
+2. **Be specific**: `task-results` not `results`, `flow-schedules` not `schedules`
+3. **Avoid abbreviations**: `executions` not `execs`, `configurations` not `configs`
+4. **Use hyphens for multi-word**: `task-results`, `device-topology`, `lock-status`
 
-### Migration Strategy
+---
 
-When refactoring endpoints:
+## Router Tags
 
-1. **Create new endpoint** with correct conventions
-2. **Deprecate old endpoint** (add deprecation notice)
-3. **Update clients** to use new endpoint
-4. **Remove old endpoint** after transition period
+### Tag Naming Convention
+
+Router tags are used for OpenAPI documentation grouping and should use **lowercase singular** or **kebab-case** format.
 
 ```python
-# Step 1 & 2: Add new endpoint, deprecate old
-@router.get("/chip", deprecated=True)  # Old
+# ✅ Good - Consistent tag naming
+app.include_router(chip.router, tags=["chip"])
+app.include_router(task.router, tags=["task"])
+app.include_router(task_result.router, tags=["task-result"])
+app.include_router(device_topology.router, tags=["device-topology"])
+
+# ❌ Bad - Inconsistent
+app.include_router(chip.router, tags=["chips"])          # Plural
+app.include_router(task.router, tags=["Task"])           # PascalCase
+app.include_router(device_topology.router, tags=["device_topology"])  # Underscore
+```
+
+### Standard Tags
+
+| Tag               | Router                   | Description              |
+| ----------------- | ------------------------ | ------------------------ |
+| `auth`            | `auth.router`            | Authentication endpoints |
+| `chip`            | `chip.router`            | Chip management          |
+| `task`            | `task.router`            | Task definitions         |
+| `task-result`     | `task_result.router`     | Task execution results   |
+| `execution`       | `execution.router`       | Workflow executions      |
+| `flow`            | `flow.router`            | User-defined flows       |
+| `tag`             | `tag.router`             | Tag management           |
+| `backend`         | `backend.router`         | Backend configurations   |
+| `settings`        | `settings.router`        | Application settings     |
+| `calibration`     | `calibration.router`     | Calibration operations   |
+| `metrics`         | `metrics.router`         | Calibration metrics      |
+| `file`            | `file.router`            | File operations          |
+| `device-topology` | `device_topology.router` | Device topology          |
+
+### Tag Organization in OpenAPI
+
+Tags appear in the order they are registered. Group related tags together:
+
+```python
+# Core resources
+app.include_router(chip.router, tags=["chip"])
+app.include_router(task.router, tags=["task"])
+app.include_router(task_result.router, tags=["task-result"])
+
+# Workflow
+app.include_router(execution.router, tags=["execution"])
+app.include_router(flow.router, tags=["flow"])
+
+# Configuration
+app.include_router(settings.router, tags=["settings"])
+app.include_router(backend.router, tags=["backend"])
+```
+
+---
+
+## File Naming
+
+### Router Files
+
+Router files should use **snake_case** matching the resource name:
+
+```
+src/qdash/api/routers/
+├── chip.py              # Chip endpoints
+├── task.py              # Task endpoints
+├── task_result.py       # Task result endpoints (multi-word)
+├── execution.py         # Execution endpoints
+├── flow.py              # Flow endpoints
+├── tag.py               # Tag endpoints
+├── backend.py           # Backend endpoints
+├── settings.py          # Settings endpoints
+├── calibration.py       # Calibration endpoints
+├── metrics.py           # Metrics endpoints
+├── file.py              # File endpoints
+├── device_topology.py   # Device topology endpoints (multi-word)
+└── auth.py              # Authentication endpoints
+```
+
+### Schema Files
+
+Schema files should match their corresponding router:
+
+```
+src/qdash/api/schemas/
+├── chip.py              # ChipResponse, ListChipsResponse, etc.
+├── task.py              # TaskResponse, ListTasksResponse, etc.
+├── task_result.py       # TaskResultResponse, etc.
+├── execution.py         # ExecutionResponseSummary, ListExecutionsResponse, etc.
+├── flow.py              # FlowSummary, ListFlowsResponse, etc.
+├── tag.py               # Tag, ListTagResponse
+├── backend.py           # BackendResponseModel, ListBackendsResponse
+├── calibration.py       # CalibrationNoteResponse
+├── metrics.py           # ChipMetricsResponse, QubitMetrics, etc.
+├── file.py              # FileTreeNode, SaveFileRequest, etc.
+├── device_topology.py   # Device, Qubit, Coupling, etc.
+├── auth.py              # User, TokenResponse, etc.
+└── error.py             # ErrorResponse, Detail
+```
+
+### Naming Rules
+
+| Type            | Convention      | Example                |
+| --------------- | --------------- | ---------------------- |
+| Router file     | `snake_case.py` | `task_result.py`       |
+| Schema file     | `snake_case.py` | `task_result.py`       |
+| Response model  | `PascalCase`    | `ListChipsResponse`    |
+| Request model   | `PascalCase`    | `CreateChipRequest`    |
+| Router variable | `router`        | `router = APIRouter()` |
+
+### Import Conventions
+
+```python
+# In main.py - import router modules
+from qdash.api.routers import (
+    auth,
+    backend,
+    calibration,
+    chip,
+    device_topology,
+    execution,
+    file,
+    flow,
+    metrics,
+    settings,
+    tag,
+    task,
+    task_result,
+)
+
+# In router files - import schemas
+from qdash.api.schemas.chip import (
+    ChipResponse,
+    CreateChipRequest,
+    ListChipsResponse,
+)
+```
+
+---
+
+## Migration Strategy
+
+When adding new endpoints or modifying existing ones:
+
+1. **Follow conventions from the start**: Use this guide for all new development
+2. **Update clients immediately**: Regenerate API clients after changes (`bun run generate-qdash`)
+3. **Avoid breaking changes**: If breaking changes are necessary, use versioning or deprecation
+
+### Deprecation Pattern
+
+```python
+# Step 1: Add new endpoint, deprecate old
+@router.get("/chip", deprecated=True)  # Old - mark as deprecated
 def list_chips_deprecated():
     return list_chips()
 
 @router.get("/chips", response_model=ListChipsResponse)  # New
 def list_chips():
+    pass
+```
+
+### Versioning Pattern
+
+```python
+# For significant breaking changes, consider API versioning
+@router.get("/v2/chips", response_model=ListChipsResponse)
+def list_chips_v2():
     pass
 ```
 
@@ -470,6 +637,27 @@ def list_chips():
 - [ ] Summary uses imperative mood
 - [ ] All parameters have descriptions
 - [ ] Error responses documented
+
+### Resource Naming Checklist
+
+- [ ] Uses domain-specific terminology
+- [ ] Multi-word resources use hyphens in URLs
+- [ ] Nested resources follow parent-child hierarchy
+- [ ] Avoids unnecessary abbreviations
+
+### Router Tag Checklist
+
+- [ ] Uses lowercase
+- [ ] Uses singular form or kebab-case for multi-word
+- [ ] Matches resource domain
+- [ ] Consistent across similar resources
+
+### File Naming Checklist
+
+- [ ] Router files use snake_case
+- [ ] Schema files match router names
+- [ ] Response models use PascalCase
+- [ ] Request models use PascalCase with action prefix
 
 ---
 

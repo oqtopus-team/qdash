@@ -6,7 +6,7 @@ import Select from "react-select";
 
 import type { SingleValue } from "react-select";
 
-import { useFetchAllBackends } from "@/client/backend/backend";
+import { useListBackends } from "@/client/backend/backend";
 
 interface BackendOption {
   value: string;
@@ -22,14 +22,14 @@ export function BackendSelector({
   selectedBackend,
   onBackendSelect,
 }: BackendSelectorProps) {
-  const { data: backends, isLoading, isError } = useFetchAllBackends();
+  const { data: backends, isLoading, isError } = useListBackends();
 
   const options = useMemo(() => {
-    if (!backends?.data) return [];
+    if (!backends?.data?.backends) return [];
 
     return [
       { value: "", label: "All Backends" },
-      ...backends.data.map((backend) => ({
+      ...backends.data.backends.map((backend) => ({
         value: backend.name,
         label: backend.name,
       })),

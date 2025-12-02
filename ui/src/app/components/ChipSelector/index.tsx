@@ -26,9 +26,9 @@ export function ChipSelector({
   const { data: chips, isLoading, isError } = useListChips();
 
   const sortedOptions = useMemo(() => {
-    if (!chips?.data) return [];
+    if (!chips?.data?.chips) return [];
 
-    return [...chips.data]
+    return [...chips.data.chips]
       .sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;

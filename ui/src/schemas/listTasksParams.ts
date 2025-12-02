@@ -6,13 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type FetchQubitTaskHistoryParams = {
+export type ListTasksParams = {
   /**
-   * Chip ID
+   * Optional backend name to filter tasks by
    */
-  chip_id: string;
-  /**
-   * Task name
-   */
-  task: string;
+  backend?: string | null;
 };

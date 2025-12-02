@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
-import { useMetricsGetQubitMetricHistory } from "@/client/metrics/metrics";
+import { useGetQubitMetricHistory } from "@/client/metrics/metrics";
 
 interface MetricHistoryItem {
   value: number | null;
@@ -28,11 +28,11 @@ export function QubitMetricHistoryModal({
 }: QubitMetricHistoryModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const { data, isLoading, isError } = useMetricsGetQubitMetricHistory(
-    chipId,
-    qid,
-    { metric: metricName, limit: 20, within_days: 30 },
-  );
+  const { data, isLoading, isError } = useGetQubitMetricHistory(chipId, qid, {
+    metric: metricName,
+    limit: 20,
+    within_days: 30,
+  });
 
   const history = (data?.data?.history || []) as MetricHistoryItem[];
 

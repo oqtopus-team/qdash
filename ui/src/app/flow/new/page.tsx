@@ -135,9 +135,9 @@ export default function NewFlowPage() {
   }, [userData, username]);
 
   useEffect(() => {
-    if (chipsData?.data && chipsData.data.length > 0 && !chipId) {
+    if (chipsData?.data?.chips && chipsData.data.chips.length > 0 && !chipId) {
       // Get the latest chip (sort by installed_at descending)
-      const sortedChips = [...chipsData.data].sort((a, b) => {
+      const sortedChips = [...chipsData.data.chips].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;

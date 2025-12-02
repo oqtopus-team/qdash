@@ -38,9 +38,9 @@ COUPLING_FIDELITY_THRESHOLD = 0.75
 
 
 @router.get(
-    "/task-results/qubit/latest",
-    summary="Fetch latest qubit task results",
-    operation_id="fetchLatestQubitTaskResults",
+    "/task-results/qubits/latest",
+    summary="Get latest qubit task results",
+    operation_id="getLatestQubitTaskResults",
     response_model=LatestTaskResultResponse,
     response_model_exclude_none=True,
 )
@@ -115,9 +115,9 @@ def fetch_latest_qubit_task_results(
 
 
 @router.get(
-    "/task-results/qubit/history",
-    summary="Fetch historical qubit task results",
-    operation_id="fetchHistoricalQubitTaskResults",
+    "/task-results/qubits/history",
+    summary="Get historical qubit task results",
+    operation_id="getHistoricalQubitTaskResults",
     response_model=LatestTaskResultResponse,
     response_model_exclude_none=True,
 )
@@ -212,9 +212,9 @@ def fetch_historical_qubit_task_results(
 
 
 @router.get(
-    "/task-results/qubit/{qid}/history",
-    summary="Fetch qubit task history",
-    operation_id="fetchQubitTaskHistory",
+    "/task-results/qubits/{qid}/history",
+    summary="Get qubit task history",
+    operation_id="getQubitTaskHistory",
     response_model=TaskHistoryResponse,
     response_model_exclude_none=True,
 )
@@ -276,9 +276,9 @@ def fetch_qubit_task_history(
 
 
 @router.get(
-    "/task-results/coupling/latest",
-    summary="Fetch latest coupling task results",
-    operation_id="fetchLatestCouplingTaskResults",
+    "/task-results/couplings/latest",
+    summary="Get latest coupling task results",
+    operation_id="getLatestCouplingTaskResults",
     response_model=LatestTaskResultResponse,
     response_model_exclude_none=True,
 )
@@ -354,9 +354,9 @@ def fetch_latest_coupling_task_results(
 
 
 @router.get(
-    "/task-results/coupling/history",
-    summary="Fetch historical coupling task results",
-    operation_id="fetchHistoricalCouplingTaskResults",
+    "/task-results/couplings/history",
+    summary="Get historical coupling task results",
+    operation_id="getHistoricalCouplingTaskResults",
     response_model=LatestTaskResultResponse,
     response_model_exclude_none=True,
 )
@@ -455,9 +455,9 @@ def fetch_historical_coupling_task_results(
 
 
 @router.get(
-    "/task-results/coupling/{coupling_id}/history",
-    summary="Fetch coupling task history",
-    operation_id="fetchCouplingTaskHistory",
+    "/task-results/couplings/{coupling_id}/history",
+    summary="Get coupling task history",
+    operation_id="getCouplingTaskHistory",
     response_model=TaskHistoryResponse,
     response_model_exclude_none=True,
 )
@@ -596,9 +596,9 @@ def _fetch_timeseries_data(
 
 @router.get(
     "/task-results/timeseries",
-    summary="Fetch timeseries task results by tag and parameter",
+    summary="Get timeseries task results by tag and parameter",
     response_model=TimeSeriesData,
-    operation_id="fetchTimeseriesTaskResults",
+    operation_id="getTimeseriesTaskResults",
 )
 def fetch_timeseries_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],

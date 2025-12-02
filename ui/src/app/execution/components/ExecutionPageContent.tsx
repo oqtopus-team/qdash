@@ -17,7 +17,7 @@ import { useExecutionUrlState } from "@/app/hooks/useUrlState";
 import { useListChips } from "@/client/chip/chip";
 import {
   useListExecutions,
-  useFetchExecution,
+  useGetExecution,
 } from "@/client/execution/execution";
 
 export function ExecutionPageContent() {
@@ -58,13 +58,13 @@ export function ExecutionPageContent() {
 
   // Memoize sorted chips to avoid recalculating on every render
   const sortedChips = useMemo(() => {
-    if (!chipsData?.data) return [];
-    return [...chipsData.data].sort((a, b) => {
+    if (!chipsData?.data?.chips) return [];
+    return [...chipsData.data.chips].sort((a, b) => {
       const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
       const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
       return dateB - dateA;
     });
-  }, [chipsData?.data]);
+  }, [chipsData?.data?.chips]);
 
   // Set the latest chip as default when chips are loaded and no chip is selected from URL
   useEffect(() => {
@@ -106,7 +106,7 @@ export function ExecutionPageContent() {
     data: executionDetailData,
     isLoading: isDetailLoading,
     isError: isDetailError,
-  } = useFetchExecution(selectedExecutionId || "", {
+  } = useGetExecution(selectedExecutionId || "", {
     query: {
       // Refresh every 5 seconds
       refetchInterval: 5000,
@@ -119,12 +119,12 @@ export function ExecutionPageContent() {
 
   // Set card data when execution data is fetched (filter by date)
   useEffect(() => {
-    if (executionData) {
-      let filteredData = executionData.data;
+    if (executionData?.data?.executions) {
+      let filteredData = executionData.data.executions;
 
       // Filter by date if not "latest"
       if (selectedDate !== "latest") {
-        filteredData = executionData.data.filter((exec) => {
+        filteredData = executionData.data.executions.filter((exec) => {
           const execDate = new Date(exec.start_at);
           const execDateStr = `${execDate.getFullYear()}${String(
             execDate.getMonth() + 1,
@@ -205,7 +205,8 @@ export function ExecutionPageContent() {
       <button
         onClick={() => setCurrentPage((prev) => prev + 1)}
         disabled={
-          !executionData?.data || executionData.data.length < itemsPerPage
+          !executionData?.data?.executions ||
+          executionData.data.executions.length < itemsPerPage
         }
         className="btn btn-sm btn-outline"
       >

@@ -13,7 +13,8 @@ logger = getLogger("uvicorn.app")
     response_model=Settings,
     summary="Get settings",
     description="Get settings from the server",
-    operation_id="fetch_config",
+    operation_id="getSettings",
 )
-def fetchConfig(settings: Annotated[Settings, Depends(get_settings)]):
+def get_settings_endpoint(settings: Annotated[Settings, Depends(get_settings)]):
+    """Get server settings."""
     return settings

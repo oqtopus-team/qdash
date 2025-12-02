@@ -8,8 +8,8 @@ import type {
 } from "../types";
 import type { OutputParameterModel } from "@/schemas";
 
-import { useFetchTimeseriesTaskResults } from "@/client/task-result/task-result";
-import { useListAllTag } from "@/client/tag/tag";
+import { useGetTimeseriesTaskResults } from "@/client/task-result/task-result";
+import { useListTags } from "@/client/tag/tag";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
 interface UseQubitTimeseriesOptions {
@@ -40,7 +40,7 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
     isLoading,
     error,
     refetch,
-  } = useFetchTimeseriesTaskResults(
+  } = useGetTimeseriesTaskResults(
     {
       chip_id: chipId,
       parameter,
@@ -184,7 +184,7 @@ export function useQubitParameters(options: UseQubitParametersOptions = {}) {
     data: tagsResponse,
     isLoading: isLoadingTags,
     error: tagsError,
-  } = useListAllTag({
+  } = useListTags({
     query: { enabled },
   });
 

@@ -6,7 +6,7 @@ import Select from "react-select";
 
 import type { SingleValue } from "react-select";
 
-import { useFetchChipDates } from "@/client/chip/chip";
+import { useGetChipDates } from "@/client/chip/chip";
 
 interface DateOption {
   value: string;
@@ -33,7 +33,7 @@ export function DateSelector({
     data: datesResponse,
     isLoading,
     isError,
-  } = useFetchChipDates(chipId, {
+  } = useGetChipDates(chipId, {
     query: {
       enabled: !disabled && !!chipId,
     },

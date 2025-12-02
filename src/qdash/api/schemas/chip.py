@@ -78,3 +78,12 @@ class ListMuxResponse(BaseModel):
     """ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers."""
 
     muxes: dict[int, MuxDetailResponse]
+
+
+class ListChipsResponse(BaseModel):
+    """Response model for listing all chips.
+
+    Wraps list of chips for API consistency and future extensibility (e.g., pagination).
+    """
+
+    chips: list[ChipResponse]

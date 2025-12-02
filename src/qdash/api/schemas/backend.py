@@ -12,3 +12,12 @@ class BackendResponseModel(BaseModel):
 
     name: str
     username: str
+
+
+class ListBackendsResponse(BaseModel):
+    """Response model for listing all backends.
+
+    Wraps list of backends for API consistency and future extensibility.
+    """
+
+    backends: list[BackendResponseModel]
