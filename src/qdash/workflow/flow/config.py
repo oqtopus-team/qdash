@@ -4,14 +4,13 @@ This module provides immutable configuration objects for FlowSession,
 supporting dependency injection and testability.
 """
 
-from dataclasses import dataclass, field
 from typing import Any
 
+from pydantic import BaseModel, Field, field_validator
 from qdash.workflow.flow.github import GitHubPushConfig
 
 
-@dataclass(frozen=True)
-class FlowSessionConfig:
+class FlowSessionConfig(BaseModel):
     """Immutable configuration for FlowSession.
 
     This value object encapsulates all initialization parameters for a
@@ -46,6 +45,8 @@ class FlowSessionConfig:
         ```
     """
 
+    model_config = {"frozen": True}
+
     username: str
     chip_id: str
     qids: tuple[str, ...]  # Use tuple for immutability
@@ -54,19 +55,26 @@ class FlowSessionConfig:
     name: str = "Python Flow Execution"
     tags: tuple[str, ...] | None = None  # Use tuple for immutability
     use_lock: bool = True
-    note: dict[str, Any] | None = field(default=None)
+    note: dict[str, Any] | None = Field(default=None)
     enable_github_pull: bool = False
     github_push_config: GitHubPushConfig | None = None
     muxes: tuple[int, ...] | None = None  # Use tuple for immutability
 
-    def __post_init__(self) -> None:
-        """Validate configuration values."""
-        if not self.username:
-            raise ValueError("username cannot be empty")
-        if not self.chip_id:
-            raise ValueError("chip_id cannot be empty")
-        if not self.qids:
+    @field_validator("username", "chip_id")
+    @classmethod
+    def not_empty_string(cls, v: str) -> str:
+        """Validate that string fields are not empty."""
+        if not v:
+            raise ValueError("cannot be empty")
+        return v
+
+    @field_validator("qids")
+    @classmethod
+    def qids_not_empty(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        """Validate that qids is not empty."""
+        if not v:
             raise ValueError("qids cannot be empty")
+        return v
 
     @classmethod
     def create(
@@ -194,8 +202,7 @@ class FlowSessionConfig:
         )
 
 
-@dataclass(frozen=True)
-class CalibrationPaths:
+class CalibrationPaths(BaseModel):
     """Immutable paths for calibration data storage.
 
     This value object encapsulates all path-related configuration
@@ -210,6 +217,8 @@ class CalibrationPaths:
         calib_path: Path for calibration files
         calib_note_path: Path for calibration notes
     """
+
+    model_config = {"frozen": True}
 
     user_path: str
     classifier_dir: str

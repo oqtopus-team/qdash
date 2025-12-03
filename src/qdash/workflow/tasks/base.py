@@ -16,14 +16,11 @@ class PreProcessResult(BaseModel):
 class PostProcessResult(BaseModel):
     """Result class."""
 
+    model_config = {"arbitrary_types_allowed": True}
+
     output_parameters: dict[str, OutputParameterModel]
     figures: list[go.Figure | go.FigureWidget] = []
     raw_data: list[Any] = []
-
-    class Config:
-        """Pydantic config."""
-
-        arbitrary_types_allowed = True
 
 
 class RunResult(BaseModel):

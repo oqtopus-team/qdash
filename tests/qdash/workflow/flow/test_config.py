@@ -1,6 +1,8 @@
 """Tests for FlowSessionConfig value objects."""
 
 import pytest
+from pydantic import ValidationError
+
 from qdash.workflow.flow.config import CalibrationPaths, FlowSessionConfig
 from qdash.workflow.flow.github import GitHubPushConfig
 
@@ -79,8 +81,8 @@ class TestFlowSessionConfigValidation:
     """Test FlowSessionConfig validation."""
 
     def test_empty_username_raises(self):
-        """Test that empty username raises ValueError."""
-        with pytest.raises(ValueError, match="username cannot be empty"):
+        """Test that empty username raises ValidationError."""
+        with pytest.raises(ValidationError, match="cannot be empty"):
             FlowSessionConfig(
                 username="",
                 chip_id="chip_1",
@@ -88,8 +90,8 @@ class TestFlowSessionConfigValidation:
             )
 
     def test_empty_chip_id_raises(self):
-        """Test that empty chip_id raises ValueError."""
-        with pytest.raises(ValueError, match="chip_id cannot be empty"):
+        """Test that empty chip_id raises ValidationError."""
+        with pytest.raises(ValidationError, match="cannot be empty"):
             FlowSessionConfig(
                 username="test_user",
                 chip_id="",
@@ -97,8 +99,8 @@ class TestFlowSessionConfigValidation:
             )
 
     def test_empty_qids_raises(self):
-        """Test that empty qids raises ValueError."""
-        with pytest.raises(ValueError, match="qids cannot be empty"):
+        """Test that empty qids raises ValidationError."""
+        with pytest.raises(ValidationError, match="qids cannot be empty"):
             FlowSessionConfig(
                 username="test_user",
                 chip_id="chip_1",
@@ -110,17 +112,17 @@ class TestFlowSessionConfigImmutability:
     """Test FlowSessionConfig immutability."""
 
     def test_cannot_modify_fields(self):
-        """Test that fields cannot be modified after creation."""
+        """Test that fields cannot be modified after creation (Pydantic frozen model)."""
         config = FlowSessionConfig(
             username="test_user",
             chip_id="chip_1",
             qids=("0", "1"),
         )
 
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValidationError, match="frozen"):
             config.username = "new_user"
 
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValidationError, match="frozen"):
             config.qids = ("3", "4")
 
 
@@ -211,11 +213,11 @@ class TestCalibrationPaths:
         assert paths.calib_note_path == "/app/calib_data/test_user/20240101/001/calib_note"
 
     def test_immutability(self):
-        """Test CalibrationPaths is immutable."""
+        """Test CalibrationPaths is immutable (Pydantic frozen model)."""
         paths = CalibrationPaths.from_config(
             username="test_user",
             execution_id="20240101-001",
         )
 
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValidationError, match="frozen"):
             paths.user_path = "/new/path"
