@@ -25,7 +25,7 @@ Example:
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pendulum
 from prefect import get_run_logger
@@ -40,9 +40,6 @@ from qdash.workflow.engine.calibration.params_updater import get_params_updater
 from qdash.workflow.engine.calibration.prefect_tasks import execute_dynamic_task_by_qid
 from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.flow.github import GitHubIntegration, GitHubPushConfig
-
-if TYPE_CHECKING:
-    from qdash.workflow.flow.config import FlowSessionConfig
 
 
 def generate_execution_id(username: str, chip_id: str) -> str:
@@ -798,48 +795,6 @@ class FlowSession:
             if self.use_lock and self._lock_acquired:
                 ExecutionLockDocument.unlock()
                 self._lock_acquired = False
-
-    @classmethod
-    def from_config(cls, config: "FlowSessionConfig") -> "FlowSession":
-        """Create a FlowSession from a FlowSessionConfig.
-
-        This factory method provides a clean way to create FlowSession instances
-        from immutable configuration objects.
-
-        Args:
-            config: FlowSessionConfig with all session parameters
-
-        Returns:
-            New FlowSession instance
-
-        Example:
-            ```python
-            from qdash.workflow.flow.config import FlowSessionConfig
-
-            config = FlowSessionConfig.create(
-                username="alice",
-                chip_id="chip_1",
-                qids=["0", "1", "2"],
-                backend_name="qubex",
-            )
-            session = FlowSession.from_config(config)
-            ```
-        """
-
-        return cls(
-            username=config.username,
-            chip_id=config.chip_id,
-            qids=list(config.qids),
-            execution_id=config.execution_id,
-            backend_name=config.backend_name,
-            name=config.name,
-            tags=list(config.tags) if config.tags else None,
-            use_lock=config.use_lock,
-            note=dict(config.note) if config.note else None,
-            enable_github_pull=config.enable_github_pull,
-            github_push_config=config.github_push_config,
-            muxes=list(config.muxes) if config.muxes else None,
-        )
 
 
 # Global session storage for Prefect context
