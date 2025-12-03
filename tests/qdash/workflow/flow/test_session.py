@@ -127,17 +127,17 @@ class TestFlowSessionInitialization:
             execution_id="20240101-001",
             chip_id="chip_1",
             qids=["0", "1"],
-            backend="fake",
+            backend_name="fake",
         )
 
         # Verify attributes
         assert session.username == "test_user"
         assert session.execution_id == "20240101-001"
         assert session.chip_id == "chip_1"
-        assert session.backend == "fake"
+        assert session.backend_name == "fake"
         assert session.qids == ["0", "1"]
         assert session.execution_manager is not None
-        assert session.session is not None
+        assert session.backend is not None
 
     def test_flow_session_default_tags(self, mock_flow_session_deps):
         """Test that default tags are set correctly."""

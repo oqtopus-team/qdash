@@ -7,8 +7,24 @@ from qdash.workflow.caltasks.base import BaseTask
 
 
 def update_active_tasks(username: str, backend: str) -> list[TaskModel]:
-    """Update the active tasks in the registry and return a list of TaskModel instances."""
+    """Update the active tasks in the registry and return a list of TaskModel instances.
+
+    Args:
+        username: The username to associate with the tasks
+        backend: The backend type (e.g., 'qubex', 'fake')
+
+    Returns:
+        List of TaskModel instances for the specified backend
+
+    Raises:
+        ValueError: If the backend is not registered in the task registry
+
+    """
     task_cls = BaseTask.registry.get(backend)
+    if task_cls is None:
+        supported_backends = list(BaseTask.registry.keys())
+        msg = f"Unknown backend '{backend}'. Supported backends: {supported_backends}"
+        raise ValueError(msg)
     return [
         TaskModel(
             username=username,

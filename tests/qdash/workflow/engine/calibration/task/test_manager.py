@@ -24,7 +24,7 @@ from qdash.datamodel.task import (
     TaskStatusModel,
 )
 from qdash.workflow.engine.calibration.task.manager import TaskManager
-from qdash.workflow.tasks.base import PostProcessResult, PreProcessResult, RunResult
+from qdash.workflow.caltasks.base import PostProcessResult, PreProcessResult, RunResult
 
 
 class TestTaskStateManagement:
@@ -433,11 +433,11 @@ class TestExecuteTaskIntegration:
         return task
 
     @pytest.fixture
-    def mock_session(self):
-        """Create a mock session for testing."""
-        session = MagicMock()
-        session.name = "fake"
-        return session
+    def mock_backend(self):
+        """Create a mock backend for testing."""
+        backend = MagicMock()
+        backend.name = "fake"
+        return backend
 
     @pytest.fixture
     def mock_execution_manager(self):
@@ -480,7 +480,7 @@ class TestExecuteTaskIntegration:
             yield tmpdir
 
     def test_execute_task_without_run_result(
-        self, init_db, mock_task, mock_session, mock_execution_manager, calib_dir
+        self, init_db, mock_task, mock_backend, mock_execution_manager, calib_dir
     ):
         """Test execute_task when run returns None."""
         tm = TaskManager(
@@ -500,7 +500,7 @@ class TestExecuteTaskIntegration:
 
             em_result, tm_result = tm.execute_task(
                 task_instance=mock_task,
-                session=mock_session,
+                backend=mock_backend,
                 execution_manager=mock_execution_manager,
                 qid="0",
             )
@@ -510,7 +510,7 @@ class TestExecuteTaskIntegration:
         assert task.status == TaskStatusModel.COMPLETED
 
     def test_execute_task_with_output_parameters(
-        self, init_db, mock_task, mock_session, mock_execution_manager, calib_dir
+        self, init_db, mock_task, mock_backend, mock_execution_manager, calib_dir
     ):
         """Test execute_task with output parameters."""
         tm = TaskManager(
@@ -536,7 +536,7 @@ class TestExecuteTaskIntegration:
 
             em_result, tm_result = tm.execute_task(
                 task_instance=mock_task,
-                session=mock_session,
+                backend=mock_backend,
                 execution_manager=mock_execution_manager,
                 qid="0",
             )
@@ -547,7 +547,7 @@ class TestExecuteTaskIntegration:
         assert "qubit_frequency" in tm_result.calib_data.qubit["0"]
 
     def test_execute_task_with_r2_validation_pass(
-        self, init_db, mock_task, mock_session, mock_execution_manager, calib_dir
+        self, init_db, mock_task, mock_backend, mock_execution_manager, calib_dir
     ):
         """Test execute_task with passing R² validation."""
         tm = TaskManager(
@@ -573,7 +573,7 @@ class TestExecuteTaskIntegration:
 
             em_result, tm_result = tm.execute_task(
                 task_instance=mock_task,
-                session=mock_session,
+                backend=mock_backend,
                 execution_manager=mock_execution_manager,
                 qid="0",
             )
@@ -584,7 +584,7 @@ class TestExecuteTaskIntegration:
         assert "qubit_frequency" in tm_result.calib_data.qubit["0"]
 
     def test_execute_task_with_r2_validation_fail(
-        self, init_db, mock_task, mock_session, mock_execution_manager, calib_dir
+        self, init_db, mock_task, mock_backend, mock_execution_manager, calib_dir
     ):
         """Test execute_task with failing R² validation."""
         tm = TaskManager(
@@ -611,7 +611,7 @@ class TestExecuteTaskIntegration:
             with pytest.raises(ValueError, match="R² value too low"):
                 tm.execute_task(
                     task_instance=mock_task,
-                    session=mock_session,
+                    backend=mock_backend,
                     execution_manager=mock_execution_manager,
                     qid="0",
                 )
@@ -621,7 +621,7 @@ class TestExecuteTaskIntegration:
         assert task.status == TaskStatusModel.FAILED
 
     def test_execute_task_with_fidelity_over_100_fails(
-        self, init_db, mock_task, mock_session, mock_execution_manager, calib_dir
+        self, init_db, mock_task, mock_backend, mock_execution_manager, calib_dir
     ):
         """Test execute_task fails when fidelity > 100% for RB tasks."""
         tm = TaskManager(
@@ -652,13 +652,13 @@ class TestExecuteTaskIntegration:
             with pytest.raises(ValueError, match="exceeds 100%"):
                 tm.execute_task(
                     task_instance=mock_task,
-                    session=mock_session,
+                    backend=mock_backend,
                     execution_manager=mock_execution_manager,
                     qid="0",
                 )
 
     def test_execute_task_with_figures(
-        self, init_db, mock_task, mock_session, mock_execution_manager, calib_dir
+        self, init_db, mock_task, mock_backend, mock_execution_manager, calib_dir
     ):
         """Test execute_task saves figures correctly."""
         tm = TaskManager(
@@ -682,7 +682,7 @@ class TestExecuteTaskIntegration:
 
             em_result, tm_result = tm.execute_task(
                 task_instance=mock_task,
-                session=mock_session,
+                backend=mock_backend,
                 execution_manager=mock_execution_manager,
                 qid="0",
             )
@@ -692,7 +692,7 @@ class TestExecuteTaskIntegration:
         assert Path(task.figure_path[0]).exists()
 
     def test_execute_task_records_to_task_result_history(
-        self, init_db, mock_task, mock_session, mock_execution_manager, calib_dir
+        self, init_db, mock_task, mock_backend, mock_execution_manager, calib_dir
     ):
         """Test execute_task creates TaskResultHistoryDocument."""
         from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -712,7 +712,7 @@ class TestExecuteTaskIntegration:
 
             em_result, tm_result = tm.execute_task(
                 task_instance=mock_task,
-                session=mock_session,
+                backend=mock_backend,
                 execution_manager=mock_execution_manager,
                 qid="0",
             )
