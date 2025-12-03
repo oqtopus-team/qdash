@@ -22,6 +22,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 import { FlowExecuteConfirmModal } from "./FlowExecuteConfirmModal";
 import { FlowSchedulePanel } from "./FlowSchedulePanel";
+import { FlowImportsPanel } from "./FlowImportsPanel";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -41,6 +42,7 @@ export default function EditFlowPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
+  const [activeTab, setActiveTab] = useState<"code" | "helpers">("code");
 
   // Fetch current user
   const { data: userData } = useGetCurrentUser();
@@ -279,36 +281,81 @@ export default function EditFlowPage() {
 
         {/* Main Editor Area */}
         <div className="flex-1 flex overflow-hidden mb-4">
-          {/* Editor */}
+          {/* Editor with Tab Switcher */}
           <div className="flex-1 flex flex-col">
-            <Editor
-              height="100%"
-              language="python"
-              theme="vs-dark"
-              value={code}
-              onChange={(value) => setCode(value || "")}
-              onMount={(editor) => {
-                editor.onDidChangeCursorPosition((e) => {
-                  setCursorPosition({
-                    line: e.position.lineNumber,
-                    column: e.position.column,
+            {/* Tab Bar */}
+            <div className="flex bg-[#252526] border-b border-[#3e3e3e]">
+              <button
+                onClick={() => setActiveTab("code")}
+                className={`px-4 py-2 text-sm font-medium flex items-center gap-2 border-r border-[#3e3e3e] transition-colors ${
+                  activeTab === "code"
+                    ? "bg-[#1e1e1e] text-white border-t-2 border-t-[#007acc]"
+                    : "bg-[#2d2d2d] text-gray-400 hover:bg-[#323232] border-t-2 border-t-transparent"
+                }`}
+              >
+                <span className="text-[#519aba]">py</span>
+                {name}.py
+              </button>
+              <button
+                onClick={() => setActiveTab("helpers")}
+                className={`px-4 py-2 text-sm font-medium flex items-center gap-2 border-r border-[#3e3e3e] transition-colors ${
+                  activeTab === "helpers"
+                    ? "bg-[#1e1e1e] text-white border-t-2 border-t-[#007acc]"
+                    : "bg-[#2d2d2d] text-gray-400 hover:bg-[#323232] border-t-2 border-t-transparent"
+                }`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-[#c586c0]"
+                >
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+                Helpers Reference
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === "code" ? (
+              <Editor
+                height="100%"
+                language="python"
+                theme="vs-dark"
+                value={code}
+                onChange={(value) => setCode(value || "")}
+                onMount={(editor) => {
+                  editor.onDidChangeCursorPosition((e) => {
+                    setCursorPosition({
+                      line: e.position.lineNumber,
+                      column: e.position.column,
+                    });
                   });
-                });
-              }}
-              options={{
-                minimap: { enabled: true },
-                fontSize: 14,
-                lineNumbers: "on",
-                automaticLayout: true,
-                scrollBeyondLastLine: true,
-                padding: { top: 16, bottom: 16 },
-                wordWrap: "on",
-                folding: true,
-                renderLineHighlight: "all",
-                cursorStyle: "line",
-                cursorBlinking: "blink",
-              }}
-            />
+                }}
+                options={{
+                  minimap: { enabled: true },
+                  fontSize: 14,
+                  lineNumbers: "on",
+                  automaticLayout: true,
+                  scrollBeyondLastLine: true,
+                  padding: { top: 16, bottom: 16 },
+                  wordWrap: "on",
+                  folding: true,
+                  renderLineHighlight: "all",
+                  cursorStyle: "line",
+                  cursorBlinking: "blink",
+                }}
+              />
+            ) : (
+              <FlowImportsPanel />
+            )}
           </div>
 
           {/* Right Sidebar - Metadata */}

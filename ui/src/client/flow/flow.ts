@@ -598,6 +598,326 @@ export function useGetFlowTemplate<
 }
 
 /**
+ * List all Python files in the qdash.workflow.flow module.
+
+Returns list of filenames that users can view for reference.
+ * @summary List flow helper files
+ */
+export const listFlowHelperFiles = (
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<string[]>(
+    { url: `/flows/helpers`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getListFlowHelperFilesQueryKey = () => {
+  return [`/flows/helpers`] as const;
+};
+
+export const getListFlowHelperFilesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof listFlowHelperFiles>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListFlowHelperFilesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listFlowHelperFiles>>
+  > = ({ signal }) => listFlowHelperFiles(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFlowHelperFiles>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type ListFlowHelperFilesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFlowHelperFiles>>
+>;
+export type ListFlowHelperFilesQueryError = ErrorType<unknown>;
+
+export function useListFlowHelperFiles<
+  TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
+  TError = ErrorType<unknown>,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listFlowHelperFiles>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listFlowHelperFiles>>,
+          TError,
+          Awaited<ReturnType<typeof listFlowHelperFiles>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useListFlowHelperFiles<
+  TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listFlowHelperFiles>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listFlowHelperFiles>>,
+          TError,
+          Awaited<ReturnType<typeof listFlowHelperFiles>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useListFlowHelperFiles<
+  TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listFlowHelperFiles>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary List flow helper files
+ */
+
+export function useListFlowHelperFiles<
+  TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listFlowHelperFiles>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getListFlowHelperFilesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get the content of a flow helper file.
+
+Args:
+    filename: Name of the Python file (e.g., "session.py")
+
+Returns:
+    File content as string
+ * @summary Get flow helper file content
+ */
+export const getFlowHelperFile = (
+  filename: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<string>(
+    { url: `/flows/helpers/${filename}`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getGetFlowHelperFileQueryKey = (filename?: string) => {
+  return [`/flows/helpers/${filename}`] as const;
+};
+
+export const getGetFlowHelperFileQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  filename: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFlowHelperFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetFlowHelperFileQueryKey(filename);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getFlowHelperFile>>
+  > = ({ signal }) => getFlowHelperFile(filename, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!filename,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFlowHelperFile>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetFlowHelperFileQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFlowHelperFile>>
+>;
+export type GetFlowHelperFileQueryError = ErrorType<HTTPValidationError>;
+
+export function useGetFlowHelperFile<
+  TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  filename: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFlowHelperFile>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFlowHelperFile>>,
+          TError,
+          Awaited<ReturnType<typeof getFlowHelperFile>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetFlowHelperFile<
+  TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  filename: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFlowHelperFile>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFlowHelperFile>>,
+          TError,
+          Awaited<ReturnType<typeof getFlowHelperFile>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetFlowHelperFile<
+  TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  filename: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFlowHelperFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get flow helper file content
+ */
+
+export function useGetFlowHelperFile<
+  TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  filename: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFlowHelperFile>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetFlowHelperFileQueryOptions(filename, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * List all Flow schedules (cron and one-time) for the current user.
 
 Args:

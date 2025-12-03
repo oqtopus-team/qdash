@@ -457,6 +457,87 @@ async def get_flow_template(template_id: str) -> FlowTemplateWithCode:
 
 
 # ============================================================================
+# Flow Helper Files Endpoints (static paths - before /flow/{name})
+# ============================================================================
+
+# Base directory for flow helper modules
+FLOW_HELPERS_DIR = Path("/app/qdash/workflow/flow")
+
+
+@router.get(
+    "/flows/helpers",
+    response_model=list[str],
+    summary="List flow helper files",
+    operation_id="listFlowHelperFiles",
+)
+async def list_flow_helper_files() -> list[str]:
+    """List all Python files in the qdash.workflow.flow module.
+
+    Returns list of filenames that users can view for reference.
+    """
+    try:
+        if not FLOW_HELPERS_DIR.exists():
+            logger.warning(f"Flow helpers directory not found: {FLOW_HELPERS_DIR}")
+            return []
+
+        files = [
+            f.name
+            for f in FLOW_HELPERS_DIR.iterdir()
+            if f.is_file() and f.suffix == ".py" and not f.name.startswith("_")
+        ]
+        # Add __init__.py explicitly as it's useful
+        if (FLOW_HELPERS_DIR / "__init__.py").exists():
+            files.insert(0, "__init__.py")
+
+        # Sort with __init__.py first, then alphabetically
+        files = sorted(set(files), key=lambda x: (x != "__init__.py", x))
+
+        logger.info(f"Listed {len(files)} flow helper files")
+        return files
+
+    except Exception as e:
+        logger.error(f"Failed to list flow helper files: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list flow helper files: {e}")
+
+
+@router.get(
+    "/flows/helpers/{filename}",
+    response_model=str,
+    summary="Get flow helper file content",
+    operation_id="getFlowHelperFile",
+)
+async def get_flow_helper_file(filename: str) -> str:
+    """Get the content of a flow helper file.
+
+    Args:
+        filename: Name of the Python file (e.g., "session.py")
+
+    Returns:
+        File content as string
+    """
+    # Validate filename to prevent directory traversal
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    if not filename.endswith(".py"):
+        raise HTTPException(status_code=400, detail="Only Python files are allowed")
+
+    file_path = FLOW_HELPERS_DIR / filename
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+
+    try:
+        content = file_path.read_text(encoding="utf-8")
+        logger.info(f"Read flow helper file: {filename}")
+        return content
+
+    except Exception as e:
+        logger.error(f"Failed to read flow helper file {filename}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
+
+
+# ============================================================================
 # Flow Schedules Endpoints (static paths - before /flow/{name})
 # ============================================================================
 
