@@ -91,13 +91,13 @@ class TaskManagerFactory(Protocol):
 class DefaultBackendFactory:
     """Default implementation of BackendFactory using create_backend."""
 
-    def __init__(self, backend: str = "qubex"):
+    def __init__(self, backend_name: str = "qubex"):
         """Initialize factory with backend type.
 
         Args:
-            backend: Backend type ('qubex' or 'fake')
+            backend_name: Backend type ('qubex' or 'fake')
         """
-        self.backend = backend
+        self.backend_name = backend_name
 
     def create(self, config: dict) -> Any:
         """Create a backend instance using the standard factory.
@@ -108,7 +108,7 @@ class DefaultBackendFactory:
         Returns:
             Backend instance
         """
-        return create_backend(backend=self.backend, config=config)
+        return create_backend(backend=self.backend_name, config=config)
 
 
 class DefaultExecutionManagerFactory:
@@ -208,17 +208,17 @@ class FlowSessionDependencies:
         self.task_manager_factory = task_manager_factory or DefaultTaskManagerFactory()
 
     @classmethod
-    def production(cls, backend: str = "qubex") -> "FlowSessionDependencies":
+    def production(cls, backend_name: str = "qubex") -> "FlowSessionDependencies":
         """Create production dependencies.
 
         Args:
-            backend: Backend type ('qubex' or 'fake')
+            backend_name: Backend type ('qubex' or 'fake')
 
         Returns:
             FlowSessionDependencies configured for production
         """
         return cls(
-            backend_factory=DefaultBackendFactory(backend=backend),
+            backend_factory=DefaultBackendFactory(backend_name=backend_name),
             execution_manager_factory=DefaultExecutionManagerFactory(),
             task_manager_factory=DefaultTaskManagerFactory(),
         )
@@ -231,7 +231,7 @@ class FlowSessionDependencies:
             FlowSessionDependencies configured for fake backend
         """
         return cls(
-            backend_factory=DefaultBackendFactory(backend="fake"),
+            backend_factory=DefaultBackendFactory(backend_name="fake"),
             execution_manager_factory=DefaultExecutionManagerFactory(),
             task_manager_factory=DefaultTaskManagerFactory(),
         )
@@ -274,7 +274,7 @@ def create_flow_session(
 
     # Use production dependencies if not specified
     if dependencies is None:
-        dependencies = FlowSessionDependencies.production(backend=config.backend)
+        dependencies = FlowSessionDependencies.production(backend_name=config.backend_name)
 
     # Convert config to kwargs for FlowSession.__init__
     return FlowSession(
@@ -282,7 +282,7 @@ def create_flow_session(
         chip_id=config.chip_id,
         qids=list(config.qids),
         execution_id=config.execution_id,
-        backend=config.backend,
+        backend_name=config.backend_name,
         name=config.name,
         tags=list(config.tags) if config.tags else None,
         use_lock=config.use_lock,

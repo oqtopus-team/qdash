@@ -765,7 +765,7 @@ def init_calibration(
     chip_id: str,
     qids: list[str],
     execution_id: str | None = None,
-    backend: str = "qubex",
+    backend_name: str = "qubex",
     name: str | None = None,
     flow_name: str | None = None,
     tags: list[str] | None = None,
@@ -786,7 +786,7 @@ def init_calibration(
         qids: List of qubit IDs to calibrate (required for qubex initialization)
         execution_id: Unique execution identifier (e.g., "20240101-001").
             If None, auto-generates using current date and counter.
-        backend: Backend type ('qubex' or 'fake')
+        backend_name: Backend type ('qubex' or 'fake')
         name: Human-readable name for the execution (deprecated, use flow_name instead).
             If None, auto-detects from Prefect flow name or defaults to "Python Flow Execution".
         flow_name: Flow name (file name without .py extension) for display in execution list.
@@ -862,7 +862,7 @@ def init_calibration(
         chip_id=chip_id,
         qids=qids,
         execution_id=execution_id,
-        backend=backend,
+        backend_name=backend_name,
         name=display_name,
         tags=tags,
         use_lock=use_lock,
