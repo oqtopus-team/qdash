@@ -422,6 +422,67 @@ class OneQubitScheduler:
             qid_to_mux=qid_to_mux,
         )
 
+    def generate_from_mux(
+        self,
+        mux_ids: list[int],
+        exclude_qids: list[str] | None = None,
+    ) -> OneQubitScheduleResult:
+        """Generate 1-qubit execution schedule from MUX IDs.
+
+        Convenience method that converts MUX IDs to qubit IDs and generates schedule.
+        Each MUX controls 4 qubits: MUX_N → qubits [4N, 4N+1, 4N+2, 4N+3].
+
+        Args:
+            mux_ids: List of MUX IDs to schedule
+            exclude_qids: Optional list of qubit IDs to exclude from scheduling
+
+        Returns:
+            OneQubitScheduleResult containing stages and metadata
+
+        Raises:
+            FileNotFoundError: If wiring configuration not found
+            ValueError: If no valid MUX IDs provided or all qubits excluded
+
+        Example:
+            ```python
+            scheduler = OneQubitScheduler(chip_id="64Qv3")
+
+            # Schedule MUXes 0, 1 but exclude qubits 2 and 5
+            schedule = scheduler.generate_from_mux(
+                mux_ids=[0, 1],
+                exclude_qids=["2", "5"]
+            )
+            # Results in qids: ["0", "1", "3", "4", "6", "7"]
+
+            for stage in schedule.stages:
+                print(f"Stage {stage.box_type}: {stage.qids}")
+            ```
+        """
+        if len(mux_ids) == 0:
+            msg = "No MUX IDs provided"
+            raise ValueError(msg)
+
+        # Convert MUX IDs to qubit IDs
+        qids = []
+        for mux_id in mux_ids:
+            for offset in range(4):
+                qids.append(str(mux_id * 4 + offset))
+
+        # Exclude specified qubit IDs
+        if exclude_qids:
+            exclude_set = set(exclude_qids)
+            original_count = len(qids)
+            qids = [qid for qid in qids if qid not in exclude_set]
+            excluded_count = original_count - len(qids)
+            logger.info(f"Excluded {excluded_count} qubits: {sorted(exclude_set & set(str(mux_id * 4 + o) for mux_id in mux_ids for o in range(4)))}")
+
+            if len(qids) == 0:
+                msg = "All qubits were excluded"
+                raise ValueError(msg)
+
+        logger.info(f"Converting {len(mux_ids)} MUX IDs to {len(qids)} qubit IDs")
+        return self.generate(qids=qids)
+
     def get_mux_info(self) -> dict[int, dict[str, Any]]:
         """Get detailed MUX information with box classification.
 

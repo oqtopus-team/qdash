@@ -383,6 +383,133 @@ class TestMuxInfo:
 
 
 # ============================================================================
+# Generate from MUX Tests
+# ============================================================================
+
+
+class TestGenerateFromMux:
+    """Test schedule generation from MUX IDs."""
+
+    def test_generate_from_single_mux(self, scheduler_simple):
+        """Test schedule generation from a single MUX ID."""
+        schedule = scheduler_simple.generate_from_mux(mux_ids=[0])
+
+        assert schedule.metadata["total_qubits"] == 4
+        assert set(schedule.stages[0].qids) == {"0", "1", "2", "3"}
+
+    def test_generate_from_multiple_mux(self, scheduler_simple):
+        """Test schedule generation from multiple MUX IDs."""
+        # MUX 0 (Box A) and MUX 1 (Box B)
+        schedule = scheduler_simple.generate_from_mux(mux_ids=[0, 1])
+
+        assert schedule.metadata["total_qubits"] == 8
+        assert schedule.metadata["box_a_count"] == 4
+        assert schedule.metadata["box_b_count"] == 4
+        assert len(schedule.stages) == 2
+
+    def test_generate_from_mux_preserves_order_within_stage(self, scheduler_simple):
+        """Test that qubit order is preserved within each stage."""
+        # MUX 0 (Box A) only - order should be preserved
+        schedule = scheduler_simple.generate_from_mux(mux_ids=[0])
+
+        assert schedule.stages[0].qids == ["0", "1", "2", "3"]
+
+    def test_generate_from_mux_groups_by_box(self, scheduler_simple):
+        """Test that qubits are grouped by box type across MUXes."""
+        # MUX 1 (Box B) and MUX 0 (Box A) - should be in separate stages
+        schedule = scheduler_simple.generate_from_mux(mux_ids=[1, 0])
+
+        # Should have 2 stages (Box A and Box B)
+        assert len(schedule.stages) == 2
+
+        # Find Box A and Box B stages
+        box_a_stage = next(s for s in schedule.stages if s.box_type == BOX_A)
+        box_b_stage = next(s for s in schedule.stages if s.box_type == BOX_B)
+
+        # MUX 0 qubits in Box A stage
+        assert set(box_a_stage.qids) == {"0", "1", "2", "3"}
+        # MUX 1 qubits in Box B stage
+        assert set(box_b_stage.qids) == {"4", "5", "6", "7"}
+
+    def test_generate_from_mux_empty_raises_error(self, scheduler_simple):
+        """Test that empty MUX ID list raises ValueError."""
+        with pytest.raises(ValueError, match="No MUX IDs provided"):
+            scheduler_simple.generate_from_mux(mux_ids=[])
+
+    def test_generate_from_mux_64qv3(self, scheduler_64qv3):
+        """Test generate_from_mux with 64Qv3 configuration."""
+        # MUX 1 (Box A) and MUX 0 (Mixed)
+        schedule = scheduler_64qv3.generate_from_mux(mux_ids=[1, 0])
+
+        assert schedule.metadata["total_qubits"] == 8
+        assert schedule.metadata["box_a_count"] == 4  # MUX 1
+        assert schedule.metadata["mixed_count"] == 4  # MUX 0
+
+    def test_generate_from_mux_with_exclude_qids(self, scheduler_simple):
+        """Test schedule generation with excluded qubit IDs."""
+        # MUX 0 (Box A) has qubits 0,1,2,3 - exclude 1 and 3
+        schedule = scheduler_simple.generate_from_mux(
+            mux_ids=[0],
+            exclude_qids=["1", "3"],
+        )
+
+        assert schedule.metadata["total_qubits"] == 2
+        assert set(schedule.stages[0].qids) == {"0", "2"}
+
+    def test_generate_from_mux_exclude_across_muxes(self, scheduler_simple):
+        """Test excluding qubits across multiple MUXes."""
+        # MUX 0 (Box A): 0,1,2,3
+        # MUX 1 (Box B): 4,5,6,7
+        schedule = scheduler_simple.generate_from_mux(
+            mux_ids=[0, 1],
+            exclude_qids=["2", "3", "5"],
+        )
+
+        assert schedule.metadata["total_qubits"] == 5
+        # Box A: 0, 1 (2,3 excluded)
+        # Box B: 4, 6, 7 (5 excluded)
+        box_a_stage = next(s for s in schedule.stages if s.box_type == BOX_A)
+        box_b_stage = next(s for s in schedule.stages if s.box_type == BOX_B)
+
+        assert set(box_a_stage.qids) == {"0", "1"}
+        assert set(box_b_stage.qids) == {"4", "6", "7"}
+
+    def test_generate_from_mux_exclude_entire_mux(self, scheduler_simple):
+        """Test excluding all qubits from one MUX."""
+        # MUX 0 (Box A): 0,1,2,3 - all excluded
+        # MUX 1 (Box B): 4,5,6,7 - none excluded
+        schedule = scheduler_simple.generate_from_mux(
+            mux_ids=[0, 1],
+            exclude_qids=["0", "1", "2", "3"],
+        )
+
+        assert schedule.metadata["total_qubits"] == 4
+        assert schedule.metadata["box_a_count"] == 0
+        assert schedule.metadata["box_b_count"] == 4
+        assert len(schedule.stages) == 1
+        assert schedule.stages[0].box_type == BOX_B
+
+    def test_generate_from_mux_exclude_all_raises_error(self, scheduler_simple):
+        """Test that excluding all qubits raises ValueError."""
+        with pytest.raises(ValueError, match="All qubits were excluded"):
+            scheduler_simple.generate_from_mux(
+                mux_ids=[0],
+                exclude_qids=["0", "1", "2", "3"],
+            )
+
+    def test_generate_from_mux_exclude_non_matching(self, scheduler_simple):
+        """Test that excluding non-matching qubits has no effect."""
+        # MUX 0 has qubits 0,1,2,3 - exclude 100 (doesn't exist in MUX 0)
+        schedule = scheduler_simple.generate_from_mux(
+            mux_ids=[0],
+            exclude_qids=["100", "200"],
+        )
+
+        assert schedule.metadata["total_qubits"] == 4
+        assert set(schedule.stages[0].qids) == {"0", "1", "2", "3"}
+
+
+# ============================================================================
 # Edge Cases and Error Handling
 # ============================================================================
 

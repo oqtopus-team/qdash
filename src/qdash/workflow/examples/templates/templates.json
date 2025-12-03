@@ -88,6 +88,14 @@
     "function_name": "full_calibration"
   },
   {
+    "id": "scheduled_full_calibration",
+    "name": "Scheduled Full Calibration",
+    "description": "Full calibration with automatic Box scheduling - uses OneQubitScheduler to detect Box A/B constraints from wiring config and schedule qubits by MUX ID with exclude support",
+    "category": "production",
+    "filename": "scheduled_full_calibration.py",
+    "function_name": "scheduled_full_calibration"
+  },
+  {
     "id": "check_skew",
     "name": "CheckSkew Calibration",
     "description": "System-level skew measurement and calibration across MUX channels",
