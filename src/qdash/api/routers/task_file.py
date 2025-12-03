@@ -15,6 +15,7 @@ from fastapi.logger import logger
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.task_file import (
+    FileNodeType,
     ListTaskFileBackendsResponse,
     ListTaskInfoResponse,
     SaveTaskFileRequest,
@@ -45,6 +46,10 @@ if Path("/app").exists() and not CALTASKS_BASE_PATH.is_absolute():
 SETTINGS_PATH = Path(os.getenv("SETTINGS_PATH", "./config/settings.yaml"))
 if Path("/app").exists() and not SETTINGS_PATH.is_absolute():
     SETTINGS_PATH = Path("/app") / "config" / "settings.yaml"
+
+# Cache for task metadata: {backend: (mtime_sum, tasks)}
+# Cache is invalidated when sum of file modification times changes
+_task_cache: dict[str, tuple[float, list[TaskInfo]]] = {}
 
 
 def validate_task_file_path(relative_path: str) -> Path:
@@ -108,7 +113,7 @@ def build_task_file_tree(directory: Path, base_path: Path) -> list[TaskFileTreeN
                     TaskFileTreeNode(
                         name=item.name,
                         path=relative_path,
-                        type="directory",
+                        type=FileNodeType.DIRECTORY,
                         children=children if children else None,
                     )
                 )
@@ -119,7 +124,7 @@ def build_task_file_tree(directory: Path, base_path: Path) -> list[TaskFileTreeN
                         TaskFileTreeNode(
                             name=item.name,
                             path=relative_path,
-                            type="file",
+                            type=FileNodeType.FILE,
                             children=None,
                         )
                     )
@@ -304,6 +309,69 @@ def save_task_file_content(
         raise HTTPException(status_code=500, detail=f"Error saving file: {e!s}")
 
 
+def _extract_string_value(node: ast.expr | None) -> str | None:
+    """Extract string value from AST node, handling various assignment patterns.
+
+    Handles:
+    - Simple constants: name = "CheckRabi"
+    - Annotated assignments: name: str = "CheckRabi"
+
+    Does NOT handle (returns None):
+    - Dynamic assignments: name = get_task_name()
+    - Complex expressions: name = PREFIX + "_task"
+    - f-strings: name = f"{prefix}_task"
+
+    Args:
+    ----
+        node: AST expression node
+
+    Returns:
+    -------
+        String value if extractable, None otherwise
+
+    """
+    if node is None:
+        return None
+
+    # Handle simple string constants
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+
+    return None
+
+
+def _is_valid_python_file(file_path: Path) -> bool:
+    """Check if a file is a valid Python file that can be parsed.
+
+    Args:
+    ----
+        file_path: Path to the file
+
+    Returns:
+    -------
+        True if file is valid Python, False otherwise
+
+    """
+    if not file_path.exists():
+        return False
+
+    if not file_path.is_file():
+        return False
+
+    if file_path.suffix != ".py":
+        return False
+
+    # Check file size (skip very large files > 1MB)
+    try:
+        if file_path.stat().st_size > 1_000_000:
+            logger.warning(f"Skipping large file: {file_path}")
+            return False
+    except OSError:
+        return False
+
+    return True
+
+
 def extract_task_info_from_file(file_path: Path, relative_path: str) -> list[TaskInfo]:
     """Extract task information from a Python file using AST parsing.
 
@@ -318,37 +386,62 @@ def extract_task_info_from_file(file_path: Path, relative_path: str) -> list[Tas
 
     """
     tasks = []
+
+    # Validate file before parsing
+    if not _is_valid_python_file(file_path):
+        return tasks
+
     try:
         content = file_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        # Log without exposing file details
+        logger.warning(f"Failed to read file: {relative_path}")
+        return tasks
+
+    try:
         tree = ast.parse(content)
+    except SyntaxError:
+        # Log without exposing syntax error details
+        logger.warning(f"Invalid Python syntax in file: {relative_path}")
+        return tasks
 
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef):
-                # Look for classes that might be tasks
-                name_value = None
-                task_type_value = None
-                docstring = ast.get_docstring(node)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
 
-                for item in node.body:
-                    if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
-                        if item.target.id == "name" and isinstance(item.value, ast.Constant):
-                            name_value = item.value.value
-                        elif item.target.id == "task_type" and isinstance(item.value, ast.Constant):
-                            task_type_value = item.value.value
+        # Look for classes that might be tasks
+        name_value = None
+        task_type_value = None
+        docstring = ast.get_docstring(node)
 
-                # Only include if it has a name attribute (indicating it's a task)
-                if name_value:
-                    tasks.append(
-                        TaskInfo(
-                            name=name_value,
-                            class_name=node.name,
-                            task_type=task_type_value,
-                            description=docstring,
-                            file_path=relative_path,
-                        )
-                    )
-    except Exception as e:
-        logger.warning(f"Failed to parse {file_path}: {e}")
+        for item in node.body:
+            # Handle annotated assignments: name: str = "value"
+            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                if item.target.id == "name":
+                    name_value = _extract_string_value(item.value)
+                elif item.target.id == "task_type":
+                    task_type_value = _extract_string_value(item.value)
+
+            # Handle simple assignments: name = "value"
+            elif isinstance(item, ast.Assign):
+                for target in item.targets:
+                    if isinstance(target, ast.Name):
+                        if target.id == "name":
+                            name_value = _extract_string_value(item.value)
+                        elif target.id == "task_type":
+                            task_type_value = _extract_string_value(item.value)
+
+        # Only include if it has a valid string name attribute (indicating it's a task)
+        if name_value and isinstance(name_value, str):
+            tasks.append(
+                TaskInfo(
+                    name=name_value,
+                    class_name=node.name,
+                    task_type=task_type_value,
+                    description=docstring,
+                    file_path=relative_path,
+                )
+            )
 
     return tasks
 
@@ -384,6 +477,34 @@ def collect_tasks_from_directory(directory: Path, base_path: Path) -> list[TaskI
     return tasks
 
 
+def _get_directory_mtime_sum(directory: Path) -> float:
+    """Calculate sum of modification times for all Python files in directory.
+
+    Used for cache invalidation.
+
+    Args:
+    ----
+        directory: Directory to scan
+
+    Returns:
+    -------
+        Sum of file modification times
+
+    """
+    mtime_sum = 0.0
+    try:
+        for item in directory.rglob("*.py"):
+            if item.name.startswith(".") or "__pycache__" in str(item):
+                continue
+            try:
+                mtime_sum += item.stat().st_mtime
+            except OSError:
+                pass
+    except PermissionError:
+        pass
+    return mtime_sum
+
+
 @router.get(
     "/task-files/tasks",
     response_model=ListTaskInfoResponse,
@@ -394,6 +515,7 @@ def list_task_info(backend: str) -> ListTaskInfoResponse:
     """List all task definitions found in a backend directory.
 
     Parses Python files to extract task names, types, and descriptions.
+    Results are cached and invalidated when files are modified.
 
     Args:
     ----
@@ -412,9 +534,24 @@ def list_task_info(backend: str) -> ListTaskInfoResponse:
     if not backend_path.is_dir():
         raise HTTPException(status_code=400, detail=f"Not a directory: {backend}")
 
+    # Check cache
+    current_mtime = _get_directory_mtime_sum(backend_path)
+    cached = _task_cache.get(backend)
+
+    if cached is not None:
+        cached_mtime, cached_tasks = cached
+        if cached_mtime == current_mtime:
+            logger.debug(f"Using cached task list for backend: {backend}")
+            return ListTaskInfoResponse(tasks=cached_tasks)
+
+    # Parse files and update cache
+    logger.debug(f"Parsing task files for backend: {backend}")
     tasks = collect_tasks_from_directory(backend_path, backend_path)
 
     # Sort by task_type then by name
     tasks.sort(key=lambda t: (t.task_type or "", t.name))
+
+    # Update cache
+    _task_cache[backend] = (current_mtime, tasks)
 
     return ListTaskInfoResponse(tasks=tasks)

@@ -1,6 +1,15 @@
 """Schema definitions for task file router."""
 
+from enum import Enum
+
 from pydantic import BaseModel
+
+
+class FileNodeType(str, Enum):
+    """File node type enum."""
+
+    FILE = "file"
+    DIRECTORY = "directory"
 
 
 class TaskFileTreeNode(BaseModel):
@@ -8,7 +17,7 @@ class TaskFileTreeNode(BaseModel):
 
     name: str
     path: str
-    type: str  # "file" or "directory"
+    type: FileNodeType
     children: list["TaskFileTreeNode"] | None = None
 
 
