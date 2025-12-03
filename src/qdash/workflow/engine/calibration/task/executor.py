@@ -282,9 +282,7 @@ class TaskExecutor:
 
             if postprocess_result:
                 # 5. Process and validate results
-                self._process_results(
-                    task, execution_manager, postprocess_result, qid, run_result, session
-                )
+                self._process_results(task, execution_manager, postprocess_result, qid, run_result, session)
 
                 result.output_parameters = dict(
                     self.state_manager.get_task(task_name, task_type, qid).output_parameters

@@ -25,7 +25,7 @@ Example:
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pendulum
 from prefect import get_run_logger
@@ -40,6 +40,9 @@ from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.engine.session.factory import create_session
 from qdash.workflow.flow.github import GitHubIntegration, GitHubPushConfig
 from qdash.workflow.tasks.active_protocols import generate_task_instances
+
+if TYPE_CHECKING:
+    from qdash.workflow.flow.config import FlowSessionConfig
 
 
 def generate_execution_id(username: str, chip_id: str) -> str:
@@ -728,7 +731,6 @@ class FlowSession:
             session = FlowSession.from_config(config)
             ```
         """
-        from qdash.workflow.flow.config import FlowSessionConfig
 
         return cls(
             username=config.username,
@@ -750,10 +752,9 @@ class FlowSession:
 # Note: Using SessionContext for thread-safe management while maintaining
 # backward compatibility with direct _current_session access
 from qdash.workflow.flow.context import (
-    get_session_context,
-    set_current_session,
-    get_current_session,
     clear_current_session,
+    get_current_session,
+    set_current_session,
 )
 
 _current_session: FlowSession | None = None  # Backward compatibility alias

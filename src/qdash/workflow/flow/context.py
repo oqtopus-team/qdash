@@ -6,7 +6,7 @@ replacing direct global variable access with a more structured approach.
 
 import threading
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Generator
 
 if TYPE_CHECKING:
     from qdash.workflow.flow.session import FlowSession
