@@ -11,6 +11,11 @@ from qdash.workflow.flow.github import (
     GitHubIntegration,
     GitHubPushConfig,
 )
+from qdash.workflow.flow.scheduled import (
+    calibrate_one_qubit_scheduled,
+    calibrate_two_qubit_scheduled,
+    extract_candidate_qubits,
+)
 from qdash.workflow.flow.session import (
     FlowSession,
     finish_calibration,
@@ -26,6 +31,10 @@ __all__ = [
     "get_session",
     "finish_calibration",
     "generate_execution_id",
+    # === Scheduled Calibration ===
+    "calibrate_one_qubit_scheduled",
+    "calibrate_two_qubit_scheduled",
+    "extract_candidate_qubits",
     # === GitHub Integration ===
     "GitHubIntegration",
     "GitHubPushConfig",

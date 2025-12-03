@@ -583,3 +583,38 @@ class TestIntegration:
                 mux_id = schedule.qid_to_mux.get(qid)
                 if mux_id is not None:
                     assert mux_id in stage.mux_ids
+
+    def test_stage_info_contains_parallel_groups(self, scheduler_simple):
+        """Test that stage info contains correct parallel groups (MUX-based)."""
+        # Qubits from MUX 0 (0, 1) and MUX 1 (4, 5)
+        schedule = scheduler_simple.generate(qids=["0", "1", "4", "5"])
+
+        for stage in schedule.stages:
+            assert isinstance(stage.parallel_groups, list)
+            assert len(stage.parallel_groups) > 0
+
+            # All qubits in stage should be in exactly one parallel group
+            all_qids_in_groups = []
+            for group in stage.parallel_groups:
+                assert isinstance(group, list)
+                all_qids_in_groups.extend(group)
+
+            assert sorted(all_qids_in_groups) == sorted(stage.qids)
+
+            # Each group should contain qubits from the same MUX
+            for group in stage.parallel_groups:
+                mux_ids = {schedule.qid_to_mux.get(qid) for qid in group}
+                assert len(mux_ids) == 1  # All qubits in group from same MUX
+
+    def test_parallel_groups_sorted_by_mux(self, scheduler_simple):
+        """Test that parallel groups are sorted by MUX ID."""
+        schedule = scheduler_simple.generate(qids=["4", "5", "0", "1"])  # MUX 1, MUX 0
+
+        for stage in schedule.stages:
+            if len(stage.parallel_groups) > 1:
+                # Groups should be sorted by MUX ID
+                mux_ids = []
+                for group in stage.parallel_groups:
+                    mux_id = schedule.qid_to_mux.get(group[0])
+                    mux_ids.append(mux_id)
+                assert mux_ids == sorted(mux_ids)

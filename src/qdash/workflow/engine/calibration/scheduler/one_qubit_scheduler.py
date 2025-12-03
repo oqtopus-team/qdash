@@ -15,6 +15,12 @@ Conflict Rules:
     - Qubits using different boxes can execute in parallel (different stages)
     - MUXes with mixed box dependencies conflict with both Box A and Box B
 
+Parallel Groups:
+    Within each stage, qubits are grouped by MUX for parallel execution:
+    - Qubits on different MUXes can run in parallel
+    - Qubits on the same MUX run sequentially (due to hardware constraints)
+    - The `parallel_groups` field contains these MUX-based groups
+
 Example:
     Basic usage in a calibration flow:
 
@@ -26,12 +32,14 @@ Example:
     # Generate schedule from qubit IDs
     schedule = scheduler.generate(qids=["0", "1", "2", "3", "16", "17"])
 
-    # Access results
+    # Access results with parallel groups
     for stage in schedule.stages:
-        print(f"Stage {stage.box_type}: qubits {stage.qids}")
-        # Execute qubits in this stage sequentially
-        for qid in stage.qids:
-            calibrate_qubit(qid)
+        print(f"Stage {stage.box_type}: {len(stage.parallel_groups)} parallel groups")
+        # Execute parallel groups concurrently
+        for group in stage.parallel_groups:
+            # Qubits within each group run sequentially
+            for qid in group:
+                calibrate_qubit(qid)
     ```
 """
 
@@ -58,17 +66,21 @@ class OneQubitStageInfo:
 
     Attributes:
         box_type: Type of box ("A", "B", or "MIXED")
-        qids: List of qubit IDs in this stage (executed sequentially)
+        qids: List of qubit IDs in this stage (executed sequentially if not using parallel_groups)
         mux_ids: Set of MUX IDs included in this stage
+        parallel_groups: MUX-based parallel groups. Each group (list of qids) can run in parallel
+                        with other groups, but qubits within the same group run sequentially.
+                        Format: [[mux0_qids], [mux1_qids], ...]
     """
 
     box_type: str
     qids: list[str]
     mux_ids: set[int] = field(default_factory=set)
+    parallel_groups: list[list[str]] = field(default_factory=list)
 
     def __repr__(self) -> str:
         """String representation."""
-        return f"Stage(type={self.box_type}, qids={self.qids})"
+        return f"Stage(type={self.box_type}, qids={self.qids}, parallel_groups={len(self.parallel_groups)})"
 
 
 @dataclass
@@ -96,6 +108,7 @@ class OneQubitScheduleResult:
                     "box_type": stage.box_type,
                     "qids": stage.qids,
                     "mux_ids": list(stage.mux_ids),
+                    "parallel_groups": stage.parallel_groups,
                 }
                 for stage in self.stages
             ],
@@ -274,6 +287,34 @@ class OneQubitScheduler:
         self._qid_to_mux = qid_to_mux
         return qid_to_mux
 
+    def _group_qids_by_mux(
+        self,
+        qids: list[str],
+        qid_to_mux: dict[str, int],
+    ) -> list[list[str]]:
+        """Group qubit IDs by their MUX for parallel execution.
+
+        Qubits on different MUXes can run in parallel, while qubits on the
+        same MUX must run sequentially.
+
+        Args:
+            qids: List of qubit IDs to group
+            qid_to_mux: Mapping from qubit ID to MUX ID
+
+        Returns:
+            List of qubit groups, where each group contains qubits from the same MUX.
+            Groups are sorted by MUX ID for deterministic ordering.
+        """
+        mux_groups: dict[int, list[str]] = {}
+        for qid in qids:
+            mux_id = qid_to_mux.get(qid, int(qid) // 4)  # Default: 4 qubits per MUX
+            if mux_id not in mux_groups:
+                mux_groups[mux_id] = []
+            mux_groups[mux_id].append(qid)
+
+        # Return groups sorted by MUX ID
+        return [mux_groups[mux_id] for mux_id in sorted(mux_groups.keys())]
+
     def _get_qubit_box_type(
         self,
         qid: str,
@@ -367,43 +408,49 @@ class OneQubitScheduler:
         logger.info(f"  Box B qubits: {box_b_qids}")
         logger.info(f"  Mixed qubits: {mixed_qids}")
 
-        # Build stages
+        # Build stages with parallel groups
         stages: list[OneQubitStageInfo] = []
 
         if box_a_qids:
             mux_ids = {qid_to_mux[qid] for qid in box_a_qids if qid in qid_to_mux}
+            parallel_groups = self._group_qids_by_mux(box_a_qids, qid_to_mux)
             stages.append(
                 OneQubitStageInfo(
                     box_type=BOX_A,
                     qids=box_a_qids,
                     mux_ids=mux_ids,
+                    parallel_groups=parallel_groups,
                 )
             )
 
         if box_b_qids:
             mux_ids = {qid_to_mux[qid] for qid in box_b_qids if qid in qid_to_mux}
+            parallel_groups = self._group_qids_by_mux(box_b_qids, qid_to_mux)
             stages.append(
                 OneQubitStageInfo(
                     box_type=BOX_B,
                     qids=box_b_qids,
                     mux_ids=mux_ids,
+                    parallel_groups=parallel_groups,
                 )
             )
 
         # Mixed qubits need to run separately (conflict with both box types)
         if mixed_qids:
             mux_ids = {qid_to_mux[qid] for qid in mixed_qids if qid in qid_to_mux}
+            parallel_groups = self._group_qids_by_mux(mixed_qids, qid_to_mux)
             stages.append(
                 OneQubitStageInfo(
                     box_type=BOX_MIXED,
                     qids=mixed_qids,
                     mux_ids=mux_ids,
+                    parallel_groups=parallel_groups,
                 )
             )
 
         logger.info(f"Generated {len(stages)} stages")
         for i, stage in enumerate(stages, 1):
-            logger.info(f"  Stage {i} ({stage.box_type}): {len(stage.qids)} qubits")
+            logger.info(f"  Stage {i} ({stage.box_type}): {len(stage.qids)} qubits, {len(stage.parallel_groups)} parallel groups")
 
         # Build metadata
         metadata = {
