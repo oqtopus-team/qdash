@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.engine.session.qubex import QubexSession
+from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,
@@ -36,7 +36,7 @@ class CheckDispersiveShift(QubexTask):
     }
 
     def postprocess(
-        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+        self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         """Process the results of the task."""
         result = run_result.raw_result
@@ -46,13 +46,13 @@ class CheckDispersiveShift(QubexTask):
         figures = [result["fig"]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
-    def run(self, session: QubexSession, qid: str) -> RunResult:
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""
-        exp = self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
+        exp = self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
 
         # Apply frequency override if qubit_frequency was explicitly provided
-        with self._apply_frequency_override(session, qid):
+        with self._apply_frequency_override(backend, qid):
             electrical_delay = exp.measure_electrical_delay(target=label)
             result = exp.measure_dispersive_shift(
                 electrical_delay=electrical_delay,
@@ -61,5 +61,5 @@ class CheckDispersiveShift(QubexTask):
                 target=label,
             )
 
-        self.save_calibration(session)
+        self.save_calibration(backend)
         return RunResult(raw_result=result)

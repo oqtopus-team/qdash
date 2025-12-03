@@ -33,11 +33,11 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
+from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.params_updater import get_params_updater
 from qdash.workflow.engine.calibration.prefect_tasks import execute_dynamic_task_by_qid
 from qdash.workflow.engine.calibration.task.manager import TaskManager
-from qdash.workflow.engine.session.factory import create_session
 from qdash.workflow.flow.github import GitHubIntegration, GitHubPushConfig
 from qdash.workflow.tasks.active_protocols import generate_task_instances
 
@@ -84,7 +84,7 @@ class FlowSession:
         chip_id: Target chip ID
         backend: Backend type ('qubex' or 'fake')
         execution_manager: Manages execution state and history
-        session: Backend session for device communication
+        backend_session: Backend instance for device communication
 
     Example:
         ```python
@@ -236,14 +236,14 @@ class FlowSession:
         if muxes is not None:
             session_config["muxes"] = muxes
 
-        self.session = create_session(
+        self.backend_session = create_backend(
             backend=backend,
             config=session_config,
         )
 
         # Save calibration_note before connecting (loads parameter overrides)
-        if self.session.name == "qubex":
-            self.session.save_note(
+        if self.backend_session.name == "qubex":
+            self.backend_session.save_note(
                 username=username,
                 chip_id=chip_id,
                 calib_dir=calib_data_path,
@@ -251,7 +251,7 @@ class FlowSession:
                 task_manager_id=self.task_manager.id,
             )
 
-        self.session.connect()
+        self.backend_session.connect()
 
     def _ensure_task_in_workflow(self, task_name: str, task_type: str, qid: str) -> None:
         """Ensure task exists in TaskManager's workflow structure.
@@ -403,7 +403,7 @@ class FlowSession:
             task_run_name=task_instance.name,
             log_prints=True,
         )(
-            session=self.session,
+            backend=self.backend_session,
             execution_manager=execution_manager,
             task_manager=execution_task_manager,
             task_instance=task_instance,
@@ -556,7 +556,7 @@ class FlowSession:
 
     def _sync_backend_params_before_push(self, logger) -> None:
         """Sync recent calibration results into backend YAML params prior to GitHub push."""
-        updater_instance = get_params_updater(self.session, self.chip_id)
+        updater_instance = get_params_updater(self.backend_session, self.chip_id)
         if updater_instance is None:
             return
 

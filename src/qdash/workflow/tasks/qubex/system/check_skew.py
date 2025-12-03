@@ -3,7 +3,7 @@ from typing import Any, ClassVar
 
 import yaml
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.engine.session.qubex import QubexSession
+from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,
@@ -28,7 +28,7 @@ class CheckSkew(QubexTask):
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 
     def postprocess(
-        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+        self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         result = run_result.raw_result
         figures: list = [result["fig"]]
@@ -38,8 +38,8 @@ class CheckSkew(QubexTask):
         with (Path.cwd() / Path(filename)).open() as file:
             return yaml.safe_load(file)
 
-    def run(self, session: QubexSession, qid: str) -> RunResult:  # noqa: ARG002
-        chip_id = session.config.get("chip_id", None)
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:  # noqa: ARG002
+        chip_id = backend.config.get("chip_id", None)
         skew_file_path = f"/app/config/qubex/{chip_id}/config/skew.yaml"
         box_file_path = f"/app/config/qubex/{chip_id}/config/box.yaml"
         skew_config = self.load(skew_file_path)

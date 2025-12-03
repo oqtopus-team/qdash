@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.engine.session.qubex import QubexSession
+from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,
@@ -41,11 +41,11 @@ class CheckQubit(QubexTask):
     }
 
     def postprocess(
-        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+        self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         """Process the results of the task."""
-        self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
+        self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
         self.output_parameters["rabi_amplitude"].value = result.rabi_params[label].amplitude
         self.output_parameters["rabi_amplitude"].error = result.data[label].fit()["amplitude_err"]
@@ -59,24 +59,24 @@ class CheckQubit(QubexTask):
             raise ValueError(f"R^2 value of Rabi oscillation is too low: {r2}")
         return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
 
-    def run(self, session: QubexSession, qid: str) -> RunResult:
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""
-        exp = self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
+        exp = self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
         result = exp.check_rabi(
             time_range=self.input_parameters["time_range"].get_value(),
             shots=self.input_parameters["shots"].get_value(),
             interval=self.input_parameters["interval"].get_value(),
             targets=[label],
         )
-        self.save_calibration(session)
+        self.save_calibration(backend)
         r2 = result.rabi_params[label].r2 if result.rabi_params else None
         return RunResult(raw_result=result, r2={qid: r2})
 
-    def batch_run(self, session: QubexSession, qids: list[str]) -> RunResult:
+    def batch_run(self, backend: QubexBackend, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits."""
-        exp = self.get_experiment(session)
-        labels = [self.get_qubit_label(session, qid) for qid in qids]
+        exp = self.get_experiment(backend)
+        labels = [self.get_qubit_label(backend, qid) for qid in qids]
         results = exp.check_rabi(
             time_range=self.input_parameters["time_range"].get_value(),
             shots=self.input_parameters["shots"].get_value(),

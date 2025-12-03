@@ -6,7 +6,7 @@ from qdash.config import get_settings
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow._internal.slack import SlackContents, Status
-from qdash.workflow.engine.session.factory import create_session
+from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.worker.flows.chip_report.generate_report import generate_chip_info_report
 from qdash.workflow.worker.flows.push_props.create_props import (
     get_chip_properties,
@@ -92,13 +92,13 @@ def chip_report(
     logger = get_run_logger()
     logger.info(f"Current chip: {chip.chip_id}")
     source_path = f"/app/config/qubex/{chip.chip_id}/params/props.yaml"
-    session = create_session(
+    backend = create_backend(
         backend="qubex",
         config={
             "chip_id": chip.chip_id,
         },
     )
-    props, _ = get_chip_properties(chip, session=session, within_24hrs=False)
+    props, _ = get_chip_properties(chip, backend=backend, within_24hrs=False)
     handler = ChipPropertyYAMLHandler(source_path)
     base = handler.read()
     merged = merge_properties(base, props, chip_id=chip.chip_id)
@@ -107,7 +107,7 @@ def chip_report(
 
     # 指定時間以内のデータを抽出（マージせずに空のベースから作成）
     props_recent, recent_stats = get_chip_properties(
-        chip, session=session, within_24hrs=True, cutoff_hours=cutoff_hours
+        chip, backend=backend, within_24hrs=True, cutoff_hours=cutoff_hours
     )
     from ruamel.yaml.comments import CommentedMap
 

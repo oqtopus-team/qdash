@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.engine.session.qubex import QubexSession
+from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,
@@ -51,9 +51,9 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
     }
 
     def postprocess(
-        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+        self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        exp = self.get_experiment(session)
+        exp = self.get_experiment(backend)
         label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
         result = run_result.raw_result
         self.output_parameters["zx90_gate_fidelity"].value = result[label]["gate_fidelity"]
@@ -63,8 +63,8 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
         figures = [result[label]["fig"]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
-    def run(self, session: QubexSession, qid: str) -> RunResult:
-        exp = self.get_experiment(session)
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:
+        exp = self.get_experiment(backend)
         label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
         result = exp.interleaved_randomized_benchmarking(
             targets=label,
@@ -74,6 +74,6 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
             shots=self.input_parameters["shots"].get_value(),
             interval=self.input_parameters["interval"].get_value(),
         )
-        self.save_calibration(session)
+        self.save_calibration(backend)
         r2 = result[label]["rb_fit_result"]["r2"]
         return RunResult(raw_result=result, r2={qid: r2})

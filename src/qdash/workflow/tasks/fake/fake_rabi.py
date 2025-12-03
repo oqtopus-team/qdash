@@ -6,7 +6,7 @@ import numpy.typing as npt
 import plotly.graph_objects as go
 import qubex as qx
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.engine.session.fake import FakeSession
+from qdash.workflow.engine.backend.fake import FakeBackend
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -105,7 +105,7 @@ class FakeRabi(FakeTask):
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 
-    def preprocess(self, session: FakeSession, qid: str) -> PreProcessResult:  # noqa: ARG002
+    def preprocess(self, backend: FakeBackend, qid: str) -> PreProcessResult:  # noqa: ARG002
         """Preprocess the task."""
         return PreProcessResult(input_parameters=self.input_parameters)
 
@@ -117,7 +117,7 @@ class FakeRabi(FakeTask):
         figures = [result.plot_population_dynamics()]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
-    def run(self, session: FakeSession, qid: str) -> RunResult:
+    def run(self, backend: FakeBackend, qid: str) -> RunResult:
         """Run the task."""
         label = self.get_label(qid)
         qubit = Transmon(

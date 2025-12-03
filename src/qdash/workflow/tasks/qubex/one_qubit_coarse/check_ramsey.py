@@ -2,7 +2,7 @@ from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.engine.session.qubex import QubexSession
+from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,
@@ -104,11 +104,11 @@ class CheckRamsey(QubexTask):
         return fig
 
     def postprocess(
-        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+        self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         """Process the results of the task."""
-        self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
+        self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
 
         # Check if results contain the expected label
         from prefect import get_run_logger
@@ -233,13 +233,13 @@ class CheckRamsey(QubexTask):
         raw_data = [selected_result.data]
         return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
 
-    def run(self, session: QubexSession, qid: str) -> RunResult:
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""
-        exp = self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
+        exp = self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
 
         # Apply frequency override if qubit_frequency was explicitly provided
-        with self._apply_frequency_override(session, qid):
+        with self._apply_frequency_override(backend, qid):
             result_y = exp.ramsey_experiment(
                 time_range=self.input_parameters["time_range"].get_value(),
                 shots=self.input_parameters["shots"].get_value(),
@@ -259,7 +259,7 @@ class CheckRamsey(QubexTask):
                 targets=label,
             )
 
-        self.save_calibration(session)
+        self.save_calibration(backend)
         result = {"x": result_x, "y": result_y}
 
         # Debug: Log what data was returned

@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.engine.session.qubex import QubexSession
+from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,
@@ -48,10 +48,10 @@ class RandomizedBenchmarking(QubexTask):
     }
 
     def postprocess(
-        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+        self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
+        self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
         self.output_parameters["average_gate_fidelity"].value = result[label]["avg_gate_fidelity"]
         self.output_parameters["average_gate_fidelity"].error = result[label]["avg_gate_fidelity_err"]
@@ -60,9 +60,9 @@ class RandomizedBenchmarking(QubexTask):
         figures = [result[label]["fig"]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
-    def run(self, session: QubexSession, qid: str) -> RunResult:
-        exp = self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:
+        exp = self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
         result = exp.randomized_benchmarking(
             targets=label,
             n_trials=self.input_parameters["n_trials"].get_value(),
@@ -70,6 +70,6 @@ class RandomizedBenchmarking(QubexTask):
             shots=self.input_parameters["shots"].get_value(),
             interval=self.input_parameters["interval"].get_value(),
         )
-        self.save_calibration(session)
+        self.save_calibration(backend)
         r2 = result[label]["r2"]
         return RunResult(raw_result=result, r2={qid: r2})

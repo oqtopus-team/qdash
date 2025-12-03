@@ -3,11 +3,11 @@ from pathlib import Path
 
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.workflow._internal.merge_notes import merge_notes_by_timestamp
-from qdash.workflow.engine.session.base import BaseSession
+from qdash.workflow.engine.backend.base import BaseBackend
 
 
-class QubexSession(BaseSession):
-    """Session management for Qubex experiments."""
+class QubexBackend(BaseBackend):
+    """Backend management for Qubex experiments."""
 
     name: str = "qubex"
 
@@ -16,17 +16,17 @@ class QubexSession(BaseSession):
     def __init__(self, config: dict) -> None:
         from qubex import Experiment
 
-        """Initialize the Qubex session with a configuration dictionary."""
+        """Initialize the Qubex backend with a configuration dictionary."""
         self._config = config
         self._exp: Experiment | None = None
 
     @property
     def config(self) -> dict:
-        """Return the configuration dictionary for the Qubex session."""
+        """Return the configuration dictionary for the Qubex backend."""
         return self._config
 
     def version(self) -> str:
-        """Return the version of the Qubex session."""
+        """Return the version of the Qubex backend."""
         from qubex.version import get_package_version
 
         return get_package_version("qubex")

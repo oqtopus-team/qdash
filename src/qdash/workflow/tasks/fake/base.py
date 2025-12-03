@@ -4,7 +4,7 @@ from qdash.workflow.engine.calibration.util import qid_to_label
 from qdash.workflow.tasks.base import BaseTask, RunResult
 
 if TYPE_CHECKING:
-    from qdash.workflow.engine.session.fake import FakeSession
+    from qdash.workflow.engine.backend.fake import FakeBackend
 
 
 class FakeTask(BaseTask):
@@ -19,7 +19,7 @@ class FakeTask(BaseTask):
     # name is empty to prevent registration in BaseTask.registry
     # Only concrete subclasses with a name should be registered
 
-    def batch_run(self, session: "FakeSession", qids: list[str]) -> RunResult:
+    def batch_run(self, backend: "FakeBackend", qids: list[str]) -> RunResult:
         """Default implementation for batch run.
 
         Most Fake tasks do not support batch execution and should use the run method instead.

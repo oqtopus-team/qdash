@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.engine.session.qubex import QubexSession
+from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,
@@ -18,13 +18,13 @@ class Configure(QubexTask):
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 
     def postprocess(
-        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+        self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         pass
 
-    def run(self, session: QubexSession, qid: str) -> RunResult:  # noqa: ARG002
-        exp = self.get_experiment(session)
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:  # noqa: ARG002
+        exp = self.get_experiment(backend)
         exp.state_manager.load(chip_id=exp.chip_id, config_dir=exp.config_path, params_dir=exp.params_path)
         exp.state_manager.push(box_ids=exp.box_ids, confirm=False)
-        self.save_calibration(session)
+        self.save_calibration(backend)
         return RunResult(raw_result=None)

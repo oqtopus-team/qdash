@@ -4,7 +4,7 @@ from typing import Any, ClassVar, Literal
 import plotly.graph_objs as go
 from pydantic import BaseModel
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.engine.session.base import BaseSession
+from qdash.workflow.engine.backend.base import BaseBackend
 
 
 class PreProcessResult(BaseModel):
@@ -148,25 +148,25 @@ class BaseTask(ABC):
                         )
 
     @abstractmethod
-    def preprocess(self, session: BaseSession, qid: str) -> PreProcessResult:
+    def preprocess(self, backend: BaseBackend, qid: str) -> PreProcessResult:
         """Preprocess the task. This method is called before the task is executed.
 
         Args:
         ----
-            session: Session object
+            backend: Backend object for device communication
             qid: qubit id
 
         """
 
     @abstractmethod
     def postprocess(
-        self, session: BaseSession, execution_id: str, run_result: RunResult, qid: str
+        self, backend: BaseBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         """Postprocess the task. This method is called after the task is executed.
 
         Args:
         ----
-            session: Session object
+            backend: Backend object for device communication
             execution_id: execution id
             run_result: RunResult object
             qid: qubit id
@@ -174,23 +174,23 @@ class BaseTask(ABC):
         """
 
     @abstractmethod
-    def run(self, session: BaseSession, qid: str) -> RunResult:
+    def run(self, backend: BaseBackend, qid: str) -> RunResult:
         """Run the task.
 
         Args:
         ----
-            session: Session object
+            backend: Backend object for device communication
             qid: qubit id
 
         """
 
     @abstractmethod
-    def batch_run(self, session: BaseSession, qids: list[str]) -> RunResult:
+    def batch_run(self, backend: BaseBackend, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits.
 
         Args:
         ----
-            session: Session object
+            backend: Backend object for device communication
             qids: list of qubit ids
 
         """

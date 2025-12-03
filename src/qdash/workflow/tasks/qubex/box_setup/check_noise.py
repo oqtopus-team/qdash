@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.engine.session.qubex import QubexSession
+from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,
@@ -18,12 +18,12 @@ class CheckNoise(QubexTask):
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 
     def postprocess(
-        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+        self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         pass
 
-    def run(self, session: QubexSession, qid: str) -> RunResult:  # noqa: ARG002
-        exp = self.get_experiment(session)
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:  # noqa: ARG002
+        exp = self.get_experiment(backend)
         exp.check_noise()
-        self.save_calibration(session)
+        self.save_calibration(backend)
         return RunResult(raw_result=None)

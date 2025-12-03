@@ -3,7 +3,7 @@ from typing import Any, ClassVar
 import numpy as np
 import plotly.graph_objs as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.engine.session.qubex import QubexSession
+from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,
@@ -36,10 +36,10 @@ class ReadoutClassification(QubexTask):
     }
 
     def plot_section_from_result(
-        self, session: QubexSession, result: dict[str, Any], qid: str, bins: int = 60
+        self, backend: QubexBackend, result: dict[str, Any], qid: str, bins: int = 60
     ) -> go.Figure:
-        self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
+        self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
         clf = result["classifiers"][label]
         z0 = result["data"][label][label][0]
         z1 = result["data"][label][label][1]
@@ -96,22 +96,22 @@ class ReadoutClassification(QubexTask):
         return fig
 
     def postprocess(
-        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+        self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
+        self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
         self.output_parameters["average_readout_fidelity"].value = result["average_readout_fidelity"][label]
         self.output_parameters["readout_fidelity_0"].value = result["readout_fidelities"][label][0]
         self.output_parameters["readout_fidelity_1"].value = result["readout_fidelities"][label][1]
         output_parameters = self.attach_execution_id(execution_id)
 
-        figures: list[go.Figure] = [self.plot_section_from_result(session, result, qid)]
+        figures: list[go.Figure] = [self.plot_section_from_result(backend, result, qid)]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
-    def run(self, session: QubexSession, qid: str) -> RunResult:
-        exp = self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:
+        exp = self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
         result = exp.build_classifier(targets=label, save_dir=exp.classifier_dir)
-        self.save_calibration(session)
+        self.save_calibration(backend)
         return RunResult(raw_result=result)

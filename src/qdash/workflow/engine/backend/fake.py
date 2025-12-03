@@ -1,20 +1,20 @@
 from typing import Any
 
-from qdash.workflow.engine.session.base import BaseSession
+from qdash.workflow.engine.backend.base import BaseBackend
 
 
-class FakeSession(BaseSession):
-    """Session management for Fake experiments."""
+class FakeBackend(BaseBackend):
+    """Backend management for Fake experiments."""
 
     name: str = "fake"
 
     def __init__(self, config: dict) -> None:
-        """Initialize the Fake session with a configuration dictionary."""
+        """Initialize the Fake backend with a configuration dictionary."""
         self._config = config
         self._session: Any | None = None
 
     def version(self) -> str:
-        """Return the version of the Fake session."""
+        """Return the version of the Fake backend."""
         return "0.1.0"
 
     def connect(self) -> None:

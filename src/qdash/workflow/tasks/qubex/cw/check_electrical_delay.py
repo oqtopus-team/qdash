@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.engine.session.qubex import QubexSession
+from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.tasks.base import (
     PostProcessResult,
     RunResult,
@@ -20,7 +20,7 @@ class CheckElectricalDelay(QubexTask):
     }
 
     def postprocess(
-        self, session: QubexSession, execution_id: str, run_result: RunResult, qid: str
+        self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         """Process the results of the task."""
         result = run_result.raw_result
@@ -28,10 +28,10 @@ class CheckElectricalDelay(QubexTask):
         output_parameters = self.attach_execution_id(execution_id)
         return PostProcessResult(output_parameters=output_parameters)
 
-    def run(self, session: QubexSession, qid: str) -> RunResult:
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""
-        exp = self.get_experiment(session)
-        label = self.get_qubit_label(session, qid)
+        exp = self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
         result = exp.measure_electrical_delay(target=label)
-        self.save_calibration(session)
+        self.save_calibration(backend)
         return RunResult(raw_result=result)

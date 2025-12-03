@@ -1,9 +1,9 @@
 from prefect import get_run_logger, task
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.task import TaskDocument
+from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.task.manager import TaskManager
-from qdash.workflow.engine.session.base import BaseSession
 from qdash.workflow.tasks.base import BaseTask
 
 
@@ -22,7 +22,7 @@ initialize()
 
 @task(name="execute-dynamic-task")
 def execute_dynamic_task_by_qid(
-    session: BaseSession,
+    backend: BaseBackend,
     execution_manager: ExecutionManager,
     task_manager: TaskManager,
     task_instance: BaseTask,
@@ -36,7 +36,7 @@ def execute_dynamic_task_by_qid(
 
     try:
         # TaskManager's integrated execution and save processing
-        execution_manager, task_manager = task_manager.execute_task(task_instance, session, execution_manager, qid)
+        execution_manager, task_manager = task_manager.execute_task(task_instance, backend, execution_manager, qid)
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
         raise RuntimeError(f"Task {task_name} failed: {e}")
@@ -46,7 +46,7 @@ def execute_dynamic_task_by_qid(
 
 @task(name="execute-dynamic-task-batch")
 def execute_dynamic_task_batch(
-    session: BaseSession,
+    backend: BaseBackend,
     execution_manager: ExecutionManager,
     task_manager: TaskManager,
     task_instance: BaseTask,
@@ -61,7 +61,7 @@ def execute_dynamic_task_batch(
     try:
         # Execute task for each qid using TaskManager's integrated processing
         for qid in qids:
-            execution_manager, task_manager = task_manager.execute_task(task_instance, session, execution_manager, qid)
+            execution_manager, task_manager = task_manager.execute_task(task_instance, backend, execution_manager, qid)
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
         raise RuntimeError(f"Task {task_name} failed: {e}")
