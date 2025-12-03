@@ -1,13 +1,14 @@
-"""Full chip calibration workflow with automatic Box/CR scheduling.
+"""Synchronized full chip calibration with step-by-step execution.
 
 Features:
-- Automatic Box detection from wiring configuration
-- MUX-based qubit grouping with exclude support
-- Automatic CR scheduling with fidelity filtering
-- Each stage tracked with separate execution_id
+- Step-based execution: All MUXes synchronized at each step boundary
+- Checkerboard pattern: Frequency-aware qubit ordering to minimize crosstalk
+- Box B module sharing: Proper handling of MIXED MUXes (8 steps)
+- 12 total steps for full chip: 4 (Box A) + 8 (Box B+A MIXED)
+- Automatic CR scheduling for 2-qubit calibration
 
 Example:
-    scheduled_full_calibration(
+    synchronized_full_calibration(
         username="alice",
         chip_id="64Qv3",
         mux_ids=[0, 1, 2, 3],
@@ -17,14 +18,14 @@ Example:
 
 from prefect import flow, get_run_logger
 from qdash.workflow.flow import (
-    calibrate_one_qubit_scheduled,
+    calibrate_one_qubit_synchronized,
     calibrate_two_qubit_scheduled,
     extract_candidate_qubits,
 )
 
 
 @flow
-def scheduled_full_calibration(
+def synchronized_full_calibration(
     username: str,
     chip_id: str,
     mux_ids: list[int] | None = None,
@@ -32,7 +33,7 @@ def scheduled_full_calibration(
     qids: list[str] | None = None,
     flow_name: str | None = None,
 ):
-    """Full chip calibration with automatic Box/CR scheduling.
+    """Synchronized full chip calibration with step-by-step execution.
 
     Args:
         username: User name (from UI)
@@ -88,8 +89,8 @@ def scheduled_full_calibration(
     # Execution
     # =========================================================================
 
-    # Stage 1: 1-qubit calibration with automatic Box scheduling
-    results_1q = calibrate_one_qubit_scheduled(
+    # Stage 1: Synchronized 1-qubit calibration (12 steps: 4 A + 8 MIXED)
+    results_1q = calibrate_one_qubit_synchronized(
         username=username,
         chip_id=chip_id,
         mux_ids=mux_ids,

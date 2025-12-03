@@ -42,11 +42,11 @@ Module names ending with 'B' → Box B (e.g., R21B, U10B, U13B)
 
 Each MUX is classified based on the modules it uses:
 
-| Classification | Modules Used | Example |
-|---------------|--------------|---------|
-| Box A | Only A modules | MUX 1: ctrl=[Q73A-*], read_out=Q73A-8 |
-| Box B | Only B modules | (rare in current configs) |
-| Mixed | Both A and B | MUX 0: ctrl=[R21B-*], read_out=Q73A-1 |
+| Classification | Modules Used   | Example                               |
+| -------------- | -------------- | ------------------------------------- |
+| Box A          | Only A modules | MUX 1: ctrl=[Q73A-*], read_out=Q73A-8 |
+| Box B          | Only B modules | (rare in current configs)             |
+| Mixed          | Both A and B   | MUX 0: ctrl=[R21B-*], read_out=Q73A-1 |
 
 ### Conflict Rules
 

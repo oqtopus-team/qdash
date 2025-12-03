@@ -13,6 +13,7 @@ from qdash.workflow.flow.github import (
 )
 from qdash.workflow.flow.scheduled import (
     calibrate_one_qubit_scheduled,
+    calibrate_one_qubit_synchronized,
     calibrate_two_qubit_scheduled,
     extract_candidate_qubits,
 )
@@ -33,6 +34,7 @@ __all__ = [
     "generate_execution_id",
     # === Scheduled Calibration ===
     "calibrate_one_qubit_scheduled",
+    "calibrate_one_qubit_synchronized",
     "calibrate_two_qubit_scheduled",
     "extract_candidate_qubits",
     # === GitHub Integration ===

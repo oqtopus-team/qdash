@@ -97,6 +97,36 @@ def _calibrate_mux_qubits(qids: list[str], tasks: list[str]) -> dict:
     return results
 
 
+@task
+def _calibrate_single_qubit(qid: str, tasks: list[str]) -> tuple[str, dict]:
+    """Execute tasks for a single qubit."""
+    logger = get_run_logger()
+    session = get_session()
+
+    try:
+        result = {}
+        for task_name in tasks:
+            task_result = session.execute_task(task_name, qid)
+            result[task_name] = task_result
+        result["status"] = "success"
+    except Exception as e:
+        logger.error(f"Failed to calibrate qubit {qid}: {e}")
+        result = {"status": "failed", "error": str(e)}
+
+    return qid, result
+
+
+@task
+def _calibrate_step_qubits_parallel(parallel_qids: list[str], tasks: list[str]) -> dict:
+    """Execute tasks for all qubits in a synchronized step in parallel.
+
+    All qubits in parallel_qids are from different MUXes and can be
+    calibrated simultaneously in a synchronized step.
+    """
+    # Submit all qubits in parallel
+    futures = [_calibrate_single_qubit.submit(qid, tasks) for qid in parallel_qids]
+    pair_results = [f.result() for f in futures]
+    return {qid: result for qid, result in pair_results}
 
 
 @task
@@ -209,8 +239,6 @@ def calibrate_one_qubit_scheduled(
             tasks=["CheckRabi", "CheckT1"],
         )
     """
-    logger = get_run_logger()
-
     # Defaults
     if mux_ids is None:
         mux_ids = list(range(16))
@@ -252,10 +280,7 @@ def calibrate_one_qubit_scheduled(
         )
 
         # Execute MUX groups in parallel, qubits within each group sequentially
-        futures = [
-            _calibrate_mux_qubits.submit(qids=group, tasks=tasks)
-            for group in parallel_groups
-        ]
+        futures = [_calibrate_mux_qubits.submit(qids=group, tasks=tasks) for group in parallel_groups]
         mux_results = [f.result() for f in futures]
 
         # Combine results
@@ -268,6 +293,118 @@ def calibrate_one_qubit_scheduled(
         finish_calibration()
 
         all_results[stage_name] = stage_results
+
+    return all_results
+
+
+def calibrate_one_qubit_synchronized(
+    username: str,
+    chip_id: str,
+    mux_ids: list[int] | None = None,
+    exclude_qids: list[str] | None = None,
+    tasks: list[str] | None = None,
+    flow_name: str | None = None,
+) -> dict[str, Any]:
+    """Execute 1-qubit calibration with synchronized step-based scheduling.
+
+    All MUXes execute the same step simultaneously before moving to the next.
+    Uses checkerboard pattern for frequency isolation and handles Box B module
+    sharing constraints (MIXED MUXes get 8 steps instead of 4).
+
+    Total steps for full chip: 12 (4 Box A + 8 MIXED)
+
+    Args:
+        username: User name
+        chip_id: Chip ID
+        mux_ids: List of MUX IDs to calibrate. If None, uses all 16 MUXes (0-15)
+        exclude_qids: List of qubit IDs to exclude from calibration
+        tasks: List of 1-qubit task names. If None, uses FULL_1Q_TASKS
+        flow_name: Flow name prefix for stage names
+
+    Returns:
+        Dictionary of results organized by Box stage:
+        {"Box_A": {...}, "Box_MIXED": {...}}
+
+    Example:
+        results = calibrate_one_qubit_synchronized(
+            username="alice",
+            chip_id="64Qv3",
+            mux_ids=[0, 1, 2, 3],
+            exclude_qids=["5", "12"],
+            tasks=["CheckRabi", "CheckT1"],
+        )
+    """
+    logger = get_run_logger()
+
+    # Defaults
+    if mux_ids is None:
+        mux_ids = list(range(16))
+    if exclude_qids is None:
+        exclude_qids = []
+    if tasks is None:
+        tasks = FULL_1Q_TASKS
+
+    # Generate synchronized schedule with checkerboard pattern
+    wiring_config_path = get_wiring_config_path(chip_id)
+    scheduler = OneQubitScheduler(chip_id=chip_id, wiring_config_path=wiring_config_path)
+    schedule = scheduler.generate_synchronized_from_mux(
+        mux_ids=mux_ids,
+        exclude_qids=exclude_qids,
+        use_checkerboard=True,
+    )
+
+    logger.info(f"Synchronized schedule: {schedule.total_steps} steps")
+
+    all_results = {}
+    current_box_type = None
+    box_session_results = {}
+
+    for step in schedule.steps:
+        # Start new session when box type changes
+        if step.box_type != current_box_type:
+            # Finish previous session
+            if current_box_type is not None:
+                session = get_session()
+                session.record_stage_result(f"1q_Box_{current_box_type}", box_session_results)
+                finish_calibration()
+                all_results[f"Box_{current_box_type}"] = box_session_results
+                box_session_results = {}
+
+            # Start new session
+            current_box_type = step.box_type
+            box_qids = [qid for s in schedule.get_steps_by_box(current_box_type) for qid in s.parallel_qids]
+
+            stage_name = f"Box_{current_box_type}"
+            init_calibration(
+                username,
+                chip_id,
+                box_qids,
+                flow_name=f"{flow_name}_{stage_name}" if flow_name else stage_name,
+                enable_github_pull=True,
+                github_push_config=GitHubPushConfig(
+                    enabled=True,
+                    file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
+                ),
+                note={
+                    "type": "1-qubit-synchronized",
+                    "box": current_box_type,
+                    "total_steps": len(schedule.get_steps_by_box(current_box_type)),
+                },
+            )
+
+        # Execute synchronized step (all qubits in parallel)
+        step_results = _calibrate_step_qubits_parallel(
+            parallel_qids=step.parallel_qids,
+            tasks=tasks,
+        )
+        box_session_results.update(step_results)
+
+    # Finish final session
+    if current_box_type is not None:
+        session = get_session()
+        session.record_stage_result(f"1q_Box_{current_box_type}", box_session_results)
+        finish_calibration()
+        all_results[f"Box_{current_box_type}"] = box_session_results
 
     return all_results
 
@@ -343,7 +480,6 @@ def calibrate_two_qubit_scheduled(
 
     parallel_groups = schedule.parallel_groups
     coupling_groups = [[f"{c}-{t}" for c, t in group] for group in parallel_groups]
-    all_pairs = [pair for group in coupling_groups for pair in group]
 
     # Initialize session
     init_calibration(

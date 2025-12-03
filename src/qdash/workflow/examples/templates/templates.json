@@ -96,6 +96,14 @@
     "function_name": "scheduled_full_calibration"
   },
   {
+    "id": "synchronized_full_calibration",
+    "name": "Synchronized Full Calibration",
+    "description": "Step-synchronized full calibration (12 steps: 4 Box A + 8 MIXED) - all MUXes execute same step simultaneously with checkerboard pattern for frequency isolation and Box B module sharing",
+    "category": "production",
+    "filename": "synchronized_full_calibration.py",
+    "function_name": "synchronized_full_calibration"
+  },
+  {
     "id": "check_skew",
     "name": "CheckSkew Calibration",
     "description": "System-level skew measurement and calibration across MUX channels",
