@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 from qdash.datamodel.task import CalibDataModel, OutputParameterModel
+from qdash.workflow.caltasks.base import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.calibration.params_updater import get_params_updater
 from qdash.workflow.engine.calibration.repository import FilesystemCalibDataSaver
 from qdash.workflow.engine.calibration.task.history_recorder import TaskHistoryRecorder
@@ -24,7 +25,6 @@ from qdash.workflow.engine.calibration.task.result_processor import (
     TaskResultProcessor,
 )
 from qdash.workflow.engine.calibration.task.state_manager import TaskStateManager
-from qdash.workflow.tasks.base import PostProcessResult, PreProcessResult, RunResult
 
 logger = logging.getLogger(__name__)
 

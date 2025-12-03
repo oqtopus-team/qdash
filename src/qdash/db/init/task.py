@@ -3,7 +3,7 @@
 from qdash.datamodel.task import TaskModel
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.task import TaskDocument
-from qdash.workflow.tasks.base import BaseTask
+from qdash.workflow.caltasks.base import BaseTask
 
 
 def update_active_tasks(username: str, backend: str) -> list[TaskModel]:

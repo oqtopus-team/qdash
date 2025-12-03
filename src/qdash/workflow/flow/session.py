@@ -33,13 +33,13 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
+from qdash.workflow.caltasks.active_protocols import generate_task_instances
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.params_updater import get_params_updater
 from qdash.workflow.engine.calibration.prefect_tasks import execute_dynamic_task_by_qid
 from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.flow.github import GitHubIntegration, GitHubPushConfig
-from qdash.workflow.tasks.active_protocols import generate_task_instances
 
 if TYPE_CHECKING:
     from qdash.workflow.flow.config import FlowSessionConfig

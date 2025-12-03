@@ -1,10 +1,10 @@
 from prefect import get_run_logger, task
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.task import TaskDocument
+from qdash.workflow.caltasks.base import BaseTask
 from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.task.manager import TaskManager
-from qdash.workflow.tasks.base import BaseTask
 
 
 def validate_task_name(task_names: list[str], username: str) -> list[str]:

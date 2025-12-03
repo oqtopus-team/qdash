@@ -32,9 +32,9 @@ from qdash.workflow.engine.calibration.task.state_manager import TaskStateManage
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from qdash.workflow.caltasks.base import BaseTask
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
-    from qdash.workflow.tasks.base import BaseTask
 
 
 class TaskManager(BaseModel):
