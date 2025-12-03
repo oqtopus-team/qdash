@@ -22,7 +22,7 @@ class TestFlowSessionConfigCreation:
         assert config.chip_id == "chip_1"
         assert config.qids == ("0", "1", "2")
         assert config.execution_id is None
-        assert config.backend == "qubex"
+        assert config.backend_name == "qubex"
         assert config.name == "Python Flow Execution"
         assert config.tags is None
         assert config.use_lock is True
@@ -39,7 +39,7 @@ class TestFlowSessionConfigCreation:
             chip_id="chip_1",
             qids=("0", "1"),
             execution_id="20240101-001",
-            backend="fake",
+            backend_name="fake",
             name="Test Calibration",
             tags=("tag1", "tag2"),
             use_lock=False,
@@ -53,7 +53,7 @@ class TestFlowSessionConfigCreation:
         assert config.chip_id == "chip_1"
         assert config.qids == ("0", "1")
         assert config.execution_id == "20240101-001"
-        assert config.backend == "fake"
+        assert config.backend_name == "fake"
         assert config.name == "Test Calibration"
         assert config.tags == ("tag1", "tag2")
         assert config.use_lock is False
