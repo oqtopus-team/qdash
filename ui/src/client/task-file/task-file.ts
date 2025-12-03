@@ -781,10 +781,12 @@ export const useSaveTaskFileContent = <
  * List all task definitions found in a backend directory.
 
 Parses Python files to extract task names, types, and descriptions.
+Results are cached and invalidated when files are modified.
 
 Args:
 ----
     backend: Backend name (e.g., "qubex", "fake")
+    sort_order: Sort order for tasks ("type_then_name", "name_only", "file_path")
 
 Returns:
 -------

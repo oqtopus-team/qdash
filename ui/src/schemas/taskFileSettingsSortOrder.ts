@@ -6,7 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type ListTaskInfoParams = {
-  backend: string;
-  sort_order?: string | null;
-};
+export type TaskFileSettingsSortOrder = string | null;

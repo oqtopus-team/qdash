@@ -43,7 +43,7 @@ export default function TasksPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const [viewMode, setViewMode] = useState<ViewMode>("tasks");
+  const [viewMode, setViewMode] = useState<ViewMode | null>(null);
   const [selectedBackend, setSelectedBackend] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
@@ -66,6 +66,18 @@ export default function TasksPage() {
     queryKey: ["taskFileBackends"],
     queryFn: () => listTaskFileBackends().then((res) => res.data),
   });
+
+  // Set default view mode when settings are loaded
+  useEffect(() => {
+    if (settingsData && viewMode === null) {
+      const defaultViewMode = settingsData.default_view_mode;
+      if (defaultViewMode === "files" || defaultViewMode === "tasks") {
+        setViewMode(defaultViewMode);
+      } else {
+        setViewMode("tasks"); // Default to tasks if not specified
+      }
+    }
+  }, [settingsData, viewMode]);
 
   // Set default backend when loaded (from settings or first available)
   useEffect(() => {
@@ -101,9 +113,12 @@ export default function TasksPage() {
 
   // Fetch task list for selected backend
   const { data: taskListData, isLoading: isTaskListLoading } = useQuery({
-    queryKey: ["taskList", selectedBackend],
+    queryKey: ["taskList", selectedBackend, settingsData?.sort_order],
     queryFn: () =>
-      listTaskInfo({ backend: selectedBackend! }).then((res) => res.data),
+      listTaskInfo({
+        backend: selectedBackend!,
+        sort_order: settingsData?.sort_order ?? undefined,
+      }).then((res) => res.data),
     enabled: !!selectedBackend,
   });
 
@@ -493,7 +508,11 @@ export default function TasksPage() {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto py-2">
-              {viewMode === "files" ? (
+              {viewMode === null ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="loading loading-spinner loading-sm"></span>
+                </div>
+              ) : viewMode === "files" ? (
                 <>
                   <h2 className="text-xs font-bold text-gray-400 mb-1 px-3 tracking-wider">
                     EXPLORER

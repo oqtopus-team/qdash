@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { FileNodeType } from "./fileNodeType";
 import type { TaskFileTreeNodeChildren } from "./taskFileTreeNodeChildren";
 
 /**
@@ -13,6 +14,6 @@ import type { TaskFileTreeNodeChildren } from "./taskFileTreeNodeChildren";
 export interface TaskFileTreeNode {
   name: string;
   path: string;
-  type: string;
+  type: FileNodeType;
   children?: TaskFileTreeNodeChildren;
 }

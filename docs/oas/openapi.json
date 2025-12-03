@@ -1272,7 +1272,7 @@
       "get": {
         "tags": ["task-file"],
         "summary": "List all tasks in a backend",
-        "description": "List all task definitions found in a backend directory.\n\nParses Python files to extract task names, types, and descriptions.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n\nReturns:\n-------\n    List of task information",
+        "description": "List all task definitions found in a backend directory.\n\nParses Python files to extract task names, types, and descriptions.\nResults are cached and invalidated when files are modified.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n    sort_order: Sort order for tasks (\"type_then_name\", \"name_only\", \"file_path\")\n\nReturns:\n-------\n    List of task information",
         "operationId": "listTaskInfo",
         "security": [
           {
@@ -1287,6 +1287,22 @@
             "schema": {
               "type": "string",
               "title": "Backend"
+            }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort Order"
             }
           }
         ],
@@ -3415,6 +3431,12 @@
         "title": "FidelityCondition",
         "description": "Condition for fidelity filtering."
       },
+      "FileNodeType": {
+        "type": "string",
+        "enum": ["file", "directory"],
+        "title": "FileNodeType",
+        "description": "File node type enum."
+      },
       "FileTreeNode": {
         "properties": {
           "name": {
@@ -5228,6 +5250,28 @@
               }
             ],
             "title": "Default Backend"
+          },
+          "default_view_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default View Mode"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
           }
         },
         "type": "object",
@@ -5245,8 +5289,7 @@
             "title": "Path"
           },
           "type": {
-            "type": "string",
-            "title": "Type"
+            "$ref": "#/components/schemas/FileNodeType"
           },
           "children": {
             "anyOf": [

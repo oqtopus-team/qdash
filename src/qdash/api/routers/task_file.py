@@ -154,7 +154,11 @@ def get_task_file_settings() -> TaskFileSettings:
             with open(SETTINGS_PATH, encoding="utf-8") as f:
                 settings = yaml.safe_load(f)
                 task_files_settings = settings.get("task_files", {})
-                return TaskFileSettings(default_backend=task_files_settings.get("default_backend"))
+                return TaskFileSettings(
+                    default_backend=task_files_settings.get("default_backend"),
+                    default_view_mode=task_files_settings.get("default_view_mode"),
+                    sort_order=task_files_settings.get("sort_order"),
+                )
     except Exception as e:
         logger.warning(f"Failed to load settings from {SETTINGS_PATH}: {e}")
 
@@ -511,7 +515,10 @@ def _get_directory_mtime_sum(directory: Path) -> float:
     summary="List all tasks in a backend",
     operation_id="listTaskInfo",
 )
-def list_task_info(backend: str) -> ListTaskInfoResponse:
+def list_task_info(
+    backend: str,
+    sort_order: str | None = None,
+) -> ListTaskInfoResponse:
     """List all task definitions found in a backend directory.
 
     Parses Python files to extract task names, types, and descriptions.
@@ -520,6 +527,7 @@ def list_task_info(backend: str) -> ListTaskInfoResponse:
     Args:
     ----
         backend: Backend name (e.g., "qubex", "fake")
+        sort_order: Sort order for tasks ("type_then_name", "name_only", "file_path")
 
     Returns:
     -------
@@ -534,9 +542,10 @@ def list_task_info(backend: str) -> ListTaskInfoResponse:
     if not backend_path.is_dir():
         raise HTTPException(status_code=400, detail=f"Not a directory: {backend}")
 
-    # Check cache
+    # Check cache (include sort_order in cache key)
+    cache_key = f"{backend}:{sort_order or 'default'}"
     current_mtime = _get_directory_mtime_sum(backend_path)
-    cached = _task_cache.get(backend)
+    cached = _task_cache.get(cache_key)
 
     if cached is not None:
         cached_mtime, cached_tasks = cached
@@ -548,10 +557,16 @@ def list_task_info(backend: str) -> ListTaskInfoResponse:
     logger.debug(f"Parsing task files for backend: {backend}")
     tasks = collect_tasks_from_directory(backend_path, backend_path)
 
-    # Sort by task_type then by name
-    tasks.sort(key=lambda t: (t.task_type or "", t.name))
+    # Sort based on sort_order parameter
+    if sort_order == "name_only":
+        tasks.sort(key=lambda t: t.name)
+    elif sort_order == "file_path":
+        tasks.sort(key=lambda t: (t.file_path, t.name))
+    else:
+        # Default: type_then_name
+        tasks.sort(key=lambda t: (t.task_type or "", t.name))
 
     # Update cache
-    _task_cache[backend] = (current_mtime, tasks)
+    _task_cache[cache_key] = (current_mtime, tasks)
 
     return ListTaskInfoResponse(tasks=tasks)
