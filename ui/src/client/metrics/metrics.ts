@@ -363,7 +363,7 @@ export function useGetChipMetrics<
 /**
  * Get historical metric data for a specific qubit with task_id for figure display.
 
-This endpoint queries ExecutionHistoryDocument to retrieve the calibration
+This endpoint queries TaskResultHistoryDocument to retrieve calibration
 history for a specific metric, including multiple executions on the same day.
 Each history item includes task_id for displaying calibration figures.
 
@@ -574,7 +574,7 @@ export function useGetQubitMetricHistory<
 /**
  * Get historical metric data for a specific coupling with task_id for figure display.
 
-This endpoint queries ExecutionHistoryDocument to retrieve the calibration
+This endpoint queries TaskResultHistoryDocument to retrieve calibration
 history for a specific coupling metric, including multiple executions on the same day.
 Each history item includes task_id for displaying calibration figures.
 

@@ -742,6 +742,14 @@ def _fetch_timeseries_data(
         if qid not in timeseries_by_qid:
             timeseries_by_qid[qid] = []
 
+        # Skip if the parameter is not in output_parameters (data inconsistency)
+        if parameter not in task_result.output_parameters:
+            logger.warning(
+                f"Parameter '{parameter}' not found in output_parameters for task_result "
+                f"(qid={qid}, start_at={task_result.start_at}), skipping"
+            )
+            continue
+
         param_data = task_result.output_parameters[parameter]
         if isinstance(param_data, dict):
             timeseries_by_qid[qid].append(OutputParameterModel(**param_data))
