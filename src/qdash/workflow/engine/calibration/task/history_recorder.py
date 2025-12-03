@@ -31,9 +31,7 @@ class TaskResultHistoryRepoProtocol(Protocol):
 class ChipRepoProtocol(Protocol):
     """Protocol for chip repository."""
 
-    def update_chip_data(
-        self, chip_id: str, calib_data: CalibDataModel, username: str
-    ) -> None:
+    def update_chip_data(self, chip_id: str, calib_data: CalibDataModel, username: str) -> None:
         """Update chip data."""
         ...
 
@@ -84,9 +82,7 @@ class TaskHistoryRecorder:
             Repository for chip history (default: MongoChipHistoryRepository)
 
         """
-        self.task_result_history_repo = (
-            task_result_history_repo or MongoTaskResultHistoryRepository()
-        )
+        self.task_result_history_repo = task_result_history_repo or MongoTaskResultHistoryRepository()
         self.chip_repo = chip_repo or MongoChipRepository()
         self.chip_history_repo = chip_history_repo or MongoChipHistoryRepository()
 

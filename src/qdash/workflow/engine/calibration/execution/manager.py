@@ -9,7 +9,6 @@ import logging
 
 import pendulum
 from pydantic import BaseModel, Field
-
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionModel,

@@ -211,9 +211,7 @@ class FlowSessionDependencies:
             task_manager_factory: Custom task manager factory
         """
         self.session_factory = session_factory
-        self.execution_manager_factory = (
-            execution_manager_factory or DefaultExecutionManagerFactory()
-        )
+        self.execution_manager_factory = execution_manager_factory or DefaultExecutionManagerFactory()
         self.task_manager_factory = task_manager_factory or DefaultTaskManagerFactory()
 
     @classmethod

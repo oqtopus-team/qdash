@@ -8,7 +8,6 @@ from typing import Any
 
 import pendulum
 from pydantic import BaseModel
-
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionModel,
@@ -301,5 +300,7 @@ class ExecutionStateManager(BaseModel):
             elapsed_time=model.elapsed_time,
             calib_data=CalibDataModel(**model.calib_data) if isinstance(model.calib_data, dict) else model.calib_data,
             message=model.message,
-            system_info=SystemInfoModel(**model.system_info) if isinstance(model.system_info, dict) else model.system_info,
+            system_info=SystemInfoModel(**model.system_info)
+            if isinstance(model.system_info, dict)
+            else model.system_info,
         )

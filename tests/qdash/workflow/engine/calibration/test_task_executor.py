@@ -206,9 +206,7 @@ class TestTaskExecutorExecuteTask:
         self, executor, mock_result_processor, mock_state_manager
     ):
         """Test execute_task raises on R² validation failure."""
-        mock_result_processor.validate_r2.side_effect = R2ValidationError(
-            "R² value too low"
-        )
+        mock_result_processor.validate_r2.side_effect = R2ValidationError("R² value too low")
         task = MockTask()
         session = MockSession()
 
@@ -221,8 +219,8 @@ class TestTaskExecutorExecuteTask:
         self, executor, mock_result_processor, mock_state_manager
     ):
         """Test execute_task raises on fidelity validation failure."""
-        mock_result_processor.process_output_parameters.side_effect = (
-            FidelityValidationError("Fidelity exceeds 100%")
+        mock_result_processor.process_output_parameters.side_effect = FidelityValidationError(
+            "Fidelity exceeds 100%"
         )
         task = MockTask()
         session = MockSession()

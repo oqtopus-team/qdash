@@ -10,7 +10,6 @@ from collections.abc import Callable
 from typing import Any
 
 from pymongo import MongoClient, ReturnDocument
-
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionModel,
@@ -222,9 +221,7 @@ class MongoExecutionRepository:
             logger.error(f"DB transaction failed: {e}")
             raise
 
-    def _ensure_document_exists(
-        self, collection, execution_id: str, initial_model: ExecutionModel
-    ) -> None:
+    def _ensure_document_exists(self, collection, execution_id: str, initial_model: ExecutionModel) -> None:
         """Ensure document exists in collection.
 
         Parameters

@@ -5,7 +5,6 @@ import re
 import pendulum
 from prefect import task
 from pydantic import BaseModel, Field
-
 from qdash.datamodel.task import TaskModel
 from qdash.workflow.tasks.base import BaseTask
 

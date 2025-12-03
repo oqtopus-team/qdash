@@ -93,9 +93,7 @@ class SessionContext:
         return self.get_session() is not None
 
     @contextmanager
-    def session_scope(
-        self, session: "FlowSession"
-    ) -> Generator["FlowSession", None, None]:
+    def session_scope(self, session: "FlowSession") -> Generator["FlowSession", None, None]:
         """Context manager for session scope.
 
         Parameters

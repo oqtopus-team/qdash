@@ -7,7 +7,6 @@ using the local filesystem as the backend.
 import json
 import logging
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import plotly.graph_objs as go

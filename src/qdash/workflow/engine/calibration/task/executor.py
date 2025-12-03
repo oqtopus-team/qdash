@@ -14,8 +14,6 @@ import logging
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
-
-from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.task import CalibDataModel, OutputParameterModel
 from qdash.workflow.engine.calibration.params_updater import get_params_updater
 from qdash.workflow.engine.calibration.repository import FilesystemCalibDataSaver
@@ -32,7 +30,6 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
-    from qdash.workflow.engine.session.base import BaseSession
 
 
 @runtime_checkable
@@ -67,9 +64,7 @@ class TaskProtocol(Protocol):
         """Run the task."""
         ...
 
-    def postprocess(
-        self, session: Any, execution_id: str, run_result: RunResult, qid: str
-    ) -> PostProcessResult:
+    def postprocess(self, session: Any, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         """Run postprocessing."""
         ...
 
@@ -116,9 +111,7 @@ class TaskExecutionResult(BaseModel):
     message: str = ""
     output_parameters: dict[str, Any] = Field(default_factory=dict)
     r2: dict[str, float] | None = None
-    calib_data_delta: CalibDataModel = Field(
-        default_factory=lambda: CalibDataModel(qubit={}, coupling={})
-    )
+    calib_data_delta: CalibDataModel = Field(default_factory=lambda: CalibDataModel(qubit={}, coupling={}))
     controller_info: dict[str, dict] = Field(default_factory=dict)
 
     model_config = {"arbitrary_types_allowed": True}
@@ -262,9 +255,7 @@ class TaskExecutor:
 
             # Record task start to history
             executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_manager.to_datamodel()
-            )
+            self.history_recorder.record_task_result(executed_task, execution_manager.to_datamodel())
 
             # Update execution manager
             execution_manager = self._update_execution_manager(execution_manager)
@@ -272,9 +263,7 @@ class TaskExecutor:
             # 2. Preprocess
             preprocess_result = self._run_preprocess(task, session, qid)
             if preprocess_result:
-                self.state_manager.put_input_parameters(
-                    task_name, preprocess_result.input_parameters, task_type, qid
-                )
+                self.state_manager.put_input_parameters(task_name, preprocess_result.input_parameters, task_type, qid)
                 execution_manager = self._update_execution_manager(execution_manager)
 
             # 3. Run
@@ -293,7 +282,7 @@ class TaskExecutor:
 
             if postprocess_result:
                 # 5. Process and validate results
-                backend_success = self._process_results(
+                self._process_results(
                     task, execution_manager, postprocess_result, qid, run_result, session
                 )
 
@@ -306,9 +295,7 @@ class TaskExecutor:
 
             # Record completion to history
             executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_manager.to_datamodel()
-            )
+            self.history_recorder.record_task_result(executed_task, execution_manager.to_datamodel())
 
             execution_manager = self._update_execution_manager(execution_manager)
             result.success = True
@@ -317,18 +304,14 @@ class TaskExecutor:
         except (R2ValidationError, FidelityValidationError, ValueError) as e:
             self._fail_task(task_name, task_type, qid, str(e))
             executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_manager.to_datamodel()
-            )
+            self.history_recorder.record_task_result(executed_task, execution_manager.to_datamodel())
             result.message = str(e)
             raise
 
         except Exception as e:
             self._fail_task(task_name, task_type, qid, str(e))
             executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_manager.to_datamodel()
-            )
+            self.history_recorder.record_task_result(executed_task, execution_manager.to_datamodel())
             result.message = str(e)
             raise TaskExecutionError(f"Task {task_name} failed: {e}") from e
 
@@ -338,9 +321,7 @@ class TaskExecutor:
 
             # Final history record
             executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_manager.to_datamodel()
-            )
+            self.history_recorder.record_task_result(executed_task, execution_manager.to_datamodel())
 
             # Create chip history snapshot
             self.history_recorder.create_chip_history_snapshot(self.username)
@@ -404,9 +385,7 @@ class TaskExecutor:
             # Preprocess
             preprocess_result = self._run_preprocess(task, session, qid)
             if preprocess_result:
-                self.state_manager.put_input_parameters(
-                    task_name, preprocess_result.input_parameters, task_type, qid
-                )
+                self.state_manager.put_input_parameters(task_name, preprocess_result.input_parameters, task_type, qid)
 
             # Run
             run_result = self._run_task(task, session, qid)
@@ -427,9 +406,7 @@ class TaskExecutor:
             postprocess_result = self._run_postprocess(task, session, run_result, qid)
 
             # Process output parameters
-            output_params = self._process_output_parameters(
-                postprocess_result, task_name, qid, task_type
-            )
+            output_params = self._process_output_parameters(postprocess_result, task_name, qid, task_type)
             result["output_parameters"] = output_params
 
             # Save figures and raw data
@@ -461,9 +438,7 @@ class TaskExecutor:
 
         return result
 
-    def _update_execution_manager(
-        self, execution_manager: "ExecutionManager"
-    ) -> "ExecutionManager":
+    def _update_execution_manager(self, execution_manager: "ExecutionManager") -> "ExecutionManager":
         """Update execution manager with current state.
 
         Parameters
@@ -477,6 +452,7 @@ class TaskExecutor:
             Updated execution manager
 
         """
+
         # Create a minimal object with task manager attributes for update
         # This maintains backward compatibility with ExecutionManager.update_with_task_manager
         class TaskManagerProxy:
@@ -535,9 +511,7 @@ class TaskExecutor:
         # 1. Validate fidelity
         if postprocess_result.output_parameters:
             try:
-                self.result_processor.validate_fidelity(
-                    postprocess_result.output_parameters, task_name
-                )
+                self.result_processor.validate_fidelity(postprocess_result.output_parameters, task_name)
             except FidelityValidationError as e:
                 raise ValueError(str(e)) from e
 
@@ -552,24 +526,16 @@ class TaskExecutor:
                 self.execution_id,
                 task_model.task_id,
             )
-            self.state_manager.put_output_parameters(
-                task_name, processed_params, task_type, qid
-            )
+            self.state_manager.put_output_parameters(task_name, processed_params, task_type, qid)
 
         # 3. Save figures
         if postprocess_result.figures:
-            png_paths, json_paths = self.data_saver.save_figures(
-                postprocess_result.figures, task_name, task_type, qid
-            )
-            self.state_manager.set_figure_paths(
-                task_name, task_type, qid, png_paths, json_paths
-            )
+            png_paths, json_paths = self.data_saver.save_figures(postprocess_result.figures, task_name, task_type, qid)
+            self.state_manager.set_figure_paths(task_name, task_type, qid, png_paths, json_paths)
 
         # 4. Save raw data
         if postprocess_result.raw_data:
-            raw_paths = self.data_saver.save_raw_data(
-                postprocess_result.raw_data, task_name, task_type, qid
-            )
+            raw_paths = self.data_saver.save_raw_data(postprocess_result.raw_data, task_name, task_type, qid)
             self.state_manager.set_raw_data_paths(task_name, task_type, qid, raw_paths)
 
         # 5. Validate R²
@@ -580,24 +546,18 @@ class TaskExecutor:
                 backend_success = False
             else:
                 try:
-                    self.result_processor.validate_r2(
-                        run_result.r2, qid, task.r2_threshold
-                    )
+                    self.result_processor.validate_r2(run_result.r2, qid, task.r2_threshold)
                 except R2ValidationError:
                     # Clear output parameters on R² failure
                     if postprocess_result.output_parameters:
-                        self.state_manager.clear_output_parameters(
-                            task_name, task_type, qid
-                        )
+                        self.state_manager.clear_output_parameters(task_name, task_type, qid)
                     raise ValueError(f"{task_name} R² value too low: {r2_value:.4f}")
 
             if not backend_success and postprocess_result.output_parameters:
                 self.state_manager.clear_output_parameters(task_name, task_type, qid)
 
         # 6. Backend-specific save processing
-        self._save_backend_specific(
-            task, execution_manager, qid, session, backend_success
-        )
+        self._save_backend_specific(task, execution_manager, qid, session, backend_success)
 
         return backend_success
 
@@ -706,9 +666,7 @@ class TaskExecutor:
                     chip_id=execution_manager.chip_id,
                     output_parameters=output_parameters,
                 )
-                self._update_backend_params(
-                    session, execution_manager, qid, output_parameters
-                )
+                self._update_backend_params(session, execution_manager, qid, output_parameters)
             elif task.is_coupling_task():
                 CouplingDocument.update_calib_data(
                     username=self.username,
@@ -918,9 +876,7 @@ class TaskExecutor:
         )
 
         # Store in state manager
-        self.state_manager.put_output_parameters(
-            task_name, processed_params, task_type, qid
-        )
+        self.state_manager.put_output_parameters(task_name, processed_params, task_type, qid)
 
         return processed_params
 
@@ -947,18 +903,12 @@ class TaskExecutor:
         """
         # Save figures
         if postprocess_result.figures:
-            png_paths, json_paths = self.data_saver.save_figures(
-                postprocess_result.figures, task_name, task_type, qid
-            )
-            self.state_manager.set_figure_paths(
-                task_name, task_type, qid, png_paths, json_paths
-            )
+            png_paths, json_paths = self.data_saver.save_figures(postprocess_result.figures, task_name, task_type, qid)
+            self.state_manager.set_figure_paths(task_name, task_type, qid, png_paths, json_paths)
 
         # Save raw data
         if postprocess_result.raw_data:
-            raw_paths = self.data_saver.save_raw_data(
-                postprocess_result.raw_data, task_name, task_type, qid
-            )
+            raw_paths = self.data_saver.save_raw_data(postprocess_result.raw_data, task_name, task_type, qid)
             self.state_manager.set_raw_data_paths(task_name, task_type, qid, raw_paths)
 
     def _complete_task(
@@ -982,9 +932,7 @@ class TaskExecutor:
             Completion message
 
         """
-        self.state_manager.update_task_status_to_completed(
-            task_name, message, task_type, qid
-        )
+        self.state_manager.update_task_status_to_completed(task_name, message, task_type, qid)
 
     def _fail_task(
         self,
@@ -1007,6 +955,4 @@ class TaskExecutor:
             Failure message
 
         """
-        self.state_manager.update_task_status_to_failed(
-            task_name, message, task_type, qid
-        )
+        self.state_manager.update_task_status_to_failed(task_name, message, task_type, qid)

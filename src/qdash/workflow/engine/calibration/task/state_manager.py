@@ -6,7 +6,6 @@ management, including task creation, status updates, and parameter handling.
 
 import pendulum
 from pydantic import BaseModel
-
 from qdash.datamodel.task import (
     BaseTaskResultModel,
     CalibDataModel,
@@ -82,9 +81,7 @@ class TaskStateManager(BaseModel):
         """
         return self._upstream_task_id
 
-    def _ensure_task_exists(
-        self, task_name: str, task_type: str, qid: str
-    ) -> BaseTaskResultModel:
+    def _ensure_task_exists(self, task_name: str, task_type: str, qid: str) -> BaseTaskResultModel:
         """Ensure a task exists in the appropriate container.
 
         Parameters
@@ -138,9 +135,7 @@ class TaskStateManager(BaseModel):
         else:
             raise ValueError(f"Unknown task type: {task_type}")
 
-    def _create_task(
-        self, task_name: str, task_type: str, qid: str
-    ) -> BaseTaskResultModel:
+    def _create_task(self, task_name: str, task_type: str, qid: str) -> BaseTaskResultModel:
         """Create a new task of the appropriate type.
 
         Parameters
@@ -171,9 +166,7 @@ class TaskStateManager(BaseModel):
         else:
             raise ValueError(f"Unknown task type: {task_type}")
 
-    def get_task(
-        self, task_name: str, task_type: str, qid: str
-    ) -> BaseTaskResultModel:
+    def get_task(self, task_name: str, task_type: str, qid: str) -> BaseTaskResultModel:
         """Get an existing task.
 
         Parameters
@@ -236,9 +229,7 @@ class TaskStateManager(BaseModel):
         task.end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
         task.elapsed_time = task.calculate_elapsed_time(task.start_at, task.end_at)
 
-    def update_task_status_to_completed(
-        self, task_name: str, message: str, task_type: str, qid: str
-    ) -> None:
+    def update_task_status_to_completed(self, task_name: str, message: str, task_type: str, qid: str) -> None:
         """Update task status to COMPLETED.
 
         Parameters
@@ -257,9 +248,7 @@ class TaskStateManager(BaseModel):
         task.status = TaskStatusModel.COMPLETED
         task.message = message
 
-    def update_task_status_to_failed(
-        self, task_name: str, message: str, task_type: str, qid: str
-    ) -> None:
+    def update_task_status_to_failed(self, task_name: str, message: str, task_type: str, qid: str) -> None:
         """Update task status to FAILED.
 
         Parameters
@@ -278,9 +267,7 @@ class TaskStateManager(BaseModel):
         task.status = TaskStatusModel.FAILED
         task.message = message
 
-    def update_task_status_to_skipped(
-        self, task_name: str, message: str, task_type: str, qid: str
-    ) -> None:
+    def update_task_status_to_skipped(self, task_name: str, message: str, task_type: str, qid: str) -> None:
         """Update task status to SKIPPED.
 
         Parameters
@@ -327,9 +314,7 @@ class TaskStateManager(BaseModel):
         task.status = new_status
         task.message = message
 
-    def put_input_parameters(
-        self, task_name: str, input_parameters: dict, task_type: str, qid: str
-    ) -> None:
+    def put_input_parameters(self, task_name: str, input_parameters: dict, task_type: str, qid: str) -> None:
         """Store input parameters for a task.
 
         Parameters
@@ -379,9 +364,7 @@ class TaskStateManager(BaseModel):
             for key, value in output_parameters.items():
                 self.calib_data.put_coupling_data(qid, key, value)
 
-    def clear_output_parameters(
-        self, task_name: str, task_type: str, qid: str
-    ) -> None:
+    def clear_output_parameters(self, task_name: str, task_type: str, qid: str) -> None:
         """Clear output parameters for a task and rollback calib_data.
 
         This method clears both the task's output_parameters and removes
@@ -413,9 +396,7 @@ class TaskStateManager(BaseModel):
             elif task_type == "coupling":
                 self._clear_coupling_calib_data(qid, parameter_names)
 
-    def get_output_parameter_by_task_name(
-        self, task_name: str, task_type: str, qid: str
-    ) -> dict:
+    def get_output_parameter_by_task_name(self, task_name: str, task_type: str, qid: str) -> dict:
         """Get output parameters for a specific task.
 
         Parameters
@@ -436,9 +417,7 @@ class TaskStateManager(BaseModel):
         task = self.get_task(task_name, task_type, qid)
         return task.output_parameters
 
-    def start_all_qid_tasks(
-        self, task_name: str, task_type: str, qids: list[str]
-    ) -> None:
+    def start_all_qid_tasks(self, task_name: str, task_type: str, qids: list[str]) -> None:
         """Start a task for all given qubit IDs.
 
         Parameters
@@ -454,9 +433,7 @@ class TaskStateManager(BaseModel):
         for qid in qids:
             self.start_task(task_name, task_type, qid)
 
-    def update_not_executed_tasks_to_skipped(
-        self, task_type: str, qid: str, message: str = "Not executed"
-    ) -> None:
+    def update_not_executed_tasks_to_skipped(self, task_type: str, qid: str, message: str = "Not executed") -> None:
         """Mark all scheduled tasks as skipped.
 
         Parameters
@@ -475,9 +452,7 @@ class TaskStateManager(BaseModel):
                 task.status = TaskStatusModel.SKIPPED
                 task.message = message
 
-    def this_task_is_completed(
-        self, task_name: str, task_type: str, qid: str
-    ) -> bool:
+    def this_task_is_completed(self, task_name: str, task_type: str, qid: str) -> bool:
         """Check if a task is completed.
 
         Parameters
@@ -501,9 +476,7 @@ class TaskStateManager(BaseModel):
         except ValueError:
             return False
 
-    def _clear_qubit_calib_data(
-        self, qid: str, parameter_names: list[str]
-    ) -> None:
+    def _clear_qubit_calib_data(self, qid: str, parameter_names: list[str]) -> None:
         """Clear specific parameters from qubit calibration data.
 
         Parameters
@@ -518,9 +491,7 @@ class TaskStateManager(BaseModel):
             for name in parameter_names:
                 self.calib_data.qubit[qid].pop(name, None)
 
-    def _clear_coupling_calib_data(
-        self, qid: str, parameter_names: list[str]
-    ) -> None:
+    def _clear_coupling_calib_data(self, qid: str, parameter_names: list[str]) -> None:
         """Clear specific parameters from coupling calibration data.
 
         Parameters
@@ -595,9 +566,7 @@ class TaskStateManager(BaseModel):
         task.figure_path = png_paths
         task.json_figure_path = json_paths
 
-    def set_raw_data_paths(
-        self, task_name: str, task_type: str, qid: str, paths: list[str]
-    ) -> None:
+    def set_raw_data_paths(self, task_name: str, task_type: str, qid: str, paths: list[str]) -> None:
         """Set raw data paths for a task.
 
         Parameters
@@ -696,9 +665,7 @@ class TaskStateManager(BaseModel):
                 return False
         return True
 
-    def ensure_task_exists(
-        self, task_name: str, task_type: str, qid: str
-    ) -> BaseTaskResultModel:
+    def ensure_task_exists(self, task_name: str, task_type: str, qid: str) -> BaseTaskResultModel:
         """Public method to ensure a task exists in the appropriate container.
 
         Parameters
@@ -731,9 +698,7 @@ class TaskStateManager(BaseModel):
         """
         self._clear_qubit_calib_data(qid, list(parameter_names))
 
-    def update_task_status_to_running(
-        self, task_name: str, message: str, task_type: str, qid: str
-    ) -> None:
+    def update_task_status_to_running(self, task_name: str, message: str, task_type: str, qid: str) -> None:
         """Update task status to RUNNING.
 
         Parameters

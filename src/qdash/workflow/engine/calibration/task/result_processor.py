@@ -41,10 +41,12 @@ class TaskResultProcessor:
     """
 
     # Task names that have fidelity output and need validation
-    FIDELITY_TASKS = frozenset([
-        "RandomizedBenchmarking",
-        "InterleavedRandomizedBenchmarking",
-    ])
+    FIDELITY_TASKS = frozenset(
+        [
+            "RandomizedBenchmarking",
+            "InterleavedRandomizedBenchmarking",
+        ]
+    )
 
     def __init__(self, r2_threshold: float = 0.7) -> None:
         """Initialize TaskResultProcessor.
@@ -95,9 +97,7 @@ class TaskResultProcessor:
         check_threshold = threshold if threshold is not None else self.r2_threshold
 
         if r2_value <= check_threshold:
-            raise R2ValidationError(
-                f"R² value too low for qid {qid}: {r2_value:.4f} <= {check_threshold}"
-            )
+            raise R2ValidationError(f"R² value too low for qid {qid}: {r2_value:.4f} <= {check_threshold}")
 
         return True
 
@@ -135,15 +135,11 @@ class TaskResultProcessor:
 
         fidelity_value = fidelity_param.value
         if fidelity_value > 1.0:
-            raise FidelityValidationError(
-                f"Fidelity exceeds 100% for {task_name}: {fidelity_value * 100:.2f}%"
-            )
+            raise FidelityValidationError(f"Fidelity exceeds 100% for {task_name}: {fidelity_value * 100:.2f}%")
 
         return True
 
-    def get_output_parameter_names(
-        self, output_parameters: dict[str, OutputParameterModel]
-    ) -> list[str]:
+    def get_output_parameter_names(self, output_parameters: dict[str, OutputParameterModel]) -> list[str]:
         """Get list of output parameter names.
 
         Parameters
@@ -179,9 +175,7 @@ class TaskResultProcessor:
             Empty dict (all parameters filtered out)
 
         """
-        logger.warning(
-            f"Filtering out {len(output_parameters)} output parameters due to low R²"
-        )
+        logger.warning(f"Filtering out {len(output_parameters)} output parameters due to low R²")
         return {}
 
     def process_run_result(

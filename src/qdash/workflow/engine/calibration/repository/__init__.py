@@ -7,6 +7,9 @@ decoupling TaskManager from specific data access implementations.
 from qdash.workflow.engine.calibration.repository.filesystem_impl import (
     FilesystemCalibDataSaver,
 )
+from qdash.workflow.engine.calibration.repository.mongo_execution import (
+    MongoExecutionRepository,
+)
 from qdash.workflow.engine.calibration.repository.mongo_impl import (
     MongoChipHistoryRepository,
     MongoChipRepository,
@@ -19,9 +22,6 @@ from qdash.workflow.engine.calibration.repository.protocols import (
     ChipRepository,
     ExecutionRepository,
     TaskResultHistoryRepository,
-)
-from qdash.workflow.engine.calibration.repository.mongo_execution import (
-    MongoExecutionRepository,
 )
 
 __all__ = [

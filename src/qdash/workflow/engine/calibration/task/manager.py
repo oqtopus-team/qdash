@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
-
 from qdash.datamodel.task import (
     CalibDataModel,
     TaskResultModel,

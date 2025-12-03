@@ -173,7 +173,9 @@ class TestParameterManagement:
         tsm.calib_data.coupling["0-1"] = {}
 
         output_param = OutputParameterModel(value=0.05, unit="GHz")
-        tsm.put_output_parameters("CheckCoupling", {"coupling_strength": output_param}, "coupling", "0-1")
+        tsm.put_output_parameters(
+            "CheckCoupling", {"coupling_strength": output_param}, "coupling", "0-1"
+        )
 
         assert "coupling_strength" in tsm.calib_data.coupling["0-1"]
 
