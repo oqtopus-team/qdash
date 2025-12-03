@@ -7,9 +7,9 @@ test configurations.
 
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
+from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.task.manager import TaskManager
-from qdash.workflow.engine.session.factory import create_session
 from qdash.workflow.flow.config import FlowSessionConfig
 
 if TYPE_CHECKING:
@@ -17,17 +17,17 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
-class SessionFactory(Protocol):
-    """Protocol for backend session factory."""
+class BackendFactory(Protocol):
+    """Protocol for backend factory."""
 
     def create(self, config: dict) -> Any:
-        """Create a backend session.
+        """Create a backend instance.
 
         Args:
-            config: Session configuration dictionary
+            config: Backend configuration dictionary
 
         Returns:
-            Backend session instance
+            Backend instance
         """
         ...
 
@@ -88,27 +88,27 @@ class TaskManagerFactory(Protocol):
         ...
 
 
-class DefaultSessionFactory:
-    """Default implementation of SessionFactory using create_session."""
+class DefaultBackendFactory:
+    """Default implementation of BackendFactory using create_backend."""
 
-    def __init__(self, backend: str = "qubex"):
+    def __init__(self, backend_name: str = "qubex"):
         """Initialize factory with backend type.
 
         Args:
-            backend: Backend type ('qubex' or 'fake')
+            backend_name: Backend type ('qubex' or 'fake')
         """
-        self.backend = backend
+        self.backend_name = backend_name
 
     def create(self, config: dict) -> Any:
-        """Create a backend session using the standard factory.
+        """Create a backend instance using the standard factory.
 
         Args:
-            config: Session configuration dictionary
+            config: Backend configuration dictionary
 
         Returns:
-            Backend session instance
+            Backend instance
         """
-        return create_session(backend=self.backend, config=config)
+        return create_backend(backend=self.backend_name, config=config)
 
 
 class DefaultExecutionManagerFactory:
@@ -185,40 +185,40 @@ class FlowSessionDependencies:
     enabling easy swapping for testing.
 
     Attributes:
-        session_factory: Factory for backend sessions
+        backend_factory: Factory for backend instances
         execution_manager_factory: Factory for ExecutionManager
         task_manager_factory: Factory for TaskManager
     """
 
     def __init__(
         self,
-        session_factory: SessionFactory | None = None,
+        backend_factory: BackendFactory | None = None,
         execution_manager_factory: ExecutionManagerFactory | None = None,
         task_manager_factory: TaskManagerFactory | None = None,
     ):
         """Initialize with optional custom factories.
 
         Args:
-            session_factory: Custom session factory (defaults to DefaultSessionFactory)
+            backend_factory: Custom backend factory (defaults to DefaultBackendFactory)
             execution_manager_factory: Custom execution manager factory
             task_manager_factory: Custom task manager factory
         """
-        self.session_factory = session_factory
+        self.backend_factory = backend_factory
         self.execution_manager_factory = execution_manager_factory or DefaultExecutionManagerFactory()
         self.task_manager_factory = task_manager_factory or DefaultTaskManagerFactory()
 
     @classmethod
-    def production(cls, backend: str = "qubex") -> "FlowSessionDependencies":
+    def production(cls, backend_name: str = "qubex") -> "FlowSessionDependencies":
         """Create production dependencies.
 
         Args:
-            backend: Backend type ('qubex' or 'fake')
+            backend_name: Backend type ('qubex' or 'fake')
 
         Returns:
             FlowSessionDependencies configured for production
         """
         return cls(
-            session_factory=DefaultSessionFactory(backend=backend),
+            backend_factory=DefaultBackendFactory(backend_name=backend_name),
             execution_manager_factory=DefaultExecutionManagerFactory(),
             task_manager_factory=DefaultTaskManagerFactory(),
         )
@@ -231,7 +231,7 @@ class FlowSessionDependencies:
             FlowSessionDependencies configured for fake backend
         """
         return cls(
-            session_factory=DefaultSessionFactory(backend="fake"),
+            backend_factory=DefaultBackendFactory(backend_name="fake"),
             execution_manager_factory=DefaultExecutionManagerFactory(),
             task_manager_factory=DefaultTaskManagerFactory(),
         )
@@ -274,7 +274,7 @@ def create_flow_session(
 
     # Use production dependencies if not specified
     if dependencies is None:
-        dependencies = FlowSessionDependencies.production(backend=config.backend)
+        dependencies = FlowSessionDependencies.production(backend_name=config.backend_name)
 
     # Convert config to kwargs for FlowSession.__init__
     return FlowSession(
@@ -282,7 +282,7 @@ def create_flow_session(
         chip_id=config.chip_id,
         qids=list(config.qids),
         execution_id=config.execution_id,
-        backend=config.backend,
+        backend_name=config.backend_name,
         name=config.name,
         tags=list(config.tags) if config.tags else None,
         use_lock=config.use_lock,

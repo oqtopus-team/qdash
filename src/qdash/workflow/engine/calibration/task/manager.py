@@ -32,9 +32,9 @@ from qdash.workflow.engine.calibration.task.state_manager import TaskStateManage
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from qdash.workflow.caltasks.base import BaseTask
+    from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
-    from qdash.workflow.engine.session.base import BaseSession
-    from qdash.workflow.tasks.base import BaseTask
 
 
 class TaskManager(BaseModel):
@@ -513,7 +513,7 @@ class TaskManager(BaseModel):
     def execute_task(
         self,
         task_instance: "BaseTask",
-        session: "BaseSession",
+        backend: "BaseBackend",
         execution_manager: "ExecutionManager",
         qid: str,
     ) -> tuple["ExecutionManager", "TaskManager"]:
@@ -526,8 +526,8 @@ class TaskManager(BaseModel):
         ----------
         task_instance : BaseTask
             Task instance to execute
-        session : BaseSession
-            Session object
+        backend : BaseBackend
+            Backend object for device communication
         execution_manager : ExecutionManager
             Execution manager
         qid : str
@@ -545,7 +545,7 @@ class TaskManager(BaseModel):
         # Delegate to TaskExecutor
         execution_manager, result = self._executor.execute(
             task=task_instance,
-            session=session,
+            backend=backend,
             execution_manager=execution_manager,
             qid=qid,
         )

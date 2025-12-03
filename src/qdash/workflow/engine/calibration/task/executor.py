@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 from qdash.datamodel.task import CalibDataModel, OutputParameterModel
+from qdash.workflow.caltasks.base import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.calibration.params_updater import get_params_updater
 from qdash.workflow.engine.calibration.repository import FilesystemCalibDataSaver
 from qdash.workflow.engine.calibration.task.history_recorder import TaskHistoryRecorder
@@ -24,7 +25,6 @@ from qdash.workflow.engine.calibration.task.result_processor import (
     TaskResultProcessor,
 )
 from qdash.workflow.engine.calibration.task.state_manager import TaskStateManager
-from qdash.workflow.tasks.base import PostProcessResult, PreProcessResult, RunResult
 
 logger = logging.getLogger(__name__)
 
@@ -56,15 +56,15 @@ class TaskProtocol(Protocol):
         """Check if coupling task."""
         ...
 
-    def preprocess(self, session: Any, qid: str) -> PreProcessResult | None:
+    def preprocess(self, backend: Any, qid: str) -> PreProcessResult | None:
         """Run preprocessing."""
         ...
 
-    def run(self, session: Any, qid: str) -> RunResult | None:
+    def run(self, backend: Any, qid: str) -> RunResult | None:
         """Run the task."""
         ...
 
-    def postprocess(self, session: Any, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
+    def postprocess(self, backend: Any, execution_id: str, run_result: RunResult, qid: str) -> PostProcessResult:
         """Run postprocessing."""
         ...
 
@@ -74,8 +74,8 @@ class TaskProtocol(Protocol):
 
 
 @runtime_checkable
-class SessionProtocol(Protocol):
-    """Protocol for session objects."""
+class BackendProtocol(Protocol):
+    """Protocol for backend objects."""
 
     name: str
 
@@ -204,7 +204,7 @@ class TaskExecutor:
     def execute(
         self,
         task: TaskProtocol,
-        session: SessionProtocol,
+        backend: BackendProtocol,
         execution_manager: "ExecutionManager",
         qid: str,
     ) -> tuple["ExecutionManager", TaskExecutionResult]:
@@ -217,8 +217,8 @@ class TaskExecutor:
         ----------
         task : TaskProtocol
             The task to execute
-        session : SessionProtocol
-            The session to use
+        backend : BackendProtocol
+            The backend to use
         execution_manager : ExecutionManager
             The execution manager
         qid : str
@@ -261,13 +261,13 @@ class TaskExecutor:
             execution_manager = self._update_execution_manager(execution_manager)
 
             # 2. Preprocess
-            preprocess_result = self._run_preprocess(task, session, qid)
+            preprocess_result = self._run_preprocess(task, backend, qid)
             if preprocess_result:
                 self.state_manager.put_input_parameters(task_name, preprocess_result.input_parameters, task_type, qid)
                 execution_manager = self._update_execution_manager(execution_manager)
 
             # 3. Run
-            run_result = self._run_task(task, session, qid)
+            run_result = self._run_task(task, backend, qid)
             result.r2 = run_result.r2 if run_result else None
 
             if run_result is None:
@@ -278,11 +278,11 @@ class TaskExecutor:
                 return execution_manager, result
 
             # 4. Postprocess
-            postprocess_result = self._run_postprocess(task, session, run_result, qid)
+            postprocess_result = self._run_postprocess(task, backend, run_result, qid)
 
             if postprocess_result:
                 # 5. Process and validate results
-                self._process_results(task, execution_manager, postprocess_result, qid, run_result, session)
+                self._process_results(task, execution_manager, postprocess_result, qid, run_result, backend)
 
                 result.output_parameters = dict(
                     self.state_manager.get_task(task_name, task_type, qid).output_parameters
@@ -335,7 +335,7 @@ class TaskExecutor:
     def execute_task(
         self,
         task: TaskProtocol,
-        session: SessionProtocol,
+        backend: BackendProtocol,
         qid: str,
     ) -> dict[str, Any]:
         """Execute a task and return results (simplified version).
@@ -347,8 +347,8 @@ class TaskExecutor:
         ----------
         task : TaskProtocol
             The task to execute
-        session : SessionProtocol
-            The session to use
+        backend : BackendProtocol
+            The backend to use
         qid : str
             The qubit ID
 
@@ -381,12 +381,12 @@ class TaskExecutor:
             self.state_manager.start_task(task_name, task_type, qid)
 
             # Preprocess
-            preprocess_result = self._run_preprocess(task, session, qid)
+            preprocess_result = self._run_preprocess(task, backend, qid)
             if preprocess_result:
                 self.state_manager.put_input_parameters(task_name, preprocess_result.input_parameters, task_type, qid)
 
             # Run
-            run_result = self._run_task(task, session, qid)
+            run_result = self._run_task(task, backend, qid)
             if run_result is None:
                 # Task didn't produce results, mark as completed
                 self._complete_task(task_name, task_type, qid, "No run result")
@@ -401,7 +401,7 @@ class TaskExecutor:
                 self._validate_r2(run_result.r2, qid, task)
 
             # Postprocess
-            postprocess_result = self._run_postprocess(task, session, run_result, qid)
+            postprocess_result = self._run_postprocess(task, backend, run_result, qid)
 
             # Process output parameters
             output_params = self._process_output_parameters(postprocess_result, task_name, qid, task_type)
@@ -478,7 +478,7 @@ class TaskExecutor:
         postprocess_result: PostProcessResult,
         qid: str,
         run_result: RunResult,
-        session: SessionProtocol,
+        backend: BackendProtocol,
     ) -> bool:
         """Process task results including validation and persistence.
 
@@ -494,8 +494,8 @@ class TaskExecutor:
             The qubit ID
         run_result : RunResult
             The run result
-        session : SessionProtocol
-            The session
+        backend : BackendProtocol
+            The backend
 
         Returns
         -------
@@ -555,7 +555,7 @@ class TaskExecutor:
                 self.state_manager.clear_output_parameters(task_name, task_type, qid)
 
         # 6. Backend-specific save processing
-        self._save_backend_specific(task, execution_manager, qid, session, backend_success)
+        self._save_backend_specific(task, execution_manager, qid, backend, backend_success)
 
         return backend_success
 
@@ -564,7 +564,7 @@ class TaskExecutor:
         task: TaskProtocol,
         execution_manager: "ExecutionManager",
         qid: str,
-        session: SessionProtocol,
+        backend: BackendProtocol,
         success: bool,
     ) -> None:
         """Backend-specific save processing.
@@ -577,23 +577,23 @@ class TaskExecutor:
             The execution manager
         qid : str
             The qubit ID
-        session : SessionProtocol
-            The session
+        backend : BackendProtocol
+            The backend
         success : bool
             Whether backend updates should be applied
 
         """
         if task.backend == "qubex":
-            self._save_qubex_specific(task, execution_manager, qid, session, success)
+            self._save_qubex_specific(task, execution_manager, qid, backend, success)
         elif task.backend == "fake":
-            self._save_fake_specific(task, execution_manager, qid, session, success)
+            self._save_fake_specific(task, execution_manager, qid, backend, success)
 
     def _save_qubex_specific(
         self,
         task: TaskProtocol,
         execution_manager: "ExecutionManager",
         qid: str,
-        session: SessionProtocol,
+        backend: BackendProtocol,
         success: bool,
     ) -> None:
         """Qubex-specific save processing.
@@ -606,8 +606,8 @@ class TaskExecutor:
             The execution manager
         qid : str
             The qubit ID
-        session : SessionProtocol
-            The session
+        backend : BackendProtocol
+            The backend
         success : bool
             Whether backend updates should be applied
 
@@ -646,8 +646,8 @@ class TaskExecutor:
             return
 
         # Save calibration note
-        if session.name == "qubex":
-            session.update_note(
+        if backend.name == "qubex":
+            backend.update_note(
                 username=self.username,
                 chip_id=execution_manager.chip_id,
                 calib_dir=self.calib_dir,
@@ -664,7 +664,7 @@ class TaskExecutor:
                     chip_id=execution_manager.chip_id,
                     output_parameters=output_parameters,
                 )
-                self._update_backend_params(session, execution_manager, qid, output_parameters)
+                self._update_backend_params(backend, execution_manager, qid, output_parameters)
             elif task.is_coupling_task():
                 CouplingDocument.update_calib_data(
                     username=self.username,
@@ -675,7 +675,7 @@ class TaskExecutor:
 
     def _update_backend_params(
         self,
-        session: SessionProtocol,
+        backend: BackendProtocol,
         execution_manager: "ExecutionManager",
         qid: str,
         output_parameters: dict[str, Any],
@@ -684,8 +684,8 @@ class TaskExecutor:
 
         Parameters
         ----------
-        session : SessionProtocol
-            The session
+        backend : BackendProtocol
+            The backend
         execution_manager : ExecutionManager
             The execution manager
         qid : str
@@ -694,7 +694,7 @@ class TaskExecutor:
             Output parameters to update
 
         """
-        updater = get_params_updater(session, execution_manager.chip_id)
+        updater = get_params_updater(backend, execution_manager.chip_id)
         if updater is None:
             return
         try:
@@ -707,7 +707,7 @@ class TaskExecutor:
         task: TaskProtocol,
         execution_manager: "ExecutionManager",
         qid: str,
-        session: SessionProtocol,
+        backend: BackendProtocol,
         success: bool,
     ) -> None:
         """Fake-specific save processing.
@@ -720,8 +720,8 @@ class TaskExecutor:
             The execution manager
         qid : str
             The qubit ID
-        session : SessionProtocol
-            The session
+        backend : BackendProtocol
+            The backend
         success : bool
             Whether backend updates should be applied
 
@@ -732,7 +732,7 @@ class TaskExecutor:
     def _run_preprocess(
         self,
         task: TaskProtocol,
-        session: SessionProtocol,
+        backend: BackendProtocol,
         qid: str,
     ) -> PreProcessResult | None:
         """Run task preprocessing.
@@ -741,8 +741,8 @@ class TaskExecutor:
         ----------
         task : TaskProtocol
             The task
-        session : SessionProtocol
-            The session
+        backend : BackendProtocol
+            The backend
         qid : str
             The qubit ID
 
@@ -753,7 +753,7 @@ class TaskExecutor:
 
         """
         try:
-            return task.preprocess(session, qid)
+            return task.preprocess(backend, qid)
         except Exception as e:
             logger.warning(f"Preprocess failed for {task.get_name()}: {e}")
             return None
@@ -761,7 +761,7 @@ class TaskExecutor:
     def _run_task(
         self,
         task: TaskProtocol,
-        session: SessionProtocol,
+        backend: BackendProtocol,
         qid: str,
     ) -> RunResult | None:
         """Run the task.
@@ -770,8 +770,8 @@ class TaskExecutor:
         ----------
         task : TaskProtocol
             The task
-        session : SessionProtocol
-            The session
+        backend : BackendProtocol
+            The backend
         qid : str
             The qubit ID
 
@@ -781,12 +781,12 @@ class TaskExecutor:
             The run result or None
 
         """
-        return task.run(session, qid)
+        return task.run(backend, qid)
 
     def _run_postprocess(
         self,
         task: TaskProtocol,
-        session: SessionProtocol,
+        backend: BackendProtocol,
         run_result: RunResult,
         qid: str,
     ) -> PostProcessResult:
@@ -796,8 +796,8 @@ class TaskExecutor:
         ----------
         task : TaskProtocol
             The task
-        session : SessionProtocol
-            The session
+        backend : BackendProtocol
+            The backend
         run_result : RunResult
             The run result
         qid : str
@@ -809,7 +809,7 @@ class TaskExecutor:
             The postprocess result
 
         """
-        return task.postprocess(session, self.execution_id, run_result, qid)
+        return task.postprocess(backend, self.execution_id, run_result, qid)
 
     def _validate_r2(
         self,

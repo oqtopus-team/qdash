@@ -6,7 +6,7 @@ import pendulum
 from prefect import task
 from pydantic import BaseModel, Field
 from qdash.datamodel.task import TaskModel
-from qdash.workflow.tasks.base import BaseTask
+from qdash.workflow.caltasks.base import BaseTask
 
 
 def qid_to_label(qid: str) -> str:

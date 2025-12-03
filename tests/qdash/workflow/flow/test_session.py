@@ -103,7 +103,7 @@ def mock_flow_session_deps(monkeypatch):
         MockExecutionManager,
     )
     monkeypatch.setattr(
-        "qdash.workflow.flow.session.create_session",
+        "qdash.workflow.flow.session.create_backend",
         lambda **kwargs: MockSession(),
     )
     monkeypatch.setattr(

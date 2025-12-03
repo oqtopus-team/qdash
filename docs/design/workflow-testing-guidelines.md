@@ -665,7 +665,7 @@ class TestFlowSessionInitialization:
             MockExecutionManager,
         )
         monkeypatch.setattr(
-            "qdash.workflow.helpers.flow_helpers.create_session",
+            "qdash.workflow.helpers.flow_helpers.create_backend",
             lambda **kwargs: MockSession(),
         )
 

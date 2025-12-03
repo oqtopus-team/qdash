@@ -8,7 +8,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
 if TYPE_CHECKING:
-    from qdash.workflow.engine.session.base import BaseSession
+    from qdash.workflow.engine.backend.base import BaseBackend
 
 
 class ParamsUpdater(Protocol):
@@ -17,24 +17,24 @@ class ParamsUpdater(Protocol):
     def update(self, qid: str, output_parameters: dict[str, Any]) -> None: ...
 
 
-def get_params_updater(session: BaseSession, chip_id: str | None = None) -> ParamsUpdater | None:
-    """Resolve a backend-specific params updater for the given session."""
-    qubex_updater = _resolve_qubex_updater(session, chip_id)
+def get_params_updater(backend: BaseBackend, chip_id: str | None = None) -> ParamsUpdater | None:
+    """Resolve a backend-specific params updater for the given backend."""
+    qubex_updater = _resolve_qubex_updater(backend, chip_id)
     if qubex_updater is not None:
         return qubex_updater
     return None
 
 
-def _resolve_qubex_updater(session: BaseSession, chip_id: str | None) -> ParamsUpdater | None:
+def _resolve_qubex_updater(backend: BaseBackend, chip_id: str | None) -> ParamsUpdater | None:
     try:
-        from qdash.workflow.engine.session.qubex import QubexSession
+        from qdash.workflow.engine.backend.qubex import QubexBackend
     except ImportError:
         return None
 
-    if not isinstance(session, QubexSession):
+    if not isinstance(backend, QubexBackend):
         return None
 
-    return _QubexParamsUpdater(session, chip_id)
+    return _QubexParamsUpdater(backend, chip_id)
 
 
 class _QubexParamsUpdater:
@@ -56,8 +56,8 @@ class _QubexParamsUpdater:
         "average_readout_fidelity": "average_readout_fidelity.yaml",
     }
 
-    def __init__(self, session: Any, chip_id: str | None) -> None:
-        self._session = session
+    def __init__(self, backend: Any, chip_id: str | None) -> None:
+        self._backend = backend
         self._chip_id = chip_id
         self._yaml = YAML(typ="rt")
         self._yaml.preserve_quotes = True
@@ -86,7 +86,7 @@ class _QubexParamsUpdater:
             self._update_yaml(file_path, label, value)
 
     def _resolve_params_dir(self) -> Path | None:
-        config_dir = getattr(self._session, "config", {}).get("params_dir")
+        config_dir = getattr(self._backend, "config", {}).get("params_dir")
         if config_dir:
             path = Path(config_dir)
             if path.exists():
@@ -95,9 +95,9 @@ class _QubexParamsUpdater:
         # Only call get_session() if already connected (avoid reconnection with empty qids)
         session_obj = None
         try:
-            # Check if session is already initialized (QubexSession has _exp attribute)
-            if hasattr(self._session, "_exp") and self._session._exp is not None:
-                session_obj = self._session.get_session()
+            # Check if backend is already initialized (QubexBackend has _exp attribute)
+            if hasattr(self._backend, "_exp") and self._backend._exp is not None:
+                session_obj = self._backend.get_instance()
         except Exception:
             session_obj = None
 
@@ -108,7 +108,7 @@ class _QubexParamsUpdater:
                 if path.exists():
                     return path
 
-        chip_id = getattr(self._session, "config", {}).get("chip_id") or self._chip_id
+        chip_id = getattr(self._backend, "config", {}).get("chip_id") or self._chip_id
         if not chip_id:
             return None
 
@@ -128,7 +128,7 @@ class _QubexParamsUpdater:
             return qid
 
         try:
-            experiment = self._session.get_session()
+            experiment = self._backend.get_instance()
         except Exception:
             return None
 

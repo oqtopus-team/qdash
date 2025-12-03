@@ -13,12 +13,12 @@ from qdash.workflow.flow.context import (
     set_current_session,
 )
 from qdash.workflow.flow.factory import (
+    BackendFactory,
+    DefaultBackendFactory,
     DefaultExecutionManagerFactory,
-    DefaultSessionFactory,
     DefaultTaskManagerFactory,
     ExecutionManagerFactory,
     FlowSessionDependencies,
-    SessionFactory,
     TaskManagerFactory,
     create_flow_session,
 )
@@ -48,10 +48,10 @@ __all__ = [
     # === Factory ===
     "create_flow_session",
     "FlowSessionDependencies",
-    "SessionFactory",
+    "BackendFactory",
     "ExecutionManagerFactory",
     "TaskManagerFactory",
-    "DefaultSessionFactory",
+    "DefaultBackendFactory",
     "DefaultExecutionManagerFactory",
     "DefaultTaskManagerFactory",
     # === GitHub Integration ===

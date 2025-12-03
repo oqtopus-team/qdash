@@ -155,7 +155,7 @@ def __init__(self, username, chip_id, qids, ...):
     self.task_manager = TaskManager(...)
 
     # 6. セッション生成・接続
-    self.session = create_session(...)
+    self.session = create_backend(...)
     self.session.connect()
 ```
 
@@ -646,7 +646,7 @@ from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from qdash.workflow.tasks.base import BaseTask
-    from qdash.workflow.engine.session.base import BaseSession
+    from qdash.workflow.engine.backend.base import BaseBackend
 
 class TaskExecutionResult(BaseModel):
     task: BaseTaskResultModel
@@ -675,7 +675,7 @@ class TaskExecutor:
     def execute(
         self,
         task_instance: "BaseTask",
-        session: "BaseSession",
+        session: "BaseBackend",
         execution_model: ExecutionModel,
         qid: str,
         username: str,
