@@ -373,7 +373,7 @@ def pad_qubit_data(data: dict[str, float], chip_id: str = "64Qv1") -> dict[str, 
     if not match:
         raise ValueError(f"Could not extract number of qubits from chip_id: {chip_id}")
     n_qubits = int(match.group())
-    exp = backend.get_session()
+    exp = backend.get_instance()
     for i in range(n_qubits):
         qubit = exp.get_qubit_label(i)  # Use zero-padded format Q00, Q01, etc.
         result[qubit] = data.get(qubit, math.nan)

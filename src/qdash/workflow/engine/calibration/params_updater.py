@@ -97,7 +97,7 @@ class _QubexParamsUpdater:
         try:
             # Check if backend is already initialized (QubexBackend has _exp attribute)
             if hasattr(self._backend, "_exp") and self._backend._exp is not None:
-                session_obj = self._backend.get_session()
+                session_obj = self._backend.get_instance()
         except Exception:
             session_obj = None
 
@@ -128,7 +128,7 @@ class _QubexParamsUpdater:
             return qid
 
         try:
-            experiment = self._backend.get_session()
+            experiment = self._backend.get_instance()
         except Exception:
             return None
 

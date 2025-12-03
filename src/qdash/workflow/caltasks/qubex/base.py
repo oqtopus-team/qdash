@@ -170,7 +170,7 @@ class QubexTask(BaseTask):
             The underlying experiment session
 
         """
-        return backend.get_session()
+        return backend.get_instance()
 
     def get_qubit_label(self, backend: "QubexBackend", qid: str) -> str:
         """Get the qubit label for a given qubit ID.

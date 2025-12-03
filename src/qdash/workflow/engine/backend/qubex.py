@@ -57,7 +57,7 @@ class QubexBackend(BaseBackend):
             )
             self._exp.connect()
 
-    def get_session(self) -> Experiment | None:
+    def get_instance(self) -> Experiment | None:
         if self._exp is None:
             self.connect()
         if self._exp is None:
@@ -67,7 +67,7 @@ class QubexBackend(BaseBackend):
 
     def get_note(self) -> str:
         """Get the calibration note from the experiment."""
-        exp = self.get_session()
+        exp = self.get_instance()
         if exp is None:
             msg = "Experiment instance is not initialized. Please call connect() first."
             raise RuntimeError(msg)

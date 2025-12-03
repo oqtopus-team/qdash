@@ -89,7 +89,7 @@ def get_chip_properties(
     if not match:
         raise ValueError(f"No digits found in chip_id: {backend.config['chip_id']}")
     n = int(match.group())
-    exp = backend.get_session()
+    exp = backend.get_instance()
     for i in range(n):
         props.qubits[exp.get_qubit_label(i)] = QubitProperties()
 

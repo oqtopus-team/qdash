@@ -22,7 +22,7 @@ class FlowSessionConfig(BaseModel):
         qids: List of qubit IDs to calibrate (required for qubex initialization)
         execution_id: Unique execution identifier (e.g., "20240101-001").
             If None, auto-generates using current date and counter.
-        backend: Backend type, either 'qubex' or 'fake' (default: 'qubex')
+        backend_name: Backend type, either 'qubex' or 'fake' (default: 'qubex')
         name: Human-readable name for the execution (default: 'Python Flow Execution')
         tags: List of tags for categorization (default: uses name as tag)
         use_lock: Whether to use ExecutionLock to prevent concurrent calibrations (default: True)
@@ -37,7 +37,7 @@ class FlowSessionConfig(BaseModel):
             username="alice",
             chip_id="chip_1",
             qids=["0", "1", "2"],
-            backend="qubex",
+            backend_name="qubex",
             name="My Calibration",
             tags=["production", "daily"],
         )
@@ -51,7 +51,7 @@ class FlowSessionConfig(BaseModel):
     chip_id: str
     qids: tuple[str, ...]  # Use tuple for immutability
     execution_id: str | None = None
-    backend: str = "qubex"
+    backend_name: str = "qubex"
     name: str = "Python Flow Execution"
     tags: tuple[str, ...] | None = None  # Use tuple for immutability
     use_lock: bool = True
@@ -83,7 +83,7 @@ class FlowSessionConfig(BaseModel):
         chip_id: str,
         qids: list[str],
         execution_id: str | None = None,
-        backend: str = "qubex",
+        backend_name: str = "qubex",
         name: str = "Python Flow Execution",
         tags: list[str] | None = None,
         use_lock: bool = True,
@@ -102,7 +102,7 @@ class FlowSessionConfig(BaseModel):
             chip_id: Target chip ID
             qids: List of qubit IDs to calibrate
             execution_id: Unique execution identifier (auto-generated if None)
-            backend: Backend type ('qubex' or 'fake')
+            backend_name: Backend type ('qubex' or 'fake')
             name: Human-readable name for the execution
             tags: List of tags for categorization
             use_lock: Whether to use ExecutionLock
@@ -119,7 +119,7 @@ class FlowSessionConfig(BaseModel):
             chip_id=chip_id,
             qids=tuple(qids),
             execution_id=execution_id,
-            backend=backend,
+            backend_name=backend_name,
             name=name,
             tags=tuple(tags) if tags else None,
             use_lock=use_lock,
@@ -140,7 +140,7 @@ class FlowSessionConfig(BaseModel):
             "chip_id": self.chip_id,
             "qids": list(self.qids),
             "execution_id": self.execution_id,
-            "backend": self.backend,
+            "backend_name": self.backend_name,
             "name": self.name,
             "tags": list(self.tags) if self.tags else None,
             "use_lock": self.use_lock,
@@ -164,7 +164,7 @@ class FlowSessionConfig(BaseModel):
             chip_id=self.chip_id,
             qids=self.qids,
             execution_id=execution_id,
-            backend=self.backend,
+            backend_name=self.backend_name,
             name=self.name,
             tags=self.tags,
             use_lock=self.use_lock,
@@ -191,7 +191,7 @@ class FlowSessionConfig(BaseModel):
             chip_id=self.chip_id,
             qids=self.qids,
             execution_id=self.execution_id,
-            backend=self.backend,
+            backend_name=self.backend_name,
             name=self.name,
             tags=self.tags,
             use_lock=self.use_lock,

@@ -82,9 +82,9 @@ class FlowSession:
         username: Username for the calibration session
         execution_id: Unique execution identifier
         chip_id: Target chip ID
-        backend: Backend type ('qubex' or 'fake')
+        backend_name: Backend type ('qubex' or 'fake')
         execution_manager: Manages execution state and history
-        backend_session: Backend instance for device communication
+        backend: Backend instance for device communication
 
     Example:
         ```python
@@ -101,7 +101,7 @@ class FlowSession:
         chip_id: str,
         qids: list[str],
         execution_id: str | None = None,
-        backend: str = "qubex",
+        backend_name: str = "qubex",
         name: str = "Python Flow Execution",
         tags: list[str] | None = None,
         use_lock: bool = True,
@@ -118,7 +118,7 @@ class FlowSession:
             qids: List of qubit IDs to calibrate (required for qubex initialization)
             execution_id: Unique execution identifier (e.g., "20240101-001").
                 If None, auto-generates using current date and counter.
-            backend: Backend type, either 'qubex' or 'fake' (default: 'qubex')
+            backend_name: Backend type, either 'qubex' or 'fake' (default: 'qubex')
             name: Human-readable name for the execution (default: 'Python Flow Execution')
             tags: List of tags for categorization (default: ['python_flow'])
             use_lock: Whether to use ExecutionLock to prevent concurrent calibrations (default: True)
@@ -135,7 +135,7 @@ class FlowSession:
         self.chip_id = chip_id
         self.qids = qids
         self.muxes = muxes
-        self.backend = backend
+        self.backend_name = backend_name
         self.use_lock = use_lock
         self._lock_acquired = False
         self._last_executed_task_id_by_qid: dict[str, str] = {}  # Track last task_id per qid
@@ -236,14 +236,14 @@ class FlowSession:
         if muxes is not None:
             session_config["muxes"] = muxes
 
-        self.backend_session = create_backend(
-            backend=backend,
+        self.backend = create_backend(
+            backend=backend_name,
             config=session_config,
         )
 
         # Save calibration_note before connecting (loads parameter overrides)
-        if self.backend_session.name == "qubex":
-            self.backend_session.save_note(
+        if self.backend.name == "qubex":
+            self.backend.save_note(
                 username=username,
                 chip_id=chip_id,
                 calib_dir=calib_data_path,
@@ -251,7 +251,7 @@ class FlowSession:
                 task_manager_id=self.task_manager.id,
             )
 
-        self.backend_session.connect()
+        self.backend.connect()
 
     def _ensure_task_in_workflow(self, task_name: str, task_type: str, qid: str) -> None:
         """Ensure task exists in TaskManager's workflow structure.
@@ -357,7 +357,7 @@ class FlowSession:
         task_instances = generate_task_instances(
             task_names=[task_name],
             task_details=task_details,
-            backend=self.backend,
+            backend=self.backend_name,
         )
 
         task_instance = task_instances[task_name]
@@ -403,7 +403,7 @@ class FlowSession:
             task_run_name=task_instance.name,
             log_prints=True,
         )(
-            backend=self.backend_session,
+            backend=self.backend,
             execution_manager=execution_manager,
             task_manager=execution_task_manager,
             task_instance=task_instance,
@@ -556,7 +556,7 @@ class FlowSession:
 
     def _sync_backend_params_before_push(self, logger) -> None:
         """Sync recent calibration results into backend YAML params prior to GitHub push."""
-        updater_instance = get_params_updater(self.backend_session, self.chip_id)
+        updater_instance = get_params_updater(self.backend, self.chip_id)
         if updater_instance is None:
             return
 
@@ -726,7 +726,7 @@ class FlowSession:
                 username="alice",
                 chip_id="chip_1",
                 qids=["0", "1", "2"],
-                backend="qubex",
+                backend_name="qubex",
             )
             session = FlowSession.from_config(config)
             ```
@@ -737,7 +737,7 @@ class FlowSession:
             chip_id=config.chip_id,
             qids=list(config.qids),
             execution_id=config.execution_id,
-            backend=config.backend,
+            backend_name=config.backend_name,
             name=config.name,
             tags=list(config.tags) if config.tags else None,
             use_lock=config.use_lock,

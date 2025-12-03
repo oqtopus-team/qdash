@@ -11,20 +11,20 @@ class FakeBackend(BaseBackend):
     def __init__(self, config: dict) -> None:
         """Initialize the Fake backend with a configuration dictionary."""
         self._config = config
-        self._session: Any | None = None
+        self._instance: Any | None = None
 
     def version(self) -> str:
         """Return the version of the Fake backend."""
         return "0.1.0"
 
     def connect(self) -> None:
-        if self._session is None:
-            self._session = object()
+        if self._instance is None:
+            self._instance = object()
 
-    def get_session(self) -> object | None:
-        if self._session is None:
+    def get_instance(self) -> object | None:
+        if self._instance is None:
             self.connect()
-        if self._session is None:
-            msg = "Experiment instance is not initialized. Please call connect() first."
+        if self._instance is None:
+            msg = "Backend instance is not initialized. Please call connect() first."
             raise RuntimeError(msg)
-        return self._session or None
+        return self._instance or None

@@ -18,7 +18,7 @@ class BaseBackend(ABC):
         raise NotImplementedError(msg)
 
     @abstractmethod
-    def get_session(self) -> object:
-        """Get the backend session object."""
+    def get_instance(self) -> object:
+        """Get the backend instance (e.g., Experiment object for qubex)."""
         msg = "This method should be implemented by subclasses."
         raise NotImplementedError(msg)
