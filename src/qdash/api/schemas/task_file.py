@@ -36,3 +36,19 @@ class TaskFileSettings(BaseModel):
     """Task file settings model."""
 
     default_backend: str | None = None
+
+
+class TaskInfo(BaseModel):
+    """Task information extracted from Python file."""
+
+    name: str
+    class_name: str
+    task_type: str | None = None
+    description: str | None = None
+    file_path: str
+
+
+class ListTaskInfoResponse(BaseModel):
+    """Response model for listing task info."""
+
+    tasks: list[TaskInfo]

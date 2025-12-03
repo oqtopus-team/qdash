@@ -13,6 +13,9 @@ import {
   VscFile,
   VscLock,
   VscUnlock,
+  VscCopy,
+  VscListTree,
+  VscSymbolClass,
 } from "react-icons/vsc";
 import { SiPython } from "react-icons/si";
 
@@ -22,17 +25,25 @@ import {
   getTaskFileContent,
   saveTaskFileContent,
   getTaskFileSettings,
+  listTaskInfo,
 } from "@/client/task-file/task-file";
-import type { TaskFileTreeNode, SaveTaskFileRequest } from "@/schemas";
+import type {
+  TaskFileTreeNode,
+  SaveTaskFileRequest,
+  TaskInfo,
+} from "@/schemas";
 
 import "react-toastify/dist/ReactToastify.css";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
+type ViewMode = "files" | "tasks";
+
 export default function TasksPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const [viewMode, setViewMode] = useState<ViewMode>("tasks");
   const [selectedBackend, setSelectedBackend] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
@@ -85,6 +96,14 @@ export default function TasksPage() {
     queryKey: ["taskFileTree", selectedBackend],
     queryFn: () =>
       getTaskFileTree({ backend: selectedBackend! }).then((res) => res.data),
+    enabled: !!selectedBackend,
+  });
+
+  // Fetch task list for selected backend
+  const { data: taskListData, isLoading: isTaskListLoading } = useQuery({
+    queryKey: ["taskList", selectedBackend],
+    queryFn: () =>
+      listTaskInfo({ backend: selectedBackend! }).then((res) => res.data),
     enabled: !!selectedBackend,
   });
 
@@ -155,6 +174,20 @@ export default function TasksPage() {
     setSelectedFile(fullPath);
     setHasUnsavedChanges(false);
     setIsEditorLocked(true);
+  };
+
+  const handleTaskClick = (task: TaskInfo) => {
+    // Open the file containing this task
+    handleFileSelect(task.file_path);
+  };
+
+  const handleCopyTaskName = async (taskName: string) => {
+    try {
+      await navigator.clipboard.writeText(taskName);
+      toast.success(`Copied: ${taskName}`, { autoClose: 1500 });
+    } catch {
+      toast.error("Failed to copy to clipboard");
+    }
   };
 
   const toggleEditorLock = () => {
@@ -235,6 +268,80 @@ export default function TasksPage() {
         )}
       </div>
     ));
+  };
+
+  // Group tasks by task_type
+  const groupedTasks = useMemo(() => {
+    if (!taskListData?.tasks) return {};
+    return taskListData.tasks.reduce(
+      (acc: Record<string, TaskInfo[]>, task) => {
+        const type = task.task_type || "other";
+        if (!acc[type]) {
+          acc[type] = [];
+        }
+        acc[type].push(task);
+        return acc;
+      },
+      {},
+    );
+  }, [taskListData]);
+
+  const renderTaskList = () => {
+    if (isTaskListLoading) {
+      return (
+        <div className="flex items-center justify-center py-4">
+          <span className="loading loading-spinner loading-sm"></span>
+        </div>
+      );
+    }
+
+    if (!taskListData?.tasks || taskListData.tasks.length === 0) {
+      return (
+        <div className="text-xs text-gray-500 px-3 py-2">No tasks found</div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {Object.entries(groupedTasks).map(([taskType, tasks]) => (
+          <details key={taskType} className="group" open>
+            <summary className="text-xs font-semibold text-gray-400 px-3 py-1 cursor-pointer select-none hover:bg-[#2a2d2e] uppercase tracking-wider flex items-center">
+              <span className="mr-1 transition-transform group-open:rotate-90">
+                ▸
+              </span>
+              {taskType}
+              <span className="ml-2 text-gray-600">({tasks.length})</span>
+            </summary>
+            <div className="space-y-0.5">
+              {tasks.map((task) => (
+                <div
+                  key={`${task.file_path}-${task.name}`}
+                  className="group/item flex items-center justify-between px-3 py-1 hover:bg-[#2a2d2e] cursor-pointer"
+                  onClick={() => handleTaskClick(task)}
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <VscSymbolClass className="text-purple-400 flex-shrink-0" />
+                    <span className="text-sm text-gray-300 truncate">
+                      {task.name}
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopyTaskName(task.name);
+                    }}
+                    className="opacity-0 group-hover/item:opacity-100 p-1 hover:bg-[#3c3c3c] rounded transition-opacity"
+                    title="Copy task name"
+                  >
+                    <VscCopy className="text-gray-400 hover:text-white" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </details>
+        ))}
+      </div>
+    );
   };
 
   // Calculate line count
@@ -357,26 +464,67 @@ export default function TasksPage() {
         {/* Main content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
-          <div className="w-64 bg-[#252526] border-r border-[#3e3e3e] overflow-y-auto">
-            <div className="py-2">
-              <h2 className="text-xs font-bold text-gray-400 mb-1 px-3 tracking-wider">
-                EXPLORER
-              </h2>
-              <div className="text-xs text-gray-500 px-3 mb-2 uppercase tracking-wide">
-                {selectedBackend
-                  ? `${selectedBackend} Tasks`
-                  : "Select Backend"}
-              </div>
-              {isTreeLoading ? (
-                <div className="flex items-center justify-center py-4">
-                  <span className="loading loading-spinner loading-sm"></span>
-                </div>
-              ) : treeError ? (
-                <div className="text-xs text-red-400 px-3">
-                  Error loading tree
-                </div>
+          <div className="w-64 bg-[#252526] border-r border-[#3e3e3e] flex flex-col">
+            {/* Tab buttons */}
+            <div className="flex border-b border-[#3e3e3e]">
+              <button
+                onClick={() => setViewMode("files")}
+                className={`flex-1 px-3 py-2 text-xs font-medium flex items-center justify-center gap-1 transition-colors ${
+                  viewMode === "files"
+                    ? "text-white bg-[#252526] border-b-2 border-blue-500"
+                    : "text-gray-500 hover:text-gray-300 hover:bg-[#2a2d2e]"
+                }`}
+              >
+                <VscListTree />
+                Files
+              </button>
+              <button
+                onClick={() => setViewMode("tasks")}
+                className={`flex-1 px-3 py-2 text-xs font-medium flex items-center justify-center gap-1 transition-colors ${
+                  viewMode === "tasks"
+                    ? "text-white bg-[#252526] border-b-2 border-blue-500"
+                    : "text-gray-500 hover:text-gray-300 hover:bg-[#2a2d2e]"
+                }`}
+              >
+                <VscSymbolClass />
+                Tasks
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto py-2">
+              {viewMode === "files" ? (
+                <>
+                  <h2 className="text-xs font-bold text-gray-400 mb-1 px-3 tracking-wider">
+                    EXPLORER
+                  </h2>
+                  <div className="text-xs text-gray-500 px-3 mb-2 uppercase tracking-wide">
+                    {selectedBackend
+                      ? `${selectedBackend} Tasks`
+                      : "Select Backend"}
+                  </div>
+                  {isTreeLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <span className="loading loading-spinner loading-sm"></span>
+                    </div>
+                  ) : treeError ? (
+                    <div className="text-xs text-red-400 px-3">
+                      Error loading tree
+                    </div>
+                  ) : (
+                    fileTreeData && renderFileTree(fileTreeData)
+                  )}
+                </>
               ) : (
-                fileTreeData && renderFileTree(fileTreeData)
+                <>
+                  <h2 className="text-xs font-bold text-gray-400 mb-1 px-3 tracking-wider">
+                    TASK LIST
+                  </h2>
+                  <div className="text-xs text-gray-500 px-3 mb-2">
+                    Click to view source, copy button for Flow Editor
+                  </div>
+                  {renderTaskList()}
+                </>
               )}
             </div>
           </div>

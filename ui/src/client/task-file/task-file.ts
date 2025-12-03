@@ -27,6 +27,8 @@ import type {
   GetTaskFileTreeParams,
   HTTPValidationError,
   ListTaskFileBackendsResponse,
+  ListTaskInfoParams,
+  ListTaskInfoResponse,
   SaveTaskFileContent200,
   SaveTaskFileRequest,
   TaskFileSettings,
@@ -775,3 +777,149 @@ export const useSaveTaskFileContent = <
 
   return useMutation(mutationOptions, queryClient);
 };
+/**
+ * List all task definitions found in a backend directory.
+
+Parses Python files to extract task names, types, and descriptions.
+
+Args:
+----
+    backend: Backend name (e.g., "qubex", "fake")
+
+Returns:
+-------
+    List of task information
+ * @summary List all tasks in a backend
+ */
+export const listTaskInfo = (
+  params: ListTaskInfoParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ListTaskInfoResponse>(
+    { url: `/task-files/tasks`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getListTaskInfoQueryKey = (params?: ListTaskInfoParams) => {
+  return [`/task-files/tasks`, ...(params ? [params] : [])] as const;
+};
+
+export const getListTaskInfoQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTaskInfo>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: ListTaskInfoParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listTaskInfo>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListTaskInfoQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTaskInfo>>> = ({
+    signal,
+  }) => listTaskInfo(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTaskInfo>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type ListTaskInfoQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTaskInfo>>
+>;
+export type ListTaskInfoQueryError = ErrorType<HTTPValidationError>;
+
+export function useListTaskInfo<
+  TData = Awaited<ReturnType<typeof listTaskInfo>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: ListTaskInfoParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listTaskInfo>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTaskInfo>>,
+          TError,
+          Awaited<ReturnType<typeof listTaskInfo>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useListTaskInfo<
+  TData = Awaited<ReturnType<typeof listTaskInfo>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: ListTaskInfoParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listTaskInfo>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTaskInfo>>,
+          TError,
+          Awaited<ReturnType<typeof listTaskInfo>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useListTaskInfo<
+  TData = Awaited<ReturnType<typeof listTaskInfo>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: ListTaskInfoParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listTaskInfo>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary List all tasks in a backend
+ */
+
+export function useListTaskInfo<
+  TData = Awaited<ReturnType<typeof listTaskInfo>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: ListTaskInfoParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listTaskInfo>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getListTaskInfoQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}

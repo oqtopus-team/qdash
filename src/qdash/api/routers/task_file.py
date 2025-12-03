@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import logging
 import os
 from datetime import datetime, timezone
@@ -15,10 +16,12 @@ from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.task_file import (
     ListTaskFileBackendsResponse,
+    ListTaskInfoResponse,
     SaveTaskFileRequest,
     TaskFileBackend,
     TaskFileSettings,
     TaskFileTreeNode,
+    TaskInfo,
 )
 
 router = APIRouter()
@@ -299,3 +302,119 @@ def save_task_file_content(
     except Exception as e:
         logger.error(f"Error saving file {file_path}: {e}")
         raise HTTPException(status_code=500, detail=f"Error saving file: {e!s}")
+
+
+def extract_task_info_from_file(file_path: Path, relative_path: str) -> list[TaskInfo]:
+    """Extract task information from a Python file using AST parsing.
+
+    Args:
+    ----
+        file_path: Absolute path to the Python file
+        relative_path: Relative path for display
+
+    Returns:
+    -------
+        List of TaskInfo objects found in the file
+
+    """
+    tasks = []
+    try:
+        content = file_path.read_text(encoding="utf-8")
+        tree = ast.parse(content)
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                # Look for classes that might be tasks
+                name_value = None
+                task_type_value = None
+                docstring = ast.get_docstring(node)
+
+                for item in node.body:
+                    if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                        if item.target.id == "name" and isinstance(item.value, ast.Constant):
+                            name_value = item.value.value
+                        elif item.target.id == "task_type" and isinstance(item.value, ast.Constant):
+                            task_type_value = item.value.value
+
+                # Only include if it has a name attribute (indicating it's a task)
+                if name_value:
+                    tasks.append(
+                        TaskInfo(
+                            name=name_value,
+                            class_name=node.name,
+                            task_type=task_type_value,
+                            description=docstring,
+                            file_path=relative_path,
+                        )
+                    )
+    except Exception as e:
+        logger.warning(f"Failed to parse {file_path}: {e}")
+
+    return tasks
+
+
+def collect_tasks_from_directory(directory: Path, base_path: Path) -> list[TaskInfo]:
+    """Recursively collect task info from all Python files in a directory.
+
+    Args:
+    ----
+        directory: Directory to scan
+        base_path: Base path for calculating relative paths
+
+    Returns:
+    -------
+        List of TaskInfo objects
+
+    """
+    tasks = []
+
+    try:
+        for item in directory.iterdir():
+            if item.name.startswith(".") or item.name == "__pycache__":
+                continue
+
+            if item.is_dir():
+                tasks.extend(collect_tasks_from_directory(item, base_path))
+            elif item.suffix == ".py" and item.name != "__init__.py":
+                relative_path = str(item.relative_to(base_path))
+                tasks.extend(extract_task_info_from_file(item, relative_path))
+    except PermissionError:
+        logger.warning(f"Permission denied accessing directory: {directory}")
+
+    return tasks
+
+
+@router.get(
+    "/task-files/tasks",
+    response_model=ListTaskInfoResponse,
+    summary="List all tasks in a backend",
+    operation_id="listTaskInfo",
+)
+def list_task_info(backend: str) -> ListTaskInfoResponse:
+    """List all task definitions found in a backend directory.
+
+    Parses Python files to extract task names, types, and descriptions.
+
+    Args:
+    ----
+        backend: Backend name (e.g., "qubex", "fake")
+
+    Returns:
+    -------
+        List of task information
+
+    """
+    backend_path = CALTASKS_BASE_PATH / backend
+
+    if not backend_path.exists():
+        raise HTTPException(status_code=404, detail=f"Backend directory not found: {backend}")
+
+    if not backend_path.is_dir():
+        raise HTTPException(status_code=400, detail=f"Not a directory: {backend}")
+
+    tasks = collect_tasks_from_directory(backend_path, backend_path)
+
+    # Sort by task_type then by name
+    tasks.sort(key=lambda t: (t.task_type or "", t.name))
+
+    return ListTaskInfoResponse(tasks=tasks)

@@ -1268,6 +1268,52 @@
         }
       }
     },
+    "/task-files/tasks": {
+      "get": {
+        "tags": ["task-file"],
+        "summary": "List all tasks in a backend",
+        "description": "List all task definitions found in a backend directory.\n\nParses Python files to extract task names, types, and descriptions.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n\nReturns:\n-------\n    List of task information",
+        "operationId": "listTaskInfo",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "backend",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Backend"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTaskInfoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/task-results/qubits/latest": {
       "get": {
         "tags": ["task-result"],
@@ -3928,6 +3974,21 @@
         "title": "ListTaskFileBackendsResponse",
         "description": "Response model for listing task file backends."
       },
+      "ListTaskInfoResponse": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskInfo"
+            },
+            "type": "array",
+            "title": "Tasks"
+          }
+        },
+        "type": "object",
+        "required": ["tasks"],
+        "title": "ListTaskInfoResponse",
+        "description": "Response model for listing task info."
+      },
       "ListTaskResponse": {
         "properties": {
           "tasks": {
@@ -5225,6 +5286,48 @@
         "required": ["name", "data"],
         "title": "TaskHistoryResponse",
         "description": "Response model for fetching task history."
+      },
+      "TaskInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "class_name": {
+            "type": "string",
+            "title": "Class Name"
+          },
+          "task_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Type"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "file_path": {
+            "type": "string",
+            "title": "File Path"
+          }
+        },
+        "type": "object",
+        "required": ["name", "class_name", "file_path"],
+        "title": "TaskInfo",
+        "description": "Task information extracted from Python file."
       },
       "TaskResponse": {
         "properties": {
