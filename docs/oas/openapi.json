@@ -1073,6 +1073,201 @@
         }
       }
     },
+    "/task-files/settings": {
+      "get": {
+        "tags": ["task-file"],
+        "summary": "Get task file settings",
+        "description": "Get task file settings from config/settings.yaml.\n\nReturns\n-------\n    Task file settings including default backend",
+        "operationId": "getTaskFileSettings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskFileSettings"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/task-files/backends": {
+      "get": {
+        "tags": ["task-file"],
+        "summary": "List available task file backends",
+        "description": "List all available backend directories in caltasks.\n\nReturns\n-------\n    List of backend names and paths",
+        "operationId": "listTaskFileBackends",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTaskFileBackendsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/task-files/tree": {
+      "get": {
+        "tags": ["task-file"],
+        "summary": "Get file tree for a specific backend",
+        "description": "Get file tree structure for a specific backend directory.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n\nReturns:\n-------\n    File tree structure for the backend",
+        "operationId": "getTaskFileTree",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "backend",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Backend"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskFileTreeNode"
+                  },
+                  "title": "Response Gettaskfiletree"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-files/content": {
+      "get": {
+        "tags": ["task-file"],
+        "summary": "Get task file content for viewing/editing",
+        "description": "Get task file content for viewing/editing.\n\nArgs:\n----\n    path: Relative path from CALTASKS_BASE_PATH (e.g., \"qubex/one_qubit_coarse/check_rabi.py\")\n\nReturns:\n-------\n    File content and metadata",
+        "operationId": "getTaskFileContent",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Gettaskfilecontent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["task-file"],
+        "summary": "Save task file content",
+        "description": "Save task file content.\n\nArgs:\n----\n    request: Save file request with path and content\n\nReturns:\n-------\n    Success message",
+        "operationId": "saveTaskFileContent",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveTaskFileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Savetaskfilecontent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/task-results/qubits/latest": {
       "get": {
         "tags": ["task-result"],
@@ -2390,7 +2585,7 @@
       "get": {
         "tags": ["metrics"],
         "summary": "Get Qubit Metric History",
-        "description": "Get historical metric data for a specific qubit with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    qid: The qubit identifier (e.g., \"0\", \"Q00\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids",
+        "description": "Get historical metric data for a specific qubit with task_id for figure display.\n\nThis endpoint queries TaskResultHistoryDocument to retrieve calibration\nhistory for a specific metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    qid: The qubit identifier (e.g., \"0\", \"Q00\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids",
         "operationId": "getQubitMetricHistory",
         "security": [
           {
@@ -2495,7 +2690,7 @@
       "get": {
         "tags": ["metrics"],
         "summary": "Get Coupling Metric History",
-        "description": "Get historical metric data for a specific coupling with task_id for figure display.\n\nThis endpoint queries ExecutionHistoryDocument to retrieve the calibration\nhistory for a specific coupling metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    coupling_id: The coupling identifier (e.g., \"0-1\", \"2-3\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids\n    (Note: qid field contains coupling_id for coupling metrics)",
+        "description": "Get historical metric data for a specific coupling with task_id for figure display.\n\nThis endpoint queries TaskResultHistoryDocument to retrieve calibration\nhistory for a specific coupling metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    coupling_id: The coupling identifier (e.g., \"0-1\", \"2-3\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids\n    (Note: qid field contains coupling_id for coupling metrics)",
         "operationId": "getCouplingMetricHistory",
         "security": [
           {
@@ -3718,6 +3913,21 @@
         "title": "ListTagResponse",
         "description": "Response model for a list of tags."
       },
+      "ListTaskFileBackendsResponse": {
+        "properties": {
+          "backends": {
+            "items": {
+              "$ref": "#/components/schemas/TaskFileBackend"
+            },
+            "type": "array",
+            "title": "Backends"
+          }
+        },
+        "type": "object",
+        "required": ["backends"],
+        "title": "ListTaskFileBackendsResponse",
+        "description": "Response model for listing task file backends."
+      },
       "ListTaskResponse": {
         "properties": {
           "tasks": {
@@ -4469,6 +4679,22 @@
         "title": "SaveFlowResponse",
         "description": "Response after saving a flow."
       },
+      "SaveTaskFileRequest": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": ["path", "content"],
+        "title": "SaveTaskFileRequest",
+        "description": "Request model for saving task file content."
+      },
       "ScheduleFlowRequest": {
         "properties": {
           "cron": {
@@ -4912,6 +5138,74 @@
         "type": "object",
         "title": "Task",
         "description": "Task is a Pydantic model that represents a task."
+      },
+      "TaskFileBackend": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          }
+        },
+        "type": "object",
+        "required": ["name", "path"],
+        "title": "TaskFileBackend",
+        "description": "Task file backend model."
+      },
+      "TaskFileSettings": {
+        "properties": {
+          "default_backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Backend"
+          }
+        },
+        "type": "object",
+        "title": "TaskFileSettings",
+        "description": "Task file settings model."
+      },
+      "TaskFileTreeNode": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "children": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TaskFileTreeNode"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Children"
+          }
+        },
+        "type": "object",
+        "required": ["name", "path", "type"],
+        "title": "TaskFileTreeNode",
+        "description": "Task file tree node model."
       },
       "TaskHistoryResponse": {
         "properties": {

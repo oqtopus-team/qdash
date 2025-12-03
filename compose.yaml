@@ -161,6 +161,7 @@ services:
       - ${CALIB_DATA_PATH}:/app/calib_data
       - ${QPU_DATA_PATH}:/app/qpu_data
       - ${CONFIG_PATH}:/app/config/qubex
+      - ${CALTASKS_PATH:-./src/qdash/workflow/caltasks}:/app/src/qdash/workflow/caltasks
     working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
     develop:

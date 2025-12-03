@@ -1,309 +1,467 @@
 "use client";
 
-import { useState } from "react";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo } from "react";
+import { toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 
-import { BsGrid, BsListUl, BsX } from "react-icons/bs";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  BsInfoCircle,
-  BsArrowDownSquare,
-  BsArrowUpSquare,
-} from "react-icons/bs";
+  VscFolder,
+  VscFolderOpened,
+  VscFile,
+  VscLock,
+  VscUnlock,
+} from "react-icons/vsc";
+import { SiPython } from "react-icons/si";
 
-import type { TaskResponse } from "@/schemas";
+import {
+  listTaskFileBackends,
+  getTaskFileTree,
+  getTaskFileContent,
+  saveTaskFileContent,
+  getTaskFileSettings,
+} from "@/client/task-file/task-file";
+import type { TaskFileTreeNode, SaveTaskFileRequest } from "@/schemas";
 
-import { BackendSelector } from "@/app/components/BackendSelector";
-import { useListTasks } from "@/client/task/task";
+import "react-toastify/dist/ReactToastify.css";
 
-type ViewMode = "grid" | "list";
+const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
-interface Parameter {
-  unit?: string;
-  value_type?: string;
-  value?: any;
-  description?: string;
-}
+export default function TasksPage() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
-interface TaskDetailModalProps {
-  task: TaskResponse | null;
-  onClose: () => void;
-}
+  const [selectedBackend, setSelectedBackend] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState("");
+  const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isEditorLocked, setIsEditorLocked] = useState(true);
 
-const TaskDetailModal = ({ task, onClose }: TaskDetailModalProps) => {
-  if (!task) return null;
+  // Fetch settings (including default backend)
+  const { data: settingsData } = useQuery({
+    queryKey: ["taskFileSettings"],
+    queryFn: () => getTaskFileSettings().then((res) => res.data),
+  });
 
-  const renderParameterValue = (value: any) => {
-    if (Array.isArray(value)) {
-      return `[${value.join(", ")}]`;
+  // Fetch available backends
+  const {
+    data: backendsData,
+    isLoading: isBackendsLoading,
+    error: backendsError,
+  } = useQuery({
+    queryKey: ["taskFileBackends"],
+    queryFn: () => listTaskFileBackends().then((res) => res.data),
+  });
+
+  // Set default backend when loaded (from settings or first available)
+  useEffect(() => {
+    if (
+      backendsData?.backends &&
+      backendsData.backends.length > 0 &&
+      !selectedBackend
+    ) {
+      // Use default from settings if available and exists in backends list
+      const defaultBackend = settingsData?.default_backend;
+      const backendExists = backendsData.backends.some(
+        (b) => b.name === defaultBackend,
+      );
+      if (defaultBackend && backendExists) {
+        setSelectedBackend(defaultBackend);
+      } else {
+        setSelectedBackend(backendsData.backends[0].name);
+      }
     }
-    return String(value);
+  }, [backendsData, settingsData, selectedBackend]);
+
+  // Fetch file tree for selected backend
+  const {
+    data: fileTreeData,
+    isLoading: isTreeLoading,
+    error: treeError,
+  } = useQuery({
+    queryKey: ["taskFileTree", selectedBackend],
+    queryFn: () =>
+      getTaskFileTree({ backend: selectedBackend! }).then((res) => res.data),
+    enabled: !!selectedBackend,
+  });
+
+  // Fetch file content
+  const { data: fileContentData, isLoading: isContentLoading } = useQuery({
+    queryKey: ["taskFileContent", selectedFile],
+    queryFn: () =>
+      getTaskFileContent({ path: selectedFile || "" }).then((res) => res.data),
+    enabled: !!selectedFile,
+  });
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: (request: SaveTaskFileRequest) =>
+      saveTaskFileContent(request).then((res) => res.data),
+    onSuccess: () => {
+      setHasUnsavedChanges(false);
+      toast.success("File saved successfully!");
+      queryClient.invalidateQueries({
+        queryKey: ["taskFileContent", selectedFile],
+      });
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to save file: ${error.message}`);
+    },
+  });
+
+  // Update file content when loaded
+  useEffect(() => {
+    if (
+      fileContentData?.content !== undefined &&
+      fileContentData?.content !== null
+    ) {
+      setFileContent(String(fileContentData.content));
+      setHasUnsavedChanges(false);
+    }
+  }, [fileContentData]);
+
+  const handleBackendChange = (backend: string) => {
+    if (hasUnsavedChanges) {
+      if (
+        !confirm(
+          "You have unsaved changes. Do you want to discard them and switch backends?",
+        )
+      ) {
+        return;
+      }
+    }
+    setSelectedBackend(backend);
+    setSelectedFile(null);
+    setFileContent("");
+    setHasUnsavedChanges(false);
+    setIsEditorLocked(true);
   };
 
-  const renderParameters = (parameters: Record<string, Parameter>) => {
-    return Object.entries(parameters).map(([name, param]) => (
-      <div
-        key={name}
-        className="mb-6 last:mb-0 bg-base-100/40 rounded-lg p-4 hover:bg-base-100/60 transition-colors"
-      >
-        <div className="flex items-start gap-3">
-          <h4 className="font-semibold text-base flex-1">{name}</h4>
-          {param.unit && (
-            <span className="badge badge-neutral badge-sm font-mono">
-              {param.unit}
-            </span>
-          )}
-        </div>
-        <div className="mt-3 space-y-3">
-          {param.description && (
-            <p className="text-sm text-base-content/70 leading-relaxed">
-              {param.description}
-            </p>
-          )}
-          <div className="flex flex-wrap gap-2">
-            <span className="font-mono text-xs bg-base-300/50 px-3 py-1.5 rounded-full">
-              {param.value_type}
-            </span>
-            {param.value !== null && (
-              <span className="font-mono text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full">
-                {renderParameterValue(param.value)}
+  const handleFileSelect = (path: string) => {
+    if (hasUnsavedChanges) {
+      if (
+        !confirm(
+          "You have unsaved changes. Do you want to discard them and open another file?",
+        )
+      ) {
+        return;
+      }
+    }
+    // Prepend backend name to get full path
+    const fullPath = `${selectedBackend}/${path}`;
+    setSelectedFile(fullPath);
+    setHasUnsavedChanges(false);
+    setIsEditorLocked(true);
+  };
+
+  const toggleEditorLock = () => {
+    setIsEditorLocked(!isEditorLocked);
+  };
+
+  const handleSave = () => {
+    if (!selectedFile) {
+      toast.error("No file selected");
+      return;
+    }
+
+    saveMutation.mutate({
+      path: selectedFile,
+      content: fileContent,
+    });
+  };
+
+  const handleContentChange = (value: string | undefined) => {
+    // Only mark as changed if editor is unlocked
+    if (isEditorLocked) {
+      return;
+    }
+    setFileContent(value || "");
+    setHasUnsavedChanges(true);
+  };
+
+  const getFileIcon = (node: TaskFileTreeNode, isOpen = false) => {
+    if (node.type === "directory") {
+      return isOpen ? (
+        <VscFolderOpened className="inline-block mr-1 text-yellow-600" />
+      ) : (
+        <VscFolder className="inline-block mr-1 text-yellow-600" />
+      );
+    }
+
+    // Python files
+    if (node.name.endsWith(".py")) {
+      return <SiPython className="inline-block mr-1 text-blue-400" />;
+    }
+
+    return <VscFile className="inline-block mr-1 text-gray-400" />;
+  };
+
+  const renderFileTree = (
+    nodes: TaskFileTreeNode[],
+    level = 0,
+  ): JSX.Element[] => {
+    return nodes.map((node) => (
+      <div key={node.path}>
+        {node.type === "directory" ? (
+          <details className="group" open={level === 0}>
+            <summary
+              className="text-sm text-gray-300 hover:bg-[#2a2d2e] px-2 py-0.5 cursor-pointer select-none flex items-center list-none"
+              style={{ paddingLeft: `${level * 12 + 8}px` }}
+            >
+              <span className="mr-1 transition-transform group-open:rotate-90">
+                ▸
               </span>
-            )}
+              {getFileIcon(node, true)}
+              <span className="truncate">{node.name}</span>
+            </summary>
+            {node.children && renderFileTree(node.children, level + 1)}
+          </details>
+        ) : (
+          <div
+            className={`text-sm px-2 py-0.5 cursor-pointer select-none flex items-center transition-colors ${
+              selectedFile === `${selectedBackend}/${node.path}`
+                ? "bg-[#37373d] text-white"
+                : "text-gray-300 hover:bg-[#2a2d2e]"
+            }`}
+            style={{ paddingLeft: `${level * 12 + 20}px` }}
+            onClick={() => handleFileSelect(node.path)}
+          >
+            {getFileIcon(node)}
+            <span className="truncate">{node.name}</span>
           </div>
-        </div>
+        )}
       </div>
     ));
   };
 
-  return (
-    <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-base-100 rounded-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-6 py-4 border-b border-base-300 flex items-center justify-between bg-base-100/80 backdrop-blur supports-[backdrop-filter]:bg-base-100/60">
-          <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold">{task.name}</h2>
-            <div className="badge badge-primary badge-outline font-medium">
-              {task.task_type}
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="btn btn-ghost btn-sm btn-square hover:rotate-90 transition-transform"
-          >
-            <BsX className="text-xl" />
-          </button>
-        </div>
-        <div className="p-8 overflow-y-auto">
-          {task.description && (
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-base-content/80">
-                <BsInfoCircle className="text-lg" />
-                Description
-              </h3>
-              <p className="text-base-content/70 leading-relaxed">
-                {task.description}
-              </p>
-            </div>
-          )}
+  // Calculate line count
+  const lineCount = useMemo(() => {
+    return fileContent.split("\n").length;
+  }, [fileContent]);
 
-          {Object.keys(task.input_parameters || {}).length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-base-content/80">
-                <BsArrowDownSquare className="text-lg" />
-                Input Parameters
-              </h3>
-              <div className="bg-base-200/50 rounded-xl p-6 border border-base-300">
-                {renderParameters(task.input_parameters)}
-              </div>
-            </div>
-          )}
-
-          {Object.keys(task.output_parameters || {}).length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-base-content/80">
-                <BsArrowUpSquare className="text-lg" />
-                Output Parameters
-              </h3>
-              <div className="bg-base-200/50 rounded-xl p-6 border border-base-300">
-                {renderParameters(task.output_parameters)}
-              </div>
-            </div>
-          )}
-          {task.backend && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2 text-base-content/80">
-                <BsInfoCircle className="text-lg" />
-                Backend Information
-              </h3>
-              <div className="bg-base-200/50 rounded-xl p-6 border border-base-300">
-                <div className="bg-base-100/40 rounded-lg p-4 font-mono text-base">
-                  {task.backend}
-                </div>
-              </div>
-            </div>
-          )}
+  if (isBackendsLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <span className="loading loading-spinner loading-lg"></span>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  }
 
-export default function TasksPage() {
-  const [selectedBackend, setSelectedBackend] = useState<string | null>(null);
-  const { data: tasksData } = useListTasks({
-    backend: selectedBackend,
-  });
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [selectedTask, setSelectedTask] = useState<TaskResponse | null>(null);
-
-  // Group tasks by type
-  const groupedTasks =
-    tasksData?.data?.tasks?.reduce(
-      (acc: { [key: string]: TaskResponse[] }, task: TaskResponse) => {
-        const type = task.task_type || "other";
-        if (!acc[type]) {
-          acc[type] = [];
-        }
-        acc[type].push(task);
-        return acc;
-      },
-      {},
-    ) || {};
-
-  const TaskCard = ({ task }: { task: TaskResponse }) => (
-    <div
-      className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 group h-full cursor-pointer hover:scale-[1.02]"
-      onClick={() => setSelectedTask(task)}
-    >
-      <div className="card-body flex flex-col p-4">
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-2 items-start">
-            <h3 className="card-title text-lg group-hover:text-primary transition-colors break-all flex-1 min-w-0">
-              {task.name}
-            </h3>
-            <div className="badge badge-primary badge-outline shrink-0 max-w-full overflow-hidden text-ellipsis">
-              {task.task_type}
-            </div>
-          </div>
-          {task.description && (
-            <p className="text-base-content/70 mt-2 line-clamp-3">
-              {task.description}
-            </p>
-          )}
+  if (backendsError) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="alert alert-error">
+          <span>Failed to load backends: {backendsError.message}</span>
         </div>
+        <button onClick={() => router.push("/")} className="btn btn-ghost mt-4">
+          ← Back to Home
+        </button>
       </div>
-    </div>
-  );
-
-  const TaskRow = ({ task }: { task: TaskResponse }) => (
-    <div
-      className="bg-base-100 p-4 rounded-lg shadow hover:shadow-md transition-all duration-300 group cursor-pointer hover:scale-[1.01]"
-      onClick={() => setSelectedTask(task)}
-    >
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-lg font-medium group-hover:text-primary transition-colors break-all">
-              {task.name}
-            </h3>
-            <div className="badge badge-primary badge-outline shrink-0 max-w-[200px] overflow-hidden text-ellipsis">
-              {task.task_type}
-            </div>
-          </div>
-          {task.description && (
-            <p className="text-base-content/70 mt-1 line-clamp-2 break-words">
-              {task.description}
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+    );
+  }
 
   return (
-    <div className="w-full px-6 py-6">
-      <div className="space-y-6">
-        <div className="flex justify-between items-center gap-4">
-          <h1 className="text-2xl font-bold">Task Definitions</h1>
+    <>
+      <ToastContainer position="top-right" autoClose={3000} />
+      <div className="h-screen flex flex-col bg-[#1e1e1e]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e]">
           <div className="flex items-center gap-4">
-            <BackendSelector
-              selectedBackend={selectedBackend}
-              onBackendSelect={setSelectedBackend}
-            />
-            <div className="join">
-              <button
-                className={`join-item btn btn-sm ${
-                  viewMode === "grid" ? "btn-active" : ""
-                }`}
-                onClick={() => setViewMode("grid")}
-              >
-                <BsGrid className="text-lg" />
-              </button>
-              <button
-                className={`join-item btn btn-sm ${
-                  viewMode === "list" ? "btn-active" : ""
-                }`}
-                onClick={() => setViewMode("list")}
-              >
-                <BsListUl className="text-lg" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {Object.entries(groupedTasks).map(([type, tasks]) => (
-          <div key={type} className="space-y-4">
+            <button
+              onClick={() => router.push("/")}
+              className="px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors"
+            >
+              ← Back
+            </button>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-semibold capitalize">{type}</h2>
-              <div className="badge badge-neutral">{tasks.length}</div>
+              <span className="text-sm font-medium text-white">Task Files</span>
+              {selectedBackend && (
+                <>
+                  <span className="text-gray-500">/</span>
+                  <span className="text-sm text-blue-400">
+                    {selectedBackend}
+                  </span>
+                </>
+              )}
+              {selectedFile && (
+                <>
+                  <span className="text-gray-500">/</span>
+                  <span className="text-sm text-gray-400">
+                    {selectedFile.replace(`${selectedBackend}/`, "")}
+                  </span>
+                </>
+              )}
             </div>
-            <div
-              className={
-                viewMode === "grid"
-                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                  : "space-y-4"
+            {hasUnsavedChanges && (
+              <span className="text-xs text-orange-400">Unsaved changes</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Backend selector */}
+            <select
+              value={selectedBackend || ""}
+              onChange={(e) => handleBackendChange(e.target.value)}
+              className="px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors"
+            >
+              {backendsData?.backends?.map((backend) => (
+                <option key={backend.name} value={backend.name}>
+                  {backend.name}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={toggleEditorLock}
+              className={`px-3 py-1 text-sm text-white border rounded transition-colors ${
+                isEditorLocked
+                  ? "bg-[#3c3c3c] border-[#454545] hover:bg-[#505050]"
+                  : "bg-[#0e639c] border-[#1177bb] hover:bg-[#1177bb]"
+              }`}
+              title={isEditorLocked ? "Unlock editor to edit" : "Lock editor"}
+            >
+              {isEditorLocked ? (
+                <>
+                  <VscLock className="inline-block mr-1" />
+                  Locked
+                </>
+              ) : (
+                <>
+                  <VscUnlock className="inline-block mr-1" />
+                  Unlocked
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50"
+              disabled={
+                !selectedFile ||
+                !hasUnsavedChanges ||
+                saveMutation.isPending ||
+                isEditorLocked
               }
             >
-              {tasks.map((task) =>
-                viewMode === "grid" ? (
-                  <TaskCard key={task.name} task={task} />
-                ) : (
-                  <TaskRow key={task.name} task={task} />
-                ),
+              {saveMutation.isPending ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : (
+                "Save (Ctrl+S)"
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Sidebar */}
+          <div className="w-64 bg-[#252526] border-r border-[#3e3e3e] overflow-y-auto">
+            <div className="py-2">
+              <h2 className="text-xs font-bold text-gray-400 mb-1 px-3 tracking-wider">
+                EXPLORER
+              </h2>
+              <div className="text-xs text-gray-500 px-3 mb-2 uppercase tracking-wide">
+                {selectedBackend
+                  ? `${selectedBackend} Tasks`
+                  : "Select Backend"}
+              </div>
+              {isTreeLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="loading loading-spinner loading-sm"></span>
+                </div>
+              ) : treeError ? (
+                <div className="text-xs text-red-400 px-3">
+                  Error loading tree
+                </div>
+              ) : (
+                fileTreeData && renderFileTree(fileTreeData)
               )}
             </div>
           </div>
-        ))}
 
-        {selectedTask && (
-          <TaskDetailModal
-            task={selectedTask}
-            onClose={() => setSelectedTask(null)}
-          />
-        )}
+          {/* Editor */}
+          <div className="flex-1 flex flex-col">
+            {selectedFile ? (
+              <>
+                {isContentLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <span className="loading loading-spinner loading-lg"></span>
+                  </div>
+                ) : (
+                  <Editor
+                    height="100%"
+                    language="python"
+                    theme="vs-dark"
+                    value={fileContent}
+                    onChange={handleContentChange}
+                    onMount={(editor, monaco) => {
+                      editor.onDidChangeCursorPosition((e) => {
+                        setCursorPosition({
+                          line: e.position.lineNumber,
+                          column: e.position.column,
+                        });
+                      });
 
-        {!tasksData?.data?.tasks?.length && (
-          <div className="alert alert-info">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              className="stroke-current shrink-0 w-6 h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span>No tasks found</span>
+                      editor.addCommand(
+                        monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+                        () => {
+                          if (!isEditorLocked) {
+                            handleSave();
+                          }
+                        },
+                      );
+                    }}
+                    options={{
+                      minimap: { enabled: true },
+                      fontSize: 14,
+                      lineNumbers: "on",
+                      automaticLayout: true,
+                      scrollBeyondLastLine: false,
+                      padding: { top: 16, bottom: 16 },
+                      wordWrap: "on",
+                      folding: true,
+                      renderLineHighlight: "all",
+                      cursorStyle: "line",
+                      cursorBlinking: "blink",
+                      readOnly: isEditorLocked,
+                    }}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="text-center">
+                  <SiPython className="text-6xl mx-auto mb-4 text-blue-400/50" />
+                  <p className="text-lg mb-2">No file selected</p>
+                  <p className="text-sm">
+                    Select a Python file from the tree to view or edit
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* Status bar */}
+        <div className="flex items-center justify-between px-4 py-1 bg-[#007acc] text-white text-xs">
+          <div className="flex items-center gap-4">
+            {selectedFile && (
+              <>
+                <span>
+                  Ln {cursorPosition.line}, Col {cursorPosition.column}
+                </span>
+                <span>Python</span>
+                <span>UTF-8</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            {selectedFile && <span>{lineCount} lines</span>}
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

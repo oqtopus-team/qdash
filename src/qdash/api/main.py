@@ -16,6 +16,7 @@ from qdash.api.routers import (
     settings,
     tag,
     task,
+    task_file,
     task_result,
 )
 
@@ -80,6 +81,7 @@ app.include_router(calibration.router, tags=["calibration"], dependencies=auth_d
 app.include_router(settings.router, tags=["settings"], dependencies=auth_dependency)
 app.include_router(chip.router, tags=["chip"], dependencies=auth_dependency)
 app.include_router(task.router, tags=["task"], dependencies=auth_dependency)
+app.include_router(task_file.router, tags=["task-file"], dependencies=auth_dependency)
 app.include_router(task_result.router, tags=["task-result"], dependencies=auth_dependency)
 app.include_router(tag.router, tags=["tag"], dependencies=auth_dependency)
 app.include_router(device_topology.router, tags=["device-topology"], dependencies=auth_dependency)

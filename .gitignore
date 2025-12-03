@@ -226,6 +226,7 @@ src/qdash/workflow/.classifier/*/*
 /config/*
 !/config/
 !/config/metrics.yaml
+!/config/settings.yaml
 src/tools/schedule/*
 .serena/cache/*
 .mcp.json
