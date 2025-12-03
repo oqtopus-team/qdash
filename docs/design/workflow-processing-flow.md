@@ -12,15 +12,15 @@ This document maps the calibration workflow execution path triggered from the Py
 
 ## 1. Runtime Components
 
-| Layer | Main modules | Responsibility |
-| --- | --- | --- |
-| Flow API | `init_calibration`, `finish_calibration`, `get_session` (`workflow/flow/__init__.py`) | Prefect-facing façade; stores the active session in `SessionContext`. |
-| Session | `FlowSession` (`workflow/flow/session.py`) | Owns session locking, execution ID generation, backend init, task execution, stage/result logging, GitHub integration. |
-| Backend | `create_backend()` (`engine/backend/factory.py`) | Injects `qubex` or `fake` backend used by `session.execute_task` to talk to devices. |
-| Execution | `ExecutionManager` + `MongoExecutionRepository` | Persists execution metadata to MongoDB (`ExecutionHistoryDocument`) and handles state transitions (RUNNING→COMPLETED/FAILED). |
-| Task | `TaskManager` + `TaskExecutor` | Coordinates the per-task lifecycle, wiring `TaskStateManager`, `TaskResultProcessor`, `TaskHistoryRecorder`, and merges results back to the execution record. |
-| Storage | `FilesystemCalibDataSaver`, `TaskHistoryRecorder` | Writes files under `/app/calib_data` and updates `TaskResultHistoryDocument`/`ChipDocument`/`ChipHistoryDocument`. |
-| Optional | `GitHubIntegration`, `get_params_updater` | Pull/push configuration files and sync YAML parameters before exporting to GitHub. |
+| Layer     | Main modules                                                                          | Responsibility                                                                                                                                                |
+| --------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Flow API  | `init_calibration`, `finish_calibration`, `get_session` (`workflow/flow/__init__.py`) | Prefect-facing façade; stores the active session in `SessionContext`.                                                                                         |
+| Session   | `FlowSession` (`workflow/flow/session.py`)                                            | Owns session locking, execution ID generation, backend init, task execution, stage/result logging, GitHub integration.                                        |
+| Backend   | `create_backend()` (`engine/backend/factory.py`)                                      | Injects `qubex` or `fake` backend used by `session.execute_task` to talk to devices.                                                                          |
+| Execution | `ExecutionManager` + `MongoExecutionRepository`                                       | Persists execution metadata to MongoDB (`ExecutionHistoryDocument`) and handles state transitions (RUNNING→COMPLETED/FAILED).                                 |
+| Task      | `TaskManager` + `TaskExecutor`                                                        | Coordinates the per-task lifecycle, wiring `TaskStateManager`, `TaskResultProcessor`, `TaskHistoryRecorder`, and merges results back to the execution record. |
+| Storage   | `FilesystemCalibDataSaver`, `TaskHistoryRecorder`                                     | Writes files under `/app/calib_data` and updates `TaskResultHistoryDocument`/`ChipDocument`/`ChipHistoryDocument`.                                            |
+| Optional  | `GitHubIntegration`, `get_params_updater`                                             | Pull/push configuration files and sync YAML parameters before exporting to GitHub.                                                                            |
 
 ### Relevant guidelines
 
@@ -111,14 +111,14 @@ sequenceDiagram
 
 ## 4. Persistence & Data Sync
 
-| Data | Write path | Destination |
-| --- | --- | --- |
-| Execution metadata (`ExecutionModel`) | `ExecutionManager.save()/start_execution()/update_*()` | MongoDB `ExecutionHistoryDocument` via `MongoExecutionRepository` |
-| Task results | `TaskHistoryRecorder.record_task_result()` | MongoDB `TaskResultHistoryDocument` |
-| Chip state | `TaskHistoryRecorder.update_chip_with_calib_data()` | MongoDB `ChipDocument` |
-| Chip history | `ChipHistoryDocument.create_history()` (also retriggered in `FlowSession.finish_calibration()`) | MongoDB `ChipHistoryDocument` |
-| Calibration files | `FilesystemCalibDataSaver.save_*()` | `/app/calib_data/<user>/<date>/<index>/{fig,raw_data,calib,calib_note}` |
-| GitHub sync | `_sync_backend_params_before_push()` → `GitHubIntegration.push_files()` | Remote repository (props/calib_note/YAML) |
+| Data                                  | Write path                                                                                      | Destination                                                             |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Execution metadata (`ExecutionModel`) | `ExecutionManager.save()/start_execution()/update_*()`                                          | MongoDB `ExecutionHistoryDocument` via `MongoExecutionRepository`       |
+| Task results                          | `TaskHistoryRecorder.record_task_result()`                                                      | MongoDB `TaskResultHistoryDocument`                                     |
+| Chip state                            | `TaskHistoryRecorder.update_chip_with_calib_data()`                                             | MongoDB `ChipDocument`                                                  |
+| Chip history                          | `ChipHistoryDocument.create_history()` (also retriggered in `FlowSession.finish_calibration()`) | MongoDB `ChipHistoryDocument`                                           |
+| Calibration files                     | `FilesystemCalibDataSaver.save_*()`                                                             | `/app/calib_data/<user>/<date>/<index>/{fig,raw_data,calib,calib_note}` |
+| GitHub sync                           | `_sync_backend_params_before_push()` → `GitHubIntegration.push_files()`                         | Remote repository (props/calib_note/YAML)                               |
 
 ### Optimistic locking
 
@@ -132,11 +132,11 @@ Inside `finish_calibration()` the helper `_sync_backend_params_before_push()` us
 
 ## 5. Session Completion & Failure Handling
 
-| Phase | Invocation | Actions |
-| --- | --- | --- |
-| Normal completion | `finish_calibration(update_chip_history=True, push_to_github=None, export_note_to_file=False)` | `ExecutionManager.complete_execution()` → optional `ChipHistoryDocument.create_history()` → optional `CalibrationNoteDocument` export → optional GitHub push → unlock execution. |
-| Failure | `fail_calibration(error_message="...")` | `ExecutionManager.fail_execution()` marks Mongo status as FAILED and releases the lock. |
-| GitHub push override | `github_push_config.enabled=True` or `push_to_github=True` | `GitHubIntegration.push_files()` results stored in `execution_manager.note["github_push_results"]`. |
+| Phase                | Invocation                                                                                     | Actions                                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Normal completion    | `finish_calibration(update_chip_history=True, push_to_github=None, export_note_to_file=False)` | `ExecutionManager.complete_execution()` → optional `ChipHistoryDocument.create_history()` → optional `CalibrationNoteDocument` export → optional GitHub push → unlock execution. |
+| Failure              | `fail_calibration(error_message="...")`                                                        | `ExecutionManager.fail_execution()` marks Mongo status as FAILED and releases the lock.                                                                                          |
+| GitHub push override | `github_push_config.enabled=True` or `push_to_github=True`                                     | `GitHubIntegration.push_files()` results stored in `execution_manager.note["github_push_results"]`.                                                                              |
 
 ```mermaid
 flowchart LR
