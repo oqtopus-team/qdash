@@ -11,7 +11,7 @@ import { QubitRadarChart } from "./components/QubitRadarChart";
 import { QubitTimeSeriesView } from "./components/QubitTimeSeriesView";
 import { TaskHistoryViewer } from "./components/TaskHistoryViewer";
 
-import type { Task, TaskResponse } from "@/schemas";
+import type { Task, TaskInfo } from "@/schemas";
 
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { DateSelector } from "@/app/components/DateSelector";
@@ -24,7 +24,10 @@ import {
   useGetLatestQubitTaskResults,
   useGetHistoricalQubitTaskResults,
 } from "@/client/task-result/task-result";
-import { useListTasks } from "@/client/task/task";
+import {
+  useListTaskInfo,
+  useGetTaskFileSettings,
+} from "@/client/task-file/task-file";
 
 function QubitDetailPageContent() {
   const params = useParams();
@@ -52,7 +55,13 @@ function QubitDetailPageContent() {
   const setViewMode = setQubitViewMode;
 
   const { data: chipData } = useGetChip(chipId);
-  const { data: tasks } = useListTasks();
+
+  // Get task file settings to determine default backend
+  const { data: taskFileSettings } = useGetTaskFileSettings();
+  const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
+
+  // Get task list from task-files API
+  const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
 
   // Update selected chip if different from URL
   useEffect(() => {
@@ -70,10 +79,9 @@ function QubitDetailPageContent() {
   } = useDateNavigation(chipId, selectedDate, setSelectedDate);
 
   // Get filtered tasks for qubit type
-  const filteredTasks =
-    tasks?.data?.tasks?.filter(
-      (task: TaskResponse) => task.task_type === "qubit",
-    ) || [];
+  const filteredTasks = (taskInfoData?.data?.tasks || []).filter(
+    (task: TaskInfo) => task.task_type === "qubit",
+  );
 
   // Get data for common qubit tasks for dashboard
   const { data: rabiData } =

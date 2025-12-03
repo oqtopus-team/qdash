@@ -5,9 +5,15 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
+import yaml
 from fastapi import APIRouter, Depends, HTTPException
 from pymongo import DESCENDING
 from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
+from qdash.api.routers.task_file import (
+    CALTASKS_BASE_PATH,
+    SETTINGS_PATH,
+    collect_tasks_from_directory,
+)
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.chip import (
     ChipDatesResponse,
@@ -21,7 +27,6 @@ from qdash.api.schemas.chip import (
 from qdash.api.services.chip_initializer import ChipInitializer
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
-from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 router = APIRouter()
@@ -198,9 +203,38 @@ def get_chip(
 # =============================================================================
 
 
+def _get_task_names_from_files() -> list[str]:
+    """Get task names from task files instead of database.
+
+    Returns
+    -------
+        List of task names from task files
+
+    """
+    # Get default backend from settings
+    default_backend = "qubex"  # fallback default
+    try:
+        if SETTINGS_PATH.exists():
+            with open(SETTINGS_PATH, encoding="utf-8") as f:
+                settings = yaml.safe_load(f)
+                task_files_settings = settings.get("task_files", {})
+                default_backend = task_files_settings.get("default_backend", "qubex")
+    except Exception as e:
+        logger.warning(f"Failed to load settings: {e}")
+
+    # Get tasks from task files
+    backend_path = CALTASKS_BASE_PATH / default_backend
+    if not backend_path.exists() or not backend_path.is_dir():
+        logger.warning(f"Backend directory not found: {backend_path}")
+        return []
+
+    tasks = collect_tasks_from_directory(backend_path, backend_path)
+    return [task.name for task in tasks]
+
+
 def _build_mux_detail(
     mux_id: int,
-    tasks: list,
+    task_names: list[str],
     task_results: dict[str, dict[str, TaskResultHistoryDocument]],
 ) -> MuxDetailResponse:
     """Build MuxDetailResponse from task results."""
@@ -211,10 +245,10 @@ def _build_mux_detail(
         detail[qid] = {}
         qid_results = task_results.get(qid, {})
 
-        for task in tasks:
-            result = qid_results.get(task.name)
+        for task_name in task_names:
+            result = qid_results.get(task_name)
             if result is None:
-                task_result = MuxTask(name=task.name)
+                task_result = MuxTask(name=task_name)
             else:
                 task_result = MuxTask(
                     task_id=result.task_id,
@@ -233,7 +267,7 @@ def _build_mux_detail(
                     elapsed_time=result.elapsed_time,
                     task_type=result.task_type,
                 )
-            detail[qid][task.name] = task_result
+            detail[qid][task_name] = task_result
 
     return MuxDetailResponse(mux_id=mux_id, detail=detail)
 
@@ -266,10 +300,9 @@ def get_chip_mux(
     """
     logger.debug(f"Fetching mux details for chip {chip_id}, user: {current_user.username}")
 
-    # Get all tasks
-    tasks = TaskDocument.find({"username": current_user.username}).run()
-    task_names = [task.name for task in tasks]
-    logger.debug("Tasks: %s", tasks)
+    # Get task names from task files instead of database
+    task_names = _get_task_names_from_files()
+    logger.debug("Task names from files: %s", task_names)
 
     # Calculate qids for this mux
     qids = [str(mux_id * 4 + i) for i in range(4)]
@@ -296,7 +329,7 @@ def get_chip_mux(
         if result.name not in task_results[result.qid]:
             task_results[result.qid][result.name] = result
 
-    return _build_mux_detail(mux_id, tasks, task_results=task_results)
+    return _build_mux_detail(mux_id, task_names, task_results=task_results)
 
 
 @router.get(
@@ -322,9 +355,8 @@ def list_chip_muxes(chip_id: str, current_user: Annotated[User, Depends(get_curr
         List of multiplexer details
 
     """
-    # Get all tasks
-    tasks = TaskDocument.find({"username": current_user.username}).run()
-    task_names = [task.name for task in tasks]
+    # Get task names from task files instead of database
+    task_names = _get_task_names_from_files()
 
     # Get chip info
     chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
@@ -360,6 +392,6 @@ def list_chip_muxes(chip_id: str, current_user: Annotated[User, Depends(get_curr
     # Build mux details
     muxes: dict[int, MuxDetailResponse] = {}
     for mux_id in range(mux_num):
-        muxes[mux_id] = _build_mux_detail(mux_id, tasks, task_results=task_results)
+        muxes[mux_id] = _build_mux_detail(mux_id, task_names, task_results=task_results)
 
     return ListMuxResponse(muxes=muxes)

@@ -9,7 +9,7 @@ import { BsGrid, BsListUl } from "react-icons/bs";
 import { CouplingGrid } from "./CouplingGrid";
 import { TaskResultGrid } from "./TaskResultGrid";
 
-import type { Task, MuxDetailResponseDetail, TaskResponse } from "@/schemas";
+import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
 
 import { ChipSelector } from "@/app/components/ChipSelector";
 import { DateSelector } from "@/app/components/DateSelector";
@@ -18,7 +18,10 @@ import { TaskSelector } from "@/app/components/TaskSelector";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useChipUrlState } from "@/app/hooks/useUrlState";
 import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
-import { useListTasks } from "@/client/task/task";
+import {
+  useListTaskInfo,
+  useGetTaskFileSettings,
+} from "@/client/task-file/task-file";
 import { TaskDetailModal } from "@/shared/components/TaskDetailModal";
 import { CreateChipModal } from "./CreateChipModal";
 
@@ -80,7 +83,12 @@ export function ChipPageContent() {
   // Track previous date to distinguish modal navigation from external navigation
   const [previousDate, setPreviousDate] = useState(selectedDate);
 
-  const { data: tasks } = useListTasks();
+  // Get task file settings to determine default backend
+  const { data: taskFileSettings } = useGetTaskFileSettings();
+  const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
+
+  // Get task list from task-files API
+  const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
 
   // Use custom hook for date navigation
   const {
@@ -99,19 +107,21 @@ export function ChipPageContent() {
   useEffect(() => {
     if (!isInitialized) return; // Wait for URL state to be initialized
 
+    const taskList = taskInfoData?.data?.tasks || [];
+
     // Only set defaults if no task is selected or if the current task doesn't match the view mode
-    if (viewMode === "2q" && tasks?.data?.tasks) {
-      const availableTasks = tasks.data.tasks.filter(
-        (task: TaskResponse) => task.task_type === "coupling",
+    if (viewMode === "2q" && taskList.length > 0) {
+      const availableTasks = taskList.filter(
+        (task: TaskInfo) => task.task_type === "coupling",
       );
       // Check if current task is valid for 2q view
       const currentTaskValid = availableTasks.some(
-        (task: TaskResponse) => task.name === selectedTask,
+        (task: TaskInfo) => task.name === selectedTask,
       );
 
       if (!currentTaskValid) {
         const checkBellState = availableTasks.find(
-          (task: TaskResponse) => task.name === "CheckBellState",
+          (task: TaskInfo) => task.name === "CheckBellState",
         );
         if (checkBellState) {
           setSelectedTask("CheckBellState");
@@ -119,13 +129,13 @@ export function ChipPageContent() {
           setSelectedTask(availableTasks[0].name);
         }
       }
-    } else if (viewMode === "1q" && tasks?.data?.tasks) {
-      const availableTasks = tasks.data.tasks.filter(
-        (task: TaskResponse) => task.task_type === "qubit",
+    } else if (viewMode === "1q" && taskList.length > 0) {
+      const availableTasks = taskList.filter(
+        (task: TaskInfo) => task.task_type === "qubit",
       );
       // Check if current task is valid for 1q view
       const currentTaskValid = availableTasks.some(
-        (task: TaskResponse) => task.name === selectedTask,
+        (task: TaskInfo) => task.name === selectedTask,
       );
 
       if (!currentTaskValid && !selectedTask) {
@@ -135,7 +145,7 @@ export function ChipPageContent() {
     }
   }, [
     viewMode,
-    tasks?.data?.tasks,
+    taskInfoData?.data?.tasks,
     isInitialized,
     selectedTask,
     setSelectedTask,
@@ -295,13 +305,14 @@ export function ChipPageContent() {
   };
 
   // Get tasks based on view mode
-  const filteredTasks =
-    tasks?.data?.tasks?.filter((task: TaskResponse) => {
+  const filteredTasks = (taskInfoData?.data?.tasks || []).filter(
+    (task: TaskInfo) => {
       if (viewMode === "2q") {
         return task.task_type === "coupling";
       }
       return task.task_type === "qubit";
-    }) || [];
+    },
+  );
 
   return (
     <div className="w-full px-6 py-6">
