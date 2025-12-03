@@ -14,6 +14,11 @@ Technical architecture documentation for QDash components.
 
 ### Calibration Workflow
 
+- **[1-Qubit Scheduler](./one-qubit-scheduler.md)** - Single-qubit calibration scheduling
+  - Box type detection (Box A/B) from wiring configuration
+  - MUX-based qubit grouping by box constraints
+  - Stage generation for parallel/sequential execution
+
 - **[CR Gate Scheduler](./cr-scheduler.md)** - Cross-resonance gate scheduling algorithm
   - Conflict detection and graph coloring
   - Fast/slow pair separation
@@ -30,9 +35,10 @@ Technical architecture documentation for QDash components.
 
 ### Implementation
 
-- CR Scheduler: `src/qdash/workflow/engine/calibration/cr_scheduler.py`
+- 1-Qubit Scheduler: `src/qdash/workflow/engine/calibration/scheduler/one_qubit_scheduler.py`
+- CR Scheduler: `src/qdash/workflow/engine/calibration/scheduler/cr_scheduler.py`
 - Visualization: `src/tools/cr_scheduler_visualizer.py`
-- Tests: `tests/qdash/workflow/engine/calibration/test_cr_scheduler.py`
+- Tests: `tests/qdash/workflow/engine/calibration/scheduler/`
 
 ### Configuration
 
