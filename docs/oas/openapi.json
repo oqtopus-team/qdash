@@ -2110,6 +2110,82 @@
         }
       }
     },
+    "/flows/helpers": {
+      "get": {
+        "tags": ["flow"],
+        "summary": "List flow helper files",
+        "description": "List all Python files in the qdash.workflow.flow module.\n\nReturns list of filenames that users can view for reference.",
+        "operationId": "listFlowHelperFiles",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Response Listflowhelperfiles"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/flows/helpers/{filename}": {
+      "get": {
+        "tags": ["flow"],
+        "summary": "Get flow helper file content",
+        "description": "Get the content of a flow helper file.\n\nArgs:\n    filename: Name of the Python file (e.g., \"session.py\")\n\nReturns:\n    File content as string",
+        "operationId": "getFlowHelperFile",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "title": "Response Getflowhelperfile"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/schedules": {
       "get": {
         "tags": ["flow"],

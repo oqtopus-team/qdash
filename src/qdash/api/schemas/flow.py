@@ -196,3 +196,43 @@ class FlowTemplateWithCode(FlowTemplate):
     """Flow template with code content."""
 
     code: str = Field(..., description="Python code content")
+
+
+# =============================================================================
+# Importable Modules (for editor sidebar)
+# =============================================================================
+
+
+class ImportableFunction(BaseModel):
+    """A function that can be imported and used in user flows."""
+
+    name: str = Field(..., description="Function name")
+    description: str = Field(..., description="Function description (from docstring)")
+    signature: str = Field(..., description="Function signature")
+    module: str = Field(..., description="Module path for import")
+    example: str | None = Field(None, description="Usage example")
+
+
+class ImportableClass(BaseModel):
+    """A class that can be imported and used in user flows."""
+
+    name: str = Field(..., description="Class name")
+    description: str = Field(..., description="Class description (from docstring)")
+    module: str = Field(..., description="Module path for import")
+    methods: list[str] = Field(default_factory=list, description="Key methods")
+
+
+class ImportableModule(BaseModel):
+    """A module category containing importable items."""
+
+    name: str = Field(..., description="Module category name")
+    description: str = Field(..., description="Module category description")
+    import_path: str = Field(..., description="Python import path")
+    functions: list[ImportableFunction] = Field(default_factory=list, description="Available functions")
+    classes: list[ImportableClass] = Field(default_factory=list, description="Available classes")
+
+
+class ListImportableModulesResponse(BaseModel):
+    """Response for listing importable modules."""
+
+    modules: list[ImportableModule] = Field(..., description="List of importable modules")
