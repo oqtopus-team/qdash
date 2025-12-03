@@ -20,13 +20,13 @@ from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.tag import TagDocument
-from qdash.workflow.engine.calibration.execution_state_manager import (
+from qdash.workflow.engine.calibration.execution.state_manager import (
     ExecutionStateManager,
 )
 from qdash.workflow.engine.calibration.repository.mongo_execution import (
     MongoExecutionRepository,
 )
-from qdash.workflow.engine.calibration.task_manager import TaskManager
+from qdash.workflow.engine.calibration.task.manager import TaskManager
 
 initialize()
 

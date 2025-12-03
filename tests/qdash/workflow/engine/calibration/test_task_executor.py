@@ -4,12 +4,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from qdash.datamodel.task import OutputParameterModel, QubitTaskModel, TaskStatusModel
-from qdash.workflow.engine.calibration.task_executor import (
+from qdash.workflow.engine.calibration.task.executor import (
     TaskExecutionError,
     TaskExecutor,
     TaskProtocol,
 )
-from qdash.workflow.engine.calibration.task_result_processor import (
+from qdash.workflow.engine.calibration.task.result_processor import (
     FidelityValidationError,
     R2ValidationError,
 )

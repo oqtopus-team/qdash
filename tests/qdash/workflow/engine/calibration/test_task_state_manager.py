@@ -2,7 +2,7 @@
 
 import pytest
 from qdash.datamodel.task import OutputParameterModel, TaskStatusModel
-from qdash.workflow.engine.calibration.task_state_manager import TaskStateManager
+from qdash.workflow.engine.calibration.task.state_manager import TaskStateManager
 
 
 class TestTaskStateManagerInit:

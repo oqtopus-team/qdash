@@ -11,7 +11,7 @@ from qdash.datamodel.task import (
     QubitTaskModel,
     TaskStatusModel,
 )
-from qdash.workflow.engine.calibration.task_history_recorder import TaskHistoryRecorder
+from qdash.workflow.engine.calibration.task.history_recorder import TaskHistoryRecorder
 
 
 class TestTaskHistoryRecorder:

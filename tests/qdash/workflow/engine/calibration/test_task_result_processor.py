@@ -2,7 +2,7 @@
 
 import pytest
 from qdash.datamodel.task import OutputParameterModel
-from qdash.workflow.engine.calibration.task_result_processor import (
+from qdash.workflow.engine.calibration.task.result_processor import (
     FidelityValidationError,
     R2ValidationError,
     TaskResultProcessor,

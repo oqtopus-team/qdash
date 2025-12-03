@@ -10,8 +10,8 @@ These tests verify the pluggable filter and scheduler architecture including:
 import pytest
 from unittest.mock import MagicMock, patch
 
-from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
-from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+from qdash.workflow.engine.calibration.scheduler.cr_scheduler import CRScheduler
+from qdash.workflow.engine.calibration.scheduler.plugins import (
     CandidateQubitFilter,
     FidelityFilter,
     FilterContext,

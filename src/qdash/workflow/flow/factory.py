@@ -7,7 +7,7 @@ test configurations.
 
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from qdash.workflow.engine.calibration.execution_manager import ExecutionManager
+from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.repository import (
     MongoChipHistoryRepository,
     MongoChipRepository,
@@ -15,7 +15,7 @@ from qdash.workflow.engine.calibration.repository import (
     MongoTaskResultHistoryRepository,
     create_default_repositories,
 )
-from qdash.workflow.engine.calibration.task_manager import TaskManager
+from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.engine.session.factory import create_session
 from qdash.workflow.flow.config import CalibrationPaths, FlowSessionConfig
 

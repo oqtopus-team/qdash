@@ -23,7 +23,7 @@ from qdash.datamodel.task import (
     TaskResultModel,
     TaskStatusModel,
 )
-from qdash.workflow.engine.calibration.task_manager import TaskManager
+from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.tasks.base import PostProcessResult, PreProcessResult, RunResult
 
 

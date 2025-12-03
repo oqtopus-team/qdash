@@ -7,7 +7,7 @@ from qdash.datamodel.execution import (
     TaskResultModel,
 )
 from qdash.datamodel.task import OutputParameterModel
-from qdash.workflow.engine.calibration.execution_state_manager import (
+from qdash.workflow.engine.calibration.execution.state_manager import (
     ExecutionStateManager,
 )
 

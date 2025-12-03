@@ -449,7 +449,7 @@ class CRScheduler:
 
         Example:
             ```python
-            from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+            from qdash.workflow.engine.calibration.scheduler.plugins import (
                 CandidateQubitFilter,
                 FrequencyDirectionalityFilter,
                 FidelityFilter,
@@ -476,7 +476,7 @@ class CRScheduler:
             schedule = cr_scheduler.generate_with_plugins(filters=filters, scheduler=scheduler)
             ```
         """
-        from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+        from qdash.workflow.engine.calibration.scheduler.plugins import (
             FilterContext,
             FrequencyDirectionalityFilter,
             IntraThenInterMuxScheduler,
