@@ -35,11 +35,14 @@ class TaskStateManager(BaseModel):
         Container for all task results
     calib_data : CalibDataModel
         Container for calibration data
+    _upstream_task_id : str
+        Upstream task ID for dependency tracking
 
     """
 
     task_result: TaskResultModel = TaskResultModel()
     calib_data: CalibDataModel = CalibDataModel(qubit={}, coupling={})
+    _upstream_task_id: str = ""
 
     def __init__(self, qids: list[str] | None = None, **data) -> None:
         """Initialize TaskStateManager.
@@ -56,6 +59,28 @@ class TaskStateManager(BaseModel):
                 self.task_result.qubit_tasks[qid] = []
                 self.task_result.coupling_tasks[qid] = []
                 self.calib_data.qubit[qid] = {}
+
+    def set_upstream_task_id(self, task_id: str) -> None:
+        """Set upstream task ID for dependency tracking.
+
+        Parameters
+        ----------
+        task_id : str
+            The upstream task ID
+
+        """
+        self._upstream_task_id = task_id
+
+    def _get_upstream_task_id(self) -> str:
+        """Get upstream task ID (QDash task_id, not Prefect ID).
+
+        Returns
+        -------
+        str
+            The upstream task ID or empty string if not set
+
+        """
+        return self._upstream_task_id
 
     def _ensure_task_exists(
         self, task_name: str, task_type: str, qid: str
@@ -133,14 +158,16 @@ class TaskStateManager(BaseModel):
             The new task instance
 
         """
+        upstream_id = self._get_upstream_task_id()
+
         if task_type == "qubit":
-            return QubitTaskModel(name=task_name, qid=qid)
+            return QubitTaskModel(name=task_name, qid=qid, upstream_id=upstream_id)
         elif task_type == "coupling":
-            return CouplingTaskModel(name=task_name, qid=qid)
+            return CouplingTaskModel(name=task_name, qid=qid, upstream_id=upstream_id)
         elif task_type == "global":
-            return GlobalTaskModel(name=task_name)
+            return GlobalTaskModel(name=task_name, upstream_id=upstream_id)
         elif task_type == "system":
-            return SystemTaskModel(name=task_name)
+            return SystemTaskModel(name=task_name, upstream_id=upstream_id)
         else:
             raise ValueError(f"Unknown task type: {task_type}")
 
@@ -272,6 +299,34 @@ class TaskStateManager(BaseModel):
         task.status = TaskStatusModel.SKIPPED
         task.message = message
 
+    def update_task_status(
+        self,
+        task_name: str,
+        new_status: TaskStatusModel,
+        message: str,
+        task_type: str,
+        qid: str,
+    ) -> None:
+        """Update task status.
+
+        Parameters
+        ----------
+        task_name : str
+            Name of the task
+        new_status : TaskStatusModel
+            The new status
+        message : str
+            Status message
+        task_type : str
+            Type of task
+        qid : str
+            Qubit ID
+
+        """
+        task = self._ensure_task_exists(task_name, task_type, qid)
+        task.status = new_status
+        task.message = message
+
     def put_input_parameters(
         self, task_name: str, input_parameters: dict, task_type: str, qid: str
     ) -> None:
@@ -323,6 +378,40 @@ class TaskStateManager(BaseModel):
         elif task_type == "coupling":
             for key, value in output_parameters.items():
                 self.calib_data.put_coupling_data(qid, key, value)
+
+    def clear_output_parameters(
+        self, task_name: str, task_type: str, qid: str
+    ) -> None:
+        """Clear output parameters for a task and rollback calib_data.
+
+        This method clears both the task's output_parameters and removes
+        the corresponding entries from calib_data to ensure data consistency
+        when R² validation fails.
+
+        Parameters
+        ----------
+        task_name : str
+            Name of the task
+        task_type : str
+            Type of task
+        qid : str
+            Qubit ID
+
+        """
+        task = self._ensure_task_exists(task_name, task_type, qid)
+
+        # Get parameter names before clearing
+        parameter_names = list(task.output_parameters.keys())
+
+        # Clear task output parameters
+        task.output_parameters = {}
+
+        # Rollback calib_data by removing the parameters
+        if parameter_names:
+            if task_type == "qubit":
+                self._clear_qubit_calib_data(qid, parameter_names)
+            elif task_type == "coupling":
+                self._clear_coupling_calib_data(qid, parameter_names)
 
     def get_output_parameter_by_task_name(
         self, task_name: str, task_type: str, qid: str

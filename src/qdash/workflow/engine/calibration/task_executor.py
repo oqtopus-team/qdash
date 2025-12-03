@@ -2,13 +2,24 @@
 
 This module provides the TaskExecutor class that handles the execution
 of calibration tasks including preprocessing, running, and postprocessing.
+
+The TaskExecutor is responsible for the complete task execution lifecycle:
+- Task state management via TaskStateManager
+- Result validation via TaskResultProcessor
+- History recording via TaskHistoryRecorder
+- Backend-specific save processing
 """
 
 import logging
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from qdash.datamodel.task import OutputParameterModel
+from pydantic import BaseModel, Field
+
+from qdash.datamodel.execution import ExecutionModel
+from qdash.datamodel.task import CalibDataModel, OutputParameterModel
+from qdash.workflow.engine.calibration.params_updater import get_params_updater
 from qdash.workflow.engine.calibration.repository import FilesystemCalibDataSaver
+from qdash.workflow.engine.calibration.task_history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.calibration.task_result_processor import (
     FidelityValidationError,
     R2ValidationError,
@@ -19,6 +30,10 @@ from qdash.workflow.tasks.base import PostProcessResult, PreProcessResult, RunRe
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from qdash.workflow.engine.calibration.execution_manager import ExecutionManager
+    from qdash.workflow.engine.session.base import BaseSession
+
 
 @runtime_checkable
 class TaskProtocol(Protocol):
@@ -26,6 +41,7 @@ class TaskProtocol(Protocol):
 
     name: str
     r2_threshold: float
+    backend: str
 
     def get_name(self) -> str:
         """Get task name."""
@@ -68,6 +84,17 @@ class SessionProtocol(Protocol):
 
     name: str
 
+    def update_note(
+        self,
+        username: str,
+        chip_id: str,
+        calib_dir: str,
+        execution_id: str,
+        task_manager_id: str,
+    ) -> None:
+        """Update calibration note."""
+        ...
+
 
 class TaskExecutionError(Exception):
     """Exception raised when task execution fails."""
@@ -75,14 +102,38 @@ class TaskExecutionError(Exception):
     pass
 
 
+class TaskExecutionResult(BaseModel):
+    """Result of task execution.
+
+    This class encapsulates the complete result of a task execution,
+    including output parameters, calibration data changes, and metadata.
+    """
+
+    task_name: str
+    task_type: str
+    qid: str
+    success: bool = False
+    message: str = ""
+    output_parameters: dict[str, Any] = Field(default_factory=dict)
+    r2: dict[str, float] | None = None
+    calib_data_delta: CalibDataModel = Field(
+        default_factory=lambda: CalibDataModel(qubit={}, coupling={})
+    )
+    controller_info: dict[str, dict] = Field(default_factory=dict)
+
+    model_config = {"arbitrary_types_allowed": True}
+
+
 class TaskExecutor:
     """Executor for calibration tasks.
 
-    This class handles:
+    This class handles the complete task execution lifecycle:
     - Task lifecycle (start, preprocess, run, postprocess, end)
     - Figure and raw data saving
     - R² and fidelity validation
     - State updates via TaskStateManager
+    - History recording via TaskHistoryRecorder
+    - Backend-specific save processing
 
     Attributes
     ----------
@@ -90,10 +141,16 @@ class TaskExecutor:
         Manager for task state
     result_processor : TaskResultProcessor
         Processor for result validation
+    history_recorder : TaskHistoryRecorder
+        Recorder for task history
     data_saver : FilesystemCalibDataSaver
         Saver for figures and raw data
     execution_id : str
         Current execution ID
+    username : str
+        Current username
+    calib_dir : str
+        Calibration data directory
 
     """
 
@@ -102,7 +159,10 @@ class TaskExecutor:
         state_manager: TaskStateManager,
         calib_dir: str,
         execution_id: str,
+        task_manager_id: str,
+        username: str = "admin",
         result_processor: TaskResultProcessor | None = None,
+        history_recorder: TaskHistoryRecorder | None = None,
         data_saver: FilesystemCalibDataSaver | None = None,
     ) -> None:
         """Initialize TaskExecutor.
@@ -115,16 +175,183 @@ class TaskExecutor:
             Directory for calibration data
         execution_id : str
             Current execution ID
+        task_manager_id : str
+            The unique TaskManager ID (used for result keys and note files)
+        username : str
+            Current username
         result_processor : TaskResultProcessor | None
             Processor for result validation
+        history_recorder : TaskHistoryRecorder | None
+            Recorder for task history
         data_saver : FilesystemCalibDataSaver | None
             Saver for figures and raw data
 
         """
         self.state_manager = state_manager
         self.execution_id = execution_id
+        self.task_manager_id = task_manager_id
+        self.username = username
+        self.calib_dir = calib_dir
         self.result_processor = result_processor or TaskResultProcessor()
+        self.history_recorder = history_recorder or TaskHistoryRecorder()
         self.data_saver = data_saver or FilesystemCalibDataSaver(calib_dir)
+        self._controller_info: dict[str, dict] = {}
+
+    def set_controller_info(self, controller_info: dict[str, dict]) -> None:
+        """Set controller information for hardware tracking.
+
+        Parameters
+        ----------
+        controller_info : dict[str, dict]
+            Controller/hardware information to track
+
+        """
+        self._controller_info = controller_info
+
+    def execute(
+        self,
+        task: TaskProtocol,
+        session: SessionProtocol,
+        execution_manager: "ExecutionManager",
+        qid: str,
+    ) -> tuple["ExecutionManager", TaskExecutionResult]:
+        """Execute a task with full lifecycle management.
+
+        This is the main entry point that mirrors the original
+        TaskManager.execute_task behavior.
+
+        Parameters
+        ----------
+        task : TaskProtocol
+            The task to execute
+        session : SessionProtocol
+            The session to use
+        execution_manager : ExecutionManager
+            The execution manager
+        qid : str
+            The qubit ID
+
+        Returns
+        -------
+        tuple[ExecutionManager, TaskExecutionResult]
+            Updated execution manager and task execution result
+
+        Raises
+        ------
+        TaskExecutionError
+            If task execution fails
+        ValueError
+            If R² or fidelity validation fails
+
+        """
+        task_name = task.get_name()
+        task_type = task.get_task_type()
+
+        result = TaskExecutionResult(
+            task_name=task_name,
+            task_type=task_type,
+            qid=qid,
+        )
+
+        try:
+            # 0. Ensure task exists
+            self.state_manager.ensure_task_exists(task_name, task_type, qid)
+
+            # 1. Start task
+            self.state_manager.start_task(task_name, task_type, qid)
+
+            # Record task start to history
+            executed_task = self.state_manager.get_task(task_name, task_type, qid)
+            self.history_recorder.record_task_result(
+                executed_task, execution_manager.to_datamodel()
+            )
+
+            # Update execution manager
+            execution_manager = self._update_execution_manager(execution_manager)
+
+            # 2. Preprocess
+            preprocess_result = self._run_preprocess(task, session, qid)
+            if preprocess_result:
+                self.state_manager.put_input_parameters(
+                    task_name, preprocess_result.input_parameters, task_type, qid
+                )
+                execution_manager = self._update_execution_manager(execution_manager)
+
+            # 3. Run
+            run_result = self._run_task(task, session, qid)
+            result.r2 = run_result.r2 if run_result else None
+
+            if run_result is None:
+                # Task didn't produce results, mark as completed
+                self._complete_task(task_name, task_type, qid, "No run result")
+                result.success = True
+                result.message = "Completed without run result"
+                return execution_manager, result
+
+            # 4. Postprocess
+            postprocess_result = self._run_postprocess(task, session, run_result, qid)
+
+            if postprocess_result:
+                # 5. Process and validate results
+                backend_success = self._process_results(
+                    task, execution_manager, postprocess_result, qid, run_result, session
+                )
+
+                result.output_parameters = dict(
+                    self.state_manager.get_task(task_name, task_type, qid).output_parameters
+                )
+
+            # 6. Complete task
+            self._complete_task(task_name, task_type, qid, f"{task_name} is completed")
+
+            # Record completion to history
+            executed_task = self.state_manager.get_task(task_name, task_type, qid)
+            self.history_recorder.record_task_result(
+                executed_task, execution_manager.to_datamodel()
+            )
+
+            execution_manager = self._update_execution_manager(execution_manager)
+            result.success = True
+            result.message = "Completed"
+
+        except (R2ValidationError, FidelityValidationError, ValueError) as e:
+            self._fail_task(task_name, task_type, qid, str(e))
+            executed_task = self.state_manager.get_task(task_name, task_type, qid)
+            self.history_recorder.record_task_result(
+                executed_task, execution_manager.to_datamodel()
+            )
+            result.message = str(e)
+            raise
+
+        except Exception as e:
+            self._fail_task(task_name, task_type, qid, str(e))
+            executed_task = self.state_manager.get_task(task_name, task_type, qid)
+            self.history_recorder.record_task_result(
+                executed_task, execution_manager.to_datamodel()
+            )
+            result.message = str(e)
+            raise TaskExecutionError(f"Task {task_name} failed: {e}") from e
+
+        finally:
+            # End task (record end time)
+            self.state_manager.end_task(task_name, task_type, qid)
+
+            # Final history record
+            executed_task = self.state_manager.get_task(task_name, task_type, qid)
+            self.history_recorder.record_task_result(
+                executed_task, execution_manager.to_datamodel()
+            )
+
+            # Create chip history snapshot
+            self.history_recorder.create_chip_history_snapshot(self.username)
+
+            execution_manager = self._update_execution_manager(execution_manager)
+
+        # Build calib_data_delta from state manager
+        result.calib_data_delta = self.state_manager.calib_data
+        result.controller_info = self._controller_info
+
+        return execution_manager, result
 
     def execute_task(
         self,
@@ -132,7 +359,10 @@ class TaskExecutor:
         session: SessionProtocol,
         qid: str,
     ) -> dict[str, Any]:
-        """Execute a task and return results.
+        """Execute a task and return results (simplified version).
+
+        This method provides a simpler interface for tests and cases
+        where ExecutionManager integration is not needed.
 
         Parameters
         ----------
@@ -194,9 +424,7 @@ class TaskExecutor:
                 self._validate_r2(run_result.r2, qid, task)
 
             # Postprocess
-            postprocess_result = self._run_postprocess(
-                task, session, run_result, qid
-            )
+            postprocess_result = self._run_postprocess(task, session, run_result, qid)
 
             # Process output parameters
             output_params = self._process_output_parameters(
@@ -232,6 +460,318 @@ class TaskExecutor:
             self.state_manager.end_task(task_name, task_type, qid)
 
         return result
+
+    def _update_execution_manager(
+        self, execution_manager: "ExecutionManager"
+    ) -> "ExecutionManager":
+        """Update execution manager with current state.
+
+        Parameters
+        ----------
+        execution_manager : ExecutionManager
+            The execution manager to update
+
+        Returns
+        -------
+        ExecutionManager
+            Updated execution manager
+
+        """
+        # Create a minimal object with task manager attributes for update
+        # This maintains backward compatibility with ExecutionManager.update_with_task_manager
+        class TaskManagerProxy:
+            """Proxy object that mimics TaskManager for ExecutionManager.update_with_task_manager."""
+
+            def __init__(self, task_manager_id: str, task_result, calib_data, controller_info):
+                self.id = task_manager_id
+                self.task_result = task_result
+                self.calib_data = calib_data
+                self.controller_info = controller_info
+
+        tm = TaskManagerProxy(
+            task_manager_id=self.task_manager_id,
+            task_result=self.state_manager.task_result,
+            calib_data=self.state_manager.calib_data,
+            controller_info=self._controller_info,
+        )
+
+        return execution_manager.update_with_task_manager(tm)
+
+    def _process_results(
+        self,
+        task: TaskProtocol,
+        execution_manager: "ExecutionManager",
+        postprocess_result: PostProcessResult,
+        qid: str,
+        run_result: RunResult,
+        session: SessionProtocol,
+    ) -> bool:
+        """Process task results including validation and persistence.
+
+        Parameters
+        ----------
+        task : TaskProtocol
+            The task
+        execution_manager : ExecutionManager
+            The execution manager
+        postprocess_result : PostProcessResult
+            The postprocess result
+        qid : str
+            The qubit ID
+        run_result : RunResult
+            The run result
+        session : SessionProtocol
+            The session
+
+        Returns
+        -------
+        bool
+            True if backend updates should be applied
+
+        """
+        task_name = task.get_name()
+        task_type = task.get_task_type()
+
+        # 1. Validate fidelity
+        if postprocess_result.output_parameters:
+            try:
+                self.result_processor.validate_fidelity(
+                    postprocess_result.output_parameters, task_name
+                )
+            except FidelityValidationError as e:
+                raise ValueError(str(e)) from e
+
+        # 2. Process output parameters
+        if postprocess_result.output_parameters:
+            task_model = self.state_manager.get_task(task_name, task_type, qid)
+            task.attach_task_id(task_model.task_id)
+
+            processed_params = self.result_processor.process_output_parameters(
+                postprocess_result.output_parameters,
+                task_name,
+                self.execution_id,
+                task_model.task_id,
+            )
+            self.state_manager.put_output_parameters(
+                task_name, processed_params, task_type, qid
+            )
+
+        # 3. Save figures
+        if postprocess_result.figures:
+            png_paths, json_paths = self.data_saver.save_figures(
+                postprocess_result.figures, task_name, task_type, qid
+            )
+            self.state_manager.set_figure_paths(
+                task_name, task_type, qid, png_paths, json_paths
+            )
+
+        # 4. Save raw data
+        if postprocess_result.raw_data:
+            raw_paths = self.data_saver.save_raw_data(
+                postprocess_result.raw_data, task_name, task_type, qid
+            )
+            self.state_manager.set_raw_data_paths(task_name, task_type, qid, raw_paths)
+
+        # 5. Validate R²
+        backend_success = True
+        if run_result.has_r2():
+            r2_value = run_result.r2.get(qid)
+            if r2_value is None:
+                backend_success = False
+            else:
+                try:
+                    self.result_processor.validate_r2(
+                        run_result.r2, qid, task.r2_threshold
+                    )
+                except R2ValidationError:
+                    # Clear output parameters on R² failure
+                    if postprocess_result.output_parameters:
+                        self.state_manager.clear_output_parameters(
+                            task_name, task_type, qid
+                        )
+                    raise ValueError(f"{task_name} R² value too low: {r2_value:.4f}")
+
+            if not backend_success and postprocess_result.output_parameters:
+                self.state_manager.clear_output_parameters(task_name, task_type, qid)
+
+        # 6. Backend-specific save processing
+        self._save_backend_specific(
+            task, execution_manager, qid, session, backend_success
+        )
+
+        return backend_success
+
+    def _save_backend_specific(
+        self,
+        task: TaskProtocol,
+        execution_manager: "ExecutionManager",
+        qid: str,
+        session: SessionProtocol,
+        success: bool,
+    ) -> None:
+        """Backend-specific save processing.
+
+        Parameters
+        ----------
+        task : TaskProtocol
+            The task
+        execution_manager : ExecutionManager
+            The execution manager
+        qid : str
+            The qubit ID
+        session : SessionProtocol
+            The session
+        success : bool
+            Whether backend updates should be applied
+
+        """
+        if task.backend == "qubex":
+            self._save_qubex_specific(task, execution_manager, qid, session, success)
+        elif task.backend == "fake":
+            self._save_fake_specific(task, execution_manager, qid, session, success)
+
+    def _save_qubex_specific(
+        self,
+        task: TaskProtocol,
+        execution_manager: "ExecutionManager",
+        qid: str,
+        session: SessionProtocol,
+        success: bool,
+    ) -> None:
+        """Qubex-specific save processing.
+
+        Parameters
+        ----------
+        task : TaskProtocol
+            The task
+        execution_manager : ExecutionManager
+            The execution manager
+        qid : str
+            The qubit ID
+        session : SessionProtocol
+            The session
+        success : bool
+            Whether backend updates should be applied
+
+        """
+        from qdash.dbmodel.coupling import CouplingDocument
+        from qdash.dbmodel.qubit import QubitDocument
+
+        task_name = task.get_name()
+        task_type = task.get_task_type()
+
+        # Get output parameters
+        task_model = self.state_manager.get_task(task_name, task_type, qid)
+        output_parameters = dict(task_model.output_parameters)
+
+        if not success:
+            logger.info(
+                "Skipping backend parameter updates for %s due to failed R² validation",
+                task_name,
+            )
+            # Still save to database even if R² failed
+            if output_parameters:
+                if task.is_qubit_task():
+                    QubitDocument.update_calib_data(
+                        username=self.username,
+                        qid=qid,
+                        chip_id=execution_manager.chip_id,
+                        output_parameters=output_parameters,
+                    )
+                elif task.is_coupling_task():
+                    CouplingDocument.update_calib_data(
+                        username=self.username,
+                        qid=qid,
+                        chip_id=execution_manager.chip_id,
+                        output_parameters=output_parameters,
+                    )
+            return
+
+        # Save calibration note
+        if session.name == "qubex":
+            session.update_note(
+                username=self.username,
+                chip_id=execution_manager.chip_id,
+                calib_dir=self.calib_dir,
+                execution_id=execution_manager.execution_id,
+                task_manager_id=self.task_manager_id,
+            )
+
+        # Update database
+        if output_parameters:
+            if task.is_qubit_task():
+                QubitDocument.update_calib_data(
+                    username=self.username,
+                    qid=qid,
+                    chip_id=execution_manager.chip_id,
+                    output_parameters=output_parameters,
+                )
+                self._update_backend_params(
+                    session, execution_manager, qid, output_parameters
+                )
+            elif task.is_coupling_task():
+                CouplingDocument.update_calib_data(
+                    username=self.username,
+                    qid=qid,
+                    chip_id=execution_manager.chip_id,
+                    output_parameters=output_parameters,
+                )
+
+    def _update_backend_params(
+        self,
+        session: SessionProtocol,
+        execution_manager: "ExecutionManager",
+        qid: str,
+        output_parameters: dict[str, Any],
+    ) -> None:
+        """Update backend parameters.
+
+        Parameters
+        ----------
+        session : SessionProtocol
+            The session
+        execution_manager : ExecutionManager
+            The execution manager
+        qid : str
+            The qubit ID
+        output_parameters : dict[str, Any]
+            Output parameters to update
+
+        """
+        updater = get_params_updater(session, execution_manager.chip_id)
+        if updater is None:
+            return
+        try:
+            updater.update(qid, output_parameters)
+        except Exception as exc:
+            logger.warning("Failed to update backend params for qid=%s: %s", qid, exc)
+
+    def _save_fake_specific(
+        self,
+        task: TaskProtocol,
+        execution_manager: "ExecutionManager",
+        qid: str,
+        session: SessionProtocol,
+        success: bool,
+    ) -> None:
+        """Fake-specific save processing.
+
+        Parameters
+        ----------
+        task : TaskProtocol
+            The task
+        execution_manager : ExecutionManager
+            The execution manager
+        qid : str
+            The qubit ID
+        session : SessionProtocol
+            The session
+        success : bool
+            Whether backend updates should be applied
+
+        """
+        # Simulation metadata save, etc. (implement as needed)
+        pass
 
     def _run_preprocess(
         self,

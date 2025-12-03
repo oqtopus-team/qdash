@@ -24,10 +24,12 @@ class MockTask:
         name: str = "CheckRabi",
         task_type: str = "qubit",
         r2_threshold: float = 0.7,
+        backend: str = "fake",
     ):
         self.name = name
         self._task_type = task_type
         self.r2_threshold = r2_threshold
+        self.backend = backend
 
     def get_name(self) -> str:
         return self.name
@@ -77,6 +79,7 @@ class TestTaskExecutorInit:
             state_manager=state_manager,
             calib_dir="/tmp/calib",
             execution_id="exec-001",
+            task_manager_id="tm-001",
             result_processor=result_processor,
             data_saver=data_saver,
         )
@@ -85,6 +88,7 @@ class TestTaskExecutorInit:
         assert executor.result_processor == result_processor
         assert executor.data_saver == data_saver
         assert executor.execution_id == "exec-001"
+        assert executor.task_manager_id == "tm-001"
 
     def test_init_creates_default_dependencies(self):
         """Test initialization creates default dependencies if not provided."""
@@ -94,6 +98,7 @@ class TestTaskExecutorInit:
             state_manager=state_manager,
             calib_dir="/tmp/calib",
             execution_id="exec-001",
+            task_manager_id="tm-001",
         )
 
         assert executor.result_processor is not None
@@ -142,6 +147,7 @@ class TestTaskExecutorExecuteTask:
             state_manager=mock_state_manager,
             calib_dir="/tmp/calib",
             execution_id="exec-001",
+            task_manager_id="tm-001",
             result_processor=mock_result_processor,
             data_saver=mock_data_saver,
         )
@@ -326,6 +332,7 @@ class TestTaskExecutorHelperMethods:
             state_manager=state_manager,
             calib_dir="/tmp/calib",
             execution_id="exec-001",
+            task_manager_id="tm-001",
         )
 
     def test_run_preprocess_returns_result(self, executor):
@@ -410,6 +417,7 @@ class TestCouplingTask:
             state_manager=state_manager,
             calib_dir="/tmp/calib",
             execution_id="exec-001",
+            task_manager_id="tm-001",
             result_processor=result_processor,
             data_saver=data_saver,
         )

@@ -181,7 +181,11 @@ class MongoExecutionRepository:
 
                     # Update system_info timestamp
                     if hasattr(model, "system_info"):
-                        model.system_info["updated_at"] = SystemInfoModel().updated_at
+                        if isinstance(model.system_info, SystemInfoModel):
+                            model.system_info = model.system_info.model_copy()
+                            model.system_info.updated_at = SystemInfoModel().updated_at
+                        elif isinstance(model.system_info, dict):
+                            model.system_info["updated_at"] = SystemInfoModel().updated_at
 
                     # Prepare update operations
                     update_ops = self._build_update_ops(model)

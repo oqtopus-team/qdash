@@ -27,16 +27,29 @@ class MongoTaskResultHistoryRepository:
 class MongoChipRepository:
     """MongoDB implementation of ChipRepository."""
 
-    def get_current_chip(self, chip_id: str) -> dict:
-        """Get current chip data from MongoDB."""
-        chip = ChipDocument.get_current_chip(chip_id)
-        if chip is None:
-            logger.warning(f"Chip {chip_id} not found")
+    def get_current_chip(self, username: str) -> dict:
+        """Get current chip data from MongoDB.
+
+        Parameters
+        ----------
+        username : str
+            The username to look up the chip
+
+        Returns
+        -------
+        dict
+            Chip data with qubit and coupling keys
+
+        """
+        try:
+            chip = ChipDocument.get_current_chip(username=username)
+            return {
+                "qubit": chip.qubit or {},
+                "coupling": chip.coupling or {},
+            }
+        except ValueError:
+            logger.warning(f"Chip not found for user {username}")
             return {"qubit": {}, "coupling": {}}
-        return {
-            "qubit": chip.qubit or {},
-            "coupling": chip.coupling or {},
-        }
 
     def update_chip_data(
         self,
@@ -44,10 +57,22 @@ class MongoChipRepository:
         calib_data: CalibDataModel,
         username: str,
     ) -> None:
-        """Update chip calibration data in MongoDB."""
-        chip = ChipDocument.get_current_chip(chip_id)
-        if chip is None:
-            logger.warning(f"Chip {chip_id} not found, skipping update")
+        """Update chip calibration data in MongoDB.
+
+        Parameters
+        ----------
+        chip_id : str
+            The chip ID (for logging purposes)
+        calib_data : CalibDataModel
+            Calibration data to merge
+        username : str
+            The username to look up the chip
+
+        """
+        try:
+            chip = ChipDocument.get_current_chip(username=username)
+        except ValueError:
+            logger.warning(f"Chip not found for user {username}, skipping update")
             return
 
         # Merge qubit data

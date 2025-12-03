@@ -108,6 +108,7 @@ class FilesystemCalibDataSaver:
         task_name: str,
         task_type: str,
         qid: str,
+        output_dir: str | None = None,
     ) -> tuple[list[str], list[str]]:
         """Save figures as PNG and JSON files.
 
@@ -131,7 +132,7 @@ class FilesystemCalibDataSaver:
         if not figures:
             return [], []
 
-        fig_dir = Path(self.calib_dir) / "fig"
+        fig_dir = Path(output_dir) if output_dir else Path(self.calib_dir) / "fig"
         fig_dir.mkdir(parents=True, exist_ok=True)
 
         png_paths: list[str] = []
@@ -158,6 +159,7 @@ class FilesystemCalibDataSaver:
         task_name: str,
         task_type: str,
         qid: str,
+        output_dir: str | None = None,
     ) -> list[str]:
         """Save raw data as CSV files.
 
@@ -181,7 +183,7 @@ class FilesystemCalibDataSaver:
         if not raw_data:
             return []
 
-        raw_data_dir = Path(self.calib_dir) / "raw_data"
+        raw_data_dir = Path(output_dir) if output_dir else Path(self.calib_dir) / "raw_data"
         raw_data_dir.mkdir(parents=True, exist_ok=True)
 
         paths: list[str] = []

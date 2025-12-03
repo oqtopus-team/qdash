@@ -1,9 +1,15 @@
 # application code for the execution manager.
+"""ExecutionManager - Facade for execution lifecycle management.
+
+This module provides backward-compatible ExecutionManager that delegates
+to ExecutionService and ExecutionStateManager internally.
+"""
+
 import logging
-from collections.abc import Callable
 
 import pendulum
 from pydantic import BaseModel, Field
+
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionModel,
@@ -14,6 +20,12 @@ from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.tag import TagDocument
+from qdash.workflow.engine.calibration.execution_state_manager import (
+    ExecutionStateManager,
+)
+from qdash.workflow.engine.calibration.repository.mongo_execution import (
+    MongoExecutionRepository,
+)
 from qdash.workflow.engine.calibration.task_manager import TaskManager
 
 initialize()
@@ -23,8 +35,19 @@ logger.setLevel(logging.DEBUG)
 
 
 class ExecutionManager(BaseModel):
-    """ExecutionManager class to manage the execution of the calibration flow."""
+    """ExecutionManager class to manage the execution of the calibration flow.
 
+    This class now acts as a facade, delegating to ExecutionStateManager
+    for state management and MongoExecutionRepository for persistence.
+    The public API remains unchanged for backward compatibility.
+    """
+
+    # Internal state manager (handles pure state logic)
+    _state_manager: ExecutionStateManager | None = None
+    # Internal repository (handles persistence)
+    _repository: MongoExecutionRepository | None = None
+
+    # Public fields (for backward compatibility and Pydantic serialization)
     username: str = "admin"
     name: str = ""
     execution_id: str = ""
@@ -46,6 +69,8 @@ class ExecutionManager(BaseModel):
     message: str = ""
     system_info: SystemInfoModel = SystemInfoModel()
 
+    model_config = {"arbitrary_types_allowed": True}
+
     def __init__(
         self,
         username: str,
@@ -56,7 +81,7 @@ class ExecutionManager(BaseModel):
         chip_id: str = "",
         name: str = "default",
         note: dict = {},
-        **kwargs,  # noqa: ANN003
+        **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.username = username
@@ -68,150 +93,72 @@ class ExecutionManager(BaseModel):
         self.chip_id = chip_id
         self.note = note
 
-    def _with_db_transaction(self, func: Callable[["ExecutionManager"], None]) -> None:
-        """Execute the function within a MongoDB transaction."""
-        import os
+        # Initialize internal components
+        self._state_manager = ExecutionStateManager(
+            username=username,
+            name=name,
+            execution_id=execution_id,
+            calib_data_path=calib_data_path,
+            note=note,
+            status=ExecutionStatusModel.SCHEDULED,
+            tags=tags,
+            fridge_info=fridge_info,
+            chip_id=chip_id,
+        )
+        self._repository = MongoExecutionRepository()
 
-        from pymongo import MongoClient, ReturnDocument
+    def _sync_from_state_manager(self) -> None:
+        """Sync public fields from internal state manager."""
+        if self._state_manager:
+            self.username = self._state_manager.username
+            self.name = self._state_manager.name
+            self.execution_id = self._state_manager.execution_id
+            self.calib_data_path = self._state_manager.calib_data_path
+            self.note = self._state_manager.note
+            self.status = self._state_manager.status
+            self.task_results = self._state_manager.task_results
+            self.tags = self._state_manager.tags
+            self.controller_info = self._state_manager.controller_info
+            self.fridge_info = self._state_manager.fridge_info
+            self.chip_id = self._state_manager.chip_id
+            self.start_at = self._state_manager.start_at
+            self.end_at = self._state_manager.end_at
+            self.elapsed_time = self._state_manager.elapsed_time
+            self.calib_data = self._state_manager.calib_data
+            self.message = self._state_manager.message
+            self.system_info = self._state_manager.system_info
 
-        try:
-            client: MongoClient = MongoClient(
-                "mongo",  # Docker service name
-                port=27017,  # Docker internal port
-                username=os.getenv("MONGO_INITDB_ROOT_USERNAME"),
-                password=os.getenv("MONGO_INITDB_ROOT_PASSWORD"),
-            )
-            # Get collection
-            collection = client.qubex[ExecutionHistoryDocument.Settings.name]
-
-            # Define array_filters for nested updates (currently unused)
-            # array_filters = []
-
-            # First, ensure the document exists with initial structure
-            collection.update_one(
-                {"execution_id": self.execution_id},
-                {
-                    "$setOnInsert": {
-                        "username": self.username,
-                        "name": self.name,
-                        "execution_id": self.execution_id,
-                        "calib_data_path": self.calib_data_path,
-                        "note": {},
-                        "status": ExecutionStatusModel.SCHEDULED,
-                        "task_results": {},
-                        "tags": [],
-                        "controller_info": {},
-                        "fridge_info": {},
-                        "chip_id": "",
-                        "start_at": "",
-                        "end_at": "",
-                        "elapsed_time": "",
-                        "calib_data": {"qubit": {}, "coupling": {}},
-                        "message": "",
-                        "system_info": {},
-                    }
-                },
-                upsert=True,
-            )
-
-            # Get latest document and apply updates
-            while True:
-                try:
-                    # Get current state
-                    doc = collection.find_one({"execution_id": self.execution_id})
-                    if doc is None:
-                        instance = self
-                    else:
-                        instance = ExecutionManager.model_validate(doc)
-
-                    # Execute update function
-                    func(instance)
-                    instance.system_info.update_time()
-
-                    # Convert to dict
-                    update_data = instance.to_datamodel().model_dump()
-
-                    # Prepare update operations
-                    update_ops = {
-                        "$set": {
-                            "username": update_data["username"],
-                            "name": update_data["name"],
-                            "calib_data_path": update_data["calib_data_path"],
-                            "note": update_data["note"],
-                            "status": update_data["status"],
-                            "tags": update_data["tags"],
-                            "chip_id": update_data["chip_id"],
-                            "start_at": update_data["start_at"],
-                            "end_at": update_data["end_at"],
-                            "elapsed_time": update_data["elapsed_time"],
-                            "message": update_data["message"],
-                            "system_info": update_data["system_info"],
-                        }
-                    }
-
-                    # Merge task_results
-                    if update_data["task_results"]:
-                        for k, v in update_data["task_results"].items():
-                            update_ops["$set"][f"task_results.{k}"] = v
-
-                    # Merge controller_info
-                    if update_data["controller_info"]:
-                        for k, v in update_data["controller_info"].items():
-                            update_ops["$set"][f"controller_info.{k}"] = v
-
-                    # Merge fridge_info
-                    if update_data["fridge_info"]:
-                        for k, v in update_data["fridge_info"].items():
-                            update_ops["$set"][f"fridge_info.{k}"] = v
-
-                    # Merge calibration data
-                    if update_data["calib_data"].get("qubit"):
-                        for qid, data in update_data["calib_data"]["qubit"].items():
-                            update_ops["$set"][f"calib_data.qubit.{qid}"] = data
-
-                    if update_data["calib_data"].get("coupling"):
-                        for qid, data in update_data["calib_data"]["coupling"].items():
-                            update_ops["$set"][f"calib_data.coupling.{qid}"] = data
-
-                    # Try to update with optimistic locking
-                    result = collection.find_one_and_update(
-                        {
-                            "execution_id": self.execution_id,
-                            "$or": [
-                                {"_version": {"$exists": False}},
-                                {"_version": doc.get("_version", 0) if doc else 0},
-                            ],
-                        },
-                        {
-                            **update_ops,
-                            "$inc": {"_version": 1},
-                        },
-                        return_document=ReturnDocument.AFTER,
-                    )
-
-                    if result is not None:
-                        # Update successful
-                        break
-
-                    # If update failed, retry with latest document
-                    logger.info("Retrying update due to concurrent modification")
-                    continue
-
-                except Exception as e:
-                    logger.error(f"Error during update retry: {e}")
-                    raise
-
-        except Exception as e:
-            logger.error(f"DB transaction failed: {e}")
-            raise
+    def _sync_to_state_manager(self) -> None:
+        """Sync public fields to internal state manager."""
+        if self._state_manager:
+            self._state_manager.username = self.username
+            self._state_manager.name = self.name
+            self._state_manager.execution_id = self.execution_id
+            self._state_manager.calib_data_path = self.calib_data_path
+            self._state_manager.note = self.note
+            self._state_manager.status = self.status
+            self._state_manager.task_results = self.task_results
+            self._state_manager.tags = self.tags
+            self._state_manager.controller_info = self.controller_info
+            self._state_manager.fridge_info = self.fridge_info
+            self._state_manager.chip_id = self.chip_id
+            self._state_manager.start_at = self.start_at
+            self._state_manager.end_at = self.end_at
+            self._state_manager.elapsed_time = self.elapsed_time
+            self._state_manager.calib_data = self.calib_data
+            self._state_manager.message = self.message
+            self._state_manager.system_info = self.system_info
 
     def update_status(self, new_status: ExecutionStatusModel) -> None:
         """Update the status of the execution."""
-
-        def updater(instance: ExecutionManager) -> None:
-            instance.status = new_status
-
-        self._with_db_transaction(updater)
+        if self._state_manager and self._repository:
+            self._state_manager.update_status(new_status)
+            self._repository.update_with_optimistic_lock(
+                execution_id=self.execution_id,
+                update_func=lambda m: setattr(m, "status", new_status),
+                initial_model=self._state_manager.to_datamodel(),
+            )
+            self._sync_from_state_manager()
 
     def update_execution_status_to_running(self) -> "ExecutionManager":
         self.update_status(ExecutionStatusModel.RUNNING)
@@ -227,93 +174,141 @@ class ExecutionManager(BaseModel):
 
     def reload(self) -> "ExecutionManager":
         """Reload the execution manager from the database."""
-        doc = ExecutionHistoryDocument.find_one({"execution_id": self.execution_id}).run()
-        if doc is None:
-            # 初回の場合は現在のインスタンスを保存
-            ExecutionHistoryDocument.upsert_document(self.to_datamodel())
-            return self
-        return ExecutionManager.model_validate(doc.model_dump())
+        if self._repository:
+            model = self._repository.find_by_id(self.execution_id)
+            if model is None:
+                # First time - save current instance
+                ExecutionHistoryDocument.upsert_document(self.to_datamodel())
+                return self
+
+            # Update state manager from loaded model
+            self._state_manager = ExecutionStateManager.from_datamodel(model)
+            self._sync_from_state_manager()
+        return self
 
     def update_with_task_manager(self, task_manager: TaskManager) -> "ExecutionManager":
-        def updater(updated: ExecutionManager) -> None:
-            # Update task results
-            updated.task_results[task_manager.id] = task_manager.task_result
+        """Update execution with task manager results."""
+        if self._state_manager and self._repository:
+            # Merge task result
+            self._state_manager.merge_task_result(task_manager.id, task_manager.task_result)
 
-            # Merge calibration data instead of overwriting
-            for qid in task_manager.calib_data.qubit:
-                if qid not in updated.calib_data.qubit:
-                    updated.calib_data.qubit[qid] = {}
-                updated.calib_data.qubit[qid].update(task_manager.calib_data.qubit[qid])
+            # Merge calibration data
+            self._state_manager.merge_calib_data(task_manager.calib_data)
 
-            for qid in task_manager.calib_data.coupling:
-                if qid not in updated.calib_data.coupling:
-                    updated.calib_data.coupling[qid] = {}
-                updated.calib_data.coupling[qid].update(task_manager.calib_data.coupling[qid])
+            # Merge controller info
+            self._state_manager.merge_controller_info(task_manager.controller_info)
 
-            # Update controller info
-            for _id in task_manager.controller_info:
-                updated.controller_info[_id] = task_manager.controller_info[_id]
+            # Persist with optimistic locking
+            def updater(model: ExecutionModel) -> None:
+                # Update task results
+                model.task_results[task_manager.id] = task_manager.task_result
 
-            # Note: Calibration notes are now updated directly in session.update_note()
-            # No need for additional merge processing here
+                # Merge calibration data
+                if isinstance(model.calib_data, dict):
+                    for qid, data in task_manager.calib_data.qubit.items():
+                        model.calib_data.setdefault("qubit", {}).setdefault(qid, {}).update(
+                            data if isinstance(data, dict) else {}
+                        )
+                    for qid, data in task_manager.calib_data.coupling.items():
+                        model.calib_data.setdefault("coupling", {}).setdefault(qid, {}).update(
+                            data if isinstance(data, dict) else {}
+                        )
 
-        self._with_db_transaction(updater)
+                # Update controller info
+                for _id, info in task_manager.controller_info.items():
+                    model.controller_info[_id] = info
+
+            self._repository.update_with_optimistic_lock(
+                execution_id=self.execution_id,
+                update_func=updater,
+                initial_model=self._state_manager.to_datamodel(),
+            )
+
+            self._sync_from_state_manager()
         return self.reload()
 
     def calculate_elapsed_time(self, start_at: str, end_at: str) -> str:
+        """Calculate elapsed time between two timestamps."""
         try:
             start_time = pendulum.parse(start_at)
             end_time = pendulum.parse(end_at)
         except Exception as e:
             raise ValueError(f"Failed to parse the time. {e}")
-        return end_time.diff_for_humans(start_time, absolute=True)  # type: ignore #noqa: PGH003
+        return end_time.diff_for_humans(start_time, absolute=True)  # type: ignore
 
     def start_execution(self) -> "ExecutionManager":
         """Start the execution and set the start time."""
+        if self._state_manager and self._repository:
+            self._state_manager.start()
 
-        def updater(instance: ExecutionManager) -> None:
-            instance.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+            def updater(model: ExecutionModel) -> None:
+                model.start_at = self._state_manager.start_at
+                model.status = ExecutionStatusModel.RUNNING
 
-        self._with_db_transaction(updater)
+            self._repository.update_with_optimistic_lock(
+                execution_id=self.execution_id,
+                update_func=updater,
+                initial_model=self._state_manager.to_datamodel(),
+            )
+
+            self._sync_from_state_manager()
         return self.reload()
 
     def complete_execution(self) -> "ExecutionManager":
         """Complete the execution with success status."""
+        if self._state_manager and self._repository:
+            self._state_manager.complete()
 
-        def updater(instance: ExecutionManager) -> None:
-            # 終了時刻を設定
-            end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-            instance.end_at = end_at
-            instance.elapsed_time = instance.calculate_elapsed_time(instance.start_at, end_at)
-            # 完了状態を設定
-            instance.status = ExecutionStatusModel.COMPLETED
+            def updater(model: ExecutionModel) -> None:
+                model.end_at = self._state_manager.end_at
+                model.elapsed_time = self._state_manager.elapsed_time
+                model.status = ExecutionStatusModel.COMPLETED
 
-        self._with_db_transaction(updater)
+            self._repository.update_with_optimistic_lock(
+                execution_id=self.execution_id,
+                update_func=updater,
+                initial_model=self._state_manager.to_datamodel(),
+            )
+
+            self._sync_from_state_manager()
         return self.reload()
 
     def fail_execution(self) -> "ExecutionManager":
         """Complete the execution with failure status."""
+        if self._state_manager and self._repository:
+            self._state_manager.fail()
 
-        def updater(instance: ExecutionManager) -> None:
-            # 終了時刻を設定
-            end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-            instance.end_at = end_at
-            instance.elapsed_time = instance.calculate_elapsed_time(instance.start_at, end_at)
-            # 失敗状態を設定
-            instance.status = ExecutionStatusModel.FAILED
+            def updater(model: ExecutionModel) -> None:
+                model.end_at = self._state_manager.end_at
+                model.elapsed_time = self._state_manager.elapsed_time
+                model.status = ExecutionStatusModel.FAILED
 
-        self._with_db_transaction(updater)
+            self._repository.update_with_optimistic_lock(
+                execution_id=self.execution_id,
+                update_func=updater,
+                initial_model=self._state_manager.to_datamodel(),
+            )
+
+            self._sync_from_state_manager()
         return self.reload()
 
     def save(self) -> "ExecutionManager":
         """Save the execution manager to the database."""
-        ExecutionHistoryDocument.upsert_document(self.to_datamodel())
+        if self._repository:
+            self._sync_to_state_manager()
+            self._repository.save(self.to_datamodel())
+
         # Auto-register tags to TagDocument for UI tag selector
         if self.tags:
             TagDocument.insert_tags(self.tags, self.username)
         return self
 
     def to_datamodel(self) -> ExecutionModel:
+        """Convert to ExecutionModel for persistence."""
+        if self._state_manager:
+            return self._state_manager.to_datamodel()
+
+        # Fallback for cases where state manager is not initialized
         return ExecutionModel(
             username=self.username,
             name=self.name,

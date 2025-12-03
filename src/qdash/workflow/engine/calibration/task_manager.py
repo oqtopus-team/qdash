@@ -2,42 +2,32 @@
 
 This facade provides the same public interface as the original TaskManager,
 keeping task_result, calib_data, and controller_info as regular Pydantic fields
-that can be assigned directly, while delegating complex logic to extracted components.
+that can be assigned directly, while delegating complex logic to TaskExecutor.
+
+The TaskManager now acts as a thin wrapper that:
+1. Maintains state via TaskStateManager
+2. Delegates task execution to TaskExecutor
+3. Records history via TaskHistoryRecorder
+4. Saves data via FilesystemCalibDataSaver
 """
 
 import json
 import logging
 import uuid
-from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
-import numpy as np
-import pendulum
-import plotly.graph_objs as go
-from numpy import ndarray
 from pydantic import BaseModel, Field
 
 from qdash.datamodel.task import (
-    BaseTaskResultModel,
     CalibDataModel,
-    CouplingTaskModel,
-    GlobalTaskModel,
-    OutputParameterModel,
-    QubitTaskModel,
-    SystemTaskModel,
     TaskResultModel,
     TaskStatusModel,
 )
-from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-from qdash.workflow.engine.calibration.params_updater import get_params_updater
-from qdash.workflow.engine.calibration.task_executor import TaskExecutor, TaskExecutionError
+from qdash.workflow.engine.calibration.repository import FilesystemCalibDataSaver
+from qdash.workflow.engine.calibration.task_executor import TaskExecutor
 from qdash.workflow.engine.calibration.task_history_recorder import TaskHistoryRecorder
-from qdash.workflow.engine.calibration.task_result_processor import (
-    FidelityValidationError,
-    R2ValidationError,
-    TaskResultProcessor,
-)
+from qdash.workflow.engine.calibration.task_result_processor import TaskResultProcessor
 from qdash.workflow.engine.calibration.task_state_manager import TaskStateManager
 
 logger = logging.getLogger(__name__)
@@ -51,9 +41,12 @@ if TYPE_CHECKING:
 class TaskManager(BaseModel):
     """Task manager facade with backward-compatible interface.
 
-    This class maintains backward compatibility by keeping task_result, calib_data,
-    and controller_info as regular Pydantic fields (which can be assigned directly),
-    while delegating complex operations to extracted components internally.
+    This class acts as a thin facade, delegating to internal components:
+    - TaskStateManager: state management (task_result, calib_data, status)
+    - TaskExecutor: task execution lifecycle
+    - TaskResultProcessor: R² and fidelity validation
+    - TaskHistoryRecorder: history recording to MongoDB
+    - FilesystemCalibDataSaver: figure and raw data saving
 
     Attributes
     ----------
@@ -70,19 +63,25 @@ class TaskManager(BaseModel):
     username: str = "admin"
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     execution_id: str
-    # Keep these as regular Pydantic fields for backward compatibility
     task_result: TaskResultModel = Field(default_factory=TaskResultModel)
     calib_data: CalibDataModel = Field(default_factory=lambda: CalibDataModel(qubit={}, coupling={}))
     calib_dir: str = ""
     controller_info: dict[str, dict] = Field(default_factory=dict)
 
-    # Internal state manager for delegating state operations
+    # Upstream task ID for dependency tracking (set by session.py)
+    _upstream_task_id: str = ""
+
+    # Internal components
     _state_manager: TaskStateManager | None = None
+    _executor: TaskExecutor | None = None
+    _result_processor: TaskResultProcessor | None = None
+    _history_recorder: TaskHistoryRecorder | None = None
+    _data_saver: FilesystemCalibDataSaver | None = None
 
     model_config = {"arbitrary_types_allowed": True}
 
     def __init__(self, username: str, execution_id: str, qids: list[str] = [], calib_dir: str = ".") -> None:
-        """Initialize TaskManager with backward-compatible interface.
+        """Initialize TaskManager.
 
         Parameters
         ----------
@@ -104,6 +103,27 @@ class TaskManager(BaseModel):
             calib_dir=calib_dir,
             controller_info={},
         )
+
+        # Initialize state manager
+        self._state_manager = TaskStateManager(qids=qids)
+
+        # Initialize other components
+        self._result_processor = TaskResultProcessor()
+        self._history_recorder = TaskHistoryRecorder()
+        self._data_saver = FilesystemCalibDataSaver(calib_dir)
+
+        # Initialize executor (needs state manager)
+        self._executor = TaskExecutor(
+            state_manager=self._state_manager,
+            calib_dir=calib_dir,
+            execution_id=execution_id,
+            task_manager_id=self.id,
+            username=username,
+            result_processor=self._result_processor,
+            history_recorder=self._history_recorder,
+            data_saver=self._data_saver,
+        )
+
         # Initialize containers for each qid
         for qid in qids:
             self.task_result.qubit_tasks[qid] = []
@@ -114,10 +134,47 @@ class TaskManager(BaseModel):
                 self.calib_data.coupling[qid] = {}
             else:
                 raise ValueError(f"Unknown qubit format: {qid}")
-            self.calib_dir = calib_dir
+
+        # Sync with state manager
+        self._sync_to_state_manager()
+
+    def __setattr__(self, name, value) -> None:  # type: ignore[override]
+        """Intercept attribute assignments to keep internal components in sync."""
+        super().__setattr__(name, value)
+
+        if name == "id":
+            executor = self.__dict__.get("_executor")
+            if executor is not None:
+                executor.task_manager_id = value
+        elif name == "controller_info":
+            executor = self.__dict__.get("_executor")
+            if executor is not None:
+                executor.set_controller_info(value)
+        elif name == "_upstream_task_id":
+            state_manager = self.__dict__.get("_state_manager")
+            if state_manager is not None:
+                state_manager.set_upstream_task_id(value)
+
+    # ========== State Synchronization ==========
+
+    def _sync_from_state_manager(self) -> None:
+        """Sync public fields from internal state manager."""
+        if self._state_manager:
+            self.task_result = self._state_manager.task_result
+            self.calib_data = self._state_manager.calib_data
+
+    def _sync_to_state_manager(self) -> None:
+        """Sync public fields to internal state manager."""
+        if self._state_manager:
+            self._state_manager.task_result = self.task_result
+            self._state_manager.calib_data = self.calib_data
+            # Sync upstream_task_id for dependency tracking
+            self._state_manager.set_upstream_task_id(self._upstream_task_id)
+
+    # ========== Format Checking ==========
 
     def _is_qubit_format(self, qid: str) -> bool:
-        """Check if qid is in qubit format (not coupling)."""
+        """Check if qid is in qubit format."""
         if "-" in qid:
             return False
         return qid in self.task_result.qubit_tasks
@@ -126,96 +183,72 @@ class TaskManager(BaseModel):
         """Check if qid is in coupling format."""
         return qid in self.task_result.coupling_tasks
 
-    def _get_task_container(
-        self, task_type: str, qid: str = ""
-    ) -> list[GlobalTaskModel] | list[QubitTaskModel] | list[CouplingTaskModel] | list[SystemTaskModel]:
-        """Get task container based on task type and qid."""
-        container: list[GlobalTaskModel] | list[QubitTaskModel] | list[CouplingTaskModel] | list[SystemTaskModel]
-        if task_type == "system":
-            return self.task_result.system_tasks
-        if task_type == "global":
-            return self.task_result.global_tasks
-        if task_type == "qubit":
-            if qid is None:
-                error_message = "For qubit tasks, a qid must be provided."
-                raise ValueError(error_message)
-            container = self.task_result.qubit_tasks[qid]
-            if container is None:
-                error_message = f"No tasks found for qubit '{qid}'."
-                raise ValueError(error_message)
-            return container
-        if task_type == "coupling":
-            if qid is None:
-                error_message = "For coupling tasks, a qid must be provided."
-                raise ValueError(error_message)
-            container = self.task_result.coupling_tasks[qid]
-            if container is None:
-                error_message = f"No tasks found for coupling with qid '{qid}'."
-                raise ValueError(error_message)
-            return container
-        error_message = f"Unknown task type: {task_type}"
-        raise ValueError(error_message)
+    # ========== Internal Methods (delegated to state manager) ==========
 
-    def get_task(self, task_name: str, task_type: str = "global", qid: str = "") -> BaseTaskResultModel:
+    def _ensure_task_exists(self, task_name: str, task_type: str, qid: str) -> Any:
+        """Ensure a task exists in the appropriate container.
+
+        Parameters
+        ----------
+        task_name : str
+            Name of the task
+        task_type : str
+            Type of task (qubit, coupling, global, system)
+        qid : str
+            Qubit ID (empty for global/system tasks)
+
+        Returns
+        -------
+        BaseTaskResultModel
+            The existing or newly created task
+
+        """
+        self._sync_to_state_manager()
+        result = self._state_manager._ensure_task_exists(task_name, task_type, qid)
+        self._sync_from_state_manager()
+        return result
+
+    def _resolve_conflict(self, filepath: Path) -> Path:
+        """Resolve filename conflicts by incrementing suffix.
+
+        Parameters
+        ----------
+        filepath : Path
+            Original file path
+
+        Returns
+        -------
+        Path
+            Resolved path with incremented suffix if needed
+
+        """
+        if self._data_saver:
+            return self._data_saver._resolve_conflict(filepath)
+        # Fallback implementation if data saver not available
+        if not filepath.exists():
+            return filepath
+        stem = filepath.stem
+        suffix = filepath.suffix
+        parent = filepath.parent
+        counter = 1
+        while True:
+            new_path = parent / f"{stem}_{counter}{suffix}"
+            if not new_path.exists():
+                return new_path
+            counter += 1
+
+    # ========== Task State Methods (delegated to state manager) ==========
+
+    def get_task(self, task_name: str, task_type: str = "global", qid: str = "") -> Any:
         """Get a task by name and type."""
-        container = self._get_task_container(task_type, qid)
-        return self._find_task_in_container(container, task_name)
-
-    def _update_task_status_in_container(
-        self, container: list, task_name: str, new_status: TaskStatusModel, message: str
-    ) -> None:
-        """Update the status of a task with the given name to the new status."""
-        for t in container:
-            if t.name == task_name:
-                t.status = new_status
-                t.message = message
-                t.system_info.update_time()
-                return
-        raise ValueError(f"Task '{task_name}' not found in container.")
-
-    def _ensure_task_exists(self, task_name: str, task_type: str = "global", qid: str = "") -> None:
-        """Ensure task exists in task_result, add if not present."""
-        container = self._get_task_container(task_type, qid)
-        # Check if task already exists
-        for t in container:
-            if t.name == task_name:
-                return  # Task already exists
-
-        # Get upstream task ID from Prefect context
-        upstream_id = self._get_upstream_task_id()
-
-        # Task doesn't exist, add it
-        if task_type == "qubit":
-            task = QubitTaskModel(name=task_name, upstream_id=upstream_id, qid=qid)
-            self.task_result.qubit_tasks.setdefault(qid, []).append(task)
-        elif task_type == "coupling":
-            task = CouplingTaskModel(name=task_name, upstream_id=upstream_id, qid=qid)
-            self.task_result.coupling_tasks.setdefault(qid, []).append(task)
-        elif task_type == "global":
-            task = GlobalTaskModel(name=task_name, upstream_id=upstream_id)
-            self.task_result.global_tasks.append(task)
-        elif task_type == "system":
-            task = SystemTaskModel(name=task_name, upstream_id=upstream_id)
-            self.task_result.system_tasks.append(task)
-
-    def _get_upstream_task_id(self) -> str:
-        """Get upstream task ID (QDash task_id, not Prefect ID)."""
-        # Check if upstream_task_id was explicitly set
-        if hasattr(self, "_upstream_task_id"):
-            return self._upstream_task_id
-        return ""
+        self._sync_to_state_manager()
+        return self._state_manager.get_task(task_name, task_type, qid)
 
     def start_task(self, task_name: str, task_type: str = "global", qid: str = "") -> None:
-        """Start a task by setting its status to RUNNING."""
-        container = self._get_task_container(task_type, qid)
-        for t in container:
-            if t.name == task_name:
-                t.status = TaskStatusModel.RUNNING
-                t.message = f"{task_name} is running."
-                t.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-                t.system_info.update_time()
-                return
-        raise ValueError(f"Task '{task_name}' not found in container.")
+        """Start a task."""
+        self._sync_to_state_manager()
+        self._state_manager.start_task(task_name, task_type, qid)
+        self._sync_from_state_manager()
 
     def start_all_qid_tasks(self, task_name: str, task_type: str = "qubit", qids: list[str] = []) -> None:
         """Start a task for all given qubit IDs."""
@@ -223,15 +256,10 @@ class TaskManager(BaseModel):
             self.start_task(task_name, task_type, qid)
 
     def end_task(self, task_name: str, task_type: str = "global", qid: str = "") -> None:
-        """End a task by recording end time and elapsed time."""
-        container = self._get_task_container(task_type, qid)
-        for t in container:
-            if t.name == task_name:
-                t.end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-                t.elapsed_time = t.calculate_elapsed_time(t.start_at, t.end_at)
-                t.system_info.update_time()
-                return
-        raise ValueError(f"Task '{task_name}' not found in container.")
+        """End a task."""
+        self._sync_to_state_manager()
+        self._state_manager.end_task(task_name, task_type, qid)
+        self._sync_from_state_manager()
 
     def end_all_qid_tasks(self, task_name: str, task_type: str = "qubit", qids: list[str] = []) -> None:
         """End a task for all given qubit IDs."""
@@ -246,328 +274,212 @@ class TaskManager(BaseModel):
         task_type: str = "global",
         qid: str = "",
     ) -> None:
-        """Update the status of a task with the given name to the new status."""
-        container = self._get_task_container(task_type, qid)
-        self._update_task_status_in_container(container, task_name, new_status, message)
+        """Update task status."""
+        self._sync_to_state_manager()
+        self._state_manager.update_task_status(task_name, new_status, message, task_type, qid)
+        self._sync_from_state_manager()
 
     def update_task_status_to_running(
         self, task_name: str, message: str = "", task_type: str = "global", qid: str = ""
     ) -> None:
         """Update task status to RUNNING."""
-        self.update_task_status(
-            task_name=task_name,
-            new_status=TaskStatusModel.RUNNING,
-            message=message,
-            task_type=task_type,
-            qid=qid,
-        )
+        self.update_task_status(task_name, TaskStatusModel.RUNNING, message, task_type, qid)
 
     def update_task_status_to_completed(
         self, task_name: str, message: str = "", task_type: str = "global", qid: str = ""
     ) -> None:
         """Update task status to COMPLETED."""
-        self.update_task_status(
-            task_name=task_name,
-            new_status=TaskStatusModel.COMPLETED,
-            message=message,
-            task_type=task_type,
-            qid=qid,
-        )
+        self.update_task_status(task_name, TaskStatusModel.COMPLETED, message, task_type, qid)
 
     def update_task_status_to_failed(
         self, task_name: str, message: str = "", task_type: str = "global", qid: str = ""
     ) -> None:
         """Update task status to FAILED."""
-        self.update_task_status(
-            task_name=task_name,
-            new_status=TaskStatusModel.FAILED,
-            message=message,
-            task_type=task_type,
-            qid=qid,
-        )
+        self.update_task_status(task_name, TaskStatusModel.FAILED, message, task_type, qid)
 
     def update_task_status_to_skipped(
         self, task_name: str, message: str = "", task_type: str = "global", qid: str = ""
     ) -> None:
         """Update task status to SKIPPED."""
-        self.update_task_status(
-            task_name=task_name,
-            new_status=TaskStatusModel.SKIPPED,
-            message=message,
-            task_type=task_type,
-            qid=qid,
-        )
+        self.update_task_status(task_name, TaskStatusModel.SKIPPED, message, task_type, qid)
 
     def update_all_qid_task_status_to_running(
         self, task_name: str, message: str = "", task_type: str = "qubit", qids: list[str] = []
     ) -> None:
-        """Update task status to RUNNING for all given qubit IDs."""
+        """Update task status to RUNNING for all qids."""
         for qid in qids:
-            self.update_task_status_to_running(task_name=task_name, message=message, task_type=task_type, qid=qid)
+            self.update_task_status_to_running(task_name, message, task_type, qid)
 
     def update_all_qid_task_status_to_completed(
         self, task_name: str, message: str = "", task_type: str = "qubit", qids: list[str] = []
     ) -> None:
-        """Update task status to COMPLETED for all given qubit IDs."""
+        """Update task status to COMPLETED for all qids."""
         for qid in qids:
-            self.update_task_status_to_completed(task_name=task_name, message=message, task_type=task_type, qid=qid)
+            self.update_task_status_to_completed(task_name, message, task_type, qid)
 
     def update_all_qid_task_status_to_failed(
         self, task_name: str, message: str = "", task_type: str = "qubit", qids: list[str] = []
     ) -> None:
-        """Update task status to FAILED for all given qubit IDs."""
+        """Update task status to FAILED for all qids."""
         for qid in qids:
-            self.update_task_status_to_failed(task_name=task_name, message=message, task_type=task_type, qid=qid)
+            self.update_task_status_to_failed(task_name, message, task_type, qid)
 
     def update_not_executed_tasks_to_skipped(self, task_type: str = "global", qid: str = "") -> None:
-        """Mark all scheduled tasks as skipped."""
-        container = self._get_task_container(task_type, qid)
-        for t in container:
-            if t.status not in {TaskStatusModel.COMPLETED, TaskStatusModel.FAILED}:
-                t.status = TaskStatusModel.SKIPPED
-                t.message = f"{t.name} is skipped."
-                t.system_info.update_time()
+        """Mark unexecuted tasks as skipped."""
+        self._sync_to_state_manager()
+        self._state_manager.update_not_executed_tasks_to_skipped(task_type, qid)
+        self._sync_from_state_manager()
 
-    def _find_task_in_container(
-        self,
-        container: list[GlobalTaskModel] | list[QubitTaskModel] | list[CouplingTaskModel],
-        task_name: str,
-    ) -> BaseTaskResultModel:
-        """Find a task in a container by name."""
-        for t in container:
-            if t.name == task_name:
-                return t
-        raise ValueError(f"Task '{task_name}' not found in container.")
+    # ========== Parameter Methods (delegated to state manager) ==========
 
     def put_input_parameters(
         self, task_name: str, input_parameters: dict, task_type: str = "global", qid: str = ""
     ) -> None:
-        """Store input parameters for a task."""
-        container = self._get_task_container(task_type, qid)
-        task = self._find_task_in_container(container, task_name)
-        if task is None:
-            raise ValueError(f"Task '{task_name}' not found.")
-        task.put_input_parameter(input_parameters)
-        task.system_info.update_time()
+        """Store input parameters."""
+        self._sync_to_state_manager()
+        self._state_manager.put_input_parameters(task_name, input_parameters, task_type, qid)
+        self._sync_from_state_manager()
 
     def put_output_parameters(
         self, task_name: str, output_parameters: dict, task_type: str = "global", qid: str = ""
     ) -> None:
-        """Store output parameters for a task and update calibration data."""
-        container = self._get_task_container(task_type, qid)
-        task = self._find_task_in_container(container, task_name)
-        if task is None:
-            raise ValueError(f"Task '{task_name}' not found.")
-        task.put_output_parameter(output_parameters)
-        task.system_info.update_time()
-        self._put_calib_data(qid, task_type, output_parameters)
-
-    def _put_calib_data(self, qid: str, task_type: str, output_parameters: dict) -> None:
-        """Update calibration data with output parameters."""
-        for key, value in output_parameters.items():
-            if task_type == "qubit":
-                self.calib_data.put_qubit_data(qid, key, value)
-            elif task_type == "coupling":
-                self.calib_data.put_coupling_data(qid, key, value)
-            else:
-                raise ValueError(f"Unknown task type: {task_type}")
+        """Store output parameters."""
+        self._sync_to_state_manager()
+        self._state_manager.put_output_parameters(task_name, output_parameters, task_type, qid)
+        self._sync_from_state_manager()
 
     def put_note_to_task(self, task_name: str, note: dict, task_type: str = "global", qid: str = "") -> None:
         """Add a note to a task."""
-        container = self._get_task_container(task_type, qid)
-        task = self._find_task_in_container(container, task_name)
-        if task is None:
-            raise ValueError(f"Task '{task_name}' not found.")
-        task.note = note
+        self._sync_to_state_manager()
+        self._state_manager.put_note_to_task(task_name, note, task_type, qid)
+        self._sync_from_state_manager()
+
+    def get_qubit_calib_data(self, qid: str) -> dict:
+        """Get calibration data for a qubit."""
+        self._sync_to_state_manager()
+        return self._state_manager.get_qubit_calib_data(qid)
+
+    def get_coupling_calib_data(self, qid: str) -> dict:
+        """Get calibration data for a coupling."""
+        self._sync_to_state_manager()
+        return self._state_manager.get_coupling_calib_data(qid)
+
+    def _clear_qubit_calib_data(self, qid: str, keys: list[str]) -> None:
+        """Clear specific keys from qubit calibration data.
+
+        Parameters
+        ----------
+        qid : str
+            Qubit ID
+        keys : list[str]
+            Keys to clear from calibration data
+
+        """
+        self._sync_to_state_manager()
+        self._state_manager._clear_qubit_calib_data(qid, keys)
+        self._sync_from_state_manager()
+
+    def _clear_coupling_calib_data(self, qid: str, keys: list[str]) -> None:
+        """Clear specific keys from coupling calibration data.
+
+        Parameters
+        ----------
+        qid : str
+            Qubit ID
+        keys : list[str]
+            Keys to clear from calibration data
+
+        """
+        self._sync_to_state_manager()
+        self._state_manager._clear_coupling_calib_data(qid, keys)
+        self._sync_from_state_manager()
+
+    def get_output_parameter_by_task_name(
+        self, task_name: str, task_type: str = "global", qid: str = ""
+    ) -> dict[str, Any]:
+        """Get output parameters for a task."""
+        self._sync_to_state_manager()
+        task = self._state_manager.get_task(task_name, task_type, qid)
+        return dict(task.output_parameters)
+
+    def this_task_is_completed(self, task_name: str, task_type: str = "global", qid: str = "") -> bool:
+        """Check if a task is completed."""
+        self._sync_to_state_manager()
+        task = self._state_manager.get_task(task_name, task_type, qid)
+        return task.status == TaskStatusModel.COMPLETED
+
+    # ========== Figure/Data Saving (delegated to data saver) ==========
 
     def save_figures(
         self,
-        figures: list[go.Figure],
+        figures: list,
         task_name: str,
         task_type: str = "global",
         savedir: str = "",
         qid: str = "",
     ) -> None:
-        """Save figures for a task."""
-        container = self._get_task_container(task_type, qid)
-        task = self._find_task_in_container(container, task_name)
-        if task is None:
-            raise ValueError(f"Task '{task_name}' not found.")
-
-        savedir_path = Path(self.calib_dir) / "fig" if savedir == "" else Path(savedir)
-        savedir_path.mkdir(parents=True, exist_ok=True)
-
-        # Ensure both fields exist
-        if not hasattr(task, "figure_path"):
-            task.figure_path = []
-        if not hasattr(task, "figure_json_path"):
-            task.json_figure_path = []
-
-        for i, fig in enumerate(figures):
-            base_name = f"{qid}_{task_name}_{i}"
-            base_path = savedir_path / base_name
-
-            # Determine dimensions
-            width, height = (500, 1200) if task_name == "CheckSkew" else (600, 300)
-
-            # JSON path
-            json_path = base_path.with_suffix(".json")
-            json_path = self._resolve_conflict(json_path)
-            task.json_figure_path.append(str(json_path))
-            self._write_figure_json(fig, savepath=json_path, width=width * 1.5, height=height * 1.5)
-
-            # PNG path
-            png_path = base_path.with_suffix(".png")
-            png_path = self._resolve_conflict(png_path)
-            task.figure_path.append(str(png_path))
-            self._write_figure_image(fig, savepath=png_path, width=width, height=height)
-
-    def _write_figure_json(
-        self,
-        fig: go.Figure,
-        savepath: Path,
-        width: int = 1000,
-        height: int = 500,
-    ) -> None:
-        """Write figure as JSON file."""
-        fig.update_layout(width=width, height=height)
-        fig.write_json(str(savepath), pretty=True)
-
-    def _write_figure_image(
-        self,
-        fig: go.Figure,
-        savepath: Path,
-        width: int = 600,
-        height: int = 300,
-        scale: int = 3,
-        file_format: Literal["png", "svg", "jpeg", "webp"] = "png",
-    ) -> None:
-        """Write figure as image file."""
-        fig.write_image(
-            str(savepath),
-            format=file_format,
-            width=width,
-            height=height,
-            scale=scale,
-        )
-
-    def _resolve_conflict(self, path: Path) -> Path:
-        """Ensure unique path by appending index if needed."""
-        counter = 1
-        new_path = path
-        while new_path.exists():
-            new_path = path.with_name(f"{path.stem}_{counter}{path.suffix}")
-            counter += 1
-        return new_path
+        """Save figures."""
+        if self._data_saver:
+            override_dir = savedir or None
+            png_paths, json_paths = self._data_saver.save_figures(
+                figures,
+                task_name,
+                task_type,
+                qid,
+                output_dir=override_dir,
+            )
+            self._sync_to_state_manager()
+            self._state_manager.set_figure_paths(task_name, task_type, qid, png_paths, json_paths)
+            self._sync_from_state_manager()
 
     def save_figure(
         self,
-        figure: go.Figure,
+        figure: Any,
         task_name: str,
         task_type: str = "global",
         savedir: str = "",
         qid: str = "",
     ) -> None:
-        """Save a single figure for a task."""
-        container = self._get_task_container(task_type, qid)
-        task = self._find_task_in_container(container, task_name)
-        if task is None:
-            raise ValueError(f"Task '{task_name}' not found.")
-        savedir_path = Path(self.calib_dir) / "fig" if savedir == "" else Path(savedir)
-        savedir_path.mkdir(parents=True, exist_ok=True)
+        """Save a single figure."""
+        self.save_figures([figure], task_name, task_type, savedir, qid)
 
-        base_savepath = savedir_path / f"{qid}_{task_name}"
-        savepath = base_savepath.with_suffix(".png")
-        counter = 1
-        while savepath.exists():
-            savepath = base_savepath.with_name(f"{base_savepath.stem}_{counter}.png")
-            counter += 1
+    def save_raw_data(self, raw_data: list, task_name: str, task_type: str = "global", qid: str = "") -> None:
+        """Save raw data."""
+        if self._data_saver:
+            paths = self._data_saver.save_raw_data(
+                raw_data,
+                task_name,
+                task_type,
+                qid,
+                output_dir=None,
+            )
+            self._sync_to_state_manager()
+            self._state_manager.set_raw_data_paths(task_name, task_type, qid, paths)
+            self._sync_from_state_manager()
 
-        task.figure_path.append(str(savepath))
-        self._write_figure(savepath=str(savepath), fig=figure)
-
-    def save_raw_data(self, raw_data: list[ndarray], task_name: str, task_type: str = "global", qid: str = "") -> None:
-        """Save raw data for a task."""
-        container = self._get_task_container(task_type, qid)
-        task = self._find_task_in_container(container, task_name)
-        if task is None:
-            raise ValueError(f"Task '{task_name}' not found.")
-        savedir_path = Path(self.calib_dir) / "raw_data"
-        savedir_path.mkdir(parents=True, exist_ok=True)
-
-        for i, raw in enumerate(raw_data):
-            base_savepath = savedir_path / f"{qid}_{task_name}_{i}"
-            savepath = base_savepath.with_suffix(".csv")
-            counter = 1
-            while savepath.exists():
-                savepath = base_savepath.with_name(f"{base_savepath.stem}_{counter}.csv")
-                counter += 1
-            task.raw_data_path.append(str(savepath))
-            data = np.column_stack((raw.real, raw.imag))
-            np.savetxt(savepath, data, delimiter=",", header="real,imag")
+    # ========== Persistence ==========
 
     def save(self, calib_dir: str = "") -> None:
         """Save task manager state to JSON file."""
         if calib_dir == "":
             calib_dir = f"{self.calib_dir}/task"
 
+        Path(calib_dir).mkdir(parents=True, exist_ok=True)
         with Path(f"{calib_dir}/{self.id}.json").open("w") as f:
             json.dump(self.model_dump(), f, indent=2)
 
     def diagnose(self) -> None:
-        """Diagnose the task manager and raise an error if the task failed."""
-
-    def _write_figure(
-        self,
-        fig: go.Figure,
-        file_format: Literal["png", "svg", "jpeg", "webp"] = "png",
-        width: int = 600,
-        height: int = 300,
-        name: str = "",
-        savepath: str = "",
-    ) -> None:
-        """Save the figure."""
-        if savepath == "":
-            savepath = str(Path(self.calib_dir) / "fig" / f"{name}.{file_format}")
-        fig.update_layout(width=width, height=height)
-        fig.write_json(
-            savepath,
-            pretty=True,
-        )
+        """Diagnose the task manager."""
+        pass
 
     def put_controller_info(self, box_info: dict) -> None:
         """Store controller information."""
         self.controller_info = box_info
+        # Also update executor's controller_info for ExecutionManager updates
+        if self._executor:
+            self._executor.set_controller_info(box_info)
 
-    def get_qubit_calib_data(self, qid: str) -> dict:
-        """Get calibration data for a qubit."""
-        return dict(self.calib_data.qubit[qid])
-
-    def get_coupling_calib_data(self, qid: str) -> dict:
-        """Get calibration data for a coupling."""
-        return dict(self.calib_data.coupling[qid])
-
-    def _clear_qubit_calib_data(self, qid: str, parameter_names: Iterable[str]) -> None:
-        """Clear specific parameters from qubit calibration data."""
-        store = self.calib_data.qubit.get(qid)
-        if store is None:
-            return
-        for name in parameter_names:
-            store.pop(name, None)
-
-    def get_output_parameter_by_task_name(
-        self, task_name: str, task_type: str = "global", qid: str = ""
-    ) -> dict[str, Any]:
-        """Get output parameters for a specific task."""
-        container = self._get_task_container(task_type, qid)
-        task = self._find_task_in_container(container, task_name)
-        return dict(task.output_parameters)
-
-    def this_task_is_completed(self, task_name: str, task_type: str = "global", qid: str = "") -> bool:
-        """Check if the task is completed."""
-        container = self._get_task_container(task_type, qid)
-        task = self._find_task_in_container(container, task_name)
-        return bool(task.status == TaskStatusModel.COMPLETED)
+    # ========== Task Type Checking ==========
 
     def _is_global_task(self, task_name: str) -> bool:
         """Check if task is a global task."""
@@ -586,16 +498,18 @@ class TaskManager(BaseModel):
         return any(task.name == task_name for task in self.task_result.system_tasks)
 
     def has_only_qubit_or_global_tasks(self, task_names: list[str]) -> bool:
-        """Check if all tasks are qubit or global types only."""
-        return all(self._is_qubit_task(task_name) or self._is_global_task(task_name) for task_name in task_names)
+        """Check if all tasks are qubit or global types."""
+        return all(self._is_qubit_task(n) or self._is_global_task(n) for n in task_names)
 
     def has_only_coupling_or_global_tasks(self, task_names: list[str]) -> bool:
-        """Check if all tasks are coupling or global types only."""
-        return all(self._is_coupling_task(task_name) or self._is_global_task(task_name) for task_name in task_names)
+        """Check if all tasks are coupling or global types."""
+        return all(self._is_coupling_task(n) or self._is_global_task(n) for n in task_names)
 
     def has_only_system_tasks(self, task_names: list[str]) -> bool:
-        """Check if all tasks are system types only."""
-        return all(self._is_system_task(task_name) for task_name in task_names)
+        """Check if all tasks are system types."""
+        return all(self._is_system_task(n) for n in task_names)
+
+    # ========== Task Execution (delegated to TaskExecutor) ==========
 
     def execute_task(
         self,
@@ -606,332 +520,41 @@ class TaskManager(BaseModel):
     ) -> tuple["ExecutionManager", "TaskManager"]:
         """Execute task with integrated save processing.
 
-        Args:
-        ----
-            task_instance: Task instance
-            session: Session object
-            execution_manager: Execution manager
-            qid: Qubit ID
+        This method delegates to TaskExecutor for the actual execution
+        while maintaining backward compatibility with the original interface.
 
-        Returns:
+        Parameters
+        ----------
+        task_instance : BaseTask
+            Task instance to execute
+        session : BaseSession
+            Session object
+        execution_manager : ExecutionManager
+            Execution manager
+        qid : str
+            Qubit ID
+
+        Returns
         -------
-            tuple[ExecutionManager, TaskManager]: Updated execution manager and task manager
+        tuple[ExecutionManager, TaskManager]
+            Updated execution manager and this task manager
 
         """
-        task_name = task_instance.get_name()
-        task_type = task_instance.get_task_type()
+        # Sync state before execution
+        self._sync_to_state_manager()
 
-        try:
-            # 0. Ensure task exists in task_result before execution
-            self._ensure_task_exists(task_name, task_type, qid)
+        # Delegate to TaskExecutor
+        execution_manager, result = self._executor.execute(
+            task=task_instance,
+            session=session,
+            execution_manager=execution_manager,
+            qid=qid,
+        )
 
-            # 1. Start task
-            self.start_task(task_name, task_type, qid)
+        # Sync state after execution
+        self._sync_from_state_manager()
 
-            # Save task execution state
-            executed_task = self.get_task(task_name=task_name, task_type=task_type, qid=qid)
-            TaskResultHistoryDocument.upsert_document(
-                task=executed_task, execution_model=execution_manager.to_datamodel()
-            )
-
-            # Update execution manager
-            execution_manager = execution_manager.update_with_task_manager(self)
-
-            # 2. Preprocess (using existing BaseTask.preprocess)
-            preprocess_result = task_instance.preprocess(session, qid)
-            if preprocess_result is not None:
-                self.put_input_parameters(task_name, preprocess_result.input_parameters, task_type=task_type, qid=qid)
-                self.save()
-                execution_manager = execution_manager.update_with_task_manager(self)
-
-            # 3. Run (using existing BaseTask.run)
-            run_result = task_instance.run(session, qid)
-
-            if run_result is not None:
-                # 4. Postprocess (using existing BaseTask.postprocess)
-                postprocess_result = task_instance.postprocess(session, execution_manager.execution_id, run_result, qid)
-
-                if postprocess_result is not None:
-                    # 5. Integrated save processing (TaskManager is responsible)
-                    self._save_all_results(
-                        task_instance, execution_manager, postprocess_result, qid, run_result, session
-                    )
-
-            # 6. Complete task
-            self.update_task_status_to_completed(
-                task_name, message=f"{task_name} is completed", task_type=task_type, qid=qid
-            )
-            self.save()
-
-            # Save completed state to database
-            executed_task = self.get_task(task_name=task_name, task_type=task_type, qid=qid)
-            TaskResultHistoryDocument.upsert_document(
-                task=executed_task, execution_model=execution_manager.to_datamodel()
-            )
-            execution_manager = execution_manager.update_with_task_manager(self)
-
-        except Exception as e:
-            # Error handling
-            self._handle_task_error(task_instance, execution_manager, qid, str(e))
-            raise
-
-        finally:
-            # Finalization
-            self.end_task(task_name, task_type, qid)
-            self.save()
-            execution_manager = execution_manager.update_with_task_manager(self)
-
-            # Save final state
-            executed_task = self.get_task(task_name=task_name, task_type=task_type, qid=qid)
-            TaskResultHistoryDocument.upsert_document(
-                task=executed_task, execution_model=execution_manager.to_datamodel()
-            )
-
-            # Create chip history
-            from qdash.dbmodel.chip import ChipDocument
-            from qdash.dbmodel.chip_history import ChipHistoryDocument
-
-            chip_doc = ChipDocument.get_current_chip(username=self.username)
-            ChipHistoryDocument.create_history(chip_doc)
-
-        return execution_manager, self
-
-    def _save_all_results(
-        self,
-        task_instance: "BaseTask",
-        execution_manager: "ExecutionManager",
-        postprocess_result: Any,
-        qid: str,
-        run_result: Any,
-        session: "BaseSession",
-    ) -> None:
-        """Integrated save processing (TaskManager is responsible).
-
-        Args:
-        ----
-            task_instance: Task instance
-            execution_manager: Execution manager
-            postprocess_result: Postprocess result
-            qid: Qubit ID
-            run_result: Run result
-            session: Session object
-
-        """
-        task_name = task_instance.get_name()
-        task_type = task_instance.get_task_type()
-
-        # 1. Validate fidelity values for randomized benchmarking tasks
-        if postprocess_result.output_parameters:
-            # Check if this is a randomized benchmarking task
-            is_rb_task = "randomized" in task_name.lower() or "benchmarking" in task_name.lower()
-
-            if is_rb_task:
-                # Check all fidelity parameters for values > 1.0 (100%)
-                for param_name, param_value in postprocess_result.output_parameters.items():
-                    if "fidelity" in param_name.lower():
-                        fidelity_value = param_value.value
-                        if fidelity_value is not None and fidelity_value > 1.0:
-                            raise ValueError(
-                                f"{task_name} failed: {param_name} = {fidelity_value:.4f} exceeds 100% "
-                                f"(physical maximum is 1.0). This indicates a fitting error."
-                            )
-
-        # 2. Save output parameters
-        if postprocess_result.output_parameters:
-            # Get current task to retrieve task_id
-            current_task = self.get_task(task_name=task_name, task_type=task_type, qid=qid)
-            # Attach task_id to all output parameters
-            task_instance.attach_task_id(current_task.task_id)
-            self.put_output_parameters(task_name, postprocess_result.output_parameters, task_type=task_type, qid=qid)
-
-        # 3. Save figures (using existing method)
-        if postprocess_result.figures:
-            self.save_figures(postprocess_result.figures, task_name, task_type=task_type, qid=qid)
-
-        # 4. Save raw data (using existing method)
-        if postprocess_result.raw_data:
-            self.save_raw_data(postprocess_result.raw_data, task_name, task_type=task_type, qid=qid)
-
-        # 5. Save task manager state
+        # Save task manager state
         self.save()
 
-        # 6. R² validation
-        backend_success = True
-        r2_value = None
-        if run_result.has_r2():
-            r2_value = run_result.r2.get(qid)
-            if r2_value is None:
-                backend_success = False
-            elif r2_value < task_instance.r2_threshold:
-                if postprocess_result is not None and postprocess_result.output_parameters:
-                    self._clear_qubit_calib_data(qid, postprocess_result.output_parameters.keys())
-                raise ValueError(f"{task_instance.name} R² value too low: {r2_value:.4f}")
-
-            if not backend_success and postprocess_result is not None and postprocess_result.output_parameters:
-                self._clear_qubit_calib_data(qid, postprocess_result.output_parameters.keys())
-        # else: Tasks without R² (like ReadoutClassification) should still save to database
-
-        # 7. Backend-specific save processing
-        # Always call _save_backend_specific, but pass backend_success to indicate R² validation status
-        self._save_backend_specific(task_instance, execution_manager, qid, session, backend_success)
-
-    def _save_backend_specific(
-        self,
-        task_instance: "BaseTask",
-        execution_manager: "ExecutionManager",
-        qid: str,
-        session: "BaseSession",
-        success: bool,
-    ) -> None:
-        """Backend-specific save processing.
-
-        Args:
-        ----
-            task_instance: Task instance
-            execution_manager: Execution manager
-            qid: Qubit ID
-            session: Session object
-            success: Whether the backend update should be applied
-
-        """
-        if task_instance.backend == "qubex":
-            self._save_qubex_specific(task_instance, execution_manager, qid, session, success)
-        elif task_instance.backend == "fake":
-            self._save_fake_specific(task_instance, execution_manager, qid, session, success)
-
-    def _save_qubex_specific(
-        self,
-        task_instance: "BaseTask",
-        execution_manager: "ExecutionManager",
-        qid: str,
-        session: "BaseSession",
-        success: bool,
-    ) -> None:
-        """Qubex-specific save processing.
-
-        Args:
-        ----
-            task_instance: Task instance
-            execution_manager: Execution manager
-            qid: Qubit ID
-            session: Session object
-
-        """
-        from qdash.dbmodel.coupling import CouplingDocument
-        from qdash.dbmodel.qubit import QubitDocument
-
-        task_name = task_instance.get_name()
-        task_type = task_instance.get_task_type()
-
-        # Get output parameters first to check if there's data to save
-        output_parameters = self.get_output_parameter_by_task_name(task_name, task_type=task_type, qid=qid)
-
-        if not success:
-            logger.info(
-                "Skipping backend parameter updates for %s due to failed R² validation", task_instance.get_name()
-            )
-            # Still save to database even if R² failed or doesn't exist
-            # This is important for tasks like ReadoutClassification that don't have R²
-            if output_parameters:
-                if task_instance.is_qubit_task():
-                    QubitDocument.update_calib_data(
-                        username=self.username,
-                        qid=qid,
-                        chip_id=execution_manager.chip_id,
-                        output_parameters=output_parameters,
-                    )
-                elif task_instance.is_coupling_task():
-                    CouplingDocument.update_calib_data(
-                        username=self.username,
-                        qid=qid,
-                        chip_id=execution_manager.chip_id,
-                        output_parameters=output_parameters,
-                    )
-            return
-
-        # 1. Save calibration note
-        if session.name == "qubex":
-            session.update_note(
-                username=self.username,
-                chip_id=execution_manager.chip_id,
-                calib_dir=self.calib_dir,
-                execution_id=execution_manager.execution_id,
-                task_manager_id=self.id,
-            )
-
-        # 2. Update parameters (already retrieved above)
-        if output_parameters:
-            if task_instance.is_qubit_task():
-                QubitDocument.update_calib_data(
-                    username=self.username,
-                    qid=qid,
-                    chip_id=execution_manager.chip_id,
-                    output_parameters=output_parameters,
-                )
-                self._update_backend_params(session, execution_manager, qid, output_parameters)
-            elif task_instance.is_coupling_task():
-                CouplingDocument.update_calib_data(
-                    username=self.username,
-                    qid=qid,
-                    chip_id=execution_manager.chip_id,
-                    output_parameters=output_parameters,
-                )
-
-    def _update_backend_params(
-        self,
-        session: "BaseSession",
-        execution_manager: "ExecutionManager",
-        qid: str,
-        output_parameters: dict[str, Any],
-    ) -> None:
-        """Update backend parameters."""
-        updater = get_params_updater(session, execution_manager.chip_id)
-        if updater is None:
-            return
-        try:
-            updater.update(qid, output_parameters)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to update backend params for qid=%s: %s", qid, exc)
-
-    def _save_fake_specific(
-        self,
-        task_instance: "BaseTask",
-        execution_manager: "ExecutionManager",
-        qid: str,
-        session: "BaseSession",
-        success: bool,
-    ) -> None:
-        """Fake-specific save processing.
-
-        Args:
-        ----
-            task_instance: Task instance
-            execution_manager: Execution manager
-            qid: Qubit ID
-            session: Session object
-
-        """
-        # Simulation metadata save, etc. (implement as needed)
-        pass
-
-    def _handle_task_error(
-        self, task_instance: "BaseTask", execution_manager: "ExecutionManager", qid: str, error_msg: str
-    ) -> None:
-        """Error handling.
-
-        Args:
-        ----
-            task_instance: Task instance
-            execution_manager: Execution manager
-            qid: Qubit ID
-            error_msg: Error message
-
-        """
-        task_name = task_instance.get_name()
-        task_type = task_instance.get_task_type()
-
-        self.update_task_status_to_failed(task_name, message=error_msg, task_type=task_type, qid=qid)
-
-        # Save error state to database
-        task_result = self.get_task(task_name, task_type=task_type, qid=qid)
-        TaskResultHistoryDocument.upsert_document(task_result, execution_manager.to_datamodel())
+        return execution_manager, self

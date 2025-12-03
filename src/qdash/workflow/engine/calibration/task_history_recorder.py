@@ -143,12 +143,17 @@ class TaskHistoryRecorder:
         username : str
             The username for chip lookup
 
+        Note
+        ----
+        This method does not raise exceptions - errors are logged but
+        do not interrupt the workflow (matching original TaskManager behavior).
+
         """
         try:
             self.chip_history_repo.create_history(username)
         except Exception as e:
             logger.error(f"Failed to create chip history snapshot: {e}")
-            raise
+            # Don't raise - this shouldn't block the workflow
 
     def record_completed_task(
         self,

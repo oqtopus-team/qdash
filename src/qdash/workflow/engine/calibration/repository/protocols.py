@@ -32,13 +32,13 @@ class TaskResultHistoryRepository(Protocol):
 class ChipRepository(Protocol):
     """Protocol for chip data access operations."""
 
-    def get_current_chip(self, chip_id: str) -> dict:
+    def get_current_chip(self, username: str) -> dict:
         """Get the current chip data.
 
         Parameters
         ----------
-        chip_id : str
-            The chip identifier
+        username : str
+            The username to look up the chip
 
         Returns
         -------
@@ -95,6 +95,7 @@ class CalibDataSaver(Protocol):
         task_name: str,
         task_type: str,
         qid: str,
+        output_dir: str | None = None,
     ) -> tuple[list[str], list[str]]:
         """Save figures as PNG and JSON.
 
@@ -123,6 +124,7 @@ class CalibDataSaver(Protocol):
         task_name: str,
         task_type: str,
         qid: str,
+        output_dir: str | None = None,
     ) -> list[str]:
         """Save raw data as CSV files.
 
