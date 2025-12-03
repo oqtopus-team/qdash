@@ -40,6 +40,8 @@ The server is the backend that receives user requests and communicates with the 
 workflow is a component that manages Qubit's calibration workflow.
 Prefect is an OSS workflow engine, and its strength is its ability to create DAGs in a Python code base.
 
+For a step-by-step breakdown of how FlowSession, TaskManager, ExecutionManager, and the repositories interact during execution, see the [Workflow Processing Flow](./design/workflow-processing-flow.md).
+
 The experimental libraries that have been used in the laboratory can be used as they are, so there is no need to change the experimental libraries.
 
 The scheduling and log management functions of general workflow engines are supported, making workflow management easy.
