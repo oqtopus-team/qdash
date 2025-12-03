@@ -9,12 +9,12 @@ with the established merge strategy for props.yaml files.
 """
 
 import os
-from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from prefect import get_run_logger
+from pydantic import BaseModel, Field
 
 
 class ConfigFileType(Enum):
@@ -33,8 +33,7 @@ class ConfigFileType(Enum):
     ALL_PARAMS = "all_params"
 
 
-@dataclass
-class GitHubPushConfig:
+class GitHubPushConfig(BaseModel):
     """Configuration for GitHub push operations.
 
     Attributes:
@@ -55,15 +54,12 @@ class GitHubPushConfig:
     """
 
     enabled: bool = False
-    file_types: list[ConfigFileType] | None = None
+    file_types: list[ConfigFileType] = Field(default_factory=lambda: [ConfigFileType.CALIB_NOTE])
     commit_message: str | None = None
     branch: str = "main"
     props_within_24hrs: bool = False
 
-    def __post_init__(self) -> None:
-        """Set default file types if not provided."""
-        if self.file_types is None:
-            self.file_types = [ConfigFileType.CALIB_NOTE]
+    model_config = {"frozen": False}
 
 
 class GitHubIntegration:

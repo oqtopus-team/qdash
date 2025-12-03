@@ -10,8 +10,8 @@ Architecture:
 
 Example:
     ```python
-    from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
-    from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+    from qdash.workflow.engine.calibration.scheduler.cr_scheduler import CRScheduler
+    from qdash.workflow.engine.calibration.scheduler.plugins import (
         CandidateQubitFilter,
         FrequencyDirectionalityFilter,
         FidelityFilter,
@@ -264,7 +264,7 @@ class FrequencyDirectionalityFilter(CRPairFilter):
 
     def _filter_by_design(self, pairs: list[str], context: FilterContext) -> list[str]:
         """Filter using design-based checkerboard pattern."""
-        from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
+        from qdash.workflow.engine.calibration.scheduler.cr_scheduler import CRScheduler
 
         return [
             pair
@@ -401,7 +401,7 @@ class MuxConflictScheduler(CRSchedulingStrategy):
 
     def schedule(self, pairs: list[str], context: ScheduleContext) -> list[list[str]]:
         """Schedule pairs using graph coloring."""
-        from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
+        from qdash.workflow.engine.calibration.scheduler.cr_scheduler import CRScheduler
 
         groups = CRScheduler._group_cr_pairs_by_conflict(
             pairs,
@@ -458,7 +458,7 @@ class IntraThenInterMuxScheduler(CRSchedulingStrategy):
 
     def schedule(self, pairs: list[str], context: ScheduleContext) -> list[list[str]]:
         """Schedule with intra-MUX pairs first, then inter-MUX pairs."""
-        from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
+        from qdash.workflow.engine.calibration.scheduler.cr_scheduler import CRScheduler
 
         # Split into intra-MUX and inter-MUX pairs
         intra_mux, inter_mux = CRScheduler._split_fast_slow_pairs(pairs, context.qid_to_mux)

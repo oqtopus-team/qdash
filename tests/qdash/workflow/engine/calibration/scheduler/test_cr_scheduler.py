@@ -11,7 +11,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 
-from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler, CRScheduleResult
+from qdash.workflow.engine.calibration.scheduler.cr_scheduler import CRScheduler, CRScheduleResult
 
 
 @pytest.fixture

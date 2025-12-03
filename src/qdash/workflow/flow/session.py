@@ -25,7 +25,7 @@ Example:
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pendulum
 from prefect import get_run_logger
@@ -33,13 +33,16 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
-from qdash.workflow.engine.calibration.execution_manager import ExecutionManager
+from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.params_updater import get_params_updater
-from qdash.workflow.engine.calibration.task import execute_dynamic_task_by_qid
-from qdash.workflow.engine.calibration.task_manager import TaskManager
+from qdash.workflow.engine.calibration.prefect_tasks import execute_dynamic_task_by_qid
+from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.engine.session.factory import create_session
 from qdash.workflow.flow.github import GitHubIntegration, GitHubPushConfig
 from qdash.workflow.tasks.active_protocols import generate_task_instances
+
+if TYPE_CHECKING:
+    from qdash.workflow.flow.config import FlowSessionConfig
 
 
 def generate_execution_id(username: str, chip_id: str) -> str:
@@ -702,9 +705,59 @@ class FlowSession:
                 ExecutionLockDocument.unlock()
                 self._lock_acquired = False
 
+    @classmethod
+    def from_config(cls, config: "FlowSessionConfig") -> "FlowSession":
+        """Create a FlowSession from a FlowSessionConfig.
+
+        This factory method provides a clean way to create FlowSession instances
+        from immutable configuration objects.
+
+        Args:
+            config: FlowSessionConfig with all session parameters
+
+        Returns:
+            New FlowSession instance
+
+        Example:
+            ```python
+            from qdash.workflow.flow.config import FlowSessionConfig
+
+            config = FlowSessionConfig.create(
+                username="alice",
+                chip_id="chip_1",
+                qids=["0", "1", "2"],
+                backend="qubex",
+            )
+            session = FlowSession.from_config(config)
+            ```
+        """
+
+        return cls(
+            username=config.username,
+            chip_id=config.chip_id,
+            qids=list(config.qids),
+            execution_id=config.execution_id,
+            backend=config.backend,
+            name=config.name,
+            tags=list(config.tags) if config.tags else None,
+            use_lock=config.use_lock,
+            note=dict(config.note) if config.note else None,
+            enable_github_pull=config.enable_github_pull,
+            github_push_config=config.github_push_config,
+            muxes=list(config.muxes) if config.muxes else None,
+        )
+
 
 # Global session storage for Prefect context
-_current_session: FlowSession | None = None
+# Note: Using SessionContext for thread-safe management while maintaining
+# backward compatibility with direct _current_session access
+from qdash.workflow.flow.context import (
+    clear_current_session,
+    get_current_session,
+    set_current_session,
+)
+
+_current_session: FlowSession | None = None  # Backward compatibility alias
 
 
 def init_calibration(
@@ -804,7 +857,7 @@ def init_calibration(
             # Fallback if context is not available (e.g., running outside Prefect)
             display_name = "Python Flow Execution"
 
-    _current_session = FlowSession(
+    session = FlowSession(
         username=username,
         chip_id=chip_id,
         qids=qids,
@@ -818,7 +871,11 @@ def init_calibration(
         github_push_config=github_push_config,
         muxes=muxes,
     )
-    return _current_session
+
+    # Use SessionContext for thread-safe management
+    set_current_session(session)
+    _current_session = session  # Backward compatibility
+    return session
 
 
 def get_session() -> FlowSession:
@@ -837,10 +894,11 @@ def get_session() -> FlowSession:
         ```
 
     """
-    if _current_session is None:
+    session = get_current_session()
+    if session is None:
         msg = "No active calibration session. Call init_calibration() first."
         raise RuntimeError(msg)
-    return _current_session
+    return session
 
 
 def finish_calibration(
@@ -873,9 +931,17 @@ def finish_calibration(
         ```
 
     """
+    global _current_session  # noqa: PLW0603
+
     session = get_session()
-    return session.finish_calibration(
+    result = session.finish_calibration(
         update_chip_history=update_chip_history,
         push_to_github=push_to_github,
         export_note_to_file=export_note_to_file,
     )
+
+    # Clear session after completion
+    clear_current_session()
+    _current_session = None  # Backward compatibility
+
+    return result
