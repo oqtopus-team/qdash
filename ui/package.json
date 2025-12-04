@@ -13,10 +13,8 @@
     "start": "next start",
     "lint": "bunx eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "fmt": "bunx eslint . --fix -c eslint.config.js",
-    "generate-qdash": "curl http://localhost:${API_PORT:-5715}/openapi.json | jq > ../docs/openapi/qdash-openapi.json && bunx openapi-typescript ../docs/openapi/qdash-openapi.json -o ./src/qdash.d.ts",
     "knip": "knip",
-    "knip:fix": "knip --fix",
-    "commit": "python ../scripts/git-auto-commit.py"
+    "knip:fix": "knip --fix"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
