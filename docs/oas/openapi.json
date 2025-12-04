@@ -17,9 +17,7 @@
   "paths": {
     "/auth/login": {
       "post": {
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "summary": "Login user",
         "description": "Authenticate user and return access token.\n\nValidates user credentials against the database and returns an access token\nfor subsequent authenticated requests.\n\nParameters\n----------\nusername : str\n    User's username provided via form data\npassword : str\n    User's password provided via form data\n\nReturns\n-------\nTokenResponse\n    Response containing access_token, token_type, and username\n\nRaises\n------\nHTTPException\n    401 if authentication fails due to incorrect username or password",
         "operationId": "login",
@@ -62,9 +60,7 @@
     },
     "/auth/register": {
       "post": {
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "summary": "Register a new user",
         "description": "Register a new user account.\n\nCreates a new user in the database with hashed password and generates\nan access token for immediate use.\n\nParameters\n----------\nuser_data : UserCreate\n    User registration data including username, password, and optional full_name\n\nReturns\n-------\nUserWithToken\n    Newly created user information including access_token\n\nRaises\n------\nHTTPException\n    400 if the username is already registered",
         "operationId": "registerUser",
@@ -107,9 +103,7 @@
     },
     "/auth/me": {
       "get": {
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "summary": "Get current user",
         "description": "Get current authenticated user information.\n\nReturns the profile information of the currently authenticated user\nbased on the provided access token.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user injected via dependency\n\nReturns\n-------\nUser\n    Current user's profile information including username, full_name,\n    and disabled status",
         "operationId": "getCurrentUser",
@@ -137,9 +131,7 @@
     },
     "/auth/logout": {
       "post": {
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "summary": "Logout user",
         "description": "Logout the current user.\n\nThis endpoint serves as a logout confirmation. Since authentication tokens\nare managed client-side (via cookies), no server-side session invalidation\nis required. The client is responsible for removing the stored credentials.\n\nReturns\n-------\ndict[str, str]\n    Success message confirming logout",
         "operationId": "logout",
@@ -166,9 +158,7 @@
     },
     "/executions/figure": {
       "get": {
-        "tags": [
-          "execution"
-        ],
+        "tags": ["execution"],
         "summary": "Get a calibration figure by its path",
         "description": "Fetch a calibration figure by its file path.\n\nRetrieves a PNG image file from the server's filesystem and returns it\nas a streaming response.\n\nParameters\n----------\npath : str\n    Absolute file path to the calibration figure image\n\nReturns\n-------\nStreamingResponse\n    PNG image data as a streaming response with media type \"image/png\"\n\nRaises\n------\nHTTPException\n    404 if the file does not exist at the specified path",
         "operationId": "getFigureByPath",
@@ -212,9 +202,7 @@
     },
     "/executions/lock-status": {
       "get": {
-        "tags": [
-          "execution"
-        ],
+        "tags": ["execution"],
         "summary": "Get the execution lock status",
         "description": "Fetch the current status of the execution lock.\n\nThe execution lock prevents concurrent calibration workflows from running\nsimultaneously. This endpoint checks whether a lock is currently held.\n\nReturns\n-------\nExecutionLockStatusResponse\n    Response containing lock status (True if locked, False if available)",
         "operationId": "getExecutionLockStatus",
@@ -234,9 +222,7 @@
     },
     "/executions": {
       "get": {
-        "tags": [
-          "execution"
-        ],
+        "tags": ["execution"],
         "summary": "List executions",
         "description": "List executions for a given chip with pagination.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
         "operationId": "listExecutions",
@@ -311,9 +297,7 @@
     },
     "/executions/{execution_id}": {
       "get": {
-        "tags": [
-          "execution"
-        ],
+        "tags": ["execution"],
         "summary": "Get an execution by its ID",
         "description": "Return the execution detail by its ID.\n\nParameters\n----------\nexecution_id : str\n    ID of the execution to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
         "operationId": "getExecution",
@@ -359,9 +343,7 @@
     },
     "/files/raw-data": {
       "get": {
-        "tags": [
-          "file"
-        ],
+        "tags": ["file"],
         "summary": "Download file",
         "description": "Download a raw data file from the server.\n\nRetrieves a file from the server's filesystem and returns it as a downloadable\nresponse.\n\nParameters\n----------\npath : str\n    Absolute file path to the file to download\n\nReturns\n-------\nFileResponse\n    The file as a downloadable response\n\nRaises\n------\nHTTPException\n    404 if the file does not exist at the specified path",
         "operationId": "downloadFile",
@@ -395,9 +377,7 @@
     },
     "/files/zip": {
       "get": {
-        "tags": [
-          "file"
-        ],
+        "tags": ["file"],
         "summary": "Download file or directory as zip",
         "description": "Download a file or directory as a ZIP archive.\n\nCreates a ZIP archive of the specified file or directory and returns it\nas a downloadable response. The archive is created in a temporary directory\nand cleaned up after the response is sent.\n\nParameters\n----------\npath : str\n    Absolute path to the file or directory to archive\n\nReturns\n-------\nFileResponse\n    ZIP archive as a downloadable response with media type \"application/zip\"\n\nRaises\n------\nHTTPException\n    404 if the path does not exist\n    500 if there is an error creating the ZIP archive",
         "operationId": "downloadZipFile",
@@ -431,9 +411,7 @@
     },
     "/files/tree": {
       "get": {
-        "tags": [
-          "file"
-        ],
+        "tags": ["file"],
         "summary": "Get file tree for entire config directory",
         "description": "Get file tree structure for entire config directory (all chips).\n\nReturns\n-------\n    File tree structure",
         "operationId": "getFileTree",
@@ -457,9 +435,7 @@
     },
     "/files/content": {
       "get": {
-        "tags": [
-          "file"
-        ],
+        "tags": ["file"],
         "summary": "Get file content for editing",
         "description": "Get file content for editing.\n\nArgs:\n----\n    path: Relative path from CONFIG_BASE_PATH (e.g., \"64Qv2/config/chip.yaml\")\n\nReturns:\n-------\n    File content and metadata",
         "operationId": "getFileContent",
@@ -500,9 +476,7 @@
         }
       },
       "put": {
-        "tags": [
-          "file"
-        ],
+        "tags": ["file"],
         "summary": "Save file content",
         "description": "Save file content.\n\nArgs:\n----\n    request: Save file request with path and content\n\nReturns:\n-------\n    Success message",
         "operationId": "saveFileContent",
@@ -551,9 +525,7 @@
     },
     "/files/validate": {
       "post": {
-        "tags": [
-          "file"
-        ],
+        "tags": ["file"],
         "summary": "Validate file content (YAML/JSON)",
         "description": "Validate YAML or JSON content.\n\nArgs:\n----\n    request: Validation request with content and file_type\n\nReturns:\n-------\n    Validation result",
         "operationId": "validateFileContent",
@@ -595,9 +567,7 @@
     },
     "/files/git/status": {
       "get": {
-        "tags": [
-          "file"
-        ],
+        "tags": ["file"],
         "summary": "Get Git status of config directory",
         "description": "Get Git status of config directory.\n\nReturns\n-------\n    Git status information",
         "operationId": "getGitStatus",
@@ -619,9 +589,7 @@
     },
     "/files/git/pull": {
       "post": {
-        "tags": [
-          "file"
-        ],
+        "tags": ["file"],
         "summary": "Pull latest config from Git repository",
         "description": "Pull latest config from Git repository.\n\nReturns\n-------\n    Pull operation result",
         "operationId": "gitPullConfig",
@@ -648,9 +616,7 @@
     },
     "/files/git/push": {
       "post": {
-        "tags": [
-          "file"
-        ],
+        "tags": ["file"],
         "summary": "Push config changes to Git repository",
         "description": "Push config changes to Git repository.\n\nArgs:\n----\n    request: Push request with commit message\n\nReturns:\n-------\n    Push operation result",
         "operationId": "gitPushConfig",
@@ -697,9 +663,7 @@
     },
     "/calibrations/note": {
       "get": {
-        "tags": [
-          "calibration"
-        ],
+        "tags": ["calibration"],
         "summary": "Get the calibration note",
         "description": "Get the latest calibration note for the master task.\n\nRetrieves the most recent calibration note from the database, sorted by timestamp\nin descending order. The note contains metadata about calibration parameters\nand configuration.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nCalibrationNoteResponse\n    The latest calibration note containing username, execution_id, task_id,\n    note content, and timestamp",
         "operationId": "getCalibrationNote",
@@ -724,9 +688,7 @@
     },
     "/settings": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Get settings",
         "description": "Get settings from the server",
         "operationId": "getSettings",
@@ -751,9 +713,7 @@
     },
     "/chips": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "List all chips",
         "description": "List all chips.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListChipsResponse\n    Wrapped list of available chips",
         "operationId": "listChips",
@@ -776,9 +736,7 @@
         ]
       },
       "post": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Create a new chip",
         "description": "Create a new chip.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
         "operationId": "createChip",
@@ -823,9 +781,7 @@
     },
     "/chips/{chip_id}/dates": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Get available dates for a chip",
         "description": "Fetch available dates for a chip from execution counter.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipDatesResponse\n    List of available dates",
         "operationId": "getChipDates",
@@ -871,9 +827,7 @@
     },
     "/chips/{chip_id}": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Get a chip",
         "description": "Get a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nChipResponse\n    Chip information\n\nRaises\n------\nHTTPException\n    If chip is not found",
         "operationId": "getChip",
@@ -919,9 +873,7 @@
     },
     "/chips/{chip_id}/muxes/{mux_id}": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "Get multiplexer details",
         "description": "Get the multiplexer details.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmux_id : int\n    ID of the multiplexer\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nMuxDetailResponse\n    Multiplexer details",
         "operationId": "getChipMux",
@@ -976,9 +928,7 @@
     },
     "/chips/{chip_id}/muxes": {
       "get": {
-        "tags": [
-          "chip"
-        ],
+        "tags": ["chip"],
         "summary": "List all multiplexers for a chip",
         "description": "List all multiplexers for a chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListMuxResponse\n    List of multiplexer details",
         "operationId": "listChipMuxes",
@@ -1024,9 +974,7 @@
     },
     "/tasks": {
       "get": {
-        "tags": [
-          "task"
-        ],
+        "tags": ["task"],
         "summary": "List all tasks",
         "description": "List all tasks.\n\nArgs:\n----\n    current_user (User): The current user.\n    backend (Optional[str]): Optional backend name to filter tasks by.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
         "operationId": "listTasks",
@@ -1081,9 +1029,7 @@
     },
     "/tasks/{task_id}/result": {
       "get": {
-        "tags": [
-          "task"
-        ],
+        "tags": ["task"],
         "summary": "Get task result by task ID",
         "description": "Get task result by task_id.\n\nArgs:\n----\n    task_id: The task ID to search for.\n    current_user: The current authenticated user.\n\nReturns:\n-------\n    TaskResultResponse: The task result information including figure paths.",
         "operationId": "getTaskResult",
@@ -1129,9 +1075,7 @@
     },
     "/task-files/settings": {
       "get": {
-        "tags": [
-          "task-file"
-        ],
+        "tags": ["task-file"],
         "summary": "Get task file settings",
         "description": "Get task file settings from config/settings.yaml.\n\nReturns\n-------\n    Task file settings including default backend",
         "operationId": "getTaskFileSettings",
@@ -1156,9 +1100,7 @@
     },
     "/task-files/backends": {
       "get": {
-        "tags": [
-          "task-file"
-        ],
+        "tags": ["task-file"],
         "summary": "List available task file backends",
         "description": "List all available backend directories in caltasks.\n\nReturns\n-------\n    List of backend names and paths",
         "operationId": "listTaskFileBackends",
@@ -1183,9 +1125,7 @@
     },
     "/task-files/tree": {
       "get": {
-        "tags": [
-          "task-file"
-        ],
+        "tags": ["task-file"],
         "summary": "Get file tree for a specific backend",
         "description": "Get file tree structure for a specific backend directory.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n\nReturns:\n-------\n    File tree structure for the backend",
         "operationId": "getTaskFileTree",
@@ -1235,9 +1175,7 @@
     },
     "/task-files/content": {
       "get": {
-        "tags": [
-          "task-file"
-        ],
+        "tags": ["task-file"],
         "summary": "Get task file content for viewing/editing",
         "description": "Get task file content for viewing/editing.\n\nArgs:\n----\n    path: Relative path from CALTASKS_BASE_PATH (e.g., \"qubex/one_qubit_coarse/check_rabi.py\")\n\nReturns:\n-------\n    File content and metadata",
         "operationId": "getTaskFileContent",
@@ -1283,9 +1221,7 @@
         }
       },
       "put": {
-        "tags": [
-          "task-file"
-        ],
+        "tags": ["task-file"],
         "summary": "Save task file content",
         "description": "Save task file content.\n\nArgs:\n----\n    request: Save file request with path and content\n\nReturns:\n-------\n    Success message",
         "operationId": "saveTaskFileContent",
@@ -1334,9 +1270,7 @@
     },
     "/task-files/tasks": {
       "get": {
-        "tags": [
-          "task-file"
-        ],
+        "tags": ["task-file"],
         "summary": "List all tasks in a backend",
         "description": "List all task definitions found in a backend directory.\n\nParses Python files to extract task names, types, and descriptions.\nResults are cached and invalidated when files are modified.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n    sort_order: Sort order for tasks (\"type_then_name\", \"name_only\", \"file_path\")\n\nReturns:\n-------\n    List of task information",
         "operationId": "listTaskInfo",
@@ -1398,9 +1332,7 @@
     },
     "/task-results/qubits/latest": {
       "get": {
-        "tags": [
-          "task-result"
-        ],
+        "tags": ["task-result"],
         "summary": "Get latest qubit task results",
         "description": "Get the latest qubit task results for all qubits on a chip.\n\nRetrieves the most recent task result for each qubit on the specified chip.\nResults include fidelity threshold status based on x90 gate fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
         "operationId": "getLatestQubitTaskResults",
@@ -1459,9 +1391,7 @@
     },
     "/task-results/qubits/history": {
       "get": {
-        "tags": [
-          "task-result"
-        ],
+        "tags": ["task-result"],
         "summary": "Get historical qubit task results",
         "description": "Get historical qubit task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
         "operationId": "getHistoricalQubitTaskResults",
@@ -1531,9 +1461,7 @@
     },
     "/task-results/qubits/{qid}/history": {
       "get": {
-        "tags": [
-          "task-result"
-        ],
+        "tags": ["task-result"],
         "summary": "Get qubit task history",
         "description": "Get complete task history for a specific qubit.\n\nRetrieves all historical task results for a specific qubit, sorted by\nend time in descending order. Useful for tracking calibration trends\nover time.\n\nParameters\n----------\nqid : str\n    Qubit ID to fetch history for\nchip_id : str\n    ID of the chip containing the qubit\ntask : str\n    Name of the task to fetch history for\ncurrent_user : User\n    Current authenticated user (optional)\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
         "operationId": "getQubitTaskHistory",
@@ -1601,9 +1529,7 @@
     },
     "/task-results/couplings/latest": {
       "get": {
-        "tags": [
-          "task-result"
-        ],
+        "tags": ["task-result"],
         "summary": "Get latest coupling task results",
         "description": "Get the latest coupling task results for all couplings on a chip.\n\nRetrieves the most recent task result for each coupling (qubit pair) on\nthe specified chip. Results include fidelity threshold status based on\nBell state fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all couplings, keyed by coupling ID (e.g., \"0-1\")\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
         "operationId": "getLatestCouplingTaskResults",
@@ -1662,9 +1588,7 @@
     },
     "/task-results/couplings/history": {
       "get": {
-        "tags": [
-          "task-result"
-        ],
+        "tags": ["task-result"],
         "summary": "Get historical coupling task results",
         "description": "Get historical coupling task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all couplings, keyed by coupling ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
         "operationId": "getHistoricalCouplingTaskResults",
@@ -1734,9 +1658,7 @@
     },
     "/task-results/couplings/{coupling_id}/history": {
       "get": {
-        "tags": [
-          "task-result"
-        ],
+        "tags": ["task-result"],
         "summary": "Get coupling task history",
         "description": "Get complete task history for a specific coupling.\n\nRetrieves all historical task results for a specific coupling (qubit pair),\nsorted by end time in descending order. Useful for tracking two-qubit\ncalibration trends over time.\n\nParameters\n----------\ncoupling_id : str\n    Coupling ID to fetch history for (e.g., \"0-1\")\nchip_id : str\n    ID of the chip containing the coupling\ntask : str\n    Name of the task to fetch history for\ncurrent_user : User\n    Current authenticated user (optional)\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current user",
         "operationId": "getCouplingTaskHistory",
@@ -1804,9 +1726,7 @@
     },
     "/task-results/timeseries": {
       "get": {
-        "tags": [
-          "task-result"
-        ],
+        "tags": ["task-result"],
         "summary": "Get timeseries task results by tag and parameter",
         "description": "Get timeseries task results filtered by tag and parameter.\n\nRetrieves time series data for calibration parameters, optionally filtered\nto a specific qubit. Useful for plotting parameter trends over time.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntag : str\n    Tag to filter tasks by (e.g., calibration category)\nparameter : str\n    Name of the output parameter to retrieve\nstart_at : str\n    Start time in ISO format for the time range\nend_at : str\n    End time in ISO format for the time range\ncurrent_user : User\n    Current authenticated user\nqid : str | None\n    Optional qubit ID to filter results to a specific qubit\n\nReturns\n-------\nTimeSeriesData\n    Time series data keyed by qubit ID, each containing a list of\n    parameter values with timestamps",
         "operationId": "getTimeseriesTaskResults",
@@ -1916,9 +1836,7 @@
     },
     "/tags": {
       "get": {
-        "tags": [
-          "tag"
-        ],
+        "tags": ["tag"],
         "summary": "List all tags",
         "description": "List all tags for the current user.\n\nRetrieves all tags associated with the current user's calibration data.\nTags are used to categorize and filter task results.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user\n\nReturns\n-------\nListTagResponse\n    Wrapped list of tag names",
         "operationId": "listTags",
@@ -1943,9 +1861,7 @@
     },
     "/device-topology": {
       "post": {
-        "tags": [
-          "device-topology"
-        ],
+        "tags": ["device-topology"],
         "summary": "Get the device topology",
         "description": "Get the device topology.",
         "operationId": "getDeviceTopology",
@@ -1990,9 +1906,7 @@
     },
     "/device-topology/plot": {
       "post": {
-        "tags": [
-          "device-topology"
-        ],
+        "tags": ["device-topology"],
         "summary": "Get the device topology plot",
         "description": "Get the device topology as a PNG image.",
         "operationId": "getDeviceTopologyPlot",
@@ -2030,9 +1944,7 @@
     },
     "/backends": {
       "get": {
-        "tags": [
-          "backend"
-        ],
+        "tags": ["backend"],
         "summary": "List all backends",
         "description": "Retrieve a list of all registered backends",
         "operationId": "listBackends",
@@ -2057,9 +1969,7 @@
     },
     "/flows": {
       "get": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "List all flows",
         "description": "List all Flows for the current user.\n\nReturns metadata only (no code content for performance).",
         "operationId": "listFlows",
@@ -2082,9 +1992,7 @@
         ]
       },
       "post": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "Save a flow",
         "description": "Save a Flow to file system and MongoDB.\n\nSteps:\n1. Validate flow name\n2. Validate flow code contains expected function\n3. Create user directory if not exists\n4. Write code to file: user_flows/{username}/{name}.py\n5. Upsert metadata to MongoDB\n6. Return file path and success message",
         "operationId": "saveFlow",
@@ -2129,9 +2037,7 @@
     },
     "/flows/templates": {
       "get": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "List all flow templates",
         "description": "List all available flow templates.\n\nReturns metadata only (no code content for performance).",
         "operationId": "listFlowTemplates",
@@ -2160,9 +2066,7 @@
     },
     "/flows/templates/{template_id}": {
       "get": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "Get a flow template",
         "description": "Get flow template details including code content.\n\nSteps:\n1. Find template metadata\n2. Read Python file content\n3. Return combined data",
         "operationId": "getFlowTemplate",
@@ -2208,9 +2112,7 @@
     },
     "/flows/helpers": {
       "get": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "List flow helper files",
         "description": "List all Python files in the qdash.workflow.flow module.\n\nReturns list of filenames that users can view for reference.",
         "operationId": "listFlowHelperFiles",
@@ -2239,9 +2141,7 @@
     },
     "/flows/helpers/{filename}": {
       "get": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "Get flow helper file content",
         "description": "Get the content of a flow helper file.\n\nArgs:\n    filename: Name of the Python file (e.g., \"session.py\")\n\nReturns:\n    File content as string",
         "operationId": "getFlowHelperFile",
@@ -2288,9 +2188,7 @@
     },
     "/flows/schedules": {
       "get": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "List all flow schedules for current user",
         "description": "List all Flow schedules (cron and one-time) for the current user.\n\nArgs:\n----\n    current_user: Current authenticated user\n    limit: Maximum number of schedules to return (max 100)\n    offset: Number of schedules to skip\n\nReturns:\n-------\n    List of all flow schedules",
         "operationId": "listAllFlowSchedules",
@@ -2347,9 +2245,7 @@
     },
     "/flows/schedules/{schedule_id}": {
       "delete": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "Delete a flow schedule",
         "description": "Delete a Flow schedule (cron or one-time).\n\nSchedule ID Types:\n- **Cron schedules**: schedule_id is the deployment_id (UUID format)\n- **One-time schedules**: schedule_id is the flow_run_id (UUID format)\n\nThe API automatically determines the type and handles accordingly:\n- Cron: Removes the schedule from the deployment (schedule=None)\n- One-time: Deletes the scheduled flow run\n\nArgs:\n----\n    schedule_id: Schedule ID (deployment_id for cron, flow_run_id for one-time)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Standardized response with schedule type information",
         "operationId": "deleteFlowSchedule",
@@ -2393,9 +2289,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "Update a flow schedule",
         "description": "Update a Flow schedule (cron schedules only).\n\nCan update: active status, cron expression, parameters.\n\nArgs:\n----\n    schedule_id: Schedule ID (deployment_id)\n    request: Update request\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Success message",
         "operationId": "updateFlowSchedule",
@@ -2451,9 +2345,7 @@
     },
     "/flows/{name}": {
       "get": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "Get flow details",
         "description": "Get Flow details including code content.\n\nSteps:\n1. Find metadata in MongoDB\n2. Read code from file\n3. Return combined data",
         "operationId": "getFlow",
@@ -2497,9 +2389,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "Delete a flow",
         "description": "Delete a Flow.\n\nSteps:\n1. Delete file from user_flows/{username}/{name}.py\n2. Delete metadata from MongoDB",
         "operationId": "deleteFlow",
@@ -2549,9 +2439,7 @@
     },
     "/flows/{name}/execute": {
       "post": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "Execute a flow",
         "description": "Execute a Flow via Prefect deployment.\n\nSteps:\n1. Find flow metadata in MongoDB\n2. Merge request parameters with default_parameters\n3. Create flow run via Prefect Client\n4. Return execution_id and URLs",
         "operationId": "executeFlow",
@@ -2607,9 +2495,7 @@
     },
     "/flows/{name}/schedule": {
       "post": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "Schedule a flow execution (cron or one-time)",
         "description": "Schedule a Flow execution with cron or one-time schedule.\n\nArgs:\n----\n    name: Flow name\n    request: Schedule request (must provide either cron or scheduled_time)\n    current_user: Current authenticated user\n\nReturns:\n-------\n    Schedule response with schedule_id and details",
         "operationId": "scheduleFlow",
@@ -2665,9 +2551,7 @@
     },
     "/flows/{name}/schedules": {
       "get": {
-        "tags": [
-          "flow"
-        ],
+        "tags": ["flow"],
         "summary": "List schedules for a specific flow",
         "description": "List all schedules (cron and one-time) for a specific Flow.\n\nArgs:\n----\n    name: Flow name\n    current_user: Current authenticated user\n    limit: Maximum number of schedules to return (max 100)\n    offset: Number of schedules to skip\n\nReturns:\n-------\n    List of schedules for the flow",
         "operationId": "listFlowSchedules",
@@ -2733,9 +2617,7 @@
     },
     "/metrics/config": {
       "get": {
-        "tags": [
-          "metrics"
-        ],
+        "tags": ["metrics"],
         "summary": "Get metrics configuration",
         "description": "Get metrics metadata configuration for visualization.\n\nRetrieves the metrics configuration loaded from YAML, including display\nmetadata for all qubit and coupling metrics used in the dashboard.\n\nReturns\n-------\ndict[str, Any]\n    Dictionary with metrics configuration including:\n    - qubit_metrics: Metadata for single-qubit metrics (frequency, T1, T2, fidelities)\n    - coupling_metrics: Metadata for two-qubit coupling metrics (ZX90, Bell state)\n    - color_scale: Color scale configuration for heatmap visualization",
         "operationId": "getMetricsConfig",
@@ -2762,9 +2644,7 @@
     },
     "/metrics/chips/{chip_id}/metrics": {
       "get": {
-        "tags": [
-          "metrics"
-        ],
+        "tags": ["metrics"],
         "summary": "Get Chip Metrics",
         "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n    current_user: Current authenticated user\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
         "operationId": "getChipMetrics",
@@ -2806,10 +2686,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "enum": [
-                "latest",
-                "best"
-              ],
+              "enum": ["latest", "best"],
               "type": "string",
               "description": "Selection mode: 'latest' for most recent, 'best' for optimal values",
               "default": "latest",
@@ -2844,9 +2721,7 @@
     },
     "/metrics/chips/{chip_id}/qubits/{qid}/history": {
       "get": {
-        "tags": [
-          "metrics"
-        ],
+        "tags": ["metrics"],
         "summary": "Get Qubit Metric History",
         "description": "Get historical metric data for a specific qubit with task_id for figure display.\n\nThis endpoint queries TaskResultHistoryDocument to retrieve calibration\nhistory for a specific metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    qid: The qubit identifier (e.g., \"0\", \"Q00\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids",
         "operationId": "getQubitMetricHistory",
@@ -2951,9 +2826,7 @@
     },
     "/metrics/chips/{chip_id}/couplings/{coupling_id}/history": {
       "get": {
-        "tags": [
-          "metrics"
-        ],
+        "tags": ["metrics"],
         "summary": "Get Coupling Metric History",
         "description": "Get historical metric data for a specific coupling with task_id for figure display.\n\nThis endpoint queries TaskResultHistoryDocument to retrieve calibration\nhistory for a specific coupling metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    coupling_id: The coupling identifier (e.g., \"0-1\", \"2-3\")\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n    current_user: Current authenticated user\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids\n    (Note: qid field contains coupling_id for coupling metrics)",
         "operationId": "getCouplingMetricHistory",
@@ -3071,10 +2944,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "username"
-        ],
+        "required": ["name", "username"],
         "title": "BackendResponseModel",
         "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
       },
@@ -3090,10 +2960,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "username",
-          "password"
-        ],
+        "required": ["username", "password"],
         "title": "Body_login"
       },
       "CalibrationNoteResponse": {
@@ -3142,9 +3009,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "data"
-        ],
+        "required": ["data"],
         "title": "ChipDatesResponse",
         "description": "Response model for chip dates."
       },
@@ -3221,9 +3086,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "chip_id"
-        ],
+        "required": ["chip_id"],
         "title": "ChipResponse",
         "description": "Chip is a Pydantic model that represents a chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    qubits (dict): Qubit information.\n    couplings (dict): Coupling information.\n    installed_at (str): Installation timestamp."
       },
@@ -3245,11 +3108,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "coupling_fidelity",
-          "qubit_fidelity",
-          "readout_fidelity"
-        ],
+        "required": ["coupling_fidelity", "qubit_fidelity", "readout_fidelity"],
         "title": "Condition",
         "description": "Condition for filtering device topology."
       },
@@ -3272,12 +3131,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "control",
-          "target",
-          "fidelity",
-          "gate_duration"
-        ],
+        "required": ["control", "target", "fidelity", "gate_duration"],
         "title": "Coupling",
         "description": "Coupling information."
       },
@@ -3289,9 +3143,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "rzx90"
-        ],
+        "required": ["rzx90"],
         "title": "CouplingGateDuration",
         "description": "Gate duration of the coupling."
       },
@@ -3357,9 +3209,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "chip_id"
-        ],
+        "required": ["chip_id"],
         "title": "CreateChipRequest",
         "description": "Request model for creating a new chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip to create.\n    size (int): The size of the chip (64, 144, 256, or 1024)."
       },
@@ -3382,11 +3232,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "message",
-          "schedule_id",
-          "schedule_type"
-        ],
+        "required": ["message", "schedule_id", "schedule_type"],
         "title": "DeleteScheduleResponse",
         "description": "Response for deleting a schedule."
       },
@@ -3398,9 +3244,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "detail"
-        ],
+        "required": ["detail"],
         "title": "Detail",
         "description": "A simple message response.\n\nArgs:\n----\n    BaseModel: The base class for Pydantic models.\n\nAttributes:\n----------\n    message (str): The message to return."
       },
@@ -3462,14 +3306,7 @@
             },
             "type": "array",
             "title": "Qubits",
-            "default": [
-              "0",
-              "1",
-              "2",
-              "3",
-              "4",
-              "5"
-            ]
+            "default": ["0", "1", "2", "3", "4", "5"]
           },
           "exclude_couplings": {
             "items": {
@@ -3503,10 +3340,7 @@
           {
             "parameters": {
               "max_iterations": 5,
-              "qids": [
-                "32",
-                "38"
-              ]
+              "qids": ["32", "38"]
             }
           }
         ]
@@ -3535,12 +3369,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "execution_id",
-          "flow_run_url",
-          "qdash_ui_url",
-          "message"
-        ],
+        "required": ["execution_id", "flow_run_url", "qdash_ui_url", "message"],
         "title": "ExecuteFlowResponse",
         "description": "Response after executing a flow."
       },
@@ -3552,9 +3381,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "lock"
-        ],
+        "required": ["lock"],
         "title": "ExecutionLockStatusResponse",
         "description": "Response model for the fetch_execution_lock_status endpoint."
       },
@@ -3676,19 +3503,13 @@
           }
         },
         "type": "object",
-        "required": [
-          "min",
-          "max"
-        ],
+        "required": ["min", "max"],
         "title": "FidelityCondition",
         "description": "Condition for fidelity filtering."
       },
       "FileNodeType": {
         "type": "string",
-        "enum": [
-          "file",
-          "directory"
-        ],
+        "enum": ["file", "directory"],
         "title": "FileNodeType",
         "description": "File node type enum."
       },
@@ -3722,11 +3543,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "path",
-          "type"
-        ],
+        "required": ["name", "path", "type"],
         "title": "FileTreeNode",
         "description": "File tree node model."
       },
@@ -4096,10 +3913,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "task_name",
-          "result"
-        ],
+        "required": ["task_name", "result"],
         "title": "LatestTaskResultResponse",
         "description": "Response model for fetching the latest tasks grouped by qid/coupling_id."
       },
@@ -4114,9 +3928,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "backends"
-        ],
+        "required": ["backends"],
         "title": "ListBackendsResponse",
         "description": "Response model for listing all backends.\n\nWraps list of backends for API consistency and future extensibility."
       },
@@ -4131,9 +3943,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "chips"
-        ],
+        "required": ["chips"],
         "title": "ListChipsResponse",
         "description": "Response model for listing all chips.\n\nWraps list of chips for API consistency and future extensibility (e.g., pagination)."
       },
@@ -4181,9 +3991,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "executions"
-        ],
+        "required": ["executions"],
         "title": "ListExecutionsResponse",
         "description": "Response model for listing executions.\n\nWraps list of executions for API consistency and future extensibility (e.g., pagination)."
       },
@@ -4199,9 +4007,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "schedules"
-        ],
+        "required": ["schedules"],
         "title": "ListFlowSchedulesResponse",
         "description": "Response for listing flow schedules."
       },
@@ -4217,9 +4023,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "flows"
-        ],
+        "required": ["flows"],
         "title": "ListFlowsResponse",
         "description": "Response for listing flows."
       },
@@ -4234,9 +4038,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "muxes"
-        ],
+        "required": ["muxes"],
         "title": "ListMuxResponse",
         "description": "ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers."
       },
@@ -4251,9 +4053,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "tags"
-        ],
+        "required": ["tags"],
         "title": "ListTagResponse",
         "description": "Response model for a list of tags."
       },
@@ -4268,9 +4068,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "backends"
-        ],
+        "required": ["backends"],
         "title": "ListTaskFileBackendsResponse",
         "description": "Response model for listing task file backends."
       },
@@ -4285,9 +4083,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "tasks"
-        ],
+        "required": ["tasks"],
         "title": "ListTaskInfoResponse",
         "description": "Response model for listing task info."
       },
@@ -4302,9 +4098,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "tasks"
-        ],
+        "required": ["tasks"],
         "title": "ListTaskResponse",
         "description": "Response model for a list of tasks."
       },
@@ -4377,11 +4171,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "value",
-          "execution_id",
-          "timestamp"
-        ],
+        "required": ["value", "execution_id", "timestamp"],
         "title": "MetricHistoryItem",
         "description": "Single historical metric data point."
       },
@@ -4443,10 +4233,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "mux_id",
-          "detail"
-        ],
+        "required": ["mux_id", "detail"],
         "title": "MuxDetailResponse",
         "description": "MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details."
       },
@@ -4713,10 +4500,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "x",
-          "y"
-        ],
+        "required": ["x", "y"],
         "title": "Position",
         "description": "Position of the qubit on the device."
       },
@@ -4776,11 +4560,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "rz",
-          "sx",
-          "x"
-        ],
+        "required": ["rz", "sx", "x"],
         "title": "QubitGateDuration",
         "description": "Gate duration of the qubit."
       },
@@ -4796,10 +4576,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "t1",
-          "t2"
-        ],
+        "required": ["t1", "t2"],
         "title": "QubitLifetime",
         "description": "Qubit lifetime of the qubit."
       },
@@ -4830,13 +4607,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "chip_id",
-          "qid",
-          "metric_name",
-          "username",
-          "history"
-        ],
+        "required": ["chip_id", "qid", "metric_name", "username", "history"],
         "title": "QubitMetricHistoryResponse",
         "description": "Historical metric data for a single qubit."
       },
@@ -4971,10 +4742,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "path",
-          "content"
-        ],
+        "required": ["path", "content"],
         "title": "SaveFileRequest",
         "description": "Request model for saving file content."
       },
@@ -5029,11 +4797,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "code",
-          "chip_id"
-        ],
+        "required": ["name", "code", "chip_id"],
         "title": "SaveFlowRequest",
         "description": "Request to save a Flow.",
         "examples": [
@@ -5042,17 +4806,12 @@
             "code": "from prefect import flow\n\n@flow\ndef my_adaptive_calibration():\n    pass",
             "default_parameters": {
               "max_iterations": 10,
-              "qids": [
-                "32"
-              ]
+              "qids": ["32"]
             },
             "description": "Adaptive calibration with convergence check",
             "flow_function_name": "my_adaptive_calibration",
             "name": "my_adaptive_calibration",
-            "tags": [
-              "adaptive",
-              "calibration"
-            ]
+            "tags": ["adaptive", "calibration"]
           }
         ]
       },
@@ -5075,11 +4834,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "file_path",
-          "message"
-        ],
+        "required": ["name", "file_path", "message"],
         "title": "SaveFlowResponse",
         "description": "Response after saving a flow."
       },
@@ -5095,10 +4850,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "path",
-          "content"
-        ],
+        "required": ["path", "content"],
         "title": "SaveTaskFileRequest",
         "description": "Request model for saving task file content."
       },
@@ -5156,18 +4908,14 @@
             "cron": "0 2 * * *",
             "parameters": {
               "max_iterations": 10,
-              "qids": [
-                "32"
-              ]
+              "qids": ["32"]
             },
             "timezone": "Asia/Tokyo"
           },
           {
             "active": true,
             "parameters": {
-              "qids": [
-                "32"
-              ]
+              "qids": ["32"]
             },
             "scheduled_time": "2025-11-01T02:00:00+09:00"
           }
@@ -5339,9 +5087,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "title": "Tag",
         "description": "Response model for a tag."
       },
@@ -5564,10 +5310,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "path"
-        ],
+        "required": ["name", "path"],
         "title": "TaskFileBackend",
         "description": "Task file backend model."
       },
@@ -5640,11 +5383,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "path",
-          "type"
-        ],
+        "required": ["name", "path", "type"],
         "title": "TaskFileTreeNode",
         "description": "Task file tree node model."
       },
@@ -5663,10 +5402,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "data"
-        ],
+        "required": ["name", "data"],
         "title": "TaskHistoryResponse",
         "description": "Response model for fetching task history."
       },
@@ -5708,11 +5444,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "name",
-          "class_name",
-          "file_path"
-        ],
+        "required": ["name", "class_name", "file_path"],
         "title": "TaskInfo",
         "description": "Task information extracted from Python file."
       },
@@ -6086,10 +5818,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "access_token",
-          "username"
-        ],
+        "required": ["access_token", "username"],
         "title": "TokenResponse",
         "description": "Token response model for login."
       },
@@ -6133,9 +5862,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "active"
-        ],
+        "required": ["active"],
         "title": "UpdateScheduleRequest",
         "description": "Request to update a schedule."
       },
@@ -6153,10 +5880,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "message",
-          "schedule_id"
-        ],
+        "required": ["message", "schedule_id"],
         "title": "UpdateScheduleResponse",
         "description": "Response for updating a schedule."
       },
@@ -6190,9 +5914,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "username"
-        ],
+        "required": ["username"],
         "title": "User",
         "description": "User model for authentication and user management."
       },
@@ -6219,10 +5941,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "username",
-          "password"
-        ],
+        "required": ["username", "password"],
         "title": "UserCreate",
         "description": "User creation model for registration."
       },
@@ -6260,10 +5979,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "username",
-          "access_token"
-        ],
+        "required": ["username", "access_token"],
         "title": "UserWithToken",
         "description": "User model with access token for login/register responses."
       },
@@ -6279,10 +5995,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "content",
-          "file_type"
-        ],
+        "required": ["content", "file_type"],
         "title": "ValidateFileRequest",
         "description": "Request model for validating file content."
       },
@@ -6312,11 +6025,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
+        "required": ["loc", "msg", "type"],
         "title": "ValidationError"
       }
     },
