@@ -15,7 +15,7 @@ def generate_access_token() -> str:
     return secrets.token_urlsafe(32)
 
 
-def migrate_users(mongo_uri: str = "mongodb://localhost:27017", db_name: str = "qubex") -> None:
+def migrate_users(mongo_uri: str = "mongodb://root:example@mongo:27017", db_name: str = "qubex") -> None:
     """Add access_token to all users without one."""
     client = MongoClient(mongo_uri)
     db = client[db_name]
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Migrate users to have access tokens")
-    parser.add_argument("--mongo-uri", default="mongodb://localhost:27017", help="MongoDB connection URI")
+    parser.add_argument("--mongo-uri", default="mongodb://root:example@mongo:27017", help="MongoDB connection URI")
     parser.add_argument("--db-name", default="qubex", help="Database name")
     args = parser.parse_args()
 
