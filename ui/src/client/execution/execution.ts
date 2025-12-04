@@ -46,8 +46,8 @@ path : str
 
 Returns
 -------
-StreamingResponse
-    PNG image data as a streaming response with media type "image/png"
+FileResponse
+    PNG image data as a file response with media type "image/png"
 
 Raises
 ------
