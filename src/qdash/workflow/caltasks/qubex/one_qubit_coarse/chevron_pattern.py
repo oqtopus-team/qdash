@@ -22,45 +22,6 @@ class ChevronPattern(QubexTask):
         "qubit_frequency": OutputParameterModel(unit="GHz", description="Qubit bare frequency"),
     }
 
-    def make_figure(self, result: Any, label: str) -> go.Figure:
-        """Create a figure for the results."""
-
-        detuning_range = result["detuning_range"]
-        time_range = result["time_range"]
-        frequencies = result["frequencies"]
-
-        result["rabi_rates"]
-        chevron_data = result["chevron_data"]
-
-        fig = go.Figure()
-        fig.add_trace(
-            go.Heatmap(
-                x=detuning_range + frequencies[label],
-                y=time_range,
-                z=chevron_data[label],
-                colorscale="Viridis",
-            )
-        )
-        fig.update_layout(
-            title=dict(
-                text=f"Chevron pattern : {label}",
-                subtitle=dict(
-                    text="control_amplitude=",
-                    font=dict(
-                        size=13,
-                        family="monospace",
-                    ),
-                ),
-            ),
-            xaxis_title="Drive frequency (GHz)",
-            yaxis_title="Time (ns)",
-            width=600,
-            height=400,
-            margin=dict(t=80),
-        )
-
-        return fig
-
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
@@ -69,7 +30,7 @@ class ChevronPattern(QubexTask):
         result = run_result.raw_result
         self.output_parameters["qubit_frequency"].value = result["resonant_frequencies"][label]
         output_parameters = self.attach_execution_id(execution_id)
-        figures = [self.make_figure(result, label)]
+        figures = [result["fig"][label]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
