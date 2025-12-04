@@ -9,6 +9,11 @@ tasks:
     cmds:
       - task -l
 
+  restart-api:
+    cmds:
+      - docker compose restart api
+    desc: Restart the API service
+
   generate:
     dir: ui
     dotenv: [.env]
