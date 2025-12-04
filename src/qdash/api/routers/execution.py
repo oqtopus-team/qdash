@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
-from io import BytesIO
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse
 from pymongo import DESCENDING
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
@@ -110,7 +109,7 @@ def flatten_tasks(task_results: dict) -> list[dict]:
 @router.get(
     "/executions/figure",
     responses={404: {"model": Detail}},
-    response_class=StreamingResponse,
+    response_class=FileResponse,
     summary="Get a calibration figure by its path",
     operation_id="getFigureByPath",
 )
@@ -127,8 +126,8 @@ def get_figure_by_path(path: str):
 
     Returns
     -------
-    StreamingResponse
-        PNG image data as a streaming response with media type "image/png"
+    FileResponse
+        PNG image data as a file response with media type "image/png"
 
     Raises
     ------
@@ -141,9 +140,8 @@ def get_figure_by_path(path: str):
             status_code=404,
             detail=f"File not found: {path}",
         )
-    with Path(path).open("rb") as file:
-        image_data = file.read()
-    return StreamingResponse(BytesIO(image_data), media_type="image/png")
+    # FileResponse を使うことで Content-Length が設定され、chunked encoding が不要になる
+    return FileResponse(path, media_type="image/png")
 
 
 @router.get(

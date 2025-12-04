@@ -1,7 +1,6 @@
-from typing import Any, ClassVar
+from typing import ClassVar
 
 import numpy as np
-import plotly.graph_objects as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.caltasks.base import (
     PostProcessResult,

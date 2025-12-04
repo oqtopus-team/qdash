@@ -7,8 +7,9 @@ export default function AxiosProvider({
 }: {
   children: React.ReactNode;
 }) {
-  // Configure base URL
-  AXIOS_INSTANCE.defaults.baseURL = process.env.NEXT_PUBLIC_API_URL;
+  // Configure base URL - use /api proxy route (handled by Next.js rewrites)
+  // Falls back to direct API URL for backward compatibility
+  AXIOS_INSTANCE.defaults.baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
   // Add request interceptor to handle auth
   AXIOS_INSTANCE.interceptors.request.use((config) => {

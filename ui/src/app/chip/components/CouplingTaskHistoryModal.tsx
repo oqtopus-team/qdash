@@ -260,9 +260,7 @@ export function CouplingTaskHistoryModal({
                     <div className="flex-1 flex justify-center items-center">
                       <PlotlyRenderer
                         className="w-full h-full"
-                        fullPath={`${
-                          process.env.NEXT_PUBLIC_API_URL
-                        }/executions/figure?path=${encodeURIComponent(
+                        fullPath={`/api/executions/figure?path=${encodeURIComponent(
                           currentJsonFigure,
                         )}`}
                       />

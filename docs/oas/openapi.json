@@ -160,7 +160,7 @@
       "get": {
         "tags": ["execution"],
         "summary": "Get a calibration figure by its path",
-        "description": "Fetch a calibration figure by its file path.\n\nRetrieves a PNG image file from the server's filesystem and returns it\nas a streaming response.\n\nParameters\n----------\npath : str\n    Absolute file path to the calibration figure image\n\nReturns\n-------\nStreamingResponse\n    PNG image data as a streaming response with media type \"image/png\"\n\nRaises\n------\nHTTPException\n    404 if the file does not exist at the specified path",
+        "description": "Fetch a calibration figure by its file path.\n\nRetrieves a PNG image file from the server's filesystem and returns it\nas a streaming response.\n\nParameters\n----------\npath : str\n    Absolute file path to the calibration figure image\n\nReturns\n-------\nFileResponse\n    PNG image data as a file response with media type \"image/png\"\n\nRaises\n------\nHTTPException\n    404 if the file does not exist at the specified path",
         "operationId": "getFigureByPath",
         "parameters": [
           {
