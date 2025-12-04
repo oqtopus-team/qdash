@@ -49,7 +49,7 @@ def _apply_frequency_offset_strategy(
     frequency_offset = retry_strategy["frequency_offset"]
 
     # Get current default frequency for this qubit
-    exp = session.session.get_session()
+    exp = session.backend.get_instance()
     label = exp.get_qubit_label(int(qid))
     current_freq = exp.experiment_system.quantum_system.get_qubit(label).frequency
     target_freq = current_freq + frequency_offset

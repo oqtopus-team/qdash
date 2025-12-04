@@ -67,3 +67,20 @@ class ChipDocument(Document):
         if chip is None:
             raise ValueError(f"Chip not found for user {username}")
         return chip
+
+    @classmethod
+    def get_chip_by_id(cls, username: str, chip_id: str) -> "ChipDocument | None":
+        """Get a specific chip by chip_id and username.
+
+        Unlike get_current_chip which returns the most recently installed chip,
+        this method returns the chip with the specified chip_id.
+
+        Args:
+            username: The username of the chip owner
+            chip_id: The specific chip ID to retrieve
+
+        Returns:
+            ChipDocument if found, None otherwise
+
+        """
+        return cls.find_one({"username": username, "chip_id": chip_id}).run()

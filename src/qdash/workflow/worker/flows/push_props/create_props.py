@@ -1,6 +1,6 @@
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
-from qdash.workflow.engine.session.qubex import QubexSession
+from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.worker.flows.push_props.formatter import format_number
 from qdash.workflow.worker.flows.push_props.io import ChipPropertyYAMLHandler
 from qdash.workflow.worker.flows.push_props.models import (
@@ -68,7 +68,7 @@ def merge_properties(base_props: CommentedMap, chip_props: ChipProperties, chip_
 
 
 def get_chip_properties(
-    chip: ChipDocument, session: QubexSession, within_24hrs: bool = False, cutoff_hours: int = 24
+    chip: ChipDocument, backend: QubexBackend, within_24hrs: bool = False, cutoff_hours: int = 24
 ) -> tuple[ChipProperties, dict]:
     """Extract chip properties from the ChipDocument.
 
@@ -85,11 +85,11 @@ def get_chip_properties(
     }
     import re
 
-    match = re.search(r"\d+", session.config["chip_id"])
+    match = re.search(r"\d+", backend.config["chip_id"])
     if not match:
-        raise ValueError(f"No digits found in chip_id: {session.config['chip_id']}")
+        raise ValueError(f"No digits found in chip_id: {backend.config['chip_id']}")
     n = int(match.group())
-    exp = session.get_session()
+    exp = backend.get_instance()
     for i in range(n):
         props.qubits[exp.get_qubit_label(i)] = QubitProperties()
 
@@ -122,9 +122,9 @@ def create_chip_properties(username: str, source_path: str, target_path: str, ch
     """Create and write chip properties to a YAML file."""
     initialize()
     chip = ChipDocument.get_current_chip(username=username)
-    from qdash.workflow.engine.session.factory import create_session
+    from qdash.workflow.engine.backend.factory import create_backend
 
-    session = create_session(
+    backend = create_backend(
         backend="qubex",
         config={
             "task_type": "",
@@ -134,7 +134,7 @@ def create_chip_properties(username: str, source_path: str, target_path: str, ch
             "chip_id": chip_id,
         },
     )
-    props, _ = get_chip_properties(chip, within_24hrs=False, session=session)
+    props, _ = get_chip_properties(chip, within_24hrs=False, backend=backend)
 
     handler = ChipPropertyYAMLHandler(source_path)
     base = handler.read()

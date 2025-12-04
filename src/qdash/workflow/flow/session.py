@@ -33,13 +33,13 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
-from qdash.workflow.engine.calibration.execution_manager import ExecutionManager
+from qdash.workflow.caltasks.active_protocols import generate_task_instances
+from qdash.workflow.engine.backend.factory import create_backend
+from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.params_updater import get_params_updater
-from qdash.workflow.engine.calibration.task import execute_dynamic_task_by_qid
-from qdash.workflow.engine.calibration.task_manager import TaskManager
-from qdash.workflow.engine.session.factory import create_session
+from qdash.workflow.engine.calibration.prefect_tasks import execute_dynamic_task_by_qid
+from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.flow.github import GitHubIntegration, GitHubPushConfig
-from qdash.workflow.tasks.active_protocols import generate_task_instances
 
 
 def generate_execution_id(username: str, chip_id: str) -> str:
@@ -79,9 +79,9 @@ class FlowSession:
         username: Username for the calibration session
         execution_id: Unique execution identifier
         chip_id: Target chip ID
-        backend: Backend type ('qubex' or 'fake')
+        backend_name: Backend type ('qubex' or 'fake')
         execution_manager: Manages execution state and history
-        session: Backend session for device communication
+        backend: Backend instance for device communication
 
     Example:
         ```python
@@ -98,7 +98,7 @@ class FlowSession:
         chip_id: str,
         qids: list[str],
         execution_id: str | None = None,
-        backend: str = "qubex",
+        backend_name: str = "qubex",
         name: str = "Python Flow Execution",
         tags: list[str] | None = None,
         use_lock: bool = True,
@@ -115,7 +115,7 @@ class FlowSession:
             qids: List of qubit IDs to calibrate (required for qubex initialization)
             execution_id: Unique execution identifier (e.g., "20240101-001").
                 If None, auto-generates using current date and counter.
-            backend: Backend type, either 'qubex' or 'fake' (default: 'qubex')
+            backend_name: Backend type, either 'qubex' or 'fake' (default: 'qubex')
             name: Human-readable name for the execution (default: 'Python Flow Execution')
             tags: List of tags for categorization (default: ['python_flow'])
             use_lock: Whether to use ExecutionLock to prevent concurrent calibrations (default: True)
@@ -132,7 +132,7 @@ class FlowSession:
         self.chip_id = chip_id
         self.qids = qids
         self.muxes = muxes
-        self.backend = backend
+        self.backend_name = backend_name
         self.use_lock = use_lock
         self._lock_acquired = False
         self._last_executed_task_id_by_qid: dict[str, str] = {}  # Track last task_id per qid
@@ -160,6 +160,58 @@ class FlowSession:
             ExecutionLockDocument.lock()
             self._lock_acquired = True
 
+        # Wrap all initialization in try/except to ensure lock is released on failure
+        try:
+            self._initialize_session(
+                username=username,
+                chip_id=chip_id,
+                qids=qids,
+                execution_id=execution_id,
+                backend_name=backend_name,
+                name=name,
+                tags=tags,
+                note=note,
+                enable_github_pull=enable_github_pull,
+                muxes=muxes,
+            )
+        except Exception:
+            # Release lock if initialization fails
+            if self._lock_acquired:
+                ExecutionLockDocument.unlock()
+                self._lock_acquired = False
+            raise
+
+    def _initialize_session(
+        self,
+        username: str,
+        chip_id: str,
+        qids: list[str],
+        execution_id: str,
+        backend_name: str,
+        name: str,
+        tags: list[str] | None,
+        note: dict[str, Any] | None,
+        enable_github_pull: bool,
+        muxes: list[int] | None,
+    ) -> None:
+        """Initialize session components after lock acquisition.
+
+        This method is separated from __init__ to enable proper exception handling
+        with lock release on failure.
+
+        Args:
+            username: Username for the session
+            chip_id: Target chip ID
+            qids: List of qubit IDs
+            execution_id: Execution identifier
+            backend_name: Backend type
+            name: Human-readable name
+            tags: Tags for categorization
+            note: Additional notes
+            enable_github_pull: Whether to pull from GitHub
+            muxes: MUX IDs for system-level tasks
+
+        """
         # Set default tags and note
         # Use name (which is flow_name or display_name) as default tag
         if tags is None:
@@ -233,14 +285,14 @@ class FlowSession:
         if muxes is not None:
             session_config["muxes"] = muxes
 
-        self.session = create_session(
-            backend=backend,
+        self.backend = create_backend(
+            backend=backend_name,
             config=session_config,
         )
 
         # Save calibration_note before connecting (loads parameter overrides)
-        if self.session.name == "qubex":
-            self.session.save_note(
+        if self.backend.name == "qubex":
+            self.backend.save_note(
                 username=username,
                 chip_id=chip_id,
                 calib_dir=calib_data_path,
@@ -248,7 +300,7 @@ class FlowSession:
                 task_manager_id=self.task_manager.id,
             )
 
-        self.session.connect()
+        self.backend.connect()
 
     def _ensure_task_in_workflow(self, task_name: str, task_type: str, qid: str) -> None:
         """Ensure task exists in TaskManager's workflow structure.
@@ -305,6 +357,24 @@ class FlowSession:
         # Save updated workflow
         self.task_manager.save()
 
+    def _get_relevant_qubit_ids(self, qid: str) -> list[str]:
+        """Get the list of qubit IDs relevant to a task execution.
+
+        For qubit tasks, this returns just the target qid.
+        For coupling tasks (e.g., "0-1"), this returns both individual qubits.
+
+        Args:
+            qid: The qubit or coupling ID
+
+        Returns:
+            List of relevant qubit IDs
+
+        """
+        if "-" in qid:
+            # Coupling ID like "0-1" - extract individual qubit IDs
+            return qid.split("-")
+        return [qid]
+
     def execute_task(
         self,
         task_name: str,
@@ -354,7 +424,7 @@ class FlowSession:
         task_instances = generate_task_instances(
             task_names=[task_name],
             task_details=task_details,
-            backend=self.backend,
+            backend=self.backend_name,
         )
 
         task_instance = task_instances[task_name]
@@ -375,6 +445,8 @@ class FlowSession:
         import uuid
         from copy import deepcopy
 
+        from qdash.datamodel.task import CalibDataModel
+
         execution_task_manager = TaskManager(
             username=self.username,
             execution_id=self.execution_id,
@@ -383,8 +455,23 @@ class FlowSession:
         )
         execution_task_manager.id = str(uuid.uuid4())
 
-        # Copy current calibration data to the new task manager
-        execution_task_manager.calib_data = deepcopy(self.task_manager.calib_data)
+        # Copy only the relevant calibration data for this qid to reduce overhead
+        # For qubit tasks: copy data for the target qid
+        # For coupling tasks: qid is like "0-1", copy both individual qubit data and coupling data
+        relevant_qubit_ids = self._get_relevant_qubit_ids(qid)
+        execution_task_manager.calib_data = CalibDataModel(
+            qubit={
+                q: deepcopy(self.task_manager.calib_data.qubit[q])
+                for q in relevant_qubit_ids
+                if q in self.task_manager.calib_data.qubit
+            },
+            coupling={
+                c: deepcopy(self.task_manager.calib_data.coupling[c])
+                for c in [qid]
+                if qid in self.task_manager.calib_data.coupling
+            },
+        )
+        # controller_info is typically small, deepcopy is acceptable
         execution_task_manager.controller_info = deepcopy(self.task_manager.controller_info)
 
         # Set upstream_id for sequential task dependency tracking
@@ -400,7 +487,7 @@ class FlowSession:
             task_run_name=task_instance.name,
             log_prints=True,
         )(
-            session=self.session,
+            backend=self.backend,
             execution_manager=execution_manager,
             task_manager=execution_task_manager,
             task_instance=task_instance,
@@ -553,7 +640,7 @@ class FlowSession:
 
     def _sync_backend_params_before_push(self, logger) -> None:
         """Sync recent calibration results into backend YAML params prior to GitHub push."""
-        updater_instance = get_params_updater(self.session, self.chip_id)
+        updater_instance = get_params_updater(self.backend, self.chip_id)
         if updater_instance is None:
             return
 
@@ -611,14 +698,21 @@ class FlowSession:
             # Reload and complete execution
             self.execution_manager = self.execution_manager.reload().complete_execution()
 
-            # Update chip history
+            # Update chip history for the specific chip being calibrated
             if update_chip_history:
                 try:
-                    chip_doc = ChipDocument.get_current_chip(username=self.username)
-                    ChipHistoryDocument.create_history(chip_doc)
-                except Exception:
+                    # Use chip_id from session instead of "current" chip to avoid
+                    # updating wrong chip's history when calibrating older chips
+                    chip_doc = ChipDocument.get_chip_by_id(username=self.username, chip_id=self.chip_id)
+                    if chip_doc is not None:
+                        ChipHistoryDocument.create_history(chip_doc)
+                    else:
+                        logger.warning(
+                            f"Chip '{self.chip_id}' not found for user '{self.username}', " "skipping history update"
+                        )
+                except Exception as e:
                     # If chip history update fails, log but don't fail the calibration
-                    pass
+                    logger.warning(f"Failed to update chip history: {e}")
 
             # Export calibration note to file if requested
             if export_note_to_file:
@@ -704,7 +798,15 @@ class FlowSession:
 
 
 # Global session storage for Prefect context
-_current_session: FlowSession | None = None
+# Note: Using SessionContext for thread-safe management while maintaining
+# backward compatibility with direct _current_session access
+from qdash.workflow.flow.context import (
+    clear_current_session,
+    get_current_session,
+    set_current_session,
+)
+
+_current_session: FlowSession | None = None  # Backward compatibility alias
 
 
 def init_calibration(
@@ -712,7 +814,7 @@ def init_calibration(
     chip_id: str,
     qids: list[str],
     execution_id: str | None = None,
-    backend: str = "qubex",
+    backend_name: str = "qubex",
     name: str | None = None,
     flow_name: str | None = None,
     tags: list[str] | None = None,
@@ -733,7 +835,7 @@ def init_calibration(
         qids: List of qubit IDs to calibrate (required for qubex initialization)
         execution_id: Unique execution identifier (e.g., "20240101-001").
             If None, auto-generates using current date and counter.
-        backend: Backend type ('qubex' or 'fake')
+        backend_name: Backend type ('qubex' or 'fake')
         name: Human-readable name for the execution (deprecated, use flow_name instead).
             If None, auto-detects from Prefect flow name or defaults to "Python Flow Execution".
         flow_name: Flow name (file name without .py extension) for display in execution list.
@@ -804,12 +906,12 @@ def init_calibration(
             # Fallback if context is not available (e.g., running outside Prefect)
             display_name = "Python Flow Execution"
 
-    _current_session = FlowSession(
+    session = FlowSession(
         username=username,
         chip_id=chip_id,
         qids=qids,
         execution_id=execution_id,
-        backend=backend,
+        backend_name=backend_name,
         name=display_name,
         tags=tags,
         use_lock=use_lock,
@@ -818,7 +920,11 @@ def init_calibration(
         github_push_config=github_push_config,
         muxes=muxes,
     )
-    return _current_session
+
+    # Use SessionContext for thread-safe management
+    set_current_session(session)
+    _current_session = session  # Backward compatibility
+    return session
 
 
 def get_session() -> FlowSession:
@@ -837,10 +943,11 @@ def get_session() -> FlowSession:
         ```
 
     """
-    if _current_session is None:
+    session = get_current_session()
+    if session is None:
         msg = "No active calibration session. Call init_calibration() first."
         raise RuntimeError(msg)
-    return _current_session
+    return session
 
 
 def finish_calibration(
@@ -873,9 +980,17 @@ def finish_calibration(
         ```
 
     """
+    global _current_session  # noqa: PLW0603
+
     session = get_session()
-    return session.finish_calibration(
+    result = session.finish_calibration(
         update_chip_history=update_chip_history,
         push_to_github=push_to_github,
         export_note_to_file=export_note_to_file,
     )
+
+    # Clear session after completion
+    clear_current_session()
+    _current_session = None  # Backward compatibility
+
+    return result

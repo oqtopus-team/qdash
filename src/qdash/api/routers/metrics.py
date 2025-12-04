@@ -19,6 +19,7 @@ from qdash.api.schemas.metrics import (
     QubitMetrics,
 )
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -48,6 +49,47 @@ def normalize_qid(qid: str) -> str:
 
     """
     return qid.replace("Q", "").lstrip("0") or "0"
+
+
+def _extract_metric_output_info(metric_data: Any) -> tuple[float | int | None, str | None, str | None]:
+    """Extract value, calibrated_at, and task_id from metric output data."""
+
+    if metric_data is None:
+        return None, None, None
+
+    if isinstance(metric_data, dict):
+        return (
+            metric_data.get("value"),
+            metric_data.get("calibrated_at"),
+            metric_data.get("task_id"),
+        )
+
+    if hasattr(metric_data, "model_dump"):
+        data = metric_data.model_dump()
+        return data.get("value"), data.get("calibrated_at"), data.get("task_id")
+
+    if hasattr(metric_data, "value"):
+        return (
+            getattr(metric_data, "value", None),
+            getattr(metric_data, "calibrated_at", None),
+            getattr(metric_data, "task_id", None),
+        )
+
+    return metric_data, None, None
+
+
+def _get_task_timestamp(task_doc: Any) -> str:
+    """Get the best available timestamp for a task history document."""
+
+    timestamp = getattr(task_doc, "start_at", "") or getattr(task_doc, "end_at", "")
+    if timestamp:
+        return timestamp
+
+    system_info = getattr(task_doc, "system_info", None)
+    if isinstance(system_info, dict):
+        return system_info.get("created_at", "")
+
+    return getattr(system_info, "created_at", "") if system_info is not None else ""
 
 
 @router.get("/config", summary="Get metrics configuration", operation_id="getMetricsConfig")
@@ -137,11 +179,11 @@ def _extract_best_metrics(
     metrics_config: dict[str, Any],
     cutoff_time: Any | None,
 ) -> dict[str, dict[str, MetricValue]]:
-    """Extract best metrics from execution history.
+    """Extract best metrics from task result history.
 
-    This function queries the execution history to find the optimal metric values
+    This function queries TaskResultHistoryDocument to find the optimal metric values
     based on the evaluation mode (maximize/minimize) defined in the configuration.
-    It processes all executions within the specified time window and selects the
+    It processes all task results within the specified time window and selects the
     best value for each metric.
 
     Args:
@@ -150,7 +192,7 @@ def _extract_best_metrics(
         entity_type: Type of entity - either "qubit" or "coupling"
         valid_metric_keys: Set of metric keys to extract from config
         metrics_config: Metrics configuration mapping metric_key -> MetricMetadata
-        cutoff_time: Optional pendulum datetime for filtering executions
+        cutoff_time: Optional pendulum datetime for filtering tasks
 
     Returns:
     -------
@@ -159,63 +201,75 @@ def _extract_best_metrics(
     Notes:
     -----
         - Only processes metrics with evaluation.mode != "none"
-        - Queries all executions within the specified time window
+        - Queries TaskResultHistoryDocument for output_parameters
         - Uses max() for "maximize" mode and min() for "minimize" mode
 
     """
-    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
-
     metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
 
-    # Query execution history with limit to prevent memory issues
+    # Filter to only metrics that support best mode (evaluation.mode != "none")
+    best_mode_metrics = [key for key in valid_metric_keys if metrics_config[key].evaluation.mode != "none"]
+
+    if not best_mode_metrics:
+        return metrics_data
+
+    # Build query for task result history with metric existence filter
+    # This significantly reduces the number of documents fetched from MongoDB
     query: dict[str, Any] = {
         "chip_id": chip.chip_id,
         "username": chip.username,
+        "task_type": entity_type,
+        "$or": [{f"output_parameters.{metric}": {"$exists": True}} for metric in best_mode_metrics],
     }
     if cutoff_time:
         query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
 
-    # Query all executions within time window, sorted by start_at descending
-    # No limit applied - we need all data within the specified time range
+    # Query task results that have at least one of the target metrics
     try:
-        executions = ExecutionHistoryDocument.find(query).sort([("start_at", -1)]).to_list()
+        task_results = TaskResultHistoryDocument.find(query).sort([("start_at", -1)]).to_list()
     except Exception as e:
-        logger.error(f"Failed to query execution history: {e}")
+        logger.error(f"Failed to query task result history: {e}")
         raise HTTPException(status_code=500, detail=f"Database query failed: {e}") from e
 
-    if not executions:
-        logger.warning(f"No execution history found for chip={chip.chip_id}, username={chip.username}")
+    if not task_results:
+        logger.warning(f"No task result history found for chip={chip.chip_id}, username={chip.username}")
         return metrics_data
 
     # Collect all values for each metric/entity_id combination
+    # Structure: metric_name -> entity_id -> list of (value, task_id, execution_id, calibrated_at)
     metric_values: dict[str, dict[str, list[tuple[float, str, str, str]]]] = {key: {} for key in valid_metric_keys}
 
-    for exec_doc in executions:
-        calib_data = exec_doc.calib_data
-        if entity_type in calib_data:
-            for entity_id, entity_data in calib_data[entity_type].items():
-                for metric_name, metric_data in entity_data.items():
-                    if metric_name not in valid_metric_keys:
-                        continue
+    for task_doc in task_results:
+        entity_id = task_doc.qid
+        if not entity_id:
+            continue
 
-                    # Extract value
-                    if isinstance(metric_data, dict):
-                        value = metric_data.get("value")
-                        task_id = metric_data.get("task_id")
-                        execution_id = exec_doc.execution_id
-                        calibrated_at = metric_data.get("calibrated_at", exec_doc.start_at)
-                    else:
-                        value = metric_data
-                        task_id = None
-                        execution_id = exec_doc.execution_id
-                        calibrated_at = exec_doc.start_at
+        output_params = task_doc.output_parameters
+        if not output_params:
+            continue
 
-                    if value is not None:
-                        if entity_id not in metric_values[metric_name]:
-                            metric_values[metric_name][entity_id] = []
-                        metric_values[metric_name][entity_id].append(
-                            (value, task_id or "", execution_id, calibrated_at)
-                        )
+        for metric_name in valid_metric_keys:
+            if metric_name not in output_params:
+                continue
+
+            metric_data = output_params[metric_name]
+
+            # Extract value from output_parameters
+            if isinstance(metric_data, dict):
+                value = metric_data.get("value")
+                task_id = metric_data.get("task_id", task_doc.task_id)
+                execution_id = metric_data.get("execution_id", task_doc.execution_id)
+                calibrated_at = metric_data.get("calibrated_at", task_doc.start_at)
+            else:
+                value = metric_data
+                task_id = task_doc.task_id
+                execution_id = task_doc.execution_id
+                calibrated_at = task_doc.start_at
+
+            if value is not None and isinstance(value, (int, float)):
+                if entity_id not in metric_values[metric_name]:
+                    metric_values[metric_name][entity_id] = []
+                metric_values[metric_name][entity_id].append((float(value), task_id or "", execution_id, calibrated_at))
 
     # Select best value for each metric/entity_id based on evaluation mode
     for metric_name in valid_metric_keys:
@@ -401,7 +455,7 @@ async def get_qubit_metric_history(
 ) -> QubitMetricHistoryResponse:
     """Get historical metric data for a specific qubit with task_id for figure display.
 
-    This endpoint queries ExecutionHistoryDocument to retrieve the calibration
+    This endpoint queries TaskResultHistoryDocument to retrieve calibration
     history for a specific metric, including multiple executions on the same day.
     Each history item includes task_id for displaying calibration figures.
 
@@ -419,83 +473,62 @@ async def get_qubit_metric_history(
         QubitMetricHistoryResponse with historical metric data and task_ids
 
     """
-    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
-
     username = current_user.username if current_user else "admin"
 
     # Normalize qid format (remove "Q" prefix if present)
     normalized_qid = normalize_qid(qid)
+    qid_variants = list({normalized_qid, qid, f"Q{normalized_qid.zfill(2)}"})
 
     # Calculate cutoff time
     cutoff_time = None
     if within_days:
         cutoff_time = pendulum.now("Asia/Tokyo").subtract(days=within_days)
 
-    # Query execution history
-    # Note: No status filter - we want to include all executions (running, completed, failed)
-    # because individual tasks may have succeeded even if the execution as a whole failed
+    # Query task result history directly for matching metrics
     query: dict[str, Any] = {
         "chip_id": chip_id,
         "username": username,
+        "task_type": "qubit",
+        "qid": {"$in": qid_variants},
+        f"output_parameters.{metric}": {"$exists": True},
     }
 
     if cutoff_time:
         query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
 
-    # Query all executions within time window, no limit applied
-    executions = ExecutionHistoryDocument.find(query).sort([("start_at", -1)]).to_list()
+    results_query = TaskResultHistoryDocument.find(query).sort([("start_at", -1)])
+    if limit is not None:
+        results_query = results_query.limit(limit)
 
-    # Extract metric values from calib_data
+    task_results = results_query.run()
+
     history_items: list[MetricHistoryItem] = []
 
-    for exec_doc in executions:
-        calib_data = exec_doc.calib_data
+    for task_doc in task_results:
+        metric_data = task_doc.output_parameters.get(metric)
+        value, calibrated_at, metric_task_id = _extract_metric_output_info(metric_data)
 
-        # Try both normalized and original qid formats
-        qid_variants = [normalized_qid, qid, f"Q{normalized_qid.zfill(2)}"]
+        if value is None:
+            continue
 
-        for qid_variant in qid_variants:
-            if "qubit" in calib_data and qid_variant in calib_data["qubit"]:
-                qubit_data = calib_data["qubit"][qid_variant]
-
-                if metric in qubit_data:
-                    metric_data = qubit_data[metric]
-
-                    # Handle both dict and direct value formats
-                    if isinstance(metric_data, dict):
-                        value = metric_data.get("value")
-                        task_id = metric_data.get("task_id")
-                        calibrated_at = metric_data.get("calibrated_at")
-                    else:
-                        value = metric_data
-                        task_id = None
-                        calibrated_at = None
-
-                    # Only include if value exists and task_id is available
-                    if value is not None and task_id:
-                        history_items.append(
-                            MetricHistoryItem(
-                                value=value,
-                                execution_id=exec_doc.execution_id,
-                                task_id=task_id,
-                                timestamp=exec_doc.start_at,
-                                calibrated_at=calibrated_at,
-                            )
-                        )
-
-                        # Stop if limit is specified and reached
-                        if limit is not None and len(history_items) >= limit:
-                            break
-
-                    # Break qid_variant loop if we found the metric
-                    break
-
-        # Stop if limit is specified and reached
-        if limit is not None and len(history_items) >= limit:
-            break
+        history_items.append(
+            MetricHistoryItem(
+                value=value,
+                execution_id=task_doc.execution_id,
+                task_id=metric_task_id or task_doc.task_id,
+                timestamp=_get_task_timestamp(task_doc),
+                calibrated_at=calibrated_at,
+            )
+        )
 
     if not history_items:
-        logger.warning(f"No history found for chip={chip_id}, qid={qid} (normalized={normalized_qid}), metric={metric}")
+        logger.warning(
+            "No task history found for chip=%s, qid=%s (normalized=%s), metric=%s",
+            chip_id,
+            qid,
+            normalized_qid,
+            metric,
+        )
 
     return QubitMetricHistoryResponse(
         chip_id=chip_id,
@@ -521,7 +554,7 @@ async def get_coupling_metric_history(
 ) -> QubitMetricHistoryResponse:
     """Get historical metric data for a specific coupling with task_id for figure display.
 
-    This endpoint queries ExecutionHistoryDocument to retrieve the calibration
+    This endpoint queries TaskResultHistoryDocument to retrieve calibration
     history for a specific coupling metric, including multiple executions on the same day.
     Each history item includes task_id for displaying calibration figures.
 
@@ -540,8 +573,6 @@ async def get_coupling_metric_history(
         (Note: qid field contains coupling_id for coupling metrics)
 
     """
-    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
-
     username = current_user.username if current_user else "admin"
 
     # Calculate cutoff time
@@ -549,64 +580,49 @@ async def get_coupling_metric_history(
     if within_days:
         cutoff_time = pendulum.now("Asia/Tokyo").subtract(days=within_days)
 
-    # Query execution history
-    # Note: No status filter - we want to include all executions (running, completed, failed)
-    # because individual tasks may have succeeded even if the execution as a whole failed
     query: dict[str, Any] = {
         "chip_id": chip_id,
         "username": username,
+        "task_type": "coupling",
+        "qid": coupling_id,
+        f"output_parameters.{metric}": {"$exists": True},
     }
 
     if cutoff_time:
         query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
 
-    # Query all executions within time window, no limit applied
-    executions = ExecutionHistoryDocument.find(query).sort([("start_at", -1)]).to_list()
+    results_query = TaskResultHistoryDocument.find(query).sort([("start_at", -1)])
+    if limit is not None:
+        results_query = results_query.limit(limit)
 
-    # Extract metric values from calib_data
+    task_results = results_query.run()
+
     history_items: list[MetricHistoryItem] = []
 
-    for exec_doc in executions:
-        calib_data = exec_doc.calib_data
+    for task_doc in task_results:
+        metric_data = task_doc.output_parameters.get(metric)
+        value, calibrated_at, metric_task_id = _extract_metric_output_info(metric_data)
 
-        if "coupling" in calib_data and coupling_id in calib_data["coupling"]:
-            coupling_data = calib_data["coupling"][coupling_id]
+        if value is None:
+            continue
 
-            if metric in coupling_data:
-                metric_data = coupling_data[metric]
-
-                # Handle both dict and direct value formats
-                if isinstance(metric_data, dict):
-                    value = metric_data.get("value")
-                    task_id = metric_data.get("task_id")
-                    calibrated_at = metric_data.get("calibrated_at")
-                else:
-                    value = metric_data
-                    task_id = None
-                    calibrated_at = None
-
-                # Only include if value exists and task_id is available
-                if value is not None and task_id:
-                    history_items.append(
-                        MetricHistoryItem(
-                            value=value,
-                            execution_id=exec_doc.execution_id,
-                            task_id=task_id,
-                            timestamp=exec_doc.start_at,
-                            calibrated_at=calibrated_at,
-                        )
-                    )
-
-                    # Stop if limit is specified and reached
-                    if limit is not None and len(history_items) >= limit:
-                        break
-
-        # Stop if limit is specified and reached
-        if limit is not None and len(history_items) >= limit:
-            break
+        history_items.append(
+            MetricHistoryItem(
+                value=value,
+                execution_id=task_doc.execution_id,
+                task_id=metric_task_id or task_doc.task_id,
+                timestamp=_get_task_timestamp(task_doc),
+                calibrated_at=calibrated_at,
+            )
+        )
 
     if not history_items:
-        logger.warning(f"No history found for chip={chip_id}, coupling_id={coupling_id}, metric={metric}")
+        logger.warning(
+            "No task history found for chip=%s, coupling_id=%s, metric=%s",
+            chip_id,
+            coupling_id,
+            metric,
+        )
 
     return QubitMetricHistoryResponse(
         chip_id=chip_id,

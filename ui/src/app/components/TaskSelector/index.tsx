@@ -2,7 +2,6 @@
 
 import Select from "react-select";
 
-import type { TaskResponse } from "@/schemas";
 import type { SingleValue } from "react-select";
 
 interface TaskOption {
@@ -10,8 +9,13 @@ interface TaskOption {
   label: string;
 }
 
+// Generic task type that works with both TaskResponse and TaskInfo
+interface TaskWithName {
+  name: string;
+}
+
 interface TaskSelectorProps {
-  tasks: TaskResponse[];
+  tasks: TaskWithName[];
   selectedTask: string;
   onTaskSelect: (taskId: string) => void;
   disabled?: boolean;
