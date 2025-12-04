@@ -549,9 +549,7 @@ export function TaskHistoryViewer({
                       <div className="w-fit h-fit m-auto">
                         <PlotlyRenderer
                           className="w-full h-full"
-                          fullPath={`${
-                            process.env.NEXT_PUBLIC_API_URL
-                          }/executions/figure?path=${encodeURIComponent(
+                          fullPath={`/api/executions/figure?path=${encodeURIComponent(
                             selectedTask.json_figure_path?.[
                               expandedFigureIdx
                             ] || "",
