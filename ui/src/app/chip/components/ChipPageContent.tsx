@@ -15,6 +15,7 @@ import { ChipSelector } from "@/app/components/ChipSelector";
 import { DateSelector } from "@/app/components/DateSelector";
 import { TaskFigure } from "@/app/components/TaskFigure";
 import { TaskSelector } from "@/app/components/TaskSelector";
+import { useProject } from "@/app/contexts/ProjectContext";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useChipUrlState } from "@/app/hooks/useUrlState";
 import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
@@ -32,6 +33,7 @@ interface SelectedTaskInfo {
 
 export function ChipPageContent() {
   const router = useRouter();
+  const { canEdit } = useProject();
   // URL state management
   const {
     selectedChip,
@@ -322,26 +324,28 @@ export function ChipPageContent() {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold">Chip Experiments</h1>
             <div className="flex gap-3 items-center">
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => setIsCreateChipModalOpen(true)}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+              {canEdit && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setIsCreateChipModalOpen(true)}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Create Chip
-              </button>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Create Chip
+                </button>
+              )}
               <div className="join rounded-lg overflow-hidden">
                 <button
                   className={`join-item btn btn-sm ${

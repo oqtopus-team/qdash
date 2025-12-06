@@ -3,7 +3,7 @@ from typing import ClassVar
 import pendulum
 from bunnet import Document
 from pydantic import ConfigDict, Field
-from pymongo import ASCENDING, IndexModel
+from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
 from qdash.datamodel.system_info import SystemInfoModel
 
@@ -13,6 +13,7 @@ class CouplingHistoryDocument(Document):
 
     Attributes
     ----------
+        project_id (str | None): The owning project identifier.
         qid (str): The coupling ID. e.g. "0-1".
         chip_id (str): The chip ID. e.g. "chip1".
         data (dict): The data of the coupling.
@@ -23,6 +24,7 @@ class CouplingHistoryDocument(Document):
 
     """
 
+    project_id: str | None = Field(None, description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the coupling")
     qid: str = Field(..., description="The coupling ID")
     status: str = Field(..., description="The status of the coupling")
@@ -50,13 +52,15 @@ class CouplingHistoryDocument(Document):
         indexes: ClassVar = [
             IndexModel(
                 [
+                    ("project_id", ASCENDING),
                     ("chip_id", ASCENDING),
                     ("qid", ASCENDING),
                     ("username", ASCENDING),
                     ("recorded_date", ASCENDING),
                 ],
                 unique=True,
-            )
+            ),
+            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING), ("recorded_date", DESCENDING)]),
         ]
 
     @classmethod
@@ -65,6 +69,7 @@ class CouplingHistoryDocument(Document):
         today = pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD")
         existing_history = cls.find_one(
             {
+                "project_id": coupling.project_id,
                 "chip_id": coupling.chip_id,
                 "qid": coupling.qid,
                 "username": coupling.username,
@@ -79,6 +84,7 @@ class CouplingHistoryDocument(Document):
             history.edge_info = coupling.edge_info
         else:
             history = cls(
+                project_id=coupling.project_id,
                 username=coupling.username,
                 qid=coupling.qid,
                 status=coupling.status,

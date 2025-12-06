@@ -2,6 +2,8 @@
 
 import { AXIOS_INSTANCE } from "@/lib/custom-instance";
 
+const PROJECT_STORAGE_KEY = "qdash_current_project_id";
+
 export default function AxiosProvider({
   children,
 }: {
@@ -11,7 +13,7 @@ export default function AxiosProvider({
   // Falls back to direct API URL for backward compatibility
   AXIOS_INSTANCE.defaults.baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
-  // Add request interceptor to handle auth
+  // Add request interceptor to handle auth and project context
   AXIOS_INSTANCE.interceptors.request.use((config) => {
     // Get token from cookies (which contains the username)
     const token = document.cookie
@@ -28,6 +30,12 @@ export default function AxiosProvider({
       } catch (error) {
         console.error("Failed to decode token:", error);
       }
+    }
+
+    // Get current project from localStorage
+    const projectId = localStorage.getItem(PROJECT_STORAGE_KEY);
+    if (projectId) {
+      config.headers["X-Project-Id"] = projectId;
     }
 
     return config;

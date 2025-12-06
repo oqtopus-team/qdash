@@ -7,6 +7,7 @@ class User(BaseModel):
     username: str
     full_name: str | None = None
     disabled: bool | None = None
+    default_project_id: str | None = None
 
 
 class UserWithToken(BaseModel):
@@ -15,6 +16,7 @@ class UserWithToken(BaseModel):
     username: str
     full_name: str | None = None
     disabled: bool | None = None
+    default_project_id: str | None = None
     access_token: str
 
 
@@ -39,3 +41,4 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     username: str
+    default_project_id: str | None = None

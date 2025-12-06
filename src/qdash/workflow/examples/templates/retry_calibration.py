@@ -319,6 +319,7 @@ def retry_calibration(
     chip_id: str,  # Automatically provided from UI properties
     qids: list[str] | None = None,
     flow_name: str | None = None,  # Automatically injected by API
+    project_id: str | None = None,  # Automatically injected by API for multi-tenancy
     max_retries: int = 3,  # Maximum number of retry attempts
 ):
     """Complete 1-qubit calibration with automatic retry and frequency feedback.
@@ -351,6 +352,7 @@ def retry_calibration(
         chip_id: Target chip ID (from UI)
         qids: List of qubit IDs (not used, groups are defined explicitly)
         flow_name: Flow name (automatically injected by API)
+        project_id: Project ID for multi-tenancy (automatically injected by API)
         max_retries: Maximum number of retry attempts (default: 2)
 
     """
@@ -380,6 +382,7 @@ def retry_calibration(
             chip_id,
             all_qids,
             flow_name=flow_name,
+            project_id=project_id,
             enable_github_pull=True,
             github_push_config=GitHubPushConfig(
                 enabled=True, file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]

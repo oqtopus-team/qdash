@@ -12,6 +12,7 @@ class CalibrationNoteDocument(Document):
 
     Attributes
     ----------
+        project_id (str | None): The project ID for multi-tenancy.
         username (str): The username of the user who created the note.
         chip_id (str): The chip ID associated with this note.
         execution_id (str): The execution ID associated with this note.
@@ -22,6 +23,7 @@ class CalibrationNoteDocument(Document):
 
     """
 
+    project_id: str | None = Field(None, description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the note")
     chip_id: str = Field(..., description="The chip ID associated with this note")
     execution_id: str = Field(..., description="The execution ID associated with this note")
@@ -39,12 +41,18 @@ class CalibrationNoteDocument(Document):
         name = "calibration_note"
         indexes: ClassVar = [
             IndexModel(
-                [("execution_id", ASCENDING), ("task_id", ASCENDING), ("username", ASCENDING), ("chip_id", ASCENDING)],
+                [
+                    ("project_id", ASCENDING),
+                    ("execution_id", ASCENDING),
+                    ("task_id", ASCENDING),
+                    ("username", ASCENDING),
+                    ("chip_id", ASCENDING),
+                ],
                 unique=True,
             ),
             IndexModel(
-                [("chip_id", ASCENDING), ("timestamp", ASCENDING)],
-                name="chip_id_timestamp_idx",
+                [("project_id", ASCENDING), ("chip_id", ASCENDING), ("timestamp", ASCENDING)],
+                name="project_chip_timestamp_idx",
             ),
         ]
 
@@ -56,6 +64,7 @@ class CalibrationNoteDocument(Document):
         execution_id: str,
         task_id: str,
         note: dict,
+        project_id: str | None = None,
     ) -> "CalibrationNoteDocument":
         """Upsert a calibration note.
 
@@ -66,6 +75,7 @@ class CalibrationNoteDocument(Document):
             execution_id (str): The execution ID associated with this note.
             task_id (str): The task ID associated with this note.
             note (dict): The calibration note data.
+            project_id (str | None): The project ID for multi-tenancy.
 
         Returns:
         -------
@@ -73,10 +83,23 @@ class CalibrationNoteDocument(Document):
 
         """
         doc = cls.find_one(
-            {"execution_id": execution_id, "task_id": task_id, "username": username, "chip_id": chip_id}
+            {
+                "project_id": project_id,
+                "execution_id": execution_id,
+                "task_id": task_id,
+                "username": username,
+                "chip_id": chip_id,
+            }
         ).run()
         if doc is None:
-            doc = cls(username=username, chip_id=chip_id, execution_id=execution_id, task_id=task_id, note=note)
+            doc = cls(
+                project_id=project_id,
+                username=username,
+                chip_id=chip_id,
+                execution_id=execution_id,
+                task_id=task_id,
+                note=note,
+            )
             doc.save()
             return doc
 

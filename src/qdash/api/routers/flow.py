@@ -21,8 +21,7 @@ from prefect.client.schemas.filters import (
     FlowRunFilterStateType,
     StateType,
 )
-from qdash.api.lib.auth import get_current_active_user
-from qdash.api.schemas.auth import User
+from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.flow import (
     DeleteScheduleResponse,
     ExecuteFlowRequest,
@@ -211,7 +210,7 @@ async def register_flow_deployment(
 )
 async def save_flow(
     request: SaveFlowRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> SaveFlowResponse:
     """Save a Flow to file system and MongoDB.
 
@@ -232,7 +231,7 @@ async def save_flow(
     # Validate that code contains the expected flow function
     validate_flow_code(request.code, request.flow_function_name)
 
-    username = current_user.username
+    username = ctx.user.username
 
     # Get user directory
     user_dir = get_user_flows_dir(username)
@@ -344,15 +343,16 @@ async def save_flow(
     operation_id="listFlows",
 )
 async def list_flows(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> ListFlowsResponse:
-    """List all Flows for the current user.
+    """List all Flows for the current project.
 
     Returns metadata only (no code content for performance).
     """
-    username = current_user.username
+    username = ctx.user.username
 
     try:
+        # TODO: Update FlowDocument.list_by_user to list_by_project
         flows = FlowDocument.list_by_user(username)
         logger.info(f"Listed {len(flows)} flows for user '{username}'")
 
@@ -549,15 +549,15 @@ async def get_flow_helper_file(filename: str) -> str:
     operation_id="listAllFlowSchedules",
 )
 async def list_all_flow_schedules(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
     limit: int = 50,
     offset: int = 0,
 ) -> ListFlowSchedulesResponse:
-    """List all Flow schedules (cron and one-time) for the current user.
+    """List all Flow schedules (cron and one-time) for the current project.
 
     Args:
     ----
-        current_user: Current authenticated user
+        ctx: Project context with user and project information
         limit: Maximum number of schedules to return (max 100)
         offset: Number of schedules to skip
 
@@ -567,7 +567,7 @@ async def list_all_flow_schedules(
 
     """
     limit = min(limit, 100)
-    username = current_user.username
+    username = ctx.user.username
     flows = FlowDocument.list_by_user(username)
 
     all_schedules: list[FlowScheduleSummary] = []
@@ -640,7 +640,7 @@ async def list_all_flow_schedules(
 )
 async def delete_flow_schedule(
     schedule_id: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> DeleteScheduleResponse:
     """Delete a Flow schedule (cron or one-time).
 
@@ -655,14 +655,14 @@ async def delete_flow_schedule(
     Args:
     ----
         schedule_id: Schedule ID (deployment_id for cron, flow_run_id for one-time)
-        current_user: Current authenticated user
+        ctx: Project context with user and project information
 
     Returns:
     -------
         Standardized response with schedule type information
 
     """
-    username = current_user.username
+    username = ctx.user.username
 
     async with get_client() as client:
         # Try as deployment ID (cron schedule)
@@ -737,7 +737,7 @@ async def delete_flow_schedule(
 async def update_flow_schedule(
     schedule_id: str,
     request: UpdateScheduleRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> UpdateScheduleResponse:
     """Update a Flow schedule (cron schedules only).
 
@@ -747,14 +747,14 @@ async def update_flow_schedule(
     ----
         schedule_id: Schedule ID (deployment_id)
         request: Update request
-        current_user: Current authenticated user
+        ctx: Project context with user and project information
 
     Returns:
     -------
         Success message
 
     """
-    username = current_user.username
+    username = ctx.user.username
 
     async with get_client() as client:
         try:
@@ -817,7 +817,7 @@ async def update_flow_schedule(
 )
 async def get_flow(
     name: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> GetFlowResponse:
     """Get Flow details including code content.
 
@@ -826,7 +826,7 @@ async def get_flow(
     2. Read code from file
     3. Return combined data
     """
-    username = current_user.username
+    username = ctx.user.username
 
     # Find flow in database
     flow = FlowDocument.find_by_user_and_name(username, name)
@@ -868,7 +868,7 @@ async def get_flow(
 async def execute_flow(
     name: str,
     request: ExecuteFlowRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> ExecuteFlowResponse:
     """Execute a Flow via Prefect deployment.
 
@@ -880,7 +880,7 @@ async def execute_flow(
     """
     from prefect import get_client
 
-    username = current_user.username
+    username = ctx.user.username
     settings = get_settings()
 
     # Find flow in database
@@ -895,11 +895,12 @@ async def execute_flow(
         )
 
     # Merge parameters (request overrides defaults)
-    # Add flow_name to parameters so it can be used for execution display name
+    # Add flow_name and project_id to parameters
     parameters: dict[str, Any] = {
         **flow.default_parameters,
         **request.parameters,
         "flow_name": name,  # Add flow name for display purposes
+        "project_id": ctx.project_id,  # Add project_id for multi-tenancy
     }
 
     logger.info(f"Executing flow '{name}' (deployment={flow.deployment_id}) with parameters: {parameters}")
@@ -938,7 +939,7 @@ async def execute_flow(
 )
 async def delete_flow(
     name: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> dict[str, str]:
     """Delete a Flow.
 
@@ -946,7 +947,7 @@ async def delete_flow(
     1. Delete file from user_flows/{username}/{name}.py
     2. Delete metadata from MongoDB
     """
-    username = current_user.username
+    username = ctx.user.username
 
     # Find flow in database
     flow = FlowDocument.find_by_user_and_name(username, name)
@@ -983,7 +984,7 @@ async def delete_flow(
 async def schedule_flow(
     name: str,
     request: ScheduleFlowRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> ScheduleFlowResponse:
     """Schedule a Flow execution with cron or one-time schedule.
 
@@ -991,14 +992,14 @@ async def schedule_flow(
     ----
         name: Flow name
         request: Schedule request (must provide either cron or scheduled_time)
-        current_user: Current authenticated user
+        ctx: Project context with user and project information
 
     Returns:
     -------
         Schedule response with schedule_id and details
 
     """
-    username = current_user.username
+    username = ctx.user.username
 
     # Validate request
     if not request.cron and not request.scheduled_time:
@@ -1035,13 +1036,14 @@ async def schedule_flow(
             detail=f"Flow '{name}' deployment not found in Prefect. Please re-save the flow. Error: {str(e)}",
         )
 
-    # Merge parameters - include username and chip_id from flow metadata
+    # Merge parameters - include username, chip_id, and project_id from flow metadata
     parameters: dict[str, Any] = {
         "username": username,
         "chip_id": flow.chip_id,
         **flow.default_parameters,
         **request.parameters,
         "flow_name": name,
+        "project_id": ctx.project_id,  # Add project_id for multi-tenancy
     }
 
     logger.info(f"Scheduling flow '{name}' with parameters: {parameters}")
@@ -1240,7 +1242,7 @@ async def schedule_flow(
 )
 async def list_flow_schedules(
     name: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
     limit: int = 50,  # Default 50, max 100
     offset: int = 0,
 ) -> ListFlowSchedulesResponse:
@@ -1249,7 +1251,7 @@ async def list_flow_schedules(
     Args:
     ----
         name: Flow name
-        current_user: Current authenticated user
+        ctx: Project context with user and project information
         limit: Maximum number of schedules to return (max 100)
         offset: Number of schedules to skip
 
@@ -1260,7 +1262,7 @@ async def list_flow_schedules(
     """
     # Enforce max limit
     limit = min(limit, 100)
-    username = current_user.username
+    username = ctx.user.username
 
     # Find flow
     flow = FlowDocument.find_by_user_and_name(username, name)

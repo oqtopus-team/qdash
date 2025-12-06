@@ -2,7 +2,7 @@ from typing import ClassVar
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
-from pymongo import ASCENDING, IndexModel
+from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import BaseTaskResultModel
@@ -13,6 +13,7 @@ class TaskResultHistoryDocument(Document):
 
     Attributes
     ----------
+        project_id (str | None): The owning project identifier.
         execution_id (str): The execution ID. e.g. "0".
         status (str): The status of the execution. e.g. "completed".
         tasks (dict): The tasks of the execution. e.g. {"task1": "completed"}.
@@ -29,6 +30,7 @@ class TaskResultHistoryDocument(Document):
 
     """
 
+    project_id: str | None = Field(None, description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the task")
     task_id: str = Field(..., description="The task ID")
     name: str = Field(..., description="The task name")
@@ -61,11 +63,16 @@ class TaskResultHistoryDocument(Document):
         """Settings for the document."""
 
         name = "task_result_history"
-        indexes: ClassVar = [IndexModel([("task_id", ASCENDING), ("username")], unique=True)]
+        indexes: ClassVar = [
+            IndexModel([("project_id", ASCENDING), ("task_id", ASCENDING)], unique=True),
+            IndexModel([("project_id", ASCENDING), ("execution_id", ASCENDING)]),
+            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING), ("start_at", DESCENDING)]),
+        ]
 
     @classmethod
     def from_datamodel(cls, task: BaseTaskResultModel, execution_model: ExecutionModel) -> "TaskResultHistoryDocument":
         return cls(
+            project_id=execution_model.project_id,
             username=execution_model.username,
             task_id=task.task_id,
             name=task.name,
@@ -92,11 +99,12 @@ class TaskResultHistoryDocument(Document):
 
     @classmethod
     def upsert_document(cls, task: BaseTaskResultModel, execution_model: ExecutionModel) -> "TaskResultHistoryDocument":
-        doc = cls.find_one({"task_id": task.task_id}).run()
+        doc = cls.find_one({"project_id": execution_model.project_id, "task_id": task.task_id}).run()
         if doc is None:
             doc = cls.from_datamodel(task=task, execution_model=execution_model)
             doc.save()
             return doc
+        doc.project_id = execution_model.project_id
         doc.username = execution_model.username
         doc.name = task.name
         doc.upstream_id = task.upstream_id

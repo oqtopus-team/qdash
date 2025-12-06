@@ -4,8 +4,10 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from qdash.api.lib.auth import get_optional_current_user
-from qdash.api.schemas.auth import User
+from qdash.api.lib.project import (
+    ProjectContext,
+    get_optional_project_context,
+)
 from qdash.api.schemas.backend import BackendResponseModel, ListBackendsResponse
 from qdash.dbmodel.backend import BackendDocument
 
@@ -22,7 +24,7 @@ logger.setLevel(logging.DEBUG)
     operation_id="listBackends",
 )
 def list_backends(
-    current_user: Annotated[User, Depends(get_optional_current_user)],
+    ctx: Annotated[ProjectContext | None, Depends(get_optional_project_context)],
 ) -> ListBackendsResponse:
     """List all registered backends.
 
@@ -32,8 +34,8 @@ def list_backends(
 
     Parameters
     ----------
-    current_user : User
-        Current authenticated user (optional)
+    ctx : ProjectContext | None
+        Project context with user and project information (optional)
 
     Returns
     -------
@@ -41,7 +43,10 @@ def list_backends(
         Wrapped list of all registered backend response models
 
     """
-    logger.info(f"User {current_user.username} is listing all backends.")
-    # Fetch all backend documents from the database
-    backends = BackendDocument.find_all().to_list()
+    if ctx:
+        logger.info(f"User {ctx.user.username} is listing backends for project {ctx.project_id}.")
+        backends = BackendDocument.find({"project_id": ctx.project_id}).to_list()
+    else:
+        logger.info("Listing all backends (no project context).")
+        backends = BackendDocument.find_all().to_list()
     return ListBackendsResponse(backends=[BackendResponseModel(**backend.dict()) for backend in backends])

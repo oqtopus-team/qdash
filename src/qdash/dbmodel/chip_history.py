@@ -4,7 +4,7 @@ from typing import ClassVar
 import pendulum
 from bunnet import Document
 from pydantic import ConfigDict, Field
-from pymongo import ASCENDING, IndexModel
+from pymongo import ASCENDING, DESCENDING, IndexModel
 from pymongo.errors import DuplicateKeyError
 from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.qubit import QubitModel
@@ -19,6 +19,7 @@ class ChipHistoryDocument(Document):
 
     Attributes
     ----------
+        project_id (str | None): The owning project identifier.
         chip_id (str): The chip ID. e.g. "chip1".
         size (int): The size of the chip.
         qubits (dict): The qubits of the chip.
@@ -29,6 +30,7 @@ class ChipHistoryDocument(Document):
 
     """
 
+    project_id: str | None = Field(None, description="Owning project identifier")
     chip_id: str = Field(..., description="The chip ID")
     username: str = Field(..., description="The username of the user who created the chip")
     size: int = Field(..., description="The size of the chip")
@@ -51,13 +53,21 @@ class ChipHistoryDocument(Document):
         name = "chip_history"
         indexes: ClassVar = [
             IndexModel(
-                [("chip_id", ASCENDING), ("username", ASCENDING), ("recorded_date", ASCENDING)],
+                [
+                    ("project_id", ASCENDING),
+                    ("chip_id", ASCENDING),
+                    ("username", ASCENDING),
+                    ("recorded_date", ASCENDING),
+                ],
                 unique=True,
-            )
+            ),
+            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING), ("recorded_date", DESCENDING)]),
         ]
 
     @classmethod
-    def get_yesterday_history(cls, chip_id: str, username: str) -> "ChipHistoryDocument | None":
+    def get_yesterday_history(
+        cls, chip_id: str, username: str, project_id: str | None = None
+    ) -> "ChipHistoryDocument | None":
         """Get yesterday's history record for a chip.
 
         Parameters
@@ -66,6 +76,8 @@ class ChipHistoryDocument(Document):
             The chip ID
         username : str
             The username of the user who created the chip
+        project_id : str | None
+            The project identifier
 
         Returns
         -------
@@ -76,6 +88,7 @@ class ChipHistoryDocument(Document):
         yesterday = pendulum.now(tz="Asia/Tokyo").subtract(days=1).format("YYYYMMDD")
         return cls.find_one(
             {
+                "project_id": project_id,
                 "chip_id": chip_id,
                 "username": username,
                 "recorded_date": yesterday,
@@ -104,6 +117,7 @@ class ChipHistoryDocument(Document):
         try:
             # Try to insert a new document
             history_doc = cls(
+                project_id=chip_doc.project_id,
                 chip_id=chip_doc.chip_id,
                 username=chip_doc.username,
                 size=chip_doc.size,
@@ -120,6 +134,7 @@ class ChipHistoryDocument(Document):
             logger.info(f"History record already exists for chip {chip_doc.chip_id}, updating existing record")
             existing_doc = cls.find_one(
                 {
+                    "project_id": chip_doc.project_id,
                     "chip_id": chip_doc.chip_id,
                     "username": chip_doc.username,
                     "recorded_date": today,

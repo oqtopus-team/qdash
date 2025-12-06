@@ -77,6 +77,7 @@ def sequential_stage_calibration(
     chip_id: str,
     qids: list[str] | None = None,
     flow_name: str | None = None,
+    project_id: str | None = None,  # Automatically injected by API for multi-tenancy
 ):
     """Sequential stage calibration with isolated sessions per stage.
 
@@ -105,6 +106,7 @@ def sequential_stage_calibration(
         chip_id: Chip ID (from UI)
         qids: Qubit IDs (not used, defined explicitly in stages)
         flow_name: Flow name (auto-injected)
+        project_id: Project ID for multi-tenancy (automatically injected by API)
 
     """
     logger = get_run_logger()
@@ -184,6 +186,7 @@ def sequential_stage_calibration(
                 chip_id,
                 stage_qids,
                 flow_name=f"{flow_name}_{stage_name}" if flow_name else stage_name,
+                project_id=project_id,
                 enable_github_pull=True,
                 github_push_config=GitHubPushConfig(
                     enabled=True, file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
