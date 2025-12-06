@@ -39,7 +39,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const { user, accessToken } = useAuth();
   const queryClient = useQueryClient();
   const [currentProject, setCurrentProject] = useState<ProjectResponse | null>(
-    null
+    null,
   );
   const [projectId, setProjectId] = useState<string | null>(null);
   const [role, setRole] = useState<ProjectRole | null>(null);
@@ -69,7 +69,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       return;
     }
     const membership = membersData.data.members.find(
-      (m) => m.username === user.username
+      (m) => m.username === user.username,
     );
     setRole((membership?.role as ProjectRole) ?? null);
   }, [membersData, user?.username]);
@@ -82,7 +82,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     const storedProjectId = localStorage.getItem(PROJECT_STORAGE_KEY);
     if (storedProjectId) {
       const storedProject = projects.find(
-        (p) => p.project_id === storedProjectId
+        (p) => p.project_id === storedProjectId,
       );
       if (storedProject) {
         setCurrentProject(storedProject);
@@ -93,7 +93,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
     if (user?.default_project_id) {
       const defaultProject = projects.find(
-        (p) => p.project_id === user.default_project_id
+        (p) => p.project_id === user.default_project_id,
       );
       if (defaultProject) {
         setCurrentProject(defaultProject);
@@ -122,7 +122,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         queryClient.invalidateQueries();
       }
     },
-    [projects, projectId, queryClient]
+    [projects, projectId, queryClient],
   );
 
   const refreshProjects = useCallback(() => {

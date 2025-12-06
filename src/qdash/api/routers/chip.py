@@ -158,9 +158,7 @@ def get_chip_dates(
 
     """
     logger.debug(f"Fetching dates for chip {chip_id}, project: {ctx.project_id}")
-    counter_list = ExecutionCounterDocument.find(
-        {"project_id": ctx.project_id, "chip_id": chip_id}
-    ).run()
+    counter_list = ExecutionCounterDocument.find({"project_id": ctx.project_id, "chip_id": chip_id}).run()
     if not counter_list:
         # Return empty list for newly created chips with no execution history
         logger.debug(f"No execution counter found for chip {chip_id}, returning empty dates list")

@@ -326,7 +326,9 @@ class ChipInitializer:
             for coupling_doc in coupling_documents:
                 coupling_doc.insert()
 
-            logger.info(f"Successfully created chip {chip_id} for user {username} (project={project_id}) with size {size}")
+            logger.info(
+                f"Successfully created chip {chip_id} for user {username} (project={project_id}) with size {size}"
+            )
             return chip
 
         except Exception as e:

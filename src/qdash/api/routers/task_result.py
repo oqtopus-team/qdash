@@ -181,9 +181,7 @@ def get_historical_qubit_task_results(
     logger.debug(f"Getting historical qubit task results for chip {chip_id}, task {task}, date {date}")
 
     # Get chip info (scoped by project)
-    chip = ChipHistoryDocument.find_one(
-        {"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}
-    ).run()
+    chip = ChipHistoryDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}).run()
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
@@ -499,9 +497,7 @@ def get_historical_coupling_task_results(
     logger.debug(f"Getting historical coupling task results for chip {chip_id}, task {task}, date {date}")
 
     # Get chip info (scoped by project)
-    chip = ChipHistoryDocument.find_one(
-        {"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}
-    ).run()
+    chip = ChipHistoryDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}).run()
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 

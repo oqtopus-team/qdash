@@ -14,26 +14,26 @@ The QDash data model consists of two layers:
 
 ## MongoDB Collections
 
-| Collection | Document Class | Description |
-|------------|----------------|-------------|
-| `project` | ProjectDocument | Project metadata (owner-centric workspace) |
-| `project_membership` | ProjectMembershipDocument | User membership & role per project |
-| `chip` | ChipDocument | Quantum chip configuration scoped to a project |
-| `qubit` | QubitDocument | Individual qubit data |
-| `coupling` | CouplingDocument | Qubit coupling information |
-| `execution_history` | ExecutionHistoryDocument | Calibration execution history |
-| `task_result_history` | TaskResultHistoryDocument | Task result history |
-| `qubit_history` | QubitHistoryDocument | Daily qubit snapshots |
-| `chip_history` | ChipHistoryDocument | Daily chip snapshots |
-| `coupling_history` | CouplingHistoryDocument | Daily coupling snapshots |
-| `task` | TaskDocument | Task definitions |
-| `backend` | BackendDocument | Backend configurations (project scoped) |
-| `user` | UserDocument | User authentication / default project bootstrap |
-| `tag` | TagDocument | Project-level tag management |
-| `execution_lock` | ExecutionLockDocument | Exclusive execution lock |
-| `execution_counter` | ExecutionCounterDocument | Execution ID counter |
-| `calibration_note` | CalibrationNoteDocument | Calibration notes |
-| `flows` | FlowDocument | User-defined flows |
+| Collection            | Document Class            | Description                                     |
+| --------------------- | ------------------------- | ----------------------------------------------- |
+| `project`             | ProjectDocument           | Project metadata (owner-centric workspace)      |
+| `project_membership`  | ProjectMembershipDocument | User membership & role per project              |
+| `chip`                | ChipDocument              | Quantum chip configuration scoped to a project  |
+| `qubit`               | QubitDocument             | Individual qubit data                           |
+| `coupling`            | CouplingDocument          | Qubit coupling information                      |
+| `execution_history`   | ExecutionHistoryDocument  | Calibration execution history                   |
+| `task_result_history` | TaskResultHistoryDocument | Task result history                             |
+| `qubit_history`       | QubitHistoryDocument      | Daily qubit snapshots                           |
+| `chip_history`        | ChipHistoryDocument       | Daily chip snapshots                            |
+| `coupling_history`    | CouplingHistoryDocument   | Daily coupling snapshots                        |
+| `task`                | TaskDocument              | Task definitions                                |
+| `backend`             | BackendDocument           | Backend configurations (project scoped)         |
+| `user`                | UserDocument              | User authentication / default project bootstrap |
+| `tag`                 | TagDocument               | Project-level tag management                    |
+| `execution_lock`      | ExecutionLockDocument     | Exclusive execution lock                        |
+| `execution_counter`   | ExecutionCounterDocument  | Execution ID counter                            |
+| `calibration_note`    | CalibrationNoteDocument   | Calibration notes                               |
+| `flows`               | FlowDocument              | User-defined flows                              |
 
 ---
 
@@ -130,18 +130,19 @@ class QubitModel(BaseModel):
 ```
 
 **Example data field structure:**
+
 ```json
 {
-    "qubit_frequency": {
-        "value": 5.0,
-        "value_type": "float",
-        "error": 0.001,
-        "unit": "GHz",
-        "description": "Qubit resonance frequency",
-        "calibrated_at": "2024-01-01T00:00:00+09:00",
-        "execution_id": "20240101-001",
-        "task_id": "uuid-xxx"
-    }
+  "qubit_frequency": {
+    "value": 5.0,
+    "value_type": "float",
+    "error": 0.001,
+    "unit": "GHz",
+    "description": "Qubit resonance frequency",
+    "calibrated_at": "2024-01-01T00:00:00+09:00",
+    "execution_id": "20240101-001",
+    "task_id": "uuid-xxx"
+  }
 }
 ```
 
@@ -324,6 +325,7 @@ class FridgeModel(BaseModel):
 **Collection:** `project`
 
 **Indexes:**
+
 - `project_id` - Unique identifier per project
 - `(owner_username, name)` - Prevent duplicate names per owner
 
@@ -345,6 +347,7 @@ class ProjectDocument(Document):
 **Collection:** `project_membership`
 
 **Indexes:**
+
 - `(project_id, username)` - Unique membership per user/project
 - `(username, status)` - Efficient lookup of invitations
 
@@ -366,6 +369,7 @@ class ProjectMembershipDocument(Document):
 **Collection:** `chip`
 
 **Indexes:**
+
 - `(project_id, chip_id)` - Unique compound index
 - `(username, chip_id)` - Backward-compat lookup while migrating
 
@@ -382,6 +386,7 @@ class ChipDocument(Document):
 ```
 
 **Key Methods:**
+
 - `get_current_chip(project_id)` - Get the most recently installed chip per project
 - `get_chip_by_id(project_id, chip_id)` - Get a specific chip
 - `update_qubit(qid, qubit_data)` - Update a qubit
@@ -394,6 +399,7 @@ class ChipDocument(Document):
 **Collection:** `qubit`
 
 **Indexes:**
+
 - `(project_id, chip_id, qid)` - Unique compound index
 - `(project_id, username)` - Filter by project/member
 
@@ -411,12 +417,14 @@ class QubitDocument(Document):
 ```
 
 **Fidelity Metrics (tracked in best_data):**
+
 - `average_readout_fidelity`
 - `readout_fidelity_0`, `readout_fidelity_1`
 - `x90_gate_fidelity`, `x180_gate_fidelity`
 - `t1`, `t2_echo`, `t2_star`
 
 **Key Methods:**
+
 - `update_calib_data(username, qid, chip_id, output_parameters)` - Update calibration data
 - `update_status(qid, chip_id, status)` - Update status
 
@@ -427,6 +435,7 @@ class QubitDocument(Document):
 **Collection:** `coupling`
 
 **Indexes:**
+
 - `(project_id, chip_id, qid)` - Unique compound index
 - `(project_id, username)` - Filter by project/member
 
@@ -444,6 +453,7 @@ class CouplingDocument(Document):
 ```
 
 **Fidelity Metrics (tracked in best_data):**
+
 - `zx90_gate_fidelity`
 - `bell_state_fidelity`
 
@@ -454,6 +464,7 @@ class CouplingDocument(Document):
 **Collection:** `execution_history`
 
 **Indexes:**
+
 - `(project_id, execution_id)` - Unique compound index
 - `(project_id, chip_id, start_at)` - Supports metrics/best queries
 - `(project_id, username, start_at)` - Audit per user
@@ -481,6 +492,7 @@ class ExecutionHistoryDocument(Document):
 ```
 
 **Key Methods:**
+
 - `from_execution_model(execution_model)` - Create from ExecutionModel
 - `upsert_document(execution_model)` - Upsert operation
 
@@ -528,6 +540,7 @@ class TaskResultHistoryDocument(Document):
 **Collection:** `qubit_history`
 
 **Indexes:**
+
 - `(project_id, chip_id, qid, recorded_date)` - Unique compound index
 
 Daily snapshot history table.
@@ -553,6 +566,7 @@ class QubitHistoryDocument(Document):
 **Collection:** `chip_history`
 
 **Indexes:**
+
 - `(project_id, chip_id, recorded_date)` - Unique compound index
 
 ```python
@@ -575,6 +589,7 @@ class ChipHistoryDocument(Document):
 **Collection:** `coupling_history`
 
 **Indexes:**
+
 - `(project_id, chip_id, qid, recorded_date)` - Unique compound index
 
 ```python
@@ -598,6 +613,7 @@ class CouplingHistoryDocument(Document):
 **Collection:** `task`
 
 **Indexes:**
+
 - `(project_id, name)` - Unique compound index
 - `(project_id, task_type)` - Filter by scope
 
@@ -622,6 +638,7 @@ class TaskDocument(Document):
 **Collection:** `backend`
 
 **Indexes:**
+
 - `(project_id, name)` - Unique compound index
 
 ```python
@@ -639,6 +656,7 @@ class BackendDocument(Document):
 **Collection:** `user`
 
 **Indexes:**
+
 - `username` - Unique index
 - `access_token` - Unique index
 
@@ -660,6 +678,7 @@ class UserDocument(Document):
 **Collection:** `tag`
 
 **Indexes:**
+
 - `(project_id, name)` - Unique compound index
 
 ```python
@@ -676,6 +695,7 @@ class TagDocument(Document):
 **Collection:** `execution_lock`
 
 **Indexes:**
+
 - `project_id` - Ensures one lock document per project
 
 Singleton document for exclusive execution control. Ensures only one calibration runs at a time.
@@ -688,6 +708,7 @@ class ExecutionLockDocument(Document):
 ```
 
 **Key Methods:**
+
 - `get_lock_status()` - Get lock status
 - `lock()` - Acquire lock
 - `unlock()` - Release lock
@@ -699,6 +720,7 @@ class ExecutionLockDocument(Document):
 **Collection:** `execution_counter`
 
 **Indexes:**
+
 - `(project_id, date, chip_id)` - Unique compound index
 
 Manages execution ID sequence numbers per date/user/chip.
@@ -714,6 +736,7 @@ class ExecutionCounterDocument(Document):
 ```
 
 **Key Methods:**
+
 - `get_next_index(project_id, date, chip_id)` - Atomically get next index
 
 Generated execution ID format: `YYYYMMDD-NNN` (e.g., `20240101-001`)
@@ -725,6 +748,7 @@ Generated execution ID format: `YYYYMMDD-NNN` (e.g., `20240101-001`)
 **Collection:** `calibration_note`
 
 **Indexes:**
+
 - `(project_id, execution_id, task_id, chip_id)` - Unique compound index
 - `(project_id, chip_id, timestamp)` - Search index
 
@@ -747,6 +771,7 @@ class CalibrationNoteDocument(Document):
 **Collection:** `flows`
 
 **Indexes:**
+
 - `(project_id, name)` - Unique per project
 - `(project_id, created_at)` - For sorted listing
 

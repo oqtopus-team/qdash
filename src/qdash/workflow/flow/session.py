@@ -42,9 +42,7 @@ from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.flow.github import GitHubIntegration, GitHubPushConfig
 
 
-def generate_execution_id(
-    username: str, chip_id: str, project_id: str | None = None
-) -> str:
+def generate_execution_id(username: str, chip_id: str, project_id: str | None = None) -> str:
     """Generate a unique execution ID based on the current date and an execution index.
 
     This function creates execution IDs in the format YYYYMMDD-NNN, where:
@@ -67,9 +65,7 @@ def generate_execution_id(
 
     """
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
-    execution_index = ExecutionCounterDocument.get_next_index(
-        date_str, username, chip_id, project_id=project_id
-    )
+    execution_index = ExecutionCounterDocument.get_next_index(date_str, username, chip_id, project_id=project_id)
     return f"{date_str}-{execution_index:03d}"
 
 

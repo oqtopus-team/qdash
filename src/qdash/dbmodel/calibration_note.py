@@ -41,7 +41,13 @@ class CalibrationNoteDocument(Document):
         name = "calibration_note"
         indexes: ClassVar = [
             IndexModel(
-                [("project_id", ASCENDING), ("execution_id", ASCENDING), ("task_id", ASCENDING), ("username", ASCENDING), ("chip_id", ASCENDING)],
+                [
+                    ("project_id", ASCENDING),
+                    ("execution_id", ASCENDING),
+                    ("task_id", ASCENDING),
+                    ("username", ASCENDING),
+                    ("chip_id", ASCENDING),
+                ],
                 unique=True,
             ),
             IndexModel(
@@ -77,10 +83,23 @@ class CalibrationNoteDocument(Document):
 
         """
         doc = cls.find_one(
-            {"project_id": project_id, "execution_id": execution_id, "task_id": task_id, "username": username, "chip_id": chip_id}
+            {
+                "project_id": project_id,
+                "execution_id": execution_id,
+                "task_id": task_id,
+                "username": username,
+                "chip_id": chip_id,
+            }
         ).run()
         if doc is None:
-            doc = cls(project_id=project_id, username=username, chip_id=chip_id, execution_id=execution_id, task_id=task_id, note=note)
+            doc = cls(
+                project_id=project_id,
+                username=username,
+                chip_id=chip_id,
+                execution_id=execution_id,
+                task_id=task_id,
+                note=note,
+            )
             doc.save()
             return doc
 

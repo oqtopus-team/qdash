@@ -259,9 +259,7 @@ def get_execution(
 
     """
     logger.debug(f"Fetching execution {execution_id}, project: {ctx.project_id}")
-    execution = ExecutionHistoryDocument.find_one(
-        {"project_id": ctx.project_id, "execution_id": execution_id}
-    ).run()
+    execution = ExecutionHistoryDocument.find_one({"project_id": ctx.project_id, "execution_id": execution_id}).run()
     if execution is None:
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
     flat_tasks = flatten_tasks(execution.task_results)

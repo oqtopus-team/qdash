@@ -23,8 +23,9 @@ pytest_plugins = ("pytest_asyncio",)
 pytest.mark.asyncio_default_fixture_loop_scope = "function"
 
 
-# Set test environment variables before importing app modules
-os.environ.setdefault("ENV", "test")
+# Force test environment - override any existing value
+# This must be set before importing any app modules
+os.environ["ENV"] = "test"
 os.environ.setdefault("CLIENT_URL", "http://localhost:3000")
 os.environ.setdefault("PREFECT_API_URL", "http://localhost:4200/api")
 os.environ.setdefault("SLACK_BOT_TOKEN", "test-token")
@@ -134,7 +135,11 @@ def init_db(
         MongoDB database instance
 
     """
+    import qdash.api.db.session as db_session
     from qdash.api.db.session import set_test_client
+
+    # Reset global database reference (not client) before setting up test database
+    db_session._database = None
 
     set_test_client(mongo_client, db_name=test_settings.mongo_test_db)
     db = mongo_client[test_settings.mongo_test_db]

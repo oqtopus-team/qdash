@@ -108,9 +108,7 @@ function CreateProjectModal({
               rows={3}
             />
           </div>
-          {error && (
-            <div className="text-error text-sm mb-4">{error}</div>
-          )}
+          {error && <div className="text-error text-sm mb-4">{error}</div>}
           <div className="modal-action">
             <button
               type="button"
@@ -174,7 +172,7 @@ function ProjectSettingsModal({
       query: {
         enabled: !!project?.project_id,
       },
-    }
+    },
   );
 
   const members = membersData?.data?.members ?? [];
@@ -468,7 +466,7 @@ function ProjectSettingsModal({
                             onChange={(e) =>
                               handleRoleChange(
                                 member.username,
-                                e.target.value as ProjectRole
+                                e.target.value as ProjectRole,
                               )
                             }
                           >
@@ -494,7 +492,9 @@ function ProjectSettingsModal({
                           {member.role !== "owner" && (
                             <button
                               className="btn btn-ghost btn-xs text-error"
-                              onClick={() => handleRemoveMember(member.username)}
+                              onClick={() =>
+                                handleRemoveMember(member.username)
+                              }
                             >
                               Remove
                             </button>
@@ -533,7 +533,7 @@ function ProjectSelector() {
       refreshProjects();
       switchProject(projectId);
     },
-    [refreshProjects, switchProject]
+    [refreshProjects, switchProject],
   );
 
   const handleProjectUpdated = useCallback(() => {
@@ -545,7 +545,7 @@ function ProjectSelector() {
     // Switch to first available project
     if (projects.length > 1) {
       const remaining = projects.filter(
-        (p) => p.project_id !== currentProject?.project_id
+        (p) => p.project_id !== currentProject?.project_id,
       );
       if (remaining.length > 0) {
         switchProject(remaining[0].project_id);
@@ -564,11 +564,7 @@ function ProjectSelector() {
   return (
     <>
       <div className="dropdown dropdown-bottom">
-        <div
-          tabIndex={0}
-          role="button"
-          className="btn btn-ghost btn-sm gap-2"
-        >
+        <div tabIndex={0} role="button" className="btn btn-ghost btn-sm gap-2">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"

@@ -8,6 +8,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from qdash.api.lib.project_service import ProjectService
 from qdash.dbmodel.backend import BackendDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
@@ -24,7 +25,6 @@ from qdash.dbmodel.tag import TagDocument
 from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
-from qdash.api.lib.project_service import ProjectService
 
 logger = logging.getLogger(__name__)
 
