@@ -14,6 +14,7 @@ import { IoAnalytics } from "react-icons/io5";
 import { VscFiles } from "react-icons/vsc";
 
 import { useSidebar } from "@/app/contexts/SidebarContext";
+import { useProject } from "@/app/contexts/ProjectContext";
 
 const PREFECT_URL =
   process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
@@ -21,6 +22,7 @@ const PREFECT_URL =
 function Sidebar() {
   const pathname = usePathname();
   const { isOpen, toggleSidebar } = useSidebar();
+  const { canEdit } = useProject();
   const isActive = (path: string) => {
     return pathname === path;
   };
@@ -87,22 +89,24 @@ function Sidebar() {
             {isOpen && <span className="ml-2">Chip</span>}
           </Link>
         </li>
-        <li>
-          <Link
-            href="/flow"
-            className={`py-4 ${
-              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
-            } my-2 text-base font-bold flex items-center ${
-              pathname.startsWith("/flow")
-                ? "bg-neutral text-neutral-content"
-                : "text-base-content"
-            }`}
-            title="Editor"
-          >
-            <FaCode />
-            {isOpen && <span className="ml-2">Editor</span>}
-          </Link>
-        </li>
+        {canEdit && (
+          <li>
+            <Link
+              href="/flow"
+              className={`py-4 ${
+                isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+              } my-2 text-base font-bold flex items-center ${
+                pathname.startsWith("/flow")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
+              }`}
+              title="Editor"
+            >
+              <FaCode />
+              {isOpen && <span className="ml-2">Editor</span>}
+            </Link>
+          </li>
+        )}
         <li>
           <Link
             href="/execution"
@@ -135,38 +139,42 @@ function Sidebar() {
             {isOpen && <span className="ml-2">Analysis</span>}
           </Link>
         </li>
-        <li>
-          <Link
-            href="/tasks"
-            className={`py-4 ${
-              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
-            } my-2 text-base font-bold flex items-center ${
-              isActive("/tasks")
-                ? "bg-neutral text-neutral-content"
-                : "text-base-content"
-            }`}
-            title="Tasks"
-          >
-            <BsListTask />
-            {isOpen && <span className="ml-2">Tasks</span>}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/files"
-            className={`py-4 ${
-              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
-            } my-2 text-base font-bold flex items-center ${
-              pathname.startsWith("/files")
-                ? "bg-neutral text-neutral-content"
-                : "text-base-content"
-            }`}
-            title="Files"
-          >
-            <VscFiles />
-            {isOpen && <span className="ml-2">Files</span>}
-          </Link>
-        </li>
+        {canEdit && (
+          <li>
+            <Link
+              href="/tasks"
+              className={`py-4 ${
+                isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+              } my-2 text-base font-bold flex items-center ${
+                isActive("/tasks")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
+              }`}
+              title="Tasks"
+            >
+              <BsListTask />
+              {isOpen && <span className="ml-2">Tasks</span>}
+            </Link>
+          </li>
+        )}
+        {canEdit && (
+          <li>
+            <Link
+              href="/files"
+              className={`py-4 ${
+                isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+              } my-2 text-base font-bold flex items-center ${
+                pathname.startsWith("/files")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
+              }`}
+              title="Files"
+            >
+              <VscFiles />
+              {isOpen && <span className="ml-2">Files</span>}
+            </Link>
+          </li>
+        )}
 
         <li>
           <Link
@@ -184,21 +192,25 @@ function Sidebar() {
             {isOpen && <span className="ml-2">Settings</span>}
           </Link>
         </li>
-        <div className="divider"></div>
-        <li>
-          <a
-            href={`${PREFECT_URL}/dashboard`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`py-4 ${
-              isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
-            } my-2 text-base font-bold flex items-center`}
-            title="Workflow"
-          >
-            <GoWorkflow />
-            {isOpen && <span className="ml-2">Workflow</span>}
-          </a>
-        </li>
+        {canEdit && (
+          <>
+            <div className="divider"></div>
+            <li>
+              <a
+                href={`${PREFECT_URL}/dashboard`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`py-4 ${
+                  isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+                } my-2 text-base font-bold flex items-center`}
+                title="Workflow"
+              >
+                <GoWorkflow />
+                {isOpen && <span className="ml-2">Workflow</span>}
+              </a>
+            </li>
+          </>
+        )}
       </ul>
     </aside>
   );

@@ -212,6 +212,7 @@ def calibrate_one_qubit_scheduled(
     exclude_qids: list[str] | None = None,
     tasks: list[str] | None = None,
     flow_name: str | None = None,
+    project_id: str | None = None,
 ) -> dict[str, Any]:
     """Execute 1-qubit calibration with automatic Box scheduling.
 
@@ -225,6 +226,7 @@ def calibrate_one_qubit_scheduled(
         exclude_qids: List of qubit IDs to exclude from calibration
         tasks: List of 1-qubit task names. If None, uses FULL_1Q_TASKS
         flow_name: Flow name prefix for stage names
+        project_id: Project ID for multi-tenancy
 
     Returns:
         Dictionary of results organized by Box stage:
@@ -267,6 +269,7 @@ def calibrate_one_qubit_scheduled(
             chip_id,
             stage_info.qids,
             flow_name=f"{flow_name}_{stage_name}" if flow_name else stage_name,
+            project_id=project_id,
             enable_github_pull=True,
             github_push_config=GitHubPushConfig(
                 enabled=True,
@@ -304,6 +307,7 @@ def calibrate_one_qubit_synchronized(
     exclude_qids: list[str] | None = None,
     tasks: list[str] | None = None,
     flow_name: str | None = None,
+    project_id: str | None = None,
 ) -> dict[str, Any]:
     """Execute 1-qubit calibration with synchronized step-based scheduling.
 
@@ -380,6 +384,7 @@ def calibrate_one_qubit_synchronized(
                 chip_id,
                 box_qids,
                 flow_name=f"{flow_name}_{stage_name}" if flow_name else stage_name,
+                project_id=project_id,
                 enable_github_pull=True,
                 github_push_config=GitHubPushConfig(
                     enabled=True,
@@ -416,6 +421,7 @@ def calibrate_two_qubit_scheduled(
     candidate_qubits: list[str] | None = None,
     tasks: list[str] | None = None,
     flow_name: str | None = None,
+    project_id: str | None = None,
     max_parallel_ops: int = 10,
     x90_fidelity_threshold: float = 0.90,
 ) -> dict[str, Any]:
@@ -487,6 +493,7 @@ def calibrate_two_qubit_scheduled(
         chip_id,
         candidate_qubits,
         flow_name=f"{flow_name}_2Qubit" if flow_name else "2Qubit",
+        project_id=project_id,
         enable_github_pull=False,
         github_push_config=GitHubPushConfig(
             enabled=True,

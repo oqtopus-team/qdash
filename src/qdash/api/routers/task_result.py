@@ -8,8 +8,7 @@ from typing import Annotated
 import pendulum
 from fastapi import APIRouter, Depends, Query
 from pymongo import ASCENDING, DESCENDING
-from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
-from qdash.api.schemas.auth import User
+from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.task_result import (
     LatestTaskResultResponse,
     TaskHistoryResponse,
@@ -47,7 +46,7 @@ COUPLING_FIDELITY_THRESHOLD = 0.75
 def get_latest_qubit_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> LatestTaskResultResponse:
     """Get the latest qubit task results for all qubits on a chip.
 
@@ -60,8 +59,8 @@ def get_latest_qubit_task_results(
         ID of the chip to fetch results for
     task : str
         Name of the task to fetch results for
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -71,15 +70,15 @@ def get_latest_qubit_task_results(
     Raises
     ------
     ValueError
-        If the chip is not found for the current user
+        If the chip is not found for the current project
 
     """
-    logger.debug(f"Getting latest qubit task results for chip {chip_id}, task {task}, user: {current_user.username}")
+    logger.debug(f"Getting latest qubit task results for chip {chip_id}, task {task}, project: {ctx.project_id}")
 
-    # Get chip info
-    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    # Get chip info (scoped by project)
+    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
     if chip is None:
-        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+        raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
     # Get qids
     qids = list(chip.qubits.keys())
@@ -87,11 +86,11 @@ def get_latest_qubit_task_results(
         k: v.data.get("x90_gate_fidelity", {}).get("value", 0.0) > QUBIT_FIDELITY_THRESHOLD
         for k, v in chip.qubits.items()
     }
-    # Fetch all task results in one query
+    # Fetch all task results in one query (scoped by project)
     all_results = (
         TaskResultHistoryDocument.find(
             {
-                "username": current_user.username,
+                "project_id": ctx.project_id,
                 "chip_id": chip_id,
                 "name": task,
                 "qid": {"$in": qids},
@@ -149,7 +148,7 @@ def get_historical_qubit_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
     date: Annotated[str, Query(description="Date in YYYYMMDD format")],
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> LatestTaskResultResponse:
     """Get historical qubit task results for a specific date.
 
@@ -165,8 +164,8 @@ def get_historical_qubit_task_results(
         Name of the task to fetch results for
     date : str
         Date in YYYYMMDD format (JST timezone)
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -181,12 +180,12 @@ def get_historical_qubit_task_results(
     """
     logger.debug(f"Getting historical qubit task results for chip {chip_id}, task {task}, date {date}")
 
-    # Get chip info
+    # Get chip info (scoped by project)
     chip = ChipHistoryDocument.find_one(
-        {"chip_id": chip_id, "username": current_user.username, "recorded_date": date}
+        {"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}
     ).run()
     if chip is None:
-        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+        raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
     # Get qids
     qids = list(chip.qubits.keys())
@@ -197,7 +196,7 @@ def get_historical_qubit_task_results(
     all_results = (
         TaskResultHistoryDocument.find(
             {
-                "username": current_user.username,
+                "project_id": ctx.project_id,
                 "chip_id": chip_id,
                 "name": task,
                 "qid": {"$in": qids},
@@ -273,7 +272,7 @@ def get_qubit_task_history(
     qid: str,
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
-    current_user: Annotated[User, Depends(get_optional_current_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> TaskHistoryResponse:
     """Get complete task history for a specific qubit.
 
@@ -289,8 +288,8 @@ def get_qubit_task_history(
         ID of the chip containing the qubit
     task : str
         Name of the task to fetch history for
-    current_user : User
-        Current authenticated user (optional)
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -300,20 +299,20 @@ def get_qubit_task_history(
     Raises
     ------
     ValueError
-        If the chip is not found for the current user
+        If the chip is not found for the current project
 
     """
     logger.debug(f"Getting qubit task history for chip {chip_id}, qid {qid}, task {task}")
 
-    # Get chip info
-    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    # Get chip info (scoped by project)
+    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
     if chip is None:
-        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
-    # Fetch all task results in one query
+        raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
+    # Fetch all task results in one query (scoped by project)
     all_results = (
         TaskResultHistoryDocument.find(
             {
-                "username": current_user.username,
+                "project_id": ctx.project_id,
                 "chip_id": chip_id,
                 "name": task,
                 "qid": qid,
@@ -363,7 +362,7 @@ def get_qubit_task_history(
 def get_latest_coupling_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> LatestTaskResultResponse:
     """Get the latest coupling task results for all couplings on a chip.
 
@@ -377,8 +376,8 @@ def get_latest_coupling_task_results(
         ID of the chip to fetch results for
     task : str
         Name of the task to fetch results for
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -388,15 +387,15 @@ def get_latest_coupling_task_results(
     Raises
     ------
     ValueError
-        If the chip is not found for the current user
+        If the chip is not found for the current project
 
     """
-    logger.debug(f"Getting latest coupling task results for chip {chip_id}, task {task}, user: {current_user.username}")
+    logger.debug(f"Getting latest coupling task results for chip {chip_id}, task {task}, project: {ctx.project_id}")
 
-    # Get chip info
-    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    # Get chip info (scoped by project)
+    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
     if chip is None:
-        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+        raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
     # Get coupling ids
     qids = list(chip.couplings.keys())
@@ -405,11 +404,11 @@ def get_latest_coupling_task_results(
         for k, v in chip.couplings.items()
     }
 
-    # Fetch all task results in one query
+    # Fetch all task results in one query (scoped by project)
     all_results = (
         TaskResultHistoryDocument.find(
             {
-                "username": current_user.username,
+                "project_id": ctx.project_id,
                 "chip_id": chip_id,
                 "name": task,
                 "qid": {"$in": qids},
@@ -467,7 +466,7 @@ def get_historical_coupling_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
     date: Annotated[str, Query(description="Date in YYYYMMDD format")],
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> LatestTaskResultResponse:
     """Get historical coupling task results for a specific date.
 
@@ -483,8 +482,8 @@ def get_historical_coupling_task_results(
         Name of the task to fetch results for
     date : str
         Date in YYYYMMDD format (JST timezone)
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -499,12 +498,12 @@ def get_historical_coupling_task_results(
     """
     logger.debug(f"Getting historical coupling task results for chip {chip_id}, task {task}, date {date}")
 
-    # Get chip info
+    # Get chip info (scoped by project)
     chip = ChipHistoryDocument.find_one(
-        {"chip_id": chip_id, "username": current_user.username, "recorded_date": date}
+        {"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}
     ).run()
     if chip is None:
-        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+        raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
     # Get coupling ids
     qids = list(chip.couplings.keys())
@@ -517,7 +516,7 @@ def get_historical_coupling_task_results(
     all_results = (
         TaskResultHistoryDocument.find(
             {
-                "username": current_user.username,
+                "project_id": ctx.project_id,
                 "chip_id": chip_id,
                 "name": task,
                 "qid": {"$in": qids},
@@ -595,7 +594,7 @@ def get_coupling_task_history(
     coupling_id: str,
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
-    current_user: Annotated[User, Depends(get_optional_current_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> TaskHistoryResponse:
     """Get complete task history for a specific coupling.
 
@@ -611,8 +610,8 @@ def get_coupling_task_history(
         ID of the chip containing the coupling
     task : str
         Name of the task to fetch history for
-    current_user : User
-        Current authenticated user (optional)
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -622,21 +621,21 @@ def get_coupling_task_history(
     Raises
     ------
     ValueError
-        If the chip is not found for the current user
+        If the chip is not found for the current project
 
     """
     logger.debug(f"Getting coupling task history for chip {chip_id}, coupling {coupling_id}, task {task}")
 
-    # Get chip info
-    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    # Get chip info (scoped by project)
+    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
     if chip is None:
-        raise ValueError(f"Chip {chip_id} not found for user {current_user.username}")
+        raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
-    # Fetch all task results in one query
+    # Fetch all task results in one query (scoped by project)
     all_results = (
         TaskResultHistoryDocument.find(
             {
-                "username": current_user.username,
+                "project_id": ctx.project_id,
                 "chip_id": chip_id,
                 "name": task,
                 "qid": coupling_id,
@@ -680,7 +679,7 @@ def _fetch_timeseries_data(
     chip_id: str,
     tag: str,
     parameter: str,
-    current_user: User,
+    project_id: str,
     target_qid: str | None = None,
     start_at: str | None = None,
     end_at: str | None = None,
@@ -695,8 +694,8 @@ def _fetch_timeseries_data(
         The tag to filter by
     parameter : str
         The parameter to fetch
-    current_user : User
-        The current user
+    project_id : str
+        The project ID for scoping the query
     target_qid : str | None
         If provided, only return data for this specific qid
     start_at : str | None
@@ -713,11 +712,11 @@ def _fetch_timeseries_data(
     if start_at is None or end_at is None:
         end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
         start_at = pendulum.now(tz="Asia/Tokyo").subtract(days=7).to_iso8601_string()
-    # Find all task results for the given tag and parameter
+    # Find all task results for the given tag and parameter (scoped by project)
     task_results = (
         TaskResultHistoryDocument.find(
             {
-                "username": current_user.username,
+                "project_id": project_id,
                 "chip_id": chip_id,
                 "tags": tag,
                 "output_parameter_names": parameter,
@@ -771,7 +770,7 @@ def get_timeseries_task_results(
     parameter: Annotated[str, Query(description="Parameter name")],
     start_at: Annotated[str, Query(description="Start time in ISO format")],
     end_at: Annotated[str, Query(description="End time in ISO format")],
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
     qid: Annotated[str | None, Query(description="Optional qubit ID to filter by")] = None,
 ) -> TimeSeriesData:
     """Get timeseries task results filtered by tag and parameter.
@@ -791,8 +790,8 @@ def get_timeseries_task_results(
         Start time in ISO format for the time range
     end_at : str
         End time in ISO format for the time range
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
     qid : str | None
         Optional qubit ID to filter results to a specific qubit
 
@@ -804,4 +803,4 @@ def get_timeseries_task_results(
 
     """
     logger.debug(f"Getting timeseries task results for chip {chip_id}, tag {tag}, parameter {parameter}, qid {qid}")
-    return _fetch_timeseries_data(chip_id, tag, parameter, current_user, qid, start_at, end_at)
+    return _fetch_timeseries_data(chip_id, tag, parameter, ctx.project_id, qid, start_at, end_at)

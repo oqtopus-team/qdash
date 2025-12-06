@@ -1,6 +1,7 @@
 # QDash Database Structure Documentation
 
-This document describes the database structure of the QDash project. QDash uses MongoDB as its primary database, managing data through the Bunnet ODM (Object Document Mapper).
+This document describes the database structure of the QDash project. QDash uses MongoDB as its primary database, managing data through the Bunnet ODM (Object Document Mapper).  
+QDash is moving toward a project-centric multi-tenant model where every piece of calibration data belongs to a project. Users create projects, invite other users with viewer/editor roles, and all chip/calibration entities inherit the owning `project_id`.
 
 ## Overview
 
@@ -15,7 +16,9 @@ The QDash data model consists of two layers:
 
 | Collection | Document Class | Description |
 |------------|----------------|-------------|
-| `chip` | ChipDocument | Quantum chip configuration |
+| `project` | ProjectDocument | Project metadata (owner-centric workspace) |
+| `project_membership` | ProjectMembershipDocument | User membership & role per project |
+| `chip` | ChipDocument | Quantum chip configuration scoped to a project |
 | `qubit` | QubitDocument | Individual qubit data |
 | `coupling` | CouplingDocument | Qubit coupling information |
 | `execution_history` | ExecutionHistoryDocument | Calibration execution history |
@@ -24,9 +27,9 @@ The QDash data model consists of two layers:
 | `chip_history` | ChipHistoryDocument | Daily chip snapshots |
 | `coupling_history` | CouplingHistoryDocument | Daily coupling snapshots |
 | `task` | TaskDocument | Task definitions |
-| `backend` | BackendDocument | Backend configurations |
-| `user` | UserDocument | User authentication |
-| `tag` | TagDocument | Tag management |
+| `backend` | BackendDocument | Backend configurations (project scoped) |
+| `user` | UserDocument | User authentication / default project bootstrap |
+| `tag` | TagDocument | Project-level tag management |
 | `execution_lock` | ExecutionLockDocument | Exclusive execution lock |
 | `execution_counter` | ExecutionCounterDocument | Execution ID counter |
 | `calibration_note` | CalibrationNoteDocument | Calibration notes |
@@ -48,6 +51,43 @@ class SystemInfoModel(BaseModel):
 
 ---
 
+### ProjectModel
+
+Represents a collaborative workspace. Every tenant-visible entity references a project.
+
+```python
+class ProjectModel(BaseModel):
+    project_id: str        # Globally unique slug/UUID
+    owner_username: str    # Creator/owner of the project
+    name: str              # Display name
+    description: str | None = None
+    tags: list[str] = []   # Optional labels for search
+    system_info: SystemInfoModel
+```
+
+---
+
+### ProjectMembershipModel
+
+Represents user access to a project.
+
+```python
+class ProjectRole(str, Enum):
+    OWNER = "owner"
+    EDITOR = "editor"
+    VIEWER = "viewer"
+
+class ProjectMembershipModel(BaseModel):
+    project_id: str
+    username: str
+    role: ProjectRole
+    invited_by: str | None = None
+    status: Literal["pending", "active", "revoked"] = "pending"
+    system_info: SystemInfoModel
+```
+
+---
+
 ### ChipModel
 
 Model representing quantum chip configuration.
@@ -55,6 +95,7 @@ Model representing quantum chip configuration.
 ```python
 class ChipModel(BaseModel):
     chip_id: str           # Chip ID (e.g., "chip1")
+    project_id: str        # Owning project ID
     username: str          # Creator's username
     size: int              # Chip size
     qubits: dict[str, QubitModel]      # Qubit map
@@ -78,6 +119,7 @@ class NodeInfoModel(BaseModel):
     position: PositionModel  # Display position
 
 class QubitModel(BaseModel):
+    project_id: str        # Owning project ID
     username: str | None   # Username
     qid: str               # Qubit ID (e.g., "0", "1")
     status: str            # Status ("pending", "completed", etc.)
@@ -117,6 +159,7 @@ class EdgeInfoModel(BaseModel):
     fill: str     # Fill color
 
 class CouplingModel(BaseModel):
+    project_id: str        # Owning project ID
     username: str | None   # Username
     qid: str               # Coupling ID (e.g., "0-1")
     status: str            # Status
@@ -140,7 +183,8 @@ class ExecutionStatusModel(str, Enum):
     FAILED = "failed"
 
 class ExecutionModel(BaseModel):
-    username: str          # Username
+    project_id: str        # Owning project ID
+    username: str          # Username (request initiator)
     name: str              # Execution name
     execution_id: str      # Execution ID (e.g., "20240101-001")
     calib_data_path: str   # Calibration data path
@@ -195,6 +239,7 @@ class CalibDataModel(BaseModel):
     coupling: dict[str, dict[str, OutputParameterModel]]  # Per-coupling data
 
 class BaseTaskResultModel(BaseModel):
+    project_id: str
     task_id: str           # UUID
     name: str              # Task name
     upstream_id: str       # Upstream task ID
@@ -274,17 +319,61 @@ class FridgeModel(BaseModel):
 
 ## Database Documents (dbmodel)
 
+### ProjectDocument
+
+**Collection:** `project`
+
+**Indexes:**
+- `project_id` - Unique identifier per project
+- `(owner_username, name)` - Prevent duplicate names per owner
+
+```python
+class ProjectDocument(Document):
+    project_id: str            # UUID/slug
+    owner_username: str
+    name: str
+    description: str | None = None
+    tags: list[str] = []
+    default_role: ProjectRole = ProjectRole.VIEWER
+    system_info: SystemInfoModel
+```
+
+---
+
+### ProjectMembershipDocument
+
+**Collection:** `project_membership`
+
+**Indexes:**
+- `(project_id, username)` - Unique membership per user/project
+- `(username, status)` - Efficient lookup of invitations
+
+```python
+class ProjectMembershipDocument(Document):
+    project_id: str
+    username: str
+    role: ProjectRole
+    status: Literal["pending", "active", "revoked"] = "pending"
+    invited_by: str | None = None
+    last_accessed_at: str | None = None
+    system_info: SystemInfoModel
+```
+
+---
+
 ### ChipDocument
 
 **Collection:** `chip`
 
 **Indexes:**
-- `(chip_id, username)` - Unique compound index
+- `(project_id, chip_id)` - Unique compound index
+- `(username, chip_id)` - Backward-compat lookup while migrating
 
 ```python
 class ChipDocument(Document):
+    project_id: str
+    username: str                # Creator/owner username
     chip_id: str = "SAMPLE"
-    username: str
     size: int = 64
     qubits: dict[str, QubitModel] = {}
     couplings: dict[str, CouplingModel] = {}
@@ -293,8 +382,8 @@ class ChipDocument(Document):
 ```
 
 **Key Methods:**
-- `get_current_chip(username)` - Get the most recently installed chip
-- `get_chip_by_id(username, chip_id)` - Get a specific chip
+- `get_current_chip(project_id)` - Get the most recently installed chip per project
+- `get_chip_by_id(project_id, chip_id)` - Get a specific chip
 - `update_qubit(qid, qubit_data)` - Update a qubit
 - `update_coupling(qid, coupling_data)` - Update a coupling
 
@@ -305,10 +394,12 @@ class ChipDocument(Document):
 **Collection:** `qubit`
 
 **Indexes:**
-- `(chip_id, qid, username)` - Unique compound index
+- `(project_id, chip_id, qid)` - Unique compound index
+- `(project_id, username)` - Filter by project/member
 
 ```python
 class QubitDocument(Document):
+    project_id: str
     username: str
     qid: str
     status: str = "pending"
@@ -336,10 +427,12 @@ class QubitDocument(Document):
 **Collection:** `coupling`
 
 **Indexes:**
-- `(chip_id, qid, username)` - Unique compound index
+- `(project_id, chip_id, qid)` - Unique compound index
+- `(project_id, username)` - Filter by project/member
 
 ```python
 class CouplingDocument(Document):
+    project_id: str
     username: str
     qid: str               # Coupling ID (e.g., "0-1")
     status: str = "pending"
@@ -361,10 +454,13 @@ class CouplingDocument(Document):
 **Collection:** `execution_history`
 
 **Indexes:**
-- `(execution_id, username)` - Unique compound index
+- `(project_id, execution_id)` - Unique compound index
+- `(project_id, chip_id, start_at)` - Supports metrics/best queries
+- `(project_id, username, start_at)` - Audit per user
 
 ```python
 class ExecutionHistoryDocument(Document):
+    project_id: str
     username: str
     name: str
     execution_id: str
@@ -394,11 +490,13 @@ class ExecutionHistoryDocument(Document):
 
 **Collection:** `task_result_history`
 
-**Indexes:**
-- `(task_id, username)` - Unique compound index
+- **Indexes:**
+- `(project_id, execution_id, task_id)` - Unique compound index
+- `(project_id, qid, task_type)` - Filter by scope/type
 
 ```python
 class TaskResultHistoryDocument(Document):
+    project_id: str
     username: str
     task_id: str
     name: str
@@ -430,12 +528,13 @@ class TaskResultHistoryDocument(Document):
 **Collection:** `qubit_history`
 
 **Indexes:**
-- `(chip_id, qid, username, recorded_date)` - Unique compound index
+- `(project_id, chip_id, qid, recorded_date)` - Unique compound index
 
 Daily snapshot history table.
 
 ```python
 class QubitHistoryDocument(Document):
+    project_id: str
     username: str
     qid: str
     status: str
@@ -454,10 +553,11 @@ class QubitHistoryDocument(Document):
 **Collection:** `chip_history`
 
 **Indexes:**
-- `(chip_id, username, recorded_date)` - Unique compound index
+- `(project_id, chip_id, recorded_date)` - Unique compound index
 
 ```python
 class ChipHistoryDocument(Document):
+    project_id: str
     chip_id: str
     username: str
     size: int
@@ -475,10 +575,11 @@ class ChipHistoryDocument(Document):
 **Collection:** `coupling_history`
 
 **Indexes:**
-- `(chip_id, qid, username, recorded_date)` - Unique compound index
+- `(project_id, chip_id, qid, recorded_date)` - Unique compound index
 
 ```python
 class CouplingHistoryDocument(Document):
+    project_id: str
     username: str
     qid: str
     status: str
@@ -497,12 +598,14 @@ class CouplingHistoryDocument(Document):
 **Collection:** `task`
 
 **Indexes:**
-- `(name, username)` - Unique compound index
+- `(project_id, name)` - Unique compound index
+- `(project_id, task_type)` - Filter by scope
 
 Stores task definition information.
 
 ```python
 class TaskDocument(Document):
+    project_id: str
     username: str
     name: str              # Task name (e.g., "CheckT1")
     backend: str | None
@@ -519,10 +622,11 @@ class TaskDocument(Document):
 **Collection:** `backend`
 
 **Indexes:**
-- `(name, username)` - Unique compound index
+- `(project_id, name)` - Unique compound index
 
 ```python
 class BackendDocument(Document):
+    project_id: str
     username: str
     name: str
     system_info: SystemInfoModel
@@ -543,6 +647,7 @@ class UserDocument(Document):
     username: str
     hashed_password: str
     access_token: str
+    default_project_id: str | None = None
     full_name: str | None = None
     disabled: bool = False
     system_info: SystemInfoModel
@@ -555,10 +660,11 @@ class UserDocument(Document):
 **Collection:** `tag`
 
 **Indexes:**
-- `(name, username)` - Unique compound index
+- `(project_id, name)` - Unique compound index
 
 ```python
 class TagDocument(Document):
+    project_id: str
     username: str
     name: str
 ```
@@ -569,10 +675,14 @@ class TagDocument(Document):
 
 **Collection:** `execution_lock`
 
+**Indexes:**
+- `project_id` - Ensures one lock document per project
+
 Singleton document for exclusive execution control. Ensures only one calibration runs at a time.
 
 ```python
 class ExecutionLockDocument(Document):
+    project_id: str
     locked: bool = False
     system_info: SystemInfoModel
 ```
@@ -589,13 +699,14 @@ class ExecutionLockDocument(Document):
 **Collection:** `execution_counter`
 
 **Indexes:**
-- `(date, username, chip_id)` - Unique compound index
+- `(project_id, date, chip_id)` - Unique compound index
 
 Manages execution ID sequence numbers per date/user/chip.
 
 ```python
 class ExecutionCounterDocument(Document):
     date: str           # YYYYMMDD format
+    project_id: str
     username: str
     chip_id: str
     index: int          # Sequence number (starts from 0)
@@ -603,7 +714,7 @@ class ExecutionCounterDocument(Document):
 ```
 
 **Key Methods:**
-- `get_next_index(date, username, chip_id)` - Atomically get next index
+- `get_next_index(project_id, date, chip_id)` - Atomically get next index
 
 Generated execution ID format: `YYYYMMDD-NNN` (e.g., `20240101-001`)
 
@@ -614,11 +725,12 @@ Generated execution ID format: `YYYYMMDD-NNN` (e.g., `20240101-001`)
 **Collection:** `calibration_note`
 
 **Indexes:**
-- `(execution_id, task_id, username, chip_id)` - Unique compound index
-- `(chip_id, timestamp)` - Search index
+- `(project_id, execution_id, task_id, chip_id)` - Unique compound index
+- `(project_id, chip_id, timestamp)` - Search index
 
 ```python
 class CalibrationNoteDocument(Document):
+    project_id: str
     username: str
     chip_id: str
     execution_id: str
@@ -635,14 +747,15 @@ class CalibrationNoteDocument(Document):
 **Collection:** `flows`
 
 **Indexes:**
-- `(username, name)` - Unique per user
-- `(username, created_at)` - For sorted listing
+- `(project_id, name)` - Unique per project
+- `(project_id, created_at)` - For sorted listing
 
 Stores metadata for user-defined Python flows (custom calibration workflows).
 
 ```python
 class FlowDocument(Document):
     name: str              # Flow name
+    project_id: str
     username: str
     chip_id: str           # Target chip ID
     description: str = ""
@@ -660,61 +773,28 @@ class FlowDocument(Document):
 ## Entity Relationship Diagram (Conceptual)
 
 ```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│     User     │     │    Chip      │     │  Execution   │
-│              │─────│              │─────│   History    │
-│  username*   │  1:n│  chip_id*    │  1:n│execution_id* │
-│  password    │     │  username    │     │  username    │
-│  token       │     │  size        │     │  chip_id     │
-└──────────────┘     │  qubits      │     │  status      │
-                     │  couplings   │     │  task_results│
-                     └──────────────┘     └──────────────┘
-                            │                    │
-                     ┌──────┴──────┐             │
-                     ▼             ▼             ▼
-              ┌──────────┐  ┌──────────┐  ┌─────────────┐
-              │  Qubit   │  │ Coupling │  │ TaskResult  │
-              │          │  │          │  │  History    │
-              │   qid*   │  │   qid*   │  │             │
-              │  chip_id │  │  chip_id │  │  task_id*   │
-              │   data   │  │   data   │  │execution_id │
-              │ best_data│  │ best_data│  │   status    │
-              └──────────┘  └──────────┘  └─────────────┘
-                    │              │
-                    ▼              ▼
-           ┌─────────────┐ ┌─────────────┐
-           │QubitHistory │ │CouplingHist │
-           │             │ │             │
-           │recorded_date│ │recorded_date│
-           │    data     │ │    data     │
-           └─────────────┘ └─────────────┘
+┌─────────────┐        ┌────────────────────┐        ┌───────────────┐
+│    User     │1     n │ ProjectMembership  │n     1 │    Project    │
+│ username PK │<------>│ project_id, user   │<------>│ project_id PK │
+│ default_proj│        │ role, status       │        │ owner_user    │
+└─────────────┘        └────────────────────┘        └────┬─────┬────┘
+                                                          │     │
+                                                          │     │
+                                                          │     │
+                                ┌─────────────────────────┘     └─────────────────────────┐
+                                │                                                       │
+                        ┌───────▼───────┐                                        ┌──────▼─────────┐
+                        │     Chip      │1     n                                  │ ExecutionHist │
+                        │ chip_id PK    │<----------------------------------------│ execution_id  │
+                        │ qubits/coupling│                                         │ task_results  │
+                        └───────┬───────┘                                         └──────┬────────┘
+                                │1                                                    1 │
+                ┌───────────────▼───────────────┐                         ┌────────────▼──────────┐
+                │          Qubit                │                         │   TaskResultHistory   │
+                │          Coupling             │                         │  CalibrationNote etc. │
+                └──────────────────────────────┘                         └───────────────────────┘
 
-         ┌─────────────┐  ┌─────────────┐
-         │    Task     │  │   Backend   │
-         │             │  │             │
-         │   name*     │  │   name*     │
-         │  username   │  │  username   │
-         │ task_type   │  └─────────────┘
-         │input_params │
-         │output_params│
-         └─────────────┘
-
-         ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-         │    Tag      │  │ Exec Lock   │  │Exec Counter │
-         │             │  │             │  │             │
-         │   name*     │  │   locked    │  │   date*     │
-         │  username   │  │             │  │ username*   │
-         └─────────────┘  └─────────────┘  │  chip_id*   │
-                                           │   index     │
-         ┌─────────────┐  ┌─────────────┐  └─────────────┘
-         │  Calib Note │  │    Flow     │
-         │             │  │             │
-         │execution_id*│  │   name*     │
-         │  task_id*   │  │  username*  │
-         │    note     │  │ file_path   │
-         └─────────────┘  └─────────────┘
-
-* = Primary Key or part of Unique Index
+Other project-scoped collections (tasks, tags, backends, flows, counters, locks, histories) all reference `project_id`, ensuring a single sharing boundary per project.
 ```
 
 ---
@@ -723,8 +803,9 @@ class FlowDocument(Document):
 
 ### During Calibration Execution
 
-1. Acquire lock via **ExecutionLock**
-2. Generate execution ID from **ExecutionCounter** (YYYYMMDD-NNN)
+0. Resolve `(project_id, username)` via **ProjectMembershipDocument** and ensure role `editor` or `owner`
+1. Acquire per-project lock via **ExecutionLockDocument(project_id)**
+2. Generate execution ID from **ExecutionCounterDocument** (YYYYMMDD-NNN scoped by project/chip)
 3. Execute each task:
    - Save task results to **TaskResultHistoryDocument**
    - Update calibration data in **QubitDocument** / **CouplingDocument**

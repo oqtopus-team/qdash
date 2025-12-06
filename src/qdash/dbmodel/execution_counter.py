@@ -9,6 +9,7 @@ from qdash.datamodel.system_info import SystemInfoModel
 class ExecutionCounterDocument(Document):
     """Document for the execution counter."""
 
+    project_id: str | None = Field(None, description="Owning project identifier")
     date: str
     username: str
     chip_id: str
@@ -21,7 +22,7 @@ class ExecutionCounterDocument(Document):
         name = "execution_counter"
         indexes: ClassVar = [
             IndexModel(
-                [("date", ASCENDING), ("username", ASCENDING), ("chip_id", ASCENDING)],
+                [("project_id", ASCENDING), ("date", ASCENDING), ("username", ASCENDING), ("chip_id", ASCENDING)],
                 unique=True,
             )
         ]
@@ -31,7 +32,7 @@ class ExecutionCounterDocument(Document):
     )
 
     @classmethod
-    def get_next_index(cls, date: str, username: str, chip_id: str) -> int:
+    def get_next_index(cls, date: str, username: str, chip_id: str, project_id: str | None = None) -> int:
         """Get the next index for the given date, username and chip_id combination.
 
         Uses atomic findAndModify to prevent race conditions in concurrent executions.
@@ -42,6 +43,7 @@ class ExecutionCounterDocument(Document):
             date: The date to get the next index for
             username: The username to get the next index for
             chip_id: The chip_id to get the next index for
+            project_id: The project_id to get the next index for
 
         Returns:
         -------
@@ -56,12 +58,12 @@ class ExecutionCounterDocument(Document):
         max_retries = 5
         for attempt in range(max_retries):
             # First, try to find existing document
-            doc = cls.find_one({"date": date, "username": username, "chip_id": chip_id}).run()
+            doc = cls.find_one({"project_id": project_id, "date": date, "username": username, "chip_id": chip_id}).run()
 
             if doc is None:
                 # Try to create initial document with index 0
                 try:
-                    doc = cls(date=date, username=username, chip_id=chip_id, index=0)
+                    doc = cls(project_id=project_id, date=date, username=username, chip_id=chip_id, index=0)
                     doc.insert()
                     return 0
                 except DuplicateKeyError:
@@ -72,7 +74,7 @@ class ExecutionCounterDocument(Document):
 
             # Document exists - use atomic increment
             result = cls.get_motor_collection().find_one_and_update(
-                {"date": date, "username": username, "chip_id": chip_id},
+                {"project_id": project_id, "date": date, "username": username, "chip_id": chip_id},
                 {"$inc": {"index": 1}},
                 return_document=ReturnDocument.AFTER,
             )

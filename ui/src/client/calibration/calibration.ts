@@ -18,7 +18,10 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { CalibrationNoteResponse } from "../../schemas";
+import type {
+  CalibrationNoteResponse,
+  HTTPValidationError,
+} from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
 import type { ErrorType } from "../../lib/custom-instance";
@@ -34,8 +37,8 @@ and configuration.
 
 Parameters
 ----------
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------
@@ -60,7 +63,7 @@ export const getGetCalibrationNoteQueryKey = () => {
 
 export const getGetCalibrationNoteQueryOptions = <
   TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -89,11 +92,11 @@ export const getGetCalibrationNoteQueryOptions = <
 export type GetCalibrationNoteQueryResult = NonNullable<
   Awaited<ReturnType<typeof getCalibrationNote>>
 >;
-export type GetCalibrationNoteQueryError = ErrorType<unknown>;
+export type GetCalibrationNoteQueryError = ErrorType<HTTPValidationError>;
 
 export function useGetCalibrationNote<
   TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options: {
     query: Partial<
@@ -119,7 +122,7 @@ export function useGetCalibrationNote<
 };
 export function useGetCalibrationNote<
   TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options?: {
     query?: Partial<
@@ -143,7 +146,7 @@ export function useGetCalibrationNote<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetCalibrationNote<
   TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options?: {
     query?: Partial<
@@ -163,7 +166,7 @@ export function useGetCalibrationNote<
 
 export function useGetCalibrationNote<
   TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options?: {
     query?: Partial<

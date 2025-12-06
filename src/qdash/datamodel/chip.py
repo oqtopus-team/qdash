@@ -17,6 +17,7 @@ class ChipModel(BaseModel):
 
     """
 
+    project_id: str | None = Field(None, description="Owning project identifier")
     chip_id: str = Field(..., description="The chip ID")
     username: str = Field(..., description="The username of the user who created the chip")
     size: int = Field(..., description="The size of the chip")

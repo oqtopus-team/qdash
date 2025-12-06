@@ -59,6 +59,7 @@ def get_user(username: str) -> UserInDB | None:
             username=user.username,
             full_name=user.full_name,
             disabled=user.disabled,
+            default_project_id=user.default_project_id,
             hashed_password=user.hashed_password,
             access_token=user.access_token,
         )
@@ -77,6 +78,7 @@ def get_user_by_token(access_token: str) -> UserInDB | None:
             username=user.username,
             full_name=user.full_name,
             disabled=user.disabled,
+            default_project_id=user.default_project_id,
             hashed_password=user.hashed_password,
             access_token=user.access_token,
         )
@@ -141,7 +143,12 @@ def get_current_user(
             detail="User account is disabled",
         )
 
-    return User(username=user.username, full_name=user.full_name, disabled=user.disabled)
+    return User(
+        username=user.username,
+        full_name=user.full_name,
+        disabled=user.disabled,
+        default_project_id=user.default_project_id,
+    )
 
 
 def get_optional_current_user(
@@ -162,17 +169,22 @@ def get_optional_current_user(
     """
     if not credentials:
         logger.debug("No token provided, using default user")
-        return User(username="default", full_name="Default User", disabled=False)
+        return User(username="default", full_name="Default User", disabled=False, default_project_id=None)
 
     token = credentials.credentials
     user = get_user_by_token(token)
 
     if not user:
         logger.debug("Invalid token, using default user")
-        return User(username="default", full_name="Default User", disabled=False)
+        return User(username="default", full_name="Default User", disabled=False, default_project_id=None)
 
     logger.debug(f"Using authenticated user: {user.username}")
-    return User(username=user.username, full_name=user.full_name, disabled=user.disabled)
+    return User(
+        username=user.username,
+        full_name=user.full_name,
+        disabled=user.disabled,
+        default_project_id=user.default_project_id,
+    )
 
 
 def get_current_active_user(

@@ -3,7 +3,7 @@ from typing import ClassVar
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
-from pymongo import ASCENDING, IndexModel
+from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.datamodel.execution import ExecutionModel, TaskResultModel
 from qdash.datamodel.system_info import SystemInfoModel
 
@@ -13,6 +13,7 @@ class ExecutionHistoryDocument(Document):
 
     Attributes
     ----------
+        project_id (str | None): The owning project identifier.
         execution_id (str): The execution ID. e.g. "0".
         status (str): The status of the execution. e.g. "completed".
         tasks (dict): The tasks of the execution. e.g. {"task1": "completed"}.
@@ -29,6 +30,7 @@ class ExecutionHistoryDocument(Document):
 
     """
 
+    project_id: str | None = Field(None, description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the execution")
     name: str = Field(..., description="The name of the execution")
     execution_id: str = Field(..., description="The execution ID")
@@ -51,11 +53,17 @@ class ExecutionHistoryDocument(Document):
         """Settings for the document."""
 
         name = "execution_history"
-        indexes: ClassVar = [IndexModel([("execution_id", ASCENDING), ("username")], unique=True)]
+        indexes: ClassVar = [
+            IndexModel([("project_id", ASCENDING), ("execution_id", ASCENDING)], unique=True),
+            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING), ("start_at", DESCENDING)]),
+            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING)]),
+            IndexModel([("project_id", ASCENDING), ("username", ASCENDING), ("start_at", DESCENDING)]),
+        ]
 
     @classmethod
     def from_execution_model(cls, execution_model: ExecutionModel) -> "ExecutionHistoryDocument":
         return cls(
+            project_id=execution_model.project_id,
             username=execution_model.username,
             name=execution_model.name,
             execution_id=execution_model.execution_id,
@@ -77,13 +85,16 @@ class ExecutionHistoryDocument(Document):
 
     @classmethod
     def upsert_document(cls, execution_model: ExecutionModel) -> "ExecutionHistoryDocument":
-        doc = cls.find_one({"execution_id": execution_model.execution_id}).run()
+        doc = cls.find_one(
+            {"project_id": execution_model.project_id, "execution_id": execution_model.execution_id}
+        ).run()
         if doc is None:
             doc = cls.from_execution_model(execution_model)
             doc.save()
             return doc
 
         # Update basic fields
+        doc.project_id = execution_model.project_id
         doc.username = execution_model.username
         doc.name = execution_model.name
         doc.calib_data_path = execution_model.calib_data_path

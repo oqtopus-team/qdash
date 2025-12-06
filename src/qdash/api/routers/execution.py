@@ -9,8 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
 from pymongo import DESCENDING
-from qdash.api.lib.auth import get_current_active_user
-from qdash.api.schemas.auth import User
+from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
     ExecutionLockStatusResponse,
@@ -150,11 +149,18 @@ def get_figure_by_path(path: str):
     operation_id="getExecutionLockStatus",
     response_model=ExecutionLockStatusResponse,
 )
-def get_execution_lock_status() -> ExecutionLockStatusResponse:
+def get_execution_lock_status(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+) -> ExecutionLockStatusResponse:
     """Fetch the current status of the execution lock.
 
     The execution lock prevents concurrent calibration workflows from running
     simultaneously. This endpoint checks whether a lock is currently held.
+
+    Parameters
+    ----------
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -162,7 +168,7 @@ def get_execution_lock_status() -> ExecutionLockStatusResponse:
         Response containing lock status (True if locked, False if available)
 
     """
-    status = ExecutionLockDocument.get_lock_status()
+    status = ExecutionLockDocument.get_lock_status(project_id=ctx.project_id)
     if status is None:
         return ExecutionLockStatusResponse(lock=False)
     return ExecutionLockStatusResponse(lock=status)
@@ -175,7 +181,7 @@ def get_execution_lock_status() -> ExecutionLockStatusResponse:
     operation_id="listExecutions",
 )
 def list_executions(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
     chip_id: Annotated[str, Query(description="Chip ID to filter executions")],
     skip: Annotated[int, Query(ge=0, description="Number of items to skip")] = 0,
     limit: Annotated[int, Query(ge=1, le=100, description="Number of items to return")] = 20,
@@ -184,8 +190,8 @@ def list_executions(
 
     Parameters
     ----------
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
     chip_id : str
         ID of the chip to fetch executions for
     skip : int
@@ -199,10 +205,10 @@ def list_executions(
         Wrapped list of executions for the chip
 
     """
-    logger.debug(f"Listing executions for chip {chip_id}, user: {current_user.username}, skip: {skip}, limit: {limit}")
+    logger.debug(f"Listing executions for chip {chip_id}, project: {ctx.project_id}, skip: {skip}, limit: {limit}")
     executions = (
         ExecutionHistoryDocument.find(
-            {"chip_id": chip_id, "username": current_user.username}, sort=[("start_at", DESCENDING)]
+            {"project_id": ctx.project_id, "chip_id": chip_id}, sort=[("start_at", DESCENDING)]
         )
         .skip(skip)
         .limit(limit)
@@ -235,7 +241,7 @@ def list_executions(
 )
 def get_execution(
     execution_id: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> ExecutionResponseDetail:
     """Return the execution detail by its ID.
 
@@ -243,8 +249,8 @@ def get_execution(
     ----------
     execution_id : str
         ID of the execution to fetch
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -252,9 +258,9 @@ def get_execution(
         Detailed execution information
 
     """
-    logger.debug(f"Fetching execution {execution_id}, user: {current_user.username}")
+    logger.debug(f"Fetching execution {execution_id}, project: {ctx.project_id}")
     execution = ExecutionHistoryDocument.find_one(
-        {"execution_id": execution_id, "username": current_user.username}
+        {"project_id": ctx.project_id, "execution_id": execution_id}
     ).run()
     if execution is None:
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
