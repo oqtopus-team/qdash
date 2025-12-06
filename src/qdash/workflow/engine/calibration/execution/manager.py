@@ -58,6 +58,7 @@ class ExecutionManager(BaseModel):
     controller_info: dict[str, dict] = {}
     fridge_info: dict = {}
     chip_id: str = ""
+    project_id: str | None = None
     start_at: str = Field(
         default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
         description="The time when the system information was created",
@@ -80,6 +81,7 @@ class ExecutionManager(BaseModel):
         chip_id: str = "",
         name: str = "default",
         note: dict = {},
+        project_id: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -91,6 +93,7 @@ class ExecutionManager(BaseModel):
         self.fridge_info = fridge_info
         self.chip_id = chip_id
         self.note = note
+        self.project_id = project_id
 
         # Initialize internal components
         self._state_manager = ExecutionStateManager(
@@ -103,6 +106,7 @@ class ExecutionManager(BaseModel):
             tags=tags,
             fridge_info=fridge_info,
             chip_id=chip_id,
+            project_id=project_id,
         )
         self._repository = MongoExecutionRepository()
 
@@ -120,6 +124,7 @@ class ExecutionManager(BaseModel):
             self.controller_info = self._state_manager.controller_info
             self.fridge_info = self._state_manager.fridge_info
             self.chip_id = self._state_manager.chip_id
+            self.project_id = self._state_manager.project_id
             self.start_at = self._state_manager.start_at
             self.end_at = self._state_manager.end_at
             self.elapsed_time = self._state_manager.elapsed_time
@@ -141,6 +146,7 @@ class ExecutionManager(BaseModel):
             self._state_manager.controller_info = self.controller_info
             self._state_manager.fridge_info = self.fridge_info
             self._state_manager.chip_id = self.chip_id
+            self._state_manager.project_id = self.project_id
             self._state_manager.start_at = self.start_at
             self._state_manager.end_at = self.end_at
             self._state_manager.elapsed_time = self.elapsed_time
@@ -320,6 +326,7 @@ class ExecutionManager(BaseModel):
             controller_info=self.controller_info,
             fridge_info=self.fridge_info,
             chip_id=self.chip_id,
+            project_id=self.project_id,
             start_at=self.start_at,
             end_at=self.end_at,
             elapsed_time=self.elapsed_time,

@@ -94,7 +94,7 @@ tasks:
 
   lint:
     cmds:
-      - uv run ruff check . # Excludes generated client (see pyproject.toml)
+      - uv run ruff check --fix . # Excludes generated client (see pyproject.toml)
       - uv run ruff format --check .
     desc: Run linting checks
 

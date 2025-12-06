@@ -37,12 +37,12 @@ import type { ErrorType, BodyType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * List all chips.
+ * List all chips in the current project.
 
 Parameters
 ----------
-current_user : User
-    Current authenticated user
+ctx : ProjectContext | None
+    Project context with user and project information
 
 Returns
 -------
@@ -66,7 +66,7 @@ export const getListChipsQueryKey = () => {
 
 export const getListChipsQueryOptions = <
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
@@ -91,11 +91,11 @@ export const getListChipsQueryOptions = <
 export type ListChipsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listChips>>
 >;
-export type ListChipsQueryError = ErrorType<unknown>;
+export type ListChipsQueryError = ErrorType<HTTPValidationError>;
 
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options: {
     query: Partial<
@@ -117,7 +117,7 @@ export function useListChips<
 };
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options?: {
     query?: Partial<
@@ -137,7 +137,7 @@ export function useListChips<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options?: {
     query?: Partial<
@@ -153,7 +153,7 @@ export function useListChips<
 
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options?: {
     query?: Partial<
@@ -176,14 +176,14 @@ export function useListChips<
 }
 
 /**
- * Create a new chip.
+ * Create a new chip in the current project.
 
 Parameters
 ----------
 request : CreateChipRequest
     Chip creation request containing chip_id and size
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with editor or owner permission
 
 Returns
 -------
@@ -291,8 +291,8 @@ Parameters
 ----------
 chip_id : str
     ID of the chip
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------
@@ -445,8 +445,8 @@ Parameters
 ----------
 chip_id : str
     ID of the chip to fetch
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------
@@ -604,8 +604,8 @@ chip_id : str
     ID of the chip
 mux_id : int
     ID of the multiplexer
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------
@@ -765,8 +765,8 @@ Parameters
 ----------
 chip_id : str
     ID of the chip
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------

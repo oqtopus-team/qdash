@@ -205,6 +205,7 @@ def execute_one_qubit_stage(
     stage_groups: list[list[str]],
     stage_tasks: list[str],
     flow_name: str | None = None,
+    project_id: str | None = None,
 ) -> dict:
     """Execute 1-qubit calibration stage.
 
@@ -216,6 +217,7 @@ def execute_one_qubit_stage(
         stage_groups: Groups of qubit IDs (parallel execution within groups)
         stage_tasks: List of 1-qubit task names to execute
         flow_name: Flow name for this stage
+        project_id: Project ID for multi-tenancy
 
     Returns:
     -------
@@ -233,6 +235,7 @@ def execute_one_qubit_stage(
         chip_id,
         stage_qids,
         flow_name=f"{flow_name}_{stage_name}" if flow_name else stage_name,
+        project_id=project_id,
         enable_github_pull=True,
         github_push_config=GitHubPushConfig(
             enabled=True, file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
@@ -309,6 +312,7 @@ def execute_two_qubit_calibration(
     candidate_qubits: list[str],
     tasks: list[str],
     flow_name: str | None = None,
+    project_id: str | None = None,
 ):
     """Execute 2-qubit calibration using CR schedule.
 
@@ -320,6 +324,7 @@ def execute_two_qubit_calibration(
         candidate_qubits: List of candidate qubit IDs
         tasks: List of 2-qubit task names to execute
         flow_name: Flow name for this stage
+        project_id: Project ID for multi-tenancy
 
     Returns:
     -------
@@ -340,6 +345,7 @@ def execute_two_qubit_calibration(
         chip_id,
         candidate_qubits,
         flow_name=f"{flow_name}_Stage2_2Qubit" if flow_name else "Stage2_2Qubit",
+        project_id=project_id,
         enable_github_pull=False,
         github_push_config=GitHubPushConfig(
             enabled=True, file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
@@ -370,6 +376,7 @@ def full_calibration(
     chip_id: str,
     qids: list[str] | None = None,
     flow_name: str | None = None,
+    project_id: str | None = None,
 ):
     """Full chip calibration workflow: 1-qubit → CR scheduling → 2-qubit.
 
@@ -487,6 +494,7 @@ def full_calibration(
                     stage_groups=stage.groups,
                     stage_tasks=stage.tasks,
                     flow_name=flow_name,
+                    project_id=project_id,
                 )
                 all_results[stage.name] = stage_results
 
@@ -517,6 +525,7 @@ def full_calibration(
                     candidate_qubits=candidate_qubits,
                     tasks=stage.tasks,
                     flow_name=flow_name,
+                    project_id=project_id,
                 )
                 all_results[stage.name] = stage2_results
 

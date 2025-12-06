@@ -5,6 +5,13 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("access_token");
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isSignupPage = request.nextUrl.pathname === "/signup";
+  const isApiRoute =
+    request.nextUrl.pathname.startsWith("/api/") ||
+    request.nextUrl.pathname === "/api";
+
+  if (isApiRoute) {
+    return NextResponse.next();
+  }
 
   // 1. 認証不要なページの処理
   if (isLoginPage || isSignupPage) {

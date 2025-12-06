@@ -48,137 +48,6 @@ import type { ErrorType, BodyType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * List all Flows for the current user.
-
-Returns metadata only (no code content for performance).
- * @summary List all flows
- */
-export const listFlows = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
-) => {
-  return customInstance<ListFlowsResponse>(
-    { url: `/flows`, method: "GET", signal },
-    options,
-  );
-};
-
-export const getListFlowsQueryKey = () => {
-  return [`/flows`] as const;
-};
-
-export const getListFlowsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getListFlowsQueryKey();
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listFlows>>> = ({
-    signal,
-  }) => listFlows(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listFlows>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
-
-export type ListFlowsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listFlows>>
->;
-export type ListFlowsQueryError = ErrorType<unknown>;
-
-export function useListFlows<
-  TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = ErrorType<unknown>,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listFlows>>,
-          TError,
-          Awaited<ReturnType<typeof listFlows>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListFlows<
-  TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = ErrorType<unknown>,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listFlows>>,
-          TError,
-          Awaited<ReturnType<typeof listFlows>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListFlows<
-  TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = ErrorType<unknown>,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-/**
- * @summary List all flows
- */
-
-export function useListFlows<
-  TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = ErrorType<unknown>,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListFlowsQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-}
-
-/**
  * Save a Flow to file system and MongoDB.
 
 Steps:
@@ -278,6 +147,137 @@ export const useSaveFlow = <
 
   return useMutation(mutationOptions, queryClient);
 };
+/**
+ * List all Flows for the current project.
+
+Returns metadata only (no code content for performance).
+ * @summary List all flows
+ */
+export const listFlows = (
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ListFlowsResponse>(
+    { url: `/flows`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getListFlowsQueryKey = () => {
+  return [`/flows`] as const;
+};
+
+export const getListFlowsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFlows>>,
+  TError = ErrorType<HTTPValidationError>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListFlowsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listFlows>>> = ({
+    signal,
+  }) => listFlows(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFlows>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type ListFlowsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFlows>>
+>;
+export type ListFlowsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListFlows<
+  TData = Awaited<ReturnType<typeof listFlows>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listFlows>>,
+          TError,
+          Awaited<ReturnType<typeof listFlows>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useListFlows<
+  TData = Awaited<ReturnType<typeof listFlows>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listFlows>>,
+          TError,
+          Awaited<ReturnType<typeof listFlows>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useListFlows<
+  TData = Awaited<ReturnType<typeof listFlows>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary List all flows
+ */
+
+export function useListFlows<
+  TData = Awaited<ReturnType<typeof listFlows>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getListFlowsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
 /**
  * List all available flow templates.
 
@@ -918,11 +918,11 @@ export function useGetFlowHelperFile<
 }
 
 /**
- * List all Flow schedules (cron and one-time) for the current user.
+ * List all Flow schedules (cron and one-time) for the current project.
 
 Args:
 ----
-    current_user: Current authenticated user
+    ctx: Project context with user and project information
     limit: Maximum number of schedules to return (max 100)
     offset: Number of schedules to skip
 
@@ -1101,7 +1101,7 @@ The API automatically determines the type and handles accordingly:
 Args:
 ----
     schedule_id: Schedule ID (deployment_id for cron, flow_run_id for one-time)
-    current_user: Current authenticated user
+    ctx: Project context with user and project information
 
 Returns:
 -------
@@ -1198,7 +1198,7 @@ Args:
 ----
     schedule_id: Schedule ID (deployment_id)
     request: Update request
-    current_user: Current authenticated user
+    ctx: Project context with user and project information
 
 Returns:
 -------
@@ -1632,7 +1632,7 @@ Args:
 ----
     name: Flow name
     request: Schedule request (must provide either cron or scheduled_time)
-    current_user: Current authenticated user
+    ctx: Project context with user and project information
 
 Returns:
 -------
@@ -1734,7 +1734,7 @@ export const useScheduleFlow = <
 Args:
 ----
     name: Flow name
-    current_user: Current authenticated user
+    ctx: Project context with user and project information
     limit: Maximum number of schedules to return (max 100)
     offset: Number of schedules to skip
 

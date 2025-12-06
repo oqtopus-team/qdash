@@ -122,4 +122,4 @@ dev = [
     "go-task-bin>=3.41.0",
 ]
 [tool.uv.sources]
-qubex = { git = "https://github.com/amachino/qubex.git", tag = "develop" }
+qubex = { git = "https://github.com/amachino/qubex.git", branch = "chore/chevron-fig" }

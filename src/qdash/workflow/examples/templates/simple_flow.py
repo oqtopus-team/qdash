@@ -54,6 +54,7 @@ def my_custom_flow(
     chip_id: str,  # Automatically provided from UI properties
     qids: list[str] | None = None,
     flow_name: str | None = None,  # Automatically injected by API
+    project_id: str | None = None,  # Automatically injected by API for multi-tenancy
 ):
     """Simple sequential calibration flow for demonstration.
 
@@ -71,6 +72,7 @@ def my_custom_flow(
         chip_id: Target chip ID (from UI)
         qids: List of qubit IDs to calibrate (e.g., ["32", "38"])
         flow_name: Flow name (automatically injected by API)
+        project_id: Project ID for multi-tenancy (automatically injected by API)
 
     """
     logger = get_run_logger()
@@ -89,6 +91,7 @@ def my_custom_flow(
             chip_id,
             qids,
             flow_name=flow_name,
+            project_id=project_id,
             enable_github_pull=True,  # Pull latest config before calibration
             github_push_config=GitHubPushConfig(
                 enabled=True,

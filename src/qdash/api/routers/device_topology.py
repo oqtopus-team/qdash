@@ -10,8 +10,7 @@ import pendulum
 from fastapi import APIRouter, Depends
 from fastapi.logger import logger
 from fastapi.responses import Response
-from qdash.api.lib.auth import get_current_active_user
-from qdash.api.schemas.auth import User
+from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.device_topology import (
     Coupling,
     CouplingGateDuration,
@@ -149,7 +148,7 @@ def split_q_string(cr_label: str) -> tuple[str, str]:
     operation_id="getDeviceTopology",
 )
 def get_device_topology(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
     request: DeviceTopologyRequest,
 ) -> Device:
     """Get the quantum device topology with filtered qubits and couplings.
@@ -160,8 +159,8 @@ def get_device_topology(
 
     Parameters
     ----------
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
     request : DeviceTopologyRequest
         Request containing qubit list, device name/id, filtering conditions,
         and optional list of couplings to exclude
@@ -173,7 +172,7 @@ def get_device_topology(
         lifetimes, gate durations, and couplings with their fidelities
 
     """
-    logger.info(f"current user: {current_user.username}")
+    logger.info(f"project: {ctx.project_id}, user: {ctx.user.username}")
     qubits = []
     couplings = []
     latest = (CalibrationNoteDocument.find({"task_id": "master"}).sort([("timestamp", -1)]).limit(1).run())[0]
@@ -471,14 +470,14 @@ def generate_device_plot(data: dict) -> bytes:
     operation_id="getDeviceTopologyPlot",
 )
 def get_device_topology_plot(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
     device: Device,
 ) -> Response:
     """Get the device topology as a PNG image.
 
     Args:
     ----
-        current_user: Authenticated user
+        ctx: Project context with user and project information
         device: Device topology data
 
     Returns:
@@ -486,6 +485,6 @@ def get_device_topology_plot(
         Response: PNG image of the device topology
 
     """
-    logger.info(f"current user: {current_user.username}")
+    logger.info(f"project: {ctx.project_id}, user: {ctx.user.username}")
     plot_bytes = generate_device_plot(device.model_dump())
     return Response(content=plot_bytes, media_type="image/png")

@@ -10,6 +10,7 @@ from qdash.api.lib.auth import (
     get_current_active_user,
     get_password_hash,
 )
+from qdash.api.lib.project_service import ProjectService
 from qdash.api.schemas.auth import TokenResponse, User, UserCreate, UserWithToken
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.user import UserDocument
@@ -67,6 +68,7 @@ def login(
         access_token=user.access_token,
         token_type="bearer",
         username=user.username,
+        default_project_id=user.default_project_id,
     )
 
 
@@ -114,12 +116,14 @@ def register_user(user_data: UserCreate) -> UserWithToken:
         system_info=SystemInfoModel(),
     )
     user.insert()
+    ProjectService().ensure_default_project(user)
     logger.debug(f"New user created: {user_data.username}")
 
     return UserWithToken(
         username=user.username,
         full_name=user.full_name,
         disabled=user.disabled,
+        default_project_id=user.default_project_id,
         access_token=user.access_token,
     )
 

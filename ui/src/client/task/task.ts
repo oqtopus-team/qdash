@@ -35,7 +35,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 Args:
 ----
-    current_user (User): The current user.
+    ctx (ProjectContext): The project context with user and project information.
     backend (Optional[str]): Optional backend name to filter tasks by.
 
 Returns:
@@ -182,7 +182,7 @@ export function useListTasks<
 Args:
 ----
     task_id: The task ID to search for.
-    current_user: The current authenticated user.
+    ctx: The project context with user and project information.
 
 Returns:
 -------

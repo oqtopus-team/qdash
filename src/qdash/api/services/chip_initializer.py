@@ -90,7 +90,11 @@ class ChipInitializer:
 
     @staticmethod
     def _generate_qubit_data(
-        num_qubits: int, pos: Dict[int, Tuple[float, float]], chip_id: str, username: str
+        num_qubits: int,
+        pos: Dict[int, Tuple[float, float]],
+        chip_id: str,
+        username: str,
+        project_id: str | None = None,
     ) -> Dict[str, QubitModel]:
         """Generate qubit data for ChipDocument.
 
@@ -100,6 +104,7 @@ class ChipInitializer:
             pos: Position dictionary
             chip_id: Chip ID
             username: Username
+            project_id: Project ID
 
         Returns:
         -------
@@ -109,6 +114,7 @@ class ChipInitializer:
         qubits = {}
         for i in range(num_qubits):
             qubits[f"{i}"] = QubitModel(
+                project_id=project_id,
                 username=username,
                 chip_id=chip_id,
                 qid=f"{i}",
@@ -125,7 +131,12 @@ class ChipInitializer:
         return qubits
 
     @staticmethod
-    def _generate_coupling_data(edges: List[Tuple[int, int]], chip_id: str, username: str) -> Dict[str, CouplingModel]:
+    def _generate_coupling_data(
+        edges: List[Tuple[int, int]],
+        chip_id: str,
+        username: str,
+        project_id: str | None = None,
+    ) -> Dict[str, CouplingModel]:
         """Generate coupling data for ChipDocument.
 
         Args:
@@ -133,6 +144,7 @@ class ChipInitializer:
             edges: List of edge tuples
             chip_id: Chip ID
             username: Username
+            project_id: Project ID
 
         Returns:
         -------
@@ -143,6 +155,7 @@ class ChipInitializer:
         couplings = {}
         for edge in bi_edges:
             couplings[f"{edge[0]}-{edge[1]}"] = CouplingModel(
+                project_id=project_id,
                 username=username,
                 qid=f"{edge[0]}-{edge[1]}",
                 status="pending",
@@ -155,7 +168,11 @@ class ChipInitializer:
 
     @staticmethod
     def _generate_qubit_documents(
-        num_qubits: int, pos: Dict[int, Tuple[float, float]], username: str, chip_id: str
+        num_qubits: int,
+        pos: Dict[int, Tuple[float, float]],
+        username: str,
+        chip_id: str,
+        project_id: str | None = None,
     ) -> List[QubitDocument]:
         """Generate QubitDocument instances for database insertion.
 
@@ -165,6 +182,7 @@ class ChipInitializer:
             pos: Position dictionary
             username: Username
             chip_id: Chip ID
+            project_id: Project ID
 
         Returns:
         -------
@@ -174,6 +192,7 @@ class ChipInitializer:
         documents = []
         for i in range(num_qubits):
             qubit_doc = QubitDocument(
+                project_id=project_id,
                 username=username,
                 chip_id=chip_id,
                 qid=f"{i}",
@@ -193,7 +212,10 @@ class ChipInitializer:
 
     @staticmethod
     def _generate_coupling_documents(
-        edges: List[Tuple[int, int]], username: str, chip_id: str
+        edges: List[Tuple[int, int]],
+        username: str,
+        chip_id: str,
+        project_id: str | None = None,
     ) -> List[CouplingDocument]:
         """Generate CouplingDocument instances for database insertion.
 
@@ -202,6 +224,7 @@ class ChipInitializer:
             edges: List of edge tuples
             username: Username
             chip_id: Chip ID
+            project_id: Project ID
 
         Returns:
         -------
@@ -212,6 +235,7 @@ class ChipInitializer:
         documents = []
         for edge in bi_edges:
             coupling_doc = CouplingDocument(
+                project_id=project_id,
                 username=username,
                 qid=f"{edge[0]}-{edge[1]}",
                 status="pending",
@@ -225,7 +249,13 @@ class ChipInitializer:
         return documents
 
     @classmethod
-    def create_chip(cls, username: str, chip_id: str, size: int) -> ChipDocument:
+    def create_chip(
+        cls,
+        username: str,
+        chip_id: str,
+        size: int,
+        project_id: str | None = None,
+    ) -> ChipDocument:
         """Create a new chip with full initialization.
 
         This method creates:
@@ -238,6 +268,7 @@ class ChipInitializer:
             username: Username creating the chip
             chip_id: Unique chip identifier
             size: Chip size (must be in VALID_SIZES)
+            project_id: Project ID for multi-tenancy
 
         Returns:
         -------
@@ -253,8 +284,11 @@ class ChipInitializer:
             msg = f"Invalid chip size. Must be one of {cls.VALID_SIZES}"
             raise ValueError(msg)
 
-        # Check if chip already exists
-        existing_chip = ChipDocument.find_one({"chip_id": chip_id, "username": username}).run()
+        # Check if chip already exists (scoped by project)
+        query = {"chip_id": chip_id, "username": username}
+        if project_id:
+            query["project_id"] = project_id
+        existing_chip = ChipDocument.find_one(query).run()
         if existing_chip:
             msg = f"Chip {chip_id} already exists for user {username}"
             raise ValueError(msg)
@@ -267,11 +301,12 @@ class ChipInitializer:
             _, edges, pos = cls._qubit_lattice(size, d)
 
             # Generate qubit and coupling data for ChipDocument
-            qubits = cls._generate_qubit_data(size, pos, chip_id, username)
-            couplings = cls._generate_coupling_data(edges, chip_id, username)
+            qubits = cls._generate_qubit_data(size, pos, chip_id, username, project_id)
+            couplings = cls._generate_coupling_data(edges, chip_id, username, project_id)
 
             # Create and save ChipDocument
             chip = ChipDocument(
+                project_id=project_id,
                 username=username,
                 chip_id=chip_id,
                 size=size,
@@ -282,16 +317,18 @@ class ChipInitializer:
             chip.save()
 
             # Generate and insert individual qubit documents
-            qubit_documents = cls._generate_qubit_documents(size, pos, username, chip_id)
+            qubit_documents = cls._generate_qubit_documents(size, pos, username, chip_id, project_id)
             for qubit_doc in qubit_documents:
                 qubit_doc.insert()
 
             # Generate and insert individual coupling documents
-            coupling_documents = cls._generate_coupling_documents(edges, username, chip_id)
+            coupling_documents = cls._generate_coupling_documents(edges, username, chip_id, project_id)
             for coupling_doc in coupling_documents:
                 coupling_doc.insert()
 
-            logger.info(f"Successfully created chip {chip_id} for user {username} with size {size}")
+            logger.info(
+                f"Successfully created chip {chip_id} for user {username} (project={project_id}) with size {size}"
+            )
             return chip
 
         except Exception as e:

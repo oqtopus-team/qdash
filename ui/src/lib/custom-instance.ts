@@ -3,7 +3,9 @@ import Axios, { AxiosHeaders } from "axios";
 import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 
 export const AXIOS_INSTANCE = Axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5715",
+  // Use /api proxy route (handled by Next.js rewrites)
+  // Falls back to direct API URL for backward compatibility
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "/api",
 });
 
 // リクエストインターセプターを追加

@@ -2909,7 +2909,7 @@ workflow = [
     { name = "pymongo", specifier = "==4.8.0" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "pyyaml", specifier = "==6.0.1" },
-    { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?tag=develop" },
+    { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?branch=chore%2Fchevron-fig" },
     { name = "reportlab", specifier = ">=4.4.1" },
     { name = "slack-sdk", specifier = "==3.36.0" },
 ]
@@ -2936,8 +2936,8 @@ dependencies = [
 
 [[package]]
 name = "qubex"
-version = "1.4.3+d201760"
-source = { git = "https://github.com/amachino/qubex.git?tag=develop#d20176016f4bf2f1e1dd18f24d0091e3fb8efd73" }
+version = "1.4.3+0e3a468"
+source = { git = "https://github.com/amachino/qubex.git?branch=chore%2Fchevron-fig#0e3a46804ad204537e5bdf1687870400ce5f3148" }
 dependencies = [
     { name = "cma" },
     { name = "cvxopt" },

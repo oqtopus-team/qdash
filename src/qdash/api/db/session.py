@@ -59,8 +59,20 @@ def init_db(database: Database | None = None) -> None:
     database : Database | None
         Optional database instance. If None, uses default.
 
+    Note
+    ----
+    If _database is already set (e.g., by set_test_client), this function
+    will skip reinitialization to preserve test database settings.
+    In test mode (ENV=test), always skip if already initialized.
+
     """
     global _database
+    # Skip if already initialized (preserves test database setting)
+    if _database is not None:
+        return
+    # In test mode, set_test_client should be called before this
+    if os.getenv("ENV") == "test":
+        return
     db = database or get_database()
     _database = db
     init_bunnet(database=db, document_models=document_models())

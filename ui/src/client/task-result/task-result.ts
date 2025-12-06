@@ -49,8 +49,8 @@ chip_id : str
     ID of the chip to fetch results for
 task : str
     Name of the task to fetch results for
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------
@@ -60,7 +60,7 @@ LatestTaskResultResponse
 Raises
 ------
 ValueError
-    If the chip is not found for the current user
+    If the chip is not found for the current project
  * @summary Get latest qubit task results
  */
 export const getLatestQubitTaskResults = (
@@ -238,8 +238,8 @@ task : str
     Name of the task to fetch results for
 date : str
     Date in YYYYMMDD format (JST timezone)
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------
@@ -428,8 +428,8 @@ chip_id : str
     ID of the chip containing the qubit
 task : str
     Name of the task to fetch history for
-current_user : User
-    Current authenticated user (optional)
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------
@@ -439,7 +439,7 @@ TaskHistoryResponse
 Raises
 ------
 ValueError
-    If the chip is not found for the current user
+    If the chip is not found for the current project
  * @summary Get qubit task history
  */
 export const getQubitTaskHistory = (
@@ -631,8 +631,8 @@ chip_id : str
     ID of the chip to fetch results for
 task : str
     Name of the task to fetch results for
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------
@@ -642,7 +642,7 @@ LatestTaskResultResponse
 Raises
 ------
 ValueError
-    If the chip is not found for the current user
+    If the chip is not found for the current project
  * @summary Get latest coupling task results
  */
 export const getLatestCouplingTaskResults = (
@@ -824,8 +824,8 @@ task : str
     Name of the task to fetch results for
 date : str
     Date in YYYYMMDD format (JST timezone)
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------
@@ -1018,8 +1018,8 @@ chip_id : str
     ID of the chip containing the coupling
 task : str
     Name of the task to fetch history for
-current_user : User
-    Current authenticated user (optional)
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------
@@ -1029,7 +1029,7 @@ TaskHistoryResponse
 Raises
 ------
 ValueError
-    If the chip is not found for the current user
+    If the chip is not found for the current project
  * @summary Get coupling task history
  */
 export const getCouplingTaskHistory = (
@@ -1232,8 +1232,8 @@ start_at : str
     Start time in ISO format for the time range
 end_at : str
     End time in ISO format for the time range
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 qid : str | None
     Optional qubit ID to filter results to a specific qubit
 

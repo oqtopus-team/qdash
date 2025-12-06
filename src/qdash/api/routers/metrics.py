@@ -7,9 +7,8 @@ from typing import Annotated, Any, Literal
 
 import pendulum
 from fastapi import APIRouter, Depends, HTTPException, Query
-from qdash.api.lib.auth import get_optional_current_user
 from qdash.api.lib.metrics_config import load_metrics_config
-from qdash.api.schemas.auth import User
+from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.metrics import (
     ChipMetricsResponse,
     CouplingMetrics,
@@ -391,12 +390,12 @@ def extract_coupling_metrics(
 @router.get("/chips/{chip_id}/metrics", response_model=ChipMetricsResponse, operation_id="getChipMetrics")
 async def get_chip_metrics(
     chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
     within_hours: Annotated[int | None, Query(description="Filter to data within N hours (e.g., 24)")] = None,
     selection_mode: Annotated[
         Literal["latest", "best"],
         Query(description="Selection mode: 'latest' for most recent, 'best' for optimal values"),
     ] = "latest",
-    current_user: User | None = Depends(get_optional_current_user),
 ) -> ChipMetricsResponse:
     """Get chip calibration metrics for visualization.
 
@@ -408,23 +407,20 @@ async def get_chip_metrics(
     Args:
     ----
         chip_id: The chip identifier
+        ctx: Project context with user and project information
         within_hours: Optional filter to only include data from last N hours (e.g., 24)
         selection_mode: "latest" to get most recent values, "best" to get optimal values
-        current_user: Current authenticated user
 
     Returns:
     -------
         ChipMetricsResponse with all metrics data
 
     """
-    # Get username from current user
-    username = current_user.username if current_user else "admin"
-
-    # Get chip document from database
-    chip = ChipDocument.find_one({"chip_id": chip_id, "username": username}).run()
+    # Get chip document from database (scoped by project)
+    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
 
     if not chip:
-        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found for user {username}")
+        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}")
 
     # Extract metrics
     qubit_metrics = extract_qubit_metrics(chip, within_hours, selection_mode)
@@ -432,7 +428,7 @@ async def get_chip_metrics(
 
     return ChipMetricsResponse(
         chip_id=chip_id,
-        username=username,
+        username=ctx.user.username,
         qubit_count=len(chip.qubits),
         within_hours=within_hours,
         qubit_metrics=qubit_metrics,
@@ -448,10 +444,10 @@ async def get_chip_metrics(
 async def get_qubit_metric_history(
     chip_id: str,
     qid: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
     metric: Annotated[str, Query(description="Metric name (e.g., t1, qubit_frequency)")],
     limit: Annotated[int | None, Query(description="Max number of history items (None for unlimited)", ge=1)] = None,
     within_days: Annotated[int | None, Query(description="Filter to last N days", ge=1)] = 30,
-    current_user: User | None = Depends(get_optional_current_user),
 ) -> QubitMetricHistoryResponse:
     """Get historical metric data for a specific qubit with task_id for figure display.
 
@@ -463,18 +459,16 @@ async def get_qubit_metric_history(
     ----
         chip_id: The chip identifier
         qid: The qubit identifier (e.g., "0", "Q00")
+        ctx: Project context with user and project information
         metric: Metric name to retrieve history for
         limit: Maximum number of history items (None for unlimited within time range)
         within_days: Optional filter to only include data from last N days
-        current_user: Current authenticated user
 
     Returns:
     -------
         QubitMetricHistoryResponse with historical metric data and task_ids
 
     """
-    username = current_user.username if current_user else "admin"
-
     # Normalize qid format (remove "Q" prefix if present)
     normalized_qid = normalize_qid(qid)
     qid_variants = list({normalized_qid, qid, f"Q{normalized_qid.zfill(2)}"})
@@ -484,10 +478,10 @@ async def get_qubit_metric_history(
     if within_days:
         cutoff_time = pendulum.now("Asia/Tokyo").subtract(days=within_days)
 
-    # Query task result history directly for matching metrics
+    # Query task result history directly for matching metrics (scoped by project)
     query: dict[str, Any] = {
+        "project_id": ctx.project_id,
         "chip_id": chip_id,
-        "username": username,
         "task_type": "qubit",
         "qid": {"$in": qid_variants},
         f"output_parameters.{metric}": {"$exists": True},
@@ -523,7 +517,8 @@ async def get_qubit_metric_history(
 
     if not history_items:
         logger.warning(
-            "No task history found for chip=%s, qid=%s (normalized=%s), metric=%s",
+            "No task history found for project=%s, chip=%s, qid=%s (normalized=%s), metric=%s",
+            ctx.project_id,
             chip_id,
             qid,
             normalized_qid,
@@ -534,7 +529,7 @@ async def get_qubit_metric_history(
         chip_id=chip_id,
         qid=qid,
         metric_name=metric,
-        username=username,
+        username=ctx.user.username,
         history=history_items,
     )
 
@@ -547,10 +542,10 @@ async def get_qubit_metric_history(
 async def get_coupling_metric_history(
     chip_id: str,
     coupling_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
     metric: Annotated[str, Query(description="Metric name (e.g., zx90_gate_fidelity, bell_state_fidelity)")],
     limit: Annotated[int | None, Query(description="Max number of history items (None for unlimited)", ge=1)] = None,
     within_days: Annotated[int | None, Query(description="Filter to last N days", ge=1)] = 30,
-    current_user: User | None = Depends(get_optional_current_user),
 ) -> QubitMetricHistoryResponse:
     """Get historical metric data for a specific coupling with task_id for figure display.
 
@@ -562,10 +557,10 @@ async def get_coupling_metric_history(
     ----
         chip_id: The chip identifier
         coupling_id: The coupling identifier (e.g., "0-1", "2-3")
+        ctx: Project context with user and project information
         metric: Metric name to retrieve history for
         limit: Maximum number of history items (None for unlimited within time range)
         within_days: Optional filter to only include data from last N days
-        current_user: Current authenticated user
 
     Returns:
     -------
@@ -573,16 +568,14 @@ async def get_coupling_metric_history(
         (Note: qid field contains coupling_id for coupling metrics)
 
     """
-    username = current_user.username if current_user else "admin"
-
     # Calculate cutoff time
     cutoff_time = None
     if within_days:
         cutoff_time = pendulum.now("Asia/Tokyo").subtract(days=within_days)
 
     query: dict[str, Any] = {
+        "project_id": ctx.project_id,
         "chip_id": chip_id,
-        "username": username,
         "task_type": "coupling",
         "qid": coupling_id,
         f"output_parameters.{metric}": {"$exists": True},
@@ -618,7 +611,8 @@ async def get_coupling_metric_history(
 
     if not history_items:
         logger.warning(
-            "No task history found for chip=%s, coupling_id=%s, metric=%s",
+            "No task history found for project=%s, chip=%s, coupling_id=%s, metric=%s",
+            ctx.project_id,
             chip_id,
             coupling_id,
             metric,
@@ -628,6 +622,6 @@ async def get_coupling_metric_history(
         chip_id=chip_id,
         qid=coupling_id,  # Reuse qid field for coupling_id
         metric_name=metric,
-        username=username,
+        username=ctx.user.username,
         history=history_items,
     )

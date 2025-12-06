@@ -31,6 +31,7 @@ def scheduled_full_calibration(
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
     flow_name: str | None = None,
+    project_id: str | None = None,
 ):
     """Full chip calibration with automatic Box/CR scheduling.
 
@@ -41,6 +42,7 @@ def scheduled_full_calibration(
         exclude_qids: Qubit IDs to exclude (e.g., known-bad qubits)
         qids: Not used (for UI compatibility)
         flow_name: Flow name (auto-injected)
+        project_id: Project ID for multi-tenancy (auto-injected)
     """
     logger = get_run_logger()
 
@@ -96,6 +98,7 @@ def scheduled_full_calibration(
         exclude_qids=exclude_qids,
         tasks=tasks_1q,
         flow_name=flow_name,
+        project_id=project_id,
     )
 
     # Stage 2: Extract candidates and run 2-qubit calibration
@@ -112,6 +115,7 @@ def scheduled_full_calibration(
         candidate_qubits=candidates,
         tasks=tasks_2q,
         flow_name=flow_name,
+        project_id=project_id,
         max_parallel_ops=max_parallel_ops,
     )
 

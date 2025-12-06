@@ -25,6 +25,7 @@ class FlowDocument(Document):
 
     """
 
+    project_id: str | None = Field(None, description="Owning project identifier")
     name: str = Field(..., description="Flow name (filename without .py)")
     username: str = Field(..., description="Owner username")
     chip_id: str = Field(..., description="Target chip ID")
@@ -46,56 +47,60 @@ class FlowDocument(Document):
 
         name = "flows"
         indexes = [
-            [("username", 1), ("name", 1)],  # Unique per user
-            [("username", 1), ("created_at", -1)],  # List by user, sorted by creation date
+            [("project_id", 1), ("username", 1), ("name", 1)],  # Unique per project+user
+            [("project_id", 1), ("username", 1), ("created_at", -1)],  # List by project+user, sorted by creation date
+            [("project_id", 1), ("chip_id", 1)],  # Lookup by project+chip
         ]
 
     @classmethod
-    def find_by_user_and_name(cls, username: str, name: str) -> "FlowDocument | None":
+    def find_by_user_and_name(cls, username: str, name: str, project_id: str | None = None) -> "FlowDocument | None":
         """Find flow by username and name.
 
         Args:
         ----
             username: Username of the flow owner
             name: Flow name
+            project_id: Optional project identifier
 
         Returns:
         -------
             FlowDocument if found, None otherwise
 
         """
-        return cls.find_one({"username": username, "name": name}).run()
+        return cls.find_one({"project_id": project_id, "username": username, "name": name}).run()
 
     @classmethod
-    def list_by_user(cls, username: str) -> list["FlowDocument"]:
+    def list_by_user(cls, username: str, project_id: str | None = None) -> list["FlowDocument"]:
         """List all flows for a user, sorted by update time (newest first).
 
         Args:
         ----
             username: Username of the flow owner
+            project_id: Optional project identifier
 
         Returns:
         -------
             List of FlowDocument objects
 
         """
-        return list(cls.find({"username": username}, sort=[("updated_at", DESCENDING)]).run())  # type: ignore[list-item]
+        return list(cls.find({"project_id": project_id, "username": username}, sort=[("updated_at", DESCENDING)]).run())  # type: ignore[list-item]
 
     @classmethod
-    def delete_by_user_and_name(cls, username: str, name: str) -> bool:
+    def delete_by_user_and_name(cls, username: str, name: str, project_id: str | None = None) -> bool:
         """Delete flow by username and name.
 
         Args:
         ----
             username: Username of the flow owner
             name: Flow name
+            project_id: Optional project identifier
 
         Returns:
         -------
             True if deleted, False if not found
 
         """
-        doc = cls.find_one({"username": username, "name": name}).run()
+        doc = cls.find_one({"project_id": project_id, "username": username, "name": name}).run()
         if doc:
             doc.delete()
             return True

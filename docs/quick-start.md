@@ -60,3 +60,14 @@ docker exec -it qdash-devcontainer /bin/bash -c "qdash init-all-data --username 
 ```
 
 You can now access the application at <a href="http://localhost:5714/execution"> localhost:5714 </a>.
+
+## Remote access (Cloudflare Tunnel)
+
+You can share QDash securely without opening extra ports by using Cloudflare Tunnel.
+
+1. Create a tunnel in the Cloudflare dashboard and copy the issued `TUNNEL_TOKEN`.
+2. Add the token to your `.env` file (e.g. `TUNNEL_TOKEN=...`).
+3. Start the tunnel with `docker compose --profile tunnel up -d tunnel`.
+4. Confirm in the Cloudflare dashboard that the tunnel status is “Connected”.
+
+Once connected, the hostname provided by Cloudflare (for example `https://your-tunnel.example.com`) will serve the same UI experience as `http://localhost:5714`, including charts and figures.

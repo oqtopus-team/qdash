@@ -708,8 +708,7 @@ export default function ExecutionDetailClient({
                                         )
                                           ? path
                                           : `/${path}`;
-                                        const apiUrl =
-                                          process.env.NEXT_PUBLIC_API_URL;
+                                        const apiUrl = "/api";
                                         link.href = `${apiUrl}/file/raw_data?path=${encodeURIComponent(
                                           normalizedPath,
                                         )}`;

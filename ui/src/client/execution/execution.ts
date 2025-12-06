@@ -46,8 +46,8 @@ path : str
 
 Returns
 -------
-StreamingResponse
-    PNG image data as a streaming response with media type "image/png"
+FileResponse
+    PNG image data as a file response with media type "image/png"
 
 Raises
 ------
@@ -214,6 +214,11 @@ export function useGetFigureByPath<
 The execution lock prevents concurrent calibration workflows from running
 simultaneously. This endpoint checks whether a lock is currently held.
 
+Parameters
+----------
+ctx : ProjectContext
+    Project context with user and project information
+
 Returns
 -------
 ExecutionLockStatusResponse
@@ -236,7 +241,7 @@ export const getGetExecutionLockStatusQueryKey = () => {
 
 export const getGetExecutionLockStatusQueryOptions = <
   TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -266,11 +271,11 @@ export const getGetExecutionLockStatusQueryOptions = <
 export type GetExecutionLockStatusQueryResult = NonNullable<
   Awaited<ReturnType<typeof getExecutionLockStatus>>
 >;
-export type GetExecutionLockStatusQueryError = ErrorType<unknown>;
+export type GetExecutionLockStatusQueryError = ErrorType<HTTPValidationError>;
 
 export function useGetExecutionLockStatus<
   TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options: {
     query: Partial<
@@ -296,7 +301,7 @@ export function useGetExecutionLockStatus<
 };
 export function useGetExecutionLockStatus<
   TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options?: {
     query?: Partial<
@@ -320,7 +325,7 @@ export function useGetExecutionLockStatus<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetExecutionLockStatus<
   TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options?: {
     query?: Partial<
@@ -340,7 +345,7 @@ export function useGetExecutionLockStatus<
 
 export function useGetExecutionLockStatus<
   TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options?: {
     query?: Partial<
@@ -371,8 +376,8 @@ export function useGetExecutionLockStatus<
 
 Parameters
 ----------
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 chip_id : str
     ID of the chip to fetch executions for
 skip : int
@@ -526,8 +531,8 @@ Parameters
 ----------
 execution_id : str
     ID of the execution to fetch
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------

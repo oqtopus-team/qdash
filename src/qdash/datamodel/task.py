@@ -176,6 +176,7 @@ class BaseTaskResultModel(BaseModel):
 
     """
 
+    project_id: str | None = Field(default=None, description="Owning project identifier")
     task_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
     upstream_id: str = ""
@@ -338,6 +339,7 @@ class TaskModel(BaseModel):
 
     """
 
+    project_id: str | None = Field(None, description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the task")
     name: str = Field(..., description="The name of the task")
     backend: str | None = Field(None, description="The backend of the task")

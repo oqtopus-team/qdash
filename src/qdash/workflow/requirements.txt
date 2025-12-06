@@ -471,7 +471,7 @@ qctrl-visualizer==8.0.2
     # via qubex
 qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@487227c1154aa087e55b9fee1eabda2a164d299c
     # via qubex
-qubex @ git+https://github.com/amachino/qubex.git@d20176016f4bf2f1e1dd18f24d0091e3fb8efd73
+qubex @ git+https://github.com/amachino/qubex.git@0e3a46804ad204537e5bdf1687870400ce5f3148
 quel-clock-master @ git+https://github.com/quel-inc/quelware.git@c839e8b1a6fde4b4ece3d5f415015829857e775e#subdirectory=quel_clock_master
     # via
     #   qubecalib

@@ -42,7 +42,7 @@ from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.flow.github import GitHubIntegration, GitHubPushConfig
 
 
-def generate_execution_id(username: str, chip_id: str) -> str:
+def generate_execution_id(username: str, chip_id: str, project_id: str | None = None) -> str:
     """Generate a unique execution ID based on the current date and an execution index.
 
     This function creates execution IDs in the format YYYYMMDD-NNN, where:
@@ -52,6 +52,7 @@ def generate_execution_id(username: str, chip_id: str) -> str:
     Args:
         username: Username for the execution
         chip_id: Chip ID for the execution
+        project_id: Project ID for the execution (optional)
 
     Returns:
         Generated execution ID (e.g., "20240101-001")
@@ -64,7 +65,7 @@ def generate_execution_id(username: str, chip_id: str) -> str:
 
     """
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
-    execution_index = ExecutionCounterDocument.get_next_index(date_str, username, chip_id)
+    execution_index = ExecutionCounterDocument.get_next_index(date_str, username, chip_id, project_id=project_id)
     return f"{date_str}-{execution_index:03d}"
 
 
@@ -106,6 +107,7 @@ class FlowSession:
         enable_github_pull: bool = False,
         github_push_config: GitHubPushConfig | None = None,
         muxes: list[int] | None = None,
+        project_id: str | None = None,
     ) -> None:
         """Initialize a new calibration flow session.
 
@@ -123,6 +125,7 @@ class FlowSession:
             enable_github_pull: Whether to pull latest config from GitHub before starting (default: False)
             github_push_config: Configuration for GitHub push operations (default: disabled)
             muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
+            project_id: Project ID for multi-tenancy support (default: None)
 
         Raises:
             RuntimeError: If use_lock=True and another calibration is already running
@@ -134,12 +137,13 @@ class FlowSession:
         self.muxes = muxes
         self.backend_name = backend_name
         self.use_lock = use_lock
+        self.project_id = project_id
         self._lock_acquired = False
         self._last_executed_task_id_by_qid: dict[str, str] = {}  # Track last task_id per qid
 
         # Auto-generate execution_id if not provided
         if execution_id is None:
-            execution_id = generate_execution_id(username, chip_id)
+            execution_id = generate_execution_id(username, chip_id, project_id=project_id)
 
         self.execution_id = execution_id
 
@@ -154,10 +158,10 @@ class FlowSession:
 
         # Acquire lock if requested
         if use_lock:
-            if ExecutionLockDocument.get_lock_status():
+            if ExecutionLockDocument.get_lock_status(project_id=project_id):
                 msg = "Calibration is already running. Cannot start a new session."
                 raise RuntimeError(msg)
-            ExecutionLockDocument.lock()
+            ExecutionLockDocument.lock(project_id=project_id)
             self._lock_acquired = True
 
         # Wrap all initialization in try/except to ensure lock is released on failure
@@ -173,11 +177,12 @@ class FlowSession:
                 note=note,
                 enable_github_pull=enable_github_pull,
                 muxes=muxes,
+                project_id=project_id,
             )
         except Exception:
             # Release lock if initialization fails
             if self._lock_acquired:
-                ExecutionLockDocument.unlock()
+                ExecutionLockDocument.unlock(project_id=project_id)
                 self._lock_acquired = False
             raise
 
@@ -193,6 +198,7 @@ class FlowSession:
         note: dict[str, Any] | None,
         enable_github_pull: bool,
         muxes: list[int] | None,
+        project_id: str | None = None,
     ) -> None:
         """Initialize session components after lock acquisition.
 
@@ -210,6 +216,7 @@ class FlowSession:
             note: Additional notes
             enable_github_pull: Whether to pull from GitHub
             muxes: MUX IDs for system-level tasks
+            project_id: Project ID for multi-tenancy support
 
         """
         # Set default tags and note
@@ -253,6 +260,7 @@ class FlowSession:
                 name=name,
                 tags=tags,
                 note=note,
+                project_id=project_id,
             )
             .save()
             .start_execution()
@@ -763,7 +771,7 @@ class FlowSession:
         finally:
             # Always release lock if we acquired it
             if self.use_lock and self._lock_acquired:
-                ExecutionLockDocument.unlock()
+                ExecutionLockDocument.unlock(project_id=self.project_id)
                 self._lock_acquired = False
 
         return push_results
@@ -793,7 +801,7 @@ class FlowSession:
         finally:
             # Always release lock if we acquired it
             if self.use_lock and self._lock_acquired:
-                ExecutionLockDocument.unlock()
+                ExecutionLockDocument.unlock(project_id=self.project_id)
                 self._lock_acquired = False
 
 
@@ -823,6 +831,7 @@ def init_calibration(
     enable_github_pull: bool = False,
     github_push_config: GitHubPushConfig | None = None,
     muxes: list[int] | None = None,
+    project_id: str | None = None,
 ) -> FlowSession:
     """Initialize a calibration session for use in Prefect flows.
 
@@ -846,6 +855,7 @@ def init_calibration(
         enable_github_pull: Whether to pull latest config from GitHub before starting (default: False)
         github_push_config: Configuration for GitHub push operations (default: disabled)
         muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
+        project_id: Project ID for multi-tenancy support (default: None)
 
     Returns:
         Initialized FlowSession instance
@@ -919,6 +929,7 @@ def init_calibration(
         enable_github_pull=enable_github_pull,
         github_push_config=github_push_config,
         muxes=muxes,
+        project_id=project_id,
     )
 
     # Use SessionContext for thread-safe management

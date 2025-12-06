@@ -18,7 +18,7 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { ListTagResponse } from "../../schemas";
+import type { HTTPValidationError, ListTagResponse } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
 import type { ErrorType } from "../../lib/custom-instance";
@@ -26,15 +26,15 @@ import type { ErrorType } from "../../lib/custom-instance";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * List all tags for the current user.
+ * List all tags for the current project.
 
-Retrieves all tags associated with the current user's calibration data.
+Retrieves all tags associated with the current project's calibration data.
 Tags are used to categorize and filter task results.
 
 Parameters
 ----------
-current_user : User
-    Current authenticated user
+ctx : ProjectContext
+    Project context with user and project information
 
 Returns
 -------
@@ -58,7 +58,7 @@ export const getListTagsQueryKey = () => {
 
 export const getListTagsQueryOptions = <
   TData = Awaited<ReturnType<typeof listTags>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>
@@ -83,11 +83,11 @@ export const getListTagsQueryOptions = <
 export type ListTagsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listTags>>
 >;
-export type ListTagsQueryError = ErrorType<unknown>;
+export type ListTagsQueryError = ErrorType<HTTPValidationError>;
 
 export function useListTags<
   TData = Awaited<ReturnType<typeof listTags>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options: {
     query: Partial<
@@ -109,7 +109,7 @@ export function useListTags<
 };
 export function useListTags<
   TData = Awaited<ReturnType<typeof listTags>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options?: {
     query?: Partial<
@@ -129,7 +129,7 @@ export function useListTags<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListTags<
   TData = Awaited<ReturnType<typeof listTags>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options?: {
     query?: Partial<
@@ -145,7 +145,7 @@ export function useListTags<
 
 export function useListTags<
   TData = Awaited<ReturnType<typeof listTags>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<HTTPValidationError>,
 >(
   options?: {
     query?: Partial<

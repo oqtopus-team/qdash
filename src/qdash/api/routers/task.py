@@ -6,8 +6,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from qdash.api.lib.auth import get_current_active_user
-from qdash.api.schemas.auth import User
+from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.task import (
     InputParameterModel,
     ListTaskResponse,
@@ -31,14 +30,14 @@ logger.setLevel(logging.DEBUG)
     operation_id="listTasks",
 )
 def list_tasks(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
     backend: str | None = Query(None, description="Optional backend name to filter tasks by"),
 ) -> ListTaskResponse:
     """List all tasks.
 
     Args:
     ----
-        current_user (User): The current user.
+        ctx (ProjectContext): The project context with user and project information.
         backend (Optional[str]): Optional backend name to filter tasks by.
 
     Returns:
@@ -46,8 +45,8 @@ def list_tasks(
         list[TaskResponse]: The list of tasks.
 
     """
-    # Build query with required username filter
-    query = {"username": current_user.username}
+    # Build query with project_id filter
+    query: dict = {"project_id": ctx.project_id}
 
     # Add backend filter if specified
     if backend:
@@ -79,22 +78,22 @@ def list_tasks(
 )
 def get_task_result(
     task_id: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> TaskResultResponse:
     """Get task result by task_id.
 
     Args:
     ----
         task_id: The task ID to search for.
-        current_user: The current authenticated user.
+        ctx: The project context with user and project information.
 
     Returns:
     -------
         TaskResultResponse: The task result information including figure paths.
 
     """
-    # Find task result by task_id
-    task_result = TaskResultHistoryDocument.find_one({"task_id": task_id}).run()
+    # Find task result by task_id (scoped to project)
+    task_result = TaskResultHistoryDocument.find_one({"project_id": ctx.project_id, "task_id": task_id}).run()
 
     if not task_result:
         raise HTTPException(status_code=404, detail=f"Task result with task_id {task_id} not found")

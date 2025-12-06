@@ -77,6 +77,7 @@ def iterative_flow(
     qids: list[str] | None = None,
     max_iterations: int = 3,  # TODO: Adjust number of iterations
     flow_name: str | None = None,  # Automatically injected by API
+    project_id: str | None = None,  # Automatically injected by API for multi-tenancy
 ):
     """Iterative parallel group calibration flow.
 
@@ -98,6 +99,8 @@ def iterative_flow(
         chip_id: Target chip ID (from UI)
         qids: List of qubit IDs (not used, groups are defined explicitly)
         max_iterations: Number of times to repeat the parallel calibration
+        flow_name: Flow name (automatically injected by API)
+        project_id: Project ID for multi-tenancy (automatically injected by API)
 
     """
     logger = get_run_logger()
@@ -127,6 +130,7 @@ def iterative_flow(
             chip_id,
             all_qids,
             flow_name=flow_name,
+            project_id=project_id,
             enable_github_pull=True,
             github_push_config=GitHubPushConfig(
                 enabled=True, file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]

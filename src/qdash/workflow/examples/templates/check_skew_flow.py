@@ -19,6 +19,7 @@ def check_skew_flow(
     chip_id: str,  # Automatically provided from UI properties
     muxes: list[int] | None = None,
     flow_name: str | None = None,  # Automatically injected by API
+    project_id: str | None = None,  # Automatically injected by API for multi-tenancy
 ):
     """CheckSkew calibration flow for system-level skew measurement.
 
@@ -33,6 +34,7 @@ def check_skew_flow(
         chip_id: Target chip ID (from UI)
         muxes: List of MUX IDs to check skew (e.g., [0, 1, 2, 4, 5, 6])
         flow_name: Flow name (automatically injected by API)
+        project_id: Project ID for multi-tenancy (automatically injected by API)
 
     """
     logger = get_run_logger()
@@ -51,6 +53,7 @@ def check_skew_flow(
             chip_id,
             qids=[],  # System tasks don't require qids
             flow_name=flow_name,
+            project_id=project_id,
         )
 
         session = get_session()

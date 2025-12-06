@@ -33,9 +33,7 @@ export function InteractiveFigureContent({
     <>
       <div className="w-fit max-w-full h-fit max-h-[78vh] bg-white rounded-xl p-4 shadow overflow-auto">
         <PlotlyRenderer
-          fullPath={`${
-            process.env.NEXT_PUBLIC_API_URL
-          }/executions/figure?path=${encodeURIComponent(figureJsonPath)}`}
+          fullPath={`/api/executions/figure?path=${encodeURIComponent(figureJsonPath)}`}
         />
       </div>
       {showNavigation && (

@@ -44,6 +44,7 @@ class ExecutionStateManager(BaseModel):
     controller_info: dict[str, dict] = {}
     fridge_info: dict = {}
     chip_id: str = ""
+    project_id: str | None = None
     start_at: str = ""
     end_at: str = ""
     elapsed_time: str = ""
@@ -260,6 +261,7 @@ class ExecutionStateManager(BaseModel):
             controller_info=self.controller_info,
             fridge_info=self.fridge_info,
             chip_id=self.chip_id,
+            project_id=self.project_id,
             start_at=self.start_at,
             end_at=self.end_at,
             elapsed_time=self.elapsed_time,
@@ -295,6 +297,7 @@ class ExecutionStateManager(BaseModel):
             controller_info=model.controller_info,
             fridge_info=model.fridge_info,
             chip_id=model.chip_id,
+            project_id=model.project_id,
             start_at=model.start_at,
             end_at=model.end_at,
             elapsed_time=model.elapsed_time,

@@ -67,15 +67,15 @@ class MockExecutionLockDocument:
     """Mock ExecutionLockDocument for testing."""
 
     @classmethod
-    def get_lock_status(cls):
+    def get_lock_status(cls, project_id: str | None = None):
         return False
 
     @classmethod
-    def lock(cls):
+    def lock(cls, project_id: str | None = None):
         pass
 
     @classmethod
-    def unlock(cls):
+    def unlock(cls, project_id: str | None = None):
         pass
 
 

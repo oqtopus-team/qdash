@@ -190,6 +190,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_PREFECT_URL: ${NEXT_PUBLIC_PREFECT_URL}
+        INTERNAL_API_URL: http://api:${API_PORT:-5715}
     restart: always
     env_file:
       - .env
@@ -209,6 +210,19 @@ services:
       ]
     networks:
       - custom_net
+  tunnel:
+    image: cloudflare/cloudflared
+    restart: unless-stopped
+    env_file:
+      - .env
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --no-chunked-encoding
+      - run
+    network_mode: host
+    profiles:
+      - tunnel
 
 networks:
   custom_net:

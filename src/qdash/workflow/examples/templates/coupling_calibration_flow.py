@@ -58,6 +58,7 @@ def my_coupling_flow(
     chip_id: str,
     coupling_groups: list[list[tuple[str, str]]] | None = None,
     flow_name: str | None = None,
+    project_id: str | None = None,  # Automatically injected by API for multi-tenancy
 ):
     """2-Qubit coupling calibration flow with group-based parallel execution.
 
@@ -80,6 +81,7 @@ def my_coupling_flow(
         coupling_groups: List of groups, where each group contains coupling pairs as (control, target).
             Groups run in parallel, pairs within a group run sequentially.
         flow_name: Flow name (automatically injected by API)
+        project_id: Project ID for multi-tenancy (automatically injected by API)
 
     """
     logger = get_run_logger()
@@ -110,6 +112,7 @@ def my_coupling_flow(
             chip_id,
             all_qids,
             flow_name=flow_name,
+            project_id=project_id,
             enable_github_pull=True,
             github_push_config=GitHubPushConfig(
                 enabled=True, file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
