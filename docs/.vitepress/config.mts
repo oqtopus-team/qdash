@@ -37,7 +37,10 @@ export default withMermaid(
         {
           text: "User Guide",
           items: [
-            { text: "Projects and Data Sharing", link: "/projects-and-sharing" },
+            {
+              text: "Projects and Data Sharing",
+              link: "/projects-and-sharing",
+            },
           ],
         },
         {

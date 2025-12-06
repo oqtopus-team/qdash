@@ -21,6 +21,7 @@ Each piece of data in QDash belongs to exactly one project. When you create a ne
 When you first register for QDash, a default project is automatically created for you. This project is named `{username}'s project` and you are set as the owner.
 
 You can:
+
 - Use this default project for all your work
 - Create additional projects for different experiments or teams
 - Invite collaborators to share your data
@@ -42,27 +43,27 @@ You automatically become the owner of any project you create.
 
 QDash supports three permission levels for project members:
 
-| Role | Capabilities |
-|------|-------------|
-| **Viewer** | View all project data (chips, calibrations, results). Cannot modify anything. |
-| **Editor** | Everything a Viewer can do, plus create/modify chips, run calibrations, and update parameters. |
-| **Owner** | Everything an Editor can do, plus invite/remove members, change permissions, and delete the project. |
+| Role       | Capabilities                                                                                         |
+| ---------- | ---------------------------------------------------------------------------------------------------- |
+| **Viewer** | View all project data (chips, calibrations, results). Cannot modify anything.                        |
+| **Editor** | Everything a Viewer can do, plus create/modify chips, run calibrations, and update parameters.       |
+| **Owner**  | Everything an Editor can do, plus invite/remove members, change permissions, and delete the project. |
 
 ### Permission Summary
 
-| Action | Viewer | Editor | Owner |
-|--------|:------:|:------:|:-----:|
-| View chips and calibration data | ✅ | ✅ | ✅ |
-| View execution history | ✅ | ✅ | ✅ |
-| Download results | ✅ | ✅ | ✅ |
-| Create/modify chips | ❌ | ✅ | ✅ |
-| Run calibrations | ❌ | ✅ | ✅ |
-| Update parameters | ❌ | ✅ | ✅ |
-| Invite members | ❌ | ❌ | ✅ |
-| Remove members | ❌ | ❌ | ✅ |
-| Change member roles | ❌ | ❌ | ✅ |
-| Delete project | ❌ | ❌ | ✅ |
-| Transfer ownership | ❌ | ❌ | ✅ |
+| Action                          | Viewer | Editor | Owner |
+| ------------------------------- | :----: | :----: | :---: |
+| View chips and calibration data |   ✅   |   ✅   |  ✅   |
+| View execution history          |   ✅   |   ✅   |  ✅   |
+| Download results                |   ✅   |   ✅   |  ✅   |
+| Create/modify chips             |   ❌   |   ✅   |  ✅   |
+| Run calibrations                |   ❌   |   ✅   |  ✅   |
+| Update parameters               |   ❌   |   ✅   |  ✅   |
+| Invite members                  |   ❌   |   ❌   |  ✅   |
+| Remove members                  |   ❌   |   ❌   |  ✅   |
+| Change member roles             |   ❌   |   ❌   |  ✅   |
+| Delete project                  |   ❌   |   ❌   |  ✅   |
+| Transfer ownership              |   ❌   |   ❌   |  ✅   |
 
 ## Inviting Team Members
 
@@ -204,6 +205,7 @@ No, each project has exactly one owner. However, Editors have broad permissions 
 ### How do I find my project ID?
 
 Your project ID is shown in:
+
 - Project Settings page
 - URL when viewing project details
 - API responses

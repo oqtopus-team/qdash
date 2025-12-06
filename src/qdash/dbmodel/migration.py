@@ -8,6 +8,8 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from bunnet import Document
+
 from qdash.api.lib.project_service import ProjectService
 from qdash.dbmodel.backend import BackendDocument
 from qdash.dbmodel.chip import ChipDocument
@@ -86,7 +88,7 @@ def migrate_add_project_id_to_all_documents(dry_run: bool = True) -> dict[str, A
             stats["projects_created"] += 1
 
     # Step 2: Update documents with project_id
-    document_classes: list[tuple[str, type, Callable[[Any], str | None]]] = [
+    document_classes: list[tuple[str, type[Document], Callable[[Any], str | None]]] = [
         ("chip", ChipDocument, lambda d: d.username),
         ("qubit", QubitDocument, lambda d: d.username),
         ("coupling", CouplingDocument, lambda d: d.username),
@@ -132,7 +134,7 @@ def migrate_add_project_id_to_all_documents(dry_run: bool = True) -> dict[str, A
 
 def _migrate_collection(
     collection_name: str,
-    doc_class: type,
+    doc_class: type[Document],
     get_username: Callable[[Any], str | None],
     user_project_map: dict[str, str],
     dry_run: bool,
