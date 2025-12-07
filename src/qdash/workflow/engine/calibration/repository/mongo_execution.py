@@ -238,6 +238,7 @@ class MongoExecutionRepository:
             {"execution_id": execution_id},
             {
                 "$setOnInsert": {
+                    "project_id": initial_model.project_id,
                     "username": initial_model.username,
                     "name": initial_model.name,
                     "execution_id": execution_id,
@@ -278,6 +279,7 @@ class MongoExecutionRepository:
 
         update_ops: dict[str, Any] = {
             "$set": {
+                "project_id": update_data["project_id"],
                 "username": update_data["username"],
                 "name": update_data["name"],
                 "calib_data_path": update_data["calib_data_path"],
@@ -353,6 +355,7 @@ class MongoExecutionRepository:
             calib_data_model = calib_data
 
         return ExecutionModel(
+            project_id=doc.get("project_id"),
             username=doc.get("username", "admin"),
             name=doc.get("name", ""),
             execution_id=doc.get("execution_id", ""),

@@ -1,7 +1,5 @@
 import "./globals.css";
-import Navbar from "./components/Navbar";
-import Sidebar from "./components/Sidebar";
-import { SidebarProvider } from "./contexts/SidebarContext";
+import AppLayout from "./components/AppLayout";
 import Providers from "./providers";
 
 export const metadata = {
@@ -21,17 +19,7 @@ export default function RootLayout({
     <html lang="en">
       <body suppressHydrationWarning>
         <Providers>
-          <SidebarProvider>
-            <div className="flex w-full">
-              <Sidebar />
-              <div className="flex-1 flex flex-col min-h-screen w-0">
-                <Navbar />
-                <main className="flex-1 overflow-y-auto bg-base-100">
-                  {children}
-                </main>
-              </div>
-            </div>
-          </SidebarProvider>
+          <AppLayout>{children}</AppLayout>
         </Providers>
       </body>
     </html>

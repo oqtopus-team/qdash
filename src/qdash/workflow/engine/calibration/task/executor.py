@@ -635,6 +635,7 @@ class TaskExecutor:
                         qid=qid,
                         chip_id=execution_manager.chip_id,
                         output_parameters=output_parameters,
+                        project_id=execution_manager.project_id,
                     )
                 elif task.is_coupling_task():
                     CouplingDocument.update_calib_data(
@@ -642,6 +643,7 @@ class TaskExecutor:
                         qid=qid,
                         chip_id=execution_manager.chip_id,
                         output_parameters=output_parameters,
+                        project_id=execution_manager.project_id,
                     )
             return
 
@@ -664,6 +666,7 @@ class TaskExecutor:
                     qid=qid,
                     chip_id=execution_manager.chip_id,
                     output_parameters=output_parameters,
+                    project_id=execution_manager.project_id,
                 )
                 self._update_backend_params(backend, execution_manager, qid, output_parameters)
             elif task.is_coupling_task():
@@ -672,6 +675,7 @@ class TaskExecutor:
                     qid=qid,
                     chip_id=execution_manager.chip_id,
                     output_parameters=output_parameters,
+                    project_id=execution_manager.project_id,
                 )
 
     def _update_backend_params(
