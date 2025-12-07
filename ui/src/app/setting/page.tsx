@@ -68,10 +68,12 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="w-full px-6">
-      <h1 className="text-left text-3xl font-bold pb-6">Settings</h1>
+    <div className="w-full px-3 sm:px-6">
+      <h1 className="text-left text-2xl sm:text-3xl font-bold pb-4 sm:pb-6">
+        Settings
+      </h1>
       <div className="w-full gap-8">
-        <div className="tabs tabs-boxed mb-6">
+        <div className="tabs tabs-boxed mb-4 sm:mb-6 w-full sm:w-fit overflow-x-auto flex-nowrap">
           <a
             className={`tab ${activeTab === "appearance" ? "tab-active" : ""}`}
             onClick={() => setActiveTab("appearance")}
