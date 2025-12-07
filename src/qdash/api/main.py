@@ -44,6 +44,7 @@ app = FastAPI(
     generate_unique_id_function=custom_generate_unique_id,
     separate_input_output_schemas=False,
     lifespan=lifespan,
+    root_path="/api",
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
     openapi_extra={
         "components": {

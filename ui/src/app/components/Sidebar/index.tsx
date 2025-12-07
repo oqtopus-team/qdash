@@ -9,6 +9,7 @@ import { FaCode } from "react-icons/fa";
 import { FaBolt } from "react-icons/fa6";
 import { FiChevronLeft, FiChevronRight, FiX } from "react-icons/fi";
 import { GoWorkflow } from "react-icons/go";
+import { SiSwagger } from "react-icons/si";
 import { IoMdSettings } from "react-icons/io";
 import { IoAnalytics } from "react-icons/io5";
 import { MdAdminPanelSettings } from "react-icons/md";
@@ -251,6 +252,25 @@ function Sidebar() {
                 <GoWorkflow />
                 {(isOpen || isMobileOpen) && (
                   <span className="ml-2">Workflow</span>
+                )}
+              </a>
+            </li>
+            <li>
+              <a
+                href="/api/docs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`py-4 ${
+                  isOpen || isMobileOpen
+                    ? "px-4 mx-10"
+                    : "px-2 mx-0 justify-center"
+                } my-2 text-base font-bold flex items-center`}
+                title="API Docs"
+                onClick={handleLinkClick}
+              >
+                <SiSwagger />
+                {(isOpen || isMobileOpen) && (
+                  <span className="ml-2">API Docs</span>
                 )}
               </a>
             </li>
