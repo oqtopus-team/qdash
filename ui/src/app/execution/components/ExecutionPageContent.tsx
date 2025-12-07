@@ -216,11 +216,13 @@ export function ExecutionPageContent() {
   );
 
   return (
-    <div className="w-full px-4 relative">
-      <div className="px-10 pb-3">
-        <h1 className="text-left text-3xl font-bold">Execution History</h1>
+    <div className="w-full px-2 sm:px-4 relative">
+      <div className="px-3 sm:px-10 pb-3">
+        <h1 className="text-left text-2xl sm:text-3xl font-bold">
+          Execution History
+        </h1>
       </div>
-      <div className="px-10 pb-6 flex gap-4">
+      <div className="px-3 sm:px-10 pb-4 sm:pb-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="flex flex-col gap-1">
           <div className="flex justify-center gap-1 opacity-0">
             <button className="btn btn-xs btn-ghost invisible">←</button>
@@ -324,12 +326,11 @@ export function ExecutionPageContent() {
       <PaginationControls />
       {/* Sidebar */}
       <div
-        className={`fixed right-0 top-0 w-1/2 h-full bg-base-100 shadow-xl border-l overflow-y-auto p-6 transition-transform duration-300 ${
+        className={`fixed right-0 top-0 w-full sm:w-3/4 lg:w-2/5 h-full bg-base-100 shadow-xl border-l overflow-y-auto p-4 sm:p-6 transition-transform duration-300 z-50 ${
           isSidebarOpen
             ? "transform translate-x-0"
             : "transform translate-x-full"
         }`}
-        style={{ maxWidth: "40%" }}
       >
         <button
           onClick={handleCloseSidebar}

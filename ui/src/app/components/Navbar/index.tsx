@@ -7,19 +7,34 @@ import type { User } from "@/schemas";
 
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useProject } from "@/app/contexts/ProjectContext";
+import { useSidebar } from "@/app/contexts/SidebarContext";
 import { useLogout } from "@/client/auth/auth";
 
 function HiddenIcon() {
+  const { toggleMobileSidebar } = useSidebar();
+
   return (
     <div className="flex items-center gap-2 lg:hidden">
-      <a
-        href="/"
-        aria-current="page"
-        aria-label="daisyUI"
-        className="flex-0 btn btn-ghost gap-1 px-2 md:gap-2"
+      <button
+        onClick={toggleMobileSidebar}
+        className="btn btn-ghost btn-square"
+        aria-label="Open menu"
       >
-        {/* Logo can be added here using Next.js Image component */}
-      </a>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+          stroke="currentColor"
+          className="w-6 h-6"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+          />
+        </svg>
+      </button>
     </div>
   );
 }

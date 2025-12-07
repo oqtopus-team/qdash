@@ -53,7 +53,7 @@ export default function AdminPage() {
   // Check if current user is admin
   if (user?.system_role !== "admin") {
     return (
-      <div className="w-full px-6">
+      <div className="w-full px-3 sm:px-6">
         <div className="alert alert-error">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -208,11 +208,13 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="w-full px-6">
-      <h1 className="text-left text-3xl font-bold pb-6">Admin Panel</h1>
+    <div className="w-full px-3 sm:px-6">
+      <h1 className="text-left text-2xl sm:text-3xl font-bold pb-4 sm:pb-6">
+        Admin Panel
+      </h1>
 
       {/* Tabs */}
-      <div className="tabs tabs-boxed mb-6">
+      <div className="tabs tabs-boxed mb-4 sm:mb-6 w-full sm:w-fit">
         <button
           className={`tab ${activeTab === "users" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("users")}

@@ -15,6 +15,7 @@ import {
   VscCopy,
   VscListTree,
   VscSymbolClass,
+  VscLayoutSidebarLeft,
 } from "react-icons/vsc";
 import { toast } from "react-toastify";
 import { ToastContainer } from "react-toastify";
@@ -51,6 +52,7 @@ export default function TasksPage() {
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
   // Fetch settings (including default backend)
   const { data: settingsData } = useQuery({
@@ -393,20 +395,29 @@ export default function TasksPage() {
       <ToastContainer position="top-right" autoClose={3000} />
       <div className="h-screen flex flex-col bg-[#1e1e1e]">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e]">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e] gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
               onClick={() => router.push("/")}
-              className="px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors"
+              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0"
             >
-              ← Back
+              ←
             </button>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-white">Task Files</span>
+            <button
+              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+              className="px-2 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0"
+              title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
+            >
+              <VscLayoutSidebarLeft />
+            </button>
+            <div className="flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
+              <span className="text-sm font-medium text-white flex-shrink-0 hidden sm:inline">
+                Task Files
+              </span>
               {selectedBackend && (
                 <>
-                  <span className="text-gray-500">/</span>
-                  <span className="text-sm text-blue-400">
+                  <span className="text-gray-500 hidden sm:inline">/</span>
+                  <span className="text-sm text-blue-400 flex-shrink-0">
                     {selectedBackend}
                   </span>
                 </>
@@ -414,22 +425,22 @@ export default function TasksPage() {
               {selectedFile && (
                 <>
                   <span className="text-gray-500">/</span>
-                  <span className="text-sm text-gray-400">
+                  <span className="text-sm text-gray-400 truncate">
                     {selectedFile.replace(`${selectedBackend}/`, "")}
                   </span>
                 </>
               )}
             </div>
             {hasUnsavedChanges && (
-              <span className="text-xs text-orange-400">Unsaved changes</span>
+              <span className="text-xs text-orange-400 flex-shrink-0">●</span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             {/* Backend selector */}
             <select
               value={selectedBackend || ""}
               onChange={(e) => handleBackendChange(e.target.value)}
-              className="px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors"
+              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors"
             >
               {backendsData?.backends?.map((backend) => (
                 <option key={backend.name} value={backend.name}>
@@ -439,7 +450,7 @@ export default function TasksPage() {
             </select>
             <button
               onClick={toggleEditorLock}
-              className={`px-3 py-1 text-sm text-white border rounded transition-colors ${
+              className={`px-2 sm:px-3 py-1 text-sm text-white border rounded transition-colors ${
                 isEditorLocked
                   ? "bg-[#3c3c3c] border-[#454545] hover:bg-[#505050]"
                   : "bg-[#0e639c] border-[#1177bb] hover:bg-[#1177bb]"
@@ -447,20 +458,17 @@ export default function TasksPage() {
               title={isEditorLocked ? "Unlock editor to edit" : "Lock editor"}
             >
               {isEditorLocked ? (
-                <>
-                  <VscLock className="inline-block mr-1" />
-                  Locked
-                </>
+                <VscLock className="inline-block" />
               ) : (
-                <>
-                  <VscUnlock className="inline-block mr-1" />
-                  Unlocked
-                </>
+                <VscUnlock className="inline-block" />
               )}
+              <span className="hidden sm:inline ml-1">
+                {isEditorLocked ? "Locked" : "Unlocked"}
+              </span>
             </button>
             <button
               onClick={handleSave}
-              className="px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50"
+              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50"
               disabled={
                 !selectedFile ||
                 !hasUnsavedChanges ||
@@ -471,7 +479,10 @@ export default function TasksPage() {
               {saveMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                "Save (Ctrl+S)"
+                <>
+                  <span className="hidden sm:inline">Save (Ctrl+S)</span>
+                  <span className="sm:hidden">Save</span>
+                </>
               )}
             </button>
           </div>
@@ -480,7 +491,9 @@ export default function TasksPage() {
         {/* Main content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
-          <div className="w-64 bg-[#252526] border-r border-[#3e3e3e] flex flex-col">
+          <div
+            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-[#252526] border-r border-[#3e3e3e] flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden`}
+          >
             {/* Tab buttons */}
             <div className="flex border-b border-[#3e3e3e]">
               <button

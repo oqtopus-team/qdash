@@ -317,13 +317,13 @@ export function ChipPageContent() {
   );
 
   return (
-    <div className="w-full px-6 py-6">
+    <div className="w-full px-3 sm:px-6 py-4 sm:py-6">
       <div className="space-y-6">
         {/* Header Section */}
-        <div className="flex flex-col gap-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">Chip Experiments</h1>
-            <div className="flex gap-3 items-center">
+        <div className="flex flex-col gap-4 sm:gap-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h1 className="text-xl sm:text-2xl font-bold">Chip Experiments</h1>
+            <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
               {canEdit && (
                 <button
                   className="btn btn-primary btn-sm"
@@ -348,38 +348,41 @@ export function ChipPageContent() {
               )}
               <div className="join rounded-lg overflow-hidden">
                 <button
-                  className={`join-item btn btn-sm ${
+                  className={`join-item btn btn-xs sm:btn-sm ${
                     viewMode === "1q" ? "btn-active" : ""
                   }`}
                   onClick={() => setViewMode("1q")}
                 >
-                  <BsGrid className="text-lg" />
-                  <span className="ml-2">1Q View</span>
+                  <BsGrid className="text-base sm:text-lg" />
+                  <span className="ml-1 sm:ml-2 hidden xs:inline">1Q</span>
+                  <span className="ml-1 sm:ml-2 hidden sm:inline">View</span>
                 </button>
                 <button
-                  className={`join-item btn btn-sm ${
+                  className={`join-item btn btn-xs sm:btn-sm ${
                     viewMode === "2q" ? "btn-active" : ""
                   }`}
                   onClick={() => setViewMode("2q")}
                 >
-                  <BsGrid className="text-lg" />
-                  <span className="ml-2">2Q View</span>
+                  <BsGrid className="text-base sm:text-lg" />
+                  <span className="ml-1 sm:ml-2 hidden xs:inline">2Q</span>
+                  <span className="ml-1 sm:ml-2 hidden sm:inline">View</span>
                 </button>
                 <button
-                  className={`join-item btn btn-sm ${
+                  className={`join-item btn btn-xs sm:btn-sm ${
                     viewMode === "mux" ? "btn-active" : ""
                   }`}
                   onClick={() => setViewMode("mux")}
                 >
-                  <BsListUl className="text-lg" />
-                  <span className="ml-2">MUX View</span>
+                  <BsListUl className="text-base sm:text-lg" />
+                  <span className="ml-1 sm:ml-2 hidden xs:inline">MUX</span>
+                  <span className="ml-1 sm:ml-2 hidden sm:inline">View</span>
                 </button>
               </div>
             </div>
           </div>
 
           {/* Selection Controls */}
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex flex-col gap-1">
               <div className="flex justify-center gap-1 opacity-0">
                 <button className="btn btn-xs btn-ghost invisible">←</button>
