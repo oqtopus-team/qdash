@@ -208,3 +208,23 @@ class TestChipRouter:
 
         # Assert
         assert response.status_code == 400
+
+    def test_list_chips_requires_authentication(self, test_client, test_project):
+        """Test that listing chips without auth returns 401."""
+        # Act: Request without Authorization header
+        response = test_client.get("/chips")
+
+        # Assert
+        assert response.status_code == 401
+
+    def test_list_chips_invalid_token(self, test_client, test_project):
+        """Test that listing chips with invalid token returns 401."""
+        # Act: Request with invalid token
+        headers = {
+            "Authorization": "Bearer invalid_token",
+            "X-Project-Id": "test_project",
+        }
+        response = test_client.get("/chips", headers=headers)
+
+        # Assert
+        assert response.status_code == 401
