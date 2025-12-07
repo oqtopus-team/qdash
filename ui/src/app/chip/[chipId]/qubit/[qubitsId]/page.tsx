@@ -21,13 +21,13 @@ import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useChipUrlState } from "@/app/hooks/useUrlState";
 import { useGetChip } from "@/client/chip/chip";
 import {
-  useGetLatestQubitTaskResults,
-  useGetHistoricalQubitTaskResults,
-} from "@/client/task-result/task-result";
-import {
   useListTaskInfo,
   useGetTaskFileSettings,
 } from "@/client/task-file/task-file";
+import {
+  useGetLatestQubitTaskResults,
+  useGetHistoricalQubitTaskResults,
+} from "@/client/task-result/task-result";
 
 function QubitDetailPageContent() {
   const params = useParams();

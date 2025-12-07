@@ -10,7 +10,7 @@ import type { ProjectResponse } from "./projectResponse";
 /**
  * Response schema for listing projects.
  */
-export interface ProjectListResponse {
+export interface QdashApiSchemasProjectProjectListResponse {
   projects: ProjectResponse[];
   total: number;
 }

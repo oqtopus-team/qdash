@@ -9,13 +9,16 @@ import {
   useEffect,
 } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
+
+import { useAuth } from "./AuthContext";
+
 import type { ProjectResponse, ProjectRole } from "@/schemas";
+
 import {
   useListProjects,
   useListProjectMembers,
 } from "@/client/projects/projects";
-import { useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "./AuthContext";
 
 interface ProjectContextType {
   currentProject: ProjectResponse | null;

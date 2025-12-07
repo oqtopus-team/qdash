@@ -4,6 +4,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.datamodel.user import SystemRole
 
 
 class UserDocument(Document):
@@ -16,6 +17,8 @@ class UserDocument(Document):
         access_token (str): The API access token for authentication.
         full_name (Optional[str]): The full name of the user.
         disabled (bool): Whether the user is disabled.
+        system_role (SystemRole): The system-level role (admin/user).
+        default_project_id (str): The user's default project ID.
         system_info (SystemInfo): The system information.
 
     """
@@ -29,6 +32,10 @@ class UserDocument(Document):
         description="Project ID automatically provisioned for the user",
     )
     disabled: bool = Field(default=False, description="Whether the user is disabled")
+    system_role: SystemRole = Field(
+        default=SystemRole.USER,
+        description="System-level role (admin/user)",
+    )
     system_info: SystemInfoModel = Field(description="The system information")
 
     model_config = ConfigDict(

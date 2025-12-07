@@ -3,10 +3,9 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
-import { toast } from "react-toastify";
-import { ToastContainer } from "react-toastify";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { SiPython } from "react-icons/si";
 import {
   VscFolder,
   VscFolderOpened,
@@ -17,7 +16,14 @@ import {
   VscListTree,
   VscSymbolClass,
 } from "react-icons/vsc";
-import { SiPython } from "react-icons/si";
+import { toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
+
+import type {
+  TaskFileTreeNode,
+  SaveTaskFileRequest,
+  TaskInfo,
+} from "@/schemas";
 
 import {
   listTaskFileBackends,
@@ -27,11 +33,6 @@ import {
   getTaskFileSettings,
   listTaskInfo,
 } from "@/client/task-file/task-file";
-import type {
-  TaskFileTreeNode,
-  SaveTaskFileRequest,
-  TaskInfo,
-} from "@/schemas";
 
 import "react-toastify/dist/ReactToastify.css";
 

@@ -8,7 +8,7 @@
 import type { UserCreateFullName } from "./userCreateFullName";
 
 /**
- * User creation model for registration.
+ * User creation model for registration (admin only).
  */
 export interface UserCreate {
   username: string;

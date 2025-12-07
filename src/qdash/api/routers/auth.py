@@ -1,5 +1,6 @@
 """Authentication router for QDash API."""
 
+import os
 import secrets
 from typing import Annotated
 
@@ -13,7 +14,33 @@ from qdash.api.lib.auth import (
 from qdash.api.lib.project_service import ProjectService
 from qdash.api.schemas.auth import TokenResponse, User, UserCreate, UserWithToken
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.user import UserDocument
+
+
+def _get_system_role_for_user(username: str) -> SystemRole:
+    """Determine system role for a user based on environment variable.
+
+    Parameters
+    ----------
+    username : str
+        Username to check
+
+    Returns
+    -------
+    SystemRole
+        ADMIN if username matches QDASH_ADMIN_USERNAME, otherwise USER
+
+    """
+    admin_username = os.getenv("QDASH_ADMIN_USERNAME", "").strip()
+    if not admin_username:
+        return SystemRole.USER
+
+    if username == admin_username:
+        logger.info(f"User '{username}' registered as admin (via QDASH_ADMIN_USERNAME)")
+        return SystemRole.ADMIN
+
+    return SystemRole.USER
 
 
 def generate_access_token() -> str:
@@ -72,17 +99,24 @@ def login(
     )
 
 
-@router.post("/register", response_model=UserWithToken, summary="Register a new user", operation_id="registerUser")
-def register_user(user_data: UserCreate) -> UserWithToken:
-    """Register a new user account.
+@router.post(
+    "/register", response_model=UserWithToken, summary="Register a new user (admin only)", operation_id="registerUser"
+)
+def register_user(
+    user_data: UserCreate,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> UserWithToken:
+    """Register a new user account (admin only).
 
     Creates a new user in the database with hashed password and generates
-    an access token for immediate use.
+    an access token for immediate use. Only admin users can create new accounts.
 
     Parameters
     ----------
     user_data : UserCreate
         User registration data including username, password, and optional full_name
+    current_user : User
+        Current authenticated admin user
 
     Returns
     -------
@@ -92,10 +126,18 @@ def register_user(user_data: UserCreate) -> UserWithToken:
     Raises
     ------
     HTTPException
+        403 if the current user is not an admin
         400 if the username is already registered
 
     """
-    logger.debug(f"Registration attempt for user: {user_data.username}")
+    # Check if current user is admin
+    if current_user.system_role != SystemRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can create new users",
+        )
+
+    logger.debug(f"Admin {current_user.username} creating user: {user_data.username}")
     # Check if username already exists
     query = UserDocument.find_one({"username": user_data.username}).run()
     existing_user = query
@@ -108,16 +150,27 @@ def register_user(user_data: UserCreate) -> UserWithToken:
     # Create new user with access token
     hashed_password = get_password_hash(user_data.password)
     access_token = generate_access_token()
+    system_role = _get_system_role_for_user(user_data.username)
     user = UserDocument(
         username=user_data.username,
         hashed_password=hashed_password,
         access_token=access_token,
         full_name=user_data.full_name,
+        system_role=system_role,
         system_info=SystemInfoModel(),
     )
     user.insert()
-    ProjectService().ensure_default_project(user)
-    logger.debug(f"New user created: {user_data.username}")
+    logger.info(f"Admin {current_user.username} created new user: {user_data.username}")
+
+    # Create default project for every user
+    service = ProjectService()
+    project = service.create_project(
+        owner_username=user.username,
+        name=f"{user.username}'s project",
+    )
+    user.default_project_id = project.project_id
+    user.save()
+    logger.info(f"Created default project for user: {user.username}")
 
     return UserWithToken(
         username=user.username,

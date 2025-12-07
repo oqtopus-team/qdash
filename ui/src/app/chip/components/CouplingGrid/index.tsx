@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
 
+import { CouplingTaskHistoryModal } from "../CouplingTaskHistoryModal";
+
 import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
@@ -11,7 +13,6 @@ import {
   useGetLatestCouplingTaskResults,
   useGetHistoricalCouplingTaskResults,
 } from "@/client/task-result/task-result";
-import { CouplingTaskHistoryModal } from "../CouplingTaskHistoryModal";
 
 interface CouplingGridProps {
   chipId: string;

@@ -153,15 +153,17 @@ export const useLogin = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Register a new user account.
+ * Register a new user account (admin only).
 
 Creates a new user in the database with hashed password and generates
-an access token for immediate use.
+an access token for immediate use. Only admin users can create new accounts.
 
 Parameters
 ----------
 user_data : UserCreate
     User registration data including username, password, and optional full_name
+current_user : User
+    Current authenticated admin user
 
 Returns
 -------
@@ -171,8 +173,9 @@ UserWithToken
 Raises
 ------
 HTTPException
+    403 if the current user is not an admin
     400 if the username is already registered
- * @summary Register a new user
+ * @summary Register a new user (admin only)
  */
 export const registerUser = (
   userCreate: BodyType<UserCreate>,
@@ -236,7 +239,7 @@ export type RegisterUserMutationBody = BodyType<UserCreate>;
 export type RegisterUserMutationError = ErrorType<void | HTTPValidationError>;
 
 /**
- * @summary Register a new user
+ * @summary Register a new user (admin only)
  */
 export const useRegisterUser = <
   TError = ErrorType<void | HTTPValidationError>,

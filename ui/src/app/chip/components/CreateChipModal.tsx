@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useCreateChip } from "@/client/chip/chip";
+
 import { useQueryClient } from "@tanstack/react-query";
+
+import { useCreateChip } from "@/client/chip/chip";
 
 interface CreateChipModalProps {
   isOpen: boolean;

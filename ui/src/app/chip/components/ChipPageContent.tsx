@@ -7,6 +7,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { BsGrid, BsListUl } from "react-icons/bs";
 
 import { CouplingGrid } from "./CouplingGrid";
+import { CreateChipModal } from "./CreateChipModal";
 import { TaskResultGrid } from "./TaskResultGrid";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
@@ -24,7 +25,6 @@ import {
   useGetTaskFileSettings,
 } from "@/client/task-file/task-file";
 import { TaskDetailModal } from "@/shared/components/TaskDetailModal";
-import { CreateChipModal } from "./CreateChipModal";
 
 interface SelectedTaskInfo {
   qid: string;
