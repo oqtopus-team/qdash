@@ -15,13 +15,13 @@ class BackendDocument(Document):
 
     Attributes
     ----------
-        project_id (str | None): The owning project identifier.
+        project_id (str): The owning project identifier (required).
         name (str): The name of the task. e.g. "CheckT1" ,"CheckT2Echo" ".
         description (str): Detailed description of the task.
 
     """
 
-    project_id: str | None = Field(None, description="Owning project identifier")
+    project_id: str = Field(..., description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the task")
     name: str = Field(..., description="The name of backend")
     system_info: SystemInfoModel = Field(default_factory=SystemInfoModel, description="The system information")

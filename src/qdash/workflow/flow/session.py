@@ -24,11 +24,14 @@ Example:
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 import pendulum
 from prefect import get_run_logger
+
+logger = logging.getLogger(__name__)
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
@@ -148,6 +151,13 @@ class FlowSession:
             user = UserDocument.find_one({"username": username}).run()
             if user and user.default_project_id:
                 project_id = user.default_project_id
+                logger.info(f"Auto-resolved project_id={project_id} from user={username}")
+            else:
+                logger.warning(
+                    f"Could not auto-resolve project_id for user={username}. "
+                    f"User found: {user is not None}, "
+                    f"default_project_id: {user.default_project_id if user else 'N/A'}"
+                )
         self.project_id = project_id
 
         # Auto-generate execution_id if not provided
@@ -315,6 +325,7 @@ class FlowSession:
                 calib_dir=calib_data_path,
                 execution_id=execution_id,
                 task_manager_id=self.task_manager.id,
+                project_id=self.project_id,
             )
 
         self.backend.connect()

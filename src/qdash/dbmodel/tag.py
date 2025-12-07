@@ -10,12 +10,12 @@ class TagDocument(Document):
 
     Attributes
     ----------
-        project_id (str | None): The owning project identifier.
+        project_id (str): The owning project identifier.
         name (str): The name of the parameter.
 
     """
 
-    project_id: str | None = Field(None, description="Owning project identifier")
+    project_id: str = Field(..., description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the tag")
     name: str = Field(..., description="The name of the tag")
 
@@ -34,7 +34,7 @@ class TagDocument(Document):
         ]
 
     @classmethod
-    def insert_tags(cls, tags: list[str], username: str, project_id: str | None = None) -> list["TagDocument"]:
+    def insert_tags(cls, tags: list[str], username: str, project_id: str) -> list["TagDocument"]:
         inserted_documents = []
         for tag in tags:
             doc = cls.find_one({"project_id": project_id, "name": tag, "username": username}).run()

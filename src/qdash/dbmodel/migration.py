@@ -11,6 +11,7 @@ from typing import Any
 from bunnet import Document
 from qdash.api.lib.project_service import ProjectService
 from qdash.dbmodel.backend import BackendDocument
+from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.coupling import CouplingDocument
@@ -71,6 +72,20 @@ def migrate_add_project_id_to_all_documents(dry_run: bool = True) -> dict[str, A
                 continue
             logger.warning(f"User {user.username} has invalid default_project_id {user.default_project_id}")
 
+        # Check if user already has a project (but default_project_id is not set)
+        existing_project = ProjectDocument.find_one({"owner_username": user.username}).run()
+        if existing_project:
+            # Link existing project to user
+            if not dry_run:
+                user.default_project_id = existing_project.project_id
+                user.save()
+                user_project_map[user.username] = existing_project.project_id
+                logger.info(f"Linked existing project {existing_project.project_id} to user {user.username}")
+            else:
+                user_project_map[user.username] = existing_project.project_id
+                logger.info(f"[DRY RUN] Would link existing project {existing_project.project_id} to user {user.username}")
+            continue
+
         # Create default project for user
         if not dry_run:
             try:
@@ -88,19 +103,20 @@ def migrate_add_project_id_to_all_documents(dry_run: bool = True) -> dict[str, A
 
     # Step 2: Update documents with project_id
     document_classes: list[tuple[str, type[Document], Callable[[Any], str | None]]] = [
-        ("chip", ChipDocument, lambda d: d.username),
-        ("qubit", QubitDocument, lambda d: d.username),
-        ("coupling", CouplingDocument, lambda d: d.username),
-        ("execution_history", ExecutionHistoryDocument, lambda d: d.username),
-        ("task", TaskDocument, lambda d: d.username),
-        ("backend", BackendDocument, lambda d: d.username),
-        ("tag", TagDocument, lambda d: d.username),
-        ("flow", FlowDocument, lambda d: d.username),
-        ("execution_counter", ExecutionCounterDocument, lambda d: d.username),
-        ("chip_history", ChipHistoryDocument, lambda d: d.username),
-        ("qubit_history", QubitHistoryDocument, lambda d: d.username),
-        ("coupling_history", CouplingHistoryDocument, lambda d: d.username),
-        ("task_result_history", TaskResultHistoryDocument, lambda d: d.username),
+        ("chip", ChipDocument, lambda d: d.get("username")),
+        ("qubit", QubitDocument, lambda d: d.get("username")),
+        ("coupling", CouplingDocument, lambda d: d.get("username")),
+        ("execution_history", ExecutionHistoryDocument, lambda d: d.get("username")),
+        ("task", TaskDocument, lambda d: d.get("username")),
+        ("backend", BackendDocument, lambda d: d.get("username")),
+        ("tag", TagDocument, lambda d: d.get("username")),
+        ("flow", FlowDocument, lambda d: d.get("username")),
+        ("execution_counter", ExecutionCounterDocument, lambda d: d.get("username")),
+        ("chip_history", ChipHistoryDocument, lambda d: d.get("username")),
+        ("qubit_history", QubitHistoryDocument, lambda d: d.get("username")),
+        ("coupling_history", CouplingHistoryDocument, lambda d: d.get("username")),
+        ("task_result_history", TaskResultHistoryDocument, lambda d: d.get("username")),
+        ("calibration_note", CalibrationNoteDocument, lambda d: d.get("username")),
     ]
 
     for collection_name, doc_class, get_username in document_classes:
@@ -138,31 +154,37 @@ def _migrate_collection(
     user_project_map: dict[str, str],
     dry_run: bool,
 ) -> int:
-    """Migrate a single collection to add project_id."""
-    # Find documents without project_id
-    docs = list(doc_class.find({"project_id": None}).run())
+    """Migrate a single collection to add project_id.
+
+    Uses raw MongoDB operations to avoid Pydantic validation errors
+    when loading documents with null project_id (which is now required).
+    """
+    # Use raw MongoDB collection to bypass Pydantic validation
+    collection = doc_class.get_motor_collection()
+
+    # Find documents without project_id (null or missing)
+    docs = list(collection.find({"$or": [{"project_id": None}, {"project_id": {"$exists": False}}]}))
     updated = 0
 
     logger.info(f"Found {len(docs)} {collection_name} documents without project_id")
 
     for doc in docs:
-        username = get_username(doc)
+        username = doc.get("username")
         if not username:
-            logger.warning(f"Document {doc.id} in {collection_name} has no username, skipping")
+            logger.warning(f"Document {doc.get('_id')} in {collection_name} has no username, skipping")
             continue
 
         project_id = user_project_map.get(username)
         if not project_id:
-            logger.warning(f"No project found for user {username} (document {doc.id} in {collection_name})")
+            logger.warning(f"No project found for user {username} (document {doc.get('_id')} in {collection_name})")
             continue
 
         if not dry_run:
-            doc.project_id = project_id
-            doc.save()
+            collection.update_one({"_id": doc["_id"]}, {"$set": {"project_id": project_id}})
             updated += 1
         else:
             updated += 1
-            logger.debug(f"[DRY RUN] Would set project_id={project_id} on {collection_name} {doc.id}")
+            logger.debug(f"[DRY RUN] Would set project_id={project_id} on {collection_name} {doc.get('_id')}")
 
     logger.info(f"{'[DRY RUN] Would update' if dry_run else 'Updated'} " f"{updated} {collection_name} documents")
     return updated
@@ -173,9 +195,16 @@ def _migrate_execution_locks(user_project_map: dict[str, str], dry_run: bool) ->
 
     Old behavior: Single global lock
     New behavior: One lock per project
+
+    Uses raw MongoDB operations to avoid Pydantic validation errors.
     """
+    import pendulum
+
+    # Use raw MongoDB collection to bypass Pydantic validation
+    collection = ExecutionLockDocument.get_motor_collection()
+
     # Find any existing lock without project_id
-    old_lock = ExecutionLockDocument.find_one({"project_id": None}).run()
+    old_lock = collection.find_one({"$or": [{"project_id": None}, {"project_id": {"$exists": False}}]})
     if not old_lock:
         logger.info("No global execution lock found")
         return 0
@@ -185,16 +214,19 @@ def _migrate_execution_locks(user_project_map: dict[str, str], dry_run: bool) ->
     # Create a lock for each project
     unique_project_ids = set(user_project_map.values())
     for project_id in unique_project_ids:
-        existing = ExecutionLockDocument.find_one({"project_id": project_id}).run()
+        existing = collection.find_one({"project_id": project_id})
         if existing:
             continue
 
         if not dry_run:
-            new_lock = ExecutionLockDocument(
-                project_id=project_id,
-                locked=False,
+            now = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+            collection.insert_one(
+                {
+                    "project_id": project_id,
+                    "locked": False,
+                    "system_info": {"created_at": now, "updated_at": now},
+                }
             )
-            new_lock.insert()
             updated += 1
         else:
             updated += 1
@@ -202,7 +234,7 @@ def _migrate_execution_locks(user_project_map: dict[str, str], dry_run: bool) ->
 
     # Remove the old global lock
     if not dry_run:
-        old_lock.delete()
+        collection.delete_one({"_id": old_lock["_id"]})
         logger.info("Deleted global execution lock")
     else:
         logger.info("[DRY RUN] Would delete global execution lock")

@@ -14,14 +14,14 @@ class TaskDocument(Document):
 
     Attributes
     ----------
-        project_id (str | None): The owning project identifier.
+        project_id (str): The owning project identifier.
         name (str): The name of the task. e.g. "CheckT1" ,"CheckT2Echo" ".
         description (str): Detailed description of the task.
         task_type (str): The type of the task. e.g. "global", "qubit", "coupling".
 
     """
 
-    project_id: str | None = Field(None, description="Owning project identifier")
+    project_id: str = Field(..., description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the task")
     name: str = Field(..., description="The name of the task")
     backend: str | None = Field(None, description="The backend of the task")

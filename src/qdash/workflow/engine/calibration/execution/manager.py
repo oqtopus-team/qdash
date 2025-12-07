@@ -304,8 +304,8 @@ class ExecutionManager(BaseModel):
             self._repository.save(self.to_datamodel())
 
         # Auto-register tags to TagDocument for UI tag selector
-        if self.tags:
-            TagDocument.insert_tags(self.tags, self.username)
+        if self.tags and self.project_id:
+            TagDocument.insert_tags(self.tags, self.username, self.project_id)
         return self
 
     def to_datamodel(self) -> ExecutionModel:

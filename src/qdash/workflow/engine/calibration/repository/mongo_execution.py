@@ -106,8 +106,8 @@ class MongoExecutionRepository:
         """
         ExecutionHistoryDocument.upsert_document(execution)
         # Auto-register tags
-        if execution.tags:
-            TagDocument.insert_tags(execution.tags, execution.username)
+        if execution.tags and execution.project_id:
+            TagDocument.insert_tags(execution.tags, execution.username, execution.project_id)
 
     def find_by_id(self, execution_id: str) -> ExecutionModel | None:
         """Find execution by ID.
