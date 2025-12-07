@@ -33,6 +33,7 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
+from qdash.dbmodel.user import UserDocument
 from qdash.workflow.caltasks.active_protocols import generate_task_instances
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
@@ -125,7 +126,8 @@ class FlowSession:
             enable_github_pull: Whether to pull latest config from GitHub before starting (default: False)
             github_push_config: Configuration for GitHub push operations (default: disabled)
             muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
-            project_id: Project ID for multi-tenancy support (default: None)
+            project_id: Project ID for multi-tenancy support. If None, auto-resolved
+                from username's default_project_id (works because only owners can run calibrations).
 
         Raises:
             RuntimeError: If use_lock=True and another calibration is already running
@@ -137,9 +139,16 @@ class FlowSession:
         self.muxes = muxes
         self.backend_name = backend_name
         self.use_lock = use_lock
-        self.project_id = project_id
         self._lock_acquired = False
         self._last_executed_task_id_by_qid: dict[str, str] = {}  # Track last task_id per qid
+
+        # Auto-resolve project_id from username if not provided
+        # This works because only owners can run calibrations (1 user = 1 project policy)
+        if project_id is None:
+            user = UserDocument.find_one({"username": username}).run()
+            if user and user.default_project_id:
+                project_id = user.default_project_id
+        self.project_id = project_id
 
         # Auto-generate execution_id if not provided
         if execution_id is None:
@@ -855,7 +864,8 @@ def init_calibration(
         enable_github_pull: Whether to pull latest config from GitHub before starting (default: False)
         github_push_config: Configuration for GitHub push operations (default: disabled)
         muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
-        project_id: Project ID for multi-tenancy support (default: None)
+        project_id: Project ID for multi-tenancy support. If None, auto-resolved
+            from username's default_project_id (works because only owners can run calibrations).
 
     Returns:
         Initialized FlowSession instance
@@ -865,6 +875,7 @@ def init_calibration(
         @flow
         def my_calibration(username, chip_id, qids, flow_name=None):
             # flow_name will be automatically injected by API
+            # project_id is auto-resolved from username (owner's default project)
             session = init_calibration(username, chip_id, qids, flow_name=flow_name)
             # ... perform calibration tasks
             finish_calibration()

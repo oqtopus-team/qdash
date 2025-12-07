@@ -10,7 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pymongo import DESCENDING
 from qdash.api.lib.project import (
     ProjectContext,
-    get_optional_project_context,
     get_project_context,
     get_project_context_owner,
 )
@@ -46,13 +45,13 @@ logger.setLevel(logging.DEBUG)
 
 @router.get("/chips", response_model=ListChipsResponse, summary="List all chips", operation_id="listChips")
 def list_chips(
-    ctx: Annotated[ProjectContext | None, Depends(get_optional_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> ListChipsResponse:
     """List all chips in the current project.
 
     Parameters
     ----------
-    ctx : ProjectContext | None
+    ctx : ProjectContext
         Project context with user and project information
 
     Returns
@@ -61,9 +60,6 @@ def list_chips(
         Wrapped list of available chips
 
     """
-    if ctx is None:
-        return ListChipsResponse(chips=[])
-
     logger.debug(f"Listing chips for project: {ctx.project_id}")
     chips = ChipDocument.find({"project_id": ctx.project_id}).run()
     return ListChipsResponse(

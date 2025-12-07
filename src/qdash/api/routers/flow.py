@@ -907,12 +907,12 @@ async def execute_flow(
         )
 
     # Merge parameters (request overrides defaults)
-    # Add flow_name and project_id to parameters
+    # Add flow_name for display purposes
+    # Note: project_id is auto-resolved from username in init_calibration (owner only)
     parameters: dict[str, Any] = {
         **flow.default_parameters,
         **request.parameters,
         "flow_name": name,  # Add flow name for display purposes
-        "project_id": ctx.project_id,  # Add project_id for multi-tenancy
     }
 
     logger.info(f"Executing flow '{name}' (deployment={flow.deployment_id}) with parameters: {parameters}")

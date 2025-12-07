@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Path, status
-from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
+from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.project import ProjectDocument
@@ -148,25 +148,6 @@ def get_project_context_owner(
     project_id = _resolve_project_id(user, project_id_header)
     project, role = _check_permission(project_id, user, required_roles=[ProjectRole.OWNER])
     return ProjectContext(project_id=project_id, project=project, user=user, role=role)
-
-
-def get_optional_project_context(
-    user: Annotated[User, Depends(get_optional_current_user)],
-    project_id_header: Annotated[str | None, Depends(get_project_id_from_header)] = None,
-) -> ProjectContext | None:
-    """Get project context if project_id is provided, otherwise return None.
-
-    Use this for endpoints that can work with or without project scope.
-    """
-    project_id = project_id_header or user.default_project_id
-    if not project_id:
-        return None
-
-    try:
-        project, role = _check_permission(project_id, user)
-        return ProjectContext(project_id=project_id, project=project, user=user, role=role)
-    except HTTPException:
-        return None
 
 
 # --- Path-based dependencies for /projects/{project_id} endpoints ---
