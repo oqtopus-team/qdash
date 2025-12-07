@@ -39,6 +39,7 @@ export default function NewFlowPage() {
   const [tags, setTags] = useState("");
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
   // Fetch current user
   const { data: userData } = useGetCurrentUser();
@@ -239,32 +240,49 @@ export default function NewFlowPage() {
       <ToastContainer position="top-right" autoClose={3000} />
       <div className="h-screen flex flex-col bg-[#1e1e1e]">
         {/* VSCode-style Header */}
-        <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e]">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e] gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
               onClick={() => router.back()}
-              className="px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors"
+              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0"
               disabled={saveMutation.isPending}
             >
-              ← Back
+              ←
             </button>
-            <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+              className="px-2 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0 sm:hidden"
+              title={isSidebarVisible ? "Hide properties" : "Show properties"}
+            >
+              ☰
+            </button>
+            <div className="flex items-center gap-2 min-w-0">
               <span className="text-sm text-gray-400">●</span>
-              <span className="text-sm font-medium text-white">
+              <span className="text-sm font-medium text-white truncate">
                 {name || "new_flow"}.py
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+              className="px-2 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors hidden sm:block"
+              title={isSidebarVisible ? "Hide properties" : "Show properties"}
+            >
+              ☰
+            </button>
             <button
               onClick={handleSave}
-              className="px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={saveMutation.isPending}
             >
               {saveMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                "Save Flow"
+                <>
+                  <span className="hidden sm:inline">Save Flow</span>
+                  <span className="sm:hidden">Save</span>
+                </>
               )}
             </button>
           </div>
@@ -309,9 +327,31 @@ export default function NewFlowPage() {
             />
           </div>
 
+          {/* Mobile Sidebar Overlay */}
+          {isSidebarVisible && (
+            <div
+              className="fixed inset-0 bg-black/50 z-10 sm:hidden"
+              onClick={() => setIsSidebarVisible(false)}
+            />
+          )}
+
           {/* Right Sidebar - Metadata */}
-          <div className="w-80 bg-[#252526] border-l border-[#3e3e3e] overflow-y-auto">
+          <div
+            className={`${isSidebarVisible ? "w-72 sm:w-80" : "w-0"} bg-[#252526] border-l border-[#3e3e3e] overflow-y-auto transition-all duration-200 overflow-hidden flex-shrink-0 ${isSidebarVisible ? "fixed sm:relative right-0 top-0 h-full z-20 sm:z-auto" : ""}`}
+          >
             <div className="p-4">
+              {/* Mobile Close Button */}
+              <div className="flex justify-between items-center mb-4 sm:hidden">
+                <span className="text-sm font-semibold text-white">
+                  Properties
+                </span>
+                <button
+                  onClick={() => setIsSidebarVisible(false)}
+                  className="btn btn-ghost btn-sm btn-square text-white"
+                >
+                  ✕
+                </button>
+              </div>
               {/* Template Selector */}
               <div className="mb-6">
                 <h2 className="text-sm font-semibold text-white mb-3">

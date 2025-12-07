@@ -59,8 +59,20 @@ def init_db(database: Database | None = None) -> None:
     database : Database | None
         Optional database instance. If None, uses default.
 
+    Note
+    ----
+    If _database is already set (e.g., by set_test_client), this function
+    will skip reinitialization to preserve test database settings.
+    In test mode (ENV=test), always skip if already initialized.
+
     """
     global _database
+    # Skip if already initialized (preserves test database setting)
+    if _database is not None:
+        return
+    # In test mode, set_test_client should be called before this
+    if os.getenv("ENV") == "test":
+        return
     db = database or get_database()
     _database = db
     init_bunnet(database=db, document_models=document_models())
@@ -92,6 +104,67 @@ def close_db() -> None:
     _database = None
 
 
+def create_initial_admin() -> None:
+    """Create initial admin user from environment variables if not exists.
+
+    Environment variables:
+    - QDASH_ADMIN_USERNAME: Admin username (required)
+    - QDASH_ADMIN_PASSWORD: Admin password (required)
+
+    If both are set and the user doesn't exist, creates the admin user
+    with a default project.
+    """
+    import logging
+    import secrets
+
+    from passlib.context import CryptContext
+    from qdash.api.lib.project_service import ProjectService
+    from qdash.datamodel.system_info import SystemInfoModel
+    from qdash.datamodel.user import SystemRole
+    from qdash.dbmodel.user import UserDocument
+
+    logger = logging.getLogger(__name__)
+
+    admin_username = os.getenv("QDASH_ADMIN_USERNAME", "").strip()
+    admin_password = os.getenv("QDASH_ADMIN_PASSWORD")
+
+    if not admin_username or not admin_password:
+        return
+
+    # Check if user already exists
+    existing_user = UserDocument.find_one({"username": admin_username}).run()
+    if existing_user:
+        logger.debug(f"Initial admin user '{admin_username}' already exists")
+        return
+
+    # Create password hash
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    hashed_password = pwd_context.hash(admin_password)
+    access_token = secrets.token_urlsafe(32)
+
+    # Create admin user
+    user = UserDocument(
+        username=admin_username,
+        hashed_password=hashed_password,
+        access_token=access_token,
+        full_name="Administrator",
+        system_role=SystemRole.ADMIN,
+        system_info=SystemInfoModel(),
+    )
+    user.insert()
+    logger.info(f"Created initial admin user: {admin_username}")
+
+    # Create default project for admin
+    service = ProjectService()
+    project = service.create_project(
+        owner_username=admin_username,
+        name=f"{admin_username}'s project",
+    )
+    user.default_project_id = project.project_id
+    user.save()
+    logger.info(f"Created default project for admin: {admin_username}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize and close the database connection.
@@ -103,5 +176,6 @@ async def lifespan(app: FastAPI):
 
     """
     init_db()
+    create_initial_admin()
     yield
     close_db()

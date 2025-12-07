@@ -14,6 +14,7 @@ class ChipDocument(Document):
 
     Attributes
     ----------
+        project_id (str): The owning project identifier (required).
         chip_id (str): The chip ID. e.g. "chip1".
         size (int): The size of the chip.
         qubits (dict): The qubits of the chip.
@@ -23,6 +24,7 @@ class ChipDocument(Document):
 
     """
 
+    project_id: str = Field(..., description="Owning project identifier")
     chip_id: str = Field("SAMPLE", description="The chip ID")
     username: str = Field(..., description="The username of the user who created the chip")
     size: int = Field(64, description="The size of the chip")
@@ -43,7 +45,10 @@ class ChipDocument(Document):
         """Settings for the document."""
 
         name = "chip"
-        indexes: ClassVar = [IndexModel([("chip_id", ASCENDING), ("username")], unique=True)]
+        indexes: ClassVar = [
+            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING), ("username", ASCENDING)], unique=True),
+            IndexModel([("project_id", ASCENDING), ("username", ASCENDING), ("installed_at", DESCENDING)]),
+        ]
 
     def update_qubit(self, qid: str, qubit_data: QubitModel) -> "ChipDocument":
         if qid not in self.qubits:

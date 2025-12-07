@@ -1,38 +1,37 @@
-"""Python Flow Editor - Session management and helper functions for custom calibration flows.
+"""CalService - High-level API for calibration workflows.
 
-This module provides a high-level API for creating custom calibration workflows
-using Python code. It leverages the refactored TaskManager architecture with
-integrated save processing.
+This module provides a clean, service-oriented API for calibration tasks.
+It wraps low-level session management and provides simple methods for
+common calibration patterns.
 
 Example:
     Basic calibration flow:
 
     ```python
     from prefect import flow
-    from qdash.workflow.flow import init_calibration, calibrate_qubits_parallel, finish_calibration
+    from qdash.workflow.flow import CalService
 
     @flow
-    def simple_calibration(username, execution_id, chip_id, qids):
-        session = init_calibration(username, execution_id, chip_id)
-        results = calibrate_qubits_parallel(
-            qids=qids,
-            tasks=["CheckFreq", "CheckRabi", "CheckT1"]
-        )
-        finish_calibration()
-        return results
+    def simple_calibration(username, chip_id, qids, flow_name=None, project_id=None):
+        cal = CalService(username, chip_id, flow_name=flow_name, project_id=project_id)
+        return cal.run(qids=qids, tasks=["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"])
     ```
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 import pendulum
-from prefect import get_run_logger
+from prefect import get_run_logger, task
+
+logger = logging.getLogger(__name__)
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
+from qdash.dbmodel.user import UserDocument
 from qdash.workflow.caltasks.active_protocols import generate_task_instances
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
@@ -42,7 +41,7 @@ from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.flow.github import GitHubIntegration, GitHubPushConfig
 
 
-def generate_execution_id(username: str, chip_id: str) -> str:
+def generate_execution_id(username: str, chip_id: str, project_id: str | None = None) -> str:
     """Generate a unique execution ID based on the current date and an execution index.
 
     This function creates execution IDs in the format YYYYMMDD-NNN, where:
@@ -52,6 +51,7 @@ def generate_execution_id(username: str, chip_id: str) -> str:
     Args:
         username: Username for the execution
         chip_id: Chip ID for the execution
+        project_id: Project ID for the execution (optional)
 
     Returns:
         Generated execution ID (e.g., "20240101-001")
@@ -64,31 +64,36 @@ def generate_execution_id(username: str, chip_id: str) -> str:
 
     """
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
-    execution_index = ExecutionCounterDocument.get_next_index(date_str, username, chip_id)
+    execution_index = ExecutionCounterDocument.get_next_index(date_str, username, chip_id, project_id=project_id)
     return f"{date_str}-{execution_index:03d}"
 
 
-class FlowSession:
-    """Session manager for Python Flow calibration workflows.
+class CalService:
+    """High-level API for calibration workflows.
 
-    This class provides a high-level interface for managing calibration sessions,
-    executing tasks, and handling parameters. It uses the refactored TaskManager
-    architecture with integrated save processing.
+    Provides a clean, intuitive interface for common calibration patterns
+    with automatic session management and error handling.
 
     Attributes:
         username: Username for the calibration session
-        execution_id: Unique execution identifier
         chip_id: Target chip ID
-        backend_name: Backend type ('qubex' or 'fake')
-        execution_manager: Manages execution state and history
-        backend: Backend instance for device communication
+        flow_name: Flow name for tracking
+        project_id: Project ID for multi-tenancy
 
     Example:
+        Simple API usage:
+
         ```python
-        session = FlowSession("user", "20240101-001", "chip_1")
-        result = session.execute_task("CheckFreq", "0")
-        freq = session.get_parameter("0", "qubit_frequency")
-        session.finish_calibration()
+        cal = CalService("alice", "64Qv3")
+        results = cal.run(qids=["0", "1"], tasks=["CheckRabi", "CreateHPIPulse"])
+        ```
+
+        Advanced low-level access:
+
+        ```python
+        cal = CalService("alice", "64Qv3", qids=["0", "1"])
+        result = cal.execute_task("CheckFreq", "0")
+        cal.finish_calibration()
         ```
     """
 
@@ -96,33 +101,55 @@ class FlowSession:
         self,
         username: str,
         chip_id: str,
-        qids: list[str],
+        qids: list[str] | None = None,
         execution_id: str | None = None,
         backend_name: str = "qubex",
-        name: str = "Python Flow Execution",
+        name: str | None = None,
+        flow_name: str | None = None,
         tags: list[str] | None = None,
         use_lock: bool = True,
         note: dict[str, Any] | None = None,
-        enable_github_pull: bool = False,
+        enable_github_pull: bool | None = None,
+        enable_github: bool = True,
         github_push_config: GitHubPushConfig | None = None,
         muxes: list[int] | None = None,
+        project_id: str | None = None,
     ) -> None:
-        """Initialize a new calibration flow session.
+        """Initialize the calibration service.
+
+        Supports two usage patterns:
+
+        1. High-level API (lazy initialization):
+           ```python
+           cal = CalService("alice", "64Qv3")
+           cal.run(qids=["0", "1"], tasks=["CheckRabi"])
+           ```
+
+        2. Low-level API (immediate initialization):
+           ```python
+           cal = CalService("alice", "64Qv3", qids=["0", "1"])
+           cal.execute_task("CheckRabi", "0")
+           cal.finish_calibration()
+           ```
 
         Args:
             username: Username for the session
             chip_id: Target chip ID
-            qids: List of qubit IDs to calibrate (required for qubex initialization)
+            qids: List of qubit IDs to calibrate. If None, session is lazily initialized.
             execution_id: Unique execution identifier (e.g., "20240101-001").
                 If None, auto-generates using current date and counter.
             backend_name: Backend type, either 'qubex' or 'fake' (default: 'qubex')
-            name: Human-readable name for the execution (default: 'Python Flow Execution')
-            tags: List of tags for categorization (default: ['python_flow'])
+            name: Human-readable name for the execution (deprecated, use flow_name)
+            flow_name: Flow name for display in execution list (auto-injected by API)
+            tags: List of tags for categorization
             use_lock: Whether to use ExecutionLock to prevent concurrent calibrations (default: True)
             note: Additional notes to store with execution (default: {})
-            enable_github_pull: Whether to pull latest config from GitHub before starting (default: False)
-            github_push_config: Configuration for GitHub push operations (default: disabled)
+            enable_github_pull: Whether to pull latest config from GitHub before starting
+            enable_github: Enable GitHub integration (default: True). Sets both pull and push.
+            github_push_config: Configuration for GitHub push operations
             muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
+            project_id: Project ID for multi-tenancy support. If None, auto-resolved
+                from username's default_project_id.
 
         Raises:
             RuntimeError: If use_lock=True and another calibration is already running
@@ -137,47 +164,112 @@ class FlowSession:
         self._lock_acquired = False
         self._last_executed_task_id_by_qid: dict[str, str] = {}  # Track last task_id per qid
 
-        # Auto-generate execution_id if not provided
-        if execution_id is None:
-            execution_id = generate_execution_id(username, chip_id)
+        # Store flow_name (priority: flow_name > name)
+        self.flow_name = flow_name or name
 
+        # GitHub configuration
+        self.enable_github = enable_github
+        # enable_github_pull: explicit value > enable_github default
+        self._enable_github_pull = enable_github_pull if enable_github_pull is not None else enable_github
+
+        # Auto-resolve project_id from username if not provided
+        # This works because only owners can run calibrations (1 user = 1 project policy)
+        if project_id is None:
+            user = UserDocument.find_one({"username": username}).run()
+            if user and user.default_project_id:
+                project_id = user.default_project_id
+                logger.info(f"Auto-resolved project_id={project_id} from user={username}")
+            else:
+                raise ValueError(
+                    f"Could not resolve project_id for user={username}. "
+                    f"User found: {user is not None}, "
+                    f"default_project_id: {user.default_project_id if user else 'N/A'}. "
+                    f"Either provide project_id explicitly or ensure user has default_project_id set."
+                )
+        self.project_id = project_id
+
+        # Session state
+        self._initialized = False
         self.execution_id = execution_id
+        self.execution_manager = None
+        self.task_manager = None
+        self.backend = None
+        self.github_integration = None
+        self.github_push_config = github_push_config
+
+        # If qids provided, initialize immediately (low-level API mode)
+        if qids is not None:
+            self._initialize(qids, tags, note)
+
+    def _initialize(
+        self,
+        qids: list[str],
+        tags: list[str] | None = None,
+        note: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize session with given qids (internal method).
+
+        Args:
+            qids: List of qubit IDs to calibrate
+            tags: List of tags for categorization
+            note: Additional notes to store with execution
+
+        """
+        if self._initialized:
+            return
+
+        self.qids = qids
+
+        # Auto-generate execution_id if not provided
+        if self.execution_id is None:
+            self.execution_id = generate_execution_id(self.username, self.chip_id, project_id=self.project_id)
 
         # Initialize GitHub integration
         self.github_integration = GitHubIntegration(
-            username=username,
-            chip_id=chip_id,
-            execution_id=execution_id,
+            username=self.username,
+            chip_id=self.chip_id,
+            execution_id=self.execution_id,
         )
-        self.github_push_config = github_push_config or GitHubPushConfig()
-        self.enable_github_pull = enable_github_pull
+
+        # Setup github_push_config if not provided
+        if self.github_push_config is None and self.enable_github:
+            from qdash.workflow.flow.github import ConfigFileType
+
+            self.github_push_config = GitHubPushConfig(
+                enabled=self.enable_github,
+                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
+            )
+        elif self.github_push_config is None:
+            self.github_push_config = GitHubPushConfig()
 
         # Acquire lock if requested
-        if use_lock:
-            if ExecutionLockDocument.get_lock_status():
+        if self.use_lock:
+            if ExecutionLockDocument.get_lock_status(project_id=self.project_id):
                 msg = "Calibration is already running. Cannot start a new session."
                 raise RuntimeError(msg)
-            ExecutionLockDocument.lock()
+            ExecutionLockDocument.lock(project_id=self.project_id)
             self._lock_acquired = True
 
         # Wrap all initialization in try/except to ensure lock is released on failure
         try:
             self._initialize_session(
-                username=username,
-                chip_id=chip_id,
+                username=self.username,
+                chip_id=self.chip_id,
                 qids=qids,
-                execution_id=execution_id,
-                backend_name=backend_name,
-                name=name,
+                execution_id=self.execution_id,
+                backend_name=self.backend_name,
+                name=self.flow_name or "Python Flow Execution",
                 tags=tags,
                 note=note,
-                enable_github_pull=enable_github_pull,
-                muxes=muxes,
+                enable_github_pull=self._enable_github_pull,
+                muxes=self.muxes,
+                project_id=self.project_id,
             )
+            self._initialized = True
         except Exception:
             # Release lock if initialization fails
             if self._lock_acquired:
-                ExecutionLockDocument.unlock()
+                ExecutionLockDocument.unlock(project_id=self.project_id)
                 self._lock_acquired = False
             raise
 
@@ -193,6 +285,7 @@ class FlowSession:
         note: dict[str, Any] | None,
         enable_github_pull: bool,
         muxes: list[int] | None,
+        project_id: str | None = None,
     ) -> None:
         """Initialize session components after lock acquisition.
 
@@ -210,6 +303,7 @@ class FlowSession:
             note: Additional notes
             enable_github_pull: Whether to pull from GitHub
             muxes: MUX IDs for system-level tasks
+            project_id: Project ID for multi-tenancy support
 
         """
         # Set default tags and note
@@ -253,6 +347,7 @@ class FlowSession:
                 name=name,
                 tags=tags,
                 note=note,
+                project_id=project_id,
             )
             .save()
             .start_execution()
@@ -298,6 +393,7 @@ class FlowSession:
                 calib_dir=calib_data_path,
                 execution_id=execution_id,
                 task_manager_id=self.task_manager.id,
+                project_id=self.project_id,
             )
 
         self.backend.connect()
@@ -438,6 +534,7 @@ class FlowSession:
             username=self.username,
             execution_id=self.execution_id,
             calib_data_path=self.execution_manager.calib_data_path,
+            project_id=self.project_id,
         ).reload()
 
         # Create a new TaskManager for this specific execution
@@ -763,7 +860,7 @@ class FlowSession:
         finally:
             # Always release lock if we acquired it
             if self.use_lock and self._lock_acquired:
-                ExecutionLockDocument.unlock()
+                ExecutionLockDocument.unlock(project_id=self.project_id)
                 self._lock_acquired = False
 
         return push_results
@@ -780,33 +877,378 @@ class FlowSession:
         Example:
             ```python
             try:
-                session.execute_task("CheckFreq", "0")
+                cal.execute_task("CheckFreq", "0")
             except Exception as e:
-                session.fail_calibration(str(e))
+                cal.fail_calibration(str(e))
                 raise
             ```
 
         """
         try:
             # Reload and mark as failed
-            self.execution_manager = self.execution_manager.reload().fail_execution()
+            if self.execution_manager:
+                self.execution_manager = self.execution_manager.reload().fail_execution()
         finally:
             # Always release lock if we acquired it
             if self.use_lock and self._lock_acquired:
-                ExecutionLockDocument.unlock()
+                ExecutionLockDocument.unlock(project_id=self.project_id)
                 self._lock_acquired = False
+            self._initialized = False
+
+    # =========================================================================
+    # High-level API Methods
+    # =========================================================================
+
+    def run(self, groups: list[list[str]], tasks: list[str]) -> dict:
+        """Run calibration with group-based parallelism.
+
+        Groups execute in PARALLEL, qubits within each group execute SEQUENTIALLY.
+
+        Args:
+            groups: List of qubit groups (e.g., [["0", "1"], ["2", "3"]])
+            tasks: List of task names to execute
+
+        Returns:
+            Results dictionary keyed by qubit ID
+
+        Example:
+            ```python
+            cal = CalService("alice", "64Qv3")
+            results = cal.run(
+                groups=[["0", "1"], ["2", "3"]],
+                tasks=["CheckRabi", "CreateHPIPulse"]
+            )
+            # Group0: Q0 → Q1 (sequential)  ─┐
+            #                                 ├─ PARALLEL
+            # Group1: Q2 → Q3 (sequential)  ─┘
+            ```
+        """
+        logger = get_run_logger()
+        all_qids = [qid for group in groups for qid in group]
+        logger.info(f"Running calibration: {len(groups)} groups, {len(all_qids)} qubits")
+
+        try:
+            self._initialize(all_qids)
+
+            futures = [_execute_group.submit(self, group, tasks) for group in groups]
+            results_list = [f.result() for f in futures]
+
+            results = {}
+            for r in results_list:
+                results.update(r)
+
+            self.finish_calibration()
+            return results
+
+        except Exception as e:
+            logger.error(f"Calibration failed: {e}")
+            self.fail_calibration(str(e))
+            raise
+
+    def run_full_chip(
+        self,
+        mux_ids: list[int] | None = None,
+        exclude_qids: list[str] | None = None,
+        tasks_1q: list[str] | None = None,
+        tasks_2q: list[str] | None = None,
+        mode: str = "synchronized",
+        fidelity_threshold: float = 0.90,
+        max_parallel_ops: int = 10,
+    ) -> dict:
+        """Run full chip calibration (1-qubit + 2-qubit).
+
+        Performs complete chip calibration with automatic quality filtering.
+
+        Args:
+            mux_ids: MUX IDs to calibrate (default: all 16)
+            exclude_qids: Qubit IDs to exclude
+            tasks_1q: 1-qubit tasks (default: standard suite)
+            tasks_2q: 2-qubit tasks (default: standard suite)
+            mode: "synchronized" or "scheduled"
+            fidelity_threshold: Minimum X90 fidelity for 2Q candidates
+            max_parallel_ops: Max parallel CR operations
+
+        Returns:
+            Results with "1qubit" and "2qubit" keys
+
+        Example:
+            ```python
+            cal = CalService("alice", "64Qv3")
+            results = cal.run_full_chip(mux_ids=[0, 1, 2, 3])
+            ```
+        """
+        from qdash.workflow.flow.scheduled import (
+            calibrate_one_qubit_scheduled,
+            calibrate_one_qubit_synchronized,
+            calibrate_two_qubit_scheduled,
+            extract_candidate_qubits,
+        )
+
+        logger = get_run_logger()
+
+        if mux_ids is None:
+            mux_ids = list(range(16))
+        if exclude_qids is None:
+            exclude_qids = []
+        if tasks_1q is None:
+            tasks_1q = [
+                "CheckRabi",
+                "CreateHPIPulse",
+                "CheckHPIPulse",
+                "CreatePIPulse",
+                "CheckPIPulse",
+                "CheckT1",
+                "CheckT2Echo",
+                "CreateDRAGHPIPulse",
+                "CheckDRAGHPIPulse",
+                "CreateDRAGPIPulse",
+                "CheckDRAGPIPulse",
+                "ReadoutClassification",
+                "RandomizedBenchmarking",
+                "X90InterleavedRandomizedBenchmarking",
+            ]
+        if tasks_2q is None:
+            tasks_2q = ["CheckCrossResonance", "CreateZX90", "CheckZX90", "CheckBellState"]
+
+        logger.info(f"Running full chip calibration: mode={mode}")
+
+        # Stage 1: 1-qubit calibration
+        if mode == "synchronized":
+            results_1q = calibrate_one_qubit_synchronized(
+                username=self.username,
+                chip_id=self.chip_id,
+                mux_ids=mux_ids,
+                exclude_qids=exclude_qids,
+                tasks=tasks_1q,
+                flow_name=self.flow_name,
+                project_id=self.project_id,
+            )
+        else:
+            results_1q = calibrate_one_qubit_scheduled(
+                username=self.username,
+                chip_id=self.chip_id,
+                mux_ids=mux_ids,
+                exclude_qids=exclude_qids,
+                tasks=tasks_1q,
+                flow_name=self.flow_name,
+                project_id=self.project_id,
+            )
+
+        # Stage 2: Extract candidates
+        candidates = extract_candidate_qubits(results_1q, fidelity_threshold)
+        logger.info(f"1-qubit success: {len(candidates)} qubits")
+
+        if len(candidates) == 0:
+            logger.warning("No candidates, skipping 2-qubit")
+            return {"1qubit": results_1q, "2qubit": {}}
+
+        # Stage 3: 2-qubit calibration
+        results_2q = calibrate_two_qubit_scheduled(
+            username=self.username,
+            chip_id=self.chip_id,
+            candidate_qubits=candidates,
+            tasks=tasks_2q,
+            flow_name=self.flow_name,
+            project_id=self.project_id,
+            max_parallel_ops=max_parallel_ops,
+        )
+
+        return {"1qubit": results_1q, "2qubit": results_2q}
+
+    def sweep(
+        self,
+        qids: list[str],
+        task: str,
+        params: list[dict[str, Any]],
+    ) -> list[dict]:
+        """Run parameter sweep over a task.
+
+        Executes the same task multiple times with different parameter values.
+
+        Args:
+            qids: Qubit IDs to calibrate
+            task: Task name to execute
+            params: List of parameter dictionaries for each iteration
+
+        Returns:
+            List of results for each iteration
+
+        Example:
+            ```python
+            cal = CalService("alice", "64Qv3")
+            results = cal.sweep(
+                qids=["0", "1"],
+                task="CheckQubitSpectroscopy",
+                params=[
+                    {"readout_amplitude": {"value": 0.05}},
+                    {"readout_amplitude": {"value": 0.10}},
+                    {"readout_amplitude": {"value": 0.15}},
+                ]
+            )
+            ```
+        """
+        logger = get_run_logger()
+        logger.info(f"Running sweep: {task}, {len(params)} iterations")
+
+        try:
+            self._initialize(qids)
+
+            all_results = []
+            for i, param_values in enumerate(params):
+                logger.info(f"Iteration {i + 1}/{len(params)}: {param_values}")
+                task_details = {task: {"input_parameters": param_values}}
+
+                iteration_results = {}
+                for qid in qids:
+                    try:
+                        result = self.execute_task(task, qid, task_details=task_details)
+                        iteration_results[qid] = {"status": "success", "result": result}
+                    except Exception as e:
+                        iteration_results[qid] = {"status": "failed", "error": str(e)}
+
+                all_results.append(
+                    {
+                        "iteration": i,
+                        "params": param_values,
+                        "results": iteration_results,
+                    }
+                )
+
+            self.finish_calibration()
+            return all_results
+
+        except Exception as e:
+            logger.error(f"Sweep failed: {e}")
+            self.fail_calibration(str(e))
+            raise
+
+    def two_qubit(
+        self,
+        pairs: list[tuple[str, str]],
+        tasks: list[str] | None = None,
+    ) -> dict:
+        """Run 2-qubit coupling calibration.
+
+        Calibrates coupling between qubit pairs.
+
+        Args:
+            pairs: List of (control, target) qubit pairs
+            tasks: 2-qubit task names (default: standard suite)
+
+        Returns:
+            Results keyed by coupling ID (e.g., "0-1")
+
+        Example:
+            ```python
+            cal = CalService("alice", "64Qv3")
+            results = cal.two_qubit(
+                pairs=[("0", "1"), ("2", "3")]
+            )
+            ```
+        """
+        logger = get_run_logger()
+
+        if tasks is None:
+            tasks = ["CheckCrossResonance", "CreateZX90", "CheckZX90", "CheckBellState"]
+
+        coupling_qids = [f"{c}-{t}" for c, t in pairs]
+        all_qids = list(set(q for pair in pairs for q in pair))
+        logger.info(f"Running 2-qubit calibration: {len(pairs)} pairs")
+
+        try:
+            self._initialize(all_qids)
+
+            futures = [_execute_coupling.submit(self, qid, tasks) for qid in coupling_qids]
+            results = {qid: f.result() for qid, f in zip(coupling_qids, futures)}
+
+            self.finish_calibration()
+            return results
+
+        except Exception as e:
+            logger.error(f"Calibration failed: {e}")
+            self.fail_calibration(str(e))
+            raise
+
+    def check_skew(self, muxes: list[int] | None = None) -> dict:
+        """Run system-level skew check.
+
+        Args:
+            muxes: MUX IDs to check (default: all except 3)
+
+        Returns:
+            CheckSkew task result
+
+        Example:
+            ```python
+            cal = CalService("alice", "64Qv3")
+            result = cal.check_skew(muxes=[0, 1, 2])
+            ```
+        """
+        logger = get_run_logger()
+
+        if muxes is None:
+            muxes = [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+
+        logger.info(f"Running CheckSkew: {len(muxes)} MUX channels")
+
+        try:
+            self.muxes = muxes
+            self._initialize([])
+
+            result = self.execute_task(
+                "CheckSkew",
+                qid="",
+                task_details={"CheckSkew": {"muxes": muxes}},
+            )
+
+            self.finish_calibration()
+            return result
+
+        except Exception as e:
+            logger.error(f"CheckSkew failed: {e}")
+            self.fail_calibration(str(e))
+            raise
 
 
-# Global session storage for Prefect context
-# Note: Using SessionContext for thread-safe management while maintaining
-# backward compatibility with direct _current_session access
+# Internal task functions for parallel execution
+@task
+def _execute_group(cal: "CalService", qids: list[str], tasks: list[str]) -> dict:
+    """Execute tasks for a group of qubits (internal task)."""
+    results = {}
+    for qid in qids:
+        try:
+            result = {}
+            for task_name in tasks:
+                result[task_name] = cal.execute_task(task_name, qid)
+            result["status"] = "success"
+        except Exception as e:
+            result = {"status": "failed", "error": str(e)}
+        results[qid] = result
+    return results
+
+
+@task
+def _execute_coupling(cal: "CalService", coupling_qid: str, tasks: list[str]) -> dict:
+    """Execute tasks for a coupling pair (internal task)."""
+    try:
+        result = {}
+        for task_name in tasks:
+            result[task_name] = cal.execute_task(task_name, coupling_qid)
+        result["status"] = "success"
+    except Exception as e:
+        result = {"status": "failed", "error": str(e)}
+    return result
+
+
+# =============================================================================
+# Internal Session Management (for scheduled.py)
+# =============================================================================
+
 from qdash.workflow.flow.context import (
     clear_current_session,
     get_current_session,
     set_current_session,
 )
-
-_current_session: FlowSession | None = None  # Backward compatibility alias
 
 
 def init_calibration(
@@ -815,7 +1257,6 @@ def init_calibration(
     qids: list[str],
     execution_id: str | None = None,
     backend_name: str = "qubex",
-    name: str | None = None,
     flow_name: str | None = None,
     tags: list[str] | None = None,
     use_lock: bool = True,
@@ -823,129 +1264,33 @@ def init_calibration(
     enable_github_pull: bool = False,
     github_push_config: GitHubPushConfig | None = None,
     muxes: list[int] | None = None,
-) -> FlowSession:
-    """Initialize a calibration session for use in Prefect flows.
-
-    This function creates and stores a FlowSession in the global context,
-    making it accessible via get_session() throughout the flow.
-
-    Args:
-        username: Username for the session
-        chip_id: Target chip ID
-        qids: List of qubit IDs to calibrate (required for qubex initialization)
-        execution_id: Unique execution identifier (e.g., "20240101-001").
-            If None, auto-generates using current date and counter.
-        backend_name: Backend type ('qubex' or 'fake')
-        name: Human-readable name for the execution (deprecated, use flow_name instead).
-            If None, auto-detects from Prefect flow name or defaults to "Python Flow Execution".
-        flow_name: Flow name (file name without .py extension) for display in execution list.
-            This takes precedence over 'name' parameter.
-        tags: List of tags for categorization
-        use_lock: Whether to use ExecutionLock to prevent concurrent calibrations
-        note: Additional notes to store with execution
-        enable_github_pull: Whether to pull latest config from GitHub before starting (default: False)
-        github_push_config: Configuration for GitHub push operations (default: disabled)
-        muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
-
-    Returns:
-        Initialized FlowSession instance
-
-    Example:
-        ```python
-        @flow
-        def my_calibration(username, chip_id, qids, flow_name=None):
-            # flow_name will be automatically injected by API
-            session = init_calibration(username, chip_id, qids, flow_name=flow_name)
-            # ... perform calibration tasks
-            finish_calibration()
-        ```
-
-        ```python
-        # With GitHub integration
-        from qdash.workflow.flow import GitHubPushConfig, ConfigFileType
-
-        @flow
-        def calibration_with_github(username, chip_id, qids):
-            session = init_calibration(
-                username, chip_id, qids,
-                enable_github_pull=True,
-                github_push_config=GitHubPushConfig(
-                    enabled=True,
-                    file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.PROPS]
-                )
-            )
-            # ... calibration tasks
-            finish_calibration()
-        ```
-
-        ```python
-        # For system-level tasks like CheckSkew
-        @flow
-        def skew_calibration(username, chip_id, muxes):
-            session = init_calibration(
-                username, chip_id, qids=[],
-                muxes=muxes
-            )
-            # ... execute CheckSkew task
-            finish_calibration()
-        ```
-
-    """
-    global _current_session  # noqa: PLW0603
-
-    # Priority: flow_name > name > auto-detect from Prefect
-    display_name = flow_name or name
-    if display_name is None:
-        try:
-            from prefect.context import get_run_context
-
-            context = get_run_context()
-            flow_name_from_context = context.flow.name if hasattr(context, "flow") else None
-            display_name = flow_name_from_context if flow_name_from_context else "Python Flow Execution"
-        except Exception:
-            # Fallback if context is not available (e.g., running outside Prefect)
-            display_name = "Python Flow Execution"
-
-    session = FlowSession(
+    project_id: str | None = None,
+) -> CalService:
+    """Initialize a session and set it in global context (internal use)."""
+    session = CalService(
         username=username,
         chip_id=chip_id,
         qids=qids,
         execution_id=execution_id,
         backend_name=backend_name,
-        name=display_name,
+        flow_name=flow_name,
         tags=tags,
         use_lock=use_lock,
         note=note,
         enable_github_pull=enable_github_pull,
         github_push_config=github_push_config,
         muxes=muxes,
+        project_id=project_id,
     )
-
-    # Use SessionContext for thread-safe management
     set_current_session(session)
-    _current_session = session  # Backward compatibility
     return session
 
 
-def get_session() -> FlowSession:
-    """Get the current calibration session.
-
-    Returns:
-        Current FlowSession instance
-
-    Raises:
-        RuntimeError: If no session has been initialized
-
-    Example:
-        ```python
-        session = get_session()
-        result = session.execute_task("CheckFreq", "0")
-        ```
-
-    """
+def get_session() -> CalService:
+    """Get the current session from global context (internal use)."""
     session = get_current_session()
     if session is None:
-        msg = "No active calibration session. Call init_calibration() first."
+        msg = "No active calibration session."
         raise RuntimeError(msg)
     return session
 
@@ -955,42 +1300,12 @@ def finish_calibration(
     push_to_github: bool | None = None,
     export_note_to_file: bool = False,
 ) -> dict[str, Any] | None:
-    """Finish the current calibration session.
-
-    This is a convenience wrapper around session.finish_calibration().
-
-    Args:
-        update_chip_history: Whether to update ChipHistoryDocument (default: True)
-        push_to_github: Override github_push_config.enabled if specified
-        export_note_to_file: Whether to export calibration note to local file (default: False)
-
-    Returns:
-        Push results dictionary if push was performed, else None
-
-    Example:
-        ```python
-        @flow
-        def my_flow():
-            init_calibration(...)
-            # ... calibration tasks
-            finish_calibration()
-
-            # With file export for debugging
-            finish_calibration(export_note_to_file=True)
-        ```
-
-    """
-    global _current_session  # noqa: PLW0603
-
+    """Finish the current session and clear from global context (internal use)."""
     session = get_session()
     result = session.finish_calibration(
         update_chip_history=update_chip_history,
         push_to_github=push_to_github,
         export_note_to_file=export_note_to_file,
     )
-
-    # Clear session after completion
     clear_current_session()
-    _current_session = None  # Backward compatibility
-
     return result

@@ -15,11 +15,13 @@ class BackendDocument(Document):
 
     Attributes
     ----------
+        project_id (str): The owning project identifier (required).
         name (str): The name of the task. e.g. "CheckT1" ,"CheckT2Echo" ".
         description (str): Detailed description of the task.
 
     """
 
+    project_id: str = Field(..., description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the task")
     name: str = Field(..., description="The name of backend")
     system_info: SystemInfoModel = Field(default_factory=SystemInfoModel, description="The system information")
@@ -32,12 +34,16 @@ class BackendDocument(Document):
         """Database settings for ParameterDocument."""
 
         name = "backend"
-        indexes: ClassVar = [IndexModel([("name", ASCENDING), ("username")], unique=True)]
+        indexes: ClassVar = [
+            IndexModel([("project_id", ASCENDING), ("name", ASCENDING), ("username", ASCENDING)], unique=True),
+            IndexModel([("project_id", ASCENDING), ("username", ASCENDING)]),
+        ]
 
     @classmethod
     def from_backend_model(cls, model: BackendModel) -> "BackendDocument":
         """Create a BackendDocument from a BackendModel."""
         return cls(
+            project_id=model.project_id,
             username=model.username,
             name=model.name,
         )

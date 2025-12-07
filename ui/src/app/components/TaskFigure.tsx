@@ -15,7 +15,8 @@ export function TaskFigure({
   qid,
   className = "",
 }: TaskFigureProps) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  // Use /api proxy route (handled by Next.js rewrites)
+  const apiUrl = "/api";
 
   // Use generated API client hook when taskId is provided
   const {

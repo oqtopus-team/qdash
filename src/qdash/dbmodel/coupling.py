@@ -14,6 +14,7 @@ class CouplingDocument(Document):
 
     Attributes
     ----------
+        project_id (str): The owning project identifier (required).
         qid (str): The coupling ID. e.g. "0-1".
         chip_id (str): The chip ID. e.g. "chip1".
         data (dict): The data of the coupling. e.g. {"coupling_strength": 0.1}.
@@ -23,6 +24,7 @@ class CouplingDocument(Document):
 
     """
 
+    project_id: str = Field(..., description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the coupling")
     qid: str = Field(..., description="The coupling ID")
     status: str = Field("pending", description="The status of the coupling")
@@ -44,7 +46,13 @@ class CouplingDocument(Document):
         """Settings for the document."""
 
         name = "coupling"
-        indexes: ClassVar = [IndexModel([("chip_id", ASCENDING), ("qid", ASCENDING), ("username")], unique=True)]
+        indexes: ClassVar = [
+            IndexModel(
+                [("project_id", ASCENDING), ("chip_id", ASCENDING), ("qid", ASCENDING), ("username", ASCENDING)],
+                unique=True,
+            ),
+            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING)]),
+        ]
 
     @staticmethod
     def merge_calib_data(existing: dict, new: dict) -> dict:
@@ -90,7 +98,14 @@ class CouplingDocument(Document):
         return current_best
 
     @classmethod
-    def update_calib_data(cls, username: str, qid: str, chip_id: str, output_parameters: dict) -> "CouplingDocument":
+    def update_calib_data(
+        cls,
+        username: str,
+        qid: str,
+        chip_id: str,
+        output_parameters: dict,
+        project_id: str,
+    ) -> "CouplingDocument":
         """Update the CouplingDocument's calibration data with new values."""
         coupling_doc = cls.find_one({"username": username, "qid": qid, "chip_id": chip_id}).run()
         if coupling_doc is None:
@@ -104,6 +119,7 @@ class CouplingDocument(Document):
         if chip_doc is None:
             raise ValueError(f"Chip {chip_id} not found")
         coupling_model = CouplingModel(
+            project_id=project_id,
             qid=qid,
             chip_id=chip_id,
             data=coupling_doc.data,

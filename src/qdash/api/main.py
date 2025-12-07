@@ -4,6 +4,7 @@ from fastapi.routing import APIRoute
 from qdash.api.db.session import lifespan
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.routers import (
+    admin,
     auth,
     backend,
     calibration,
@@ -13,6 +14,7 @@ from qdash.api.routers import (
     file,
     flow,
     metrics,
+    project,
     settings,
     tag,
     task,
@@ -69,6 +71,12 @@ app.add_middleware(
 )
 # Auth router without global auth dependency (login/register/logout need to be public)
 app.include_router(auth.router, tags=["auth"])
+
+# Admin router (has its own admin auth via get_admin_user dependency)
+app.include_router(admin.router, tags=["admin"])
+
+# Project router (has its own auth handling via dependencies)
+app.include_router(project.router, tags=["projects"])
 
 # Routers without auth (for direct browser access like images, file downloads)
 # These routers handle their own auth for write operations

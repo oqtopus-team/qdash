@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+
 import { useQuery } from "@tanstack/react-query";
-import { listFlows } from "@/client/flow/flow";
+
 import { FlowSchedulesSection } from "./FlowSchedulesSection";
+
+import { listFlows } from "@/client/flow/flow";
 
 export default function FlowListPage() {
   const { data, isLoading, error } = useQuery({
@@ -13,7 +16,7 @@ export default function FlowListPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-3 sm:p-6">
         <div className="flex items-center justify-center h-64">
           <span className="loading loading-spinner loading-lg"></span>
         </div>
@@ -23,7 +26,7 @@ export default function FlowListPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-3 sm:p-6">
         <div className="alert alert-error">
           <span>Failed to load flows: {error.message}</span>
         </div>
@@ -34,9 +37,9 @@ export default function FlowListPage() {
   const flows = data?.data?.flows || [];
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">User Flows</h1>
+    <div className="container mx-auto p-3 sm:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold">User Flows</h1>
         <Link href="/flow/new" className="btn btn-primary">
           + New Flow
         </Link>

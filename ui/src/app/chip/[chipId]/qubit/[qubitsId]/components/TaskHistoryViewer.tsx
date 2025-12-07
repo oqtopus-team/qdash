@@ -12,8 +12,8 @@ import {
 
 import type { Task } from "@/schemas";
 
-import { TaskFigure } from "@/app/components/TaskFigure";
 import PlotlyRenderer from "@/app/components/PlotlyRenderer";
+import { TaskFigure } from "@/app/components/TaskFigure";
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { TaskGridView } from "@/shared/components/TaskGridView";
 
@@ -549,9 +549,7 @@ export function TaskHistoryViewer({
                       <div className="w-fit h-fit m-auto">
                         <PlotlyRenderer
                           className="w-full h-full"
-                          fullPath={`${
-                            process.env.NEXT_PUBLIC_API_URL
-                          }/executions/figure?path=${encodeURIComponent(
+                          fullPath={`/api/executions/figure?path=${encodeURIComponent(
                             selectedTask.json_figure_path?.[
                               expandedFigureIdx
                             ] || "",

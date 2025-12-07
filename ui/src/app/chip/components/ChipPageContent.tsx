@@ -7,6 +7,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { BsGrid, BsListUl } from "react-icons/bs";
 
 import { CouplingGrid } from "./CouplingGrid";
+import { CreateChipModal } from "./CreateChipModal";
 import { TaskResultGrid } from "./TaskResultGrid";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
@@ -15,6 +16,7 @@ import { ChipSelector } from "@/app/components/ChipSelector";
 import { DateSelector } from "@/app/components/DateSelector";
 import { TaskFigure } from "@/app/components/TaskFigure";
 import { TaskSelector } from "@/app/components/TaskSelector";
+import { useProject } from "@/app/contexts/ProjectContext";
 import { useDateNavigation } from "@/app/hooks/useDateNavigation";
 import { useChipUrlState } from "@/app/hooks/useUrlState";
 import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
@@ -23,7 +25,6 @@ import {
   useGetTaskFileSettings,
 } from "@/client/task-file/task-file";
 import { TaskDetailModal } from "@/shared/components/TaskDetailModal";
-import { CreateChipModal } from "./CreateChipModal";
 
 interface SelectedTaskInfo {
   qid: string;
@@ -32,6 +33,7 @@ interface SelectedTaskInfo {
 
 export function ChipPageContent() {
   const router = useRouter();
+  const { canEdit } = useProject();
   // URL state management
   const {
     selectedChip,
@@ -315,67 +317,72 @@ export function ChipPageContent() {
   );
 
   return (
-    <div className="w-full px-6 py-6">
+    <div className="w-full px-3 sm:px-6 py-4 sm:py-6">
       <div className="space-y-6">
         {/* Header Section */}
-        <div className="flex flex-col gap-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">Chip Experiments</h1>
-            <div className="flex gap-3 items-center">
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => setIsCreateChipModalOpen(true)}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+        <div className="flex flex-col gap-4 sm:gap-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h1 className="text-xl sm:text-2xl font-bold">Chip Experiments</h1>
+            <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
+              {canEdit && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setIsCreateChipModalOpen(true)}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Create Chip
-              </button>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Create Chip
+                </button>
+              )}
               <div className="join rounded-lg overflow-hidden">
                 <button
-                  className={`join-item btn btn-sm ${
+                  className={`join-item btn btn-xs sm:btn-sm ${
                     viewMode === "1q" ? "btn-active" : ""
                   }`}
                   onClick={() => setViewMode("1q")}
                 >
-                  <BsGrid className="text-lg" />
-                  <span className="ml-2">1Q View</span>
+                  <BsGrid className="text-base sm:text-lg" />
+                  <span className="ml-1 sm:ml-2 hidden xs:inline">1Q</span>
+                  <span className="ml-1 sm:ml-2 hidden sm:inline">View</span>
                 </button>
                 <button
-                  className={`join-item btn btn-sm ${
+                  className={`join-item btn btn-xs sm:btn-sm ${
                     viewMode === "2q" ? "btn-active" : ""
                   }`}
                   onClick={() => setViewMode("2q")}
                 >
-                  <BsGrid className="text-lg" />
-                  <span className="ml-2">2Q View</span>
+                  <BsGrid className="text-base sm:text-lg" />
+                  <span className="ml-1 sm:ml-2 hidden xs:inline">2Q</span>
+                  <span className="ml-1 sm:ml-2 hidden sm:inline">View</span>
                 </button>
                 <button
-                  className={`join-item btn btn-sm ${
+                  className={`join-item btn btn-xs sm:btn-sm ${
                     viewMode === "mux" ? "btn-active" : ""
                   }`}
                   onClick={() => setViewMode("mux")}
                 >
-                  <BsListUl className="text-lg" />
-                  <span className="ml-2">MUX View</span>
+                  <BsListUl className="text-base sm:text-lg" />
+                  <span className="ml-1 sm:ml-2 hidden xs:inline">MUX</span>
+                  <span className="ml-1 sm:ml-2 hidden sm:inline">View</span>
                 </button>
               </div>
             </div>
           </div>
 
           {/* Selection Controls */}
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex flex-col gap-1">
               <div className="flex justify-center gap-1 opacity-0">
                 <button className="btn btn-xs btn-ghost invisible">←</button>

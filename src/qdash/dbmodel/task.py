@@ -14,12 +14,14 @@ class TaskDocument(Document):
 
     Attributes
     ----------
+        project_id (str): The owning project identifier.
         name (str): The name of the task. e.g. "CheckT1" ,"CheckT2Echo" ".
         description (str): Detailed description of the task.
         task_type (str): The type of the task. e.g. "global", "qubit", "coupling".
 
     """
 
+    project_id: str = Field(..., description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the task")
     name: str = Field(..., description="The name of the task")
     backend: str | None = Field(None, description="The backend of the task")
@@ -36,7 +38,10 @@ class TaskDocument(Document):
         """Database settings for ParameterDocument."""
 
         name = "task"
-        indexes: ClassVar = [IndexModel([("name", ASCENDING), ("username")], unique=True)]
+        indexes: ClassVar = [
+            IndexModel([("project_id", ASCENDING), ("name", ASCENDING), ("username", ASCENDING)], unique=True),
+            IndexModel([("project_id", ASCENDING), ("username", ASCENDING)]),
+        ]
 
     @classmethod
     def from_task_model(cls, model: TaskModel) -> "TaskDocument":
@@ -54,6 +59,7 @@ class TaskDocument(Document):
 
         """
         return cls(
+            project_id=model.project_id,
             username=model.username,
             name=model.name,
             backend=model.backend,
@@ -68,7 +74,7 @@ class TaskDocument(Document):
         inserted_documents = []
         for task in tasks:
             logger.debug(f"Inserting task: {task}")
-            doc = cls.find_one(cls.name == task.name, cls.username == task.username).run()
+            doc = cls.find_one({"project_id": task.project_id, "name": task.name, "username": task.username}).run()
             if doc is None:
                 logger.debug(f"Task {task.name} not found. Inserting new task.")
                 doc = cls.from_task_model(task)
@@ -76,6 +82,7 @@ class TaskDocument(Document):
                 logger.debug(f"Task {task.name} inserted.")
             else:
                 logger.debug(f"Task {task.name} found. Updating task.")
+                doc.project_id = task.project_id
                 doc.username = task.username
                 doc.backend = task.backend
                 doc.task_type = task.task_type

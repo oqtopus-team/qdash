@@ -22,8 +22,8 @@ import type { ExecutionResponseDetail } from "@/schemas";
 import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 import { TaskFigure } from "@/app/components/TaskFigure";
 import { useGetExecution } from "@/client/execution/execution";
-import { TaskGridView } from "@/shared/components/TaskGridView";
 import { InteractiveFigureModal } from "@/shared/components/InteractiveFigureModal";
+import { TaskGridView } from "@/shared/components/TaskGridView";
 
 type FilterOption = {
   value: string;
@@ -708,8 +708,7 @@ export default function ExecutionDetailClient({
                                         )
                                           ? path
                                           : `/${path}`;
-                                        const apiUrl =
-                                          process.env.NEXT_PUBLIC_API_URL;
+                                        const apiUrl = "/api";
                                         link.href = `${apiUrl}/file/raw_data?path=${encodeURIComponent(
                                           normalizedPath,
                                         )}`;

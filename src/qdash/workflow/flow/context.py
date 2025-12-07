@@ -8,21 +8,21 @@ import threading
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from qdash.workflow.flow.session import FlowSession
+    from qdash.workflow.flow.session import CalService
 
 
 class SessionContext:
     """Thread-safe session context manager.
 
-    This class provides a structured way to manage FlowSession instances
+    This class provides a structured way to manage CalService instances
     in a thread-safe manner.
 
     Attributes
     ----------
     _local : threading.local
         Thread-local storage for session instances
-    _global_session : FlowSession | None
-        Fallback global session (for backward compatibility)
+    _global_session : CalService | None
+        Fallback global session
     """
 
     _instance: "SessionContext | None" = None
@@ -38,23 +38,23 @@ class SessionContext:
                     cls._instance._global_session = None
         return cls._instance
 
-    def set_session(self, session: "FlowSession | None") -> None:
+    def set_session(self, session: "CalService | None") -> None:
         """Set the current session.
 
         Parameters
         ----------
-        session : FlowSession | None
+        session : CalService | None
             Session to set as current, or None to clear
         """
         self._local.session = session
         self._global_session = session
 
-    def get_session(self) -> "FlowSession | None":
+    def get_session(self) -> "CalService | None":
         """Get the current session.
 
         Returns
         -------
-        FlowSession | None
+        CalService | None
             Current session or None if not set
         """
         # Try thread-local first, fallback to global
@@ -70,23 +70,23 @@ class SessionContext:
 _session_context = SessionContext()
 
 
-def set_current_session(session: "FlowSession | None") -> None:
+def set_current_session(session: "CalService | None") -> None:
     """Set the current session (convenience function).
 
     Parameters
     ----------
-    session : FlowSession | None
+    session : CalService | None
         Session to set as current
     """
     _session_context.set_session(session)
 
 
-def get_current_session() -> "FlowSession | None":
+def get_current_session() -> "CalService | None":
     """Get the current session (convenience function).
 
     Returns
     -------
-    FlowSession | None
+    CalService | None
         Current session or None
     """
     return _session_context.get_session()

@@ -1,11 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useParams } from "next/navigation";
+import { useState, useEffect } from "react";
+
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { ToastContainer } from "react-toastify";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+import { FlowExecuteConfirmModal } from "./FlowExecuteConfirmModal";
+import { FlowImportsPanel } from "./FlowImportsPanel";
+import { FlowSchedulePanel } from "./FlowSchedulePanel";
+
+import type { SaveFlowRequest } from "@/schemas";
+
+import { useGetCurrentUser } from "@/client/auth/auth";
+import { useListChips } from "@/client/chip/chip";
+import { useGetExecutionLockStatus } from "@/client/execution/execution";
+
+import "react-toastify/dist/ReactToastify.css";
 
 import {
   getFlow,
@@ -13,16 +26,6 @@ import {
   deleteFlow,
   useExecuteFlow,
 } from "@/client/flow/flow";
-import { useListChips } from "@/client/chip/chip";
-import { useGetCurrentUser } from "@/client/auth/auth";
-import { useGetExecutionLockStatus } from "@/client/execution/execution";
-import type { SaveFlowRequest } from "@/schemas";
-
-import "react-toastify/dist/ReactToastify.css";
-
-import { FlowExecuteConfirmModal } from "./FlowExecuteConfirmModal";
-import { FlowSchedulePanel } from "./FlowSchedulePanel";
-import { FlowImportsPanel } from "./FlowImportsPanel";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -43,6 +46,7 @@ export default function EditFlowPage() {
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [activeTab, setActiveTab] = useState<"code" | "helpers">("code");
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
   // Fetch current user
   const { data: userData } = useGetCurrentUser();
@@ -193,29 +197,45 @@ export default function EditFlowPage() {
       <ToastContainer position="top-right" autoClose={3000} />
       <div className="h-screen flex flex-col bg-[#1e1e1e]">
         {/* VSCode-style Header */}
-        <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e]">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e] gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
               onClick={() => router.push("/flow")}
-              className="px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors"
+              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0"
               disabled={saveMutation.isPending || deleteMutation.isPending}
             >
-              ← Back
+              ←
             </button>
-            <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+              className="px-2 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0 sm:hidden"
+              title={isSidebarVisible ? "Hide properties" : "Show properties"}
+            >
+              ☰
+            </button>
+            <div className="flex items-center gap-2 min-w-0">
               <span className="text-sm text-gray-400">●</span>
-              <span className="text-sm font-medium text-white">{name}.py</span>
+              <span className="text-sm font-medium text-white truncate">
+                {name}.py
+              </span>
             </div>
             {data?.data?.updated_at && (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 hidden lg:inline">
                 Updated: {new Date(data.data.updated_at).toLocaleString()}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+            <button
+              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+              className="px-2 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors hidden sm:block"
+              title={isSidebarVisible ? "Hide properties" : "Show properties"}
+            >
+              ☰
+            </button>
             <button
               onClick={() => setShowExecuteConfirm(true)}
-              className={`px-3 py-1 text-sm text-white border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`px-2 sm:px-3 py-1 text-sm text-white border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 lockStatus?.data.lock
                   ? "bg-gray-600 border-gray-700"
                   : "bg-[#16825d] border-[#1a9870] hover:bg-[#1a9870]"
@@ -235,27 +255,34 @@ export default function EditFlowPage() {
               {executeMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : lockStatus?.data.lock ? (
-                "🔒 Locked"
+                "🔒"
               ) : (
-                "▶ Execute"
+                "▶"
               )}
+              <span className="hidden sm:inline ml-1">
+                {lockStatus?.data.lock ? "Locked" : "Execute"}
+              </span>
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="px-3 py-1 text-sm text-white bg-[#c72e2e] border border-[#d73737] rounded hover:bg-[#d73737] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#c72e2e] border border-[#d73737] rounded hover:bg-[#d73737] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={saveMutation.isPending || deleteMutation.isPending}
             >
-              Delete
+              <span className="hidden sm:inline">Delete</span>
+              <span className="sm:hidden">✕</span>
             </button>
             <button
               onClick={handleSave}
-              className="px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={saveMutation.isPending || deleteMutation.isPending}
             >
               {saveMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                "Save Changes"
+                <>
+                  <span className="hidden sm:inline">Save Changes</span>
+                  <span className="sm:hidden">Save</span>
+                </>
               )}
             </button>
           </div>
@@ -358,9 +385,31 @@ export default function EditFlowPage() {
             )}
           </div>
 
+          {/* Mobile Sidebar Overlay */}
+          {isSidebarVisible && (
+            <div
+              className="fixed inset-0 bg-black/50 z-10 sm:hidden"
+              onClick={() => setIsSidebarVisible(false)}
+            />
+          )}
+
           {/* Right Sidebar - Metadata */}
-          <div className="w-80 bg-[#252526] border-l border-[#3e3e3e] overflow-y-auto">
+          <div
+            className={`${isSidebarVisible ? "w-72 sm:w-80" : "w-0"} bg-[#252526] border-l border-[#3e3e3e] overflow-y-auto transition-all duration-200 overflow-hidden flex-shrink-0 ${isSidebarVisible ? "fixed sm:relative right-0 top-0 h-full z-20 sm:z-auto" : ""}`}
+          >
             <div className="p-4">
+              {/* Mobile Close Button */}
+              <div className="flex justify-between items-center mb-4 sm:hidden">
+                <span className="text-sm font-semibold text-white">
+                  Properties
+                </span>
+                <button
+                  onClick={() => setIsSidebarVisible(false)}
+                  className="btn btn-ghost btn-sm btn-square text-white"
+                >
+                  ✕
+                </button>
+              </div>
               <h2 className="text-sm font-semibold text-white mb-4">
                 PROPERTIES
               </h2>

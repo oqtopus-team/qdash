@@ -8,13 +8,16 @@ from typing import Annotated
 import yaml
 from fastapi import APIRouter, Depends, HTTPException
 from pymongo import DESCENDING
-from qdash.api.lib.auth import get_current_active_user, get_optional_current_user
+from qdash.api.lib.project import (
+    ProjectContext,
+    get_project_context,
+    get_project_context_owner,
+)
 from qdash.api.routers.task_file import (
     CALTASKS_BASE_PATH,
     SETTINGS_PATH,
     collect_tasks_from_directory,
 )
-from qdash.api.schemas.auth import User
 from qdash.api.schemas.chip import (
     ChipDatesResponse,
     ChipResponse,
@@ -42,14 +45,14 @@ logger.setLevel(logging.DEBUG)
 
 @router.get("/chips", response_model=ListChipsResponse, summary="List all chips", operation_id="listChips")
 def list_chips(
-    current_user: Annotated[User, Depends(get_optional_current_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> ListChipsResponse:
-    """List all chips.
+    """List all chips in the current project.
 
     Parameters
     ----------
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -57,8 +60,8 @@ def list_chips(
         Wrapped list of available chips
 
     """
-    logger.debug(f"Listing chips for user: {current_user.username}")
-    chips = ChipDocument.find({"username": current_user.username}).run()
+    logger.debug(f"Listing chips for project: {ctx.project_id}")
+    chips = ChipDocument.find({"project_id": ctx.project_id}).run()
     return ListChipsResponse(
         chips=[
             ChipResponse(
@@ -76,16 +79,16 @@ def list_chips(
 @router.post("/chips", response_model=ChipResponse, summary="Create a new chip", operation_id="createChip")
 def create_chip(
     request: CreateChipRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
 ) -> ChipResponse:
-    """Create a new chip.
+    """Create a new chip in the current project.
 
     Parameters
     ----------
     request : CreateChipRequest
         Chip creation request containing chip_id and size
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with owner permission
 
     Returns
     -------
@@ -98,14 +101,15 @@ def create_chip(
         If chip_id already exists or size is invalid
 
     """
-    logger.debug(f"Creating chip {request.chip_id} for user: {current_user.username}")
+    logger.debug(f"Creating chip {request.chip_id} for project: {ctx.project_id}")
 
     try:
         # Use ChipInitializer service to create chip with full initialization
         chip = ChipInitializer.create_chip(
-            username=current_user.username,
+            username=ctx.user.username,
             chip_id=request.chip_id,
             size=request.size,
+            project_id=ctx.project_id,
         )
 
         return ChipResponse(
@@ -130,15 +134,18 @@ def create_chip(
     summary="Get available dates for a chip",
     operation_id="getChipDates",
 )
-def get_chip_dates(chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]) -> ChipDatesResponse:
+def get_chip_dates(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+) -> ChipDatesResponse:
     """Fetch available dates for a chip from execution counter.
 
     Parameters
     ----------
     chip_id : str
         ID of the chip
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -146,8 +153,8 @@ def get_chip_dates(chip_id: str, current_user: Annotated[User, Depends(get_curre
         List of available dates
 
     """
-    logger.debug(f"Fetching dates for chip {chip_id}, user: {current_user.username}")
-    counter_list = ExecutionCounterDocument.find({"chip_id": chip_id, "username": current_user.username}).run()
+    logger.debug(f"Fetching dates for chip {chip_id}, project: {ctx.project_id}")
+    counter_list = ExecutionCounterDocument.find({"project_id": ctx.project_id, "chip_id": chip_id}).run()
     if not counter_list:
         # Return empty list for newly created chips with no execution history
         logger.debug(f"No execution counter found for chip {chip_id}, returning empty dates list")
@@ -161,7 +168,7 @@ def get_chip_dates(chip_id: str, current_user: Annotated[User, Depends(get_curre
 @router.get("/chips/{chip_id}", response_model=ChipResponse, summary="Get a chip", operation_id="getChip")
 def get_chip(
     chip_id: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> ChipResponse:
     """Get a chip by its ID.
 
@@ -169,8 +176,8 @@ def get_chip(
     ----------
     chip_id : str
         ID of the chip to fetch
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -183,9 +190,9 @@ def get_chip(
         If chip is not found
 
     """
-    logger.debug(f"Fetching chip {chip_id} for user: {current_user.username}")
+    logger.debug(f"Fetching chip {chip_id} for project: {ctx.project_id}")
 
-    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
     if chip is None:
         raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
 
@@ -279,7 +286,9 @@ def _build_mux_detail(
     operation_id="getChipMux",
 )
 def get_chip_mux(
-    chip_id: str, mux_id: int, current_user: Annotated[User, Depends(get_current_active_user)]
+    chip_id: str,
+    mux_id: int,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> MuxDetailResponse:
     """Get the multiplexer details.
 
@@ -289,8 +298,8 @@ def get_chip_mux(
         ID of the chip
     mux_id : int
         ID of the multiplexer
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -298,7 +307,7 @@ def get_chip_mux(
         Multiplexer details
 
     """
-    logger.debug(f"Fetching mux details for chip {chip_id}, user: {current_user.username}")
+    logger.debug(f"Fetching mux details for chip {chip_id}, project: {ctx.project_id}")
 
     # Get task names from task files instead of database
     task_names = _get_task_names_from_files()
@@ -311,7 +320,7 @@ def get_chip_mux(
     all_results = (
         TaskResultHistoryDocument.find(
             {
-                "username": current_user.username,
+                "project_id": ctx.project_id,
                 "chip_id": chip_id,
                 "qid": {"$in": qids},
                 "name": {"$in": task_names},
@@ -339,15 +348,18 @@ def get_chip_mux(
     operation_id="listChipMuxes",
     response_model_exclude_none=True,
 )
-def list_chip_muxes(chip_id: str, current_user: Annotated[User, Depends(get_current_active_user)]) -> ListMuxResponse:
+def list_chip_muxes(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+) -> ListMuxResponse:
     """List all multiplexers for a chip.
 
     Parameters
     ----------
     chip_id : str
         ID of the chip
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -359,9 +371,9 @@ def list_chip_muxes(chip_id: str, current_user: Annotated[User, Depends(get_curr
     task_names = _get_task_names_from_files()
 
     # Get chip info
-    chip = ChipDocument.find_one({"chip_id": chip_id, "username": current_user.username}).run()
+    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
     if chip is None:
-        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found for user {current_user.username}")
+        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}")
 
     # Calculate mux number
     mux_num = int(chip.size // 4)
@@ -371,7 +383,7 @@ def list_chip_muxes(chip_id: str, current_user: Annotated[User, Depends(get_curr
     all_results = (
         TaskResultHistoryDocument.find(
             {
-                "username": current_user.username,
+                "project_id": ctx.project_id,
                 "chip_id": chip_id,
                 "qid": {"$in": qids},
                 "name": {"$in": task_names},

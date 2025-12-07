@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
 
+import { TaskHistoryModal } from "../TaskHistoryModal";
+
 import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
@@ -11,7 +13,6 @@ import {
   useGetLatestQubitTaskResults,
   useGetHistoricalQubitTaskResults,
 } from "@/client/task-result/task-result";
-import { TaskHistoryModal } from "../TaskHistoryModal";
 
 interface TaskResultGridProps {
   chipId: string;

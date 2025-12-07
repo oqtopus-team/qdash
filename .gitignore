@@ -231,3 +231,4 @@ src/tools/schedule/*
 .serena/cache/*
 .mcp.json
 .tmp/*
+/.claude/settings.local.json

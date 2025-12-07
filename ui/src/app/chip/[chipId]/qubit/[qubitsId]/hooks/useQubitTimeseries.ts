@@ -8,8 +8,8 @@ import type {
 } from "../types";
 import type { OutputParameterModel } from "@/schemas";
 
-import { useGetTimeseriesTaskResults } from "@/client/task-result/task-result";
 import { useListTags } from "@/client/tag/tag";
+import { useGetTimeseriesTaskResults } from "@/client/task-result/task-result";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
 interface UseQubitTimeseriesOptions {

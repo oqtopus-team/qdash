@@ -7,6 +7,8 @@
  */
 import type { UserFullName } from "./userFullName";
 import type { UserDisabled } from "./userDisabled";
+import type { UserDefaultProjectId } from "./userDefaultProjectId";
+import type { SystemRole } from "./systemRole";
 
 /**
  * User model for authentication and user management.
@@ -15,4 +17,6 @@ export interface User {
   username: string;
   full_name?: UserFullName;
   disabled?: UserDisabled;
+  default_project_id?: UserDefaultProjectId;
+  system_role?: SystemRole;
 }

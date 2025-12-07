@@ -5,6 +5,13 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("access_token");
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isSignupPage = request.nextUrl.pathname === "/signup";
+  const isApiRoute =
+    request.nextUrl.pathname.startsWith("/api/") ||
+    request.nextUrl.pathname === "/api";
+
+  if (isApiRoute) {
+    return NextResponse.next();
+  }
 
   // 1. 認証不要なページの処理
   if (isLoginPage || isSignupPage) {
@@ -30,7 +37,8 @@ export const config = {
      * 以下のパスに対してミドルウェアを適用:
      * - すべてのパス（/:path*）
      * - ルートパス（/）
+     * 除外: _next/static, _next/image, favicon, 静的ファイル（画像等）
      */
-    "/((?!_next/static|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.svg$|.*\\.jpg$|.*\\.jpeg$|.*\\.gif$|.*\\.ico$).*)",
   ],
 };

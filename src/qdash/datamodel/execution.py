@@ -41,6 +41,7 @@ class ExecutionModel(BaseModel):
 
     """
 
+    project_id: str | None = Field(None, description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the execution")
     name: str = Field(..., description="The name of the execution")
     execution_id: str = Field(..., description="The execution ID")

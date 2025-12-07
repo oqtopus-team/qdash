@@ -3,8 +3,6 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { toast } from "react-toastify";
-import { ToastContainer } from "react-toastify";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -15,6 +13,10 @@ import {
   VscLock,
   VscUnlock,
 } from "react-icons/vsc";
+import { toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
+
+import type { FileTreeNode, SaveFileRequest } from "@/schemas";
 
 import {
   getFileTree,
@@ -24,7 +26,6 @@ import {
   gitPullConfig,
   gitPushConfig,
 } from "@/client/file/file";
-import type { FileTreeNode, SaveFileRequest } from "@/schemas";
 
 import "react-toastify/dist/ReactToastify.css";
 

@@ -6,8 +6,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from qdash.api.lib.auth import get_current_active_user
-from qdash.api.schemas.auth import User
+from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.tag import ListTagResponse, Tag
 from qdash.dbmodel.tag import TagDocument
 
@@ -25,17 +24,17 @@ logger.setLevel(logging.DEBUG)
     operation_id="listTags",
 )
 def list_tags(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> ListTagResponse:
-    """List all tags for the current user.
+    """List all tags for the current project.
 
-    Retrieves all tags associated with the current user's calibration data.
+    Retrieves all tags associated with the current project's calibration data.
     Tags are used to categorize and filter task results.
 
     Parameters
     ----------
-    current_user : User
-        Current authenticated user
+    ctx : ProjectContext
+        Project context with user and project information
 
     Returns
     -------
@@ -43,6 +42,6 @@ def list_tags(
         Wrapped list of tag names
 
     """
-    tags = TagDocument.find({"username": current_user.username}).run()
+    tags = TagDocument.find({"project_id": ctx.project_id}).run()
     tags = [Tag(name=tag.name) for tag in tags]
     return ListTagResponse(tags=tags)
