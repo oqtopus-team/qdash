@@ -390,12 +390,21 @@ export default function AdminPage() {
                           >
                             Members
                           </button>
-                          <button
-                            className="btn btn-sm btn-error btn-ghost"
-                            onClick={() => handleDeleteProject(project)}
-                          >
-                            Delete
-                          </button>
+                          {project.owner_username === user?.username ? (
+                            <span
+                              className="btn btn-sm btn-ghost btn-disabled opacity-50"
+                              title="Cannot delete your own project"
+                            >
+                              Delete
+                            </span>
+                          ) : (
+                            <button
+                              className="btn btn-sm btn-error btn-ghost"
+                              onClick={() => handleDeleteProject(project)}
+                            >
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -692,24 +701,11 @@ function CreateUserModal({
 
   return (
     <dialog className="modal modal-open">
-      <div className="modal-box max-w-md">
+      <div className="modal-box">
         <h3 className="font-bold text-lg mb-4">Create New User</h3>
 
         {displayError && (
           <div className="alert alert-error mb-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="stroke-current shrink-0 h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
             <span>{displayError}</span>
           </div>
         )}
@@ -721,7 +717,7 @@ function CreateUserModal({
             </label>
             <input
               type="text"
-              className="input input-bordered"
+              className="input input-bordered w-full"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Enter username"
@@ -734,7 +730,7 @@ function CreateUserModal({
             </label>
             <input
               type="password"
-              className="input input-bordered"
+              className="input input-bordered w-full"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
@@ -747,30 +743,16 @@ function CreateUserModal({
             </label>
             <input
               type="text"
-              className="input input-bordered"
+              className="input input-bordered w-full"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Enter full name (optional)"
             />
-          </div>
-
-          <div className="alert alert-info">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              className="stroke-current shrink-0 w-5 h-5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
-            <span className="text-sm">
-              A default project will be created for this user.
-            </span>
+            <label className="label">
+              <span className="label-text-alt text-base-content/60">
+                A default project will be created for this user
+              </span>
+            </label>
           </div>
         </div>
 

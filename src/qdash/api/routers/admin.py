@@ -365,6 +365,7 @@ def admin_delete_project(
     ------
     HTTPException
         404 if project not found
+        400 if trying to delete own project
 
     """
     logger.debug(f"Admin {admin.username} deleting project {project_id}")
@@ -374,6 +375,13 @@ def admin_delete_project(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project '{project_id}' not found",
+        )
+
+    # Prevent admin from deleting their own project
+    if project.owner_username == admin.username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own project",
         )
 
     # Delete all memberships for this project

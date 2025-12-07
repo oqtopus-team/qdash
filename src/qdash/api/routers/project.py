@@ -386,12 +386,12 @@ def transfer_ownership(
             detail=f"User '{new_owner.username}' not found",
         )
 
-    # Update old owner membership to editor
+    # Update old owner membership to viewer
     old_owner_membership = ProjectMembershipDocument.find_one(
         {"project_id": project_id, "username": project.owner_username}
     ).run()
     if old_owner_membership:
-        old_owner_membership.role = ProjectRole.EDITOR
+        old_owner_membership.role = ProjectRole.VIEWER
         old_owner_membership.system_info.update_time()
         old_owner_membership.save()
 

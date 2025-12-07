@@ -175,7 +175,12 @@ def get_device_topology(
     logger.info(f"project: {ctx.project_id}, user: {ctx.user.username}")
     qubits = []
     couplings = []
-    latest = (CalibrationNoteDocument.find({"task_id": "master"}).sort([("timestamp", -1)]).limit(1).run())[0]
+    latest = (
+        CalibrationNoteDocument.find({"project_id": ctx.project_id, "task_id": "master"})
+        .sort([("timestamp", -1)])
+        .limit(1)
+        .run()
+    )[0]
     cr_params = latest.note["cr_params"]
     drag_hpi_params = latest.note["drag_hpi_params"]
     drag_pi_params = latest.note["drag_pi_params"]

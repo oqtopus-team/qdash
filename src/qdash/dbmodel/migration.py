@@ -257,13 +257,37 @@ def migrate_remove_user_default_role() -> dict[str, int]:
     return stats
 
 
+def migrate_editor_to_viewer() -> dict[str, int]:
+    """Convert all EDITOR roles to VIEWER in project memberships.
+
+    The simplified permission model only has OWNER and VIEWER.
+    EDITOR role is deprecated and should be converted to VIEWER.
+
+    Returns:
+        Migration statistics with count of affected memberships.
+    """
+    from qdash.dbmodel.project_membership import ProjectMembershipDocument
+
+    stats: dict[str, int] = {
+        "editor_to_viewer": 0,
+    }
+
+    result = ProjectMembershipDocument.find({"role": "editor"}).update_many({"$set": {"role": "viewer"}}).run()
+    stats["editor_to_viewer"] = result.modified_count
+    if result.modified_count > 0:
+        logger.info(f"Migration: Converted {result.modified_count} EDITOR roles to VIEWER")
+
+    return stats
+
+
 def migrate_full(dry_run: bool = True) -> dict[str, Any]:
     """Run full migration for systems without project_id.
 
     This migration:
     1. Adds system_role to users (if missing)
     2. Removes deprecated default_role from users
-    3. Creates projects for users and adds project_id to all documents
+    3. Converts deprecated EDITOR roles to VIEWER
+    4. Creates projects for users and adds project_id to all documents
 
     Args:
         dry_run: If True, only reports what would be changed.
@@ -271,10 +295,13 @@ def migrate_full(dry_run: bool = True) -> dict[str, Any]:
     Returns:
         Combined migration statistics.
     """
+    from qdash.dbmodel.project_membership import ProjectMembershipDocument
+
     stats: dict[str, Any] = {
         "dry_run": dry_run,
         "system_role_added": 0,
         "default_role_removed": 0,
+        "editor_to_viewer": 0,
         "project_migration": {},
     }
 
@@ -298,7 +325,17 @@ def migrate_full(dry_run: bool = True) -> dict[str, Any]:
         if count > 0:
             logger.info(f"[DRY RUN] Would remove default_role from {count} users")
 
-    # Step 3: Add project_id to all documents
+    # Step 3: Convert deprecated EDITOR roles to VIEWER
+    if not dry_run:
+        editor_stats = migrate_editor_to_viewer()
+        stats["editor_to_viewer"] = editor_stats["editor_to_viewer"]
+    else:
+        count = ProjectMembershipDocument.find({"role": "editor"}).count()
+        stats["editor_to_viewer"] = count
+        if count > 0:
+            logger.info(f"[DRY RUN] Would convert {count} EDITOR roles to VIEWER")
+
+    # Step 4: Add project_id to all documents
     project_stats = migrate_add_project_id_to_all_documents(dry_run=dry_run)
     stats["project_migration"] = project_stats
 
@@ -376,6 +413,7 @@ if __name__ == "__main__":
         logger.info(f"Dry run: {stats['dry_run']}")
         logger.info(f"system_role added: {stats['system_role_added']}")
         logger.info(f"default_role removed: {stats['default_role_removed']}")
+        logger.info(f"EDITOR→VIEWER converted: {stats['editor_to_viewer']}")
         logger.info(f"Users processed: {stats['project_migration'].get('users_processed', 0)}")
         logger.info(f"Projects created: {stats['project_migration'].get('projects_created', 0)}")
         logger.info("Documents updated:")
@@ -396,8 +434,9 @@ if __name__ == "__main__":
         print("  full        - Full migration for systems without project_id (recommended)")
         print("                1. Adds system_role to users")
         print("                2. Removes deprecated default_role")
-        print("                3. Creates projects for users")
-        print("                4. Adds project_id to all documents")
+        print("                3. Converts deprecated EDITOR roles to VIEWER")
+        print("                4. Creates projects for users")
+        print("                5. Adds project_id to all documents")
         print("")
         print("  project-id  - Add project_id to documents only")
         print("                (use if system_role is already set)")

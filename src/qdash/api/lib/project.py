@@ -49,6 +49,7 @@ def _resolve_project_id(
     1. Path parameter (explicit)
     2. Header (X-Project-Id)
     3. User's default project
+    4. User's owned project (fallback)
     """
     if project_id_path:
         return project_id_path
@@ -56,6 +57,14 @@ def _resolve_project_id(
         return project_id_header
     if user.default_project_id:
         return user.default_project_id
+
+    # Fallback: check if user owns a project
+    from qdash.dbmodel.project import ProjectDocument
+
+    owned_project = ProjectDocument.find_one({"owner_username": user.username}).run()
+    if owned_project:
+        return owned_project.project_id
+
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Project ID is required. Provide via X-Project-Id header or path parameter.",
@@ -125,19 +134,6 @@ def get_project_context(
     """
     project_id = _resolve_project_id(user, project_id_header)
     project, role = _check_permission(project_id, user)
-    return ProjectContext(project_id=project_id, project=project, user=user, role=role)
-
-
-def get_project_context_editor(
-    user: Annotated[User, Depends(get_current_active_user)],
-    project_id_header: Annotated[str | None, Depends(get_project_id_from_header)] = None,
-) -> ProjectContext:
-    """Get project context with editor or owner permission.
-
-    Use this dependency for write endpoints.
-    """
-    project_id = _resolve_project_id(user, project_id_header)
-    project, role = _check_permission(project_id, user, required_roles=[ProjectRole.EDITOR, ProjectRole.OWNER])
     return ProjectContext(project_id=project_id, project=project, user=user, role=role)
 
 

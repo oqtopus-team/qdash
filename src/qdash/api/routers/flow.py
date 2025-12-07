@@ -238,7 +238,7 @@ async def save_flow(
     file_path = user_dir / f"{request.name}.py"
 
     # Check if flow already exists (to get old deployment_id)
-    existing_flow = FlowDocument.find_by_user_and_name(username, request.name)
+    existing_flow = FlowDocument.find_by_user_and_name(username, request.name, ctx.project_id)
     old_deployment_id = existing_flow.deployment_id if existing_flow else None
 
     # Write code to file
@@ -308,6 +308,7 @@ async def save_flow(
         else:
             # Create new flow
             flow_doc = FlowDocument(
+                project_id=ctx.project_id,
                 name=request.name,
                 username=username,
                 chip_id=request.chip_id,
@@ -350,10 +351,10 @@ async def list_flows(
     Returns metadata only (no code content for performance).
     """
     username = ctx.user.username
+    project_id = ctx.project_id
 
     try:
-        # TODO: Update FlowDocument.list_by_user to list_by_project
-        flows = FlowDocument.list_by_user(username)
+        flows = FlowDocument.list_by_user(username, project_id)
         logger.info(f"Listed {len(flows)} flows for user '{username}'")
 
         from qdash.api.schemas.flow import FlowSummary
@@ -568,7 +569,8 @@ async def list_all_flow_schedules(
     """
     limit = min(limit, 100)
     username = ctx.user.username
-    flows = FlowDocument.list_by_user(username)
+    project_id = ctx.project_id
+    flows = FlowDocument.list_by_user(username, project_id)
 
     all_schedules: list[FlowScheduleSummary] = []
 
@@ -663,6 +665,7 @@ async def delete_flow_schedule(
 
     """
     username = ctx.user.username
+    project_id = ctx.project_id
 
     async with get_client() as client:
         # Try as deployment ID (cron schedule)
@@ -670,7 +673,9 @@ async def delete_flow_schedule(
             _ = await client.read_deployment(schedule_id)
 
             # Verify ownership
-            flow = FlowDocument.find_one({"deployment_id": schedule_id, "username": username}).run()
+            flow = FlowDocument.find_one(
+                {"project_id": project_id, "deployment_id": schedule_id, "username": username}
+            ).run()
             if not flow:
                 raise HTTPException(
                     status_code=403,
@@ -706,7 +711,9 @@ async def delete_flow_schedule(
 
             # Verify ownership through deployment
             if flow_run.deployment_id:
-                flow = FlowDocument.find_one({"deployment_id": str(flow_run.deployment_id), "username": username}).run()
+                flow = FlowDocument.find_one(
+                    {"project_id": project_id, "deployment_id": str(flow_run.deployment_id), "username": username}
+                ).run()
                 if not flow:
                     raise HTTPException(
                         status_code=403,
@@ -755,11 +762,14 @@ async def update_flow_schedule(
 
     """
     username = ctx.user.username
+    project_id = ctx.project_id
 
     async with get_client() as client:
         try:
             # Verify ownership
-            flow = FlowDocument.find_one({"deployment_id": schedule_id, "username": username}).run()
+            flow = FlowDocument.find_one(
+                {"project_id": project_id, "deployment_id": schedule_id, "username": username}
+            ).run()
             if not flow:
                 raise HTTPException(
                     status_code=403,
@@ -827,9 +837,10 @@ async def get_flow(
     3. Return combined data
     """
     username = ctx.user.username
+    project_id = ctx.project_id
 
     # Find flow in database
-    flow = FlowDocument.find_by_user_and_name(username, name)
+    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -881,10 +892,11 @@ async def execute_flow(
     from prefect import get_client
 
     username = ctx.user.username
+    project_id = ctx.project_id
     settings = get_settings()
 
     # Find flow in database
-    flow = FlowDocument.find_by_user_and_name(username, name)
+    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -948,9 +960,10 @@ async def delete_flow(
     2. Delete metadata from MongoDB
     """
     username = ctx.user.username
+    project_id = ctx.project_id
 
     # Find flow in database
-    flow = FlowDocument.find_by_user_and_name(username, name)
+    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -966,7 +979,7 @@ async def delete_flow(
 
     # Delete from database
     try:
-        FlowDocument.delete_by_user_and_name(username, name)
+        FlowDocument.delete_by_user_and_name(username, name, project_id)
         logger.info(f"Deleted flow '{name}' from database")
     except Exception as e:
         logger.error(f"Failed to delete flow from database: {e}")
@@ -1013,8 +1026,10 @@ async def schedule_flow(
             detail="Cannot provide both 'cron' and 'scheduled_time'",
         )
 
+    project_id = ctx.project_id
+
     # Find flow
-    flow = FlowDocument.find_by_user_and_name(username, name)
+    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -1263,9 +1278,10 @@ async def list_flow_schedules(
     # Enforce max limit
     limit = min(limit, 100)
     username = ctx.user.username
+    project_id = ctx.project_id
 
     # Find flow
-    flow = FlowDocument.find_by_user_and_name(username, name)
+    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
