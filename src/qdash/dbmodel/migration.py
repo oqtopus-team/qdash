@@ -83,7 +83,9 @@ def migrate_add_project_id_to_all_documents(dry_run: bool = True) -> dict[str, A
                 logger.info(f"Linked existing project {existing_project.project_id} to user {user.username}")
             else:
                 user_project_map[user.username] = existing_project.project_id
-                logger.info(f"[DRY RUN] Would link existing project {existing_project.project_id} to user {user.username}")
+                logger.info(
+                    f"[DRY RUN] Would link existing project {existing_project.project_id} to user {user.username}"
+                )
             continue
 
         # Create default project for user
