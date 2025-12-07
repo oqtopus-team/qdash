@@ -103,7 +103,14 @@ class QubitDocument(Document):
         return current_best
 
     @classmethod
-    def update_calib_data(cls, username: str, qid: str, chip_id: str, output_parameters: dict) -> "QubitDocument":
+    def update_calib_data(
+        cls,
+        username: str,
+        qid: str,
+        chip_id: str,
+        output_parameters: dict,
+        project_id: str,
+    ) -> "QubitDocument":
         """Update the QubitDocument's calibration data with new values."""
         qubit_doc = cls.find_one({"username": username, "qid": qid, "chip_id": chip_id}).run()
         if qubit_doc is None:
@@ -119,6 +126,7 @@ class QubitDocument(Document):
         if chip_doc is None:
             raise ValueError(f"Chip {chip_id} not found")
         qubit_model = QubitModel(
+            project_id=project_id,
             qid=qid,
             chip_id=chip_id,
             data=qubit_doc.data,

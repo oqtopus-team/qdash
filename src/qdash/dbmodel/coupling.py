@@ -98,7 +98,14 @@ class CouplingDocument(Document):
         return current_best
 
     @classmethod
-    def update_calib_data(cls, username: str, qid: str, chip_id: str, output_parameters: dict) -> "CouplingDocument":
+    def update_calib_data(
+        cls,
+        username: str,
+        qid: str,
+        chip_id: str,
+        output_parameters: dict,
+        project_id: str,
+    ) -> "CouplingDocument":
         """Update the CouplingDocument's calibration data with new values."""
         coupling_doc = cls.find_one({"username": username, "qid": qid, "chip_id": chip_id}).run()
         if coupling_doc is None:
@@ -112,6 +119,7 @@ class CouplingDocument(Document):
         if chip_doc is None:
             raise ValueError(f"Chip {chip_id} not found")
         coupling_model = CouplingModel(
+            project_id=project_id,
             qid=qid,
             chip_id=chip_id,
             data=coupling_doc.data,

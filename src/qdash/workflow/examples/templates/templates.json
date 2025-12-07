@@ -1,114 +1,50 @@
 [
   {
     "id": "simple",
-    "name": "Simple Flow",
-    "description": "Basic sequential calibration demonstrating low-level API usage",
+    "name": "Simple Calibration",
+    "description": "Basic calibration for learning and simple tasks. Supports sequential and parallel group execution.",
     "category": "basic",
-    "filename": "simple_flow.py",
-    "function_name": "my_custom_flow"
+    "filename": "simple.py",
+    "function_name": "simple_calibration"
   },
   {
-    "id": "custom_parallel",
-    "name": "Custom Parallel Flow",
-    "description": "Group-based parallel execution using Prefect's @task + submit()",
-    "category": "parallel",
-    "filename": "custom_parallel_flow.py",
-    "function_name": "custom_parallel_flow"
-  },
-  {
-    "id": "iterative",
-    "name": "Iterative Parallel Flow",
-    "description": "Repeat parallel group calibration multiple times with custom parameters",
-    "category": "advanced",
-    "filename": "iterative_flow.py",
-    "function_name": "iterative_flow"
-  },
-  {
-    "id": "full_qubit",
-    "name": "Full Qubit Calibration",
-    "description": "Complete 1-qubit calibration suite with all standard tasks (Rabi, T1/T2, DRAG, RB)",
-    "category": "production",
-    "filename": "full_qubit_calibration.py",
-    "function_name": "full_qubit_calibration"
-  },
-  {
-    "id": "retry",
-    "name": "Retry Calibration",
-    "description": "Full 1-qubit calibration with smart per-qubit retry - immediately retries failed qubits within groups",
-    "category": "advanced",
-    "filename": "retry_calibration.py",
-    "function_name": "retry_calibration"
-  },
-  {
-    "id": "iterative_parameter_sweep",
-    "name": "Generic Iterative Parameter Sweep",
-    "description": "Execute ANY task repeatedly with different parameter values (readout_amplitude, qubit_frequency, etc.) - works with CheckQubitSpectroscopy, ChevronPattern, CheckRabi, and all QubexTask tasks",
-    "category": "advanced",
-    "filename": "iterative_parameter_sweep_flow.py",
-    "function_name": "iterative_parameter_sweep_flow"
-  },
-  {
-    "id": "iterative_chevron_pattern",
-    "name": "Iterative ChevronPattern Flow (Example)",
-    "description": "ChevronPattern-specific example of parameter sweep. For other tasks, use the generic iterative_parameter_sweep template instead",
-    "category": "advanced",
-    "filename": "iterative_chevron_pattern_flow.py",
-    "function_name": "iterative_chevron_pattern_flow"
-  },
-  {
-    "id": "coupling_calibration",
-    "name": "Coupling Calibration Flow",
-    "description": "2-qubit coupling calibration with group-based parallel execution (e.g., CheckCrossResonance)",
-    "category": "coupling",
-    "filename": "coupling_calibration_flow.py",
-    "function_name": "my_coupling_flow"
-  },
-  {
-    "id": "sequential_stage",
-    "name": "Sequential Stage Calibration",
-    "description": "Execute same calibration tasks across multiple stages with isolated sessions (e.g., chassis-based execution with hardware constraints)",
-    "category": "advanced",
-    "filename": "sequential_stage_calibration.py",
-    "function_name": "sequential_stage_calibration"
-  },
-  {
-    "id": "two_qubit_parallel",
-    "name": "Two-Qubit Parallel Calibration",
-    "description": "Execute 2-qubit coupling calibration with parallel groups to manage qubit-sharing constraints",
-    "category": "coupling",
-    "filename": "two_qubit_parallel_calibration.py",
-    "function_name": "two_qubit_parallel_calibration"
-  },
-  {
-    "id": "full_calibration",
+    "id": "full_chip",
     "name": "Full Chip Calibration",
-    "description": "Complete chip calibration workflow: 1-qubit → CR scheduling → 2-qubit with automatic candidate filtering",
+    "description": "Complete chip calibration: 1-qubit + CR scheduling + 2-qubit with automatic quality filtering.",
     "category": "production",
-    "filename": "full_calibration.py",
-    "function_name": "full_calibration"
+    "filename": "full_chip.py",
+    "function_name": "full_chip_calibration"
   },
   {
-    "id": "scheduled_full_calibration",
-    "name": "Scheduled Full Calibration",
-    "description": "Full calibration with automatic Box scheduling - uses OneQubitScheduler to detect Box A/B constraints from wiring config and schedule qubits by MUX ID with exclude support",
-    "category": "production",
-    "filename": "scheduled_full_calibration.py",
-    "function_name": "scheduled_full_calibration"
+    "id": "parameter_sweep",
+    "name": "Parameter Sweep",
+    "description": "Execute a task repeatedly with different parameter values for exploring parameter space.",
+    "category": "advanced",
+    "filename": "parameter_sweep.py",
+    "function_name": "parameter_sweep"
   },
   {
-    "id": "synchronized_full_calibration",
-    "name": "Synchronized Full Calibration",
-    "description": "Step-synchronized full calibration (12 steps: 4 Box A + 8 MIXED) - all MUXes execute same step simultaneously with checkerboard pattern for frequency isolation and Box B module sharing",
-    "category": "production",
-    "filename": "synchronized_full_calibration.py",
-    "function_name": "synchronized_full_calibration"
+    "id": "parallel_retry",
+    "name": "Parallel Retry Calibration",
+    "description": "Parallel execution with @task + submit(). Demonstrates retry logic with frequency offset.",
+    "category": "advanced",
+    "filename": "retry.py",
+    "function_name": "parallel_retry_calibration"
+  },
+  {
+    "id": "two_qubit",
+    "name": "Two-Qubit Calibration",
+    "description": "2-qubit coupling calibration (Cross Resonance, ZX90, Bell state) with parallel execution.",
+    "category": "coupling",
+    "filename": "two_qubit.py",
+    "function_name": "two_qubit_calibration"
   },
   {
     "id": "check_skew",
-    "name": "CheckSkew Calibration",
-    "description": "System-level skew measurement and calibration across MUX channels",
+    "name": "Check Skew",
+    "description": "System-level skew measurement and calibration across MUX channels.",
     "category": "system",
-    "filename": "check_skew_flow.py",
-    "function_name": "check_skew_flow"
+    "filename": "check_skew.py",
+    "function_name": "check_skew"
   }
 ]

@@ -18,19 +18,13 @@ from qdash.workflow.flow.scheduled import (
     extract_candidate_qubits,
 )
 from qdash.workflow.flow.session import (
-    FlowSession,
-    finish_calibration,
+    CalService,
     generate_execution_id,
-    get_session,
-    init_calibration,
 )
 
 __all__ = [
-    # === Session Management ===
-    "FlowSession",
-    "init_calibration",
-    "get_session",
-    "finish_calibration",
+    # === High-level API ===
+    "CalService",
     "generate_execution_id",
     # === Scheduled Calibration ===
     "calibrate_one_qubit_scheduled",

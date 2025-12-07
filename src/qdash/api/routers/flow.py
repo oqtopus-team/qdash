@@ -907,12 +907,12 @@ async def execute_flow(
         )
 
     # Merge parameters (request overrides defaults)
-    # Add flow_name for display purposes
-    # Note: project_id is auto-resolved from username in init_calibration (owner only)
+    # Add flow_name and project_id for multi-tenancy support
     parameters: dict[str, Any] = {
         **flow.default_parameters,
         **request.parameters,
         "flow_name": name,  # Add flow name for display purposes
+        "project_id": project_id,  # Add project_id for multi-tenancy
     }
 
     logger.info(f"Executing flow '{name}' (deployment={flow.deployment_id}) with parameters: {parameters}")
@@ -956,8 +956,9 @@ async def delete_flow(
     """Delete a Flow.
 
     Steps:
-    1. Delete file from user_flows/{username}/{name}.py
-    2. Delete metadata from MongoDB
+    1. Delete Prefect deployment
+    2. Delete file from user_flows/{username}/{name}.py
+    3. Delete metadata from MongoDB
     """
     username = ctx.user.username
     project_id = ctx.project_id
@@ -966,6 +967,16 @@ async def delete_flow(
     flow = FlowDocument.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
+
+    # Delete Prefect deployment
+    if flow.deployment_id:
+        try:
+            async with get_client() as client:
+                await client.delete_deployment(flow.deployment_id)
+                logger.info(f"Deleted Prefect deployment: {flow.deployment_id}")
+        except Exception as e:
+            # Log but don't fail - deployment might already be deleted
+            logger.warning(f"Failed to delete Prefect deployment (may not exist): {e}")
 
     # Delete file
     file_path = Path(flow.file_path)

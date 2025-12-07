@@ -37,7 +37,8 @@ export const config = {
      * 以下のパスに対してミドルウェアを適用:
      * - すべてのパス（/:path*）
      * - ルートパス（/）
+     * 除外: _next/static, _next/image, favicon, 静的ファイル（画像等）
      */
-    "/((?!_next/static|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.svg$|.*\\.jpg$|.*\\.jpeg$|.*\\.gif$|.*\\.ico$).*)",
   ],
 };
