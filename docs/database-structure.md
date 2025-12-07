@@ -1,7 +1,7 @@
 # QDash Database Structure Documentation
 
 This document describes the database structure of the QDash project. QDash uses MongoDB as its primary database, managing data through the Bunnet ODM (Object Document Mapper).  
-QDash is moving toward a project-centric multi-tenant model where every piece of calibration data belongs to a project. Users create projects, invite other users with viewer/editor roles, and all chip/calibration entities inherit the owning `project_id`.
+QDash is moving toward a project-centric multi-tenant model where every piece of calibration data belongs to a project. Users create projects, invite other users as viewers, and all chip/calibration entities inherit the owning `project_id`.
 
 ## Overview
 
@@ -73,9 +73,9 @@ Represents user access to a project.
 
 ```python
 class ProjectRole(str, Enum):
-    OWNER = "owner"
-    EDITOR = "editor"
-    VIEWER = "viewer"
+    """Simplified two-role permission model."""
+    OWNER = "owner"   # Full access (read, write, admin)
+    VIEWER = "viewer" # Read-only access
 
 class ProjectMembershipModel(BaseModel):
     project_id: str
@@ -336,7 +336,6 @@ class ProjectDocument(Document):
     name: str
     description: str | None = None
     tags: list[str] = []
-    default_role: ProjectRole = ProjectRole.VIEWER
     system_info: SystemInfoModel
 ```
 
@@ -828,7 +827,7 @@ Other project-scoped collections (tasks, tags, backends, flows, counters, locks,
 
 ### During Calibration Execution
 
-0. Resolve `(project_id, username)` via **ProjectMembershipDocument** and ensure role `editor` or `owner`
+0. Resolve `(project_id, username)` via **ProjectMembershipDocument** and ensure role is `owner`
 1. Acquire per-project lock via **ExecutionLockDocument(project_id)**
 2. Generate execution ID from **ExecutionCounterDocument** (YYYYMMDD-NNN scoped by project/chip)
 3. Execute each task:
