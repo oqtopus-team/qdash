@@ -1,0 +1,1033 @@
+"use client";
+
+import { useState } from "react";
+
+import { useQueryClient } from "@tanstack/react-query";
+
+import type { UserListItem, SystemRole, ProjectListItem } from "@/schemas";
+
+import { useAuth } from "@/app/contexts/AuthContext";
+import {
+  useListAllUsers,
+  useUpdateUserSettings,
+  useDeleteUser,
+  getListAllUsersQueryKey,
+  useListAllProjects,
+  useAdminDeleteProject,
+  getListAllProjectsQueryKey,
+  useListProjectMembersAdmin,
+  useAddProjectMemberAdmin,
+  useRemoveProjectMemberAdmin,
+  useCreateProjectForUser,
+} from "@/client/admin/admin";
+import { useRegisterUser } from "@/client/auth/auth";
+
+export default function AdminPage() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"users" | "projects">("users");
+  const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
+  const [selectedProject, setSelectedProject] =
+    useState<ProjectListItem | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] =
+    useState(false);
+  const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
+
+  const { data: usersData, isLoading, error } = useListAllUsers();
+  const {
+    data: projectsData,
+    isLoading: projectsLoading,
+    error: projectsError,
+  } = useListAllProjects();
+  const updateUserMutation = useUpdateUserSettings();
+  const deleteUserMutation = useDeleteUser();
+  const registerUserMutation = useRegisterUser();
+  const deleteProjectMutation = useAdminDeleteProject();
+  const addMemberMutation = useAddProjectMemberAdmin();
+  const removeMemberMutation = useRemoveProjectMemberAdmin();
+  const createProjectMutation = useCreateProjectForUser();
+
+  // Check if current user is admin
+  if (user?.system_role !== "admin") {
+    return (
+      <div className="w-full px-6">
+        <div className="alert alert-error">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="stroke-current shrink-0 h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <span>Access denied. Admin privileges required.</span>
+        </div>
+      </div>
+    );
+  }
+
+  const handleEdit = (userItem: UserListItem) => {
+    setSelectedUser(userItem);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDelete = (userItem: UserListItem) => {
+    setSelectedUser(userItem);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleUpdateUser = async (updates: {
+    disabled?: boolean;
+    system_role?: SystemRole;
+  }) => {
+    if (!selectedUser) return;
+
+    try {
+      await updateUserMutation.mutateAsync({
+        username: selectedUser.username,
+        data: updates,
+      });
+      queryClient.invalidateQueries({ queryKey: getListAllUsersQueryKey() });
+      setIsEditModalOpen(false);
+      setSelectedUser(null);
+    } catch (err) {
+      console.error("Failed to update user:", err);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedUser) return;
+
+    try {
+      await deleteUserMutation.mutateAsync({ username: selectedUser.username });
+      queryClient.invalidateQueries({ queryKey: getListAllUsersQueryKey() });
+      setIsDeleteModalOpen(false);
+      setSelectedUser(null);
+    } catch (err) {
+      console.error("Failed to delete user:", err);
+    }
+  };
+
+  const handleCreateUser = async (userData: {
+    username: string;
+    password: string;
+    full_name?: string;
+  }) => {
+    try {
+      await registerUserMutation.mutateAsync({ data: userData });
+      queryClient.invalidateQueries({ queryKey: getListAllUsersQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
+      setIsCreateModalOpen(false);
+    } catch (err) {
+      console.error("Failed to create user:", err);
+      throw err;
+    }
+  };
+
+  const handleDeleteProject = (project: ProjectListItem) => {
+    setSelectedProject(project);
+    setIsDeleteProjectModalOpen(true);
+  };
+
+  const handleConfirmDeleteProject = async () => {
+    if (!selectedProject) return;
+
+    try {
+      await deleteProjectMutation.mutateAsync({
+        projectId: selectedProject.project_id,
+      });
+      queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
+      setIsDeleteProjectModalOpen(false);
+      setSelectedProject(null);
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+    }
+  };
+
+  const handleManageMembers = (project: ProjectListItem) => {
+    setSelectedProject(project);
+    setIsMembersModalOpen(true);
+  };
+
+  const handleCreateProject = async (username: string) => {
+    try {
+      await createProjectMutation.mutateAsync({ username });
+      queryClient.invalidateQueries({ queryKey: getListAllUsersQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
+    } catch (err) {
+      console.error("Failed to create project:", err);
+    }
+  };
+
+  const handleAddMember = async (username: string) => {
+    if (!selectedProject) return;
+
+    await addMemberMutation.mutateAsync({
+      projectId: selectedProject.project_id,
+      data: { username },
+    });
+    queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
+  };
+
+  const handleRemoveMember = async (username: string) => {
+    if (!selectedProject) return;
+
+    await removeMemberMutation.mutateAsync({
+      projectId: selectedProject.project_id,
+      username,
+    });
+    queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
+  };
+
+  if (isLoading || projectsLoading) {
+    return (
+      <div className="w-full px-6 flex justify-center items-center min-h-[400px]">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
+  }
+
+  if (error || projectsError) {
+    return (
+      <div className="w-full px-6">
+        <div className="alert alert-error">
+          <span>
+            Failed to load data: {error?.message || projectsError?.message}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full px-6">
+      <h1 className="text-left text-3xl font-bold pb-6">Admin Panel</h1>
+
+      {/* Tabs */}
+      <div className="tabs tabs-boxed mb-6">
+        <button
+          className={`tab ${activeTab === "users" ? "tab-active" : ""}`}
+          onClick={() => setActiveTab("users")}
+        >
+          Users ({usersData?.data?.total || 0})
+        </button>
+        <button
+          className={`tab ${activeTab === "projects" ? "tab-active" : ""}`}
+          onClick={() => setActiveTab("projects")}
+        >
+          Projects ({projectsData?.data?.total || 0})
+        </button>
+      </div>
+
+      {/* Users Tab */}
+      {activeTab === "users" && (
+        <div className="card bg-base-200 shadow-lg">
+          <div className="card-body">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="card-title">User Management</h2>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => setIsCreateModalOpen(true)}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Create User
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="table table-zebra">
+                <thead>
+                  <tr>
+                    <th>Username</th>
+                    <th>Full Name</th>
+                    <th>System Role</th>
+                    <th>Project</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usersData?.data?.users.map((userItem) => (
+                    <tr key={userItem.username}>
+                      <td className="font-mono">{userItem.username}</td>
+                      <td>{userItem.full_name || "-"}</td>
+                      <td>
+                        <span
+                          className={`badge ${
+                            userItem.system_role === "admin"
+                              ? "badge-primary"
+                              : "badge-ghost"
+                          }`}
+                        >
+                          {userItem.system_role}
+                        </span>
+                      </td>
+                      <td>
+                        {userItem.default_project_id ? (
+                          <span className="badge badge-success badge-sm">
+                            Has Project
+                          </span>
+                        ) : (
+                          <button
+                            className="btn btn-xs btn-primary"
+                            onClick={() =>
+                              handleCreateProject(userItem.username)
+                            }
+                            disabled={createProjectMutation.isPending}
+                          >
+                            {createProjectMutation.isPending ? (
+                              <span className="loading loading-spinner loading-xs"></span>
+                            ) : (
+                              "Add Project"
+                            )}
+                          </button>
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          className={`badge ${
+                            userItem.disabled ? "badge-error" : "badge-success"
+                          }`}
+                        >
+                          {userItem.disabled ? "Disabled" : "Active"}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="flex gap-2">
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            onClick={() => handleEdit(userItem)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn-sm btn-error btn-ghost"
+                            onClick={() => handleDelete(userItem)}
+                            disabled={userItem.username === user?.username}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Projects Tab */}
+      {activeTab === "projects" && (
+        <div className="card bg-base-200 shadow-lg">
+          <div className="card-body">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="card-title">Project Management</h2>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="table table-zebra">
+                <thead>
+                  <tr>
+                    <th>Project Name</th>
+                    <th>Owner</th>
+                    <th>Members</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projectsData?.data?.projects.map((project) => (
+                    <tr key={project.project_id}>
+                      <td>
+                        <div>
+                          <div className="font-medium">{project.name}</div>
+                          {project.description && (
+                            <div className="text-xs text-base-content/60">
+                              {project.description}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="font-mono">{project.owner_username}</td>
+                      <td>
+                        <span className="badge badge-ghost">
+                          {project.member_count}
+                        </span>
+                      </td>
+                      <td className="text-sm text-base-content/60">
+                        {project.created_at
+                          ? new Date(project.created_at).toLocaleDateString()
+                          : "-"}
+                      </td>
+                      <td>
+                        <div className="flex gap-2">
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            onClick={() => handleManageMembers(project)}
+                          >
+                            Members
+                          </button>
+                          {project.owner_username === user?.username ? (
+                            <span
+                              className="btn btn-sm btn-ghost btn-disabled opacity-50"
+                              title="Cannot delete your own project"
+                            >
+                              Delete
+                            </span>
+                          ) : (
+                            <button
+                              className="btn btn-sm btn-error btn-ghost"
+                              onClick={() => handleDeleteProject(project)}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {isEditModalOpen && selectedUser && (
+        <EditUserModal
+          user={selectedUser}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedUser(null);
+          }}
+          onSave={handleUpdateUser}
+          isLoading={updateUserMutation.isPending}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && selectedUser && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Confirm Delete</h3>
+            <p className="py-4">
+              Are you sure you want to delete user{" "}
+              <span className="font-bold">{selectedUser.username}</span>? This
+              action cannot be undone.
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setSelectedUser(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-error"
+                onClick={handleConfirmDelete}
+                disabled={deleteUserMutation.isPending}
+              >
+                {deleteUserMutation.isPending ? (
+                  <span className="loading loading-spinner loading-sm"></span>
+                ) : (
+                  "Delete"
+                )}
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button
+              onClick={() => {
+                setIsDeleteModalOpen(false);
+                setSelectedUser(null);
+              }}
+            >
+              close
+            </button>
+          </form>
+        </dialog>
+      )}
+
+      {/* Create User Modal */}
+      {isCreateModalOpen && (
+        <CreateUserModal
+          onClose={() => setIsCreateModalOpen(false)}
+          onSave={handleCreateUser}
+          isLoading={registerUserMutation.isPending}
+          error={registerUserMutation.error}
+        />
+      )}
+
+      {/* Delete Project Confirmation Modal */}
+      {isDeleteProjectModalOpen && selectedProject && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Confirm Delete Project</h3>
+            <p className="py-4">
+              Are you sure you want to delete project{" "}
+              <span className="font-bold">{selectedProject.name}</span>?
+            </p>
+            <p className="text-sm text-base-content/60">
+              This will also remove all project memberships. This action cannot
+              be undone.
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={() => {
+                  setIsDeleteProjectModalOpen(false);
+                  setSelectedProject(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-error"
+                onClick={handleConfirmDeleteProject}
+                disabled={deleteProjectMutation.isPending}
+              >
+                {deleteProjectMutation.isPending ? (
+                  <span className="loading loading-spinner loading-sm"></span>
+                ) : (
+                  "Delete"
+                )}
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button
+              onClick={() => {
+                setIsDeleteProjectModalOpen(false);
+                setSelectedProject(null);
+              }}
+            >
+              close
+            </button>
+          </form>
+        </dialog>
+      )}
+
+      {/* Members Management Modal */}
+      {isMembersModalOpen && selectedProject && (
+        <MembersModal
+          project={selectedProject}
+          users={usersData?.data?.users || []}
+          onClose={() => {
+            setIsMembersModalOpen(false);
+            setSelectedProject(null);
+          }}
+          onAddMember={handleAddMember}
+          onRemoveMember={handleRemoveMember}
+          isAddingMember={addMemberMutation.isPending}
+          isRemovingMember={removeMemberMutation.isPending}
+          addMemberError={addMemberMutation.error}
+        />
+      )}
+    </div>
+  );
+}
+
+// Edit User Modal Component
+function EditUserModal({
+  user,
+  onClose,
+  onSave,
+  isLoading,
+}: {
+  user: UserListItem;
+  onClose: () => void;
+  onSave: (updates: { disabled?: boolean; system_role?: SystemRole }) => void;
+  isLoading: boolean;
+}) {
+  const [disabled, setDisabled] = useState(user.disabled ?? false);
+  const [systemRole, setSystemRole] = useState<SystemRole>(
+    user.system_role ?? "user",
+  );
+
+  const handleSave = () => {
+    onSave({
+      disabled,
+      system_role: systemRole,
+    });
+  };
+
+  return (
+    <dialog className="modal modal-open">
+      <div className="modal-box max-w-2xl">
+        <h3 className="font-bold text-lg mb-4">Edit User: {user.username}</h3>
+
+        <div className="space-y-4">
+          {/* Status */}
+          <div className="form-control">
+            <label className="label cursor-pointer justify-start gap-4">
+              <input
+                type="checkbox"
+                className="toggle toggle-error"
+                checked={disabled}
+                onChange={(e) => setDisabled(e.target.checked)}
+              />
+              <span className="label-text">
+                Account Disabled
+                {disabled && (
+                  <span className="text-error ml-2">(User cannot login)</span>
+                )}
+              </span>
+            </label>
+          </div>
+
+          {/* System Role */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-medium">System Role</span>
+            </label>
+            <select
+              className="select select-bordered"
+              value={systemRole}
+              onChange={(e) => setSystemRole(e.target.value as SystemRole)}
+            >
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+            <label className="label">
+              <span className="label-text-alt text-base-content/60">
+                Admin users can manage all users and system settings
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div className="modal-action">
+          <button className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <span className="loading loading-spinner loading-sm"></span>
+            ) : (
+              "Save Changes"
+            )}
+          </button>
+        </div>
+      </div>
+      <form method="dialog" className="modal-backdrop">
+        <button onClick={onClose}>close</button>
+      </form>
+    </dialog>
+  );
+}
+
+// Create User Modal Component
+function CreateUserModal({
+  onClose,
+  onSave,
+  isLoading,
+  error,
+}: {
+  onClose: () => void;
+  onSave: (userData: {
+    username: string;
+    password: string;
+    full_name?: string;
+  }) => Promise<void>;
+  isLoading: boolean;
+  error: Error | null;
+}) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setLocalError(null);
+
+    if (!username.trim()) {
+      setLocalError("Username is required");
+      return;
+    }
+    if (!password.trim()) {
+      setLocalError("Password is required");
+      return;
+    }
+    if (password.length < 4) {
+      setLocalError("Password must be at least 4 characters");
+      return;
+    }
+
+    try {
+      await onSave({
+        username: username.trim(),
+        password,
+        full_name: fullName.trim() || undefined,
+      });
+    } catch {
+      // Error is handled by the mutation
+    }
+  };
+
+  const displayError =
+    localError ||
+    (error ? "Failed to create user. Username may already exist." : null);
+
+  return (
+    <dialog className="modal modal-open">
+      <div className="modal-box">
+        <h3 className="font-bold text-lg mb-4">Create New User</h3>
+
+        {displayError && (
+          <div className="alert alert-error mb-4">
+            <span>{displayError}</span>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-medium">Username *</span>
+            </label>
+            <input
+              type="text"
+              className="input input-bordered w-full"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter username"
+            />
+          </div>
+
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-medium">Password *</span>
+            </label>
+            <input
+              type="password"
+              className="input input-bordered w-full"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+            />
+          </div>
+
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-medium">Full Name</span>
+            </label>
+            <input
+              type="text"
+              className="input input-bordered w-full"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Enter full name (optional)"
+            />
+            <label className="label">
+              <span className="label-text-alt text-base-content/60">
+                A default project will be created for this user
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div className="modal-action">
+          <button className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <span className="loading loading-spinner loading-sm"></span>
+            ) : (
+              "Create User"
+            )}
+          </button>
+        </div>
+      </div>
+      <form method="dialog" className="modal-backdrop">
+        <button onClick={onClose}>close</button>
+      </form>
+    </dialog>
+  );
+}
+
+// Members Modal Component
+function MembersModal({
+  project,
+  users,
+  onClose,
+  onAddMember,
+  onRemoveMember,
+  isAddingMember,
+  isRemovingMember,
+  addMemberError,
+}: {
+  project: ProjectListItem;
+  users: UserListItem[];
+  onClose: () => void;
+  onAddMember: (username: string) => Promise<void>;
+  onRemoveMember: (username: string) => Promise<void>;
+  isAddingMember: boolean;
+  isRemovingMember: boolean;
+  addMemberError: Error | null;
+}) {
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedUsername, setSelectedUsername] = useState("");
+  const [removingUsername, setRemovingUsername] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  // Fetch members for this project
+  const {
+    data: membersData,
+    isLoading: membersLoading,
+    refetch,
+  } = useListProjectMembersAdmin(project.project_id);
+
+  const members = membersData?.data?.members || [];
+
+  // Filter out users who are already members
+  const availableUsers = users.filter(
+    (u) => !members.some((m) => m.username === u.username),
+  );
+
+  const handleAddMember = async () => {
+    setLocalError(null);
+
+    if (!selectedUsername) {
+      setLocalError("Please select a user");
+      return;
+    }
+
+    try {
+      await onAddMember(selectedUsername);
+      setSelectedUsername("");
+      setIsAddModalOpen(false);
+      refetch();
+    } catch {
+      // Error is handled by the mutation
+    }
+  };
+
+  const handleRemoveMember = async (username: string) => {
+    setRemovingUsername(username);
+    await onRemoveMember(username);
+    setRemovingUsername(null);
+    refetch();
+  };
+
+  const getRoleBadgeClass = (role: string) => {
+    switch (role) {
+      case "owner":
+        return "badge-secondary";
+      case "viewer":
+        return "badge-ghost";
+      default:
+        return "badge-ghost";
+    }
+  };
+
+  return (
+    <dialog className="modal modal-open">
+      <div className="modal-box max-w-2xl">
+        <h3 className="font-bold text-lg mb-4">Members of {project.name}</h3>
+
+        {membersLoading ? (
+          <div className="flex justify-center py-8">
+            <span className="loading loading-spinner loading-lg"></span>
+          </div>
+        ) : (
+          <>
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-sm text-base-content/60">
+                {members.length} member{members.length !== 1 ? "s" : ""}
+              </span>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => setIsAddModalOpen(true)}
+              >
+                Add Member
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="table table-zebra">
+                <thead>
+                  <tr>
+                    <th>Username</th>
+                    <th>Full Name</th>
+                    <th>Role</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map((member) => (
+                    <tr key={member.username}>
+                      <td className="font-mono">{member.username}</td>
+                      <td>{member.full_name || "-"}</td>
+                      <td>
+                        <span
+                          className={`badge ${getRoleBadgeClass(member.role)}`}
+                        >
+                          {member.role}
+                        </span>
+                      </td>
+                      <td>
+                        {member.role !== "owner" ? (
+                          <button
+                            className="btn btn-sm btn-error btn-ghost"
+                            onClick={() => handleRemoveMember(member.username)}
+                            disabled={
+                              isRemovingMember &&
+                              removingUsername === member.username
+                            }
+                          >
+                            {isRemovingMember &&
+                            removingUsername === member.username ? (
+                              <span className="loading loading-spinner loading-xs"></span>
+                            ) : (
+                              "Remove"
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-base-content/60">
+                            Owner
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {members.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="text-center text-base-content/60"
+                      >
+                        No members found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        <div className="modal-action">
+          <button className="btn" onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        {/* Add Member Sub-Modal */}
+        {isAddModalOpen && (
+          <dialog className="modal modal-open" style={{ zIndex: 100 }}>
+            <div className="modal-box">
+              <h3 className="font-bold text-lg mb-4">Add Member as Viewer</h3>
+
+              {(localError || addMemberError) && (
+                <div className="alert alert-error mb-4">
+                  <span>{localError || "Failed to add member"}</span>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-medium">User</span>
+                  </label>
+                  <select
+                    className="select select-bordered"
+                    value={selectedUsername}
+                    onChange={(e) => setSelectedUsername(e.target.value)}
+                  >
+                    <option value="">Select a user...</option>
+                    {availableUsers.map((u) => (
+                      <option key={u.username} value={u.username}>
+                        {u.username}
+                        {u.full_name ? ` (${u.full_name})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="alert alert-info">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    className="stroke-current shrink-0 w-5 h-5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    ></path>
+                  </svg>
+                  <span className="text-sm">
+                    Members are added as viewers with read-only access.
+                  </span>
+                </div>
+              </div>
+
+              <div className="modal-action">
+                <button
+                  className="btn"
+                  onClick={() => setIsAddModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleAddMember}
+                  disabled={isAddingMember || !selectedUsername}
+                >
+                  {isAddingMember ? (
+                    <span className="loading loading-spinner loading-sm"></span>
+                  ) : (
+                    "Add as Viewer"
+                  )}
+                </button>
+              </div>
+            </div>
+            <form method="dialog" className="modal-backdrop">
+              <button onClick={() => setIsAddModalOpen(false)}>close</button>
+            </form>
+          </dialog>
+        )}
+      </div>
+      <form method="dialog" className="modal-backdrop">
+        <button onClick={onClose}>close</button>
+      </form>
+    </dialog>
+  );
+}

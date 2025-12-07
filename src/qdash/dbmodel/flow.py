@@ -25,7 +25,7 @@ class FlowDocument(Document):
 
     """
 
-    project_id: str | None = Field(None, description="Owning project identifier")
+    project_id: str = Field(..., description="Owning project identifier")
     name: str = Field(..., description="Flow name (filename without .py)")
     username: str = Field(..., description="Owner username")
     chip_id: str = Field(..., description="Target chip ID")
@@ -53,7 +53,7 @@ class FlowDocument(Document):
         ]
 
     @classmethod
-    def find_by_user_and_name(cls, username: str, name: str, project_id: str | None = None) -> "FlowDocument | None":
+    def find_by_user_and_name(cls, username: str, name: str, project_id: str) -> "FlowDocument | None":
         """Find flow by username and name.
 
         Args:
@@ -70,7 +70,7 @@ class FlowDocument(Document):
         return cls.find_one({"project_id": project_id, "username": username, "name": name}).run()
 
     @classmethod
-    def list_by_user(cls, username: str, project_id: str | None = None) -> list["FlowDocument"]:
+    def list_by_user(cls, username: str, project_id: str) -> list["FlowDocument"]:
         """List all flows for a user, sorted by update time (newest first).
 
         Args:
@@ -86,7 +86,7 @@ class FlowDocument(Document):
         return list(cls.find({"project_id": project_id, "username": username}, sort=[("updated_at", DESCENDING)]).run())  # type: ignore[list-item]
 
     @classmethod
-    def delete_by_user_and_name(cls, username: str, name: str, project_id: str | None = None) -> bool:
+    def delete_by_user_and_name(cls, username: str, name: str, project_id: str) -> bool:
         """Delete flow by username and name.
 
         Args:

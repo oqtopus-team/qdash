@@ -14,7 +14,7 @@ class QubitDocument(Document):
 
     Attributes
     ----------
-        project_id (str | None): The owning project identifier.
+        project_id (str): The owning project identifier (required).
         qid (str): The qubit ID. e.g. "0".
         chip_id (str): The chip ID. e.g. "chip1".
         data (dict): The data of the qubit. e.g. {"qubit_frequency": 5.0}.
@@ -23,7 +23,7 @@ class QubitDocument(Document):
 
     """
 
-    project_id: str | None = Field(None, description="Owning project identifier")
+    project_id: str = Field(..., description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the qubit")
     qid: str = Field(..., description="The qubit ID")
     status: str = Field("pending", description="The status of the qubit")

@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from qdash.datamodel.user import SystemRole
 
 
 class User(BaseModel):
@@ -8,6 +9,7 @@ class User(BaseModel):
     full_name: str | None = None
     disabled: bool | None = None
     default_project_id: str | None = None
+    system_role: SystemRole = SystemRole.USER
 
 
 class UserWithToken(BaseModel):
@@ -17,6 +19,7 @@ class UserWithToken(BaseModel):
     full_name: str | None = None
     disabled: bool | None = None
     default_project_id: str | None = None
+    system_role: SystemRole = SystemRole.USER
     access_token: str
 
 
@@ -28,7 +31,7 @@ class UserInDB(User):
 
 
 class UserCreate(BaseModel):
-    """User creation model for registration."""
+    """User creation model for registration (admin only)."""
 
     username: str
     password: str

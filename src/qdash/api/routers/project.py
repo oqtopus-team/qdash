@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.logger import logger
-from qdash.api.lib.auth import get_current_active_user
+from qdash.api.lib.auth import get_admin_user, get_current_active_user
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context_from_path,
@@ -23,6 +23,7 @@ from qdash.api.schemas.project import (
     ProjectUpdate,
 )
 from qdash.datamodel.project import ProjectRole
+from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
@@ -76,6 +77,14 @@ def create_project(
 ) -> ProjectResponse:
     """Create a new project with the current user as owner."""
     logger.debug(f"Creating project '{project_data.name}' for user {current_user.username}")
+
+    # Check if user has permission to create projects
+    # Only admin users can create projects (1 user = 1 project principle)
+    if current_user.system_role != SystemRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can create projects.",
+        )
 
     service = ProjectService()
     project = service.create_project(
@@ -205,10 +214,18 @@ def list_members(
     operation_id="inviteProjectMember",
 )
 def invite_member(
+    project_id: str,
     invite_data: MemberInvite,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_owner_from_path)],
+    admin: Annotated[User, Depends(get_admin_user)],
 ) -> MemberResponse:
-    """Invite a user to the project. Owner only."""
+    """Invite a user to the project. Admin only."""
+    # Verify project exists
+    project = ProjectDocument.find_one({"project_id": project_id}).run()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project '{project_id}' not found",
+        )
     # Check if user exists
     target_user = UserDocument.find_one({"username": invite_data.username}).run()
     if not target_user:
@@ -218,9 +235,7 @@ def invite_member(
         )
 
     # Check if already a member
-    existing = ProjectMembershipDocument.find_one(
-        {"project_id": ctx.project_id, "username": invite_data.username}
-    ).run()
+    existing = ProjectMembershipDocument.find_one({"project_id": project_id, "username": invite_data.username}).run()
 
     if existing:
         if existing.status == "active":
@@ -231,24 +246,25 @@ def invite_member(
         # Reactivate if revoked
         existing.role = invite_data.role
         existing.status = "active"
-        existing.invited_by = ctx.user.username
+        existing.invited_by = admin.username
         existing.system_info.update_time()
         existing.save()
         return _to_member_response(existing)
 
     # Create new membership
+    from qdash.datamodel.system_info import SystemInfoModel
+
     membership = ProjectMembershipDocument(
-        project_id=ctx.project_id,
+        project_id=project_id,
         username=invite_data.username,
         role=invite_data.role,
         status="active",  # Directly active for now (no invitation flow)
-        invited_by=ctx.user.username,
+        invited_by=admin.username,
+        system_info=SystemInfoModel(),
     )
     membership.insert()
 
-    logger.info(
-        f"User {ctx.user.username} invited {invite_data.username} " f"to project {ctx.project_id} as {invite_data.role}"
-    )
+    logger.info(f"Admin {admin.username} invited {invite_data.username} to project {project_id} as {invite_data.role}")
 
     return _to_member_response(membership)
 
@@ -260,18 +276,26 @@ def invite_member(
     operation_id="updateProjectMember",
 )
 def update_member(
+    project_id: str,
     username: str,
     update_data: MemberUpdate,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_owner_from_path)],
+    admin: Annotated[User, Depends(get_admin_user)],
 ) -> MemberResponse:
-    """Update a member's role. Owner only."""
-    if username == ctx.project.owner_username:
+    """Update a member's role. Admin only."""
+    project = ProjectDocument.find_one({"project_id": project_id}).run()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project '{project_id}' not found",
+        )
+
+    if username == project.owner_username:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot change the owner's role",
         )
 
-    membership = ProjectMembershipDocument.find_one({"project_id": ctx.project_id, "username": username}).run()
+    membership = ProjectMembershipDocument.find_one({"project_id": project_id, "username": username}).run()
 
     if not membership:
         raise HTTPException(
@@ -293,17 +317,25 @@ def update_member(
     operation_id="removeProjectMember",
 )
 def remove_member(
+    project_id: str,
     username: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_owner_from_path)],
+    admin: Annotated[User, Depends(get_admin_user)],
 ) -> None:
-    """Remove a member from the project. Owner only."""
-    if username == ctx.project.owner_username:
+    """Remove a member from the project. Admin only."""
+    project = ProjectDocument.find_one({"project_id": project_id}).run()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project '{project_id}' not found",
+        )
+
+    if username == project.owner_username:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot remove the project owner",
         )
 
-    membership = ProjectMembershipDocument.find_one({"project_id": ctx.project_id, "username": username}).run()
+    membership = ProjectMembershipDocument.find_one({"project_id": project_id, "username": username}).run()
 
     if not membership:
         raise HTTPException(
@@ -315,7 +347,7 @@ def remove_member(
     membership.system_info.update_time()
     membership.save()
 
-    logger.info(f"User {ctx.user.username} removed {username} from project {ctx.project_id}")
+    logger.info(f"Admin {admin.username} removed {username} from project {project_id}")
 
 
 # --- Transfer ownership ---
@@ -328,11 +360,19 @@ def remove_member(
     operation_id="transferProjectOwnership",
 )
 def transfer_ownership(
+    project_id: str,
     new_owner: MemberInvite,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_owner_from_path)],
+    admin: Annotated[User, Depends(get_admin_user)],
 ) -> ProjectResponse:
-    """Transfer project ownership to another user. Current owner only."""
-    if new_owner.username == ctx.project.owner_username:
+    """Transfer project ownership to another user. Admin only."""
+    project = ProjectDocument.find_one({"project_id": project_id}).run()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project '{project_id}' not found",
+        )
+
+    if new_owner.username == project.owner_username:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User is already the owner",
@@ -346,18 +386,18 @@ def transfer_ownership(
             detail=f"User '{new_owner.username}' not found",
         )
 
-    # Update old owner membership to editor
+    # Update old owner membership to viewer
     old_owner_membership = ProjectMembershipDocument.find_one(
-        {"project_id": ctx.project_id, "username": ctx.project.owner_username}
+        {"project_id": project_id, "username": project.owner_username}
     ).run()
     if old_owner_membership:
-        old_owner_membership.role = ProjectRole.EDITOR
+        old_owner_membership.role = ProjectRole.VIEWER
         old_owner_membership.system_info.update_time()
         old_owner_membership.save()
 
     # Update or create new owner membership
     new_owner_membership = ProjectMembershipDocument.find_one(
-        {"project_id": ctx.project_id, "username": new_owner.username}
+        {"project_id": project_id, "username": new_owner.username}
     ).run()
 
     if new_owner_membership:
@@ -366,22 +406,23 @@ def transfer_ownership(
         new_owner_membership.system_info.update_time()
         new_owner_membership.save()
     else:
+        from qdash.datamodel.system_info import SystemInfoModel
+
         new_owner_membership = ProjectMembershipDocument(
-            project_id=ctx.project_id,
+            project_id=project_id,
             username=new_owner.username,
             role=ProjectRole.OWNER,
             status="active",
-            invited_by=ctx.user.username,
+            invited_by=admin.username,
+            system_info=SystemInfoModel(),
         )
         new_owner_membership.insert()
 
     # Update project owner
-    ctx.project.owner_username = new_owner.username
-    ctx.project.system_info.update_time()
-    ctx.project.save()
+    project.owner_username = new_owner.username
+    project.system_info.update_time()
+    project.save()
 
-    logger.warning(
-        f"Project {ctx.project_id} ownership transferred from " f"{ctx.user.username} to {new_owner.username}"
-    )
+    logger.warning(f"Admin {admin.username} transferred project {project_id} ownership to {new_owner.username}")
 
-    return _to_project_response(ctx.project)
+    return _to_project_response(project)

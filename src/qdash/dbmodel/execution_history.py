@@ -13,7 +13,7 @@ class ExecutionHistoryDocument(Document):
 
     Attributes
     ----------
-        project_id (str | None): The owning project identifier.
+        project_id (str): The owning project identifier.
         execution_id (str): The execution ID. e.g. "0".
         status (str): The status of the execution. e.g. "completed".
         tasks (dict): The tasks of the execution. e.g. {"task1": "completed"}.
@@ -30,7 +30,7 @@ class ExecutionHistoryDocument(Document):
 
     """
 
-    project_id: str | None = Field(None, description="Owning project identifier")
+    project_id: str = Field(..., description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the execution")
     name: str = Field(..., description="The name of the execution")
     execution_id: str = Field(..., description="The execution ID")

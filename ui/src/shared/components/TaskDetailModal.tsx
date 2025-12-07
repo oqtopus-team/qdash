@@ -3,11 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { InteractiveFigureContent } from "./InteractiveFigureContent";
+
 import type { Task } from "@/schemas";
-import { useGetTaskResult } from "@/client/task/task";
 
 import { TaskFigure } from "@/app/components/TaskFigure";
-import { InteractiveFigureContent } from "./InteractiveFigureContent";
+import { useGetTaskResult } from "@/client/task/task";
 
 interface TaskDetailModalProps {
   isOpen: boolean;

@@ -12,8 +12,8 @@ import {
 
 import type { Task } from "@/schemas";
 
-import { TaskFigure } from "@/app/components/TaskFigure";
 import PlotlyRenderer from "@/app/components/PlotlyRenderer";
+import { TaskFigure } from "@/app/components/TaskFigure";
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { TaskGridView } from "@/shared/components/TaskGridView";
 

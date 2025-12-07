@@ -14,7 +14,7 @@ class ChipDocument(Document):
 
     Attributes
     ----------
-        project_id (str | None): The owning project identifier.
+        project_id (str): The owning project identifier (required).
         chip_id (str): The chip ID. e.g. "chip1".
         size (int): The size of the chip.
         qubits (dict): The qubits of the chip.
@@ -24,7 +24,7 @@ class ChipDocument(Document):
 
     """
 
-    project_id: str | None = Field(None, description="Owning project identifier")
+    project_id: str = Field(..., description="Owning project identifier")
     chip_id: str = Field("SAMPLE", description="The chip ID")
     username: str = Field(..., description="The username of the user who created the chip")
     size: int = Field(64, description="The size of the chip")

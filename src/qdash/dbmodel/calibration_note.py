@@ -12,7 +12,7 @@ class CalibrationNoteDocument(Document):
 
     Attributes
     ----------
-        project_id (str | None): The project ID for multi-tenancy.
+        project_id (str): The project ID for multi-tenancy.
         username (str): The username of the user who created the note.
         chip_id (str): The chip ID associated with this note.
         execution_id (str): The execution ID associated with this note.
@@ -23,7 +23,7 @@ class CalibrationNoteDocument(Document):
 
     """
 
-    project_id: str | None = Field(None, description="Owning project identifier")
+    project_id: str = Field(..., description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the note")
     chip_id: str = Field(..., description="The chip ID associated with this note")
     execution_id: str = Field(..., description="The execution ID associated with this note")
@@ -64,7 +64,7 @@ class CalibrationNoteDocument(Document):
         execution_id: str,
         task_id: str,
         note: dict,
-        project_id: str | None = None,
+        project_id: str,
     ) -> "CalibrationNoteDocument":
         """Upsert a calibration note.
 
@@ -75,7 +75,7 @@ class CalibrationNoteDocument(Document):
             execution_id (str): The execution ID associated with this note.
             task_id (str): The task ID associated with this note.
             note (dict): The calibration note data.
-            project_id (str | None): The project ID for multi-tenancy.
+            project_id (str): The project ID for multi-tenancy.
 
         Returns:
         -------

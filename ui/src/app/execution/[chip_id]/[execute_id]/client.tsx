@@ -22,8 +22,8 @@ import type { ExecutionResponseDetail } from "@/schemas";
 import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 import { TaskFigure } from "@/app/components/TaskFigure";
 import { useGetExecution } from "@/client/execution/execution";
-import { TaskGridView } from "@/shared/components/TaskGridView";
 import { InteractiveFigureModal } from "@/shared/components/InteractiveFigureModal";
+import { TaskGridView } from "@/shared/components/TaskGridView";
 
 type FilterOption = {
   value: string;

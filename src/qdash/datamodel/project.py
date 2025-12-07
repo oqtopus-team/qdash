@@ -5,10 +5,14 @@ from qdash.datamodel.system_info import SystemInfoModel
 
 
 class ProjectRole(str, Enum):
-    """Role of a member inside a project."""
+    """Role of a member inside a project.
+
+    Simplified model:
+    - OWNER: Full access to project (read, write, admin)
+    - VIEWER: Read-only access (for invited members)
+    """
 
     OWNER = "owner"
-    EDITOR = "editor"
     VIEWER = "viewer"
 
 

@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useMemo } from "react";
-
 import dynamic from "next/dynamic";
+import React, { useMemo } from "react";
 
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 

@@ -73,14 +73,16 @@ class QubexBackend(BaseBackend):
             raise RuntimeError(msg)
         return str(exp.calib_note)
 
-    def save_note(self, username: str, chip_id: str, calib_dir: str, execution_id: str, task_manager_id: str) -> None:
+    def save_note(
+        self, username: str, chip_id: str, calib_dir: str, execution_id: str, task_manager_id: str, project_id: str
+    ) -> None:
         """Save the calibration note to the experiment."""
         # Initialize calibration note
         note_path = Path(f"{calib_dir}/calib_note/{task_manager_id}.json")
         note_path.parent.mkdir(parents=True, exist_ok=True)
 
         master_doc = (
-            CalibrationNoteDocument.find({"task_id": "master", "chip_id": chip_id})
+            CalibrationNoteDocument.find({"task_id": "master", "chip_id": chip_id, "project_id": project_id})
             .sort([("timestamp", -1)])
             .limit(1)
             .run()
@@ -93,12 +95,15 @@ class QubexBackend(BaseBackend):
                 execution_id=execution_id,
                 task_id="master",
                 note={},
+                project_id=project_id,
             )
         else:
             master_doc = master_doc[0]
         note_path.write_text(json.dumps(master_doc.note, indent=2))
 
-    def update_note(self, username: str, chip_id: str, calib_dir: str, execution_id: str, task_manager_id: str) -> None:
+    def update_note(
+        self, username: str, chip_id: str, calib_dir: str, execution_id: str, task_manager_id: str, project_id: str
+    ) -> None:
         """Update the master calibration note in MongoDB only.
 
         This method saves calibration notes exclusively to MongoDB, avoiding
@@ -123,6 +128,7 @@ class QubexBackend(BaseBackend):
             {
                 "task_id": "master",
                 "chip_id": chip_id,
+                "project_id": project_id,
             }
         ).run()
 
@@ -134,6 +140,7 @@ class QubexBackend(BaseBackend):
                 execution_id=execution_id,
                 task_id="master",
                 note=calib_note,
+                project_id=project_id,
             )
         else:
             # マスターノートが存在する場合はマージ
@@ -144,6 +151,7 @@ class QubexBackend(BaseBackend):
                 execution_id=execution_id,
                 task_id="master",
                 note=merged_note,
+                project_id=project_id,
             )
 
         # File I/O removed - MongoDB is the single source of truth

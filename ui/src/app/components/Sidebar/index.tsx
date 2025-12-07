@@ -11,10 +11,12 @@ import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { GoWorkflow } from "react-icons/go";
 import { IoMdSettings } from "react-icons/io";
 import { IoAnalytics } from "react-icons/io5";
+import { MdAdminPanelSettings } from "react-icons/md";
 import { VscFiles } from "react-icons/vsc";
 
-import { useSidebar } from "@/app/contexts/SidebarContext";
+import { useAuth } from "@/app/contexts/AuthContext";
 import { useProject } from "@/app/contexts/ProjectContext";
+import { useSidebar } from "@/app/contexts/SidebarContext";
 
 const PREFECT_URL =
   process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
@@ -23,6 +25,8 @@ function Sidebar() {
   const pathname = usePathname();
   const { isOpen, toggleSidebar } = useSidebar();
   const { canEdit } = useProject();
+  const { user } = useAuth();
+  const isAdmin = user?.system_role === "admin";
   const isActive = (path: string) => {
     return pathname === path;
   };
@@ -192,6 +196,24 @@ function Sidebar() {
             {isOpen && <span className="ml-2">Settings</span>}
           </Link>
         </li>
+        {isAdmin && (
+          <li>
+            <Link
+              href="/admin"
+              className={`py-4 ${
+                isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
+              } my-2 text-base font-bold flex items-center ${
+                isActive("/admin")
+                  ? "bg-neutral text-neutral-content"
+                  : "text-base-content"
+              }`}
+              title="Admin"
+            >
+              <MdAdminPanelSettings />
+              {isOpen && <span className="ml-2">Admin</span>}
+            </Link>
+          </li>
+        )}
         {canEdit && (
           <>
             <div className="divider"></div>

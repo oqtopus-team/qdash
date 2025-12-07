@@ -1,3 +1,4 @@
+import logging
 import os
 
 from bunnet import init_bunnet
@@ -6,6 +7,7 @@ from qdash.config import get_settings
 from qdash.dbmodel.document_models import document_models
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 # Skip MongoDB connection in test mode - tests set up their own connection
 _client: MongoClient | None = None
@@ -51,4 +53,5 @@ def initialize() -> None:
         database=_get_client().qubex,
         document_models=document_models(),
     )
+
     _initialized = True

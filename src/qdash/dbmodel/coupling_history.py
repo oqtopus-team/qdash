@@ -13,7 +13,7 @@ class CouplingHistoryDocument(Document):
 
     Attributes
     ----------
-        project_id (str | None): The owning project identifier.
+        project_id (str): The owning project identifier.
         qid (str): The coupling ID. e.g. "0-1".
         chip_id (str): The chip ID. e.g. "chip1".
         data (dict): The data of the coupling.
@@ -24,7 +24,7 @@ class CouplingHistoryDocument(Document):
 
     """
 
-    project_id: str | None = Field(None, description="Owning project identifier")
+    project_id: str = Field(..., description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the coupling")
     qid: str = Field(..., description="The coupling ID")
     status: str = Field(..., description="The status of the coupling")

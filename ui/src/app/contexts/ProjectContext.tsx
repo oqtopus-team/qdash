@@ -9,13 +9,16 @@ import {
   useEffect,
 } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
+
+import { useAuth } from "./AuthContext";
+
 import type { ProjectResponse, ProjectRole } from "@/schemas";
+
 import {
   useListProjects,
   useListProjectMembers,
 } from "@/client/projects/projects";
-import { useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "./AuthContext";
 
 interface ProjectContextType {
   currentProject: ProjectResponse | null;
@@ -23,9 +26,8 @@ interface ProjectContextType {
   projectId: string | null;
   role: ProjectRole | null;
   isOwner: boolean;
-  isEditor: boolean;
   isViewer: boolean;
-  canEdit: boolean;
+  canEdit: boolean; // Only owner can edit (simplified permission model)
   loading: boolean;
   switchProject: (projectId: string) => void;
   refreshProjects: () => void;
@@ -130,9 +132,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, [refetch]);
 
   const isOwner = role === "owner";
-  const isEditor = role === "editor";
   const isViewer = role === "viewer";
-  const canEdit = isOwner || isEditor;
+  const canEdit = isOwner; // Only owner can edit (simplified permission model)
 
   return (
     <ProjectContext.Provider
@@ -142,7 +143,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         projectId,
         role,
         isOwner,
-        isEditor,
         isViewer,
         canEdit,
         loading: isLoading,

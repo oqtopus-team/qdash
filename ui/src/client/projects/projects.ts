@@ -24,13 +24,13 @@ import type {
 import type {
   HTTPValidationError,
   MemberInvite,
-  MemberListResponse,
   MemberResponse,
   MemberUpdate,
   ProjectCreate,
-  ProjectListResponse,
   ProjectResponse,
   ProjectUpdate,
+  QdashApiSchemasProjectMemberListResponse,
+  QdashApiSchemasProjectProjectListResponse,
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
@@ -46,7 +46,7 @@ export const listProjects = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
-  return customInstance<ProjectListResponse>(
+  return customInstance<QdashApiSchemasProjectProjectListResponse>(
     { url: `/projects`, method: "GET", signal },
     options,
   );
@@ -589,7 +589,7 @@ export const listProjectMembers = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
-  return customInstance<MemberListResponse>(
+  return customInstance<QdashApiSchemasProjectMemberListResponse>(
     { url: `/projects/${projectId}/members`, method: "GET", signal },
     options,
   );
@@ -745,7 +745,7 @@ export function useListProjectMembers<
 }
 
 /**
- * Invite a user to the project. Owner only.
+ * Invite a user to the project. Admin only.
  * @summary Invite a member
  */
 export const inviteProjectMember = (
@@ -839,7 +839,7 @@ export const useInviteProjectMember = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Update a member's role. Owner only.
+ * Update a member's role. Admin only.
  * @summary Update member role
  */
 export const updateProjectMember = (
@@ -932,7 +932,7 @@ export const useUpdateProjectMember = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Remove a member from the project. Owner only.
+ * Remove a member from the project. Admin only.
  * @summary Remove member
  */
 export const removeProjectMember = (
@@ -1019,7 +1019,7 @@ export const useRemoveProjectMember = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Transfer project ownership to another user. Current owner only.
+ * Transfer project ownership to another user. Admin only.
  * @summary Transfer project ownership
  */
 export const transferProjectOwnership = (

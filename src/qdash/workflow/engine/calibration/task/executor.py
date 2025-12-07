@@ -653,6 +653,7 @@ class TaskExecutor:
                 calib_dir=self.calib_dir,
                 execution_id=execution_manager.execution_id,
                 task_manager_id=self.task_manager_id,
+                project_id=execution_manager.project_id,
             )
 
         # Update database

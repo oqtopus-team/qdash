@@ -9,7 +9,7 @@ from qdash.datamodel.system_info import SystemInfoModel
 class ExecutionCounterDocument(Document):
     """Document for the execution counter."""
 
-    project_id: str | None = Field(None, description="Owning project identifier")
+    project_id: str = Field(..., description="Owning project identifier")
     date: str
     username: str
     chip_id: str
@@ -32,7 +32,7 @@ class ExecutionCounterDocument(Document):
     )
 
     @classmethod
-    def get_next_index(cls, date: str, username: str, chip_id: str, project_id: str | None = None) -> int:
+    def get_next_index(cls, date: str, username: str, chip_id: str, project_id: str) -> int:
         """Get the next index for the given date, username and chip_id combination.
 
         Uses atomic findAndModify to prevent race conditions in concurrent executions.

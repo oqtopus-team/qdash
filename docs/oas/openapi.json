@@ -61,8 +61,8 @@
     "/auth/register": {
       "post": {
         "tags": ["auth"],
-        "summary": "Register a new user",
-        "description": "Register a new user account.\n\nCreates a new user in the database with hashed password and generates\nan access token for immediate use.\n\nParameters\n----------\nuser_data : UserCreate\n    User registration data including username, password, and optional full_name\n\nReturns\n-------\nUserWithToken\n    Newly created user information including access_token\n\nRaises\n------\nHTTPException\n    400 if the username is already registered",
+        "summary": "Register a new user (admin only)",
+        "description": "Register a new user account (admin only).\n\nCreates a new user in the database with hashed password and generates\nan access token for immediate use. Only admin users can create new accounts.\n\nParameters\n----------\nuser_data : UserCreate\n    User registration data including username, password, and optional full_name\ncurrent_user : User\n    Current authenticated admin user\n\nReturns\n-------\nUserWithToken\n    Newly created user information including access_token\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin\n    400 if the username is already registered",
         "operationId": "registerUser",
         "requestBody": {
           "content": {
@@ -98,7 +98,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/auth/me": {
@@ -156,6 +161,553 @@
         }
       }
     },
+    "/admin/users": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "List all users",
+        "description": "List all users in the system (admin only).\n\nParameters\n----------\nadmin : User\n    Current admin user (verified by dependency)\nskip : int\n    Number of users to skip for pagination\nlimit : int\n    Maximum number of users to return\n\nReturns\n-------\nUserListResponse\n    List of users with total count",
+        "operationId": "listAllUsers",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{username}": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "Get user details",
+        "description": "Get detailed information about a specific user (admin only).\n\nParameters\n----------\nusername : str\n    Username to look up\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\nUserDetailResponse\n    Detailed user information\n\nRaises\n------\nHTTPException\n    404 if user not found",
+        "operationId": "getUserDetails",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["admin"],
+        "summary": "Update user settings",
+        "description": "Update user settings (admin only).\n\nParameters\n----------\nusername : str\n    Username to update\nrequest : UpdateUserRequest\n    Update request with fields to modify\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\nUserDetailResponse\n    Updated user information\n\nRaises\n------\nHTTPException\n    404 if user not found\n    400 if trying to demote the last admin",
+        "operationId": "updateUserSettings",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Username"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["admin"],
+        "summary": "Delete user",
+        "description": "Delete a user account (admin only).\n\nParameters\n----------\nusername : str\n    Username to delete\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\ndict[str, str]\n    Success message\n\nRaises\n------\nHTTPException\n    404 if user not found\n    400 if trying to delete self or last admin",
+        "operationId": "deleteUser",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Deleteuser"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/projects": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "List all projects",
+        "description": "List all projects in the system (admin only).\n\nParameters\n----------\nadmin : User\n    Current admin user (verified by dependency)\nskip : int\n    Number of projects to skip for pagination\nlimit : int\n    Maximum number of projects to return\n\nReturns\n-------\nProjectListResponse\n    List of projects with total count",
+        "operationId": "listAllProjects",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/qdash__api__schemas__admin__ProjectListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/projects/{project_id}": {
+      "delete": {
+        "tags": ["admin"],
+        "summary": "Delete project",
+        "description": "Delete a project and all its memberships (admin only).\n\nParameters\n----------\nproject_id : str\n    Project ID to delete\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\ndict[str, str]\n    Success message\n\nRaises\n------\nHTTPException\n    404 if project not found",
+        "operationId": "adminDeleteProject",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Admindeleteproject"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/projects/{project_id}/members": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "List project members",
+        "description": "List all members of a project (admin only).\n\nParameters\n----------\nproject_id : str\n    Project ID to list members for\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\nMemberListResponse\n    List of members with total count\n\nRaises\n------\nHTTPException\n    404 if project not found",
+        "operationId": "listProjectMembersAdmin",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/qdash__api__schemas__admin__MemberListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["admin"],
+        "summary": "Add member to project",
+        "description": "Add a member to a project as viewer (admin only).\n\nParameters\n----------\nproject_id : str\n    Project ID to add member to\nrequest : AddMemberRequest\n    Member details (username)\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\nMemberItem\n    Created member info\n\nRaises\n------\nHTTPException\n    404 if project or user not found\n    400 if user is already a member",
+        "operationId": "addProjectMemberAdmin",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMemberRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberItem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/projects/{project_id}/members/{username}": {
+      "delete": {
+        "tags": ["admin"],
+        "summary": "Remove member from project",
+        "description": "Remove a member from a project (admin only).\n\nParameters\n----------\nproject_id : str\n    Project ID to remove member from\nusername : str\n    Username to remove\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\ndict[str, str]\n    Success message\n\nRaises\n------\nHTTPException\n    404 if project or member not found\n    400 if trying to remove the owner",
+        "operationId": "removeProjectMemberAdmin",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Removeprojectmemberadmin"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{username}/project": {
+      "post": {
+        "tags": ["admin"],
+        "summary": "Create project for user",
+        "description": "Create a default project for a user who doesn't have one (admin only).\n\nParameters\n----------\nusername : str\n    Username to create project for\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\nUserDetailResponse\n    Updated user information with new project\n\nRaises\n------\nHTTPException\n    404 if user not found\n    400 if user already has a project",
+        "operationId": "createProjectForUser",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects": {
       "get": {
         "tags": ["projects", "projects"],
@@ -168,7 +720,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectListResponse"
+                  "$ref": "#/components/schemas/qdash__api__schemas__project__ProjectListResponse"
                 }
               }
             }
@@ -412,7 +964,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MemberListResponse"
+                  "$ref": "#/components/schemas/qdash__api__schemas__project__MemberListResponse"
                 }
               }
             }
@@ -435,7 +987,7 @@
       "post": {
         "tags": ["projects", "projects"],
         "summary": "Invite a member",
-        "description": "Invite a user to the project. Owner only.",
+        "description": "Invite a user to the project. Admin only.",
         "operationId": "inviteProjectMember",
         "security": [
           {
@@ -449,10 +1001,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "Project identifier",
               "title": "Project Id"
-            },
-            "description": "Project identifier"
+            }
           }
         ],
         "requestBody": {
@@ -496,7 +1046,7 @@
       "patch": {
         "tags": ["projects", "projects"],
         "summary": "Update member role",
-        "description": "Update a member's role. Owner only.",
+        "description": "Update a member's role. Admin only.",
         "operationId": "updateProjectMember",
         "security": [
           {
@@ -505,6 +1055,15 @@
         ],
         "parameters": [
           {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
             "name": "username",
             "in": "path",
             "required": true,
@@ -512,17 +1071,6 @@
               "type": "string",
               "title": "Username"
             }
-          },
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Project identifier",
-              "title": "Project Id"
-            },
-            "description": "Project identifier"
           }
         ],
         "requestBody": {
@@ -564,7 +1112,7 @@
       "delete": {
         "tags": ["projects", "projects"],
         "summary": "Remove member",
-        "description": "Remove a member from the project. Owner only.",
+        "description": "Remove a member from the project. Admin only.",
         "operationId": "removeProjectMember",
         "security": [
           {
@@ -573,6 +1121,15 @@
         ],
         "parameters": [
           {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
             "name": "username",
             "in": "path",
             "required": true,
@@ -580,17 +1137,6 @@
               "type": "string",
               "title": "Username"
             }
-          },
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Project identifier",
-              "title": "Project Id"
-            },
-            "description": "Project identifier"
           }
         ],
         "responses": {
@@ -617,7 +1163,7 @@
       "post": {
         "tags": ["projects", "projects"],
         "summary": "Transfer project ownership",
-        "description": "Transfer project ownership to another user. Current owner only.",
+        "description": "Transfer project ownership to another user. Admin only.",
         "operationId": "transferProjectOwnership",
         "security": [
           {
@@ -631,10 +1177,8 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "Project identifier",
               "title": "Project Id"
-            },
-            "description": "Project identifier"
+            }
           }
         ],
         "requestBody": {
@@ -4111,6 +4655,18 @@
   },
   "components": {
     "schemas": {
+      "AddMemberRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "required": ["username"],
+        "title": "AddMemberRequest",
+        "description": "Request to add a member to a project (always as viewer)."
+      },
       "BackendResponseModel": {
         "properties": {
           "name": {
@@ -5323,24 +5879,36 @@
         "title": "MemberInvite",
         "description": "Request schema for inviting a member."
       },
-      "MemberListResponse": {
+      "MemberItem": {
         "properties": {
-          "members": {
-            "items": {
-              "$ref": "#/components/schemas/MemberResponse"
-            },
-            "type": "array",
-            "title": "Members"
+          "username": {
+            "type": "string",
+            "title": "Username"
           },
-          "total": {
-            "type": "integer",
-            "title": "Total"
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ProjectRole"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "active"
           }
         },
         "type": "object",
-        "required": ["members", "total"],
-        "title": "MemberListResponse",
-        "description": "Response schema for listing project members."
+        "required": ["username", "role"],
+        "title": "MemberItem",
+        "description": "Member info for admin view."
       },
       "MemberResponse": {
         "properties": {
@@ -5820,24 +6388,52 @@
         "title": "ProjectCreate",
         "description": "Request schema for creating a new project."
       },
-      "ProjectListResponse": {
+      "ProjectListItem": {
         "properties": {
-          "projects": {
-            "items": {
-              "$ref": "#/components/schemas/ProjectResponse"
-            },
-            "type": "array",
-            "title": "Projects"
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
           },
-          "total": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "owner_username": {
+            "type": "string",
+            "title": "Owner Username"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "member_count": {
             "type": "integer",
-            "title": "Total"
+            "title": "Member Count",
+            "default": 0
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
           }
         },
         "type": "object",
-        "required": ["projects", "total"],
-        "title": "ProjectListResponse",
-        "description": "Response schema for listing projects."
+        "required": ["project_id", "name", "owner_username"],
+        "title": "ProjectListItem",
+        "description": "Project summary for admin list view."
       },
       "ProjectResponse": {
         "properties": {
@@ -6537,6 +7133,12 @@
         ],
         "title": "Settings",
         "description": "Settings for the QDash application."
+      },
+      "SystemRole": {
+        "type": "string",
+        "enum": ["admin", "user"],
+        "title": "SystemRole",
+        "description": "System-level role for a user.\n\nADMIN: Full system access, can manage all users and projects.\nUSER: Regular user."
       },
       "Tag": {
         "properties": {
@@ -7354,6 +7956,45 @@
         "title": "UpdateScheduleResponse",
         "description": "Response for updating a schedule."
       },
+      "UpdateUserRequest": {
+        "properties": {
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "disabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled"
+          },
+          "system_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "UpdateUserRequest",
+        "description": "Request to update user settings (admin only)."
+      },
       "User": {
         "properties": {
           "username": {
@@ -7392,6 +8033,10 @@
               }
             ],
             "title": "Default Project Id"
+          },
+          "system_role": {
+            "$ref": "#/components/schemas/SystemRole",
+            "default": "user"
           }
         },
         "type": "object",
@@ -7424,7 +8069,134 @@
         "type": "object",
         "required": ["username", "password"],
         "title": "UserCreate",
-        "description": "User creation model for registration."
+        "description": "User creation model for registration (admin only)."
+      },
+      "UserDetailResponse": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "disabled": {
+            "type": "boolean",
+            "title": "Disabled",
+            "default": false
+          },
+          "system_role": {
+            "$ref": "#/components/schemas/SystemRole",
+            "default": "user"
+          },
+          "default_project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Project Id"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": ["username"],
+        "title": "UserDetailResponse",
+        "description": "Detailed user response for admin view."
+      },
+      "UserListItem": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "disabled": {
+            "type": "boolean",
+            "title": "Disabled",
+            "default": false
+          },
+          "system_role": {
+            "$ref": "#/components/schemas/SystemRole",
+            "default": "user"
+          },
+          "default_project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Project Id"
+          }
+        },
+        "type": "object",
+        "required": ["username"],
+        "title": "UserListItem",
+        "description": "User summary for admin list view."
+      },
+      "UserListResponse": {
+        "properties": {
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/UserListItem"
+            },
+            "type": "array",
+            "title": "Users"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": ["users", "total"],
+        "title": "UserListResponse",
+        "description": "Response containing list of users."
       },
       "UserWithToken": {
         "properties": {
@@ -7464,6 +8236,10 @@
               }
             ],
             "title": "Default Project Id"
+          },
+          "system_role": {
+            "$ref": "#/components/schemas/SystemRole",
+            "default": "user"
           },
           "access_token": {
             "type": "string",
@@ -7519,6 +8295,82 @@
         "type": "object",
         "required": ["loc", "msg", "type"],
         "title": "ValidationError"
+      },
+      "qdash__api__schemas__admin__MemberListResponse": {
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/MemberItem"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": ["members", "total"],
+        "title": "MemberListResponse",
+        "description": "Response containing list of project members."
+      },
+      "qdash__api__schemas__admin__ProjectListResponse": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectListItem"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": ["projects", "total"],
+        "title": "ProjectListResponse",
+        "description": "Response containing list of all projects."
+      },
+      "qdash__api__schemas__project__MemberListResponse": {
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/MemberResponse"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": ["members", "total"],
+        "title": "MemberListResponse",
+        "description": "Response schema for listing project members."
+      },
+      "qdash__api__schemas__project__ProjectListResponse": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectResponse"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": ["projects", "total"],
+        "title": "ProjectListResponse",
+        "description": "Response schema for listing projects."
       }
     },
     "securitySchemes": {

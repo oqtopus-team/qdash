@@ -41,29 +41,27 @@ You automatically become the owner of any project you create.
 
 ## Team Roles and Permissions
 
-QDash supports three permission levels for project members:
+QDash uses a simplified two-role permission model:
 
-| Role       | Capabilities                                                                                         |
-| ---------- | ---------------------------------------------------------------------------------------------------- |
-| **Viewer** | View all project data (chips, calibrations, results). Cannot modify anything.                        |
-| **Editor** | Everything a Viewer can do, plus create/modify chips, run calibrations, and update parameters.       |
-| **Owner**  | Everything an Editor can do, plus invite/remove members, change permissions, and delete the project. |
+| Role       | Capabilities                                                                                       |
+| ---------- | -------------------------------------------------------------------------------------------------- |
+| **Viewer** | View all project data (chips, calibrations, results). Cannot modify anything.                      |
+| **Owner**  | Full access: create/modify chips, run calibrations, invite/remove members, and delete the project. |
 
 ### Permission Summary
 
-| Action                          | Viewer | Editor | Owner |
-| ------------------------------- | :----: | :----: | :---: |
-| View chips and calibration data |   ✅   |   ✅   |  ✅   |
-| View execution history          |   ✅   |   ✅   |  ✅   |
-| Download results                |   ✅   |   ✅   |  ✅   |
-| Create/modify chips             |   ❌   |   ✅   |  ✅   |
-| Run calibrations                |   ❌   |   ✅   |  ✅   |
-| Update parameters               |   ❌   |   ✅   |  ✅   |
-| Invite members                  |   ❌   |   ❌   |  ✅   |
-| Remove members                  |   ❌   |   ❌   |  ✅   |
-| Change member roles             |   ❌   |   ❌   |  ✅   |
-| Delete project                  |   ❌   |   ❌   |  ✅   |
-| Transfer ownership              |   ❌   |   ❌   |  ✅   |
+| Action                          | Viewer | Owner |
+| ------------------------------- | :----: | :---: |
+| View chips and calibration data |   ✅   |  ✅   |
+| View execution history          |   ✅   |  ✅   |
+| Download results                |   ✅   |  ✅   |
+| Create/modify chips             |   ❌   |  ✅   |
+| Run calibrations                |   ❌   |  ✅   |
+| Update parameters               |   ❌   |  ✅   |
+| Invite members                  |   ❌   |  ✅   |
+| Remove members                  |   ❌   |  ✅   |
+| Delete project                  |   ❌   |  ✅   |
+| Transfer ownership              |   ❌   |  ✅   |
 
 ## Inviting Team Members
 
@@ -73,32 +71,30 @@ As a project owner, you can invite other QDash users to collaborate:
 2. Go to the **Members** tab
 3. Click **"Invite Member"**
 4. Enter the username of the person you want to invite
-5. Select their role (Viewer or Editor)
-6. Click **"Send Invitation"**
+5. Click **"Send Invitation"**
 
-The invited user will see the project in their project list immediately.
+The invited user will be added as a **Viewer** and see the project in their project list immediately.
 
 ### Managing Members
 
 From the Members tab, owners can:
 
-- **Change roles**: Upgrade a Viewer to Editor, or downgrade an Editor to Viewer
 - **Remove members**: Revoke a user's access to the project
-- **Transfer ownership**: Make another member the owner (you become an Editor)
+- **Transfer ownership**: Make another member the owner (you become a Viewer)
 
 ## Sharing Calibration Results
 
 Once you have team members in your project, sharing is automatic:
 
 1. **Run a calibration** in your project
-2. **All members can view** the results based on their role
+2. **All members can view** the results
 3. **Viewers** can see and download data
-4. **Editors** can also modify and re-run calibrations
+4. **Only the Owner** can modify and re-run calibrations
 
 ### Best Practices for Sharing
 
-- Use **Viewer** role for stakeholders who only need to see results
-- Use **Editor** role for active collaborators who run experiments
+- Invite team members as **Viewers** so they can access results
+- Keep **ownership** for active calibration work
 - Create **separate projects** for different experiments or teams
 - Use **descriptive project names** to keep things organized
 
@@ -171,7 +167,6 @@ Access project settings from the project selector menu:
 
 - **Project Name**: Display name for the project
 - **Description**: Optional description of the project's purpose
-- **Default Role**: Role assigned to new members (Viewer by default)
 
 ### Danger Zone
 
@@ -200,7 +195,7 @@ Before leaving, the owner must transfer ownership to another member. A project c
 
 ### Can I have multiple owners?
 
-No, each project has exactly one owner. However, Editors have broad permissions for day-to-day operations.
+No, each project has exactly one owner. If you need another user to have write access, transfer ownership to them.
 
 ### How do I find my project ID?
 

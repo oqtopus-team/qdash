@@ -9,9 +9,9 @@ from collections.abc import Callable
 from typing import Any
 
 from bunnet import Document
-
 from qdash.api.lib.project_service import ProjectService
 from qdash.dbmodel.backend import BackendDocument
+from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.coupling import CouplingDocument
@@ -72,6 +72,22 @@ def migrate_add_project_id_to_all_documents(dry_run: bool = True) -> dict[str, A
                 continue
             logger.warning(f"User {user.username} has invalid default_project_id {user.default_project_id}")
 
+        # Check if user already has a project (but default_project_id is not set)
+        existing_project = ProjectDocument.find_one({"owner_username": user.username}).run()
+        if existing_project:
+            # Link existing project to user
+            if not dry_run:
+                user.default_project_id = existing_project.project_id
+                user.save()
+                user_project_map[user.username] = existing_project.project_id
+                logger.info(f"Linked existing project {existing_project.project_id} to user {user.username}")
+            else:
+                user_project_map[user.username] = existing_project.project_id
+                logger.info(
+                    f"[DRY RUN] Would link existing project {existing_project.project_id} to user {user.username}"
+                )
+            continue
+
         # Create default project for user
         if not dry_run:
             try:
@@ -89,19 +105,20 @@ def migrate_add_project_id_to_all_documents(dry_run: bool = True) -> dict[str, A
 
     # Step 2: Update documents with project_id
     document_classes: list[tuple[str, type[Document], Callable[[Any], str | None]]] = [
-        ("chip", ChipDocument, lambda d: d.username),
-        ("qubit", QubitDocument, lambda d: d.username),
-        ("coupling", CouplingDocument, lambda d: d.username),
-        ("execution_history", ExecutionHistoryDocument, lambda d: d.username),
-        ("task", TaskDocument, lambda d: d.username),
-        ("backend", BackendDocument, lambda d: d.username),
-        ("tag", TagDocument, lambda d: d.username),
-        ("flow", FlowDocument, lambda d: d.username),
-        ("execution_counter", ExecutionCounterDocument, lambda d: d.username),
-        ("chip_history", ChipHistoryDocument, lambda d: d.username),
-        ("qubit_history", QubitHistoryDocument, lambda d: d.username),
-        ("coupling_history", CouplingHistoryDocument, lambda d: d.username),
-        ("task_result_history", TaskResultHistoryDocument, lambda d: d.username),
+        ("chip", ChipDocument, lambda d: d.get("username")),
+        ("qubit", QubitDocument, lambda d: d.get("username")),
+        ("coupling", CouplingDocument, lambda d: d.get("username")),
+        ("execution_history", ExecutionHistoryDocument, lambda d: d.get("username")),
+        ("task", TaskDocument, lambda d: d.get("username")),
+        ("backend", BackendDocument, lambda d: d.get("username")),
+        ("tag", TagDocument, lambda d: d.get("username")),
+        ("flow", FlowDocument, lambda d: d.get("username")),
+        ("execution_counter", ExecutionCounterDocument, lambda d: d.get("username")),
+        ("chip_history", ChipHistoryDocument, lambda d: d.get("username")),
+        ("qubit_history", QubitHistoryDocument, lambda d: d.get("username")),
+        ("coupling_history", CouplingHistoryDocument, lambda d: d.get("username")),
+        ("task_result_history", TaskResultHistoryDocument, lambda d: d.get("username")),
+        ("calibration_note", CalibrationNoteDocument, lambda d: d.get("username")),
     ]
 
     for collection_name, doc_class, get_username in document_classes:
@@ -139,31 +156,37 @@ def _migrate_collection(
     user_project_map: dict[str, str],
     dry_run: bool,
 ) -> int:
-    """Migrate a single collection to add project_id."""
-    # Find documents without project_id
-    docs = list(doc_class.find({"project_id": None}).run())
+    """Migrate a single collection to add project_id.
+
+    Uses raw MongoDB operations to avoid Pydantic validation errors
+    when loading documents with null project_id (which is now required).
+    """
+    # Use raw MongoDB collection to bypass Pydantic validation
+    collection = doc_class.get_motor_collection()
+
+    # Find documents without project_id (null or missing)
+    docs = list(collection.find({"$or": [{"project_id": None}, {"project_id": {"$exists": False}}]}))
     updated = 0
 
     logger.info(f"Found {len(docs)} {collection_name} documents without project_id")
 
     for doc in docs:
-        username = get_username(doc)
+        username = doc.get("username")
         if not username:
-            logger.warning(f"Document {doc.id} in {collection_name} has no username, skipping")
+            logger.warning(f"Document {doc.get('_id')} in {collection_name} has no username, skipping")
             continue
 
         project_id = user_project_map.get(username)
         if not project_id:
-            logger.warning(f"No project found for user {username} (document {doc.id} in {collection_name})")
+            logger.warning(f"No project found for user {username} (document {doc.get('_id')} in {collection_name})")
             continue
 
         if not dry_run:
-            doc.project_id = project_id
-            doc.save()
+            collection.update_one({"_id": doc["_id"]}, {"$set": {"project_id": project_id}})
             updated += 1
         else:
             updated += 1
-            logger.debug(f"[DRY RUN] Would set project_id={project_id} on {collection_name} {doc.id}")
+            logger.debug(f"[DRY RUN] Would set project_id={project_id} on {collection_name} {doc.get('_id')}")
 
     logger.info(f"{'[DRY RUN] Would update' if dry_run else 'Updated'} " f"{updated} {collection_name} documents")
     return updated
@@ -174,9 +197,16 @@ def _migrate_execution_locks(user_project_map: dict[str, str], dry_run: bool) ->
 
     Old behavior: Single global lock
     New behavior: One lock per project
+
+    Uses raw MongoDB operations to avoid Pydantic validation errors.
     """
+    import pendulum
+
+    # Use raw MongoDB collection to bypass Pydantic validation
+    collection = ExecutionLockDocument.get_motor_collection()
+
     # Find any existing lock without project_id
-    old_lock = ExecutionLockDocument.find_one({"project_id": None}).run()
+    old_lock = collection.find_one({"$or": [{"project_id": None}, {"project_id": {"$exists": False}}]})
     if not old_lock:
         logger.info("No global execution lock found")
         return 0
@@ -186,16 +216,19 @@ def _migrate_execution_locks(user_project_map: dict[str, str], dry_run: bool) ->
     # Create a lock for each project
     unique_project_ids = set(user_project_map.values())
     for project_id in unique_project_ids:
-        existing = ExecutionLockDocument.find_one({"project_id": project_id}).run()
+        existing = collection.find_one({"project_id": project_id})
         if existing:
             continue
 
         if not dry_run:
-            new_lock = ExecutionLockDocument(
-                project_id=project_id,
-                locked=False,
+            now = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+            collection.insert_one(
+                {
+                    "project_id": project_id,
+                    "locked": False,
+                    "system_info": {"created_at": now, "updated_at": now},
+                }
             )
-            new_lock.insert()
             updated += 1
         else:
             updated += 1
@@ -203,12 +236,144 @@ def _migrate_execution_locks(user_project_map: dict[str, str], dry_run: bool) ->
 
     # Remove the old global lock
     if not dry_run:
-        old_lock.delete()
+        collection.delete_one({"_id": old_lock["_id"]})
         logger.info("Deleted global execution lock")
     else:
         logger.info("[DRY RUN] Would delete global execution lock")
 
     return updated
+
+
+def migrate_add_system_role() -> dict[str, int]:
+    """Add system_role to users who don't have it.
+
+    Returns:
+        Migration statistics with count of affected users.
+    """
+    from qdash.datamodel.user import SystemRole
+
+    stats: dict[str, int] = {
+        "system_role_added": 0,
+    }
+
+    result = (
+        UserDocument.find({"system_role": {"$exists": False}})
+        .update_many({"$set": {"system_role": SystemRole.USER}})
+        .run()
+    )
+    stats["system_role_added"] = result.modified_count
+    if result.modified_count > 0:
+        logger.info(f"Migration: Added system_role to {result.modified_count} users")
+
+    return stats
+
+
+def migrate_remove_user_default_role() -> dict[str, int]:
+    """Remove default_role field from all users.
+
+    This migration:
+    - Removes the default_role field from all user documents
+    - The simplified permission model no longer uses user-level default_role
+    - Users are owners of their own project and viewers when invited elsewhere
+
+    Returns:
+        Migration statistics with count of affected users.
+    """
+    stats: dict[str, int] = {
+        "default_role_removed": 0,
+    }
+
+    result = UserDocument.find({"default_role": {"$exists": True}}).update_many({"$unset": {"default_role": ""}}).run()
+    stats["default_role_removed"] = result.modified_count
+    if result.modified_count > 0:
+        logger.info(f"Migration: Removed default_role from {result.modified_count} users")
+
+    return stats
+
+
+def migrate_editor_to_viewer() -> dict[str, int]:
+    """Convert all EDITOR roles to VIEWER in project memberships.
+
+    The simplified permission model only has OWNER and VIEWER.
+    EDITOR role is deprecated and should be converted to VIEWER.
+
+    Returns:
+        Migration statistics with count of affected memberships.
+    """
+    from qdash.dbmodel.project_membership import ProjectMembershipDocument
+
+    stats: dict[str, int] = {
+        "editor_to_viewer": 0,
+    }
+
+    result = ProjectMembershipDocument.find({"role": "editor"}).update_many({"$set": {"role": "viewer"}}).run()
+    stats["editor_to_viewer"] = result.modified_count
+    if result.modified_count > 0:
+        logger.info(f"Migration: Converted {result.modified_count} EDITOR roles to VIEWER")
+
+    return stats
+
+
+def migrate_full(dry_run: bool = True) -> dict[str, Any]:
+    """Run full migration for systems without project_id.
+
+    This migration:
+    1. Adds system_role to users (if missing)
+    2. Removes deprecated default_role from users
+    3. Converts deprecated EDITOR roles to VIEWER
+    4. Creates projects for users and adds project_id to all documents
+
+    Args:
+        dry_run: If True, only reports what would be changed.
+
+    Returns:
+        Combined migration statistics.
+    """
+    from qdash.dbmodel.project_membership import ProjectMembershipDocument
+
+    stats: dict[str, Any] = {
+        "dry_run": dry_run,
+        "system_role_added": 0,
+        "default_role_removed": 0,
+        "editor_to_viewer": 0,
+        "project_migration": {},
+    }
+
+    # Step 1: Add system_role to users
+    if not dry_run:
+        role_stats = migrate_add_system_role()
+        stats["system_role_added"] = role_stats["system_role_added"]
+    else:
+        count = UserDocument.find({"system_role": {"$exists": False}}).count()
+        stats["system_role_added"] = count
+        if count > 0:
+            logger.info(f"[DRY RUN] Would add system_role to {count} users")
+
+    # Step 2: Remove deprecated default_role
+    if not dry_run:
+        role_stats = migrate_remove_user_default_role()
+        stats["default_role_removed"] = role_stats["default_role_removed"]
+    else:
+        count = UserDocument.find({"default_role": {"$exists": True}}).count()
+        stats["default_role_removed"] = count
+        if count > 0:
+            logger.info(f"[DRY RUN] Would remove default_role from {count} users")
+
+    # Step 3: Convert deprecated EDITOR roles to VIEWER
+    if not dry_run:
+        editor_stats = migrate_editor_to_viewer()
+        stats["editor_to_viewer"] = editor_stats["editor_to_viewer"]
+    else:
+        count = ProjectMembershipDocument.find({"role": "editor"}).count()
+        stats["editor_to_viewer"] = count
+        if count > 0:
+            logger.info(f"[DRY RUN] Would convert {count} EDITOR roles to VIEWER")
+
+    # Step 4: Add project_id to all documents
+    project_stats = migrate_add_project_id_to_all_documents(dry_run=dry_run)
+    stats["project_migration"] = project_stats
+
+    return stats
 
 
 def run_migration(dry_run: bool = True) -> None:
@@ -245,12 +410,74 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    parser = argparse.ArgumentParser(description="Migrate database for multi-tenancy")
-    parser.add_argument(
+    parser = argparse.ArgumentParser(description="Database migrations")
+    subparsers = parser.add_subparsers(dest="command", help="Migration commands")
+
+    # Full migration (recommended for fresh systems)
+    full_parser = subparsers.add_parser("full", help="Full migration: system_role + project_id (recommended)")
+    full_parser.add_argument(
         "--execute",
         action="store_true",
         help="Actually execute the migration (default is dry-run)",
     )
+
+    # project-id migration (for systems that already have system_role)
+    project_parser = subparsers.add_parser("project-id", help="Add project_id to all documents only")
+    project_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
+    # list migrations
+    subparsers.add_parser("list", help="List available migrations")
+
     args = parser.parse_args()
 
-    run_migration(dry_run=not args.execute)
+    if args.command == "full":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        logger.info(f"Starting full migration (dry_run={not args.execute})")
+        stats = migrate_full(dry_run=not args.execute)
+
+        logger.info("=" * 50)
+        logger.info("Full Migration Summary")
+        logger.info("=" * 50)
+        logger.info(f"Dry run: {stats['dry_run']}")
+        logger.info(f"system_role added: {stats['system_role_added']}")
+        logger.info(f"default_role removed: {stats['default_role_removed']}")
+        logger.info(f"EDITOR→VIEWER converted: {stats['editor_to_viewer']}")
+        logger.info(f"Users processed: {stats['project_migration'].get('users_processed', 0)}")
+        logger.info(f"Projects created: {stats['project_migration'].get('projects_created', 0)}")
+        logger.info("Documents updated:")
+        for collection, count in stats["project_migration"].get("documents_updated", {}).items():
+            logger.info(f"  - {collection}: {count}")
+        if stats["project_migration"].get("errors"):
+            logger.error(f"Errors: {len(stats['project_migration']['errors'])}")
+            for error in stats["project_migration"]["errors"]:
+                logger.error(f"  - {error}")
+        logger.info("=" * 50)
+
+    elif args.command == "project-id":
+        run_migration(dry_run=not args.execute)
+
+    elif args.command == "list":
+        print("Available migrations:")
+        print("")
+        print("  full        - Full migration for systems without project_id (recommended)")
+        print("                1. Adds system_role to users")
+        print("                2. Removes deprecated default_role")
+        print("                3. Converts deprecated EDITOR roles to VIEWER")
+        print("                4. Creates projects for users")
+        print("                5. Adds project_id to all documents")
+        print("")
+        print("  project-id  - Add project_id to documents only")
+        print("                (use if system_role is already set)")
+        print("")
+        print("Usage:")
+        print("  python -m qdash.dbmodel.migration full          # dry-run")
+        print("  python -m qdash.dbmodel.migration full --execute  # actual migration")
+
+    else:
+        parser.print_help()

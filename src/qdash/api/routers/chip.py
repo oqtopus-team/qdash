@@ -10,9 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pymongo import DESCENDING
 from qdash.api.lib.project import (
     ProjectContext,
-    get_optional_project_context,
     get_project_context,
-    get_project_context_editor,
+    get_project_context_owner,
 )
 from qdash.api.routers.task_file import (
     CALTASKS_BASE_PATH,
@@ -46,13 +45,13 @@ logger.setLevel(logging.DEBUG)
 
 @router.get("/chips", response_model=ListChipsResponse, summary="List all chips", operation_id="listChips")
 def list_chips(
-    ctx: Annotated[ProjectContext | None, Depends(get_optional_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> ListChipsResponse:
     """List all chips in the current project.
 
     Parameters
     ----------
-    ctx : ProjectContext | None
+    ctx : ProjectContext
         Project context with user and project information
 
     Returns
@@ -61,9 +60,6 @@ def list_chips(
         Wrapped list of available chips
 
     """
-    if ctx is None:
-        return ListChipsResponse(chips=[])
-
     logger.debug(f"Listing chips for project: {ctx.project_id}")
     chips = ChipDocument.find({"project_id": ctx.project_id}).run()
     return ListChipsResponse(
@@ -83,7 +79,7 @@ def list_chips(
 @router.post("/chips", response_model=ChipResponse, summary="Create a new chip", operation_id="createChip")
 def create_chip(
     request: CreateChipRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
 ) -> ChipResponse:
     """Create a new chip in the current project.
 
@@ -92,7 +88,7 @@ def create_chip(
     request : CreateChipRequest
         Chip creation request containing chip_id and size
     ctx : ProjectContext
-        Project context with editor or owner permission
+        Project context with owner permission
 
     Returns
     -------

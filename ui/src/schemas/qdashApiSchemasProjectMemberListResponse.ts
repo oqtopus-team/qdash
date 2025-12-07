@@ -10,7 +10,7 @@ import type { MemberResponse } from "./memberResponse";
 /**
  * Response schema for listing project members.
  */
-export interface MemberListResponse {
+export interface QdashApiSchemasProjectMemberListResponse {
   members: MemberResponse[];
   total: number;
 }
