@@ -45,7 +45,7 @@ While there are no strict rules, the following naming conventions are recommende
 
 ## Conventional Commits
 
-The commit messages should preferably follow the 　[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) guidelines.
+The commit messages should preferably follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) guidelines.
 
 ### Commit Message Format
 
@@ -102,3 +102,22 @@ Below is the correspondence between prefixes and labels:
 | test:     | `test`          | Adding or correcting existing tests                                                                    |
 | ci:       | `ci`            | Adding or updating CI configuration and scripts                                                        |
 | chore:    | `chore`         | Minor changes or maintenance tasks                                                                     |
+
+## Claude Code Custom Commands
+
+The project includes custom slash commands for Claude Code to assist with development:
+
+| Command | Description |
+|---------|-------------|
+| `/commit` | Analyze changes and suggest a commit message |
+| `/suggest-commit` | Generate commit message suggestion without committing |
+| `/auto-commit` | Automatically commit with generated message |
+
+### Using Task Commands
+
+For manual commit assistance, you can also use:
+
+```bash
+task commit    # Interactive auto-commit script
+task ac        # Alias for task commit
+```

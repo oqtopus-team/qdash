@@ -25,14 +25,6 @@ scripts/init.sh
 docker compose up -d
 ```
 
-## (Option) if you specified a custom network in the `.env` file
-
-If you specified a custom network in the `.env` file, you need to create the network before starting the application:
-
-```bash
-docker compose -f compose.yaml -f compose.override.yaml up
-```
-
 You can now access the application at <a href="http://localhost:5714/signup"> localhost:5714 </a>.
 
 ## Create account
@@ -44,19 +36,19 @@ Now, your data is not setup yet. You need to initialize the database with your d
 ## Setup devcontainer
 
 ```bash
- docker compose -f compose.dev.yaml up -d
+docker compose -f compose.devcontainer.yaml up -d
 ```
 
 ## Install QDash CLI
 
 ```bash
-docker compose -f compose.dev.yaml exec devcontainer sh -c "pip install -e ."
+docker compose -f compose.devcontainer.yaml exec devcontainer sh -c "pip install -e ."
 ```
 
 ## Initialize the Database
 
 ```bash
-docker exec -it qdash-devcontainer /bin/bash -c "qdash init-all-data --username <your-username> --chip-id <your-chip-id>"
+docker compose -f compose.devcontainer.yaml exec devcontainer sh -c "qdash init-all-data --username <your-username> --chip-id <your-chip-id>"
 ```
 
 You can now access the application at <a href="http://localhost:5714/execution"> localhost:5714 </a>.

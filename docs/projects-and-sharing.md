@@ -117,24 +117,6 @@ curl -X GET "https://your-qdash-instance/chips" \
   -H "X-Project-Id: your-project-id"
 ```
 
-### Python Client
-
-```python
-from qdash_client import Client
-from qdash_client.api.chip import list_chips
-
-client = Client(
-    base_url="https://your-qdash-instance",
-    headers={
-        "Authorization": "Bearer YOUR_TOKEN",
-        "X-Project-Id": "your-project-id",
-    }
-)
-
-response = list_chips.sync_detailed(client=client)
-chips = response.parsed
-```
-
 ## Workflow Integration
 
 When running calibration workflows, specify the project context:
