@@ -1,5 +1,196 @@
-/* docs/.vitepress/theme/custom.css */
+/* QDash Custom Theme */
+
+:root {
+  /* Brand colors from OQTOPUS logo */
+  --vp-c-brand-1: #1f1fdd;
+  --vp-c-brand-2: #3b3be8;
+  --vp-c-brand-3: #5555f0;
+  --vp-c-brand-soft: rgba(31, 31, 221, 0.14);
+
+  /* Accent color */
+  --vp-c-accent: #e21331;
+
+  /* Home hero gradient */
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    #1f1fdd 30%,
+    #e21331 70%
+  );
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    #1f1fdd50 50%,
+    #e2133150 50%
+  );
+  --vp-home-hero-image-filter: blur(44px);
+}
+
+.dark {
+  --vp-c-brand-1: #5555f0;
+  --vp-c-brand-2: #6b6bf5;
+  --vp-c-brand-3: #8080f8;
+  --vp-c-brand-soft: rgba(85, 85, 240, 0.16);
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    #5555f050 50%,
+    #e2133150 50%
+  );
+}
+
+/* Hero section improvements */
 .VPHero .image-bg {
-  width: 2000px; /* 幅を100%に設定 */
-  max-width: none; /* 最大幅の制限を解除 */
+  width: 200px;
+  max-width: none;
+}
+
+.VPHero .image-container {
+  transform: scale(1.2);
+  animation: hero-float 4s ease-in-out infinite;
+}
+
+.VPHero .image-container img {
+  transition: filter 0.5s ease, transform 0.5s ease;
+  filter: drop-shadow(0 4px 20px rgba(31, 31, 221, 0.3));
+}
+
+.VPHero .image-container:hover img {
+  filter: drop-shadow(0 8px 30px rgba(31, 31, 221, 0.5)) drop-shadow(0 0 40px rgba(226, 19, 49, 0.3));
+  transform: scale(1.08);
+}
+
+@keyframes hero-float {
+  0%, 100% {
+    transform: scale(1.2) translateY(0);
+  }
+  50% {
+    transform: scale(1.2) translateY(-10px);
+  }
+}
+
+/* Hero name pulse effect */
+.VPHero .name {
+  animation: name-glow 3s ease-in-out infinite alternate;
+}
+
+@keyframes name-glow {
+  0% {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  100% {
+    filter: drop-shadow(0 0 15px rgba(31, 31, 221, 0.4));
+  }
+}
+
+/* Feature cards */
+.VPFeature {
+  border-radius: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.VPFeature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(31, 31, 221, 0.1);
+}
+
+/* Sidebar styling */
+.VPSidebar .VPSidebarItem.level-0 > .item > .text {
+  font-weight: 600;
+  color: var(--vp-c-brand-1);
+}
+
+/* Code blocks */
+.vp-doc [class*="language-"] code {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Button improvements */
+.VPButton.brand {
+  background-color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+
+.VPButton.brand:hover {
+  background-color: var(--vp-c-brand-2);
+  border-color: var(--vp-c-brand-2);
+}
+
+/* Navigation bar logo */
+.VPNavBarTitle {
+  transition: transform 0.3s ease;
+}
+
+.VPNavBarTitle:hover {
+  transform: scale(1.05);
+}
+
+.VPNavBarTitle .logo {
+  transition: filter 0.3s ease, transform 0.3s ease;
+  filter: drop-shadow(0 0 0 transparent);
+}
+
+.VPNavBarTitle:hover .logo {
+  filter: drop-shadow(0 0 8px rgba(31, 31, 221, 0.6)) drop-shadow(0 0 16px rgba(226, 19, 49, 0.4));
+  transform: rotate(-5deg) scale(1.1);
+}
+
+.VPNavBarTitle .title {
+  font-weight: 700;
+  background: linear-gradient(120deg, #1f1fdd, #e21331);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  transition: background-position 0.5s ease, text-shadow 0.3s ease;
+  animation: gradient-shift 3s ease infinite;
+}
+
+.VPNavBarTitle:hover .title {
+  background-position: 100% 0;
+  text-shadow: 0 0 20px rgba(31, 31, 221, 0.5);
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Sidebar logo animation */
+.VPSidebar .logo {
+  transition: filter 0.3s ease, transform 0.3s ease;
+}
+
+.VPSidebar .logo:hover {
+  filter: drop-shadow(0 0 10px rgba(31, 31, 221, 0.7));
+  transform: scale(1.1);
+}
+
+/* Table styling */
+.vp-doc table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.vp-doc th {
+  background-color: var(--vp-c-brand-soft);
+}
+
+/* Badges / Tags */
+.VPBadge {
+  border-radius: 6px;
+}
+
+/* Custom container styling */
+.custom-block.warning {
+  border-color: var(--vp-c-accent);
+}
+
+.custom-block.tip {
+  border-color: var(--vp-c-brand-1);
 }

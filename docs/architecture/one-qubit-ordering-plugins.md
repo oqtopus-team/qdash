@@ -355,7 +355,7 @@ Step 3: [3, 5, 11, 13, ...] - 16 qubits simultaneously
 
 ### Box Constraints
 
-Synchronized scheduling respects box (筐体) constraints:
+Synchronized scheduling respects box (enclosure) constraints:
 
 - **Box A only**: 4 synchronized steps (A handles both control and readout)
 - **Box B + A Mixed**: 8 synchronized steps (see Box B Module Sharing below)

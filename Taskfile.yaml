@@ -27,7 +27,8 @@ tasks:
   docs:
     dir: docs
     cmds:
-      - npm run docs:dev
+      - bun install
+      - bun run docs:dev --host
 
   test:
     cmds:
