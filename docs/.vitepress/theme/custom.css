@@ -47,6 +47,40 @@
 
 .VPHero .image-container {
   transform: scale(1.2);
+  animation: hero-float 4s ease-in-out infinite;
+}
+
+.VPHero .image-container img {
+  transition: filter 0.5s ease, transform 0.5s ease;
+  filter: drop-shadow(0 4px 20px rgba(31, 31, 221, 0.3));
+}
+
+.VPHero .image-container:hover img {
+  filter: drop-shadow(0 8px 30px rgba(31, 31, 221, 0.5)) drop-shadow(0 0 40px rgba(226, 19, 49, 0.3));
+  transform: scale(1.08);
+}
+
+@keyframes hero-float {
+  0%, 100% {
+    transform: scale(1.2) translateY(0);
+  }
+  50% {
+    transform: scale(1.2) translateY(-10px);
+  }
+}
+
+/* Hero name pulse effect */
+.VPHero .name {
+  animation: name-glow 3s ease-in-out infinite alternate;
+}
+
+@keyframes name-glow {
+  0% {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  100% {
+    filter: drop-shadow(0 0 15px rgba(31, 31, 221, 0.4));
+  }
 }
 
 /* Feature cards */
@@ -84,12 +118,57 @@
 }
 
 /* Navigation bar logo */
+.VPNavBarTitle {
+  transition: transform 0.3s ease;
+}
+
+.VPNavBarTitle:hover {
+  transform: scale(1.05);
+}
+
+.VPNavBarTitle .logo {
+  transition: filter 0.3s ease, transform 0.3s ease;
+  filter: drop-shadow(0 0 0 transparent);
+}
+
+.VPNavBarTitle:hover .logo {
+  filter: drop-shadow(0 0 8px rgba(31, 31, 221, 0.6)) drop-shadow(0 0 16px rgba(226, 19, 49, 0.4));
+  transform: rotate(-5deg) scale(1.1);
+}
+
 .VPNavBarTitle .title {
   font-weight: 700;
   background: linear-gradient(120deg, #1f1fdd, #e21331);
+  background-size: 200% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  transition: background-position 0.5s ease, text-shadow 0.3s ease;
+  animation: gradient-shift 3s ease infinite;
+}
+
+.VPNavBarTitle:hover .title {
+  background-position: 100% 0;
+  text-shadow: 0 0 20px rgba(31, 31, 221, 0.5);
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Sidebar logo animation */
+.VPSidebar .logo {
+  transition: filter 0.3s ease, transform 0.3s ease;
+}
+
+.VPSidebar .logo:hover {
+  filter: drop-shadow(0 0 10px rgba(31, 31, 221, 0.7));
+  transform: scale(1.1);
 }
 
 /* Table styling */
