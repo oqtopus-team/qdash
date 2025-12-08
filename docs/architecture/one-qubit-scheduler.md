@@ -1,6 +1,6 @@
 # 1-Qubit Calibration Scheduler
 
-The 1-qubit scheduler generates optimized execution schedules for single-qubit calibration based on box (筐体) constraints.
+The 1-qubit scheduler generates optimized execution schedules for single-qubit calibration based on box (enclosure) constraints.
 
 ## Overview
 

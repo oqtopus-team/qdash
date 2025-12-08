@@ -3,28 +3,37 @@
 layout: home
 
 hero:
-  name: "QDash"
-  text: "Simplifies qubit calibration workflow management and monitoring."
-  tagline: "A platform for managing calibration workflows."
+  name: QDash
+  text: Qubit Calibration Platform
+  tagline: Manage and monitor qubit calibration workflows with ease
   image:
-    src: /oqtopus-symbol.png
+    src: /oqtopus_logo.svg
     alt: OQTOPUS
   actions:
     - theme: brand
-      text: What is QDash?
-      link: /what-is-qdash
-    - theme: alt
-      text: Quickstart
+      text: Get Started
       link: /quick-start
     - theme: alt
-      text: Python Client
-      link: /python-client
+      text: What is QDash?
+      link: /what-is-qdash
 
 features:
-  - title: ⚡ Workflows
-    details: Centrally manage and track the progress of calibration workflows, from creation to completion.
-  - title: 📊 Observations
-    details: Access and analyze the observational data utilized in calibration processes, ensuring transparency and insight.
-  - title: ⚙️ Settings
-    details: Configure calibration parameters and adjust workflow settings to meet specific requirements seamlessly.
+  - icon: ⚡
+    title: Workflow Management
+    details: Centrally manage and track calibration workflows from creation to completion with real-time progress monitoring.
+  - icon: 📊
+    title: Data Analysis
+    details: Access and analyze observational data with built-in visualization tools, time-series analysis, and CSV export.
+  - icon: ⚙️
+    title: Parameter Control
+    details: Configure calibration parameters and adjust workflow settings to meet specific experimental requirements.
+  - icon: 🔐
+    title: Secure Authentication
+    details: JWT-based authentication with admin-controlled signup and role-based access management.
+  - icon: 👥
+    title: Team Collaboration
+    details: Share projects and calibration data across team members with flexible permission controls.
+  - icon: 🔄
+    title: Remote Access
+    details: Access your calibration platform securely from anywhere via Cloudflare Tunnel integration.
 ---
