@@ -1,5 +1,7 @@
 **/node_modules
-# **/.next
+**/.next
+**/.turbo
+**/.bun
 **/.git
 **/.env
 **/dist

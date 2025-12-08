@@ -186,7 +186,7 @@ services:
   ui:
     build:
       context: .
-      dockerfile: ./ui/Dockerfile.prod
+      dockerfile: ./ui/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_PREFECT_URL: ${NEXT_PUBLIC_PREFECT_URL}
