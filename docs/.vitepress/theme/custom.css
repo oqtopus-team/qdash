@@ -1,5 +1,117 @@
-/* docs/.vitepress/theme/custom.css */
+/* QDash Custom Theme */
+
+:root {
+  /* Brand colors from OQTOPUS logo */
+  --vp-c-brand-1: #1f1fdd;
+  --vp-c-brand-2: #3b3be8;
+  --vp-c-brand-3: #5555f0;
+  --vp-c-brand-soft: rgba(31, 31, 221, 0.14);
+
+  /* Accent color */
+  --vp-c-accent: #e21331;
+
+  /* Home hero gradient */
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    #1f1fdd 30%,
+    #e21331 70%
+  );
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    #1f1fdd50 50%,
+    #e2133150 50%
+  );
+  --vp-home-hero-image-filter: blur(44px);
+}
+
+.dark {
+  --vp-c-brand-1: #5555f0;
+  --vp-c-brand-2: #6b6bf5;
+  --vp-c-brand-3: #8080f8;
+  --vp-c-brand-soft: rgba(85, 85, 240, 0.16);
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    #5555f050 50%,
+    #e2133150 50%
+  );
+}
+
+/* Hero section improvements */
 .VPHero .image-bg {
-  width: 2000px; /* 幅を100%に設定 */
-  max-width: none; /* 最大幅の制限を解除 */
+  width: 200px;
+  max-width: none;
+}
+
+.VPHero .image-container {
+  transform: scale(1.2);
+}
+
+/* Feature cards */
+.VPFeature {
+  border-radius: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.VPFeature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(31, 31, 221, 0.1);
+}
+
+/* Sidebar styling */
+.VPSidebar .VPSidebarItem.level-0 > .item > .text {
+  font-weight: 600;
+  color: var(--vp-c-brand-1);
+}
+
+/* Code blocks */
+.vp-doc [class*="language-"] code {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Button improvements */
+.VPButton.brand {
+  background-color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+
+.VPButton.brand:hover {
+  background-color: var(--vp-c-brand-2);
+  border-color: var(--vp-c-brand-2);
+}
+
+/* Navigation bar logo */
+.VPNavBarTitle .title {
+  font-weight: 700;
+  background: linear-gradient(120deg, #1f1fdd, #e21331);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Table styling */
+.vp-doc table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.vp-doc th {
+  background-color: var(--vp-c-brand-soft);
+}
+
+/* Badges / Tags */
+.VPBadge {
+  border-radius: 6px;
+}
+
+/* Custom container styling */
+.custom-block.warning {
+  border-color: var(--vp-c-accent);
+}
+
+.custom-block.tip {
+  border-color: var(--vp-c-brand-1);
 }

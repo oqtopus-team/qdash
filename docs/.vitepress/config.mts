@@ -1,27 +1,43 @@
 import { defineConfig } from "vitepress";
 import { withMermaid } from "vitepress-plugin-mermaid";
+
 // https://vitepress.dev/reference/site-config
 export default withMermaid(
   defineConfig({
     base: "/qdash/",
     title: "QDash",
-    description: "QDash Documentation",
+    description: "Qubit Calibration Management Platform",
     ignoreDeadLinks: true,
+    head: [
+      ["link", { rel: "icon", href: "/qdash/oqtopus_logo.svg", type: "image/svg+xml" }],
+      ["meta", { name: "theme-color", content: "#1f1fdd" }],
+      ["meta", { property: "og:type", content: "website" }],
+      ["meta", { property: "og:title", content: "QDash Documentation" }],
+      ["meta", { property: "og:description", content: "Qubit Calibration Management Platform" }],
+    ],
+
     mermaid: {
-      // refer https://mermaid.js.org/config/setup/modules/mermaidAPI.html#mermaidapi-configuration-defaults for options
+      theme: "neutral",
     },
-    // optionally set additional config for plugin itself with MermaidPluginConfig
     mermaidPlugin: {
-      class: "mermaid my-class", // set additional css classes for parent container
+      class: "mermaid my-class",
     },
 
     themeConfig: {
-      // https://vitepress.dev/reference/default-theme-config
-      logo: "/oqtopus-symbol.png",
+      logo: "/oqtopus_logo.svg",
+      siteTitle: "QDash",
+
       nav: [
         { text: "Home", link: "/" },
-        { text: "What is QDash", link: "/what-is-qdash" },
-        { text: "Quickstart", link: "/quick-start" },
+        { text: "Guide", link: "/what-is-qdash" },
+        { text: "Reference", link: "/reference/database-structure" },
+        {
+          text: "Links",
+          items: [
+            { text: "GitHub", link: "https://github.com/oqtopus-team/qdash" },
+            { text: "OQTOPUS", link: "https://github.com/oqtopus-team" },
+          ],
+        },
       ],
 
       sidebar: [
@@ -36,7 +52,7 @@ export default withMermaid(
         {
           text: "User Guide",
           items: [
-            { text: "Projects and Data Sharing", link: "/projects-and-sharing" },
+            { text: "Projects and Sharing", link: "/projects-and-sharing" },
           ],
         },
         {
@@ -45,9 +61,9 @@ export default withMermaid(
           items: [
             { text: "Development Flow", link: "/guide/development-flow" },
             { text: "Setup Environment", link: "/guide/setup-development-environment" },
-            { text: "API Design Guidelines", link: "/guide/api-design-guidelines" },
-            { text: "API Testing Guidelines", link: "/guide/api-testing-guidelines" },
-            { text: "Workflow Testing Guidelines", link: "/guide/workflow-testing-guidelines" },
+            { text: "API Design", link: "/guide/api-design-guidelines" },
+            { text: "API Testing", link: "/guide/api-testing-guidelines" },
+            { text: "Workflow Testing", link: "/guide/workflow-testing-guidelines" },
           ],
         },
         {
@@ -56,7 +72,7 @@ export default withMermaid(
           items: [
             { text: "Database Structure", link: "/reference/database-structure" },
             { text: "Database Indexes", link: "/reference/database-indexes" },
-            { text: "OpenAPI Specification", link: "/reference/openapi" },
+            { text: "OpenAPI", link: "/reference/openapi" },
           ],
         },
         {
@@ -64,17 +80,17 @@ export default withMermaid(
           collapsed: true,
           items: [
             { text: "Overview", link: "/architecture/README" },
-            { text: "One-Qubit Scheduler", link: "/architecture/one-qubit-scheduler" },
+            { text: "1-Qubit Scheduler", link: "/architecture/one-qubit-scheduler" },
             { text: "Ordering Plugins", link: "/architecture/one-qubit-ordering-plugins" },
             { text: "CR Scheduler", link: "/architecture/cr-scheduler" },
-            { text: "Square Lattice Topology", link: "/architecture/square-lattice-topology" },
+            { text: "Square Lattice", link: "/architecture/square-lattice-topology" },
           ],
         },
         {
           text: "Community",
           collapsed: true,
           items: [
-            { text: "How to Contribute", link: "/CONTRIBUTING" },
+            { text: "Contributing", link: "/CONTRIBUTING" },
             { text: "Code of Conduct", link: "/CODE_OF_CONDUCT" },
             { text: "Security", link: "/SECURITY" },
           ],
@@ -82,11 +98,29 @@ export default withMermaid(
       ],
 
       socialLinks: [
-        {
-          icon: "github",
-          link: "https://github.com/oqtopus-team/qdash",
-        },
+        { icon: "github", link: "https://github.com/oqtopus-team/qdash" },
       ],
+
+      footer: {
+        message: "Released under the Apache 2.0 License.",
+        copyright: "Copyright © 2024-present OQTOPUS Team",
+      },
+
+      search: {
+        provider: "local",
+      },
+
+      editLink: {
+        pattern: "https://github.com/oqtopus-team/qdash/edit/develop/docs/:path",
+        text: "Edit this page on GitHub",
+      },
+
+      lastUpdated: {
+        text: "Updated at",
+        formatOptions: {
+          dateStyle: "medium",
+        },
+      },
     },
   }),
 );
