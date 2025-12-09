@@ -26,7 +26,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -60,7 +59,7 @@ export const getListTasksQueryKey = (params?: ListTasksParams) => {
 
 export const getListTasksQueryOptions = <
   TData = Awaited<ReturnType<typeof listTasks>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params?: ListTasksParams,
   options?: {
@@ -88,11 +87,11 @@ export const getListTasksQueryOptions = <
 export type ListTasksQueryResult = NonNullable<
   Awaited<ReturnType<typeof listTasks>>
 >;
-export type ListTasksQueryError = ErrorType<HTTPValidationError>;
+export type ListTasksQueryError = HTTPValidationError;
 
 export function useListTasks<
   TData = Awaited<ReturnType<typeof listTasks>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: undefined | ListTasksParams,
   options: {
@@ -115,7 +114,7 @@ export function useListTasks<
 };
 export function useListTasks<
   TData = Awaited<ReturnType<typeof listTasks>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params?: ListTasksParams,
   options?: {
@@ -136,7 +135,7 @@ export function useListTasks<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListTasks<
   TData = Awaited<ReturnType<typeof listTasks>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params?: ListTasksParams,
   options?: {
@@ -153,7 +152,7 @@ export function useListTasks<
 
 export function useListTasks<
   TData = Awaited<ReturnType<typeof listTasks>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params?: ListTasksParams,
   options?: {
@@ -206,7 +205,7 @@ export const getGetTaskResultQueryKey = (taskId?: string) => {
 
 export const getGetTaskResultQueryOptions = <
   TData = Awaited<ReturnType<typeof getTaskResult>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   taskId: string,
   options?: {
@@ -239,11 +238,11 @@ export const getGetTaskResultQueryOptions = <
 export type GetTaskResultQueryResult = NonNullable<
   Awaited<ReturnType<typeof getTaskResult>>
 >;
-export type GetTaskResultQueryError = ErrorType<HTTPValidationError>;
+export type GetTaskResultQueryError = HTTPValidationError;
 
 export function useGetTaskResult<
   TData = Awaited<ReturnType<typeof getTaskResult>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   taskId: string,
   options: {
@@ -266,7 +265,7 @@ export function useGetTaskResult<
 };
 export function useGetTaskResult<
   TData = Awaited<ReturnType<typeof getTaskResult>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   taskId: string,
   options?: {
@@ -287,7 +286,7 @@ export function useGetTaskResult<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetTaskResult<
   TData = Awaited<ReturnType<typeof getTaskResult>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   taskId: string,
   options?: {
@@ -304,7 +303,7 @@ export function useGetTaskResult<
 
 export function useGetTaskResult<
   TData = Awaited<ReturnType<typeof getTaskResult>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   taskId: string,
   options?: {

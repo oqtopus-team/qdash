@@ -34,7 +34,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType, BodyType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -58,7 +57,7 @@ export const getListProjectsQueryKey = () => {
 
 export const getListProjectsQueryOptions = <
   TData = Awaited<ReturnType<typeof listProjects>>,
-  TError = ErrorType<void>,
+  TError = void,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>
@@ -83,11 +82,11 @@ export const getListProjectsQueryOptions = <
 export type ListProjectsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listProjects>>
 >;
-export type ListProjectsQueryError = ErrorType<void>;
+export type ListProjectsQueryError = void;
 
 export function useListProjects<
   TData = Awaited<ReturnType<typeof listProjects>>,
-  TError = ErrorType<void>,
+  TError = void,
 >(
   options: {
     query: Partial<
@@ -109,7 +108,7 @@ export function useListProjects<
 };
 export function useListProjects<
   TData = Awaited<ReturnType<typeof listProjects>>,
-  TError = ErrorType<void>,
+  TError = void,
 >(
   options?: {
     query?: Partial<
@@ -129,7 +128,7 @@ export function useListProjects<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListProjects<
   TData = Awaited<ReturnType<typeof listProjects>>,
-  TError = ErrorType<void>,
+  TError = void,
 >(
   options?: {
     query?: Partial<
@@ -145,7 +144,7 @@ export function useListProjects<
 
 export function useListProjects<
   TData = Awaited<ReturnType<typeof listProjects>>,
-  TError = ErrorType<void>,
+  TError = void,
 >(
   options?: {
     query?: Partial<
@@ -172,7 +171,7 @@ export function useListProjects<
  * @summary Create a new project
  */
 export const createProject = (
-  projectCreate: BodyType<ProjectCreate>,
+  projectCreate: ProjectCreate,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -189,20 +188,20 @@ export const createProject = (
 };
 
 export const getCreateProjectMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createProject>>,
     TError,
-    { data: BodyType<ProjectCreate> },
+    { data: ProjectCreate },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createProject>>,
   TError,
-  { data: BodyType<ProjectCreate> },
+  { data: ProjectCreate },
   TContext
 > => {
   const mutationKey = ["createProject"];
@@ -216,7 +215,7 @@ export const getCreateProjectMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof createProject>>,
-    { data: BodyType<ProjectCreate> }
+    { data: ProjectCreate }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -229,21 +228,21 @@ export const getCreateProjectMutationOptions = <
 export type CreateProjectMutationResult = NonNullable<
   Awaited<ReturnType<typeof createProject>>
 >;
-export type CreateProjectMutationBody = BodyType<ProjectCreate>;
-export type CreateProjectMutationError = ErrorType<void | HTTPValidationError>;
+export type CreateProjectMutationBody = ProjectCreate;
+export type CreateProjectMutationError = void | HTTPValidationError;
 
 /**
  * @summary Create a new project
  */
 export const useCreateProject = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof createProject>>,
       TError,
-      { data: BodyType<ProjectCreate> },
+      { data: ProjectCreate },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -252,7 +251,7 @@ export const useCreateProject = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof createProject>>,
   TError,
-  { data: BodyType<ProjectCreate> },
+  { data: ProjectCreate },
   TContext
 > => {
   const mutationOptions = getCreateProjectMutationOptions(options);
@@ -280,7 +279,7 @@ export const getGetProjectQueryKey = (projectId?: string) => {
 
 export const getGetProjectQueryOptions = <
   TData = Awaited<ReturnType<typeof getProject>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options?: {
@@ -313,11 +312,11 @@ export const getGetProjectQueryOptions = <
 export type GetProjectQueryResult = NonNullable<
   Awaited<ReturnType<typeof getProject>>
 >;
-export type GetProjectQueryError = ErrorType<void | HTTPValidationError>;
+export type GetProjectQueryError = void | HTTPValidationError;
 
 export function useGetProject<
   TData = Awaited<ReturnType<typeof getProject>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options: {
@@ -340,7 +339,7 @@ export function useGetProject<
 };
 export function useGetProject<
   TData = Awaited<ReturnType<typeof getProject>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options?: {
@@ -361,7 +360,7 @@ export function useGetProject<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetProject<
   TData = Awaited<ReturnType<typeof getProject>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options?: {
@@ -378,7 +377,7 @@ export function useGetProject<
 
 export function useGetProject<
   TData = Awaited<ReturnType<typeof getProject>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options?: {
@@ -407,7 +406,7 @@ export function useGetProject<
  */
 export const updateProject = (
   projectId: string,
-  projectUpdate: BodyType<ProjectUpdate>,
+  projectUpdate: ProjectUpdate,
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<ProjectResponse>(
@@ -422,20 +421,20 @@ export const updateProject = (
 };
 
 export const getUpdateProjectMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateProject>>,
     TError,
-    { projectId: string; data: BodyType<ProjectUpdate> },
+    { projectId: string; data: ProjectUpdate },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateProject>>,
   TError,
-  { projectId: string; data: BodyType<ProjectUpdate> },
+  { projectId: string; data: ProjectUpdate },
   TContext
 > => {
   const mutationKey = ["updateProject"];
@@ -449,7 +448,7 @@ export const getUpdateProjectMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof updateProject>>,
-    { projectId: string; data: BodyType<ProjectUpdate> }
+    { projectId: string; data: ProjectUpdate }
   > = (props) => {
     const { projectId, data } = props ?? {};
 
@@ -462,21 +461,21 @@ export const getUpdateProjectMutationOptions = <
 export type UpdateProjectMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateProject>>
 >;
-export type UpdateProjectMutationBody = BodyType<ProjectUpdate>;
-export type UpdateProjectMutationError = ErrorType<void | HTTPValidationError>;
+export type UpdateProjectMutationBody = ProjectUpdate;
+export type UpdateProjectMutationError = void | HTTPValidationError;
 
 /**
  * @summary Update project
  */
 export const useUpdateProject = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof updateProject>>,
       TError,
-      { projectId: string; data: BodyType<ProjectUpdate> },
+      { projectId: string; data: ProjectUpdate },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -485,7 +484,7 @@ export const useUpdateProject = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof updateProject>>,
   TError,
-  { projectId: string; data: BodyType<ProjectUpdate> },
+  { projectId: string; data: ProjectUpdate },
   TContext
 > => {
   const mutationOptions = getUpdateProjectMutationOptions(options);
@@ -510,7 +509,7 @@ export const deleteProject = (
 };
 
 export const getDeleteProjectMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -551,13 +550,13 @@ export type DeleteProjectMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteProject>>
 >;
 
-export type DeleteProjectMutationError = ErrorType<void | HTTPValidationError>;
+export type DeleteProjectMutationError = void | HTTPValidationError;
 
 /**
  * @summary Delete project
  */
 export const useDeleteProject = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
@@ -601,7 +600,7 @@ export const getListProjectMembersQueryKey = (projectId?: string) => {
 
 export const getListProjectMembersQueryOptions = <
   TData = Awaited<ReturnType<typeof listProjectMembers>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options?: {
@@ -639,12 +638,11 @@ export const getListProjectMembersQueryOptions = <
 export type ListProjectMembersQueryResult = NonNullable<
   Awaited<ReturnType<typeof listProjectMembers>>
 >;
-export type ListProjectMembersQueryError =
-  ErrorType<void | HTTPValidationError>;
+export type ListProjectMembersQueryError = void | HTTPValidationError;
 
 export function useListProjectMembers<
   TData = Awaited<ReturnType<typeof listProjectMembers>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options: {
@@ -671,7 +669,7 @@ export function useListProjectMembers<
 };
 export function useListProjectMembers<
   TData = Awaited<ReturnType<typeof listProjectMembers>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options?: {
@@ -696,7 +694,7 @@ export function useListProjectMembers<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListProjectMembers<
   TData = Awaited<ReturnType<typeof listProjectMembers>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options?: {
@@ -717,7 +715,7 @@ export function useListProjectMembers<
 
 export function useListProjectMembers<
   TData = Awaited<ReturnType<typeof listProjectMembers>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options?: {
@@ -750,7 +748,7 @@ export function useListProjectMembers<
  */
 export const inviteProjectMember = (
   projectId: string,
-  memberInvite: BodyType<MemberInvite>,
+  memberInvite: MemberInvite,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -767,20 +765,20 @@ export const inviteProjectMember = (
 };
 
 export const getInviteProjectMemberMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof inviteProjectMember>>,
     TError,
-    { projectId: string; data: BodyType<MemberInvite> },
+    { projectId: string; data: MemberInvite },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof inviteProjectMember>>,
   TError,
-  { projectId: string; data: BodyType<MemberInvite> },
+  { projectId: string; data: MemberInvite },
   TContext
 > => {
   const mutationKey = ["inviteProjectMember"];
@@ -794,7 +792,7 @@ export const getInviteProjectMemberMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof inviteProjectMember>>,
-    { projectId: string; data: BodyType<MemberInvite> }
+    { projectId: string; data: MemberInvite }
   > = (props) => {
     const { projectId, data } = props ?? {};
 
@@ -807,22 +805,21 @@ export const getInviteProjectMemberMutationOptions = <
 export type InviteProjectMemberMutationResult = NonNullable<
   Awaited<ReturnType<typeof inviteProjectMember>>
 >;
-export type InviteProjectMemberMutationBody = BodyType<MemberInvite>;
-export type InviteProjectMemberMutationError =
-  ErrorType<void | HTTPValidationError>;
+export type InviteProjectMemberMutationBody = MemberInvite;
+export type InviteProjectMemberMutationError = void | HTTPValidationError;
 
 /**
  * @summary Invite a member
  */
 export const useInviteProjectMember = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof inviteProjectMember>>,
       TError,
-      { projectId: string; data: BodyType<MemberInvite> },
+      { projectId: string; data: MemberInvite },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -831,7 +828,7 @@ export const useInviteProjectMember = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof inviteProjectMember>>,
   TError,
-  { projectId: string; data: BodyType<MemberInvite> },
+  { projectId: string; data: MemberInvite },
   TContext
 > => {
   const mutationOptions = getInviteProjectMemberMutationOptions(options);
@@ -845,7 +842,7 @@ export const useInviteProjectMember = <
 export const updateProjectMember = (
   projectId: string,
   username: string,
-  memberUpdate: BodyType<MemberUpdate>,
+  memberUpdate: MemberUpdate,
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<MemberResponse>(
@@ -860,20 +857,20 @@ export const updateProjectMember = (
 };
 
 export const getUpdateProjectMemberMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateProjectMember>>,
     TError,
-    { projectId: string; username: string; data: BodyType<MemberUpdate> },
+    { projectId: string; username: string; data: MemberUpdate },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateProjectMember>>,
   TError,
-  { projectId: string; username: string; data: BodyType<MemberUpdate> },
+  { projectId: string; username: string; data: MemberUpdate },
   TContext
 > => {
   const mutationKey = ["updateProjectMember"];
@@ -887,7 +884,7 @@ export const getUpdateProjectMemberMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof updateProjectMember>>,
-    { projectId: string; username: string; data: BodyType<MemberUpdate> }
+    { projectId: string; username: string; data: MemberUpdate }
   > = (props) => {
     const { projectId, username, data } = props ?? {};
 
@@ -900,22 +897,21 @@ export const getUpdateProjectMemberMutationOptions = <
 export type UpdateProjectMemberMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateProjectMember>>
 >;
-export type UpdateProjectMemberMutationBody = BodyType<MemberUpdate>;
-export type UpdateProjectMemberMutationError =
-  ErrorType<void | HTTPValidationError>;
+export type UpdateProjectMemberMutationBody = MemberUpdate;
+export type UpdateProjectMemberMutationError = void | HTTPValidationError;
 
 /**
  * @summary Update member role
  */
 export const useUpdateProjectMember = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof updateProjectMember>>,
       TError,
-      { projectId: string; username: string; data: BodyType<MemberUpdate> },
+      { projectId: string; username: string; data: MemberUpdate },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -924,7 +920,7 @@ export const useUpdateProjectMember = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof updateProjectMember>>,
   TError,
-  { projectId: string; username: string; data: BodyType<MemberUpdate> },
+  { projectId: string; username: string; data: MemberUpdate },
   TContext
 > => {
   const mutationOptions = getUpdateProjectMemberMutationOptions(options);
@@ -947,7 +943,7 @@ export const removeProjectMember = (
 };
 
 export const getRemoveProjectMemberMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -988,14 +984,13 @@ export type RemoveProjectMemberMutationResult = NonNullable<
   Awaited<ReturnType<typeof removeProjectMember>>
 >;
 
-export type RemoveProjectMemberMutationError =
-  ErrorType<void | HTTPValidationError>;
+export type RemoveProjectMemberMutationError = void | HTTPValidationError;
 
 /**
  * @summary Remove member
  */
 export const useRemoveProjectMember = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
@@ -1024,7 +1019,7 @@ export const useRemoveProjectMember = <
  */
 export const transferProjectOwnership = (
   projectId: string,
-  memberInvite: BodyType<MemberInvite>,
+  memberInvite: MemberInvite,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -1041,20 +1036,20 @@ export const transferProjectOwnership = (
 };
 
 export const getTransferProjectOwnershipMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof transferProjectOwnership>>,
     TError,
-    { projectId: string; data: BodyType<MemberInvite> },
+    { projectId: string; data: MemberInvite },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof transferProjectOwnership>>,
   TError,
-  { projectId: string; data: BodyType<MemberInvite> },
+  { projectId: string; data: MemberInvite },
   TContext
 > => {
   const mutationKey = ["transferProjectOwnership"];
@@ -1068,7 +1063,7 @@ export const getTransferProjectOwnershipMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof transferProjectOwnership>>,
-    { projectId: string; data: BodyType<MemberInvite> }
+    { projectId: string; data: MemberInvite }
   > = (props) => {
     const { projectId, data } = props ?? {};
 
@@ -1081,22 +1076,21 @@ export const getTransferProjectOwnershipMutationOptions = <
 export type TransferProjectOwnershipMutationResult = NonNullable<
   Awaited<ReturnType<typeof transferProjectOwnership>>
 >;
-export type TransferProjectOwnershipMutationBody = BodyType<MemberInvite>;
-export type TransferProjectOwnershipMutationError =
-  ErrorType<void | HTTPValidationError>;
+export type TransferProjectOwnershipMutationBody = MemberInvite;
+export type TransferProjectOwnershipMutationError = void | HTTPValidationError;
 
 /**
  * @summary Transfer project ownership
  */
 export const useTransferProjectOwnership = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof transferProjectOwnership>>,
       TError,
-      { projectId: string; data: BodyType<MemberInvite> },
+      { projectId: string; data: MemberInvite },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1105,7 +1099,7 @@ export const useTransferProjectOwnership = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof transferProjectOwnership>>,
   TError,
-  { projectId: string; data: BodyType<MemberInvite> },
+  { projectId: string; data: MemberInvite },
   TContext
 > => {
   const mutationOptions = getTransferProjectOwnershipMutationOptions(options);

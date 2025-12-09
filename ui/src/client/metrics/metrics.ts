@@ -29,7 +29,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -64,7 +63,7 @@ export const getGetMetricsConfigQueryKey = () => {
 
 export const getGetMetricsConfigQueryOptions = <
   TData = Awaited<ReturnType<typeof getMetricsConfig>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof getMetricsConfig>>, TError, TData>
@@ -89,11 +88,11 @@ export const getGetMetricsConfigQueryOptions = <
 export type GetMetricsConfigQueryResult = NonNullable<
   Awaited<ReturnType<typeof getMetricsConfig>>
 >;
-export type GetMetricsConfigQueryError = ErrorType<unknown>;
+export type GetMetricsConfigQueryError = unknown;
 
 export function useGetMetricsConfig<
   TData = Awaited<ReturnType<typeof getMetricsConfig>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options: {
     query: Partial<
@@ -119,7 +118,7 @@ export function useGetMetricsConfig<
 };
 export function useGetMetricsConfig<
   TData = Awaited<ReturnType<typeof getMetricsConfig>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -143,7 +142,7 @@ export function useGetMetricsConfig<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetMetricsConfig<
   TData = Awaited<ReturnType<typeof getMetricsConfig>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -163,7 +162,7 @@ export function useGetMetricsConfig<
 
 export function useGetMetricsConfig<
   TData = Awaited<ReturnType<typeof getMetricsConfig>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -233,7 +232,7 @@ export const getGetChipMetricsQueryKey = (
 
 export const getGetChipMetricsQueryOptions = <
   TData = Awaited<ReturnType<typeof getChipMetrics>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   params?: GetChipMetricsParams,
@@ -268,11 +267,11 @@ export const getGetChipMetricsQueryOptions = <
 export type GetChipMetricsQueryResult = NonNullable<
   Awaited<ReturnType<typeof getChipMetrics>>
 >;
-export type GetChipMetricsQueryError = ErrorType<HTTPValidationError>;
+export type GetChipMetricsQueryError = HTTPValidationError;
 
 export function useGetChipMetrics<
   TData = Awaited<ReturnType<typeof getChipMetrics>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   params: undefined | GetChipMetricsParams,
@@ -296,7 +295,7 @@ export function useGetChipMetrics<
 };
 export function useGetChipMetrics<
   TData = Awaited<ReturnType<typeof getChipMetrics>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   params?: GetChipMetricsParams,
@@ -318,7 +317,7 @@ export function useGetChipMetrics<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetChipMetrics<
   TData = Awaited<ReturnType<typeof getChipMetrics>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   params?: GetChipMetricsParams,
@@ -336,7 +335,7 @@ export function useGetChipMetrics<
 
 export function useGetChipMetrics<
   TData = Awaited<ReturnType<typeof getChipMetrics>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   params?: GetChipMetricsParams,
@@ -412,7 +411,7 @@ export const getGetQubitMetricHistoryQueryKey = (
 
 export const getGetQubitMetricHistoryQueryOptions = <
   TData = Awaited<ReturnType<typeof getQubitMetricHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   qid: string,
@@ -454,11 +453,11 @@ export const getGetQubitMetricHistoryQueryOptions = <
 export type GetQubitMetricHistoryQueryResult = NonNullable<
   Awaited<ReturnType<typeof getQubitMetricHistory>>
 >;
-export type GetQubitMetricHistoryQueryError = ErrorType<HTTPValidationError>;
+export type GetQubitMetricHistoryQueryError = HTTPValidationError;
 
 export function useGetQubitMetricHistory<
   TData = Awaited<ReturnType<typeof getQubitMetricHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   qid: string,
@@ -487,7 +486,7 @@ export function useGetQubitMetricHistory<
 };
 export function useGetQubitMetricHistory<
   TData = Awaited<ReturnType<typeof getQubitMetricHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   qid: string,
@@ -514,7 +513,7 @@ export function useGetQubitMetricHistory<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetQubitMetricHistory<
   TData = Awaited<ReturnType<typeof getQubitMetricHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   qid: string,
@@ -537,7 +536,7 @@ export function useGetQubitMetricHistory<
 
 export function useGetQubitMetricHistory<
   TData = Awaited<ReturnType<typeof getQubitMetricHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   qid: string,
@@ -624,7 +623,7 @@ export const getGetCouplingMetricHistoryQueryKey = (
 
 export const getGetCouplingMetricHistoryQueryOptions = <
   TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   couplingId: string,
@@ -672,11 +671,11 @@ export const getGetCouplingMetricHistoryQueryOptions = <
 export type GetCouplingMetricHistoryQueryResult = NonNullable<
   Awaited<ReturnType<typeof getCouplingMetricHistory>>
 >;
-export type GetCouplingMetricHistoryQueryError = ErrorType<HTTPValidationError>;
+export type GetCouplingMetricHistoryQueryError = HTTPValidationError;
 
 export function useGetCouplingMetricHistory<
   TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   couplingId: string,
@@ -705,7 +704,7 @@ export function useGetCouplingMetricHistory<
 };
 export function useGetCouplingMetricHistory<
   TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   couplingId: string,
@@ -732,7 +731,7 @@ export function useGetCouplingMetricHistory<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetCouplingMetricHistory<
   TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   couplingId: string,
@@ -755,7 +754,7 @@ export function useGetCouplingMetricHistory<
 
 export function useGetCouplingMetricHistory<
   TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   couplingId: string,

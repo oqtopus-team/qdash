@@ -32,7 +32,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType, BodyType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -41,7 +40,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 Parameters
 ----------
-ctx : ProjectContext | None
+ctx : ProjectContext
     Project context with user and project information
 
 Returns
@@ -66,7 +65,7 @@ export const getListChipsQueryKey = () => {
 
 export const getListChipsQueryOptions = <
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
@@ -91,11 +90,11 @@ export const getListChipsQueryOptions = <
 export type ListChipsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listChips>>
 >;
-export type ListChipsQueryError = ErrorType<HTTPValidationError>;
+export type ListChipsQueryError = HTTPValidationError;
 
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options: {
     query: Partial<
@@ -117,7 +116,7 @@ export function useListChips<
 };
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -137,7 +136,7 @@ export function useListChips<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -153,7 +152,7 @@ export function useListChips<
 
 export function useListChips<
   TData = Awaited<ReturnType<typeof listChips>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -183,7 +182,7 @@ Parameters
 request : CreateChipRequest
     Chip creation request containing chip_id and size
 ctx : ProjectContext
-    Project context with editor or owner permission
+    Project context with owner permission
 
 Returns
 -------
@@ -197,7 +196,7 @@ HTTPException
  * @summary Create a new chip
  */
 export const createChip = (
-  createChipRequest: BodyType<CreateChipRequest>,
+  createChipRequest: CreateChipRequest,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -214,20 +213,20 @@ export const createChip = (
 };
 
 export const getCreateChipMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createChip>>,
     TError,
-    { data: BodyType<CreateChipRequest> },
+    { data: CreateChipRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createChip>>,
   TError,
-  { data: BodyType<CreateChipRequest> },
+  { data: CreateChipRequest },
   TContext
 > => {
   const mutationKey = ["createChip"];
@@ -241,7 +240,7 @@ export const getCreateChipMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof createChip>>,
-    { data: BodyType<CreateChipRequest> }
+    { data: CreateChipRequest }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -254,21 +253,18 @@ export const getCreateChipMutationOptions = <
 export type CreateChipMutationResult = NonNullable<
   Awaited<ReturnType<typeof createChip>>
 >;
-export type CreateChipMutationBody = BodyType<CreateChipRequest>;
-export type CreateChipMutationError = ErrorType<HTTPValidationError>;
+export type CreateChipMutationBody = CreateChipRequest;
+export type CreateChipMutationError = HTTPValidationError;
 
 /**
  * @summary Create a new chip
  */
-export const useCreateChip = <
-  TError = ErrorType<HTTPValidationError>,
-  TContext = unknown,
->(
+export const useCreateChip = <TError = HTTPValidationError, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof createChip>>,
       TError,
-      { data: BodyType<CreateChipRequest> },
+      { data: CreateChipRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -277,7 +273,7 @@ export const useCreateChip = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof createChip>>,
   TError,
-  { data: BodyType<CreateChipRequest> },
+  { data: CreateChipRequest },
   TContext
 > => {
   const mutationOptions = getCreateChipMutationOptions(options);
@@ -317,7 +313,7 @@ export const getGetChipDatesQueryKey = (chipId?: string) => {
 
 export const getGetChipDatesQueryOptions = <
   TData = Awaited<ReturnType<typeof getChipDates>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options?: {
@@ -350,11 +346,11 @@ export const getGetChipDatesQueryOptions = <
 export type GetChipDatesQueryResult = NonNullable<
   Awaited<ReturnType<typeof getChipDates>>
 >;
-export type GetChipDatesQueryError = ErrorType<HTTPValidationError>;
+export type GetChipDatesQueryError = HTTPValidationError;
 
 export function useGetChipDates<
   TData = Awaited<ReturnType<typeof getChipDates>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options: {
@@ -377,7 +373,7 @@ export function useGetChipDates<
 };
 export function useGetChipDates<
   TData = Awaited<ReturnType<typeof getChipDates>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options?: {
@@ -398,7 +394,7 @@ export function useGetChipDates<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetChipDates<
   TData = Awaited<ReturnType<typeof getChipDates>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options?: {
@@ -415,7 +411,7 @@ export function useGetChipDates<
 
 export function useGetChipDates<
   TData = Awaited<ReturnType<typeof getChipDates>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options?: {
@@ -476,7 +472,7 @@ export const getGetChipQueryKey = (chipId?: string) => {
 
 export const getGetChipQueryOptions = <
   TData = Awaited<ReturnType<typeof getChip>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options?: {
@@ -507,11 +503,11 @@ export const getGetChipQueryOptions = <
 export type GetChipQueryResult = NonNullable<
   Awaited<ReturnType<typeof getChip>>
 >;
-export type GetChipQueryError = ErrorType<HTTPValidationError>;
+export type GetChipQueryError = HTTPValidationError;
 
 export function useGetChip<
   TData = Awaited<ReturnType<typeof getChip>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options: {
@@ -534,7 +530,7 @@ export function useGetChip<
 };
 export function useGetChip<
   TData = Awaited<ReturnType<typeof getChip>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options?: {
@@ -555,7 +551,7 @@ export function useGetChip<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetChip<
   TData = Awaited<ReturnType<typeof getChip>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options?: {
@@ -572,7 +568,7 @@ export function useGetChip<
 
 export function useGetChip<
   TData = Awaited<ReturnType<typeof getChip>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options?: {
@@ -631,7 +627,7 @@ export const getGetChipMuxQueryKey = (chipId?: string, muxId?: number) => {
 
 export const getGetChipMuxQueryOptions = <
   TData = Awaited<ReturnType<typeof getChipMux>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   muxId: number,
@@ -666,11 +662,11 @@ export const getGetChipMuxQueryOptions = <
 export type GetChipMuxQueryResult = NonNullable<
   Awaited<ReturnType<typeof getChipMux>>
 >;
-export type GetChipMuxQueryError = ErrorType<HTTPValidationError>;
+export type GetChipMuxQueryError = HTTPValidationError;
 
 export function useGetChipMux<
   TData = Awaited<ReturnType<typeof getChipMux>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   muxId: number,
@@ -694,7 +690,7 @@ export function useGetChipMux<
 };
 export function useGetChipMux<
   TData = Awaited<ReturnType<typeof getChipMux>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   muxId: number,
@@ -716,7 +712,7 @@ export function useGetChipMux<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetChipMux<
   TData = Awaited<ReturnType<typeof getChipMux>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   muxId: number,
@@ -734,7 +730,7 @@ export function useGetChipMux<
 
 export function useGetChipMux<
   TData = Awaited<ReturnType<typeof getChipMux>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   muxId: number,
@@ -791,7 +787,7 @@ export const getListChipMuxesQueryKey = (chipId?: string) => {
 
 export const getListChipMuxesQueryOptions = <
   TData = Awaited<ReturnType<typeof listChipMuxes>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options?: {
@@ -824,11 +820,11 @@ export const getListChipMuxesQueryOptions = <
 export type ListChipMuxesQueryResult = NonNullable<
   Awaited<ReturnType<typeof listChipMuxes>>
 >;
-export type ListChipMuxesQueryError = ErrorType<HTTPValidationError>;
+export type ListChipMuxesQueryError = HTTPValidationError;
 
 export function useListChipMuxes<
   TData = Awaited<ReturnType<typeof listChipMuxes>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options: {
@@ -851,7 +847,7 @@ export function useListChipMuxes<
 };
 export function useListChipMuxes<
   TData = Awaited<ReturnType<typeof listChipMuxes>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options?: {
@@ -872,7 +868,7 @@ export function useListChipMuxes<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListChipMuxes<
   TData = Awaited<ReturnType<typeof listChipMuxes>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options?: {
@@ -889,7 +885,7 @@ export function useListChipMuxes<
 
 export function useListChipMuxes<
   TData = Awaited<ReturnType<typeof listChipMuxes>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   chipId: string,
   options?: {

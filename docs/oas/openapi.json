@@ -14,6 +14,11 @@
     },
     "version": "0.0.1"
   },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
   "paths": {
     "/auth/login": {
       "post": {
@@ -442,7 +447,7 @@
       "delete": {
         "tags": ["admin"],
         "summary": "Delete project",
-        "description": "Delete a project and all its memberships (admin only).\n\nParameters\n----------\nproject_id : str\n    Project ID to delete\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\ndict[str, str]\n    Success message\n\nRaises\n------\nHTTPException\n    404 if project not found",
+        "description": "Delete a project and all its memberships (admin only).\n\nParameters\n----------\nproject_id : str\n    Project ID to delete\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\ndict[str, str]\n    Success message\n\nRaises\n------\nHTTPException\n    404 if project not found\n    400 if trying to delete own project",
         "operationId": "adminDeleteProject",
         "security": [
           {
@@ -1870,7 +1875,7 @@
       "get": {
         "tags": ["chip"],
         "summary": "List all chips",
-        "description": "List all chips in the current project.\n\nParameters\n----------\nctx : ProjectContext | None\n    Project context with user and project information\n\nReturns\n-------\nListChipsResponse\n    Wrapped list of available chips",
+        "description": "List all chips in the current project.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nListChipsResponse\n    Wrapped list of available chips",
         "operationId": "listChips",
         "security": [
           {
@@ -1921,7 +1926,7 @@
       "post": {
         "tags": ["chip"],
         "summary": "Create a new chip",
-        "description": "Create a new chip in the current project.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\nctx : ProjectContext\n    Project context with editor or owner permission\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
+        "description": "Create a new chip in the current project.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\nctx : ProjectContext\n    Project context with owner permission\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
         "operationId": "createChip",
         "security": [
           {
@@ -4002,7 +4007,7 @@
       "delete": {
         "tags": ["flow"],
         "summary": "Delete a flow",
-        "description": "Delete a Flow.\n\nSteps:\n1. Delete file from user_flows/{username}/{name}.py\n2. Delete metadata from MongoDB",
+        "description": "Delete a Flow.\n\nSteps:\n1. Delete Prefect deployment\n2. Delete file from user_flows/{username}/{name}.py\n3. Delete metadata from MongoDB",
         "operationId": "deleteFlow",
         "security": [
           {
@@ -6495,9 +6500,9 @@
       },
       "ProjectRole": {
         "type": "string",
-        "enum": ["owner", "editor", "viewer"],
+        "enum": ["owner", "viewer"],
         "title": "ProjectRole",
-        "description": "Role of a member inside a project."
+        "description": "Role of a member inside a project.\n\nSimplified model:\n- OWNER: Full access to project (read, write, admin)\n- VIEWER: Read-only access (for invited members)"
       },
       "ProjectUpdate": {
         "properties": {

@@ -39,7 +39,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType, BodyType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -82,7 +81,7 @@ export const getDownloadFileQueryKey = (params?: DownloadFileParams) => {
 
 export const getDownloadFileQueryOptions = <
   TData = Awaited<ReturnType<typeof downloadFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: DownloadFileParams,
   options?: {
@@ -110,11 +109,11 @@ export const getDownloadFileQueryOptions = <
 export type DownloadFileQueryResult = NonNullable<
   Awaited<ReturnType<typeof downloadFile>>
 >;
-export type DownloadFileQueryError = ErrorType<HTTPValidationError>;
+export type DownloadFileQueryError = HTTPValidationError;
 
 export function useDownloadFile<
   TData = Awaited<ReturnType<typeof downloadFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: DownloadFileParams,
   options: {
@@ -137,7 +136,7 @@ export function useDownloadFile<
 };
 export function useDownloadFile<
   TData = Awaited<ReturnType<typeof downloadFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: DownloadFileParams,
   options?: {
@@ -158,7 +157,7 @@ export function useDownloadFile<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useDownloadFile<
   TData = Awaited<ReturnType<typeof downloadFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: DownloadFileParams,
   options?: {
@@ -175,7 +174,7 @@ export function useDownloadFile<
 
 export function useDownloadFile<
   TData = Awaited<ReturnType<typeof downloadFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: DownloadFileParams,
   options?: {
@@ -239,7 +238,7 @@ export const getDownloadZipFileQueryKey = (params?: DownloadZipFileParams) => {
 
 export const getDownloadZipFileQueryOptions = <
   TData = Awaited<ReturnType<typeof downloadZipFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: DownloadZipFileParams,
   options?: {
@@ -271,11 +270,11 @@ export const getDownloadZipFileQueryOptions = <
 export type DownloadZipFileQueryResult = NonNullable<
   Awaited<ReturnType<typeof downloadZipFile>>
 >;
-export type DownloadZipFileQueryError = ErrorType<HTTPValidationError>;
+export type DownloadZipFileQueryError = HTTPValidationError;
 
 export function useDownloadZipFile<
   TData = Awaited<ReturnType<typeof downloadZipFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: DownloadZipFileParams,
   options: {
@@ -302,7 +301,7 @@ export function useDownloadZipFile<
 };
 export function useDownloadZipFile<
   TData = Awaited<ReturnType<typeof downloadZipFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: DownloadZipFileParams,
   options?: {
@@ -327,7 +326,7 @@ export function useDownloadZipFile<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useDownloadZipFile<
   TData = Awaited<ReturnType<typeof downloadZipFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: DownloadZipFileParams,
   options?: {
@@ -348,7 +347,7 @@ export function useDownloadZipFile<
 
 export function useDownloadZipFile<
   TData = Awaited<ReturnType<typeof downloadZipFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: DownloadZipFileParams,
   options?: {
@@ -399,7 +398,7 @@ export const getGetFileTreeQueryKey = () => {
 
 export const getGetFileTreeQueryOptions = <
   TData = Awaited<ReturnType<typeof getFileTree>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>
@@ -424,11 +423,11 @@ export const getGetFileTreeQueryOptions = <
 export type GetFileTreeQueryResult = NonNullable<
   Awaited<ReturnType<typeof getFileTree>>
 >;
-export type GetFileTreeQueryError = ErrorType<unknown>;
+export type GetFileTreeQueryError = unknown;
 
 export function useGetFileTree<
   TData = Awaited<ReturnType<typeof getFileTree>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options: {
     query: Partial<
@@ -450,7 +449,7 @@ export function useGetFileTree<
 };
 export function useGetFileTree<
   TData = Awaited<ReturnType<typeof getFileTree>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -470,7 +469,7 @@ export function useGetFileTree<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetFileTree<
   TData = Awaited<ReturnType<typeof getFileTree>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -486,7 +485,7 @@ export function useGetFileTree<
 
 export function useGetFileTree<
   TData = Awaited<ReturnType<typeof getFileTree>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -537,7 +536,7 @@ export const getGetFileContentQueryKey = (params?: GetFileContentParams) => {
 
 export const getGetFileContentQueryOptions = <
   TData = Awaited<ReturnType<typeof getFileContent>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetFileContentParams,
   options?: {
@@ -565,11 +564,11 @@ export const getGetFileContentQueryOptions = <
 export type GetFileContentQueryResult = NonNullable<
   Awaited<ReturnType<typeof getFileContent>>
 >;
-export type GetFileContentQueryError = ErrorType<HTTPValidationError>;
+export type GetFileContentQueryError = HTTPValidationError;
 
 export function useGetFileContent<
   TData = Awaited<ReturnType<typeof getFileContent>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetFileContentParams,
   options: {
@@ -592,7 +591,7 @@ export function useGetFileContent<
 };
 export function useGetFileContent<
   TData = Awaited<ReturnType<typeof getFileContent>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetFileContentParams,
   options?: {
@@ -613,7 +612,7 @@ export function useGetFileContent<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetFileContent<
   TData = Awaited<ReturnType<typeof getFileContent>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetFileContentParams,
   options?: {
@@ -630,7 +629,7 @@ export function useGetFileContent<
 
 export function useGetFileContent<
   TData = Awaited<ReturnType<typeof getFileContent>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetFileContentParams,
   options?: {
@@ -666,7 +665,7 @@ Returns:
  * @summary Save file content
  */
 export const saveFileContent = (
-  saveFileRequest: BodyType<SaveFileRequest>,
+  saveFileRequest: SaveFileRequest,
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<SaveFileContent200>(
@@ -681,20 +680,20 @@ export const saveFileContent = (
 };
 
 export const getSaveFileContentMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof saveFileContent>>,
     TError,
-    { data: BodyType<SaveFileRequest> },
+    { data: SaveFileRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof saveFileContent>>,
   TError,
-  { data: BodyType<SaveFileRequest> },
+  { data: SaveFileRequest },
   TContext
 > => {
   const mutationKey = ["saveFileContent"];
@@ -708,7 +707,7 @@ export const getSaveFileContentMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof saveFileContent>>,
-    { data: BodyType<SaveFileRequest> }
+    { data: SaveFileRequest }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -721,21 +720,21 @@ export const getSaveFileContentMutationOptions = <
 export type SaveFileContentMutationResult = NonNullable<
   Awaited<ReturnType<typeof saveFileContent>>
 >;
-export type SaveFileContentMutationBody = BodyType<SaveFileRequest>;
-export type SaveFileContentMutationError = ErrorType<HTTPValidationError>;
+export type SaveFileContentMutationBody = SaveFileRequest;
+export type SaveFileContentMutationError = HTTPValidationError;
 
 /**
  * @summary Save file content
  */
 export const useSaveFileContent = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof saveFileContent>>,
       TError,
-      { data: BodyType<SaveFileRequest> },
+      { data: SaveFileRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -744,7 +743,7 @@ export const useSaveFileContent = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof saveFileContent>>,
   TError,
-  { data: BodyType<SaveFileRequest> },
+  { data: SaveFileRequest },
   TContext
 > => {
   const mutationOptions = getSaveFileContentMutationOptions(options);
@@ -764,7 +763,7 @@ Returns:
  * @summary Validate file content (YAML/JSON)
  */
 export const validateFileContent = (
-  validateFileRequest: BodyType<ValidateFileRequest>,
+  validateFileRequest: ValidateFileRequest,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -781,20 +780,20 @@ export const validateFileContent = (
 };
 
 export const getValidateFileContentMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof validateFileContent>>,
     TError,
-    { data: BodyType<ValidateFileRequest> },
+    { data: ValidateFileRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof validateFileContent>>,
   TError,
-  { data: BodyType<ValidateFileRequest> },
+  { data: ValidateFileRequest },
   TContext
 > => {
   const mutationKey = ["validateFileContent"];
@@ -808,7 +807,7 @@ export const getValidateFileContentMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof validateFileContent>>,
-    { data: BodyType<ValidateFileRequest> }
+    { data: ValidateFileRequest }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -821,21 +820,21 @@ export const getValidateFileContentMutationOptions = <
 export type ValidateFileContentMutationResult = NonNullable<
   Awaited<ReturnType<typeof validateFileContent>>
 >;
-export type ValidateFileContentMutationBody = BodyType<ValidateFileRequest>;
-export type ValidateFileContentMutationError = ErrorType<HTTPValidationError>;
+export type ValidateFileContentMutationBody = ValidateFileRequest;
+export type ValidateFileContentMutationError = HTTPValidationError;
 
 /**
  * @summary Validate file content (YAML/JSON)
  */
 export const useValidateFileContent = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof validateFileContent>>,
       TError,
-      { data: BodyType<ValidateFileRequest> },
+      { data: ValidateFileRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -844,7 +843,7 @@ export const useValidateFileContent = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof validateFileContent>>,
   TError,
-  { data: BodyType<ValidateFileRequest> },
+  { data: ValidateFileRequest },
   TContext
 > => {
   const mutationOptions = getValidateFileContentMutationOptions(options);
@@ -875,7 +874,7 @@ export const getGetGitStatusQueryKey = () => {
 
 export const getGetGitStatusQueryOptions = <
   TData = Awaited<ReturnType<typeof getGitStatus>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>
@@ -900,11 +899,11 @@ export const getGetGitStatusQueryOptions = <
 export type GetGitStatusQueryResult = NonNullable<
   Awaited<ReturnType<typeof getGitStatus>>
 >;
-export type GetGitStatusQueryError = ErrorType<unknown>;
+export type GetGitStatusQueryError = unknown;
 
 export function useGetGitStatus<
   TData = Awaited<ReturnType<typeof getGitStatus>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options: {
     query: Partial<
@@ -926,7 +925,7 @@ export function useGetGitStatus<
 };
 export function useGetGitStatus<
   TData = Awaited<ReturnType<typeof getGitStatus>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -946,7 +945,7 @@ export function useGetGitStatus<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetGitStatus<
   TData = Awaited<ReturnType<typeof getGitStatus>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -962,7 +961,7 @@ export function useGetGitStatus<
 
 export function useGetGitStatus<
   TData = Awaited<ReturnType<typeof getGitStatus>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -1003,7 +1002,7 @@ export const gitPullConfig = (
 };
 
 export const getGitPullConfigMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1042,15 +1041,12 @@ export type GitPullConfigMutationResult = NonNullable<
   Awaited<ReturnType<typeof gitPullConfig>>
 >;
 
-export type GitPullConfigMutationError = ErrorType<unknown>;
+export type GitPullConfigMutationError = unknown;
 
 /**
  * @summary Pull latest config from Git repository
  */
-export const useGitPullConfig = <
-  TError = ErrorType<unknown>,
-  TContext = unknown,
->(
+export const useGitPullConfig = <TError = unknown, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof gitPullConfig>>,
@@ -1084,7 +1080,7 @@ Returns:
  * @summary Push config changes to Git repository
  */
 export const gitPushConfig = (
-  gitPushRequest: BodyType<GitPushRequest>,
+  gitPushRequest: GitPushRequest,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -1101,20 +1097,20 @@ export const gitPushConfig = (
 };
 
 export const getGitPushConfigMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof gitPushConfig>>,
     TError,
-    { data: BodyType<GitPushRequest> },
+    { data: GitPushRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof gitPushConfig>>,
   TError,
-  { data: BodyType<GitPushRequest> },
+  { data: GitPushRequest },
   TContext
 > => {
   const mutationKey = ["gitPushConfig"];
@@ -1128,7 +1124,7 @@ export const getGitPushConfigMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof gitPushConfig>>,
-    { data: BodyType<GitPushRequest> }
+    { data: GitPushRequest }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -1141,21 +1137,21 @@ export const getGitPushConfigMutationOptions = <
 export type GitPushConfigMutationResult = NonNullable<
   Awaited<ReturnType<typeof gitPushConfig>>
 >;
-export type GitPushConfigMutationBody = BodyType<GitPushRequest>;
-export type GitPushConfigMutationError = ErrorType<HTTPValidationError>;
+export type GitPushConfigMutationBody = GitPushRequest;
+export type GitPushConfigMutationError = HTTPValidationError;
 
 /**
  * @summary Push config changes to Git repository
  */
 export const useGitPushConfig = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof gitPushConfig>>,
       TError,
-      { data: BodyType<GitPushRequest> },
+      { data: GitPushRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1164,7 +1160,7 @@ export const useGitPushConfig = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof gitPushConfig>>,
   TError,
-  { data: BodyType<GitPushRequest> },
+  { data: GitPushRequest },
   TContext
 > => {
   const mutationOptions = getGitPushConfigMutationOptions(options);

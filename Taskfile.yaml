@@ -21,7 +21,7 @@ tasks:
       - curl http://api:$API_PORT/openapi.json | jq > ../docs/oas/openapi.json
       - bunx orval@7.14.0 --config ./orval.config.cjs
       - bunx prettier . --write
-      - bunx eslint . --fix -c eslint.config.js
+      - bunx eslint . --fix -c eslint.config.mjs
     desc: Generate the TypeScript client
 
   docs:
@@ -79,7 +79,7 @@ tasks:
     dir: ui
     cmds:
       - bunx prettier . --write
-      - bunx eslint . --fix -c eslint.config.js
+      - bunx eslint . --fix -c eslint.config.mjs
     desc: Format the UI code
 
   fmt:

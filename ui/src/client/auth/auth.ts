@@ -32,7 +32,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType, BodyType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -61,7 +60,7 @@ HTTPException
  * @summary Login user
  */
 export const login = (
-  bodyLogin: BodyType<BodyLogin>,
+  bodyLogin: BodyLogin,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -82,20 +81,20 @@ export const login = (
 };
 
 export const getLoginMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof login>>,
     TError,
-    { data: BodyType<BodyLogin> },
+    { data: BodyLogin },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof login>>,
   TError,
-  { data: BodyType<BodyLogin> },
+  { data: BodyLogin },
   TContext
 > => {
   const mutationKey = ["login"];
@@ -109,7 +108,7 @@ export const getLoginMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof login>>,
-    { data: BodyType<BodyLogin> }
+    { data: BodyLogin }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -122,21 +121,21 @@ export const getLoginMutationOptions = <
 export type LoginMutationResult = NonNullable<
   Awaited<ReturnType<typeof login>>
 >;
-export type LoginMutationBody = BodyType<BodyLogin>;
-export type LoginMutationError = ErrorType<void | HTTPValidationError>;
+export type LoginMutationBody = BodyLogin;
+export type LoginMutationError = void | HTTPValidationError;
 
 /**
  * @summary Login user
  */
 export const useLogin = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof login>>,
       TError,
-      { data: BodyType<BodyLogin> },
+      { data: BodyLogin },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -145,7 +144,7 @@ export const useLogin = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof login>>,
   TError,
-  { data: BodyType<BodyLogin> },
+  { data: BodyLogin },
   TContext
 > => {
   const mutationOptions = getLoginMutationOptions(options);
@@ -178,7 +177,7 @@ HTTPException
  * @summary Register a new user (admin only)
  */
 export const registerUser = (
-  userCreate: BodyType<UserCreate>,
+  userCreate: UserCreate,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -195,20 +194,20 @@ export const registerUser = (
 };
 
 export const getRegisterUserMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof registerUser>>,
     TError,
-    { data: BodyType<UserCreate> },
+    { data: UserCreate },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof registerUser>>,
   TError,
-  { data: BodyType<UserCreate> },
+  { data: UserCreate },
   TContext
 > => {
   const mutationKey = ["registerUser"];
@@ -222,7 +221,7 @@ export const getRegisterUserMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof registerUser>>,
-    { data: BodyType<UserCreate> }
+    { data: UserCreate }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -235,21 +234,21 @@ export const getRegisterUserMutationOptions = <
 export type RegisterUserMutationResult = NonNullable<
   Awaited<ReturnType<typeof registerUser>>
 >;
-export type RegisterUserMutationBody = BodyType<UserCreate>;
-export type RegisterUserMutationError = ErrorType<void | HTTPValidationError>;
+export type RegisterUserMutationBody = UserCreate;
+export type RegisterUserMutationError = void | HTTPValidationError;
 
 /**
  * @summary Register a new user (admin only)
  */
 export const useRegisterUser = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof registerUser>>,
       TError,
-      { data: BodyType<UserCreate> },
+      { data: UserCreate },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -258,7 +257,7 @@ export const useRegisterUser = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof registerUser>>,
   TError,
-  { data: BodyType<UserCreate> },
+  { data: UserCreate },
   TContext
 > => {
   const mutationOptions = getRegisterUserMutationOptions(options);
@@ -299,7 +298,7 @@ export const getGetCurrentUserQueryKey = () => {
 
 export const getGetCurrentUserQueryOptions = <
   TData = Awaited<ReturnType<typeof getCurrentUser>>,
-  TError = ErrorType<void>,
+  TError = void,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>
@@ -324,11 +323,11 @@ export const getGetCurrentUserQueryOptions = <
 export type GetCurrentUserQueryResult = NonNullable<
   Awaited<ReturnType<typeof getCurrentUser>>
 >;
-export type GetCurrentUserQueryError = ErrorType<void>;
+export type GetCurrentUserQueryError = void;
 
 export function useGetCurrentUser<
   TData = Awaited<ReturnType<typeof getCurrentUser>>,
-  TError = ErrorType<void>,
+  TError = void,
 >(
   options: {
     query: Partial<
@@ -350,7 +349,7 @@ export function useGetCurrentUser<
 };
 export function useGetCurrentUser<
   TData = Awaited<ReturnType<typeof getCurrentUser>>,
-  TError = ErrorType<void>,
+  TError = void,
 >(
   options?: {
     query?: Partial<
@@ -370,7 +369,7 @@ export function useGetCurrentUser<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetCurrentUser<
   TData = Awaited<ReturnType<typeof getCurrentUser>>,
-  TError = ErrorType<void>,
+  TError = void,
 >(
   options?: {
     query?: Partial<
@@ -386,7 +385,7 @@ export function useGetCurrentUser<
 
 export function useGetCurrentUser<
   TData = Awaited<ReturnType<typeof getCurrentUser>>,
-  TError = ErrorType<void>,
+  TError = void,
 >(
   options?: {
     query?: Partial<
@@ -432,7 +431,7 @@ export const logout = (
 };
 
 export const getLogoutMutationOptions = <
-  TError = ErrorType<void>,
+  TError = void,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -471,12 +470,12 @@ export type LogoutMutationResult = NonNullable<
   Awaited<ReturnType<typeof logout>>
 >;
 
-export type LogoutMutationError = ErrorType<void>;
+export type LogoutMutationError = void;
 
 /**
  * @summary Logout user
  */
-export const useLogout = <TError = ErrorType<void>, TContext = unknown>(
+export const useLogout = <TError = void, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof logout>>,
