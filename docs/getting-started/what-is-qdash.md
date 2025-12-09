@@ -58,7 +58,7 @@ QDash follows a microservices architecture with three major components:
 
 Here are some screenshots of QDash in action:
 
-![qdash-demo](qdash-demo.gif)
+![qdash-demo](/images/qdash-demo.gif)
 
 ## Technology Stack
 
@@ -86,4 +86,4 @@ Here are some screenshots of QDash in action:
 
 - [Quick Start](./quick-start.md) - Get started with QDash
 - [Architecture](./architecture.md) - Detailed architecture overview
-- [Database Structure](./database-structure.md) - Database schema reference
+- [Database Structure](/reference/database-structure.md) - Database schema reference
