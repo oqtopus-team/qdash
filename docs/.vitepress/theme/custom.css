@@ -51,17 +51,21 @@
 }
 
 .VPHero .image-container img {
-  transition: filter 0.5s ease, transform 0.5s ease;
+  transition:
+    filter 0.5s ease,
+    transform 0.5s ease;
   filter: drop-shadow(0 4px 20px rgba(31, 31, 221, 0.3));
 }
 
 .VPHero .image-container:hover img {
-  filter: drop-shadow(0 8px 30px rgba(31, 31, 221, 0.5)) drop-shadow(0 0 40px rgba(226, 19, 49, 0.3));
+  filter: drop-shadow(0 8px 30px rgba(31, 31, 221, 0.5))
+    drop-shadow(0 0 40px rgba(226, 19, 49, 0.3));
   transform: scale(1.08);
 }
 
 @keyframes hero-float {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1.2) translateY(0);
   }
   50% {
@@ -86,7 +90,9 @@
 /* Feature cards */
 .VPFeature {
   border-radius: 12px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .VPFeature:hover {
@@ -102,8 +108,9 @@
 
 /* Code blocks */
 .vp-doc [class*="language-"] code {
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
 }
 
 /* Button improvements */
@@ -127,12 +134,15 @@
 }
 
 .VPNavBarTitle .logo {
-  transition: filter 0.3s ease, transform 0.3s ease;
+  transition:
+    filter 0.3s ease,
+    transform 0.3s ease;
   filter: drop-shadow(0 0 0 transparent);
 }
 
 .VPNavBarTitle:hover .logo {
-  filter: drop-shadow(0 0 8px rgba(31, 31, 221, 0.6)) drop-shadow(0 0 16px rgba(226, 19, 49, 0.4));
+  filter: drop-shadow(0 0 8px rgba(31, 31, 221, 0.6))
+    drop-shadow(0 0 16px rgba(226, 19, 49, 0.4));
   transform: rotate(-5deg) scale(1.1);
 }
 
@@ -143,7 +153,9 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  transition: background-position 0.5s ease, text-shadow 0.3s ease;
+  transition:
+    background-position 0.5s ease,
+    text-shadow 0.3s ease;
   animation: gradient-shift 3s ease infinite;
 }
 
@@ -153,7 +165,8 @@
 }
 
 @keyframes gradient-shift {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% 50%;
   }
   50% {
@@ -163,7 +176,9 @@
 
 /* Sidebar logo animation */
 .VPSidebar .logo {
-  transition: filter 0.3s ease, transform 0.3s ease;
+  transition:
+    filter 0.3s ease,
+    transform 0.3s ease;
 }
 
 .VPSidebar .logo:hover {

@@ -9,11 +9,20 @@ export default withMermaid(
     description: "Qubit Calibration Management Platform",
     ignoreDeadLinks: true,
     head: [
-      ["link", { rel: "icon", href: "/qdash/oqtopus_logo.svg", type: "image/svg+xml" }],
+      [
+        "link",
+        { rel: "icon", href: "/qdash/oqtopus_logo.svg", type: "image/svg+xml" },
+      ],
       ["meta", { name: "theme-color", content: "#1f1fdd" }],
       ["meta", { property: "og:type", content: "website" }],
       ["meta", { property: "og:title", content: "QDash Documentation" }],
-      ["meta", { property: "og:description", content: "Qubit Calibration Management Platform" }],
+      [
+        "meta",
+        {
+          property: "og:description",
+          content: "Qubit Calibration Management Platform",
+        },
+      ],
     ],
 
     mermaid: {
@@ -60,17 +69,26 @@ export default withMermaid(
           collapsed: false,
           items: [
             { text: "Development Flow", link: "/guide/development-flow" },
-            { text: "Setup Environment", link: "/guide/setup-development-environment" },
+            {
+              text: "Setup Environment",
+              link: "/guide/setup-development-environment",
+            },
             { text: "API Design", link: "/guide/api-design-guidelines" },
             { text: "API Testing", link: "/guide/api-testing-guidelines" },
-            { text: "Workflow Testing", link: "/guide/workflow-testing-guidelines" },
+            {
+              text: "Workflow Testing",
+              link: "/guide/workflow-testing-guidelines",
+            },
           ],
         },
         {
           text: "Reference",
           collapsed: false,
           items: [
-            { text: "Database Structure", link: "/reference/database-structure" },
+            {
+              text: "Database Structure",
+              link: "/reference/database-structure",
+            },
             { text: "Database Indexes", link: "/reference/database-indexes" },
             { text: "OpenAPI", link: "/reference/openapi" },
           ],
@@ -80,10 +98,19 @@ export default withMermaid(
           collapsed: true,
           items: [
             { text: "Overview", link: "/architecture/README" },
-            { text: "1-Qubit Scheduler", link: "/architecture/one-qubit-scheduler" },
-            { text: "Ordering Plugins", link: "/architecture/one-qubit-ordering-plugins" },
+            {
+              text: "1-Qubit Scheduler",
+              link: "/architecture/one-qubit-scheduler",
+            },
+            {
+              text: "Ordering Plugins",
+              link: "/architecture/one-qubit-ordering-plugins",
+            },
             { text: "CR Scheduler", link: "/architecture/cr-scheduler" },
-            { text: "Square Lattice", link: "/architecture/square-lattice-topology" },
+            {
+              text: "Square Lattice",
+              link: "/architecture/square-lattice-topology",
+            },
           ],
         },
         {
@@ -111,7 +138,8 @@ export default withMermaid(
       },
 
       editLink: {
-        pattern: "https://github.com/oqtopus-team/qdash/edit/develop/docs/:path",
+        pattern:
+          "https://github.com/oqtopus-team/qdash/edit/develop/docs/:path",
         text: "Edit this page on GitHub",
       },
 

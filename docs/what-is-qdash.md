@@ -63,6 +63,7 @@ Here are some screenshots of QDash in action:
 ## Technology Stack
 
 ### Frontend
+
 - **Framework**: Next.js 14, React 18
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS, DaisyUI
@@ -70,12 +71,14 @@ Here are some screenshots of QDash in action:
 - **State Management**: TanStack Query
 
 ### Backend
+
 - **Framework**: FastAPI
 - **Language**: Python 3.10-3.12
 - **Database**: MongoDB (Bunnet ODM), PostgreSQL
 - **Authentication**: JWT
 
 ### Workflow Engine
+
 - **Orchestration**: Prefect 2.20
 - **Quantum Library**: qubex
 
