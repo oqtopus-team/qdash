@@ -1,6 +1,7 @@
 import "./globals.css";
-import AppLayout from "./components/AppLayout";
 import Providers from "./providers";
+
+import AppLayout from "@/components/layout/AppLayout";
 
 export const metadata = {
   title: "QDash",

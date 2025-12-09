@@ -36,7 +36,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType, BodyType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -64,7 +63,7 @@ export const getGetTaskFileSettingsQueryKey = () => {
 
 export const getGetTaskFileSettingsQueryOptions = <
   TData = Awaited<ReturnType<typeof getTaskFileSettings>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -93,11 +92,11 @@ export const getGetTaskFileSettingsQueryOptions = <
 export type GetTaskFileSettingsQueryResult = NonNullable<
   Awaited<ReturnType<typeof getTaskFileSettings>>
 >;
-export type GetTaskFileSettingsQueryError = ErrorType<unknown>;
+export type GetTaskFileSettingsQueryError = unknown;
 
 export function useGetTaskFileSettings<
   TData = Awaited<ReturnType<typeof getTaskFileSettings>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options: {
     query: Partial<
@@ -123,7 +122,7 @@ export function useGetTaskFileSettings<
 };
 export function useGetTaskFileSettings<
   TData = Awaited<ReturnType<typeof getTaskFileSettings>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -147,7 +146,7 @@ export function useGetTaskFileSettings<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetTaskFileSettings<
   TData = Awaited<ReturnType<typeof getTaskFileSettings>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -167,7 +166,7 @@ export function useGetTaskFileSettings<
 
 export function useGetTaskFileSettings<
   TData = Awaited<ReturnType<typeof getTaskFileSettings>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -217,7 +216,7 @@ export const getListTaskFileBackendsQueryKey = () => {
 
 export const getListTaskFileBackendsQueryOptions = <
   TData = Awaited<ReturnType<typeof listTaskFileBackends>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -246,11 +245,11 @@ export const getListTaskFileBackendsQueryOptions = <
 export type ListTaskFileBackendsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listTaskFileBackends>>
 >;
-export type ListTaskFileBackendsQueryError = ErrorType<unknown>;
+export type ListTaskFileBackendsQueryError = unknown;
 
 export function useListTaskFileBackends<
   TData = Awaited<ReturnType<typeof listTaskFileBackends>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options: {
     query: Partial<
@@ -276,7 +275,7 @@ export function useListTaskFileBackends<
 };
 export function useListTaskFileBackends<
   TData = Awaited<ReturnType<typeof listTaskFileBackends>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -300,7 +299,7 @@ export function useListTaskFileBackends<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListTaskFileBackends<
   TData = Awaited<ReturnType<typeof listTaskFileBackends>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -320,7 +319,7 @@ export function useListTaskFileBackends<
 
 export function useListTaskFileBackends<
   TData = Awaited<ReturnType<typeof listTaskFileBackends>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -375,7 +374,7 @@ export const getGetTaskFileTreeQueryKey = (params?: GetTaskFileTreeParams) => {
 
 export const getGetTaskFileTreeQueryOptions = <
   TData = Awaited<ReturnType<typeof getTaskFileTree>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTaskFileTreeParams,
   options?: {
@@ -407,11 +406,11 @@ export const getGetTaskFileTreeQueryOptions = <
 export type GetTaskFileTreeQueryResult = NonNullable<
   Awaited<ReturnType<typeof getTaskFileTree>>
 >;
-export type GetTaskFileTreeQueryError = ErrorType<HTTPValidationError>;
+export type GetTaskFileTreeQueryError = HTTPValidationError;
 
 export function useGetTaskFileTree<
   TData = Awaited<ReturnType<typeof getTaskFileTree>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTaskFileTreeParams,
   options: {
@@ -438,7 +437,7 @@ export function useGetTaskFileTree<
 };
 export function useGetTaskFileTree<
   TData = Awaited<ReturnType<typeof getTaskFileTree>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTaskFileTreeParams,
   options?: {
@@ -463,7 +462,7 @@ export function useGetTaskFileTree<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetTaskFileTree<
   TData = Awaited<ReturnType<typeof getTaskFileTree>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTaskFileTreeParams,
   options?: {
@@ -484,7 +483,7 @@ export function useGetTaskFileTree<
 
 export function useGetTaskFileTree<
   TData = Awaited<ReturnType<typeof getTaskFileTree>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTaskFileTreeParams,
   options?: {
@@ -542,7 +541,7 @@ export const getGetTaskFileContentQueryKey = (
 
 export const getGetTaskFileContentQueryOptions = <
   TData = Awaited<ReturnType<typeof getTaskFileContent>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTaskFileContentParams,
   options?: {
@@ -575,11 +574,11 @@ export const getGetTaskFileContentQueryOptions = <
 export type GetTaskFileContentQueryResult = NonNullable<
   Awaited<ReturnType<typeof getTaskFileContent>>
 >;
-export type GetTaskFileContentQueryError = ErrorType<HTTPValidationError>;
+export type GetTaskFileContentQueryError = HTTPValidationError;
 
 export function useGetTaskFileContent<
   TData = Awaited<ReturnType<typeof getTaskFileContent>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTaskFileContentParams,
   options: {
@@ -606,7 +605,7 @@ export function useGetTaskFileContent<
 };
 export function useGetTaskFileContent<
   TData = Awaited<ReturnType<typeof getTaskFileContent>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTaskFileContentParams,
   options?: {
@@ -631,7 +630,7 @@ export function useGetTaskFileContent<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetTaskFileContent<
   TData = Awaited<ReturnType<typeof getTaskFileContent>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTaskFileContentParams,
   options?: {
@@ -652,7 +651,7 @@ export function useGetTaskFileContent<
 
 export function useGetTaskFileContent<
   TData = Awaited<ReturnType<typeof getTaskFileContent>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTaskFileContentParams,
   options?: {
@@ -692,7 +691,7 @@ Returns:
  * @summary Save task file content
  */
 export const saveTaskFileContent = (
-  saveTaskFileRequest: BodyType<SaveTaskFileRequest>,
+  saveTaskFileRequest: SaveTaskFileRequest,
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<SaveTaskFileContent200>(
@@ -707,20 +706,20 @@ export const saveTaskFileContent = (
 };
 
 export const getSaveTaskFileContentMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof saveTaskFileContent>>,
     TError,
-    { data: BodyType<SaveTaskFileRequest> },
+    { data: SaveTaskFileRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof saveTaskFileContent>>,
   TError,
-  { data: BodyType<SaveTaskFileRequest> },
+  { data: SaveTaskFileRequest },
   TContext
 > => {
   const mutationKey = ["saveTaskFileContent"];
@@ -734,7 +733,7 @@ export const getSaveTaskFileContentMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof saveTaskFileContent>>,
-    { data: BodyType<SaveTaskFileRequest> }
+    { data: SaveTaskFileRequest }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -747,21 +746,21 @@ export const getSaveTaskFileContentMutationOptions = <
 export type SaveTaskFileContentMutationResult = NonNullable<
   Awaited<ReturnType<typeof saveTaskFileContent>>
 >;
-export type SaveTaskFileContentMutationBody = BodyType<SaveTaskFileRequest>;
-export type SaveTaskFileContentMutationError = ErrorType<HTTPValidationError>;
+export type SaveTaskFileContentMutationBody = SaveTaskFileRequest;
+export type SaveTaskFileContentMutationError = HTTPValidationError;
 
 /**
  * @summary Save task file content
  */
 export const useSaveTaskFileContent = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof saveTaskFileContent>>,
       TError,
-      { data: BodyType<SaveTaskFileRequest> },
+      { data: SaveTaskFileRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -770,7 +769,7 @@ export const useSaveTaskFileContent = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof saveTaskFileContent>>,
   TError,
-  { data: BodyType<SaveTaskFileRequest> },
+  { data: SaveTaskFileRequest },
   TContext
 > => {
   const mutationOptions = getSaveTaskFileContentMutationOptions(options);
@@ -810,7 +809,7 @@ export const getListTaskInfoQueryKey = (params?: ListTaskInfoParams) => {
 
 export const getListTaskInfoQueryOptions = <
   TData = Awaited<ReturnType<typeof listTaskInfo>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: ListTaskInfoParams,
   options?: {
@@ -838,11 +837,11 @@ export const getListTaskInfoQueryOptions = <
 export type ListTaskInfoQueryResult = NonNullable<
   Awaited<ReturnType<typeof listTaskInfo>>
 >;
-export type ListTaskInfoQueryError = ErrorType<HTTPValidationError>;
+export type ListTaskInfoQueryError = HTTPValidationError;
 
 export function useListTaskInfo<
   TData = Awaited<ReturnType<typeof listTaskInfo>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: ListTaskInfoParams,
   options: {
@@ -865,7 +864,7 @@ export function useListTaskInfo<
 };
 export function useListTaskInfo<
   TData = Awaited<ReturnType<typeof listTaskInfo>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: ListTaskInfoParams,
   options?: {
@@ -886,7 +885,7 @@ export function useListTaskInfo<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListTaskInfo<
   TData = Awaited<ReturnType<typeof listTaskInfo>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: ListTaskInfoParams,
   options?: {
@@ -903,7 +902,7 @@ export function useListTaskInfo<
 
 export function useListTaskInfo<
   TData = Awaited<ReturnType<typeof listTaskInfo>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: ListTaskInfoParams,
   options?: {

@@ -68,19 +68,37 @@ export default withMermaid(
           ],
         },
         {
-          text: "Development Guide",
+          text: "Development",
           collapsed: false,
           items: [
-            { text: "Development Flow", link: "/guide/development-flow" },
             {
-              text: "Setup Environment",
-              link: "/guide/setup-development-environment",
+              text: "Development Flow",
+              link: "/development/development-flow",
             },
-            { text: "API Design", link: "/guide/api-design-guidelines" },
-            { text: "API Testing", link: "/guide/api-testing-guidelines" },
+            { text: "Setup", link: "/development/setup" },
             {
-              text: "Workflow Testing",
-              link: "/guide/workflow-testing-guidelines",
+              text: "API",
+              collapsed: true,
+              items: [
+                { text: "Design Guidelines", link: "/development/api/design" },
+                { text: "Testing", link: "/development/api/testing" },
+              ],
+            },
+            {
+              text: "UI",
+              collapsed: true,
+              items: [
+                { text: "Guidelines", link: "/development/ui/guidelines" },
+                { text: "Architecture", link: "/development/ui/architecture" },
+                { text: "Testing", link: "/development/ui/testing" },
+              ],
+            },
+            {
+              text: "Workflow",
+              collapsed: true,
+              items: [
+                { text: "Testing", link: "/development/workflow/testing" },
+              ],
             },
           ],
         },

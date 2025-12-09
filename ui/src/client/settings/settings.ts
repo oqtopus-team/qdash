@@ -21,7 +21,6 @@ import type {
 import type { Settings } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -45,7 +44,7 @@ export const getGetSettingsQueryKey = () => {
 
 export const getGetSettingsQueryOptions = <
   TData = Awaited<ReturnType<typeof getSettings>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof getSettings>>, TError, TData>
@@ -70,11 +69,11 @@ export const getGetSettingsQueryOptions = <
 export type GetSettingsQueryResult = NonNullable<
   Awaited<ReturnType<typeof getSettings>>
 >;
-export type GetSettingsQueryError = ErrorType<unknown>;
+export type GetSettingsQueryError = unknown;
 
 export function useGetSettings<
   TData = Awaited<ReturnType<typeof getSettings>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options: {
     query: Partial<
@@ -96,7 +95,7 @@ export function useGetSettings<
 };
 export function useGetSettings<
   TData = Awaited<ReturnType<typeof getSettings>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -116,7 +115,7 @@ export function useGetSettings<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetSettings<
   TData = Awaited<ReturnType<typeof getSettings>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -132,7 +131,7 @@ export function useGetSettings<
 
 export function useGetSettings<
   TData = Awaited<ReturnType<typeof getSettings>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
