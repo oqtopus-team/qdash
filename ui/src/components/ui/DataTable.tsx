@@ -1,17 +1,24 @@
 import type { ReactNode } from "react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 interface Column {
   key: string;
   label: string;
   sortable?: boolean;
   className?: string;
+  // Using any here to maintain compatibility with existing render functions
+  // that have specific value types (number, string, etc.)
+  // biome-ignore lint: required for flexible column rendering
   render?: (value: any, row: any) => ReactNode;
 }
 
+// DataRow uses any to allow for flexible data structures from various sources
+// biome-ignore lint: required for flexible data structures
+type DataRow = Record<string, any>;
+
 interface DataTableProps {
   title: string;
-  data: any[];
+  data: DataRow[];
   columns: Column[];
   searchable?: boolean;
   searchPlaceholder?: string;
@@ -95,7 +102,7 @@ export function DataTable({
   );
 
   // Reset page when filter changes
-  useMemo(() => {
+  useEffect(() => {
     setCurrentPage(1);
   }, [filter]);
 

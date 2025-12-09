@@ -21,9 +21,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const savedTheme = localStorage.getItem("theme");
     if (savedTheme) {
       setTheme(savedTheme);
+      document.documentElement.setAttribute("data-theme", savedTheme);
     }
     themeChange(false);
-    document.documentElement.setAttribute("data-theme", theme);
   }, []);
 
   useEffect(() => {

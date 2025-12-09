@@ -7,6 +7,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useMemo,
 } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
@@ -76,7 +77,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setRole((membership?.role as ProjectRole) ?? null);
   }, [membersData, user?.username]);
 
-  const projects = projectsData?.data?.projects ?? [];
+  const projects = useMemo(
+    () => projectsData?.data?.projects ?? [],
+    [projectsData?.data?.projects],
+  );
 
   useEffect(() => {
     if (!projects.length) return;

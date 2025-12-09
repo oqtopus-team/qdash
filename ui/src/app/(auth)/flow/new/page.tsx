@@ -175,6 +175,7 @@ export default function NewFlowPage() {
     };
 
     loadDefaultTemplate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toast is a singleton from sonner, doesn't need to be a dependency
   }, []);
 
   // Load template when selected

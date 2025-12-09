@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 import type { Task } from "@/schemas";
 
@@ -48,6 +48,35 @@ export function TaskDetailModal({
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [subIndex, setSubIndex] = useState(initialSubIndex);
+  const modalRef = useRef<HTMLDialogElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Handle keyboard navigation
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    },
+    [onClose],
+  );
+
+  // Focus management and keyboard handling
+  useEffect(() => {
+    if (isOpen) {
+      // Focus the close button when modal opens
+      closeButtonRef.current?.focus();
+      // Add keyboard listener
+      document.addEventListener("keydown", handleKeyDown);
+      // Prevent body scroll
+      document.body.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [isOpen, handleKeyDown]);
 
   // Use generated API client hook when taskId is provided
   const {
@@ -167,14 +196,23 @@ export function TaskDetailModal({
 
   const precision = variant === "detailed" ? 6 : 4;
 
+  const modalTitle =
+    variant === "detailed" && taskName
+      ? `Task Details - ${taskName}`
+      : `Result for QID ${qid}`;
+
   return (
-    <dialog className="modal modal-open">
+    <dialog
+      ref={modalRef}
+      className="modal modal-open"
+      aria-labelledby="modal-title"
+      aria-modal="true"
+      role="dialog"
+    >
       <div className="modal-box w-fit min-w-[500px] max-w-[95vw] h-fit max-h-[95vh] p-6 rounded-2xl shadow-xl bg-base-100 overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="font-bold text-xl">
-            {variant === "detailed" && taskName
-              ? `Task Details - ${taskName}`
-              : `Result for QID ${qid}`}
+          <h3 id="modal-title" className="font-bold text-xl">
+            {modalTitle}
           </h3>
           <div className="flex items-center gap-2">
             {getStatusBadge(task.status)}
@@ -184,7 +222,7 @@ export function TaskDetailModal({
                   onClick={onNavigatePrevious}
                   disabled={!canNavigatePrevious}
                   className="btn btn-sm btn-ghost"
-                  title="Previous Day"
+                  aria-label="Go to previous day"
                 >
                   ←
                 </button>
@@ -195,7 +233,7 @@ export function TaskDetailModal({
                   onClick={onNavigateNext}
                   disabled={!canNavigateNext}
                   className="btn btn-sm btn-ghost"
-                  title="Next Day"
+                  aria-label="Go to next day"
                 >
                   →
                 </button>
@@ -205,14 +243,16 @@ export function TaskDetailModal({
               <button
                 onClick={() => router.push(`/chip/${chipId}/qubit/${qid}`)}
                 className="btn btn-sm btn-primary"
-                title="Detailed Analysis"
+                aria-label="Open detailed analysis view"
               >
                 Detail View
               </button>
             )}
             <button
+              ref={closeButtonRef}
               onClick={onClose}
               className="btn btn-sm btn-circle btn-ghost"
+              aria-label="Close modal"
             >
               ✕
             </button>
@@ -562,7 +602,9 @@ export function TaskDetailModal({
         </div>
       </div>
       <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
+        <button onClick={onClose} aria-label="Close modal">
+          close
+        </button>
       </form>
     </dialog>
   );

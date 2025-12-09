@@ -400,14 +400,18 @@ export function CDFView() {
 
   // Primary parameter data
   const primaryParameter = selectedParameters[0];
-  const primaryData = processedDataByParameter[primaryParameter] || {
-    plotData: [],
-    tableData: [],
-    median: null,
-    mean: null,
-    percentile10: null,
-    percentile90: null,
-  };
+  const primaryData = useMemo(
+    () =>
+      processedDataByParameter[primaryParameter] || {
+        plotData: [],
+        tableData: [],
+        median: null,
+        mean: null,
+        percentile10: null,
+        percentile90: null,
+      },
+    [processedDataByParameter, primaryParameter],
+  );
 
   // Create combined table data for all selected parameters
   const combinedTableData = useMemo(() => {
@@ -643,7 +647,6 @@ export function CDFView() {
   }, [
     primaryData,
     primaryParameter,
-    selectedMetricConfigs,
     couplingMetrics,
     selectedChip,
     timeRange,

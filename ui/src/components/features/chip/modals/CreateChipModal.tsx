@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -20,8 +20,32 @@ export function CreateChipModal({
   const [chipId, setChipId] = useState("");
   const [size, setSize] = useState<64 | 144 | 256 | 1024>(64);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
+
+  // Handle keyboard navigation
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    },
+    [onClose],
+  );
+
+  // Focus management and keyboard handling
+  useEffect(() => {
+    if (isOpen) {
+      inputRef.current?.focus();
+      document.addEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [isOpen, handleKeyDown]);
   const createChipMutation = useCreateChip({
     mutation: {
       onSuccess: (data) => {
@@ -76,32 +100,43 @@ export function CreateChipModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal modal-open">
+    <div
+      className="modal modal-open"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-chip-title"
+    >
       <div className="modal-box">
-        <h3 className="font-bold text-lg mb-4">Create New Chip</h3>
+        <h3 id="create-chip-title" className="font-bold text-lg mb-4">
+          Create New Chip
+        </h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Chip ID Input */}
           <div className="form-control">
-            <label className="label">
+            <label className="label" htmlFor="chip-id-input">
               <span className="label-text">Chip ID</span>
             </label>
             <input
+              ref={inputRef}
+              id="chip-id-input"
               type="text"
               placeholder="e.g., 64Q, Chip001"
               className="input input-bordered w-full"
               value={chipId}
               onChange={(e) => setChipId(e.target.value)}
               disabled={createChipMutation.isPending}
+              aria-describedby={error ? "chip-error" : undefined}
             />
           </div>
 
           {/* Size Selection */}
           <div className="form-control">
-            <label className="label">
+            <label className="label" htmlFor="chip-size-select">
               <span className="label-text">Chip Size</span>
             </label>
             <select
+              id="chip-size-select"
               className="select select-bordered w-full"
               value={size}
               onChange={(e) =>
@@ -118,12 +153,13 @@ export function CreateChipModal({
 
           {/* Error Message */}
           {error && (
-            <div className="alert alert-error">
+            <div id="chip-error" className="alert alert-error" role="alert">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="stroke-current shrink-0 h-6 w-6"
                 fill="none"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -153,7 +189,10 @@ export function CreateChipModal({
             >
               {createChipMutation.isPending ? (
                 <>
-                  <span className="loading loading-spinner loading-sm"></span>
+                  <span
+                    className="loading loading-spinner loading-sm"
+                    aria-hidden="true"
+                  ></span>
                   Creating...
                 </>
               ) : (
@@ -163,7 +202,11 @@ export function CreateChipModal({
           </div>
         </form>
       </div>
-      <div className="modal-backdrop" onClick={handleClose}></div>
+      <div
+        className="modal-backdrop"
+        onClick={handleClose}
+        aria-label="Close modal"
+      ></div>
     </div>
   );
 }
