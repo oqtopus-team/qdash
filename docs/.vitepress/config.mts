@@ -120,9 +120,9 @@ export default withMermaid(
           text: "Community",
           collapsed: true,
           items: [
-            { text: "Contributing", link: "/community/CONTRIBUTING" },
-            { text: "Code of Conduct", link: "/community/CODE_OF_CONDUCT" },
-            { text: "Security", link: "/community/SECURITY" },
+            { text: "Contributing", link: "/CONTRIBUTING" },
+            { text: "Code of Conduct", link: "/CODE_OF_CONDUCT" },
+            { text: "Security", link: "/SECURITY" },
           ],
         },
       ],
