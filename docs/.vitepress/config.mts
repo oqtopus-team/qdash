@@ -38,7 +38,7 @@ export default withMermaid(
 
       nav: [
         { text: "Home", link: "/" },
-        { text: "Guide", link: "/what-is-qdash" },
+        { text: "Guide", link: "/getting-started/what-is-qdash" },
         { text: "Reference", link: "/reference/database-structure" },
         {
           text: "Links",
@@ -53,15 +53,18 @@ export default withMermaid(
         {
           text: "Getting Started",
           items: [
-            { text: "What is QDash", link: "/what-is-qdash" },
-            { text: "Quickstart", link: "/quick-start" },
-            { text: "Architecture", link: "/architecture" },
+            { text: "What is QDash", link: "/getting-started/what-is-qdash" },
+            { text: "Quickstart", link: "/getting-started/quick-start" },
+            { text: "Architecture", link: "/getting-started/architecture" },
           ],
         },
         {
           text: "User Guide",
           items: [
-            { text: "Projects and Sharing", link: "/projects-and-sharing" },
+            {
+              text: "Projects and Sharing",
+              link: "/user-guide/projects-and-sharing",
+            },
           ],
         },
         {
@@ -117,9 +120,9 @@ export default withMermaid(
           text: "Community",
           collapsed: true,
           items: [
-            { text: "Contributing", link: "/CONTRIBUTING" },
-            { text: "Code of Conduct", link: "/CODE_OF_CONDUCT" },
-            { text: "Security", link: "/SECURITY" },
+            { text: "Contributing", link: "/community/CONTRIBUTING" },
+            { text: "Code of Conduct", link: "/community/CODE_OF_CONDUCT" },
+            { text: "Security", link: "/community/SECURITY" },
           ],
         },
       ],

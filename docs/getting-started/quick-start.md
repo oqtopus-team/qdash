@@ -29,7 +29,7 @@ You can now access the application at <a href="http://localhost:5714/signup"> lo
 
 ## Create account
 
-![create account](create_account.png)
+![create account](/images/create_account.png)
 
 Now, your data is not setup yet. You need to initialize the database with your data.
 
