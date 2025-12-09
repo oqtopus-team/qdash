@@ -107,11 +107,11 @@ Below is the correspondence between prefixes and labels:
 
 The project includes custom slash commands for Claude Code to assist with development:
 
-| Command | Description |
-|---------|-------------|
-| `/commit` | Analyze changes and suggest a commit message |
+| Command           | Description                                           |
+| ----------------- | ----------------------------------------------------- |
+| `/commit`         | Analyze changes and suggest a commit message          |
 | `/suggest-commit` | Generate commit message suggestion without committing |
-| `/auto-commit` | Automatically commit with generated message |
+| `/auto-commit`    | Automatically commit with generated message           |
 
 ### Using Task Commands
 

@@ -15,11 +15,11 @@ Before starting development, you need to install the following tools:
 
 ### Optional Tools (for local development)
 
-| Tool                                                       | Version    | Description                              |
-| ---------------------------------------------------------- | ---------- | ---------------------------------------- |
-| [Python](https://www.python.org/downloads/)                | 3.10-3.12  | Backend development                      |
-| [Bun](https://bun.sh/)                                     | 1.0+       | Frontend package manager and runtime     |
-| [Node.js](https://nodejs.org/)                             | 20+        | Alternative frontend runtime             |
+| Tool                                        | Version   | Description                          |
+| ------------------------------------------- | --------- | ------------------------------------ |
+| [Python](https://www.python.org/downloads/) | 3.10-3.12 | Backend development                  |
+| [Bun](https://bun.sh/)                      | 1.0+      | Frontend package manager and runtime |
+| [Node.js](https://nodejs.org/)              | 20+       | Alternative frontend runtime         |
 
 ## Getting Started
 
@@ -40,6 +40,7 @@ scripts/init.sh
 ```
 
 This script will:
+
 - Create required data directories
 - Generate `.env` file from template
 
@@ -81,6 +82,7 @@ task deploy-dev
 ```
 
 This starts the following services:
+
 - **mongo**: MongoDB database (port 27017)
 - **mongo-express**: MongoDB admin UI (port 8081)
 - **postgres**: PostgreSQL database (port 5432)
@@ -93,12 +95,12 @@ This starts the following services:
 
 ### Access Points
 
-| Service | URL |
-|---------|-----|
-| QDash UI | http://localhost:5714 |
+| Service           | URL                        |
+| ----------------- | -------------------------- |
+| QDash UI          | http://localhost:5714      |
 | API Documentation | http://localhost:5715/docs |
-| Prefect Dashboard | http://localhost:4200 |
-| MongoDB Admin | http://localhost:8081 |
+| Prefect Dashboard | http://localhost:4200      |
+| MongoDB Admin     | http://localhost:8081      |
 
 ## Development Commands
 
@@ -195,12 +197,12 @@ task tbls-docs
 
 Key environment variables are configured in `.env`. See `.env.example` for available options:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `API_PORT` | 5715 | Backend API port |
-| `UI_PORT` | 5714 | Frontend UI port |
-| `MONGO_PORT` | 27017 | MongoDB port |
-| `POSTGRES_PORT` | 5432 | PostgreSQL port |
-| `PREFECT_PORT` | 4200 | Prefect dashboard port |
-| `NEXT_PUBLIC_API_URL` | - | Public API URL for frontend |
-| `NEXT_PUBLIC_PREFECT_URL` | - | Prefect dashboard URL |
+| Variable                  | Default | Description                 |
+| ------------------------- | ------- | --------------------------- |
+| `API_PORT`                | 5715    | Backend API port            |
+| `UI_PORT`                 | 5714    | Frontend UI port            |
+| `MONGO_PORT`              | 27017   | MongoDB port                |
+| `POSTGRES_PORT`           | 5432    | PostgreSQL port             |
+| `PREFECT_PORT`            | 4200    | Prefect dashboard port      |
+| `NEXT_PUBLIC_API_URL`     | -       | Public API URL for frontend |
+| `NEXT_PUBLIC_PREFECT_URL` | -       | Prefect dashboard URL       |
