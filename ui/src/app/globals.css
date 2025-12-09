@@ -1,6 +1,491 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
+/* ========================================
+   Rich Interactive Design System
+   ======================================== */
+
+/*
+ * Performance-optimized transitions
+ * Only apply to interactive elements, not all elements
+ * This prevents animation jank on data-heavy pages
+ */
+
+/* Buttons, links, and interactive elements */
+.btn,
+.badge,
+.tab,
+.menu li > a,
+.menu li > button,
+.dropdown-content,
+.alert {
+  transition-property:
+    background-color, border-color, color, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Cards - only apply transition if not already set by component */
+.card:not([class*="transition-"]) {
+  transition-property: box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Form elements - only border and shadow */
+input,
+textarea,
+select,
+.input,
+.select,
+.textarea {
+  transition-property: border-color, box-shadow;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Disable transitions during page load and for reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ----------------------------------------
+   Card & Box Styles - Rich Interactive
+   ---------------------------------------- */
+
+/* Rich card with deeper shadow */
+.card {
+  border-radius: 1rem;
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
+  border: 1px solid
+    color-mix(in oklch, var(--color-base-content) 8%, transparent);
+}
+
+.card:hover {
+  box-shadow:
+    0 10px 15px -3px rgb(0 0 0 / 0.15),
+    0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* Interactive cards get lift effect with glow */
+.card[role="button"]:hover,
+.card.cursor-pointer:hover,
+button.card:hover,
+a.card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 20px 25px -5px rgb(0 0 0 / 0.15),
+    0 8px 10px -6px rgb(0 0 0 / 0.1),
+    0 0 0 1px color-mix(in oklch, var(--color-primary) 20%, transparent);
+}
+
+/* ----------------------------------------
+   Button Styles - Rich Interactive
+   ---------------------------------------- */
+
+/* Base button improvements */
+.btn {
+  border-radius: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow:
+    0 2px 4px 0 rgb(0 0 0 / 0.1),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(to bottom, rgb(255 255 255 / 0.1), transparent);
+  pointer-events: none;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 12px -2px rgb(0 0 0 / 0.15),
+    0 4px 6px -2px rgb(0 0 0 / 0.1),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.15);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow:
+    0 1px 2px 0 rgb(0 0 0 / 0.1),
+    inset 0 2px 4px 0 rgb(0 0 0 / 0.1);
+}
+
+/* Primary button with gradient */
+.btn-primary {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary),
+    color-mix(in oklch, var(--color-primary) 80%, var(--color-accent))
+  );
+  color: var(--color-primary-content);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--color-primary) 90%, white),
+    var(--color-primary)
+  );
+}
+
+/* Secondary button with gradient */
+.btn-secondary {
+  background: linear-gradient(
+    135deg,
+    var(--color-secondary),
+    color-mix(in oklch, var(--color-secondary) 80%, var(--color-accent))
+  );
+  color: var(--color-secondary-content);
+}
+
+/* Ghost buttons - subtle hover effect */
+.btn-ghost {
+  box-shadow: none;
+  background: transparent;
+}
+
+.btn-ghost::before {
+  display: none;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  box-shadow: none;
+  transform: none;
+  background-color: color-mix(
+    in oklch,
+    var(--color-base-content) 10%,
+    transparent
+  );
+}
+
+/* Small buttons - proportional effects */
+.btn-xs,
+.btn-sm {
+  border-radius: 0.5rem;
+}
+
+.btn-xs:hover:not(:disabled),
+.btn-sm:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+/* ----------------------------------------
+   Input Styles - Rich Interactive
+   ---------------------------------------- */
+
+/* Input fields with rich focus state */
+.input,
+.select,
+.textarea {
+  border-radius: 0.75rem;
+  border: 2px solid var(--color-base-300);
+  background-color: var(--color-base-100);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.3s ease,
+    background-color 0.2s ease;
+}
+
+.input:hover,
+.select:hover,
+.textarea:hover {
+  border-color: color-mix(
+    in oklch,
+    var(--color-primary) 50%,
+    var(--color-base-300)
+  );
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow:
+    0 0 0 4px color-mix(in oklch, var(--color-primary) 20%, transparent),
+    0 4px 6px -1px rgb(0 0 0 / 0.1);
+  outline: none;
+  background-color: var(--color-base-100);
+}
+
+/* ----------------------------------------
+   Badge & Chip Styles - Rich
+   ---------------------------------------- */
+
+.badge {
+  border-radius: 9999px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.1);
+}
+
+.badge-primary {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary),
+    color-mix(in oklch, var(--color-primary) 80%, var(--color-accent))
+  );
+}
+
+.badge-secondary {
+  background: linear-gradient(
+    135deg,
+    var(--color-secondary),
+    color-mix(in oklch, var(--color-secondary) 80%, var(--color-accent))
+  );
+}
+
+/* ----------------------------------------
+   Tab Styles - Rich Interactive
+   ---------------------------------------- */
+
+.tabs-boxed {
+  background-color: var(--color-base-200);
+  border-radius: 1rem;
+  padding: 0.375rem;
+  box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.06);
+}
+
+.tabs-boxed .tab {
+  border-radius: 0.625rem;
+  transition: all 0.25s ease-out;
+  font-weight: 500;
+}
+
+.tabs-boxed .tab:hover:not(.tab-active) {
+  background-color: color-mix(
+    in oklch,
+    var(--color-base-content) 5%,
+    transparent
+  );
+}
+
+.tabs-boxed .tab-active {
+  background-color: var(--color-base-100);
+  box-shadow:
+    0 2px 8px 0 rgb(0 0 0 / 0.12),
+    0 1px 2px 0 rgb(0 0 0 / 0.08);
+  font-weight: 600;
+}
+
+/* ----------------------------------------
+   Modal Styles - Rich Interactive
+   ---------------------------------------- */
+
+.modal-box {
+  border-radius: 1.5rem;
+  box-shadow:
+    0 25px 50px -12px rgb(0 0 0 / 0.3),
+    0 0 0 1px rgb(0 0 0 / 0.05);
+  border: 1px solid
+    color-mix(in oklch, var(--color-base-content) 10%, transparent);
+}
+
+/* Modal backdrop with blur */
+.modal-backdrop,
+.modal::backdrop {
+  background-color: rgb(0 0 0 / 0.5);
+  backdrop-filter: blur(4px);
+}
+
+/* ----------------------------------------
+   Alert Styles - Rich
+   ---------------------------------------- */
+
+.alert {
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklch, currentColor 20%, transparent);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+/* ----------------------------------------
+   Table Styles - Rich
+   ---------------------------------------- */
+
+.table {
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+.table th {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--color-base-content);
+  opacity: 0.7;
+  background-color: color-mix(in oklch, var(--color-base-200) 50%, transparent);
+}
+
+/* Table row hover - use simple background change without transition */
+.table tbody tr {
+  transition: none;
+}
+
+.table tr:hover td {
+  background-color: color-mix(in oklch, var(--color-primary) 5%, transparent);
+}
+
+/* ----------------------------------------
+   Dropdown Styles - Rich
+   ---------------------------------------- */
+
+.dropdown-content {
+  border-radius: 1rem;
+  box-shadow:
+    0 10px 25px -5px rgb(0 0 0 / 0.2),
+    0 8px 10px -6px rgb(0 0 0 / 0.1);
+  border: 1px solid
+    color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  animation: dropdownFadeIn 0.2s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ----------------------------------------
+   Menu Styles - Rich
+   ---------------------------------------- */
+
+.menu li > a:hover,
+.menu li > button:hover {
+  background-color: color-mix(in oklch, var(--color-primary) 10%, transparent);
+}
+
+.menu li > a.active,
+.menu li > button.active {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary),
+    color-mix(in oklch, var(--color-primary) 85%, var(--color-accent))
+  );
+  color: var(--color-primary-content);
+  font-weight: 600;
+  box-shadow: 0 2px 8px -2px
+    color-mix(in oklch, var(--color-primary) 50%, transparent);
+}
+
+/* ----------------------------------------
+   Scrollbar Styles - Rich
+   ---------------------------------------- */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: color-mix(in oklch, var(--color-base-300) 30%, transparent);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    to bottom,
+    var(--color-base-300),
+    color-mix(in oklch, var(--color-base-300) 80%, var(--color-base-content))
+  );
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--color-base-content) 30%, var(--color-base-300)),
+    var(--color-base-300)
+  );
+}
+
+/* ----------------------------------------
+   Loading Spinner Enhancement
+   ---------------------------------------- */
+
+.loading {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary),
+    var(--color-secondary)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* ----------------------------------------
+   Tooltip Styles - Rich
+   ---------------------------------------- */
+
+.tooltip::before {
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px -2px rgb(0 0 0 / 0.2);
+  font-weight: 500;
+}
+
+/* Import all DaisyUI themes that users can select */
+@import "daisyui/theme/light.css";
+@import "daisyui/theme/dark.css";
+@import "daisyui/theme/cupcake.css";
+@import "daisyui/theme/bumblebee.css";
+@import "daisyui/theme/emerald.css";
+@import "daisyui/theme/corporate.css";
+@import "daisyui/theme/synthwave.css";
+@import "daisyui/theme/retro.css";
+@import "daisyui/theme/cyberpunk.css";
+@import "daisyui/theme/valentine.css";
+@import "daisyui/theme/halloween.css";
+@import "daisyui/theme/garden.css";
+@import "daisyui/theme/forest.css";
+@import "daisyui/theme/aqua.css";
+@import "daisyui/theme/lofi.css";
+@import "daisyui/theme/pastel.css";
+@import "daisyui/theme/fantasy.css";
+@import "daisyui/theme/wireframe.css";
+@import "daisyui/theme/black.css";
+@import "daisyui/theme/luxury.css";
+@import "daisyui/theme/dracula.css";
+@import "daisyui/theme/cmyk.css";
+@import "daisyui/theme/autumn.css";
+@import "daisyui/theme/business.css";
+@import "daisyui/theme/acid.css";
+@import "daisyui/theme/lemonade.css";
+@import "daisyui/theme/night.css";
+@import "daisyui/theme/coffee.css";
+@import "daisyui/theme/winter.css";
+@import "daisyui/theme/dim.css";
+@import "daisyui/theme/nord.css";
+@import "daisyui/theme/sunset.css";
+@import "daisyui/theme/caramellatte.css";
+@import "daisyui/theme/abyss.css";
+@import "daisyui/theme/silk.css";
+
 /* Login page floating logo animation */
 @keyframes float {
   0%,

@@ -24,7 +24,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -63,7 +62,7 @@ export const getGetCalibrationNoteQueryKey = () => {
 
 export const getGetCalibrationNoteQueryOptions = <
   TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -92,11 +91,11 @@ export const getGetCalibrationNoteQueryOptions = <
 export type GetCalibrationNoteQueryResult = NonNullable<
   Awaited<ReturnType<typeof getCalibrationNote>>
 >;
-export type GetCalibrationNoteQueryError = ErrorType<HTTPValidationError>;
+export type GetCalibrationNoteQueryError = HTTPValidationError;
 
 export function useGetCalibrationNote<
   TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options: {
     query: Partial<
@@ -122,7 +121,7 @@ export function useGetCalibrationNote<
 };
 export function useGetCalibrationNote<
   TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -146,7 +145,7 @@ export function useGetCalibrationNote<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetCalibrationNote<
   TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -166,7 +165,7 @@ export function useGetCalibrationNote<
 
 export function useGetCalibrationNote<
   TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<

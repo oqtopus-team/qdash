@@ -33,7 +33,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -82,7 +81,7 @@ export const getGetLatestQubitTaskResultsQueryKey = (
 
 export const getGetLatestQubitTaskResultsQueryOptions = <
   TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetLatestQubitTaskResultsParams,
   options?: {
@@ -115,12 +114,11 @@ export const getGetLatestQubitTaskResultsQueryOptions = <
 export type GetLatestQubitTaskResultsQueryResult = NonNullable<
   Awaited<ReturnType<typeof getLatestQubitTaskResults>>
 >;
-export type GetLatestQubitTaskResultsQueryError =
-  ErrorType<HTTPValidationError>;
+export type GetLatestQubitTaskResultsQueryError = HTTPValidationError;
 
 export function useGetLatestQubitTaskResults<
   TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetLatestQubitTaskResultsParams,
   options: {
@@ -147,7 +145,7 @@ export function useGetLatestQubitTaskResults<
 };
 export function useGetLatestQubitTaskResults<
   TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetLatestQubitTaskResultsParams,
   options?: {
@@ -172,7 +170,7 @@ export function useGetLatestQubitTaskResults<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetLatestQubitTaskResults<
   TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetLatestQubitTaskResultsParams,
   options?: {
@@ -193,7 +191,7 @@ export function useGetLatestQubitTaskResults<
 
 export function useGetLatestQubitTaskResults<
   TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetLatestQubitTaskResultsParams,
   options?: {
@@ -271,7 +269,7 @@ export const getGetHistoricalQubitTaskResultsQueryKey = (
 
 export const getGetHistoricalQubitTaskResultsQueryOptions = <
   TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetHistoricalQubitTaskResultsParams,
   options?: {
@@ -305,12 +303,11 @@ export const getGetHistoricalQubitTaskResultsQueryOptions = <
 export type GetHistoricalQubitTaskResultsQueryResult = NonNullable<
   Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>
 >;
-export type GetHistoricalQubitTaskResultsQueryError =
-  ErrorType<HTTPValidationError>;
+export type GetHistoricalQubitTaskResultsQueryError = HTTPValidationError;
 
 export function useGetHistoricalQubitTaskResults<
   TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetHistoricalQubitTaskResultsParams,
   options: {
@@ -337,7 +334,7 @@ export function useGetHistoricalQubitTaskResults<
 };
 export function useGetHistoricalQubitTaskResults<
   TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetHistoricalQubitTaskResultsParams,
   options?: {
@@ -362,7 +359,7 @@ export function useGetHistoricalQubitTaskResults<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetHistoricalQubitTaskResults<
   TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetHistoricalQubitTaskResultsParams,
   options?: {
@@ -383,7 +380,7 @@ export function useGetHistoricalQubitTaskResults<
 
 export function useGetHistoricalQubitTaskResults<
   TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetHistoricalQubitTaskResultsParams,
   options?: {
@@ -471,7 +468,7 @@ export const getGetQubitTaskHistoryQueryKey = (
 
 export const getGetQubitTaskHistoryQueryOptions = <
   TData = Awaited<ReturnType<typeof getQubitTaskHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   qid: string,
   params: GetQubitTaskHistoryParams,
@@ -510,11 +507,11 @@ export const getGetQubitTaskHistoryQueryOptions = <
 export type GetQubitTaskHistoryQueryResult = NonNullable<
   Awaited<ReturnType<typeof getQubitTaskHistory>>
 >;
-export type GetQubitTaskHistoryQueryError = ErrorType<HTTPValidationError>;
+export type GetQubitTaskHistoryQueryError = HTTPValidationError;
 
 export function useGetQubitTaskHistory<
   TData = Awaited<ReturnType<typeof getQubitTaskHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   qid: string,
   params: GetQubitTaskHistoryParams,
@@ -542,7 +539,7 @@ export function useGetQubitTaskHistory<
 };
 export function useGetQubitTaskHistory<
   TData = Awaited<ReturnType<typeof getQubitTaskHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   qid: string,
   params: GetQubitTaskHistoryParams,
@@ -568,7 +565,7 @@ export function useGetQubitTaskHistory<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetQubitTaskHistory<
   TData = Awaited<ReturnType<typeof getQubitTaskHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   qid: string,
   params: GetQubitTaskHistoryParams,
@@ -590,7 +587,7 @@ export function useGetQubitTaskHistory<
 
 export function useGetQubitTaskHistory<
   TData = Awaited<ReturnType<typeof getQubitTaskHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   qid: string,
   params: GetQubitTaskHistoryParams,
@@ -667,7 +664,7 @@ export const getGetLatestCouplingTaskResultsQueryKey = (
 
 export const getGetLatestCouplingTaskResultsQueryOptions = <
   TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetLatestCouplingTaskResultsParams,
   options?: {
@@ -701,12 +698,11 @@ export const getGetLatestCouplingTaskResultsQueryOptions = <
 export type GetLatestCouplingTaskResultsQueryResult = NonNullable<
   Awaited<ReturnType<typeof getLatestCouplingTaskResults>>
 >;
-export type GetLatestCouplingTaskResultsQueryError =
-  ErrorType<HTTPValidationError>;
+export type GetLatestCouplingTaskResultsQueryError = HTTPValidationError;
 
 export function useGetLatestCouplingTaskResults<
   TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetLatestCouplingTaskResultsParams,
   options: {
@@ -733,7 +729,7 @@ export function useGetLatestCouplingTaskResults<
 };
 export function useGetLatestCouplingTaskResults<
   TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetLatestCouplingTaskResultsParams,
   options?: {
@@ -758,7 +754,7 @@ export function useGetLatestCouplingTaskResults<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetLatestCouplingTaskResults<
   TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetLatestCouplingTaskResultsParams,
   options?: {
@@ -779,7 +775,7 @@ export function useGetLatestCouplingTaskResults<
 
 export function useGetLatestCouplingTaskResults<
   TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetLatestCouplingTaskResultsParams,
   options?: {
@@ -860,7 +856,7 @@ export const getGetHistoricalCouplingTaskResultsQueryKey = (
 
 export const getGetHistoricalCouplingTaskResultsQueryOptions = <
   TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetHistoricalCouplingTaskResultsParams,
   options?: {
@@ -895,12 +891,11 @@ export const getGetHistoricalCouplingTaskResultsQueryOptions = <
 export type GetHistoricalCouplingTaskResultsQueryResult = NonNullable<
   Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>
 >;
-export type GetHistoricalCouplingTaskResultsQueryError =
-  ErrorType<HTTPValidationError>;
+export type GetHistoricalCouplingTaskResultsQueryError = HTTPValidationError;
 
 export function useGetHistoricalCouplingTaskResults<
   TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetHistoricalCouplingTaskResultsParams,
   options: {
@@ -927,7 +922,7 @@ export function useGetHistoricalCouplingTaskResults<
 };
 export function useGetHistoricalCouplingTaskResults<
   TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetHistoricalCouplingTaskResultsParams,
   options?: {
@@ -952,7 +947,7 @@ export function useGetHistoricalCouplingTaskResults<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetHistoricalCouplingTaskResults<
   TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetHistoricalCouplingTaskResultsParams,
   options?: {
@@ -973,7 +968,7 @@ export function useGetHistoricalCouplingTaskResults<
 
 export function useGetHistoricalCouplingTaskResults<
   TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetHistoricalCouplingTaskResultsParams,
   options?: {
@@ -1061,7 +1056,7 @@ export const getGetCouplingTaskHistoryQueryKey = (
 
 export const getGetCouplingTaskHistoryQueryOptions = <
   TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   couplingId: string,
   params: GetCouplingTaskHistoryParams,
@@ -1102,11 +1097,11 @@ export const getGetCouplingTaskHistoryQueryOptions = <
 export type GetCouplingTaskHistoryQueryResult = NonNullable<
   Awaited<ReturnType<typeof getCouplingTaskHistory>>
 >;
-export type GetCouplingTaskHistoryQueryError = ErrorType<HTTPValidationError>;
+export type GetCouplingTaskHistoryQueryError = HTTPValidationError;
 
 export function useGetCouplingTaskHistory<
   TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   couplingId: string,
   params: GetCouplingTaskHistoryParams,
@@ -1134,7 +1129,7 @@ export function useGetCouplingTaskHistory<
 };
 export function useGetCouplingTaskHistory<
   TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   couplingId: string,
   params: GetCouplingTaskHistoryParams,
@@ -1160,7 +1155,7 @@ export function useGetCouplingTaskHistory<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetCouplingTaskHistory<
   TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   couplingId: string,
   params: GetCouplingTaskHistoryParams,
@@ -1182,7 +1177,7 @@ export function useGetCouplingTaskHistory<
 
 export function useGetCouplingTaskHistory<
   TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   couplingId: string,
   params: GetCouplingTaskHistoryParams,
@@ -1263,7 +1258,7 @@ export const getGetTimeseriesTaskResultsQueryKey = (
 
 export const getGetTimeseriesTaskResultsQueryOptions = <
   TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTimeseriesTaskResultsParams,
   options?: {
@@ -1296,11 +1291,11 @@ export const getGetTimeseriesTaskResultsQueryOptions = <
 export type GetTimeseriesTaskResultsQueryResult = NonNullable<
   Awaited<ReturnType<typeof getTimeseriesTaskResults>>
 >;
-export type GetTimeseriesTaskResultsQueryError = ErrorType<HTTPValidationError>;
+export type GetTimeseriesTaskResultsQueryError = HTTPValidationError;
 
 export function useGetTimeseriesTaskResults<
   TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTimeseriesTaskResultsParams,
   options: {
@@ -1327,7 +1322,7 @@ export function useGetTimeseriesTaskResults<
 };
 export function useGetTimeseriesTaskResults<
   TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTimeseriesTaskResultsParams,
   options?: {
@@ -1352,7 +1347,7 @@ export function useGetTimeseriesTaskResults<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetTimeseriesTaskResults<
   TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTimeseriesTaskResultsParams,
   options?: {
@@ -1373,7 +1368,7 @@ export function useGetTimeseriesTaskResults<
 
 export function useGetTimeseriesTaskResults<
   TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: GetTimeseriesTaskResultsParams,
   options?: {

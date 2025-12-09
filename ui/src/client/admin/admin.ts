@@ -38,7 +38,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType, BodyType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -77,7 +76,7 @@ export const getListAllUsersQueryKey = (params?: ListAllUsersParams) => {
 
 export const getListAllUsersQueryOptions = <
   TData = Awaited<ReturnType<typeof listAllUsers>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   params?: ListAllUsersParams,
   options?: {
@@ -105,11 +104,11 @@ export const getListAllUsersQueryOptions = <
 export type ListAllUsersQueryResult = NonNullable<
   Awaited<ReturnType<typeof listAllUsers>>
 >;
-export type ListAllUsersQueryError = ErrorType<void | HTTPValidationError>;
+export type ListAllUsersQueryError = void | HTTPValidationError;
 
 export function useListAllUsers<
   TData = Awaited<ReturnType<typeof listAllUsers>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   params: undefined | ListAllUsersParams,
   options: {
@@ -132,7 +131,7 @@ export function useListAllUsers<
 };
 export function useListAllUsers<
   TData = Awaited<ReturnType<typeof listAllUsers>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   params?: ListAllUsersParams,
   options?: {
@@ -153,7 +152,7 @@ export function useListAllUsers<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListAllUsers<
   TData = Awaited<ReturnType<typeof listAllUsers>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   params?: ListAllUsersParams,
   options?: {
@@ -170,7 +169,7 @@ export function useListAllUsers<
 
 export function useListAllUsers<
   TData = Awaited<ReturnType<typeof listAllUsers>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   params?: ListAllUsersParams,
   options?: {
@@ -231,7 +230,7 @@ export const getGetUserDetailsQueryKey = (username?: string) => {
 
 export const getGetUserDetailsQueryOptions = <
   TData = Awaited<ReturnType<typeof getUserDetails>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   username: string,
   options?: {
@@ -265,11 +264,11 @@ export const getGetUserDetailsQueryOptions = <
 export type GetUserDetailsQueryResult = NonNullable<
   Awaited<ReturnType<typeof getUserDetails>>
 >;
-export type GetUserDetailsQueryError = ErrorType<void | HTTPValidationError>;
+export type GetUserDetailsQueryError = void | HTTPValidationError;
 
 export function useGetUserDetails<
   TData = Awaited<ReturnType<typeof getUserDetails>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   username: string,
   options: {
@@ -292,7 +291,7 @@ export function useGetUserDetails<
 };
 export function useGetUserDetails<
   TData = Awaited<ReturnType<typeof getUserDetails>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   username: string,
   options?: {
@@ -313,7 +312,7 @@ export function useGetUserDetails<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetUserDetails<
   TData = Awaited<ReturnType<typeof getUserDetails>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   username: string,
   options?: {
@@ -330,7 +329,7 @@ export function useGetUserDetails<
 
 export function useGetUserDetails<
   TData = Awaited<ReturnType<typeof getUserDetails>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   username: string,
   options?: {
@@ -379,7 +378,7 @@ HTTPException
  */
 export const updateUserSettings = (
   username: string,
-  updateUserRequest: BodyType<UpdateUserRequest>,
+  updateUserRequest: UpdateUserRequest,
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<UserDetailResponse>(
@@ -394,20 +393,20 @@ export const updateUserSettings = (
 };
 
 export const getUpdateUserSettingsMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateUserSettings>>,
     TError,
-    { username: string; data: BodyType<UpdateUserRequest> },
+    { username: string; data: UpdateUserRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateUserSettings>>,
   TError,
-  { username: string; data: BodyType<UpdateUserRequest> },
+  { username: string; data: UpdateUserRequest },
   TContext
 > => {
   const mutationKey = ["updateUserSettings"];
@@ -421,7 +420,7 @@ export const getUpdateUserSettingsMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof updateUserSettings>>,
-    { username: string; data: BodyType<UpdateUserRequest> }
+    { username: string; data: UpdateUserRequest }
   > = (props) => {
     const { username, data } = props ?? {};
 
@@ -434,22 +433,21 @@ export const getUpdateUserSettingsMutationOptions = <
 export type UpdateUserSettingsMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateUserSettings>>
 >;
-export type UpdateUserSettingsMutationBody = BodyType<UpdateUserRequest>;
-export type UpdateUserSettingsMutationError =
-  ErrorType<void | HTTPValidationError>;
+export type UpdateUserSettingsMutationBody = UpdateUserRequest;
+export type UpdateUserSettingsMutationError = void | HTTPValidationError;
 
 /**
  * @summary Update user settings
  */
 export const useUpdateUserSettings = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof updateUserSettings>>,
       TError,
-      { username: string; data: BodyType<UpdateUserRequest> },
+      { username: string; data: UpdateUserRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -458,7 +456,7 @@ export const useUpdateUserSettings = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof updateUserSettings>>,
   TError,
-  { username: string; data: BodyType<UpdateUserRequest> },
+  { username: string; data: UpdateUserRequest },
   TContext
 > => {
   const mutationOptions = getUpdateUserSettingsMutationOptions(options);
@@ -498,7 +496,7 @@ export const deleteUser = (
 };
 
 export const getDeleteUserMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -539,13 +537,13 @@ export type DeleteUserMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteUser>>
 >;
 
-export type DeleteUserMutationError = ErrorType<void | HTTPValidationError>;
+export type DeleteUserMutationError = void | HTTPValidationError;
 
 /**
  * @summary Delete user
  */
 export const useDeleteUser = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
@@ -603,7 +601,7 @@ export const getListAllProjectsQueryKey = (params?: ListAllProjectsParams) => {
 
 export const getListAllProjectsQueryOptions = <
   TData = Awaited<ReturnType<typeof listAllProjects>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   params?: ListAllProjectsParams,
   options?: {
@@ -635,11 +633,11 @@ export const getListAllProjectsQueryOptions = <
 export type ListAllProjectsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listAllProjects>>
 >;
-export type ListAllProjectsQueryError = ErrorType<void | HTTPValidationError>;
+export type ListAllProjectsQueryError = void | HTTPValidationError;
 
 export function useListAllProjects<
   TData = Awaited<ReturnType<typeof listAllProjects>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   params: undefined | ListAllProjectsParams,
   options: {
@@ -666,7 +664,7 @@ export function useListAllProjects<
 };
 export function useListAllProjects<
   TData = Awaited<ReturnType<typeof listAllProjects>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   params?: ListAllProjectsParams,
   options?: {
@@ -691,7 +689,7 @@ export function useListAllProjects<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListAllProjects<
   TData = Awaited<ReturnType<typeof listAllProjects>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   params?: ListAllProjectsParams,
   options?: {
@@ -712,7 +710,7 @@ export function useListAllProjects<
 
 export function useListAllProjects<
   TData = Awaited<ReturnType<typeof listAllProjects>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   params?: ListAllProjectsParams,
   options?: {
@@ -758,6 +756,7 @@ Raises
 ------
 HTTPException
     404 if project not found
+    400 if trying to delete own project
  * @summary Delete project
  */
 export const adminDeleteProject = (
@@ -771,7 +770,7 @@ export const adminDeleteProject = (
 };
 
 export const getAdminDeleteProjectMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -812,14 +811,13 @@ export type AdminDeleteProjectMutationResult = NonNullable<
   Awaited<ReturnType<typeof adminDeleteProject>>
 >;
 
-export type AdminDeleteProjectMutationError =
-  ErrorType<void | HTTPValidationError>;
+export type AdminDeleteProjectMutationError = void | HTTPValidationError;
 
 /**
  * @summary Delete project
  */
 export const useAdminDeleteProject = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
@@ -880,7 +878,7 @@ export const getListProjectMembersAdminQueryKey = (projectId?: string) => {
 
 export const getListProjectMembersAdminQueryOptions = <
   TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options?: {
@@ -919,12 +917,11 @@ export const getListProjectMembersAdminQueryOptions = <
 export type ListProjectMembersAdminQueryResult = NonNullable<
   Awaited<ReturnType<typeof listProjectMembersAdmin>>
 >;
-export type ListProjectMembersAdminQueryError =
-  ErrorType<void | HTTPValidationError>;
+export type ListProjectMembersAdminQueryError = void | HTTPValidationError;
 
 export function useListProjectMembersAdmin<
   TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options: {
@@ -951,7 +948,7 @@ export function useListProjectMembersAdmin<
 };
 export function useListProjectMembersAdmin<
   TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options?: {
@@ -976,7 +973,7 @@ export function useListProjectMembersAdmin<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListProjectMembersAdmin<
   TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options?: {
@@ -997,7 +994,7 @@ export function useListProjectMembersAdmin<
 
 export function useListProjectMembersAdmin<
   TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
 >(
   projectId: string,
   options?: {
@@ -1053,7 +1050,7 @@ HTTPException
  */
 export const addProjectMemberAdmin = (
   projectId: string,
-  addMemberRequest: BodyType<AddMemberRequest>,
+  addMemberRequest: AddMemberRequest,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -1070,20 +1067,20 @@ export const addProjectMemberAdmin = (
 };
 
 export const getAddProjectMemberAdminMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof addProjectMemberAdmin>>,
     TError,
-    { projectId: string; data: BodyType<AddMemberRequest> },
+    { projectId: string; data: AddMemberRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof addProjectMemberAdmin>>,
   TError,
-  { projectId: string; data: BodyType<AddMemberRequest> },
+  { projectId: string; data: AddMemberRequest },
   TContext
 > => {
   const mutationKey = ["addProjectMemberAdmin"];
@@ -1097,7 +1094,7 @@ export const getAddProjectMemberAdminMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof addProjectMemberAdmin>>,
-    { projectId: string; data: BodyType<AddMemberRequest> }
+    { projectId: string; data: AddMemberRequest }
   > = (props) => {
     const { projectId, data } = props ?? {};
 
@@ -1110,22 +1107,21 @@ export const getAddProjectMemberAdminMutationOptions = <
 export type AddProjectMemberAdminMutationResult = NonNullable<
   Awaited<ReturnType<typeof addProjectMemberAdmin>>
 >;
-export type AddProjectMemberAdminMutationBody = BodyType<AddMemberRequest>;
-export type AddProjectMemberAdminMutationError =
-  ErrorType<void | HTTPValidationError>;
+export type AddProjectMemberAdminMutationBody = AddMemberRequest;
+export type AddProjectMemberAdminMutationError = void | HTTPValidationError;
 
 /**
  * @summary Add member to project
  */
 export const useAddProjectMemberAdmin = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof addProjectMemberAdmin>>,
       TError,
-      { projectId: string; data: BodyType<AddMemberRequest> },
+      { projectId: string; data: AddMemberRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1134,7 +1130,7 @@ export const useAddProjectMemberAdmin = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof addProjectMemberAdmin>>,
   TError,
-  { projectId: string; data: BodyType<AddMemberRequest> },
+  { projectId: string; data: AddMemberRequest },
   TContext
 > => {
   const mutationOptions = getAddProjectMemberAdminMutationOptions(options);
@@ -1180,7 +1176,7 @@ export const removeProjectMemberAdmin = (
 };
 
 export const getRemoveProjectMemberAdminMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1221,14 +1217,13 @@ export type RemoveProjectMemberAdminMutationResult = NonNullable<
   Awaited<ReturnType<typeof removeProjectMemberAdmin>>
 >;
 
-export type RemoveProjectMemberAdminMutationError =
-  ErrorType<void | HTTPValidationError>;
+export type RemoveProjectMemberAdminMutationError = void | HTTPValidationError;
 
 /**
  * @summary Remove member from project
  */
 export const useRemoveProjectMemberAdmin = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
@@ -1285,7 +1280,7 @@ export const createProjectForUser = (
 };
 
 export const getCreateProjectForUserMutationOptions = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1326,14 +1321,13 @@ export type CreateProjectForUserMutationResult = NonNullable<
   Awaited<ReturnType<typeof createProjectForUser>>
 >;
 
-export type CreateProjectForUserMutationError =
-  ErrorType<void | HTTPValidationError>;
+export type CreateProjectForUserMutationError = void | HTTPValidationError;
 
 /**
  * @summary Create project for user
  */
 export const useCreateProjectForUser = <
-  TError = ErrorType<void | HTTPValidationError>,
+  TError = void | HTTPValidationError,
   TContext = unknown,
 >(
   options?: {

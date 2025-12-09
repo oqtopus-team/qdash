@@ -1,4 +1,4 @@
-![OQTOPUS](docs/oqtopus-logo.png)
+![OQTOPUS](docs/public/images/oqtopus-logo.png)
 
 # QDash
 
@@ -8,12 +8,12 @@
 
 QDash is a web application that provides a user-friendly interface to manage and monitor the execution of qubit calibration workflows.
 
-![screenshot](docs/qdash-screenshot.png)
+![screenshot](docs/public/images/qdash-screenshot.png)
 
 > [!WARNING]
 > QDash is currently under development. Please check back later for updates.
 
-![qdash-demo](docs/qdash-demo.gif)
+![qdash-demo](docs/public/images/qdash-demo.gif)
 
 ## Key Features
 

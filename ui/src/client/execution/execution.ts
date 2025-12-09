@@ -29,7 +29,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -72,7 +71,7 @@ export const getGetFigureByPathQueryKey = (params?: GetFigureByPathParams) => {
 
 export const getGetFigureByPathQueryOptions = <
   TData = Awaited<ReturnType<typeof getFigureByPath>>,
-  TError = ErrorType<Detail | HTTPValidationError>,
+  TError = Detail | HTTPValidationError,
 >(
   params: GetFigureByPathParams,
   options?: {
@@ -104,11 +103,11 @@ export const getGetFigureByPathQueryOptions = <
 export type GetFigureByPathQueryResult = NonNullable<
   Awaited<ReturnType<typeof getFigureByPath>>
 >;
-export type GetFigureByPathQueryError = ErrorType<Detail | HTTPValidationError>;
+export type GetFigureByPathQueryError = Detail | HTTPValidationError;
 
 export function useGetFigureByPath<
   TData = Awaited<ReturnType<typeof getFigureByPath>>,
-  TError = ErrorType<Detail | HTTPValidationError>,
+  TError = Detail | HTTPValidationError,
 >(
   params: GetFigureByPathParams,
   options: {
@@ -135,7 +134,7 @@ export function useGetFigureByPath<
 };
 export function useGetFigureByPath<
   TData = Awaited<ReturnType<typeof getFigureByPath>>,
-  TError = ErrorType<Detail | HTTPValidationError>,
+  TError = Detail | HTTPValidationError,
 >(
   params: GetFigureByPathParams,
   options?: {
@@ -160,7 +159,7 @@ export function useGetFigureByPath<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetFigureByPath<
   TData = Awaited<ReturnType<typeof getFigureByPath>>,
-  TError = ErrorType<Detail | HTTPValidationError>,
+  TError = Detail | HTTPValidationError,
 >(
   params: GetFigureByPathParams,
   options?: {
@@ -181,7 +180,7 @@ export function useGetFigureByPath<
 
 export function useGetFigureByPath<
   TData = Awaited<ReturnType<typeof getFigureByPath>>,
-  TError = ErrorType<Detail | HTTPValidationError>,
+  TError = Detail | HTTPValidationError,
 >(
   params: GetFigureByPathParams,
   options?: {
@@ -241,7 +240,7 @@ export const getGetExecutionLockStatusQueryKey = () => {
 
 export const getGetExecutionLockStatusQueryOptions = <
   TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -271,11 +270,11 @@ export const getGetExecutionLockStatusQueryOptions = <
 export type GetExecutionLockStatusQueryResult = NonNullable<
   Awaited<ReturnType<typeof getExecutionLockStatus>>
 >;
-export type GetExecutionLockStatusQueryError = ErrorType<HTTPValidationError>;
+export type GetExecutionLockStatusQueryError = HTTPValidationError;
 
 export function useGetExecutionLockStatus<
   TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options: {
     query: Partial<
@@ -301,7 +300,7 @@ export function useGetExecutionLockStatus<
 };
 export function useGetExecutionLockStatus<
   TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -325,7 +324,7 @@ export function useGetExecutionLockStatus<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetExecutionLockStatus<
   TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -345,7 +344,7 @@ export function useGetExecutionLockStatus<
 
 export function useGetExecutionLockStatus<
   TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -408,7 +407,7 @@ export const getListExecutionsQueryKey = (params?: ListExecutionsParams) => {
 
 export const getListExecutionsQueryOptions = <
   TData = Awaited<ReturnType<typeof listExecutions>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: ListExecutionsParams,
   options?: {
@@ -436,11 +435,11 @@ export const getListExecutionsQueryOptions = <
 export type ListExecutionsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listExecutions>>
 >;
-export type ListExecutionsQueryError = ErrorType<HTTPValidationError>;
+export type ListExecutionsQueryError = HTTPValidationError;
 
 export function useListExecutions<
   TData = Awaited<ReturnType<typeof listExecutions>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: ListExecutionsParams,
   options: {
@@ -463,7 +462,7 @@ export function useListExecutions<
 };
 export function useListExecutions<
   TData = Awaited<ReturnType<typeof listExecutions>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: ListExecutionsParams,
   options?: {
@@ -484,7 +483,7 @@ export function useListExecutions<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListExecutions<
   TData = Awaited<ReturnType<typeof listExecutions>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: ListExecutionsParams,
   options?: {
@@ -501,7 +500,7 @@ export function useListExecutions<
 
 export function useListExecutions<
   TData = Awaited<ReturnType<typeof listExecutions>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: ListExecutionsParams,
   options?: {
@@ -557,7 +556,7 @@ export const getGetExecutionQueryKey = (executionId?: string) => {
 
 export const getGetExecutionQueryOptions = <
   TData = Awaited<ReturnType<typeof getExecution>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   executionId: string,
   options?: {
@@ -591,11 +590,11 @@ export const getGetExecutionQueryOptions = <
 export type GetExecutionQueryResult = NonNullable<
   Awaited<ReturnType<typeof getExecution>>
 >;
-export type GetExecutionQueryError = ErrorType<HTTPValidationError>;
+export type GetExecutionQueryError = HTTPValidationError;
 
 export function useGetExecution<
   TData = Awaited<ReturnType<typeof getExecution>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   executionId: string,
   options: {
@@ -618,7 +617,7 @@ export function useGetExecution<
 };
 export function useGetExecution<
   TData = Awaited<ReturnType<typeof getExecution>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   executionId: string,
   options?: {
@@ -639,7 +638,7 @@ export function useGetExecution<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetExecution<
   TData = Awaited<ReturnType<typeof getExecution>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   executionId: string,
   options?: {
@@ -656,7 +655,7 @@ export function useGetExecution<
 
 export function useGetExecution<
   TData = Awaited<ReturnType<typeof getExecution>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   executionId: string,
   options?: {

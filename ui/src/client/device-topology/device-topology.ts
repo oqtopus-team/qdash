@@ -20,7 +20,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType, BodyType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -29,7 +28,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * @summary Get the device topology
  */
 export const getDeviceTopology = (
-  deviceTopologyRequest: BodyType<DeviceTopologyRequest>,
+  deviceTopologyRequest: DeviceTopologyRequest,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -46,20 +45,20 @@ export const getDeviceTopology = (
 };
 
 export const getGetDeviceTopologyMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof getDeviceTopology>>,
     TError,
-    { data: BodyType<DeviceTopologyRequest> },
+    { data: DeviceTopologyRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof getDeviceTopology>>,
   TError,
-  { data: BodyType<DeviceTopologyRequest> },
+  { data: DeviceTopologyRequest },
   TContext
 > => {
   const mutationKey = ["getDeviceTopology"];
@@ -73,7 +72,7 @@ export const getGetDeviceTopologyMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof getDeviceTopology>>,
-    { data: BodyType<DeviceTopologyRequest> }
+    { data: DeviceTopologyRequest }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -86,21 +85,21 @@ export const getGetDeviceTopologyMutationOptions = <
 export type GetDeviceTopologyMutationResult = NonNullable<
   Awaited<ReturnType<typeof getDeviceTopology>>
 >;
-export type GetDeviceTopologyMutationBody = BodyType<DeviceTopologyRequest>;
-export type GetDeviceTopologyMutationError = ErrorType<HTTPValidationError>;
+export type GetDeviceTopologyMutationBody = DeviceTopologyRequest;
+export type GetDeviceTopologyMutationError = HTTPValidationError;
 
 /**
  * @summary Get the device topology
  */
 export const useGetDeviceTopology = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof getDeviceTopology>>,
       TError,
-      { data: BodyType<DeviceTopologyRequest> },
+      { data: DeviceTopologyRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -109,7 +108,7 @@ export const useGetDeviceTopology = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof getDeviceTopology>>,
   TError,
-  { data: BodyType<DeviceTopologyRequest> },
+  { data: DeviceTopologyRequest },
   TContext
 > => {
   const mutationOptions = getGetDeviceTopologyMutationOptions(options);
@@ -121,7 +120,7 @@ export const useGetDeviceTopology = <
  * @summary Get the device topology plot
  */
 export const getDeviceTopologyPlot = (
-  device: BodyType<Device>,
+  device: Device,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -138,20 +137,20 @@ export const getDeviceTopologyPlot = (
 };
 
 export const getGetDeviceTopologyPlotMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof getDeviceTopologyPlot>>,
     TError,
-    { data: BodyType<Device> },
+    { data: Device },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof getDeviceTopologyPlot>>,
   TError,
-  { data: BodyType<Device> },
+  { data: Device },
   TContext
 > => {
   const mutationKey = ["getDeviceTopologyPlot"];
@@ -165,7 +164,7 @@ export const getGetDeviceTopologyPlotMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof getDeviceTopologyPlot>>,
-    { data: BodyType<Device> }
+    { data: Device }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -178,21 +177,21 @@ export const getGetDeviceTopologyPlotMutationOptions = <
 export type GetDeviceTopologyPlotMutationResult = NonNullable<
   Awaited<ReturnType<typeof getDeviceTopologyPlot>>
 >;
-export type GetDeviceTopologyPlotMutationBody = BodyType<Device>;
-export type GetDeviceTopologyPlotMutationError = ErrorType<HTTPValidationError>;
+export type GetDeviceTopologyPlotMutationBody = Device;
+export type GetDeviceTopologyPlotMutationError = HTTPValidationError;
 
 /**
  * @summary Get the device topology plot
  */
 export const useGetDeviceTopologyPlot = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof getDeviceTopologyPlot>>,
       TError,
-      { data: BodyType<Device> },
+      { data: Device },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -201,7 +200,7 @@ export const useGetDeviceTopologyPlot = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof getDeviceTopologyPlot>>,
   TError,
-  { data: BodyType<Device> },
+  { data: Device },
   TContext
 > => {
   const mutationOptions = getGetDeviceTopologyPlotMutationOptions(options);

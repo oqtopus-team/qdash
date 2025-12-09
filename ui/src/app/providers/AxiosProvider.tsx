@@ -1,6 +1,6 @@
 "use client";
 
-import { AXIOS_INSTANCE } from "@/lib/custom-instance";
+import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 
 const PROJECT_STORAGE_KEY = "qdash_current_project_id";
 

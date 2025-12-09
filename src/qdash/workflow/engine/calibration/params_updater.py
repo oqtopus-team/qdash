@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from qdash.datamodel.task import OutputParameterModel
+from qdash.workflow.worker.flows.push_props.formatter import represent_none
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
@@ -63,6 +64,7 @@ class _QubexParamsUpdater:
         self._yaml.preserve_quotes = True
         self._yaml.width = None
         self._yaml.indent(mapping=2, sequence=4, offset=2)
+        self._yaml.representer.add_representer(type(None), represent_none)
 
     def update(self, qid: str, output_parameters: dict[str, Any]) -> None:
         params_dir = self._resolve_params_dir()

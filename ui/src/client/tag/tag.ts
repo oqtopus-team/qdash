@@ -21,7 +21,6 @@ import type {
 import type { HTTPValidationError, ListTagResponse } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -58,7 +57,7 @@ export const getListTagsQueryKey = () => {
 
 export const getListTagsQueryOptions = <
   TData = Awaited<ReturnType<typeof listTags>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>
@@ -83,11 +82,11 @@ export const getListTagsQueryOptions = <
 export type ListTagsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listTags>>
 >;
-export type ListTagsQueryError = ErrorType<HTTPValidationError>;
+export type ListTagsQueryError = HTTPValidationError;
 
 export function useListTags<
   TData = Awaited<ReturnType<typeof listTags>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options: {
     query: Partial<
@@ -109,7 +108,7 @@ export function useListTags<
 };
 export function useListTags<
   TData = Awaited<ReturnType<typeof listTags>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -129,7 +128,7 @@ export function useListTags<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListTags<
   TData = Awaited<ReturnType<typeof listTags>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -145,7 +144,7 @@ export function useListTags<
 
 export function useListTags<
   TData = Awaited<ReturnType<typeof listTags>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<

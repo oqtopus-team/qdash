@@ -43,7 +43,6 @@ import type {
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType, BodyType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -60,7 +59,7 @@ Steps:
  * @summary Save a flow
  */
 export const saveFlow = (
-  saveFlowRequest: BodyType<SaveFlowRequest>,
+  saveFlowRequest: SaveFlowRequest,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -77,20 +76,20 @@ export const saveFlow = (
 };
 
 export const getSaveFlowMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof saveFlow>>,
     TError,
-    { data: BodyType<SaveFlowRequest> },
+    { data: SaveFlowRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof saveFlow>>,
   TError,
-  { data: BodyType<SaveFlowRequest> },
+  { data: SaveFlowRequest },
   TContext
 > => {
   const mutationKey = ["saveFlow"];
@@ -104,7 +103,7 @@ export const getSaveFlowMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof saveFlow>>,
-    { data: BodyType<SaveFlowRequest> }
+    { data: SaveFlowRequest }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -117,21 +116,18 @@ export const getSaveFlowMutationOptions = <
 export type SaveFlowMutationResult = NonNullable<
   Awaited<ReturnType<typeof saveFlow>>
 >;
-export type SaveFlowMutationBody = BodyType<SaveFlowRequest>;
-export type SaveFlowMutationError = ErrorType<HTTPValidationError>;
+export type SaveFlowMutationBody = SaveFlowRequest;
+export type SaveFlowMutationError = HTTPValidationError;
 
 /**
  * @summary Save a flow
  */
-export const useSaveFlow = <
-  TError = ErrorType<HTTPValidationError>,
-  TContext = unknown,
->(
+export const useSaveFlow = <TError = HTTPValidationError, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof saveFlow>>,
       TError,
-      { data: BodyType<SaveFlowRequest> },
+      { data: SaveFlowRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -140,7 +136,7 @@ export const useSaveFlow = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof saveFlow>>,
   TError,
-  { data: BodyType<SaveFlowRequest> },
+  { data: SaveFlowRequest },
   TContext
 > => {
   const mutationOptions = getSaveFlowMutationOptions(options);
@@ -169,7 +165,7 @@ export const getListFlowsQueryKey = () => {
 
 export const getListFlowsQueryOptions = <
   TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
@@ -194,11 +190,11 @@ export const getListFlowsQueryOptions = <
 export type ListFlowsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listFlows>>
 >;
-export type ListFlowsQueryError = ErrorType<HTTPValidationError>;
+export type ListFlowsQueryError = HTTPValidationError;
 
 export function useListFlows<
   TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options: {
     query: Partial<
@@ -220,7 +216,7 @@ export function useListFlows<
 };
 export function useListFlows<
   TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -240,7 +236,7 @@ export function useListFlows<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListFlows<
   TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -256,7 +252,7 @@ export function useListFlows<
 
 export function useListFlows<
   TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -300,7 +296,7 @@ export const getListFlowTemplatesQueryKey = () => {
 
 export const getListFlowTemplatesQueryOptions = <
   TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -329,11 +325,11 @@ export const getListFlowTemplatesQueryOptions = <
 export type ListFlowTemplatesQueryResult = NonNullable<
   Awaited<ReturnType<typeof listFlowTemplates>>
 >;
-export type ListFlowTemplatesQueryError = ErrorType<unknown>;
+export type ListFlowTemplatesQueryError = unknown;
 
 export function useListFlowTemplates<
   TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options: {
     query: Partial<
@@ -359,7 +355,7 @@ export function useListFlowTemplates<
 };
 export function useListFlowTemplates<
   TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -383,7 +379,7 @@ export function useListFlowTemplates<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListFlowTemplates<
   TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -403,7 +399,7 @@ export function useListFlowTemplates<
 
 export function useListFlowTemplates<
   TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -455,7 +451,7 @@ export const getGetFlowTemplateQueryKey = (templateId?: string) => {
 
 export const getGetFlowTemplateQueryOptions = <
   TData = Awaited<ReturnType<typeof getFlowTemplate>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   templateId: string,
   options?: {
@@ -493,11 +489,11 @@ export const getGetFlowTemplateQueryOptions = <
 export type GetFlowTemplateQueryResult = NonNullable<
   Awaited<ReturnType<typeof getFlowTemplate>>
 >;
-export type GetFlowTemplateQueryError = ErrorType<HTTPValidationError>;
+export type GetFlowTemplateQueryError = HTTPValidationError;
 
 export function useGetFlowTemplate<
   TData = Awaited<ReturnType<typeof getFlowTemplate>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   templateId: string,
   options: {
@@ -524,7 +520,7 @@ export function useGetFlowTemplate<
 };
 export function useGetFlowTemplate<
   TData = Awaited<ReturnType<typeof getFlowTemplate>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   templateId: string,
   options?: {
@@ -549,7 +545,7 @@ export function useGetFlowTemplate<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetFlowTemplate<
   TData = Awaited<ReturnType<typeof getFlowTemplate>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   templateId: string,
   options?: {
@@ -570,7 +566,7 @@ export function useGetFlowTemplate<
 
 export function useGetFlowTemplate<
   TData = Awaited<ReturnType<typeof getFlowTemplate>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   templateId: string,
   options?: {
@@ -619,7 +615,7 @@ export const getListFlowHelperFilesQueryKey = () => {
 
 export const getListFlowHelperFilesQueryOptions = <
   TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -648,11 +644,11 @@ export const getListFlowHelperFilesQueryOptions = <
 export type ListFlowHelperFilesQueryResult = NonNullable<
   Awaited<ReturnType<typeof listFlowHelperFiles>>
 >;
-export type ListFlowHelperFilesQueryError = ErrorType<unknown>;
+export type ListFlowHelperFilesQueryError = unknown;
 
 export function useListFlowHelperFiles<
   TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options: {
     query: Partial<
@@ -678,7 +674,7 @@ export function useListFlowHelperFiles<
 };
 export function useListFlowHelperFiles<
   TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -702,7 +698,7 @@ export function useListFlowHelperFiles<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListFlowHelperFiles<
   TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -722,7 +718,7 @@ export function useListFlowHelperFiles<
 
 export function useListFlowHelperFiles<
   TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
-  TError = ErrorType<unknown>,
+  TError = unknown,
 >(
   options?: {
     query?: Partial<
@@ -775,7 +771,7 @@ export const getGetFlowHelperFileQueryKey = (filename?: string) => {
 
 export const getGetFlowHelperFileQueryOptions = <
   TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   filename: string,
   options?: {
@@ -813,11 +809,11 @@ export const getGetFlowHelperFileQueryOptions = <
 export type GetFlowHelperFileQueryResult = NonNullable<
   Awaited<ReturnType<typeof getFlowHelperFile>>
 >;
-export type GetFlowHelperFileQueryError = ErrorType<HTTPValidationError>;
+export type GetFlowHelperFileQueryError = HTTPValidationError;
 
 export function useGetFlowHelperFile<
   TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   filename: string,
   options: {
@@ -844,7 +840,7 @@ export function useGetFlowHelperFile<
 };
 export function useGetFlowHelperFile<
   TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   filename: string,
   options?: {
@@ -869,7 +865,7 @@ export function useGetFlowHelperFile<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetFlowHelperFile<
   TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   filename: string,
   options?: {
@@ -890,7 +886,7 @@ export function useGetFlowHelperFile<
 
 export function useGetFlowHelperFile<
   TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   filename: string,
   options?: {
@@ -950,7 +946,7 @@ export const getListAllFlowSchedulesQueryKey = (
 
 export const getListAllFlowSchedulesQueryOptions = <
   TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params?: ListAllFlowSchedulesParams,
   options?: {
@@ -983,11 +979,11 @@ export const getListAllFlowSchedulesQueryOptions = <
 export type ListAllFlowSchedulesQueryResult = NonNullable<
   Awaited<ReturnType<typeof listAllFlowSchedules>>
 >;
-export type ListAllFlowSchedulesQueryError = ErrorType<HTTPValidationError>;
+export type ListAllFlowSchedulesQueryError = HTTPValidationError;
 
 export function useListAllFlowSchedules<
   TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params: undefined | ListAllFlowSchedulesParams,
   options: {
@@ -1014,7 +1010,7 @@ export function useListAllFlowSchedules<
 };
 export function useListAllFlowSchedules<
   TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params?: ListAllFlowSchedulesParams,
   options?: {
@@ -1039,7 +1035,7 @@ export function useListAllFlowSchedules<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListAllFlowSchedules<
   TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params?: ListAllFlowSchedulesParams,
   options?: {
@@ -1060,7 +1056,7 @@ export function useListAllFlowSchedules<
 
 export function useListAllFlowSchedules<
   TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   params?: ListAllFlowSchedulesParams,
   options?: {
@@ -1119,7 +1115,7 @@ export const deleteFlowSchedule = (
 };
 
 export const getDeleteFlowScheduleMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1160,13 +1156,13 @@ export type DeleteFlowScheduleMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteFlowSchedule>>
 >;
 
-export type DeleteFlowScheduleMutationError = ErrorType<HTTPValidationError>;
+export type DeleteFlowScheduleMutationError = HTTPValidationError;
 
 /**
  * @summary Delete a flow schedule
  */
 export const useDeleteFlowSchedule = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
@@ -1207,7 +1203,7 @@ Returns:
  */
 export const updateFlowSchedule = (
   scheduleId: string,
-  updateScheduleRequest: BodyType<UpdateScheduleRequest>,
+  updateScheduleRequest: UpdateScheduleRequest,
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<UpdateScheduleResponse>(
@@ -1222,20 +1218,20 @@ export const updateFlowSchedule = (
 };
 
 export const getUpdateFlowScheduleMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateFlowSchedule>>,
     TError,
-    { scheduleId: string; data: BodyType<UpdateScheduleRequest> },
+    { scheduleId: string; data: UpdateScheduleRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateFlowSchedule>>,
   TError,
-  { scheduleId: string; data: BodyType<UpdateScheduleRequest> },
+  { scheduleId: string; data: UpdateScheduleRequest },
   TContext
 > => {
   const mutationKey = ["updateFlowSchedule"];
@@ -1249,7 +1245,7 @@ export const getUpdateFlowScheduleMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof updateFlowSchedule>>,
-    { scheduleId: string; data: BodyType<UpdateScheduleRequest> }
+    { scheduleId: string; data: UpdateScheduleRequest }
   > = (props) => {
     const { scheduleId, data } = props ?? {};
 
@@ -1262,21 +1258,21 @@ export const getUpdateFlowScheduleMutationOptions = <
 export type UpdateFlowScheduleMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateFlowSchedule>>
 >;
-export type UpdateFlowScheduleMutationBody = BodyType<UpdateScheduleRequest>;
-export type UpdateFlowScheduleMutationError = ErrorType<HTTPValidationError>;
+export type UpdateFlowScheduleMutationBody = UpdateScheduleRequest;
+export type UpdateFlowScheduleMutationError = HTTPValidationError;
 
 /**
  * @summary Update a flow schedule
  */
 export const useUpdateFlowSchedule = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof updateFlowSchedule>>,
       TError,
-      { scheduleId: string; data: BodyType<UpdateScheduleRequest> },
+      { scheduleId: string; data: UpdateScheduleRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1285,7 +1281,7 @@ export const useUpdateFlowSchedule = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof updateFlowSchedule>>,
   TError,
-  { scheduleId: string; data: BodyType<UpdateScheduleRequest> },
+  { scheduleId: string; data: UpdateScheduleRequest },
   TContext
 > => {
   const mutationOptions = getUpdateFlowScheduleMutationOptions(options);
@@ -1318,7 +1314,7 @@ export const getGetFlowQueryKey = (name?: string) => {
 
 export const getGetFlowQueryOptions = <
   TData = Awaited<ReturnType<typeof getFlow>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   name: string,
   options?: {
@@ -1349,11 +1345,11 @@ export const getGetFlowQueryOptions = <
 export type GetFlowQueryResult = NonNullable<
   Awaited<ReturnType<typeof getFlow>>
 >;
-export type GetFlowQueryError = ErrorType<HTTPValidationError>;
+export type GetFlowQueryError = HTTPValidationError;
 
 export function useGetFlow<
   TData = Awaited<ReturnType<typeof getFlow>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   name: string,
   options: {
@@ -1376,7 +1372,7 @@ export function useGetFlow<
 };
 export function useGetFlow<
   TData = Awaited<ReturnType<typeof getFlow>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   name: string,
   options?: {
@@ -1397,7 +1393,7 @@ export function useGetFlow<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useGetFlow<
   TData = Awaited<ReturnType<typeof getFlow>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   name: string,
   options?: {
@@ -1414,7 +1410,7 @@ export function useGetFlow<
 
 export function useGetFlow<
   TData = Awaited<ReturnType<typeof getFlow>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   name: string,
   options?: {
@@ -1441,8 +1437,9 @@ export function useGetFlow<
  * Delete a Flow.
 
 Steps:
-1. Delete file from user_flows/{username}/{name}.py
-2. Delete metadata from MongoDB
+1. Delete Prefect deployment
+2. Delete file from user_flows/{username}/{name}.py
+3. Delete metadata from MongoDB
  * @summary Delete a flow
  */
 export const deleteFlow = (
@@ -1456,7 +1453,7 @@ export const deleteFlow = (
 };
 
 export const getDeleteFlowMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1497,15 +1494,12 @@ export type DeleteFlowMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteFlow>>
 >;
 
-export type DeleteFlowMutationError = ErrorType<HTTPValidationError>;
+export type DeleteFlowMutationError = HTTPValidationError;
 
 /**
  * @summary Delete a flow
  */
-export const useDeleteFlow = <
-  TError = ErrorType<HTTPValidationError>,
-  TContext = unknown,
->(
+export const useDeleteFlow = <TError = HTTPValidationError, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof deleteFlow>>,
@@ -1538,7 +1532,7 @@ Steps:
  */
 export const executeFlow = (
   name: string,
-  executeFlowRequest: BodyType<ExecuteFlowRequest>,
+  executeFlowRequest: ExecuteFlowRequest,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -1555,20 +1549,20 @@ export const executeFlow = (
 };
 
 export const getExecuteFlowMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof executeFlow>>,
     TError,
-    { name: string; data: BodyType<ExecuteFlowRequest> },
+    { name: string; data: ExecuteFlowRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof executeFlow>>,
   TError,
-  { name: string; data: BodyType<ExecuteFlowRequest> },
+  { name: string; data: ExecuteFlowRequest },
   TContext
 > => {
   const mutationKey = ["executeFlow"];
@@ -1582,7 +1576,7 @@ export const getExecuteFlowMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof executeFlow>>,
-    { name: string; data: BodyType<ExecuteFlowRequest> }
+    { name: string; data: ExecuteFlowRequest }
   > = (props) => {
     const { name, data } = props ?? {};
 
@@ -1595,21 +1589,21 @@ export const getExecuteFlowMutationOptions = <
 export type ExecuteFlowMutationResult = NonNullable<
   Awaited<ReturnType<typeof executeFlow>>
 >;
-export type ExecuteFlowMutationBody = BodyType<ExecuteFlowRequest>;
-export type ExecuteFlowMutationError = ErrorType<HTTPValidationError>;
+export type ExecuteFlowMutationBody = ExecuteFlowRequest;
+export type ExecuteFlowMutationError = HTTPValidationError;
 
 /**
  * @summary Execute a flow
  */
 export const useExecuteFlow = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof executeFlow>>,
       TError,
-      { name: string; data: BodyType<ExecuteFlowRequest> },
+      { name: string; data: ExecuteFlowRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1618,7 +1612,7 @@ export const useExecuteFlow = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof executeFlow>>,
   TError,
-  { name: string; data: BodyType<ExecuteFlowRequest> },
+  { name: string; data: ExecuteFlowRequest },
   TContext
 > => {
   const mutationOptions = getExecuteFlowMutationOptions(options);
@@ -1641,7 +1635,7 @@ Returns:
  */
 export const scheduleFlow = (
   name: string,
-  scheduleFlowRequest: BodyType<ScheduleFlowRequest>,
+  scheduleFlowRequest: ScheduleFlowRequest,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -1658,20 +1652,20 @@ export const scheduleFlow = (
 };
 
 export const getScheduleFlowMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof scheduleFlow>>,
     TError,
-    { name: string; data: BodyType<ScheduleFlowRequest> },
+    { name: string; data: ScheduleFlowRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof scheduleFlow>>,
   TError,
-  { name: string; data: BodyType<ScheduleFlowRequest> },
+  { name: string; data: ScheduleFlowRequest },
   TContext
 > => {
   const mutationKey = ["scheduleFlow"];
@@ -1685,7 +1679,7 @@ export const getScheduleFlowMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof scheduleFlow>>,
-    { name: string; data: BodyType<ScheduleFlowRequest> }
+    { name: string; data: ScheduleFlowRequest }
   > = (props) => {
     const { name, data } = props ?? {};
 
@@ -1698,21 +1692,21 @@ export const getScheduleFlowMutationOptions = <
 export type ScheduleFlowMutationResult = NonNullable<
   Awaited<ReturnType<typeof scheduleFlow>>
 >;
-export type ScheduleFlowMutationBody = BodyType<ScheduleFlowRequest>;
-export type ScheduleFlowMutationError = ErrorType<HTTPValidationError>;
+export type ScheduleFlowMutationBody = ScheduleFlowRequest;
+export type ScheduleFlowMutationError = HTTPValidationError;
 
 /**
  * @summary Schedule a flow execution (cron or one-time)
  */
 export const useScheduleFlow = <
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof scheduleFlow>>,
       TError,
-      { name: string; data: BodyType<ScheduleFlowRequest> },
+      { name: string; data: ScheduleFlowRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1721,7 +1715,7 @@ export const useScheduleFlow = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof scheduleFlow>>,
   TError,
-  { name: string; data: BodyType<ScheduleFlowRequest> },
+  { name: string; data: ScheduleFlowRequest },
   TContext
 > => {
   const mutationOptions = getScheduleFlowMutationOptions(options);
@@ -1764,7 +1758,7 @@ export const getListFlowSchedulesQueryKey = (
 
 export const getListFlowSchedulesQueryOptions = <
   TData = Awaited<ReturnType<typeof listFlowSchedules>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   name: string,
   params?: ListFlowSchedulesParams,
@@ -1803,11 +1797,11 @@ export const getListFlowSchedulesQueryOptions = <
 export type ListFlowSchedulesQueryResult = NonNullable<
   Awaited<ReturnType<typeof listFlowSchedules>>
 >;
-export type ListFlowSchedulesQueryError = ErrorType<HTTPValidationError>;
+export type ListFlowSchedulesQueryError = HTTPValidationError;
 
 export function useListFlowSchedules<
   TData = Awaited<ReturnType<typeof listFlowSchedules>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   name: string,
   params: undefined | ListFlowSchedulesParams,
@@ -1835,7 +1829,7 @@ export function useListFlowSchedules<
 };
 export function useListFlowSchedules<
   TData = Awaited<ReturnType<typeof listFlowSchedules>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   name: string,
   params?: ListFlowSchedulesParams,
@@ -1861,7 +1855,7 @@ export function useListFlowSchedules<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListFlowSchedules<
   TData = Awaited<ReturnType<typeof listFlowSchedules>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   name: string,
   params?: ListFlowSchedulesParams,
@@ -1883,7 +1877,7 @@ export function useListFlowSchedules<
 
 export function useListFlowSchedules<
   TData = Awaited<ReturnType<typeof listFlowSchedules>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   name: string,
   params?: ListFlowSchedulesParams,

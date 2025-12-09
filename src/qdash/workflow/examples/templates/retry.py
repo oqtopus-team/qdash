@@ -56,14 +56,20 @@ def calibrate_group_with_retry(
         for attempt, offset in enumerate(offsets):
             try:
                 if offset != 0:
-                    logger.info(f"Q{qid}: Attempt {attempt + 1} with {offset * 1000:+.0f} MHz offset")
+                    logger.info(
+                        f"Q{qid}: Attempt {attempt + 1} with {offset * 1000:+.0f} MHz offset"
+                    )
 
                 # Tasks run SEQUENTIALLY within qubit
                 result = {}
                 for task_name in tasks:
                     task_details = None
                     if offset != 0:
-                        task_details = {task_name: {"input_parameters": {"qubit_frequency_offset": {"value": offset}}}}
+                        task_details = {
+                            task_name: {
+                                "input_parameters": {"qubit_frequency_offset": {"value": offset}}
+                            }
+                        }
                     result[task_name] = cal.execute_task(task_name, qid, task_details=task_details)
 
                 result["status"] = "success"
@@ -141,7 +147,10 @@ def parallel_retry_calibration(
 
     try:
         # === PARALLEL: submit each group ===
-        futures = [calibrate_group_with_retry.submit(cal, group, tasks, frequency_offsets) for group in groups]
+        futures = [
+            calibrate_group_with_retry.submit(cal, group, tasks, frequency_offsets)
+            for group in groups
+        ]
 
         # Wait for all groups to complete
         group_results = [f.result() for f in futures]

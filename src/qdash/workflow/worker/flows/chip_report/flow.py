@@ -28,7 +28,9 @@ def generate_data_availability_message(stats: dict) -> str:
     couplings_with_data = stats["couplings_with_recent_data"]
 
     qubit_percentage = (qubits_with_data / total_qubits * 100) if total_qubits > 0 else 0
-    coupling_percentage = (couplings_with_data / total_couplings * 100) if total_couplings > 0 else 0
+    coupling_percentage = (
+        (couplings_with_data / total_couplings * 100) if total_couplings > 0 else 0
+    )
 
     lines = []
     lines.append(f"**過去{cutoff_hours}時間の測定データ状況:**")
@@ -39,7 +41,9 @@ def generate_data_availability_message(stats: dict) -> str:
         lines.append("- 全てのデータが古い可能性があります")
         lines.append("- 新しいキャリブレーションの実行を検討してください")
     else:
-        lines.append(f"📊 **量子ビットデータ**: {qubits_with_data}/{total_qubits} ({qubit_percentage:.1f}%)")
+        lines.append(
+            f"📊 **量子ビットデータ**: {qubits_with_data}/{total_qubits} ({qubit_percentage:.1f}%)"
+        )
         if qubit_percentage < 50:
             lines.append("⚠️ 最近のデータが不足しています")
         elif qubit_percentage < 80:
@@ -48,7 +52,9 @@ def generate_data_availability_message(stats: dict) -> str:
             lines.append("✅ 十分な最新データがあります")
 
     if total_couplings > 0:
-        lines.append(f"🔗 **カップリングデータ**: {couplings_with_data}/{total_couplings} ({coupling_percentage:.1f}%)")
+        lines.append(
+            f"🔗 **カップリングデータ**: {couplings_with_data}/{total_couplings} ({coupling_percentage:.1f}%)"
+        )
 
     if qubits_with_data < total_qubits:
         missing_count = total_qubits - qubits_with_data
@@ -124,7 +130,9 @@ def chip_report(
     target_thread_ts = slack_thread_ts if slack_thread_ts else ""
 
     logger.info(f"Slack parameters - Channel: {target_channel}, Thread: {target_thread_ts}")
-    logger.info(f"Received params - slack_channel: {slack_channel}, slack_thread_ts: {slack_thread_ts}")
+    logger.info(
+        f"Received params - slack_channel: {slack_channel}, slack_thread_ts: {slack_thread_ts}"
+    )
 
     slack = SlackContents(
         status=Status.SUCCESS,
@@ -143,7 +151,10 @@ def chip_report(
     ts = target_thread_ts if target_thread_ts else sent_ts
 
     # Send data availability statistics if recent data was requested
-    if cutoff_hours != 24 or recent_stats["qubits_with_recent_data"] < recent_stats["total_qubits"] * 0.8:
+    if (
+        cutoff_hours != 24
+        or recent_stats["qubits_with_recent_data"] < recent_stats["total_qubits"] * 0.8
+    ):
         data_msg = generate_data_availability_message(recent_stats)
         slack_stats = SlackContents(
             status=Status.SUCCESS if recent_stats["qubits_with_recent_data"] > 0 else Status.FAILED,

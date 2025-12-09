@@ -21,7 +21,6 @@ import type {
 import type { HTTPValidationError, ListBackendsResponse } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
-import type { ErrorType } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -45,7 +44,7 @@ export const getListBackendsQueryKey = () => {
 
 export const getListBackendsQueryOptions = <
   TData = Awaited<ReturnType<typeof listBackends>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(options?: {
   query?: Partial<
     UseQueryOptions<Awaited<ReturnType<typeof listBackends>>, TError, TData>
@@ -70,11 +69,11 @@ export const getListBackendsQueryOptions = <
 export type ListBackendsQueryResult = NonNullable<
   Awaited<ReturnType<typeof listBackends>>
 >;
-export type ListBackendsQueryError = ErrorType<HTTPValidationError>;
+export type ListBackendsQueryError = HTTPValidationError;
 
 export function useListBackends<
   TData = Awaited<ReturnType<typeof listBackends>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options: {
     query: Partial<
@@ -96,7 +95,7 @@ export function useListBackends<
 };
 export function useListBackends<
   TData = Awaited<ReturnType<typeof listBackends>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -116,7 +115,7 @@ export function useListBackends<
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 export function useListBackends<
   TData = Awaited<ReturnType<typeof listBackends>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<
@@ -132,7 +131,7 @@ export function useListBackends<
 
 export function useListBackends<
   TData = Awaited<ReturnType<typeof listBackends>>,
-  TError = ErrorType<HTTPValidationError>,
+  TError = HTTPValidationError,
 >(
   options?: {
     query?: Partial<

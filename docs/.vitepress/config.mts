@@ -9,11 +9,20 @@ export default withMermaid(
     description: "Qubit Calibration Management Platform",
     ignoreDeadLinks: true,
     head: [
-      ["link", { rel: "icon", href: "/qdash/oqtopus_logo.svg", type: "image/svg+xml" }],
+      [
+        "link",
+        { rel: "icon", href: "/qdash/oqtopus_logo.svg", type: "image/svg+xml" },
+      ],
       ["meta", { name: "theme-color", content: "#1f1fdd" }],
       ["meta", { property: "og:type", content: "website" }],
       ["meta", { property: "og:title", content: "QDash Documentation" }],
-      ["meta", { property: "og:description", content: "Qubit Calibration Management Platform" }],
+      [
+        "meta",
+        {
+          property: "og:description",
+          content: "Qubit Calibration Management Platform",
+        },
+      ],
     ],
 
     mermaid: {
@@ -29,7 +38,7 @@ export default withMermaid(
 
       nav: [
         { text: "Home", link: "/" },
-        { text: "Guide", link: "/what-is-qdash" },
+        { text: "Guide", link: "/getting-started/what-is-qdash" },
         { text: "Reference", link: "/reference/database-structure" },
         {
           text: "Links",
@@ -44,33 +53,63 @@ export default withMermaid(
         {
           text: "Getting Started",
           items: [
-            { text: "What is QDash", link: "/what-is-qdash" },
-            { text: "Quickstart", link: "/quick-start" },
-            { text: "Architecture", link: "/architecture" },
+            { text: "What is QDash", link: "/getting-started/what-is-qdash" },
+            { text: "Quickstart", link: "/getting-started/quick-start" },
+            { text: "Architecture", link: "/getting-started/architecture" },
           ],
         },
         {
           text: "User Guide",
           items: [
-            { text: "Projects and Sharing", link: "/projects-and-sharing" },
+            {
+              text: "Projects and Sharing",
+              link: "/user-guide/projects-and-sharing",
+            },
           ],
         },
         {
-          text: "Development Guide",
+          text: "Development",
           collapsed: false,
           items: [
-            { text: "Development Flow", link: "/guide/development-flow" },
-            { text: "Setup Environment", link: "/guide/setup-development-environment" },
-            { text: "API Design", link: "/guide/api-design-guidelines" },
-            { text: "API Testing", link: "/guide/api-testing-guidelines" },
-            { text: "Workflow Testing", link: "/guide/workflow-testing-guidelines" },
+            {
+              text: "Development Flow",
+              link: "/development/development-flow",
+            },
+            { text: "Setup", link: "/development/setup" },
+            {
+              text: "API",
+              collapsed: true,
+              items: [
+                { text: "Design Guidelines", link: "/development/api/design" },
+                { text: "Testing", link: "/development/api/testing" },
+              ],
+            },
+            {
+              text: "UI",
+              collapsed: true,
+              items: [
+                { text: "Guidelines", link: "/development/ui/guidelines" },
+                { text: "Architecture", link: "/development/ui/architecture" },
+                { text: "Testing", link: "/development/ui/testing" },
+              ],
+            },
+            {
+              text: "Workflow",
+              collapsed: true,
+              items: [
+                { text: "Testing", link: "/development/workflow/testing" },
+              ],
+            },
           ],
         },
         {
           text: "Reference",
           collapsed: false,
           items: [
-            { text: "Database Structure", link: "/reference/database-structure" },
+            {
+              text: "Database Structure",
+              link: "/reference/database-structure",
+            },
             { text: "Database Indexes", link: "/reference/database-indexes" },
             { text: "OpenAPI", link: "/reference/openapi" },
           ],
@@ -80,10 +119,19 @@ export default withMermaid(
           collapsed: true,
           items: [
             { text: "Overview", link: "/architecture/README" },
-            { text: "1-Qubit Scheduler", link: "/architecture/one-qubit-scheduler" },
-            { text: "Ordering Plugins", link: "/architecture/one-qubit-ordering-plugins" },
+            {
+              text: "1-Qubit Scheduler",
+              link: "/architecture/one-qubit-scheduler",
+            },
+            {
+              text: "Ordering Plugins",
+              link: "/architecture/one-qubit-ordering-plugins",
+            },
             { text: "CR Scheduler", link: "/architecture/cr-scheduler" },
-            { text: "Square Lattice", link: "/architecture/square-lattice-topology" },
+            {
+              text: "Square Lattice",
+              link: "/architecture/square-lattice-topology",
+            },
           ],
         },
         {
@@ -111,7 +159,8 @@ export default withMermaid(
       },
 
       editLink: {
-        pattern: "https://github.com/oqtopus-team/qdash/edit/develop/docs/:path",
+        pattern:
+          "https://github.com/oqtopus-team/qdash/edit/develop/docs/:path",
         text: "Edit this page on GitHub",
       },
 

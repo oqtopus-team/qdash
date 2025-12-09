@@ -20,6 +20,8 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_PREFECT_URL=$NEXT_PUBLIC_PREFECT_URL
 ENV INTERNAL_API_URL=$INTERNAL_API_URL
 COPY ./ui .
+# Fix file permissions (may be restrictive when created in devcontainer)
+RUN chmod -R a+r .
 RUN bun run build
 
 FROM oven/bun:1 AS runner
