@@ -37,6 +37,12 @@ const themes = [
   "night",
   "coffee",
   "winter",
+  "dim",
+  "nord",
+  "sunset",
+  "caramellatte",
+  "abyss",
+  "silk",
 ];
 
 type Tab = "appearance" | "api" | "system";
