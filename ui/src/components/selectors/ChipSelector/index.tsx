@@ -45,9 +45,6 @@ export function ChipSelector({
       }));
   }, [chips]);
 
-  // Don't set defaults - let the parent component handle initial state
-  // The URL state should be the source of truth
-
   if (isLoading) {
     return (
       <div className="w-full animate-pulse">

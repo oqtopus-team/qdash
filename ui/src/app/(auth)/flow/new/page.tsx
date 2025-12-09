@@ -6,8 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+
+import { useToast } from "@/components/ui/Toast";
 
 import type {
   SaveFlowRequest,
@@ -35,6 +35,7 @@ type TemplateOption = {
 
 export default function NewFlowPage() {
   const router = useRouter();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [code, setCode] = useState("");
@@ -242,7 +243,6 @@ export default function NewFlowPage() {
 
   return (
     <>
-      <ToastContainer position="top-right" autoClose={3000} />
       <div className="h-screen flex flex-col bg-[#1e1e1e]">
         {/* VSCode-style Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e] gap-2">

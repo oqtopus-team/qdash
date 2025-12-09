@@ -17,8 +17,7 @@ import {
   VscSymbolClass,
   VscLayoutSidebarLeft,
 } from "react-icons/vsc";
-import { toast } from "react-toastify";
-import { ToastContainer } from "react-toastify";
+import { useToast } from "@/components/ui/Toast";
 
 import type {
   TaskFileTreeNode,
@@ -42,8 +41,6 @@ import {
   listTaskInfo,
 } from "@/client/task-file/task-file";
 
-import "react-toastify/dist/ReactToastify.css";
-
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 type ViewMode = "files" | "tasks";
@@ -51,6 +48,7 @@ type ViewMode = "files" | "tasks";
 export default function TasksPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [viewMode, setViewMode] = useState<ViewMode | null>(null);
   const [selectedBackend, setSelectedBackend] = useState<string | null>(null);
@@ -221,7 +219,7 @@ export default function TasksPage() {
   const handleCopyTaskName = async (taskName: string) => {
     try {
       await navigator.clipboard.writeText(taskName);
-      toast.success(`Copied: ${taskName}`, { autoClose: 1500 });
+      toast.success(`Copied: ${taskName}`);
     } catch {
       toast.error("Failed to copy to clipboard");
     }
@@ -413,7 +411,6 @@ export default function TasksPage() {
 
   return (
     <>
-      <ToastContainer position="top-right" autoClose={3000} />
       <div className="h-screen flex flex-col bg-[#1e1e1e]">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e] gap-2">

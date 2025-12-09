@@ -13,8 +13,6 @@ import {
   VscLock,
   VscUnlock,
 } from "react-icons/vsc";
-import { toast } from "react-toastify";
-import { ToastContainer } from "react-toastify";
 
 import type {
   FileTreeNode,
@@ -35,14 +33,14 @@ import {
   gitPullConfig,
   gitPushConfig,
 } from "@/client/file/file";
-
-import "react-toastify/dist/ReactToastify.css";
+import { useToast } from "@/components/ui/Toast";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 export default function FilesEditorPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
@@ -120,7 +118,7 @@ export default function FilesEditorPage() {
       if (data.commit) {
         toast.success(`Git push successful! Commit: ${data.commit}`);
       } else {
-        toast.info((data.message as string) || "No changes to commit");
+        toast.info(String(data.message) || "No changes to commit");
       }
       setCommitMessage("");
       refetchGitStatus();
@@ -284,7 +282,6 @@ export default function FilesEditorPage() {
 
   return (
     <>
-      <ToastContainer position="top-right" autoClose={3000} />
       <div className="h-screen flex flex-col bg-[#1e1e1e]">
         <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e]">
           <div className="flex items-center gap-4">
