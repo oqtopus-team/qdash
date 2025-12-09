@@ -8,22 +8,22 @@ export function useToast() {
 
   const success = useCallback(
     (message: string) => addToast(message, "success"),
-    [addToast]
+    [addToast],
   );
 
   const error = useCallback(
     (message: string) => addToast(message, "error"),
-    [addToast]
+    [addToast],
   );
 
   const info = useCallback(
     (message: string) => addToast(message, "info"),
-    [addToast]
+    [addToast],
   );
 
   const warning = useCallback(
     (message: string) => addToast(message, "warning"),
-    [addToast]
+    [addToast],
   );
 
   return { success, error, info, warning };

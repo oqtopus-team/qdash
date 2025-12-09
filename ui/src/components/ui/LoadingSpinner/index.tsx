@@ -2,7 +2,15 @@
 
 type LoadingSpinnerProps = {
   size?: "xs" | "sm" | "md" | "lg";
-  color?: "primary" | "secondary" | "accent" | "neutral" | "info" | "success" | "warning" | "error";
+  color?:
+    | "primary"
+    | "secondary"
+    | "accent"
+    | "neutral"
+    | "info"
+    | "success"
+    | "warning"
+    | "error";
 };
 
 export function LoadingSpinner({
