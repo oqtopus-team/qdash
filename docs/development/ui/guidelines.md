@@ -544,15 +544,15 @@ QDash supports 35+ DaisyUI themes. Users can switch themes in Settings (`/settin
 
 QDash uses a custom **Rich Interactive Design System** defined in `globals.css`. This enhances DaisyUI components with:
 
-| Element       | Enhancement                                               |
-| ------------- | --------------------------------------------------------- |
-| **Cards**     | Subtle border, deeper shadows on hover                    |
-| **Buttons**   | Gradient backgrounds, lift effect on hover, inner glow    |
-| **Inputs**    | 2px border, color change on hover, ring + shadow on focus |
-| **Badges**    | Fully rounded (pill shape), gradient backgrounds          |
-| **Dropdowns** | Fade-in animation, rich shadows                           |
-| **Tables**    | Row hover highlights with primary color tint              |
-| **Scrollbars**| Custom styled with gradient thumb                         |
+| Element        | Enhancement                                               |
+| -------------- | --------------------------------------------------------- |
+| **Cards**      | Subtle border, deeper shadows on hover                    |
+| **Buttons**    | Gradient backgrounds, lift effect on hover, inner glow    |
+| **Inputs**     | 2px border, color change on hover, ring + shadow on focus |
+| **Badges**     | Fully rounded (pill shape), gradient backgrounds          |
+| **Dropdowns**  | Fade-in animation, rich shadows                           |
+| **Tables**     | Row hover highlights with primary color tint              |
+| **Scrollbars** | Custom styled with gradient thumb                         |
 
 #### Performance Guidelines
 
@@ -579,6 +579,7 @@ Transitions are **only applied to interactive elements** to prevent animation ja
 ```
 
 **Key rules:**
+
 1. Don't add `transition-*` classes to elements that globals.css already styles (cards, buttons, badges)
 2. Use `transition: none` for elements in lists/grids with many items
 3. Avoid `transition-all` - prefer specific properties like `transition-shadow`

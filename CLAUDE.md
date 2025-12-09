@@ -14,11 +14,11 @@ QDash is a web platform for managing and monitoring qubit calibration workflows.
 
 See [docs/getting-started/architecture.md](docs/getting-started/architecture.md) for detailed architecture documentation.
 
-| Component | Location | Technology |
-|-----------|----------|------------|
-| Frontend (UI) | `/ui/` | Next.js 14, TypeScript, DaisyUI, TanStack Query |
-| Backend (API) | `/src/qdash/api/` | FastAPI, Python 3.10-3.12, MongoDB, PostgreSQL |
-| Workflow Engine | `/src/qdash/workflow/` | Prefect 2.20, qubex |
+| Component       | Location               | Technology                                      |
+| --------------- | ---------------------- | ----------------------------------------------- |
+| Frontend (UI)   | `/ui/`                 | Next.js 14, TypeScript, DaisyUI, TanStack Query |
+| Backend (API)   | `/src/qdash/api/`      | FastAPI, Python 3.10-3.12, MongoDB, PostgreSQL  |
+| Workflow Engine | `/src/qdash/workflow/` | Prefect 2.20, qubex                             |
 
 ## Directory Structure
 
@@ -50,21 +50,21 @@ For detailed setup instructions, see [docs/development/setup.md](docs/developmen
 
 ## Key Documentation
 
-| Topic | Location |
-|-------|----------|
-| UI Guidelines | [docs/development/ui/guidelines.md](docs/development/ui/guidelines.md) |
-| UI Architecture | [docs/development/ui/architecture.md](docs/development/ui/architecture.md) |
-| API Design | [docs/development/api/design.md](docs/development/api/design.md) |
-| Development Flow | [docs/development/development-flow.md](docs/development/development-flow.md) |
+| Topic              | Location                                                                     |
+| ------------------ | ---------------------------------------------------------------------------- |
+| UI Guidelines      | [docs/development/ui/guidelines.md](docs/development/ui/guidelines.md)       |
+| UI Architecture    | [docs/development/ui/architecture.md](docs/development/ui/architecture.md)   |
+| API Design         | [docs/development/api/design.md](docs/development/api/design.md)             |
+| Development Flow   | [docs/development/development-flow.md](docs/development/development-flow.md) |
 | Database Structure | [docs/reference/database-structure.md](docs/reference/database-structure.md) |
 
 ## Claude Code Custom Commands
 
-| Command | Description |
-|---------|-------------|
-| `/commit` | Analyze changes and suggest a commit message |
+| Command           | Description                                           |
+| ----------------- | ----------------------------------------------------- |
+| `/commit`         | Analyze changes and suggest a commit message          |
 | `/suggest-commit` | Generate commit message suggestion without committing |
-| `/auto-commit` | Automatically commit with generated message |
+| `/auto-commit`    | Automatically commit with generated message           |
 
 ## Notes for AI Assistants
 
