@@ -30,7 +30,9 @@ coupling_field_map = {
 }
 
 
-def merge_properties(base_props: CommentedMap, chip_props: ChipProperties, chip_id: str = "64Qv1") -> CommentedMap:
+def merge_properties(
+    base_props: CommentedMap, chip_props: ChipProperties, chip_id: str = "64Qv1"
+) -> CommentedMap:
     """Merge chip properties into the base properties map."""
 
     def update_if_different(section: str, key: str, value: float | str | None) -> None:
@@ -52,7 +54,12 @@ def merge_properties(base_props: CommentedMap, chip_props: ChipProperties, chip_
 
     for qid, qubit in chip_props.qubits.items():
         for field, value in qubit.model_dump(exclude_none=True).items():
-            if field == "x90_gate_fidelity" and value > 1.0 or field == "x180_gate_fidelity" and value > 1.0:
+            if (
+                field == "x90_gate_fidelity"
+                and value > 1.0
+                or field == "x180_gate_fidelity"
+                and value > 1.0
+            ):
                 update_if_different(field, qid, None)
             # elif field == "qubit_frequency":
             #     continue
@@ -95,30 +102,39 @@ def get_chip_properties(
 
     for qid, q in chip.qubits.items():
         stats["total_qubits"] += 1
-        qubit_props = _process_data(q.data, qubit_field_map, QubitProperties, within_24hrs, cutoff_hours)
+        qubit_props = _process_data(
+            q.data, qubit_field_map, QubitProperties, within_24hrs, cutoff_hours
+        )
         props.qubits[exp.get_qubit_label(int(qid))] = qubit_props
 
         # Check if qubit has any recent data
-        if within_24hrs and any(getattr(qubit_props, field, None) is not None for field in qubit_field_map.values()):
+        if within_24hrs and any(
+            getattr(qubit_props, field, None) is not None for field in qubit_field_map.values()
+        ):
             stats["qubits_with_recent_data"] += 1
 
     for cid, c in chip.couplings.items():
         source, target = cid.split("-")
         cid_str = f"{exp.get_qubit_label(int(source))}-{exp.get_qubit_label(int(target))}"
         stats["total_couplings"] += 1
-        coupling_props = _process_data(c.data, coupling_field_map, CouplingProperties, within_24hrs, cutoff_hours)
+        coupling_props = _process_data(
+            c.data, coupling_field_map, CouplingProperties, within_24hrs, cutoff_hours
+        )
         props.couplings[cid_str] = coupling_props
 
         # Check if coupling has any recent data
         if within_24hrs and any(
-            getattr(coupling_props, field, None) is not None for field in coupling_field_map.values()
+            getattr(coupling_props, field, None) is not None
+            for field in coupling_field_map.values()
         ):
             stats["couplings_with_recent_data"] += 1
 
     return props, stats
 
 
-def create_chip_properties(username: str, source_path: str, target_path: str, chip_id: str = "64Qv1") -> None:
+def create_chip_properties(
+    username: str, source_path: str, target_path: str, chip_id: str = "64Qv1"
+) -> None:
     """Create and write chip properties to a YAML file."""
     initialize()
     chip = ChipDocument.get_current_chip(username=username)

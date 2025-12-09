@@ -28,5 +28,7 @@ def push_props(
     """
     source_path = f"/app/config/qubex/{chip_id}/params/props.yaml"
     repo_subpath = f"{chip_id}/params/props.yaml"
-    create_chip_properties(username=username, source_path=source_path, target_path=source_path, chip_id=chip_id)
+    create_chip_properties(
+        username=username, source_path=source_path, target_path=source_path, chip_id=chip_id
+    )
     return str(push_github(source_path, repo_subpath, commit_message, branch))
