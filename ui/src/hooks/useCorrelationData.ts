@@ -13,8 +13,24 @@ interface ParameterValue {
   updated: string;
 }
 
+interface QubitParameter {
+  value: number;
+  unit: string;
+  description?: string;
+  calibrated_at?: string;
+}
+
+interface QubitData {
+  qid?: string;
+  data?: Record<string, QubitParameter>;
+}
+
+interface ChipData {
+  qubits?: Record<string, QubitData>;
+}
+
 interface UseCorrelationDataOptions {
-  chipData: any;
+  chipData: ChipData | null | undefined;
   xParameter: ParameterKey;
   yParameter: ParameterKey;
   enabled?: boolean;
@@ -28,7 +44,10 @@ export function useCorrelationData(options: UseCorrelationDataOptions) {
   const { chipData, xParameter, yParameter, enabled = true } = options;
 
   // Get parameter value for a qubit
-  const getParameterValue = (qubit: any, param: string): ParameterValue => {
+  const getParameterValue = (
+    qubit: QubitData,
+    param: string,
+  ): ParameterValue => {
     if (param === "qid") {
       return {
         value: Number(qubit.qid),
@@ -54,8 +73,10 @@ export function useCorrelationData(options: UseCorrelationDataOptions) {
     return {
       value: paramData.unit === "ns" ? value / 1000 : value,
       unit,
-      description: paramData.description,
-      updated: new Date(paramData.calibrated_at).toLocaleString(),
+      description: paramData.description ?? "",
+      updated: paramData.calibrated_at
+        ? new Date(paramData.calibrated_at).toLocaleString()
+        : "",
     };
   };
 
@@ -64,13 +85,13 @@ export function useCorrelationData(options: UseCorrelationDataOptions) {
     if (!enabled || !chipData?.qubits || !xParameter || !yParameter) return [];
 
     return Object.entries(chipData.qubits)
-      .filter(([_, qubit]: [string, any]) => {
+      .filter(([, qubit]) => {
         if (xParameter === "qid" && yParameter === "qid") return true;
         if (xParameter === "qid") return qubit?.data && qubit.data[yParameter];
         if (yParameter === "qid") return qubit?.data && qubit.data[xParameter];
         return qubit?.data && qubit.data[xParameter] && qubit.data[yParameter];
       })
-      .map(([qid, qubit]: [string, any]) => {
+      .map(([qid, qubit]) => {
         const xData = getParameterValue(qubit, xParameter);
         const yData = getParameterValue(qubit, yParameter);
 
@@ -170,7 +191,7 @@ export function useCorrelationData(options: UseCorrelationDataOptions) {
     if (!chipData?.qubits) return [];
     const params = new Set<string>(["qid"]);
 
-    Object.entries(chipData.qubits).forEach(([_, qubit]: [string, any]) => {
+    Object.entries(chipData.qubits).forEach(([, qubit]) => {
       if (qubit?.data) {
         Object.keys(qubit.data).forEach((param) => {
           if (param !== "qid") {
@@ -189,6 +210,6 @@ export function useCorrelationData(options: UseCorrelationDataOptions) {
     statistics,
     availableParameters,
     isLoading: false, // This hook processes existing data
-    error: null as any, // Fix TypeScript error
+    error: null as Error | null,
   };
 }

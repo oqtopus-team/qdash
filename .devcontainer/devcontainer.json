@@ -66,6 +66,9 @@
   // Run bun install after container creation
   "postCreateCommand": "cd /workspace/qdash/ui && bun install",
 
+  // Set umask to ensure files are readable by all users (for host-side Docker builds)
+  "postStartCommand": "grep -q 'umask 022' ~/.bashrc || echo 'umask 022' >> ~/.bashrc; grep -q 'umask 022' ~/.zshrc || echo 'umask 022' >> ~/.zshrc",
+
   // Disable features (reduce build time)
   "features": {}
 }

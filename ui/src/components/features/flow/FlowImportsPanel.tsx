@@ -38,29 +38,31 @@ export function FlowImportsPanel() {
     });
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#1e1e1e]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-base-300">
       {/* File Tabs */}
-      <div className="flex items-center bg-[#252526] border-b border-[#3e3e3e] overflow-x-auto">
-        <div className="flex items-center px-3 py-1 border-r border-[#3e3e3e]">
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider">
+      <div className="flex items-center bg-base-200 border-b border-base-300 overflow-x-auto">
+        <div className="flex items-center px-3 py-1 border-r border-base-300">
+          <span className="text-[10px] text-base-content/50 uppercase tracking-wider">
             qdash.workflow.flow
           </span>
         </div>
         {isLoadingFiles ? (
-          <div className="px-3 py-2 text-xs text-gray-500">Loading...</div>
+          <div className="px-3 py-2 text-xs text-base-content/50">
+            Loading...
+          </div>
         ) : (
           <div className="flex">
             {files?.data?.map((file) => (
               <button
                 key={file}
                 onClick={() => setSelectedFile(file)}
-                className={`px-3 py-1.5 text-xs font-mono border-r border-[#3e3e3e] flex items-center gap-1.5 transition-colors ${
+                className={`px-3 py-1.5 text-xs font-mono border-r border-base-300 flex items-center gap-1.5 transition-colors ${
                   selectedFile === file
-                    ? "bg-[#1e1e1e] text-white border-t-2 border-t-[#007acc]"
-                    : "bg-[#2d2d2d] text-gray-400 hover:bg-[#323232] border-t-2 border-t-transparent"
+                    ? "bg-base-300 text-base-content border-t-2 border-t-primary"
+                    : "bg-base-200 text-base-content/60 hover:bg-base-300/50 border-t-2 border-t-transparent"
                 }`}
               >
-                <span className="text-[#519aba]">py</span>
+                <span className="text-info">py</span>
                 {file}
               </button>
             ))}
@@ -74,7 +76,7 @@ export function FlowImportsPanel() {
           <div className="flex-1 relative">
             {isLoadingContent ? (
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="loading loading-spinner loading-md text-gray-400"></span>
+                <span className="loading loading-spinner loading-md text-base-content/50"></span>
               </div>
             ) : (
               <Editor
@@ -97,18 +99,18 @@ export function FlowImportsPanel() {
             )}
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-sm text-gray-500">
+          <div className="flex-1 flex items-center justify-center text-sm text-base-content/50">
             Select a file to view the implementation
           </div>
         )}
       </div>
 
       {/* Footer hint */}
-      <div className="px-4 py-2 bg-[#252526] border-t border-[#3e3e3e] text-xs text-gray-500">
-        <code className="text-[#ce9178]">
+      <div className="px-4 py-2 bg-base-200 border-t border-base-300 text-xs text-base-content/50">
+        <code className="text-secondary">
           from qdash.workflow.flow import ...
         </code>
-        <span className="ml-4 text-gray-600">Read-only reference</span>
+        <span className="ml-4 text-base-content/30">Read-only reference</span>
       </div>
     </div>
   );

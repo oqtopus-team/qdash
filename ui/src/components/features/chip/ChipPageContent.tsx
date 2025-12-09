@@ -217,6 +217,7 @@ export function ChipPageContent() {
         clearTimeout(timeoutId);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only re-run when qid changes, not the entire selectedTaskInfo object
   }, [muxData?.data, selectedTaskInfo?.qid]);
 
   // Get all QIDs for this mux (always 4 qids based on mux number)

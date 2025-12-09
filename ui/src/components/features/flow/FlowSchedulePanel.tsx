@@ -135,26 +135,22 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-white">SCHEDULE</h3>
+      <h3 className="text-sm font-semibold">SCHEDULE</h3>
 
       {/* Schedule Type Toggle */}
       <div className="flex gap-2">
         <button
           onClick={() => setScheduleType("cron")}
-          className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${
-            scheduleType === "cron"
-              ? "bg-[#0e639c] text-white"
-              : "bg-[#3c3c3c] text-gray-400"
+          className={`btn btn-xs flex-1 ${
+            scheduleType === "cron" ? "btn-primary" : "btn-ghost"
           }`}
         >
           Cron
         </button>
         <button
           onClick={() => setScheduleType("one-time")}
-          className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${
-            scheduleType === "one-time"
-              ? "bg-[#0e639c] text-white"
-              : "bg-[#3c3c3c] text-gray-400"
+          className={`btn btn-xs flex-1 ${
+            scheduleType === "one-time" ? "btn-primary" : "btn-ghost"
           }`}
         >
           One-time
@@ -166,19 +162,17 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
         <div className="space-y-3">
           <div className="form-control">
             <label className="label">
-              <span className="label-text text-xs text-gray-400">
-                Cron Expression
-              </span>
+              <span className="label-text text-xs">Cron Expression</span>
             </label>
             <input
               type="text"
               placeholder="0 2 * * * (daily at 2:00 JST)"
-              className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white font-mono text-xs"
+              className="input input-bordered input-sm font-mono text-xs"
               value={cronExpression}
               onChange={(e) => setCronExpression(e.target.value)}
             />
             <label className="label">
-              <span className="label-text-alt text-xs text-gray-500">
+              <span className="label-text-alt text-xs">
                 Timezone: Asia/Tokyo (JST)
               </span>
             </label>
@@ -192,12 +186,12 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
               />
-              <span className="label-text text-xs text-gray-400">
+              <span className="label-text text-xs">
                 Enable schedule immediately
               </span>
             </label>
             <label className="label">
-              <span className="label-text-alt text-xs text-gray-500">
+              <span className="label-text-alt text-xs">
                 If unchecked, the schedule will be created but paused
               </span>
             </label>
@@ -210,13 +204,11 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
         <div className="space-y-3">
           <div className="form-control">
             <label className="label">
-              <span className="label-text text-xs text-gray-400">
-                Date (JST)
-              </span>
+              <span className="label-text text-xs">Date (JST)</span>
             </label>
             <input
               type="date"
-              className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white text-xs [color-scheme:dark]"
+              className="input input-bordered input-sm text-xs"
               value={scheduledTime.split("T")[0] || ""}
               onChange={(e) => {
                 const timePart = scheduledTime.split("T")[1] || "00:00";
@@ -226,13 +218,11 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
           </div>
           <div className="form-control">
             <label className="label">
-              <span className="label-text text-xs text-gray-400">
-                Time (JST)
-              </span>
+              <span className="label-text text-xs">Time (JST)</span>
             </label>
             <div className="flex gap-2">
               <select
-                className="select select-bordered select-sm bg-[#3c3c3c] border-[#3e3e3e] text-white text-xs flex-1"
+                className="select select-bordered select-sm text-xs flex-1"
                 value={scheduledTime.split("T")[1]?.split(":")[0] || "00"}
                 onChange={(e) => {
                   const date =
@@ -254,9 +244,9 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                   );
                 })}
               </select>
-              <span className="text-white text-lg">:</span>
+              <span className="text-lg">:</span>
               <select
-                className="select select-bordered select-sm bg-[#3c3c3c] border-[#3e3e3e] text-white text-xs flex-1"
+                className="select select-bordered select-sm text-xs flex-1"
                 value={scheduledTime.split("T")[1]?.split(":")[1] || "00"}
                 onChange={(e) => {
                   const date =
@@ -279,7 +269,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
             </div>
           </div>
           <label className="label py-0">
-            <span className="label-text-alt text-xs text-gray-500">
+            <span className="label-text-alt text-xs">
               Timezone: Asia/Tokyo (JST)
             </span>
           </label>
@@ -302,7 +292,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       {/* Existing Schedules List */}
       <div className="divider my-2"></div>
 
-      <h4 className="text-xs font-semibold text-gray-400 uppercase">
+      <h4 className="text-xs font-semibold text-base-content/60 uppercase">
         Active Schedules
       </h4>
 
@@ -311,7 +301,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
           <span className="loading loading-spinner loading-sm"></span>
         </div>
       ) : schedules.length === 0 ? (
-        <p className="text-xs text-gray-500 text-center py-4">
+        <p className="text-xs text-base-content/50 text-center py-4">
           No schedules configured
         </p>
       ) : (
@@ -320,7 +310,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
             <div
               key={schedule.schedule_id}
               className={`rounded p-3 space-y-2 ${
-                schedule.active ? "bg-[#3c3c3c]" : "bg-[#2a2a2a] opacity-60"
+                schedule.active ? "bg-base-200" : "bg-base-200/50 opacity-60"
               }`}
             >
               <div className="flex items-start justify-between">
@@ -342,14 +332,16 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                   {schedule.cron && (
                     <p
                       className={`text-xs font-mono mt-1 ${
-                        schedule.active ? "text-white" : "text-gray-500"
+                        schedule.active
+                          ? "text-base-content"
+                          : "text-base-content/50"
                       }`}
                     >
                       {schedule.cron}
                     </p>
                   )}
                   {schedule.next_run && schedule.active && (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-base-content/50 mt-1">
                       Next: {new Date(schedule.next_run).toLocaleString()}
                     </p>
                   )}
@@ -383,24 +375,26 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
 
       {/* Cron Expression Helper */}
       {scheduleType === "cron" && (
-        <div className="bg-[#3c3c3c] rounded p-3 mt-4">
-          <h5 className="text-xs font-semibold text-gray-400 mb-2">
+        <div className="bg-base-200 rounded p-3 mt-4">
+          <h5 className="text-xs font-semibold text-base-content/60 mb-2">
             Cron Examples
           </h5>
-          <div className="space-y-1 text-xs text-gray-500">
+          <div className="space-y-1 text-xs text-base-content/50">
             <p>
-              <code className="text-white">0 2 * * *</code> - Daily at 2:00 AM
+              <code className="text-base-content">0 2 * * *</code> - Daily at
+              2:00 AM
             </p>
             <p>
-              <code className="text-white">0 */6 * * *</code> - Every 6 hours
+              <code className="text-base-content">0 */6 * * *</code> - Every 6
+              hours
             </p>
             <p>
-              <code className="text-white">0 0 * * 1</code> - Every Monday at
-              midnight
+              <code className="text-base-content">0 0 * * 1</code> - Every
+              Monday at midnight
             </p>
             <p>
-              <code className="text-white">30 14 1 * *</code> - 1st of month at
-              2:30 PM
+              <code className="text-base-content">30 14 1 * *</code> - 1st of
+              month at 2:30 PM
             </p>
           </div>
         </div>

@@ -401,13 +401,7 @@ export function HistogramView() {
       count: values.length,
       yieldPercent,
     };
-  }, [
-    histogramData,
-    selectedParameter,
-    showAsErrorRate,
-    customThreshold,
-    currentMetricConfig,
-  ]);
+  }, [histogramData, showAsErrorRate, customThreshold, currentMetricConfig]);
 
   // Create Plotly traces
   const plotData = useMemo(() => {
@@ -561,7 +555,7 @@ export function HistogramView() {
   }, [
     selectedParameter,
     currentMetricConfig,
-    couplingMetrics,
+    metricType,
     timeRange,
     selectionMode,
     histogramData,

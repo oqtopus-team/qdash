@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import Select, { type SingleValue, type StylesConfig } from "react-select";
 
 import { useToast } from "@/components/ui/Toast";
 
@@ -71,68 +70,7 @@ export default function NewFlowPage() {
     [templatesData],
   );
 
-  const templateSelectStyles = useMemo<StylesConfig<TemplateOption, false>>(
-    () => ({
-      control: (provided, state) => ({
-        ...provided,
-        backgroundColor: "#3c3c3c",
-        borderColor: state.isFocused ? "#007acc" : "#454545",
-        boxShadow: state.isFocused ? "0 0 0 1px #007acc" : "none",
-        "&:hover": {
-          borderColor: "#007acc",
-        },
-        minHeight: 38,
-      }),
-      valueContainer: (provided) => ({
-        ...provided,
-        padding: "2px 8px",
-      }),
-      menu: (provided) => ({
-        ...provided,
-        backgroundColor: "#252526",
-        border: "1px solid #3c3c3c",
-      }),
-      menuList: (provided) => ({
-        ...provided,
-        backgroundColor: "#252526",
-      }),
-      option: (provided, state) => ({
-        ...provided,
-        backgroundColor: state.isFocused ? "#3c3c3c" : "#252526",
-        color: "#ffffff",
-        "&:active": {
-          backgroundColor: "#007acc",
-        },
-      }),
-      singleValue: (provided) => ({
-        ...provided,
-        color: "#ffffff",
-      }),
-      placeholder: (provided) => ({
-        ...provided,
-        color: "#9ca3af",
-      }),
-      input: (provided) => ({
-        ...provided,
-        color: "#ffffff",
-      }),
-      dropdownIndicator: (provided) => ({
-        ...provided,
-        color: "#ffffff",
-        "&:hover": { color: "#ffffff" },
-      }),
-      clearIndicator: (provided) => ({
-        ...provided,
-        color: "#ffffff",
-        "&:hover": { color: "#ffffff" },
-      }),
-      indicatorSeparator: (provided) => ({
-        ...provided,
-        backgroundColor: "#4b5563",
-      }),
-    }),
-    [],
-  );
+  // Template select styles removed - using DaisyUI native select instead
 
   // Set default username and chip_id
   useEffect(() => {
@@ -175,6 +113,7 @@ export default function NewFlowPage() {
     };
 
     loadDefaultTemplate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toast is a singleton from sonner, doesn't need to be a dependency
   }, []);
 
   // Load template when selected
@@ -243,27 +182,27 @@ export default function NewFlowPage() {
 
   return (
     <>
-      <div className="h-screen flex flex-col bg-[#1e1e1e]">
-        {/* VSCode-style Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e] gap-2">
+      <div className="h-screen flex flex-col bg-base-300">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
               onClick={() => router.back()}
-              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0"
+              className="btn btn-sm btn-ghost"
               disabled={saveMutation.isPending}
             >
               ←
             </button>
             <button
               onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="px-2 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0 sm:hidden"
+              className="btn btn-sm btn-ghost sm:hidden"
               title={isSidebarVisible ? "Hide properties" : "Show properties"}
             >
               ☰
             </button>
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm text-gray-400">●</span>
-              <span className="text-sm font-medium text-white truncate">
+              <span className="text-sm text-base-content/50">●</span>
+              <span className="text-sm font-medium text-base-content truncate">
                 {name || "new_flow"}.py
               </span>
             </div>
@@ -271,14 +210,14 @@ export default function NewFlowPage() {
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="px-2 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors hidden sm:block"
+              className="btn btn-sm btn-ghost hidden sm:flex"
               title={isSidebarVisible ? "Hide properties" : "Show properties"}
             >
               ☰
             </button>
             <button
               onClick={handleSave}
-              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-sm btn-primary"
               disabled={saveMutation.isPending}
             >
               {saveMutation.isPending ? (
@@ -345,75 +284,65 @@ export default function NewFlowPage() {
 
           {/* Right Sidebar - Metadata */}
           <div
-            className={`${isSidebarVisible ? "w-72 sm:w-80" : "w-0"} bg-[#252526] border-l border-[#3e3e3e] overflow-y-auto transition-all duration-200 overflow-hidden flex-shrink-0 ${isSidebarVisible ? "fixed sm:relative right-0 top-0 h-full z-20 sm:z-auto" : ""}`}
+            className={`${isSidebarVisible ? "w-72 sm:w-80" : "w-0"} bg-base-100 border-l border-base-300 overflow-y-auto transition-all duration-200 overflow-hidden flex-shrink-0 ${isSidebarVisible ? "fixed sm:relative right-0 top-0 h-full z-20 sm:z-auto" : ""}`}
           >
             <div className="p-4">
               {/* Mobile Close Button */}
               <div className="flex justify-between items-center mb-4 sm:hidden">
-                <span className="text-sm font-semibold text-white">
-                  Properties
-                </span>
+                <span className="text-sm font-semibold">Properties</span>
                 <button
                   onClick={() => setIsSidebarVisible(false)}
-                  className="btn btn-ghost btn-sm btn-square text-white"
+                  className="btn btn-ghost btn-sm btn-square"
                 >
                   ✕
                 </button>
               </div>
               {/* Template Selector */}
               <div className="mb-6">
-                <h2 className="text-sm font-semibold text-white mb-3">
-                  TEMPLATE
-                </h2>
-                <Select<TemplateOption, false>
-                  className="text-sm"
-                  classNamePrefix="react-select"
-                  options={templateOptions}
-                  value={
-                    templateOptions.find(
-                      (option) => option.value === selectedTemplateId,
-                    ) ?? null
-                  }
-                  onChange={(option: SingleValue<TemplateOption>) => {
-                    if (!option) {
+                <h2 className="text-sm font-semibold mb-3">TEMPLATE</h2>
+                <select
+                  className="select select-bordered select-sm w-full"
+                  value={selectedTemplateId}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (!value) {
                       setSelectedTemplateId("");
                       return;
                     }
-                    handleTemplateSelect(option.value);
+                    handleTemplateSelect(value);
                   }}
-                  placeholder="Select a template..."
-                  styles={templateSelectStyles}
-                  isClearable
-                  isLoading={isTemplatesLoading}
-                  noOptionsMessage={() => "No templates available"}
-                />
+                  disabled={isTemplatesLoading}
+                >
+                  <option value="">Select a template...</option>
+                  {templateOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
                 {selectedTemplateId && (
-                  <p className="text-xs text-gray-400 mt-2">
+                  <p className="text-xs text-base-content/60 mt-2">
                     Template loaded. You can modify the code as needed.
                   </p>
                 )}
               </div>
 
-              <h2 className="text-sm font-semibold text-white mb-4">
-                PROPERTIES
-              </h2>
+              <h2 className="text-sm font-semibold mb-4">PROPERTIES</h2>
 
               <div className="space-y-4">
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
-                      Flow Name *
-                    </span>
+                    <span className="label-text text-xs">Flow Name *</span>
                   </label>
                   <input
                     type="text"
                     placeholder="my_flow"
-                    className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white"
+                    className="input input-bordered input-sm"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
                   <label className="label">
-                    <span className="label-text-alt text-xs text-gray-500">
+                    <span className="label-text-alt text-xs">
                       Alphanumeric and underscores only
                     </span>
                   </label>
@@ -421,12 +350,10 @@ export default function NewFlowPage() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
-                      Description
-                    </span>
+                    <span className="label-text text-xs">Description</span>
                   </label>
                   <textarea
-                    className="textarea textarea-bordered textarea-sm bg-[#3c3c3c] border-[#3e3e3e] text-white"
+                    className="textarea textarea-bordered textarea-sm"
                     placeholder="Describe your flow..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
@@ -436,19 +363,19 @@ export default function NewFlowPage() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
+                    <span className="label-text text-xs">
                       Entrypoint Function
                     </span>
                   </label>
                   <input
                     type="text"
                     placeholder="simple_flow"
-                    className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white"
+                    className="input input-bordered input-sm"
                     value={flowFunctionName}
                     onChange={(e) => setFlowFunctionName(e.target.value)}
                   />
                   <label className="label">
-                    <span className="label-text-alt text-xs text-gray-500">
+                    <span className="label-text-alt text-xs">
                       The @flow decorated function name in your code
                     </span>
                   </label>
@@ -456,14 +383,12 @@ export default function NewFlowPage() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
-                      Username *
-                    </span>
+                    <span className="label-text text-xs">Username *</span>
                   </label>
                   <input
                     type="text"
                     placeholder="your_username"
-                    className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white"
+                    className="input input-bordered input-sm"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                   />
@@ -471,14 +396,12 @@ export default function NewFlowPage() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
-                      Chip ID *
-                    </span>
+                    <span className="label-text text-xs">Chip ID *</span>
                   </label>
                   <input
                     type="text"
                     placeholder="64Qv3"
-                    className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white"
+                    className="input input-bordered input-sm"
                     value={chipId}
                     onChange={(e) => setChipId(e.target.value)}
                   />
@@ -486,19 +409,17 @@ export default function NewFlowPage() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
-                      Tags
-                    </span>
+                    <span className="label-text text-xs">Tags</span>
                   </label>
                   <input
                     type="text"
                     placeholder="tag1, tag2, tag3"
-                    className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white"
+                    className="input input-bordered input-sm"
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
                   />
                   <label className="label">
-                    <span className="label-text-alt text-xs text-gray-500">
+                    <span className="label-text-alt text-xs">
                       Comma-separated
                     </span>
                   </label>
@@ -508,8 +429,8 @@ export default function NewFlowPage() {
           </div>
         </div>
 
-        {/* VSCode-style Status Bar */}
-        <div className="flex items-center justify-between px-4 py-1 bg-[#007acc] text-white text-xs">
+        {/* Status Bar */}
+        <div className="flex items-center justify-between px-4 py-1 bg-primary text-primary-content text-xs">
           <div className="flex items-center gap-4">
             <span>
               Ln {cursorPosition.line}, Col {cursorPosition.column}
