@@ -60,6 +60,7 @@ bun run dev
 ### Testing Workflow
 
 1. **Start the full stack**
+
    ```bash
    # From project root
    docker compose up -d
@@ -78,35 +79,41 @@ bun run dev
 ### Key Test Scenarios
 
 #### Authentication
+
 - [ ] Login page displays correctly
 - [ ] Login redirects to /metrics
 - [ ] Protected routes redirect to /login when not authenticated
 - [ ] Logout clears session
 
 #### Metrics Page (`/metrics`)
+
 - [ ] Page loads without errors
 - [ ] Chip selector works
 - [ ] Data visualizations render
 - [ ] Time range selection works
 
 #### Chip Page (`/chip`)
+
 - [ ] Chip list loads
 - [ ] Chip details page loads
 - [ ] Qubit grid displays correctly
 - [ ] Task results show properly
 
 #### Flow Page (`/flow`)
+
 - [ ] Flow list loads
 - [ ] Create new flow works
 - [ ] Flow editor functions
 - [ ] Execute flow works
 
 #### Execution Page (`/execution`)
+
 - [ ] Execution list loads
 - [ ] Execution details show
 - [ ] Real-time updates work (if applicable)
 
 #### Analysis Page (`/analysis`)
+
 - [ ] Charts render correctly
 - [ ] Filters work
 - [ ] Export functions work
@@ -133,11 +140,11 @@ bunx tsc --noEmit --watch
 
 ```tsx
 // ❌ Error: Parameter 'chip' implicitly has an 'any' type
-chips.map((chip) => chip.name)
+chips.map((chip) => chip.name);
 
 // ✅ Fix: Add explicit type
 import type { ChipSummary } from "@/schemas";
-chips.map((chip: ChipSummary) => chip.name)
+chips.map((chip: ChipSummary) => chip.name);
 ```
 
 #### Mutation Callback Types
@@ -146,7 +153,7 @@ chips.map((chip: ChipSummary) => chip.name)
 // ❌ Error: Parameter 'response' implicitly has an 'any' type
 onSuccess: (response) => {
   console.log(response.data);
-}
+};
 
 // ✅ Fix: Add explicit type
 import type { AxiosResponse } from "axios";
@@ -154,7 +161,7 @@ import type { ExecuteFlowResponse } from "@/schemas";
 
 onSuccess: (response: AxiosResponse<ExecuteFlowResponse>) => {
   console.log(response.data);
-}
+};
 ```
 
 #### Array Method Types
@@ -202,8 +209,8 @@ export default [
     ignores: [
       "node_modules/**",
       ".next/**",
-      "src/schemas/**",    // Auto-generated types
-      "src/client/**",     // Auto-generated client
+      "src/schemas/**", // Auto-generated types
+      "src/client/**", // Auto-generated client
     ],
   },
   {
@@ -226,7 +233,7 @@ export default [
 // ❌ Error: Hook called conditionally
 function Component({ condition }) {
   if (condition) {
-    const [state, setState] = useState(null);  // Error!
+    const [state, setState] = useState(null); // Error!
   }
 }
 
@@ -245,7 +252,7 @@ function Component({ condition }) {
 // ⚠️ Warning: Missing dependency
 useEffect(() => {
   fetchData(userId);
-}, []);  // Missing 'userId'
+}, []); // Missing 'userId'
 
 // ✅ Fix: Add dependency
 useEffect(() => {
@@ -314,6 +321,7 @@ Route (app)                              Size     First Load JS
 ```
 
 Monitor for:
+
 - Large bundle sizes (> 500KB first load)
 - Missing routes
 - Build errors
@@ -384,9 +392,7 @@ describe("ChipList", () => {
   });
 
   const wrapper = ({ children }) => (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 
   it("renders chips from API", async () => {
@@ -501,6 +507,7 @@ const { data, isLoading, error } = useQuery({
 ### React Developer Tools
 
 Install React DevTools browser extension to:
+
 - Inspect component tree
 - View props and state
 - Profile rendering performance
@@ -511,13 +518,13 @@ Install React DevTools browser extension to:
 
 ### Testing Commands Quick Reference
 
-| Command | Purpose |
-|---------|---------|
-| `bunx tsc --noEmit` | Type checking |
-| `bun run lint` | ESLint checks |
-| `bun run fmt` | Auto-fix lint issues |
-| `bun run build` | Production build (includes type check) |
-| `bun run dev` | Development server for manual testing |
+| Command             | Purpose                                |
+| ------------------- | -------------------------------------- |
+| `bunx tsc --noEmit` | Type checking                          |
+| `bun run lint`      | ESLint checks                          |
+| `bun run fmt`       | Auto-fix lint issues                   |
+| `bun run build`     | Production build (includes type check) |
+| `bun run dev`       | Development server for manual testing  |
 
 ### Key Testing Principles
 

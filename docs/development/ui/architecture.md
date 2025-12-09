@@ -170,13 +170,13 @@ components/
 
 ### Component Responsibility
 
-| Category | Responsibility | Reusability |
-|----------|---------------|-------------|
-| `ui/` | Generic UI primitives | High - used across all features |
-| `charts/` | Data visualization | Medium - used in multiple pages |
-| `features/` | Feature-specific logic | Low - specific to one feature |
-| `layout/` | Page structure | High - used in all pages |
-| `selectors/` | Data selection | Medium - used across features |
+| Category     | Responsibility         | Reusability                     |
+| ------------ | ---------------------- | ------------------------------- |
+| `ui/`        | Generic UI primitives  | High - used across all features |
+| `charts/`    | Data visualization     | Medium - used in multiple pages |
+| `features/`  | Feature-specific logic | Low - specific to one feature   |
+| `layout/`    | Page structure         | High - used in all pages        |
+| `selectors/` | Data selection         | Medium - used across features   |
 
 ---
 
@@ -242,19 +242,16 @@ const mutation = useMutation({
 });
 
 // User action triggers mutation
-<button onClick={() => mutation.mutate(formData)}>
-  Save Changes
-</button>
+<button onClick={() => mutation.mutate(formData)}>Save Changes</button>;
 ```
 
 ### Query Key Strategy
 
 ```tsx
 // Hierarchical keys for granular cache control
-["chips"]                           // All chips
-["chips", chipId]                   // Single chip
-["chips", chipId, "qubits"]         // Qubits for a chip
-["chips", chipId, "qubits", qid]    // Single qubit
+["chips"][("chips", chipId)][("chips", chipId, "qubits")][ // All chips // Single chip // Qubits for a chip
+  ("chips", chipId, "qubits", qid)
+]; // Single qubit
 
 // Invalidation cascades
 queryClient.invalidateQueries({ queryKey: ["chips"] });
@@ -364,9 +361,9 @@ export const config = {
 module.exports = {
   "qdash-file-transfomer": {
     output: {
-      client: "react-query",    // Generate React Query hooks
-      mode: "tags-split",       // Split by API tags
-      target: "./src/client",   // Output directory
+      client: "react-query", // Generate React Query hooks
+      mode: "tags-split", // Split by API tags
+      target: "./src/client", // Output directory
       schemas: "./src/schemas", // Types output directory
       override: {
         mutator: {
@@ -374,7 +371,7 @@ module.exports = {
           name: "customInstance",
         },
       },
-      clean: true,              // Clean output before generation
+      clean: true, // Clean output before generation
     },
     input: {
       target: "../docs/oas/openapi.json",
@@ -417,12 +414,12 @@ export const customInstance = <T>(config: AxiosRequestConfig): Promise<T> => {
 
 ### State Categories
 
-| State Type | Tool | Use Case |
-|------------|------|----------|
-| Server State | TanStack Query | API data, cached server responses |
-| Client State | React Context | Theme, auth, selected project |
-| URL State | nuqs | Filters, pagination, selected items |
-| Component State | useState | Form inputs, UI toggles |
+| State Type      | Tool           | Use Case                            |
+| --------------- | -------------- | ----------------------------------- |
+| Server State    | TanStack Query | API data, cached server responses   |
+| Client State    | React Context  | Theme, auth, selected project       |
+| URL State       | nuqs           | Filters, pagination, selected items |
+| Component State | useState       | Form inputs, UI toggles             |
 
 ### Pattern: Query + URL State
 
@@ -432,8 +429,14 @@ import { useQueryState, parseAsString } from "nuqs";
 
 export function ChipListPage() {
   // URL state for filters (persisted in URL)
-  const [search, setSearch] = useQueryState("search", parseAsString.withDefault(""));
-  const [status, setStatus] = useQueryState("status", parseAsString.withDefault("all"));
+  const [search, setSearch] = useQueryState(
+    "search",
+    parseAsString.withDefault(""),
+  );
+  const [status, setStatus] = useQueryState(
+    "status",
+    parseAsString.withDefault("all"),
+  );
 
   // Server state with filters
   const { data, isLoading } = useQuery({
@@ -502,9 +505,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <Navbar />
       <div className="flex">
         <Sidebar />
-        <main className="flex-1 p-6">
-          {children}
-        </main>
+        <main className="flex-1 p-6">{children}</main>
       </div>
     </div>
   );
@@ -587,12 +588,12 @@ export function ChipSelector({ value, onChange, disabled }: ChipSelectorProps) {
 
 ### Key Files Reference
 
-| File | Purpose |
-|------|---------|
-| `src/app/layout.tsx` | Root layout with providers |
-| `src/app/providers.tsx` | Provider composition |
-| `src/middleware.ts` | Authentication middleware |
-| `src/lib/api/custom-instance.ts` | Axios configuration |
-| `orval.config.cjs` | API client generation config |
-| `eslint.config.mjs` | ESLint configuration |
-| `tailwind.config.ts` | Tailwind CSS configuration |
+| File                             | Purpose                      |
+| -------------------------------- | ---------------------------- |
+| `src/app/layout.tsx`             | Root layout with providers   |
+| `src/app/providers.tsx`          | Provider composition         |
+| `src/middleware.ts`              | Authentication middleware    |
+| `src/lib/api/custom-instance.ts` | Axios configuration          |
+| `orval.config.cjs`               | API client generation config |
+| `eslint.config.mjs`              | ESLint configuration         |
+| `tailwind.config.ts`             | Tailwind CSS configuration   |

@@ -21,30 +21,30 @@ This document defines the UI development conventions and standards for the QDash
 
 ### Core Technologies
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Next.js | 14.x | React framework with App Router |
-| React | 18.x | UI library |
-| TypeScript | 5.x | Type-safe JavaScript |
-| Bun | 1.x+ | Package manager and runtime |
+| Technology | Version | Purpose                         |
+| ---------- | ------- | ------------------------------- |
+| Next.js    | 14.x    | React framework with App Router |
+| React      | 18.x    | UI library                      |
+| TypeScript | 5.x     | Type-safe JavaScript            |
+| Bun        | 1.x+    | Package manager and runtime     |
 
 ### UI Libraries
 
-| Library | Purpose |
-|---------|---------|
-| Tailwind CSS | Utility-first CSS framework |
-| DaisyUI | Component library built on Tailwind |
-| Plotly.js | Data visualization and charts |
-| React Flow | Node-based diagrams and workflows |
-| React Icons | Icon components |
+| Library      | Purpose                             |
+| ------------ | ----------------------------------- |
+| Tailwind CSS | Utility-first CSS framework         |
+| DaisyUI      | Component library built on Tailwind |
+| Plotly.js    | Data visualization and charts       |
+| React Flow   | Node-based diagrams and workflows   |
+| React Icons  | Icon components                     |
 
 ### State Management
 
-| Library | Purpose |
-|---------|---------|
-| TanStack Query (React Query) | Server state management and caching |
-| React Context | Global client state (theme, user, project) |
-| nuqs | URL query string state management |
+| Library                      | Purpose                                    |
+| ---------------------------- | ------------------------------------------ |
+| TanStack Query (React Query) | Server state management and caching        |
+| React Context                | Global client state (theme, user, project) |
+| nuqs                         | URL query string state management          |
 
 ---
 
@@ -116,15 +116,15 @@ Next.js App Router uses **route groups** (folders in parentheses) for organizati
 
 ### Files and Directories
 
-| Type | Convention | Example |
-|------|------------|---------|
-| Page files | `page.tsx` | `src/app/(auth)/metrics/page.tsx` |
-| Layout files | `layout.tsx` | `src/app/(auth)/layout.tsx` |
-| Components | PascalCase | `MetricsChart.tsx` |
-| Hooks | camelCase with `use` prefix | `useQubitData.ts` |
-| Contexts | PascalCase with `Context` suffix | `ProjectContext.tsx` |
-| Utilities | camelCase | `formatDate.ts` |
-| Types | PascalCase | `ChipTypes.ts` |
+| Type         | Convention                       | Example                           |
+| ------------ | -------------------------------- | --------------------------------- |
+| Page files   | `page.tsx`                       | `src/app/(auth)/metrics/page.tsx` |
+| Layout files | `layout.tsx`                     | `src/app/(auth)/layout.tsx`       |
+| Components   | PascalCase                       | `MetricsChart.tsx`                |
+| Hooks        | camelCase with `use` prefix      | `useQubitData.ts`                 |
+| Contexts     | PascalCase with `Context` suffix | `ProjectContext.tsx`              |
+| Utilities    | camelCase                        | `formatDate.ts`                   |
+| Types        | PascalCase                       | `ChipTypes.ts`                    |
 
 ### Component Naming
 
@@ -202,7 +202,11 @@ interface ChipCardProps {
   isSelected?: boolean;
 }
 
-export function ChipCard({ chip, onSelect, isSelected = false }: ChipCardProps) {
+export function ChipCard({
+  chip,
+  onSelect,
+  isSelected = false,
+}: ChipCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -232,7 +236,12 @@ interface DataTableProps {
   isLoading?: boolean;
 }
 
-export function DataTable({ data, columns, onRowClick, isLoading = false }: DataTableProps) {
+export function DataTable({
+  data,
+  columns,
+  onRowClick,
+  isLoading = false,
+}: DataTableProps) {
   // ...
 }
 
@@ -291,13 +300,13 @@ export function useUpdateChip() {
 
 ```tsx
 // ✅ Good - Hierarchical query keys
-queryKey: ["chips"]                              // All chips
-queryKey: ["chips", chipId]                      // Specific chip
-queryKey: ["chips", chipId, "qubits"]            // Qubits for a chip
-queryKey: ["chips", chipId, "qubits", qid]       // Specific qubit
+queryKey: ["chips"]; // All chips
+queryKey: ["chips", chipId]; // Specific chip
+queryKey: ["chips", chipId, "qubits"]; // Qubits for a chip
+queryKey: ["chips", chipId, "qubits", qid]; // Specific qubit
 
 // ✅ Good - With filters
-queryKey: ["tasks", { chipId, status: "active" }]
+queryKey: ["tasks", { chipId, status: "active" }];
 ```
 
 ### Client State with Context
@@ -343,7 +352,10 @@ import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
 
 export function FilteredList() {
   // State synced to URL: ?search=foo&page=2
-  const [search, setSearch] = useQueryState("search", parseAsString.withDefault(""));
+  const [search, setSearch] = useQueryState(
+    "search",
+    parseAsString.withDefault(""),
+  );
   const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
 
   return (
@@ -419,7 +431,8 @@ const mutation = useMutation({
 // ❌ Bad - Implicit any types
 const mutation = useMutation({
   mutationFn: () => executeFlow(flowName),
-  onSuccess: (response) => {  // 'response' implicitly has 'any' type
+  onSuccess: (response) => {
+    // 'response' implicitly has 'any' type
     console.log(response.data.execution_id);
   },
 });
@@ -433,7 +446,9 @@ Add type annotations to array callbacks to avoid implicit `any`:
 import type { TaskInfo, ChipSummary } from "@/schemas";
 
 // ✅ Good - Explicit types
-const activeChips = chips.filter((chip: ChipSummary) => chip.status === "active");
+const activeChips = chips.filter(
+  (chip: ChipSummary) => chip.status === "active",
+);
 const chipNames = chips.map((chip: ChipSummary) => chip.chip_id);
 const hasTask = tasks.some((task: TaskInfo) => task.name === targetName);
 
@@ -586,7 +601,7 @@ if (isChipData(response)) {
 }
 
 // ❌ Bad - Type assertion
-const chip = response as ChipData;  // Unsafe
+const chip = response as ChipData; // Unsafe
 ```
 
 ---
@@ -671,14 +686,14 @@ bun run start
 
 ### Common Tasks
 
-| Command | Description |
-|---------|-------------|
-| `bun run dev` | Start development server |
-| `bun run build` | Build for production |
-| `bun run lint` | Run ESLint |
-| `bun run fmt` | Fix ESLint issues |
-| `bunx tsc --noEmit` | Type check |
-| `task generate` | Regenerate API client |
+| Command             | Description              |
+| ------------------- | ------------------------ |
+| `bun run dev`       | Start development server |
+| `bun run build`     | Build for production     |
+| `bun run lint`      | Run ESLint               |
+| `bun run fmt`       | Fix ESLint issues        |
+| `bunx tsc --noEmit` | Type check               |
+| `task generate`     | Regenerate API client    |
 
 ---
 
