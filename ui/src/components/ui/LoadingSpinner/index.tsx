@@ -1,21 +1,27 @@
 "use client";
 
-import { Oval } from "react-loader-spinner";
+type LoadingSpinnerProps = {
+  size?: "xs" | "sm" | "md" | "lg";
+  color?:
+    | "primary"
+    | "secondary"
+    | "accent"
+    | "neutral"
+    | "info"
+    | "success"
+    | "warning"
+    | "error";
+};
 
-export function LoadingSpinner() {
+export function LoadingSpinner({
+  size = "lg",
+  color = "primary",
+}: LoadingSpinnerProps = {}) {
   return (
     <div className="flex justify-center items-center h-full">
-      <Oval
-        height={80}
-        width={80}
-        color="#98A0F7"
-        wrapperStyle={{}}
-        wrapperClass=""
-        visible={true}
-        ariaLabel="oval-loading"
-        secondaryColor="#98A0F7"
-        strokeWidth={2}
-        strokeWidthSecondary={2}
+      <span
+        className={`loading loading-spinner loading-${size} text-${color}`}
+        aria-label="Loading"
       />
     </div>
   );

@@ -132,6 +132,7 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
     -p fzf \
     -a "export FZF_BASE=/usr/bin" \
     -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
+    -a "umask 022" \
     -x
 
 # Setup node_modules cache directory

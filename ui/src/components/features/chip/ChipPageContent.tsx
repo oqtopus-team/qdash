@@ -354,8 +354,7 @@ export function ChipPageContent() {
                   onClick={() => setViewMode("1q")}
                 >
                   <BsGrid className="text-base sm:text-lg" />
-                  <span className="ml-1 sm:ml-2 hidden xs:inline">1Q</span>
-                  <span className="ml-1 sm:ml-2 hidden sm:inline">View</span>
+                  <span className="ml-1 sm:ml-2">1Q</span>
                 </button>
                 <button
                   className={`join-item btn btn-xs sm:btn-sm ${
@@ -364,8 +363,7 @@ export function ChipPageContent() {
                   onClick={() => setViewMode("2q")}
                 >
                   <BsGrid className="text-base sm:text-lg" />
-                  <span className="ml-1 sm:ml-2 hidden xs:inline">2Q</span>
-                  <span className="ml-1 sm:ml-2 hidden sm:inline">View</span>
+                  <span className="ml-1 sm:ml-2">2Q</span>
                 </button>
                 <button
                   className={`join-item btn btn-xs sm:btn-sm ${
@@ -374,8 +372,7 @@ export function ChipPageContent() {
                   onClick={() => setViewMode("mux")}
                 >
                   <BsListUl className="text-base sm:text-lg" />
-                  <span className="ml-1 sm:ml-2 hidden xs:inline">MUX</span>
-                  <span className="ml-1 sm:ml-2 hidden sm:inline">View</span>
+                  <span className="ml-1 sm:ml-2">MUX</span>
                 </button>
               </div>
             </div>
@@ -552,7 +549,7 @@ export function ChipPageContent() {
                                 <h3 className="text-lg font-medium mb-3">
                                   {taskName}
                                 </h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-1 min-[400px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                                   {qids.map((qid) => {
                                     const task = qidResults[qid];
 

@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "react-toastify";
+
+import { useToast } from "@/components/ui/Toast";
 
 import type { ScheduleFlowRequest, FlowScheduleSummary } from "@/schemas";
 
@@ -20,6 +21,7 @@ interface FlowSchedulePanelProps {
 
 export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [cronExpression, setCronExpression] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [scheduleType, setScheduleType] = useState<"cron" | "one-time">("cron");

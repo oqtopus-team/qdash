@@ -5,13 +5,11 @@ import { useRouter, useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "react-toastify";
-import { ToastContainer } from "react-toastify";
 
 import type { SaveFlowRequest, ExecuteFlowResponse } from "@/schemas";
 import type { AxiosResponse } from "axios";
 
-import "react-toastify/dist/ReactToastify.css";
+import { useToast } from "@/components/ui/Toast";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
@@ -33,6 +31,7 @@ export default function EditFlowPage() {
   const router = useRouter();
   const params = useParams();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const name = params.name as string;
 
   const [description, setDescription] = useState("");
@@ -193,7 +192,6 @@ export default function EditFlowPage() {
 
   return (
     <>
-      <ToastContainer position="top-right" autoClose={3000} />
       <div className="h-screen flex flex-col bg-[#1e1e1e]">
         {/* VSCode-style Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e] gap-2">

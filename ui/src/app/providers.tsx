@@ -8,7 +8,7 @@ import { NuqsAdapter } from "nuqs/adapters/next/app";
 import AxiosProvider from "./providers/AxiosProvider";
 import { ThemeProvider } from "./providers/theme-provider";
 
-import { ThemedToastContainer } from "@/components/ui/ThemedToastContainer";
+import { ToastProvider, ToastContainer } from "@/components/ui/Toast";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 
@@ -22,8 +22,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           <AuthProvider>
             <ProjectProvider>
               <ThemeProvider>
-                {children}
-                <ThemedToastContainer />
+                <ToastProvider>
+                  {children}
+                  <ToastContainer />
+                </ToastProvider>
               </ThemeProvider>
             </ProjectProvider>
           </AuthProvider>

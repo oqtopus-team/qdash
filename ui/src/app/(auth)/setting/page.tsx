@@ -37,6 +37,12 @@ const themes = [
   "night",
   "coffee",
   "winter",
+  "dim",
+  "nord",
+  "sunset",
+  "caramellatte",
+  "abyss",
+  "silk",
 ];
 
 type Tab = "appearance" | "api" | "system";
@@ -217,15 +223,15 @@ export default function SettingsPage() {
                       Your Access Token
                     </label>
                     <div className="flex flex-col gap-2">
-                      <div className="join w-full">
-                        <input
-                          type={showToken ? "text" : "password"}
-                          value={accessToken || ""}
-                          readOnly
-                          className="input input-bordered join-item flex-1 font-mono text-sm"
-                        />
+                      <input
+                        type={showToken ? "text" : "password"}
+                        value={accessToken || ""}
+                        readOnly
+                        className="input input-bordered w-full font-mono text-sm"
+                      />
+                      <div className="flex gap-2">
                         <button
-                          className="btn join-item"
+                          className="btn btn-sm flex-1"
                           onClick={() => setShowToken(!showToken)}
                         >
                           {showToken ? (
@@ -235,7 +241,7 @@ export default function SettingsPage() {
                               viewBox="0 0 24 24"
                               strokeWidth={1.5}
                               stroke="currentColor"
-                              className="w-5 h-5"
+                              className="w-4 h-4"
                             >
                               <path
                                 strokeLinecap="round"
@@ -250,7 +256,7 @@ export default function SettingsPage() {
                               viewBox="0 0 24 24"
                               strokeWidth={1.5}
                               stroke="currentColor"
-                              className="w-5 h-5"
+                              className="w-4 h-4"
                             >
                               <path
                                 strokeLinecap="round"
@@ -264,9 +270,12 @@ export default function SettingsPage() {
                               />
                             </svg>
                           )}
+                          <span className="hidden sm:inline">
+                            {showToken ? "Hide" : "Show"}
+                          </span>
                         </button>
                         <button
-                          className={`btn join-item ${copied ? "btn-success" : "btn-primary"}`}
+                          className={`btn btn-sm flex-1 ${copied ? "btn-success" : "btn-primary"}`}
                           onClick={handleCopyToken}
                         >
                           {copied ? (
@@ -277,7 +286,7 @@ export default function SettingsPage() {
                                 viewBox="0 0 24 24"
                                 strokeWidth={1.5}
                                 stroke="currentColor"
-                                className="w-5 h-5"
+                                className="w-4 h-4"
                               >
                                 <path
                                   strokeLinecap="round"
@@ -285,7 +294,7 @@ export default function SettingsPage() {
                                   d="M4.5 12.75l6 6 9-13.5"
                                 />
                               </svg>
-                              Copied!
+                              <span className="hidden sm:inline">Copied!</span>
                             </>
                           ) : (
                             <>
@@ -295,7 +304,7 @@ export default function SettingsPage() {
                                 viewBox="0 0 24 24"
                                 strokeWidth={1.5}
                                 stroke="currentColor"
-                                className="w-5 h-5"
+                                className="w-4 h-4"
                               >
                                 <path
                                   strokeLinecap="round"
@@ -303,7 +312,7 @@ export default function SettingsPage() {
                                   d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"
                                 />
                               </svg>
-                              Copy
+                              <span className="hidden sm:inline">Copy</span>
                             </>
                           )}
                         </button>
@@ -316,8 +325,8 @@ export default function SettingsPage() {
                       Example Usage (curl)
                     </label>
                     <div className="relative">
-                      <div className="mockup-code text-sm">
-                        <pre>
+                      <div className="mockup-code text-xs sm:text-sm overflow-x-auto">
+                        <pre className="whitespace-pre-wrap break-all sm:whitespace-pre sm:break-normal">
                           <code>
                             curl -H "Authorization: Bearer{" "}
                             {showToken && accessToken
@@ -331,46 +340,43 @@ export default function SettingsPage() {
                         </pre>
                       </div>
                       <button
-                        className={`btn btn-sm absolute top-2 right-2 ${copiedCurl ? "btn-success" : "btn-ghost"}`}
+                        className={`btn btn-xs sm:btn-sm absolute top-2 right-2 ${copiedCurl ? "btn-success" : "btn-ghost"}`}
                         onClick={handleCopyCurl}
                       >
                         {copiedCurl ? (
-                          <>
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              strokeWidth={1.5}
-                              stroke="currentColor"
-                              className="w-4 h-4"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M4.5 12.75l6 6 9-13.5"
-                              />
-                            </svg>
-                            Copied!
-                          </>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                            stroke="currentColor"
+                            className="w-4 h-4"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M4.5 12.75l6 6 9-13.5"
+                            />
+                          </svg>
                         ) : (
-                          <>
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              strokeWidth={1.5}
-                              stroke="currentColor"
-                              className="w-4 h-4"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"
-                              />
-                            </svg>
-                            Copy
-                          </>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                            stroke="currentColor"
+                            className="w-4 h-4"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"
+                            />
+                          </svg>
                         )}
+                        <span className="hidden sm:inline">
+                          {copiedCurl ? "Copied!" : "Copy"}
+                        </span>
                       </button>
                     </div>
                   </div>

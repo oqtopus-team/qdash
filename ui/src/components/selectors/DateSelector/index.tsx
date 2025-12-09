@@ -39,8 +39,6 @@ export function DateSelector({
     },
   });
 
-  // Don't auto-reset dates - let the parent component handle it
-
   // Format date string for display (YYYYMMDD -> YYYY/MM/DD)
   const formatDate = (dateStr: string): string => {
     if (dateStr === "latest") return "Latest";
@@ -70,8 +68,6 @@ export function DateSelector({
       label: formatDate(date),
     }));
   }, [datesResponse]);
-
-  // Don't auto-reset on error - preserve user's selection
 
   // Show loading state but keep the current selection visible
   if (isLoading) {
