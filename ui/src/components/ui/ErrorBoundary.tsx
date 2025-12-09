@@ -33,10 +33,7 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Log error to console in development
     console.error("ErrorBoundary caught an error:", error, errorInfo);
-
-    // Call optional error handler
     this.props.onError?.(error, errorInfo);
   }
 
@@ -46,16 +43,13 @@ export class ErrorBoundary extends Component<
 
   render(): ReactNode {
     if (this.state.hasError) {
-      // If a custom fallback is provided, use it
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
-      // Default error UI
       return (
         <div className="card bg-base-100 shadow-xl rounded-xl p-8 border border-error/20 m-4">
           <div className="flex flex-col items-center text-center space-y-4">
-            {/* Error Icon */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="w-16 h-16 text-error"
@@ -72,18 +66,15 @@ export class ErrorBoundary extends Component<
               <line x1="9" y1="9" x2="15" y2="15"></line>
             </svg>
 
-            {/* Error Title */}
             <h3 className="text-xl font-semibold text-error">
               Something went wrong
             </h3>
 
-            {/* Error Message */}
             <p className="text-base-content/70 max-w-md">
               An unexpected error occurred. Please try again or contact support
               if the problem persists.
             </p>
 
-            {/* Error Details (development only) */}
             {process.env.NODE_ENV === "development" && this.state.error && (
               <details className="text-left w-full max-w-lg">
                 <summary className="cursor-pointer text-sm text-base-content/50 hover:text-base-content">
@@ -97,7 +88,6 @@ export class ErrorBoundary extends Component<
               </details>
             )}
 
-            {/* Retry Button */}
             <div className="card-actions gap-2">
               <button
                 className="btn btn-error btn-outline gap-2"
