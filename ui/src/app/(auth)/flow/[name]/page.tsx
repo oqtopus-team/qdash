@@ -192,32 +192,32 @@ export default function EditFlowPage() {
 
   return (
     <>
-      <div className="h-screen flex flex-col bg-[#1e1e1e]">
-        {/* VSCode-style Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e] gap-2">
+      <div className="h-screen flex flex-col bg-base-300">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
               onClick={() => router.push("/flow")}
-              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0"
+              className="btn btn-sm btn-ghost"
               disabled={saveMutation.isPending || deleteMutation.isPending}
             >
               ←
             </button>
             <button
               onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="px-2 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0 sm:hidden"
+              className="btn btn-sm btn-ghost sm:hidden"
               title={isSidebarVisible ? "Hide properties" : "Show properties"}
             >
               ☰
             </button>
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm text-gray-400">●</span>
-              <span className="text-sm font-medium text-white truncate">
+              <span className="text-sm text-base-content/50">●</span>
+              <span className="text-sm font-medium text-base-content truncate">
                 {name}.py
               </span>
             </div>
             {data?.data?.updated_at && (
-              <span className="text-xs text-gray-500 hidden lg:inline">
+              <span className="text-xs text-base-content/50 hidden lg:inline">
                 Updated: {new Date(data.data.updated_at).toLocaleString()}
               </span>
             )}
@@ -225,17 +225,15 @@ export default function EditFlowPage() {
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             <button
               onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="px-2 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors hidden sm:block"
+              className="btn btn-sm btn-ghost hidden sm:flex"
               title={isSidebarVisible ? "Hide properties" : "Show properties"}
             >
               ☰
             </button>
             <button
               onClick={() => setShowExecuteConfirm(true)}
-              className={`px-2 sm:px-3 py-1 text-sm text-white border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                lockStatus?.data.lock
-                  ? "bg-gray-600 border-gray-700"
-                  : "bg-[#16825d] border-[#1a9870] hover:bg-[#1a9870]"
+              className={`btn btn-sm ${
+                lockStatus?.data.lock ? "btn-disabled" : "btn-success"
               }`}
               disabled={
                 saveMutation.isPending ||
@@ -262,7 +260,7 @@ export default function EditFlowPage() {
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#c72e2e] border border-[#d73737] rounded hover:bg-[#d73737] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-sm btn-error"
               disabled={saveMutation.isPending || deleteMutation.isPending}
             >
               <span className="hidden sm:inline">Delete</span>
@@ -270,7 +268,7 @@ export default function EditFlowPage() {
             </button>
             <button
               onClick={handleSave}
-              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-sm btn-primary"
               disabled={saveMutation.isPending || deleteMutation.isPending}
             >
               {saveMutation.isPending ? (
@@ -317,24 +315,24 @@ export default function EditFlowPage() {
           {/* Editor with Tab Switcher */}
           <div className="flex-1 flex flex-col">
             {/* Tab Bar */}
-            <div className="flex bg-[#252526] border-b border-[#3e3e3e]">
+            <div className="flex bg-base-200 border-b border-base-300">
               <button
                 onClick={() => setActiveTab("code")}
-                className={`px-4 py-2 text-sm font-medium flex items-center gap-2 border-r border-[#3e3e3e] transition-colors ${
+                className={`px-4 py-2 text-sm font-medium flex items-center gap-2 border-r border-base-300 transition-colors ${
                   activeTab === "code"
-                    ? "bg-[#1e1e1e] text-white border-t-2 border-t-[#007acc]"
-                    : "bg-[#2d2d2d] text-gray-400 hover:bg-[#323232] border-t-2 border-t-transparent"
+                    ? "bg-base-300 text-base-content border-t-2 border-t-primary"
+                    : "bg-base-200 text-base-content/60 hover:bg-base-300/50 border-t-2 border-t-transparent"
                 }`}
               >
-                <span className="text-[#519aba]">py</span>
+                <span className="text-info">py</span>
                 {name}.py
               </button>
               <button
                 onClick={() => setActiveTab("helpers")}
-                className={`px-4 py-2 text-sm font-medium flex items-center gap-2 border-r border-[#3e3e3e] transition-colors ${
+                className={`px-4 py-2 text-sm font-medium flex items-center gap-2 border-r border-base-300 transition-colors ${
                   activeTab === "helpers"
-                    ? "bg-[#1e1e1e] text-white border-t-2 border-t-[#007acc]"
-                    : "bg-[#2d2d2d] text-gray-400 hover:bg-[#323232] border-t-2 border-t-transparent"
+                    ? "bg-base-300 text-base-content border-t-2 border-t-primary"
+                    : "bg-base-200 text-base-content/60 hover:bg-base-300/50 border-t-2 border-t-transparent"
                 }`}
               >
                 <svg
@@ -347,7 +345,7 @@ export default function EditFlowPage() {
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="text-[#c586c0]"
+                  className="text-secondary"
                 >
                   <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                   <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
@@ -401,40 +399,34 @@ export default function EditFlowPage() {
 
           {/* Right Sidebar - Metadata */}
           <div
-            className={`${isSidebarVisible ? "w-72 sm:w-80" : "w-0"} bg-[#252526] border-l border-[#3e3e3e] overflow-y-auto transition-all duration-200 overflow-hidden flex-shrink-0 ${isSidebarVisible ? "fixed sm:relative right-0 top-0 h-full z-20 sm:z-auto" : ""}`}
+            className={`${isSidebarVisible ? "w-72 sm:w-80" : "w-0"} bg-base-100 border-l border-base-300 overflow-y-auto transition-all duration-200 overflow-hidden flex-shrink-0 ${isSidebarVisible ? "fixed sm:relative right-0 top-0 h-full z-20 sm:z-auto" : ""}`}
           >
             <div className="p-4">
               {/* Mobile Close Button */}
               <div className="flex justify-between items-center mb-4 sm:hidden">
-                <span className="text-sm font-semibold text-white">
-                  Properties
-                </span>
+                <span className="text-sm font-semibold">Properties</span>
                 <button
                   onClick={() => setIsSidebarVisible(false)}
-                  className="btn btn-ghost btn-sm btn-square text-white"
+                  className="btn btn-ghost btn-sm btn-square"
                 >
                   ✕
                 </button>
               </div>
-              <h2 className="text-sm font-semibold text-white mb-4">
-                PROPERTIES
-              </h2>
+              <h2 className="text-sm font-semibold mb-4">PROPERTIES</h2>
 
               <div className="space-y-4">
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
-                      Flow Name
-                    </span>
+                    <span className="label-text text-xs">Flow Name</span>
                   </label>
                   <input
                     type="text"
-                    className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-gray-500"
+                    className="input input-bordered input-sm"
                     value={name}
                     disabled
                   />
                   <label className="label">
-                    <span className="label-text-alt text-xs text-gray-500">
+                    <span className="label-text-alt text-xs">
                       Cannot be changed
                     </span>
                   </label>
@@ -442,12 +434,10 @@ export default function EditFlowPage() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
-                      Description
-                    </span>
+                    <span className="label-text text-xs">Description</span>
                   </label>
                   <textarea
-                    className="textarea textarea-bordered textarea-sm bg-[#3c3c3c] border-[#3e3e3e] text-white"
+                    className="textarea textarea-bordered textarea-sm"
                     placeholder="Describe your flow..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
@@ -457,19 +447,19 @@ export default function EditFlowPage() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
+                    <span className="label-text text-xs">
                       Entrypoint Function
                     </span>
                   </label>
                   <input
                     type="text"
                     placeholder="simple_flow"
-                    className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white"
+                    className="input input-bordered input-sm"
                     value={flowFunctionName}
                     onChange={(e) => setFlowFunctionName(e.target.value)}
                   />
                   <label className="label">
-                    <span className="label-text-alt text-xs text-gray-500">
+                    <span className="label-text-alt text-xs">
                       The @flow decorated function name in your code
                     </span>
                   </label>
@@ -477,14 +467,12 @@ export default function EditFlowPage() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
-                      Username *
-                    </span>
+                    <span className="label-text text-xs">Username *</span>
                   </label>
                   <input
                     type="text"
                     placeholder="your_username"
-                    className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white"
+                    className="input input-bordered input-sm"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                   />
@@ -492,14 +480,12 @@ export default function EditFlowPage() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
-                      Chip ID *
-                    </span>
+                    <span className="label-text text-xs">Chip ID *</span>
                   </label>
                   <input
                     type="text"
                     placeholder="64Qv3"
-                    className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white"
+                    className="input input-bordered input-sm"
                     value={chipId}
                     onChange={(e) => setChipId(e.target.value)}
                   />
@@ -507,19 +493,17 @@ export default function EditFlowPage() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
-                      Tags
-                    </span>
+                    <span className="label-text text-xs">Tags</span>
                   </label>
                   <input
                     type="text"
                     placeholder="tag1, tag2, tag3"
-                    className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-white"
+                    className="input input-bordered input-sm"
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
                   />
                   <label className="label">
-                    <span className="label-text-alt text-xs text-gray-500">
+                    <span className="label-text-alt text-xs">
                       Comma-separated
                     </span>
                   </label>
@@ -529,13 +513,11 @@ export default function EditFlowPage() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs text-gray-400">
-                      File Path
-                    </span>
+                    <span className="label-text text-xs">File Path</span>
                   </label>
                   <input
                     type="text"
-                    className="input input-bordered input-sm bg-[#3c3c3c] border-[#3e3e3e] text-gray-500 text-xs"
+                    className="input input-bordered input-sm text-xs"
                     value={data?.data?.file_path || ""}
                     disabled
                   />
@@ -551,8 +533,8 @@ export default function EditFlowPage() {
           </div>
         </div>
 
-        {/* VSCode-style Status Bar */}
-        <div className="flex items-center justify-between px-4 py-1 bg-[#007acc] text-white text-xs">
+        {/* Status Bar */}
+        <div className="flex items-center justify-between px-4 py-1 bg-primary text-primary-content text-xs">
           <div className="flex items-center gap-4">
             <span>
               Ln {cursorPosition.line}, Col {cursorPosition.column}

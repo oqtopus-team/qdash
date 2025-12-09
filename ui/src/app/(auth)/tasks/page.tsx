@@ -264,7 +264,7 @@ export default function TasksPage() {
       return <SiPython className="inline-block mr-1 text-blue-400" />;
     }
 
-    return <VscFile className="inline-block mr-1 text-gray-400" />;
+    return <VscFile className="inline-block mr-1 text-base-content/50" />;
   };
 
   const renderFileTree = (
@@ -276,7 +276,7 @@ export default function TasksPage() {
         {node.type === "directory" ? (
           <details className="group" open={level === 0}>
             <summary
-              className="text-sm text-gray-300 hover:bg-[#2a2d2e] px-2 py-0.5 cursor-pointer select-none flex items-center list-none"
+              className="text-sm text-base-content/80 hover:bg-base-200 px-2 py-0.5 cursor-pointer select-none flex items-center list-none"
               style={{ paddingLeft: `${level * 12 + 8}px` }}
             >
               <span className="mr-1 transition-transform group-open:rotate-90">
@@ -291,8 +291,8 @@ export default function TasksPage() {
           <div
             className={`text-sm px-2 py-0.5 cursor-pointer select-none flex items-center transition-colors ${
               selectedFile === `${selectedBackend}/${node.path}`
-                ? "bg-[#37373d] text-white"
-                : "text-gray-300 hover:bg-[#2a2d2e]"
+                ? "bg-primary/20 text-base-content"
+                : "text-base-content/80 hover:bg-base-200"
             }`}
             style={{ paddingLeft: `${level * 12 + 20}px` }}
             onClick={() => handleFileSelect(node.path)}
@@ -332,7 +332,9 @@ export default function TasksPage() {
 
     if (!taskListData?.tasks || taskListData.tasks.length === 0) {
       return (
-        <div className="text-xs text-gray-500 px-3 py-2">No tasks found</div>
+        <div className="text-xs text-base-content/50 px-3 py-2">
+          No tasks found
+        </div>
       );
     }
 
@@ -340,23 +342,25 @@ export default function TasksPage() {
       <div className="space-y-2">
         {Object.entries(groupedTasks).map(([taskType, tasks]) => (
           <details key={taskType} className="group" open>
-            <summary className="text-xs font-semibold text-gray-400 px-3 py-1 cursor-pointer select-none hover:bg-[#2a2d2e] uppercase tracking-wider flex items-center">
+            <summary className="text-xs font-semibold text-base-content/60 px-3 py-1 cursor-pointer select-none hover:bg-base-200 uppercase tracking-wider flex items-center">
               <span className="mr-1 transition-transform group-open:rotate-90">
                 ▸
               </span>
               {taskType}
-              <span className="ml-2 text-gray-600">({tasks.length})</span>
+              <span className="ml-2 text-base-content/40">
+                ({tasks.length})
+              </span>
             </summary>
             <div className="space-y-0.5">
               {tasks.map((task: TaskInfo) => (
                 <div
                   key={`${task.file_path}-${task.name}`}
-                  className="group/item flex items-center justify-between px-3 py-1 hover:bg-[#2a2d2e] cursor-pointer"
+                  className="group/item flex items-center justify-between px-3 py-1 hover:bg-base-200 cursor-pointer"
                   onClick={() => handleTaskClick(task)}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <VscSymbolClass className="text-purple-400 flex-shrink-0" />
-                    <span className="text-sm text-gray-300 truncate">
+                    <span className="text-sm text-base-content/80 truncate">
                       {task.name}
                     </span>
                   </div>
@@ -365,10 +369,10 @@ export default function TasksPage() {
                       e.stopPropagation();
                       handleCopyTaskName(task.name);
                     }}
-                    className="opacity-0 group-hover/item:opacity-100 p-1 hover:bg-[#3c3c3c] rounded transition-opacity"
+                    className="opacity-0 group-hover/item:opacity-100 p-1 hover:bg-base-300 rounded transition-opacity"
                     title="Copy task name"
                   >
-                    <VscCopy className="text-gray-400 hover:text-white" />
+                    <VscCopy className="text-base-content/50 hover:text-base-content" />
                   </button>
                 </div>
               ))}
@@ -411,46 +415,48 @@ export default function TasksPage() {
 
   return (
     <>
-      <div className="h-screen flex flex-col bg-[#1e1e1e]">
+      <div className="h-screen flex flex-col bg-base-300">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e] gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
               onClick={() => router.push("/")}
-              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0"
+              className="btn btn-sm btn-ghost"
             >
               ←
             </button>
             <button
               onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="px-2 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0"
+              className="btn btn-sm btn-ghost"
               title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
             >
               <VscLayoutSidebarLeft />
             </button>
             <div className="flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
-              <span className="text-sm font-medium text-white flex-shrink-0 hidden sm:inline">
+              <span className="text-sm font-medium flex-shrink-0 hidden sm:inline">
                 Task Files
               </span>
               {selectedBackend && (
                 <>
-                  <span className="text-gray-500 hidden sm:inline">/</span>
-                  <span className="text-sm text-blue-400 flex-shrink-0">
+                  <span className="text-base-content/50 hidden sm:inline">
+                    /
+                  </span>
+                  <span className="text-sm text-info flex-shrink-0">
                     {selectedBackend}
                   </span>
                 </>
               )}
               {selectedFile && (
                 <>
-                  <span className="text-gray-500">/</span>
-                  <span className="text-sm text-gray-400 truncate">
+                  <span className="text-base-content/50">/</span>
+                  <span className="text-sm text-base-content/70 truncate">
                     {selectedFile.replace(`${selectedBackend}/`, "")}
                   </span>
                 </>
               )}
             </div>
             {hasUnsavedChanges && (
-              <span className="text-xs text-orange-400 flex-shrink-0">●</span>
+              <span className="text-xs text-warning flex-shrink-0">●</span>
             )}
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
@@ -458,7 +464,7 @@ export default function TasksPage() {
             <select
               value={selectedBackend || ""}
               onChange={(e) => handleBackendChange(e.target.value)}
-              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors"
+              className="select select-sm select-bordered"
             >
               {backendsData?.backends?.map((backend: TaskFileBackend) => (
                 <option key={backend.name} value={backend.name}>
@@ -468,11 +474,7 @@ export default function TasksPage() {
             </select>
             <button
               onClick={toggleEditorLock}
-              className={`px-2 sm:px-3 py-1 text-sm text-white border rounded transition-colors ${
-                isEditorLocked
-                  ? "bg-[#3c3c3c] border-[#454545] hover:bg-[#505050]"
-                  : "bg-[#0e639c] border-[#1177bb] hover:bg-[#1177bb]"
-              }`}
+              className={`btn btn-sm ${isEditorLocked ? "btn-ghost" : "btn-primary"}`}
               title={isEditorLocked ? "Unlock editor to edit" : "Lock editor"}
             >
               {isEditorLocked ? (
@@ -486,7 +488,7 @@ export default function TasksPage() {
             </button>
             <button
               onClick={handleSave}
-              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50"
+              className="btn btn-sm btn-primary"
               disabled={
                 !selectedFile ||
                 !hasUnsavedChanges ||
@@ -510,16 +512,16 @@ export default function TasksPage() {
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
           <div
-            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-[#252526] border-r border-[#3e3e3e] flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden`}
+            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-base-100 border-r border-base-300 flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden`}
           >
             {/* Tab buttons */}
-            <div className="flex border-b border-[#3e3e3e]">
+            <div className="flex border-b border-base-300">
               <button
                 onClick={() => setViewMode("files")}
                 className={`flex-1 px-3 py-2 text-xs font-medium flex items-center justify-center gap-1 transition-colors ${
                   viewMode === "files"
-                    ? "text-white bg-[#252526] border-b-2 border-blue-500"
-                    : "text-gray-500 hover:text-gray-300 hover:bg-[#2a2d2e]"
+                    ? "text-base-content bg-base-100 border-b-2 border-primary"
+                    : "text-base-content/50 hover:text-base-content/80 hover:bg-base-200"
                 }`}
               >
                 <VscListTree />
@@ -529,8 +531,8 @@ export default function TasksPage() {
                 onClick={() => setViewMode("tasks")}
                 className={`flex-1 px-3 py-2 text-xs font-medium flex items-center justify-center gap-1 transition-colors ${
                   viewMode === "tasks"
-                    ? "text-white bg-[#252526] border-b-2 border-blue-500"
-                    : "text-gray-500 hover:text-gray-300 hover:bg-[#2a2d2e]"
+                    ? "text-base-content bg-base-100 border-b-2 border-primary"
+                    : "text-base-content/50 hover:text-base-content/80 hover:bg-base-200"
                 }`}
               >
                 <VscSymbolClass />
@@ -546,10 +548,10 @@ export default function TasksPage() {
                 </div>
               ) : viewMode === "files" ? (
                 <>
-                  <h2 className="text-xs font-bold text-gray-400 mb-1 px-3 tracking-wider">
+                  <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
                     EXPLORER
                   </h2>
-                  <div className="text-xs text-gray-500 px-3 mb-2 uppercase tracking-wide">
+                  <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
                     {selectedBackend
                       ? `${selectedBackend} Tasks`
                       : "Select Backend"}
@@ -568,10 +570,10 @@ export default function TasksPage() {
                 </>
               ) : (
                 <>
-                  <h2 className="text-xs font-bold text-gray-400 mb-1 px-3 tracking-wider">
+                  <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
                     TASK LIST
                   </h2>
-                  <div className="text-xs text-gray-500 px-3 mb-2">
+                  <div className="text-xs text-base-content/50 px-3 mb-2">
                     Click to view source, copy button for Flow Editor
                   </div>
                   {renderTaskList()}
@@ -630,7 +632,7 @@ export default function TasksPage() {
                 )}
               </>
             ) : (
-              <div className="flex items-center justify-center h-full text-gray-500">
+              <div className="flex items-center justify-center h-full text-base-content/50">
                 <div className="text-center">
                   <SiPython className="text-6xl mx-auto mb-4 text-blue-400/50" />
                   <p className="text-lg mb-2">No file selected</p>
@@ -644,7 +646,7 @@ export default function TasksPage() {
         </div>
 
         {/* Status bar */}
-        <div className="flex items-center justify-between px-4 py-1 bg-[#007acc] text-white text-xs">
+        <div className="flex items-center justify-between px-4 py-1 bg-primary text-primary-content text-xs">
           <div className="flex items-center gap-4">
             {selectedFile && (
               <>

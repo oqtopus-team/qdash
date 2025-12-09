@@ -136,6 +136,7 @@ a.card:hover {
     var(--color-primary),
     color-mix(in oklch, var(--color-primary) 80%, var(--color-accent))
   );
+  color: var(--color-primary-content);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -153,6 +154,7 @@ a.card:hover {
     var(--color-secondary),
     color-mix(in oklch, var(--color-secondary) 80%, var(--color-accent))
   );
+  color: var(--color-secondary-content);
 }
 
 /* Ghost buttons - subtle hover effect */
