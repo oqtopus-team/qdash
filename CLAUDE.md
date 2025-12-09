@@ -1,591 +1,80 @@
 # QDash Project Reference Guide
 
+## Quick Reference
+
+- **Repository**: https://github.com/oqtopus-team/qdash
+- **Documentation**: https://qdash.readthedocs.io/
+- **License**: Apache 2.0
+
 ## Project Overview
 
-QDash is a comprehensive web platform for managing and monitoring qubit calibration workflows. It provides a user-friendly interface to manage calibration processes, track observational data, and configure calibration parameters seamlessly.
-
-**Repository**: https://github.com/oqtopus-team/qdash
-**License**: Apache 2.0
-**Status**: Under active development
+QDash is a web platform for managing and monitoring qubit calibration workflows. It provides an interface to manage calibration processes, track observational data, and configure calibration parameters.
 
 ## Architecture
 
-QDash follows a microservices architecture with three major components:
+See [docs/getting-started/architecture.md](docs/getting-started/architecture.md) for detailed architecture documentation.
 
-### 1. Frontend (UI)
-
-- **Location**: `/ui/`
-- **Technology**: React, Next.js 14, TypeScript
-- **Styling**: Tailwind CSS, DaisyUI
-- **State Management**: TanStack Query
-- **Charts/Visualization**: Plotly.js, Nivo, React Flow
-- **Code Generation**: OpenAPI TypeScript (orval)
-
-### 2. Backend (API)
-
-- **Location**: `/src/qdash/api/`
-- **Technology**: FastAPI, Python 3.10-3.12
-- **Database**: MongoDB (via Bunnet ODM), PostgreSQL
-- **Authentication**: JWT with python-jose
-- **API Documentation**: Auto-generated OpenAPI/Swagger
-
-### 3. Workflow Engine
-
-- **Location**: `/src/qdash/workflow/`
-- **Technology**: Prefect 2.20
-- **Purpose**: Manages qubit calibration workflows
-- **Integration**: Uses qubex library for quantum experiments
-
-### 4. Python Flow Editor (New Feature)
-
-- **Location**: `/src/qdash/workflow/helpers/`
-- **Purpose**: High-level API for creating custom calibration workflows in Python
-- **Features**:
-  - `FlowSession`: Session management for calibration flows
-  - Parallel/serial qubit calibration helpers
-  - Adaptive calibration with convergence detection
-  - Integrated save processing via refactored TaskManager
-- **Examples**: `/src/qdash/workflow/examples/`
-
-**Key Components:**
-
-- **FlowSession**: Manages calibration sessions with automatic save processing
-- **Helper Functions**:
-  - `init_calibration()` - Initialize calibration session
-  - `calibrate_qubits_task_first()` - Execute tasks sequentially, processing all qubits for each task
-  - `calibrate_qubits_qubit_first()` - Execute tasks sequentially, completing all tasks for each qubit
-  - `adaptive_calibrate()` - Closed-loop calibration with convergence
-  - `execute_schedule()` - Execute tasks according to schedule definition (SerialNode, ParallelNode, BatchNode)
-- **Integration**: Built on top of refactored TaskManager with unified save processing
-
-**Execution Modes (Sequential):**
-
-- **`calibrate_qubits_task_first`**: Task1→Q0→Q1→Q2, Task2→Q0→Q1→Q2, Task3→Q0→Q1→Q2
-- **`calibrate_qubits_qubit_first`**: Q0:[Task1→Task2→Task3], Q1:[Task1→Task2→Task3], Q2:[Task1→Task2→Task3]
-- **`execute_schedule`**: Custom orchestration using SerialNode, ParallelNode, BatchNode (compatible with MenuModel schedules)
-
-**Note on Parallel Execution:**
-Python Flow Editor provides simple sequential execution for custom flows. For true parallel execution across multiple qubits or deployment-level orchestration, use the existing `dispatch_cal_flow` with `ParallelNode` schedules.
-
-**Usage Examples:**
-
-```python
-from prefect import flow
-from qdash.workflow.helpers import init_calibration, get_session, finish_calibration, execute_schedule
-from qdash.datamodel.menu import SerialNode, ParallelNode, BatchNode
-
-# Simple sequential calibration
-@flow
-def simple_calibration(username, chip_id, qids):
-    # execution_id auto-generated, ExecutionLock managed automatically
-    # qids required for qubex backend initialization
-    session = init_calibration(username, chip_id, qids)
-
-    # Execute tasks sequentially
-    session = get_session()
-    results = {}
-    for qid in qids:
-        results[qid] = {}
-        for task in ["CheckFreq", "CheckRabi"]:
-            results[qid][task] = session.execute_task(task, qid)
-
-    finish_calibration()
-    return results
-
-# Schedule-based calibration
-@flow
-def schedule_calibration(username, chip_id, qids):
-    session = init_calibration(username, chip_id, qids)
-
-    # Custom schedule: Q0→Q1 in serial, then all together
-    schedule = SerialNode(serial=[
-        ParallelNode(parallel=["0", "1"]),
-        BatchNode(batch=["0", "1", "2"])
-    ])
-
-    results = execute_schedule(tasks=["CheckFreq", "CheckRabi"], schedule=schedule)
-    finish_calibration()
-    return results
-```
-
-**Key Features:**
-
-- **Auto-generation of execution_id**: If not provided, generates YYYYMMDD-NNN format
-- **ExecutionLock management**: Prevents concurrent calibrations (can be disabled with `use_lock=False`)
-- **Automatic directory creation**: Creates calibration data directories automatically
-- **ChipHistory updates**: Updates ChipHistoryDocument on completion
-- **Error handling**: `fail_calibration()` method for proper error cleanup
-- **Integrated with handler.py**: Compatible with existing Menu-based workflows
-
-### Parallel Execution (New)
-
-Python Flow Editor now supports true parallel execution using Prefect's `@task` + `submit()`:
-
-```python
-from prefect import flow
-from qdash.workflow.helpers import init_calibration, calibrate_parallel, finish_calibration
-
-# True parallel execution across multiple qubits
-@flow
-def parallel_calibration(username, chip_id, qids):
-    session = init_calibration(username, chip_id, qids)
-
-    # Each qubit calibrated in parallel (not sequential)
-    results = calibrate_parallel(
-        qids=["0", "1", "2", "3"],
-        tasks=["CheckFreq", "CheckRabi", "CheckT1"]
-    )
-
-    finish_calibration()
-    return results
-```
-
-### Custom Parallel Adaptive Calibration (Closed Loop)
-
-Write your own closed-loop calibration logic and parallelize it:
-
-```python
-from prefect import flow
-from qdash.workflow.helpers import (
-    init_calibration,
-    parallel_map,
-    get_session,
-    finish_calibration
-)
-
-def my_adaptive_calibration(qid, threshold, max_iter):
-    """YOUR custom convergence logic"""
-    session = get_session()
-
-    for iteration in range(max_iter):
-        result = session.execute_task("CheckFreq", qid)
-
-        # YOUR convergence check
-        if abs(result["qubit_frequency"] - 5.0) < threshold:
-            print(f"Q{qid} converged!")
-            break
-
-        # YOUR parameter update
-        session.set_parameter(qid, "qubit_frequency", result["qubit_frequency"])
-
-    return result
-
-# Parallel closed-loop calibration
-@flow
-def adaptive_freq_calibration(username, chip_id, qids):
-    session = init_calibration(username, chip_id, qids)
-
-    # Parallelize your custom logic
-    # Each qubit appears as "adaptive-Q{qid}" in Prefect UI
-    results = parallel_map(
-        items=qids,
-        func=my_adaptive_calibration,
-        task_name_func=lambda qid: f"adaptive-Q{qid}",  # Visible in Prefect UI
-        threshold=0.01,
-        max_iter=10
-    )
-
-    finish_calibration()
-    return results
-```
-
-### Custom Parallel Logic
-
-Execute arbitrary custom code in parallel:
-
-```python
-from prefect import flow
-from qdash.workflow.helpers import (
-    init_calibration,
-    parallel_map,
-    get_session,
-    finish_calibration
-)
-
-def my_custom_calibration(qid, threshold):
-    """Custom calibration logic"""
-    session = get_session()
-    for i in range(10):
-        result = session.execute_task("CheckFreq", qid)
-        if abs(result["qubit_frequency"] - 5.0) < threshold:
-            break
-    return result
-
-@flow
-def custom_parallel_flow(username, chip_id, qids):
-    session = init_calibration(username, chip_id, qids)
-
-    # Parallelize custom logic across qubits
-    results = parallel_map(
-        items=qids,
-        func=my_custom_calibration,
-        threshold=0.01
-    )
-
-    finish_calibration()
-    return results
-```
+| Component | Location | Technology |
+|-----------|----------|------------|
+| Frontend (UI) | `/ui/` | Next.js 14, TypeScript, DaisyUI, TanStack Query |
+| Backend (API) | `/src/qdash/api/` | FastAPI, Python 3.10-3.12, MongoDB, PostgreSQL |
+| Workflow Engine | `/src/qdash/workflow/` | Prefect 2.20, qubex |
 
 ## Directory Structure
 
 ```
 qdash/
-├── ui/                      # Frontend React application
-│   ├── src/
-│   │   ├── app/            # Next.js app directory
-│   │   │   ├── analysis/   # Analysis page components
-│   │   │   ├── chip/       # Chip and qubit detail pages
-│   │   │   └── ...         # Other feature pages
-│   │   ├── shared/         # 🆕 Shared UI architecture (DRY compliance)
-│   │   │   ├── hooks/      # Reusable custom hooks
-│   │   │   ├── components/ # Reusable UI components
-│   │   │   └── types/      # Shared type definitions
-│   │   └── client/         # API client code
-├── src/
-│   ├── qdash/
-│   │   ├── api/            # FastAPI backend
-│   │   ├── workflow/       # Prefect workflow engine
-│   │   │   ├── helpers/    # 🆕 Python Flow Editor helpers
-│   │   │   └── examples/   # 🆕 Example Python Flows
-│   │   ├── dbmodel/        # Database models
-│   │   ├── datamodel/      # Data models
-│   │   └── cli/            # CLI tools
+├── ui/                      # Frontend (see docs/development/ui/)
+├── src/qdash/
+│   ├── api/                 # Backend API (see docs/development/api/)
+│   └── workflow/            # Workflow engine (see docs/development/workflow/)
 ├── docs/                    # Documentation
 ├── tests/                   # Test files
-├── calib_data/             # Calibration data storage
-├── config/                 # Configuration files
-└── scripts/                # Utility scripts
+└── config/                  # Configuration files
 ```
 
-## Key Technologies
-
-### Frontend Stack
-
-- **Framework**: Next.js 14.2.24
-- **Language**: TypeScript 5.6.3
-- **Package Manager**: Bun
-- **Build Tool**: Next.js built-in
-- **UI Components**: DaisyUI 5.0.0
-- **Data Visualization**: Plotly.js, React Flow, Nivo
-
-### Backend Stack
-
-- **Framework**: FastAPI 0.111.1
-- **Language**: Python 3.10-3.12
-- **ORM/ODM**: Bunnet (MongoDB), SQLAlchemy (PostgreSQL)
-- **Workflow Engine**: Prefect 2.20
-- **Quantum Library**: qubex v1.4.1b1
-
-### Infrastructure
-
-- **Containerization**: Docker & Docker Compose
-- **Databases**: MongoDB, PostgreSQL 14
-- **Task Runner**: go-task v3.41.0
-- **API Gateway**: Uvicorn with Gunicorn
-
-## Development Commands
-
-### Frontend Commands (in `/ui/` directory)
+## Development Quick Start
 
 ```bash
-# Development server
-bun run dev
+# Frontend (in /ui/)
+bun install && bun run dev
 
-# Build production
-bun run build
-
-# Start production server
-bun run start
-
-# Linting
-bun run lint
-
-# Format code
-bun run fmt
-
-# Generate API client from OpenAPI
-bun run generate-qdash
-```
-
-### Backend Commands
-
-```bash
-# Run API server (from project root)
+# Backend (from project root)
 uvicorn src.qdash.api.main:app --reload
-
-# Format Python code
-ruff format .
-
-# Lint Python code
-ruff check .
-
-# Run tests
-pytest
-
-# Type checking
-mypy src/
-```
-
-### Task Commands (using go-task)
-
-```bash
-# Show all available tasks
-task
 
 # Generate API client
 task generate
-
-# Format all code
-task fmt
-
-# Build Docker images
-task build-api
-task build-workflow
-
-# Export requirements
-task export-all
 ```
 
-## API Endpoints
+For detailed setup instructions, see [docs/development/setup.md](docs/development/setup.md).
 
-The API is organized into the following router modules:
+## Key Documentation
 
-- `/api/calibration` - Calibration workflow management
-- `/api/menu` - Menu and experiment configuration
-- `/api/settings` - Application settings
-- `/api/execution` - Workflow execution tracking
-- `/api/chip` - Quantum chip management
-- `/api/file` - File operations
-- `/api/auth` - Authentication
-- `/api/task` - Task management
-- `/api/parameter` - Parameter configuration
-- `/api/tag` - Tagging system
-- `/api/device_topology` - Device topology management
-- `/api/backend` - Backend operations
-
-## Database Schema
-
-### MongoDB Collections
-
-- Calibration data
-- Execution logs
-- Device configurations
-- User settings
-
-### PostgreSQL Tables
-
-- Prefect workflow metadata
-- Execution state tracking
-- User authentication
-
-## Workflow System
-
-The workflow system uses Prefect to orchestrate quantum calibration experiments:
-
-1. User requests calibration through the UI
-2. API creates a workflow request
-3. Prefect workflow engine processes the request
-4. qubex library performs quantum measurements
-5. Results are stored in MongoDB
-6. UI displays real-time progress and results
-
-## Testing
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=src/qdash
-
-# Run specific test file
-pytest tests/qdash/api/test_main.py
-```
-
-## Environment Variables
-
-Key environment variables (see `.env.example`):
-
-- `API_PORT` - API server port (default: 5715)
-- `MONGO_PORT` - MongoDB port (default: 27017)
-- `POSTGRES_PORT` - PostgreSQL port (default: 5432)
-- `PREFECT_PORT` - Prefect UI port (default: 4200)
-- `NEXT_PUBLIC_API_URL` - Frontend API URL
-- `NEXT_PUBLIC_PREFECT_URL` - Frontend Prefect/Workflow dashboard URL (default: http://localhost:4200)
-
-## Docker Compose Services
-
-- `mongo` - MongoDB database
-- `mongo-express` - MongoDB admin interface
-- `postgres` - PostgreSQL database
-- `prefect-server` - Prefect workflow server
-- `workflow` - QDash workflow worker
-- `api` - FastAPI backend
-- `ui` - Next.js frontend
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feat/feature-name`)
-3. Commit changes following conventional commits
-4. Run tests and linting
-5. Submit a pull request to the `develop` branch
+| Topic | Location |
+|-------|----------|
+| UI Guidelines | [docs/development/ui/guidelines.md](docs/development/ui/guidelines.md) |
+| UI Architecture | [docs/development/ui/architecture.md](docs/development/ui/architecture.md) |
+| API Design | [docs/development/api/design.md](docs/development/api/design.md) |
+| Development Flow | [docs/development/development-flow.md](docs/development/development-flow.md) |
+| Database Structure | [docs/reference/database-structure.md](docs/reference/database-structure.md) |
 
 ## Claude Code Custom Commands
 
-The project includes custom slash commands for Claude Code:
-
-### Commit Commands
-
-- `/commit` - Analyze changes and suggest a commit message
-- `/suggest-commit` - Generate commit message suggestion without committing
-- `/auto-commit` - Automatically commit with generated message
-
-### Usage Examples
-
-```
-/commit
-# Analyzes changes and provides a commit message with the git command
-
-/suggest-commit
-# Only suggests a message without committing
-
-/auto-commit
-# Analyzes and commits automatically
-```
-
-### Manual Scripts
-
-If you prefer running scripts manually:
-
-- `task commit` or `task ac` - Interactive auto-commit script
-- `python scripts/git-auto-commit.py` - Python version
-- `./scripts/auto-commit.sh` - Shell version (requires ANTHROPIC_API_KEY)
-
-## Useful Links
-
-- [Documentation](https://qdash.readthedocs.io/)
-- [Slack Channel](https://oqtopus.slack.com/archives/C08KM5JPUEL)
-- [Issue Tracker](https://github.com/oqtopus-team/qdash/issues)
-- [DeepWiki](https://deepwiki.com/oqtopus-team/qdash)
+| Command | Description |
+|---------|-------------|
+| `/commit` | Analyze changes and suggest a commit message |
+| `/suggest-commit` | Generate commit message suggestion without committing |
+| `/auto-commit` | Automatically commit with generated message |
 
 ## Notes for AI Assistants
 
-- The project uses a microservices architecture with clear separation of concerns
-- Frontend code is generated from OpenAPI specs - always regenerate after API changes
-- Workflow system has exclusive locking to prevent concurrent calibrations
-- The project follows Python and TypeScript best practices
-- All Docker services are configured to work within a custom network
-- Authentication uses a simple X-Username header (development mode)
+- **Don't edit generated code**: `ui/src/client/` and `ui/src/schemas/` are auto-generated from OpenAPI
+- **Regenerate after API changes**: Run `task generate` when backend API changes
+- **Follow existing patterns**: Check `docs/development/ui/guidelines.md` for coding standards
+- **Use conventional commits**: See `docs/development/development-flow.md`
 
-## Problem-Solving Process
+## Useful Links
 
-When encountering complex technical issues, especially those involving Python packaging, Git subdirectories, or build systems:
-
-1. **Use Advanced AI Consultation**: For complex problems that seem unsolvable, use `mcp__gpt__advanced_search` with detailed context
-   - Provide specific error messages and technical details
-   - Include relevant file structures and configurations
-   - Ask for root cause analysis and systematic solutions
-
-2. **Example Success Case - qdash_client GitHub Installation Issue**:
-   - **Problem**: `uv add "git+https://github.com/oqtopus-team/qdash.git#subdirectory=qdash_client"` appeared successful but installed no actual Python files
-   - **Investigation**: Used advanced AI to analyze package discovery patterns, wheel contents, and subdirectory installation mechanics
-   - **Root Cause**: Package structure was incorrect for subdirectory Git installations - needed src layout
-   - **Solution**: Restructured to `qdash_client/src/qdash_client/` and updated `pyproject.toml` package discovery
-   - **Verification**: Built wheel locally, tested GitHub installation, confirmed all imports work
-
-3. **Key Techniques**:
-   - Build wheels locally and inspect contents (`unzip -l dist/*.whl`) to verify actual file inclusion
-   - Test installations in clean environments to avoid local conflicts
-   - Use RECORD files in site-packages to understand what was actually installed
-   - Check for namespace conflicts between local development files and installed packages
-
-This systematic approach combining AI consultation with methodical debugging resolved a complex packaging issue that would have been difficult to solve through trial and error alone.
-
-## Shared UI Architecture (`/ui/src/shared/`)
-
-The project implements a DRY (Don't Repeat Yourself) compliant shared architecture to eliminate code duplication between analysis and qubit detail pages. This modular approach reduces maintenance overhead and ensures consistent UI/UX across the application.
-
-### Architecture Overview
-
-The shared directory contains reusable hooks, components, and types that are consumed by multiple pages:
-
-```
-/ui/src/shared/
-├── hooks/                   # Reusable custom hooks
-│   ├── useTimeRange.ts      # JST time management and auto-refresh
-│   ├── useTimeseriesData.ts # Generic time series data processing
-│   ├── useCorrelationData.ts # Parameter correlation analysis
-│   └── useCSVExport.ts      # CSV export functionality
-├── components/              # Reusable UI components
-│   ├── PlotCard.tsx         # Standardized Plotly visualization container
-│   ├── StatisticsCards.tsx  # Statistical analysis display
-│   ├── DataTable.tsx        # Generic data table with sorting/filtering
-│   └── ErrorCard.tsx        # Consistent error state display
-└── types/
-    └── analysis.ts          # Shared TypeScript type definitions
-```
-
-### Key Benefits
-
-- **42% code reduction**: Eliminated 1,330+ lines of duplicate code across analysis and qubit pages
-- **Consistent UX**: Unified behavior for plots, tables, errors, and time controls
-- **Single source of truth**: Bug fixes and features apply automatically to all consumers
-- **Type safety**: Shared TypeScript definitions prevent interface mismatches
-- **Maintainability**: Centralized components enable faster development cycles
-
-### Usage Examples
-
-```typescript
-// Using shared hooks
-import { useTimeRange } from "@/shared/hooks/useTimeRange";
-import { useCSVExport } from "@/shared/hooks/useCSVExport";
-
-// Using shared components
-import { PlotCard } from "@/shared/components/PlotCard";
-import { DataTable } from "@/shared/components/DataTable";
-import { ErrorCard } from "@/shared/components/ErrorCard";
-
-// Using shared types
-import { TimeSeriesDataPoint, ParameterKey } from "@/shared/types/analysis";
-```
-
-### Component Features
-
-- **PlotCard**: Standardized Plotly container with loading states, error handling, and export controls
-- **DataTable**: Generic table with sorting, filtering, pagination, and CSV export
-- **StatisticsCards**: Statistical summaries with correlation strength indicators
-- **ErrorCard**: Consistent error display with retry functionality
-
-### Hook Capabilities
-
-- **useTimeRange**: JST timezone handling, auto-refresh, time locking controls
-- **useCSVExport**: Multi-format CSV generation with proper escaping
-- **useCorrelationData**: Statistical analysis including correlation coefficients
-- **useTimeseriesData**: Generic time series processing for both single and multi-qubit data
-
-## Python Client Generation
-
-The project generates a Python client from the OpenAPI specification:
-
-### Client Usage
-
-```bash
-# Generate client
-task generate-python-client
-
-# Install from GitHub
-pip install "git+https://github.com/oqtopus-team/qdash.git#subdirectory=qdash_client"
-
-# Basic usage
-from qdash_client import Client
-from qdash_client.api.menu import list_menu
-
-client = Client(
-    base_url="http://localhost:5715",
-    headers={"X-Username": "your-username"}
-)
-response = list_menu.sync_detailed(client=client)
-if response.status_code == 200:
-    menus = response.parsed
-```
+- [DeepWiki](https://deepwiki.com/oqtopus-team/qdash) - AI-powered codebase exploration
+- [Issue Tracker](https://github.com/oqtopus-team/qdash/issues)
+- [Slack Channel](https://oqtopus.slack.com/archives/C08KM5JPUEL)

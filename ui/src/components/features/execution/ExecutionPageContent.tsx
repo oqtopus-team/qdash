@@ -278,7 +278,7 @@ export function ExecutionPageContent() {
           return (
             <div
               key={executionKey}
-              className={`p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden transition-transform duration-200 bg-base-100 ${
+              className={`p-3 sm:p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden transition-transform duration-200 bg-base-100 ${
                 isSelected ? "transform scale-100" : "transform scale-95"
               } ${statusBorderStyle}`}
               onClick={() => handleCardClick(execution)}
@@ -286,19 +286,13 @@ export function ExecutionPageContent() {
               {isSelected && (
                 <div className="absolute inset-0 bg-primary opacity-10 pointer-events-none transition-opacity duration-500" />
               )}
-              <div className="relative z-10">
-                <h2 className="text-xl font-semibold mb-1">{execution.name}</h2>
-                <div className="flex items-center mb-1">
-                  <p className="text-sm text-base-content/60 mr-4">
-                    {new Date(execution.start_at).toLocaleString()}
-                  </p>
-                  {execution.elapsed_time && (
-                    <p className="text-sm text-base-content/60 mr-4">
-                      Duration: {execution.elapsed_time}
-                    </p>
-                  )}
+              <div className="relative z-10 w-full">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    {execution.name}
+                  </h2>
                   <span
-                    className={`text-sm font-semibold ${
+                    className={`text-sm font-semibold flex-shrink-0 ${
                       execution.status === "running"
                         ? "text-info"
                         : execution.status === "completed"
@@ -316,6 +310,12 @@ export function ExecutionPageContent() {
                           ? "Scheduled"
                           : "Failed"}
                   </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-base-content/60">
+                  <span>{new Date(execution.start_at).toLocaleString()}</span>
+                  {execution.elapsed_time && (
+                    <span>Duration: {execution.elapsed_time}</span>
+                  )}
                 </div>
               </div>
             </div>

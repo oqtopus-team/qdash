@@ -48,6 +48,7 @@ export default function FilesEditorPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [commitMessage, setCommitMessage] = useState("");
   const [isEditorLocked, setIsEditorLocked] = useState(true);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
   const {
     data: fileTreeData,
@@ -283,33 +284,42 @@ export default function FilesEditorPage() {
   return (
     <>
       <div className="h-screen flex flex-col bg-[#1e1e1e]">
-        <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e]">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-[#2d2d2d] border-b border-[#3e3e3e] gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
               onClick={() => router.push("/")}
-              className="px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors"
+              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0"
             >
-              ← Back
+              ←
             </button>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-white">
+            <button
+              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+              className="px-2 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors flex-shrink-0 sm:hidden"
+              title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
+            >
+              <VscFolder />
+            </button>
+            <div className="flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
+              <span className="text-sm font-medium text-white flex-shrink-0 hidden sm:inline">
                 Config Files
               </span>
               {selectedFile && (
                 <>
-                  <span className="text-gray-500">/</span>
-                  <span className="text-sm text-gray-400">{selectedFile}</span>
+                  <span className="text-gray-500 hidden sm:inline">/</span>
+                  <span className="text-sm text-gray-400 truncate">
+                    {selectedFile}
+                  </span>
                 </>
               )}
             </div>
             {hasUnsavedChanges && (
-              <span className="text-xs text-orange-400">Unsaved changes</span>
+              <span className="text-xs text-orange-400 flex-shrink-0">●</span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 overflow-x-auto">
             <button
               onClick={toggleEditorLock}
-              className={`px-3 py-1 text-sm text-white border rounded transition-colors ${
+              className={`px-2 sm:px-3 py-1 text-sm text-white border rounded transition-colors flex-shrink-0 ${
                 isEditorLocked
                   ? "bg-[#3c3c3c] border-[#454545] hover:bg-[#505050]"
                   : "bg-[#0e639c] border-[#1177bb] hover:bg-[#1177bb]"
@@ -317,19 +327,16 @@ export default function FilesEditorPage() {
               title={isEditorLocked ? "Unlock editor to edit" : "Lock editor"}
             >
               {isEditorLocked ? (
-                <>
-                  <VscLock className="inline-block mr-1" />
-                  Locked
-                </>
+                <VscLock className="inline-block" />
               ) : (
-                <>
-                  <VscUnlock className="inline-block mr-1" />
-                  Unlocked
-                </>
+                <VscUnlock className="inline-block" />
               )}
+              <span className="hidden sm:inline ml-1">
+                {isEditorLocked ? "Locked" : "Unlocked"}
+              </span>
             </button>
             {(gitStatusData as any)?.is_git_repo && (
-              <div className="flex items-center gap-2 px-3 py-1 text-xs bg-[#3c3c3c] border border-[#454545] rounded">
+              <div className="hidden md:flex items-center gap-2 px-2 sm:px-3 py-1 text-xs bg-[#3c3c3c] border border-[#454545] rounded">
                 <span className="text-gray-400">
                   {(gitStatusData as any).branch || "main"}
                 </span>
@@ -338,37 +345,39 @@ export default function FilesEditorPage() {
                   {(gitStatusData as any).commit || "unknown"}
                 </span>
                 {(gitStatusData as any).is_dirty && (
-                  <span className="text-orange-400">● Modified</span>
+                  <span className="text-orange-400">●</span>
                 )}
               </div>
             )}
             <button
               onClick={handlePull}
-              className="px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors disabled:opacity-50"
+              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors disabled:opacity-50 flex-shrink-0"
               disabled={pullMutation.isPending}
               title="Pull latest changes from Git repository"
             >
               {pullMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                "↓ Pull"
+                "↓"
               )}
+              <span className="hidden sm:inline ml-1">Pull</span>
             </button>
             <button
               onClick={handlePush}
-              className="px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors disabled:opacity-50"
+              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#3c3c3c] border border-[#454545] rounded hover:bg-[#505050] transition-colors disabled:opacity-50 flex-shrink-0"
               disabled={pushMutation.isPending}
               title="Push changes to Git repository"
             >
               {pushMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                "↑ Push"
+                "↑"
               )}
+              <span className="hidden sm:inline ml-1">Push</span>
             </button>
             <button
               onClick={handleSave}
-              className="px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50"
+              className="px-2 sm:px-3 py-1 text-sm text-white bg-[#0e639c] border border-[#1177bb] rounded hover:bg-[#1177bb] transition-colors disabled:opacity-50 flex-shrink-0"
               disabled={
                 !selectedFile ||
                 !hasUnsavedChanges ||
@@ -379,14 +388,19 @@ export default function FilesEditorPage() {
               {saveMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                "Save (Ctrl+S)"
+                <>
+                  <span className="hidden sm:inline">Save (Ctrl+S)</span>
+                  <span className="sm:hidden">Save</span>
+                </>
               )}
             </button>
           </div>
         </div>
 
         <div className="flex-1 flex overflow-hidden">
-          <div className="w-64 bg-[#252526] border-r border-[#3e3e3e] overflow-y-auto">
+          <div
+            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-[#252526] border-r border-[#3e3e3e] overflow-y-auto transition-all duration-200 overflow-hidden flex-shrink-0`}
+          >
             <div className="py-2">
               <h2 className="text-xs font-bold text-gray-400 mb-1 px-3 tracking-wider">
                 EXPLORER

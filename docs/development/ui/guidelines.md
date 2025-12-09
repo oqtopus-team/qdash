@@ -517,7 +517,7 @@ Use DaisyUI component classes for consistent UI:
 
 ### Theme Support
 
-QDash supports light and dark themes via DaisyUI:
+QDash supports 35+ DaisyUI themes. Users can switch themes in Settings (`/setting`).
 
 ```tsx
 // Use semantic color classes (auto-adjust to theme)
@@ -534,6 +534,55 @@ QDash supports light and dark themes via DaisyUI:
 // ✅ Good
 <div className="bg-base-100 text-base-content">...</div>
 ```
+
+#### Adding New Themes
+
+1. Add the import to `globals.css`: `@import "daisyui/theme/themename.css";`
+2. Add the theme name to the `themes` array in `/ui/src/app/(auth)/setting/page.tsx`
+
+### Rich Interactive Design System
+
+QDash uses a custom **Rich Interactive Design System** defined in `globals.css`. This enhances DaisyUI components with:
+
+| Element       | Enhancement                                               |
+| ------------- | --------------------------------------------------------- |
+| **Cards**     | Subtle border, deeper shadows on hover                    |
+| **Buttons**   | Gradient backgrounds, lift effect on hover, inner glow    |
+| **Inputs**    | 2px border, color change on hover, ring + shadow on focus |
+| **Badges**    | Fully rounded (pill shape), gradient backgrounds          |
+| **Dropdowns** | Fade-in animation, rich shadows                           |
+| **Tables**    | Row hover highlights with primary color tint              |
+| **Scrollbars**| Custom styled with gradient thumb                         |
+
+#### Performance Guidelines
+
+Transitions are **only applied to interactive elements** to prevent animation jank on data-heavy pages:
+
+```tsx
+// ✅ Good - globals.css handles card transitions
+<div className="card">Content</div>
+
+// ✅ Good - Custom transition overrides globals.css
+<div className="card transition-all duration-200 hover:scale-105">Content</div>
+
+// ❌ Bad - Avoid transition-all on many items (causes jank)
+{items.map((item) => (
+  <div className="transition-all duration-300">{item}</div>
+))}
+
+// ✅ Good - Use transition: none for data-heavy views
+<table className="table">
+  <tbody>
+    {/* Table rows have transition: none by default */}
+  </tbody>
+</table>
+```
+
+**Key rules:**
+1. Don't add `transition-*` classes to elements that globals.css already styles (cards, buttons, badges)
+2. Use `transition: none` for elements in lists/grids with many items
+3. Avoid `transition-all` - prefer specific properties like `transition-shadow`
+4. The system respects `prefers-reduced-motion` automatically
 
 ---
 
