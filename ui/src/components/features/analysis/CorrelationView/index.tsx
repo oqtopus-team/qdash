@@ -555,15 +555,15 @@ export function CorrelationView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Controls Section */}
       <div className="card bg-base-100 shadow-md">
-        <div className="card-body p-4 gap-4">
+        <div className="card-body p-3 sm:p-4 gap-3 sm:gap-4">
           {/* Row 1: Main Controls */}
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-            {/* Left: Type + Chip */}
-            <div className="flex items-center gap-3">
-              <div className="tabs tabs-boxed bg-base-200 h-9">
+          <div className="flex flex-col gap-3 sm:gap-4">
+            {/* Row 1a: Type + Chip */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="tabs tabs-boxed bg-base-200 h-8 sm:h-9">
                 <button
                   className={`tab h-full ${metricType === "qubit" ? "tab-active" : ""}`}
                   onClick={() => handleMetricTypeChange("qubit")}
@@ -578,18 +578,16 @@ export function CorrelationView() {
                 </button>
               </div>
 
-              <div className="w-36">
+              <div className="w-28 sm:w-36">
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}
                 />
               </div>
-            </div>
 
-            {/* X Parameter Selection */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">X:</span>
-              <div className="w-48">
+              {/* X Parameter Selection - inline */}
+              <span className="text-xs sm:text-sm font-medium">X:</span>
+              <div className="w-32 sm:w-48">
                 <Select<MetricOption, false>
                   className="text-base-content"
                   classNamePrefix="react-select"
@@ -609,12 +607,10 @@ export function CorrelationView() {
                   styles={metricSelectStyles}
                 />
               </div>
-            </div>
 
-            {/* Y Parameter Selection */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Y:</span>
-              <div className="w-48">
+              {/* Y Parameter Selection - inline */}
+              <span className="text-xs sm:text-sm font-medium">Y:</span>
+              <div className="w-32 sm:w-48">
                 <Select<MetricOption, false>
                   className="text-base-content"
                   classNamePrefix="react-select"
@@ -636,9 +632,9 @@ export function CorrelationView() {
               </div>
             </div>
 
-            {/* Time Range + Mode */}
-            <div className="flex items-center gap-3">
-              <div className="join h-9">
+            {/* Row 1b: Time Range + Mode + Export */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="join h-8 sm:h-9">
                 <button
                   className={`join-item btn btn-sm h-full ${timeRange === "1d" ? "btn-active" : ""}`}
                   onClick={() => setTimeRange("1d")}
@@ -659,15 +655,15 @@ export function CorrelationView() {
                 </button>
               </div>
 
-              <div className="join h-9">
+              <div className="join h-8 sm:h-9">
                 <button
-                  className={`join-item btn btn-sm h-full ${selectionMode === "latest" ? "btn-active" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-active" : ""}`}
                   onClick={() => setSelectionMode("latest")}
                 >
                   Latest
                 </button>
                 <button
-                  className={`join-item btn btn-sm h-full ${selectionMode === "best" ? "btn-active" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "best" ? "btn-active" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
                   onClick={() => setSelectionMode("best")}
                   disabled={!isBestModeSupported}
                   title={
@@ -679,12 +675,9 @@ export function CorrelationView() {
                   Best
                 </button>
               </div>
-            </div>
 
-            {/* Export */}
-            <div className="flex items-center gap-3 lg:ml-auto">
               <button
-                className="btn btn-outline btn-sm h-9"
+                className="btn btn-outline btn-xs sm:btn-sm h-8 sm:h-9 ml-auto sm:ml-0"
                 onClick={handleExportCSV}
                 disabled={correlationData.length === 0 || isSameParameter}
               >
@@ -717,63 +710,126 @@ export function CorrelationView() {
 
           {/* Statistics Display */}
           {statistics && !isSameParameter && (
-            <div className="stats stats-vertical lg:stats-horizontal shadow w-full">
-              <div className="stat py-2">
-                <div className="stat-title text-xs">Sample Size</div>
-                <div className="stat-value text-primary text-lg">
-                  {statistics.sampleSize}
+            <>
+              {/* Mobile: Grid layout */}
+              <div className="grid grid-cols-2 gap-2 sm:hidden">
+                <div className="bg-base-200 rounded-lg p-2 text-center">
+                  <div className="text-xs text-base-content/60">
+                    Sample Size
+                  </div>
+                  <div className="text-sm font-bold text-primary">
+                    {statistics.sampleSize}
+                  </div>
+                </div>
+                <div className="bg-base-200 rounded-lg p-2 text-center">
+                  <div className="text-xs text-base-content/60">
+                    Correlation (r)
+                  </div>
+                  <div
+                    className={`text-sm font-bold ${
+                      statistics.correlation >= 0.7
+                        ? "text-success"
+                        : statistics.correlation >= 0.3
+                          ? "text-warning"
+                          : statistics.correlation <= -0.7
+                            ? "text-error"
+                            : statistics.correlation <= -0.3
+                              ? "text-warning"
+                              : "text-info"
+                    }`}
+                  >
+                    {statistics.correlation.toFixed(3)}
+                  </div>
+                  <div className="text-xs text-base-content/60">
+                    {Math.abs(statistics.correlation) >= 0.7
+                      ? "Strong"
+                      : Math.abs(statistics.correlation) >= 0.3
+                        ? "Moderate"
+                        : "Weak"}
+                  </div>
+                </div>
+                <div className="bg-base-200 rounded-lg p-2 text-center">
+                  <div className="text-xs text-base-content/60 truncate">
+                    {xMetricConfig?.title || xParameter}
+                  </div>
+                  <div className="text-sm font-bold text-secondary">
+                    {statistics.xMean.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-base-content/60">
+                    {statistics.xMin.toFixed(1)}-{statistics.xMax.toFixed(1)}
+                  </div>
+                </div>
+                <div className="bg-base-200 rounded-lg p-2 text-center">
+                  <div className="text-xs text-base-content/60 truncate">
+                    {yMetricConfig?.title || yParameter}
+                  </div>
+                  <div className="text-sm font-bold text-accent">
+                    {statistics.yMean.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-base-content/60">
+                    {statistics.yMin.toFixed(1)}-{statistics.yMax.toFixed(1)}
+                  </div>
                 </div>
               </div>
-              <div className="stat py-2">
-                <div className="stat-title text-xs">Correlation (r)</div>
-                <div
-                  className={`stat-value text-lg ${
-                    statistics.correlation >= 0.7
-                      ? "text-success"
-                      : statistics.correlation >= 0.3
-                        ? "text-warning"
-                        : statistics.correlation <= -0.7
-                          ? "text-error"
-                          : statistics.correlation <= -0.3
-                            ? "text-warning"
-                            : "text-info"
-                  }`}
-                >
-                  {statistics.correlation.toFixed(3)}
+              {/* Desktop: Stats component */}
+              <div className="stats stats-horizontal shadow w-full hidden sm:inline-grid">
+                <div className="stat py-2">
+                  <div className="stat-title text-xs">Sample Size</div>
+                  <div className="stat-value text-primary text-lg">
+                    {statistics.sampleSize}
+                  </div>
                 </div>
-                <div className="stat-desc text-xs">
-                  {Math.abs(statistics.correlation) >= 0.7
-                    ? "Strong"
-                    : Math.abs(statistics.correlation) >= 0.3
-                      ? "Moderate"
-                      : "Weak"}
+                <div className="stat py-2">
+                  <div className="stat-title text-xs">Correlation (r)</div>
+                  <div
+                    className={`stat-value text-lg ${
+                      statistics.correlation >= 0.7
+                        ? "text-success"
+                        : statistics.correlation >= 0.3
+                          ? "text-warning"
+                          : statistics.correlation <= -0.7
+                            ? "text-error"
+                            : statistics.correlation <= -0.3
+                              ? "text-warning"
+                              : "text-info"
+                    }`}
+                  >
+                    {statistics.correlation.toFixed(3)}
+                  </div>
+                  <div className="stat-desc text-xs">
+                    {Math.abs(statistics.correlation) >= 0.7
+                      ? "Strong"
+                      : Math.abs(statistics.correlation) >= 0.3
+                        ? "Moderate"
+                        : "Weak"}
+                  </div>
+                </div>
+                <div className="stat py-2">
+                  <div className="stat-title text-xs">
+                    {xMetricConfig?.title || xParameter} (Mean)
+                  </div>
+                  <div className="stat-value text-secondary text-lg">
+                    {statistics.xMean.toFixed(2)}
+                  </div>
+                  <div className="stat-desc text-xs">
+                    Range: {statistics.xMin.toFixed(2)} -{" "}
+                    {statistics.xMax.toFixed(2)}
+                  </div>
+                </div>
+                <div className="stat py-2">
+                  <div className="stat-title text-xs">
+                    {yMetricConfig?.title || yParameter} (Mean)
+                  </div>
+                  <div className="stat-value text-accent text-lg">
+                    {statistics.yMean.toFixed(2)}
+                  </div>
+                  <div className="stat-desc text-xs">
+                    Range: {statistics.yMin.toFixed(2)} -{" "}
+                    {statistics.yMax.toFixed(2)}
+                  </div>
                 </div>
               </div>
-              <div className="stat py-2">
-                <div className="stat-title text-xs">
-                  {xMetricConfig?.title || xParameter} (Mean)
-                </div>
-                <div className="stat-value text-secondary text-lg">
-                  {statistics.xMean.toFixed(2)}
-                </div>
-                <div className="stat-desc text-xs">
-                  Range: {statistics.xMin.toFixed(2)} -{" "}
-                  {statistics.xMax.toFixed(2)}
-                </div>
-              </div>
-              <div className="stat py-2">
-                <div className="stat-title text-xs">
-                  {yMetricConfig?.title || yParameter} (Mean)
-                </div>
-                <div className="stat-value text-accent text-lg">
-                  {statistics.yMean.toFixed(2)}
-                </div>
-                <div className="stat-desc text-xs">
-                  Range: {statistics.yMin.toFixed(2)} -{" "}
-                  {statistics.yMax.toFixed(2)}
-                </div>
-              </div>
-            </div>
+            </>
           )}
         </div>
       </div>

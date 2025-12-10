@@ -699,15 +699,15 @@ export function CDFView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Controls Section */}
       <div className="card bg-base-100 shadow-md">
-        <div className="card-body p-4 gap-4">
+        <div className="card-body p-3 sm:p-4 gap-3 sm:gap-4">
           {/* Row 1: Main Controls */}
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-            {/* Left: Type + Chip */}
-            <div className="flex items-center gap-3">
-              <div className="tabs tabs-boxed bg-base-200 h-9">
+          <div className="flex flex-col gap-3 sm:gap-4">
+            {/* Row 1a: Type + Chip + Parameters */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="tabs tabs-boxed bg-base-200 h-8 sm:h-9">
                 <button
                   className={`tab h-full ${currentMetricType === "qubit" ? "tab-active" : ""}`}
                   onClick={() => handleMetricTypeChange("qubit")}
@@ -722,58 +722,58 @@ export function CDFView() {
                 </button>
               </div>
 
-              <div className="w-36">
+              <div className="w-28 sm:w-36">
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}
                 />
               </div>
+
+              {/* Parameter Selection - inline on mobile */}
+              <div className="w-48 sm:w-80">
+                <Select<{ value: string; label: string }, true>
+                  isMulti
+                  options={availableParameters}
+                  value={selectedParameters
+                    .map((p) => {
+                      const config = selectedMetricConfigs[p];
+                      return config ? { value: p, label: config.title } : null;
+                    })
+                    .filter(
+                      (item): item is { value: string; label: string } =>
+                        item !== null,
+                    )}
+                  onChange={(options) => {
+                    const values = options
+                      ? options.map((option) => option!.value)
+                      : [];
+                    setSelectedParameters(values);
+                  }}
+                  placeholder="Select parameters"
+                  className="text-base-content"
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      minHeight: "36px",
+                      height: "auto",
+                      borderRadius: "0.5rem",
+                    }),
+                    valueContainer: (base) => ({
+                      ...base,
+                      padding: "2px 8px",
+                    }),
+                    menu: (base) => ({
+                      ...base,
+                      zIndex: 50,
+                    }),
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Parameter Selection */}
-            <div className="w-80">
-              <Select<{ value: string; label: string }, true>
-                isMulti
-                options={availableParameters}
-                value={selectedParameters
-                  .map((p) => {
-                    const config = selectedMetricConfigs[p];
-                    return config ? { value: p, label: config.title } : null;
-                  })
-                  .filter(
-                    (item): item is { value: string; label: string } =>
-                      item !== null,
-                  )}
-                onChange={(options) => {
-                  const values = options
-                    ? options.map((option) => option!.value)
-                    : [];
-                  setSelectedParameters(values);
-                }}
-                placeholder="Select parameters"
-                className="text-base-content"
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    minHeight: "36px",
-                    height: "auto",
-                    borderRadius: "0.5rem",
-                  }),
-                  valueContainer: (base) => ({
-                    ...base,
-                    padding: "2px 8px",
-                  }),
-                  menu: (base) => ({
-                    ...base,
-                    zIndex: 50,
-                  }),
-                }}
-              />
-            </div>
-
-            {/* Time Range + Mode */}
-            <div className="flex items-center gap-3">
-              <div className="join h-9">
+            {/* Row 1b: Time Range + Mode + Display Toggle + Export */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="join h-8 sm:h-9">
                 <button
                   className={`join-item btn btn-sm h-full ${timeRange === "1d" ? "btn-active" : ""}`}
                   onClick={() => setTimeRange("1d")}
@@ -794,15 +794,15 @@ export function CDFView() {
                 </button>
               </div>
 
-              <div className="join h-9">
+              <div className="join h-8 sm:h-9">
                 <button
-                  className={`join-item btn btn-sm h-full ${selectionMode === "latest" ? "btn-active" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-active" : ""}`}
                   onClick={() => setSelectionMode("latest")}
                 >
                   Latest
                 </button>
                 <button
-                  className={`join-item btn btn-sm h-full ${selectionMode === "best" ? "btn-active" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "best" ? "btn-active" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
                   onClick={() => setSelectionMode("best")}
                   disabled={!isBestModeSupported}
                   title={
@@ -814,25 +814,22 @@ export function CDFView() {
                   Best
                 </button>
               </div>
-            </div>
 
-            {/* Display Toggle + Export */}
-            <div className="flex items-center gap-3 lg:ml-auto">
               {hasPercentageMetrics && (
-                <label className="cursor-pointer flex items-center gap-2 h-9">
-                  <span className="text-sm">Fidelity</span>
+                <label className="cursor-pointer flex items-center gap-1 sm:gap-2 h-8 sm:h-9">
+                  <span className="text-xs sm:text-sm">Fidelity</span>
                   <input
                     type="checkbox"
-                    className="toggle toggle-primary toggle-sm"
+                    className="toggle toggle-primary toggle-xs sm:toggle-sm"
                     checked={showAsErrorRate}
                     onChange={(e) => setShowAsErrorRate(e.target.checked)}
                   />
-                  <span className="text-sm">Error</span>
+                  <span className="text-xs sm:text-sm">Error</span>
                 </label>
               )}
 
               <button
-                className="btn btn-outline btn-sm h-9"
+                className="btn btn-outline btn-xs sm:btn-sm h-8 sm:h-9 ml-auto sm:ml-0"
                 onClick={handleExportCSV}
                 disabled={
                   !primaryData.tableData || primaryData.tableData.length === 0
@@ -845,7 +842,7 @@ export function CDFView() {
 
           {/* Statistics Display */}
           {selectedParameters.length > 0 && (
-            <div className="mt-4 space-y-2">
+            <div className="mt-2 sm:mt-4 space-y-2">
               {selectedParameters.map((param) => {
                 const data = processedDataByParameter[param];
                 const config = selectedMetricConfigs[param];
@@ -875,45 +872,90 @@ export function CDFView() {
                 };
 
                 return (
-                  <div key={param} className="stats shadow w-full">
-                    <div className="stat py-2 flex-1">
-                      <div className="stat-title text-xs">Parameter</div>
-                      <div className={`stat-value text-sm ${colorClass}`}>
+                  <div key={param}>
+                    {/* Mobile: Grid layout */}
+                    <div className="sm:hidden">
+                      <div className={`text-xs font-medium mb-1 ${colorClass}`}>
                         {config.title}
                       </div>
-                    </div>
-                    <div className="stat py-2 flex-1">
-                      <div className="stat-title text-xs">N_valid</div>
-                      <div className="stat-value text-success text-sm">
-                        {data.tableData.length}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-base-200 rounded-lg p-2 text-center">
+                          <div className="text-xs text-base-content/60">N</div>
+                          <div className="text-sm font-bold text-success">
+                            {data.tableData.length}
+                          </div>
+                        </div>
+                        <div className="bg-base-200 rounded-lg p-2 text-center">
+                          <div className="text-xs text-base-content/60">
+                            Median
+                          </div>
+                          <div className="text-sm font-bold text-primary">
+                            {formatValue(data.median)}
+                            {unit}
+                          </div>
+                        </div>
+                        <div className="bg-base-200 rounded-lg p-2 text-center">
+                          <div className="text-xs text-base-content/60">
+                            Mean
+                          </div>
+                          <div className="text-sm font-bold text-secondary">
+                            {formatValue(data.mean)}
+                            {unit}
+                          </div>
+                        </div>
+                        <div className="bg-base-200 rounded-lg p-2 text-center col-span-3">
+                          <div className="text-xs text-base-content/60">
+                            P10 / P90
+                          </div>
+                          <div className="text-sm font-bold text-accent">
+                            {formatValue(data.percentile10!)}
+                            {unit} / {formatValue(data.percentile90!)}
+                            {unit}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="stat py-2 flex-1">
-                      <div className="stat-title text-xs">Median</div>
-                      <div className="stat-value text-primary text-sm">
-                        {formatValue(data.median)}
-                        {unit}
+                    {/* Desktop: Stats component */}
+                    <div className="stats shadow w-full hidden sm:inline-grid">
+                      <div className="stat py-2 flex-1">
+                        <div className="stat-title text-xs">Parameter</div>
+                        <div className={`stat-value text-sm ${colorClass}`}>
+                          {config.title}
+                        </div>
                       </div>
-                    </div>
-                    <div className="stat py-2 flex-1">
-                      <div className="stat-title text-xs">Mean</div>
-                      <div className="stat-value text-secondary text-sm">
-                        {formatValue(data.mean)}
-                        {unit}
+                      <div className="stat py-2 flex-1">
+                        <div className="stat-title text-xs">N_valid</div>
+                        <div className="stat-value text-success text-sm">
+                          {data.tableData.length}
+                        </div>
                       </div>
-                    </div>
-                    <div className="stat py-2 flex-1">
-                      <div className="stat-title text-xs">10th %ile</div>
-                      <div className="stat-value text-accent text-sm">
-                        {formatValue(data.percentile10!)}
-                        {unit}
+                      <div className="stat py-2 flex-1">
+                        <div className="stat-title text-xs">Median</div>
+                        <div className="stat-value text-primary text-sm">
+                          {formatValue(data.median)}
+                          {unit}
+                        </div>
                       </div>
-                    </div>
-                    <div className="stat py-2 flex-1">
-                      <div className="stat-title text-xs">90th %ile</div>
-                      <div className="stat-value text-accent text-sm">
-                        {formatValue(data.percentile90!)}
-                        {unit}
+                      <div className="stat py-2 flex-1">
+                        <div className="stat-title text-xs">Mean</div>
+                        <div className="stat-value text-secondary text-sm">
+                          {formatValue(data.mean)}
+                          {unit}
+                        </div>
+                      </div>
+                      <div className="stat py-2 flex-1">
+                        <div className="stat-title text-xs">10th %ile</div>
+                        <div className="stat-value text-accent text-sm">
+                          {formatValue(data.percentile10!)}
+                          {unit}
+                        </div>
+                      </div>
+                      <div className="stat py-2 flex-1">
+                        <div className="stat-title text-xs">90th %ile</div>
+                        <div className="stat-value text-accent text-sm">
+                          {formatValue(data.percentile90!)}
+                          {unit}
+                        </div>
                       </div>
                     </div>
                   </div>

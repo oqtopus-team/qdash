@@ -483,9 +483,11 @@ export function CouplingMetricsGrid({
                     !bgColor ? "bg-base-300/50" : ""
                   }`}
                 >
-                  {/* Coupling ID Label */}
+                  {/* Coupling ID Label - hidden on mobile in full view */}
                   <div
                     className={`absolute top-0.5 left-0.5 md:top-1 md:left-1 backdrop-blur-sm px-1 py-0.5 md:px-2 rounded text-[0.5rem] md:text-xs font-bold shadow-sm ${
+                      zoomMode === "full" ? "hidden md:block" : ""
+                    } ${
                       value !== null && value !== undefined
                         ? "bg-black/30 text-white"
                         : "bg-base-content/20 text-base-content"
@@ -496,11 +498,16 @@ export function CouplingMetricsGrid({
 
                   {/* Value Display */}
                   {value !== null && value !== undefined && (
-                    <div className="flex flex-col items-center justify-center h-full pt-3 md:pt-4">
-                      <div className="text-xs md:text-sm lg:text-base font-bold text-white drop-shadow-md">
+                    <div className="flex flex-col items-center justify-center h-full">
+                      <div className="text-[0.5rem] sm:text-xs md:text-sm lg:text-base font-bold text-white drop-shadow-md">
                         {value.toFixed(2)}
                       </div>
-                      <div className="text-[0.5rem] md:text-xs text-white/90 font-medium drop-shadow">
+                      {/* Unit - hidden on mobile in full view */}
+                      <div
+                        className={`text-[0.4rem] md:text-xs text-white/90 font-medium drop-shadow ${
+                          zoomMode === "full" ? "hidden md:block" : ""
+                        }`}
+                      >
                         {unit}
                       </div>
                     </div>
@@ -508,8 +515,8 @@ export function CouplingMetricsGrid({
 
                   {/* No data indicator */}
                   {(value === null || value === undefined) && (
-                    <div className="flex flex-col items-center justify-center h-full pt-3 md:pt-4">
-                      <div className="text-xs text-base-content/40 font-medium">
+                    <div className="flex flex-col items-center justify-center h-full">
+                      <div className="text-[0.5rem] sm:text-xs text-base-content/40 font-medium">
                         N/A
                       </div>
                     </div>
@@ -581,21 +588,20 @@ export function CouplingMetricsGrid({
       {/* Coupling Detail Modal with History */}
       {selectedCouplingInfo && (
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4"
+          className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 backdrop-blur-sm sm:p-4"
           onClick={() => setSelectedCouplingInfo(null)}
         >
           <div
-            className="bg-base-100 rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+            className="bg-base-100 rounded-t-xl sm:rounded-xl w-full sm:max-w-6xl max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-base-300 flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold">
-                  Coupling {selectedCouplingInfo.couplingId} - {title} History
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg sm:text-2xl font-bold truncate">
+                  {selectedCouplingInfo.couplingId} - {title}
                 </h2>
-                <p className="text-base-content/70 mt-1">
-                  Current Value:{" "}
+                <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
                   {selectedCouplingInfo.metric.value !== null
                     ? `${selectedCouplingInfo.metric.value.toFixed(4)} ${unit}`
                     : "No data"}
@@ -603,14 +609,14 @@ export function CouplingMetricsGrid({
               </div>
               <button
                 onClick={() => setSelectedCouplingInfo(null)}
-                className="btn btn-ghost btn-sm btn-circle"
+                className="btn btn-ghost btn-sm btn-circle flex-shrink-0 ml-2"
               >
                 ✕
               </button>
             </div>
 
             {/* Modal Content - History */}
-            <div className="flex-1 overflow-auto p-6">
+            <div className="flex-1 overflow-auto p-3 sm:p-6">
               <CouplingMetricHistoryModal
                 chipId={chipId}
                 couplingId={selectedCouplingInfo.couplingId}
@@ -620,10 +626,10 @@ export function CouplingMetricsGrid({
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-base-300 flex justify-end gap-2">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-end gap-2">
               <button
                 onClick={() => setSelectedCouplingInfo(null)}
-                className="btn btn-ghost"
+                className="btn btn-ghost btn-sm sm:btn-md"
               >
                 Close
               </button>
