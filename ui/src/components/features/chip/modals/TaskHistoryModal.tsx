@@ -24,6 +24,7 @@ export function TaskHistoryModal({
 }: TaskHistoryModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [subIndex, setSubIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
 
   const { data, isLoading, isError } = useGetQubitTaskHistory(
     qid,
@@ -58,7 +59,7 @@ export function TaskHistoryModal({
     : [];
   const currentFigure = figures[subIndex];
 
-  // Reset subIndex when changing selected item
+  // Reset subIndex when changing selected item (keep flip state)
   const handleSelectIndex = (idx: number) => {
     setSelectedIndex(idx);
     setSubIndex(0);
@@ -110,84 +111,178 @@ export function TaskHistoryModal({
                 </div>
               </div>
 
-              {/* Navigation Arrows */}
-              <div className="flex gap-2 mb-2 sm:mb-3 flex-shrink-0">
+              {/* Navigation Arrows + View Toggle */}
+              <div className="flex items-center justify-between mb-2 sm:mb-3 flex-shrink-0">
+                <div className="flex gap-2">
+                  <button
+                    className="btn btn-xs sm:btn-sm btn-ghost"
+                    disabled={selectedIndex === 0}
+                    onClick={() =>
+                      handleSelectIndex(Math.max(0, selectedIndex - 1))
+                    }
+                  >
+                    ← Newer
+                  </button>
+                  <button
+                    className="btn btn-xs sm:btn-sm btn-ghost"
+                    disabled={selectedIndex === historyArray.length - 1}
+                    onClick={() =>
+                      handleSelectIndex(
+                        Math.min(historyArray.length - 1, selectedIndex + 1),
+                      )
+                    }
+                  >
+                    Older →
+                  </button>
+                </div>
                 <button
-                  className="btn btn-xs sm:btn-sm btn-ghost"
-                  disabled={selectedIndex === 0}
-                  onClick={() =>
-                    handleSelectIndex(Math.max(0, selectedIndex - 1))
-                  }
+                  className={`btn btn-xs sm:btn-sm ${isFlipped ? "btn-primary" : "btn-ghost"}`}
+                  onClick={() => setIsFlipped(!isFlipped)}
                 >
-                  ← Newer
-                </button>
-                <button
-                  className="btn btn-xs sm:btn-sm btn-ghost"
-                  disabled={selectedIndex === historyArray.length - 1}
-                  onClick={() =>
-                    handleSelectIndex(
-                      Math.min(historyArray.length - 1, selectedIndex + 1),
-                    )
-                  }
-                >
-                  Older →
+                  {isFlipped ? "◀ Figure" : "Parameters ▶"}
                 </button>
               </div>
 
-              {/* Figure Display */}
-              <div className="flex-1 bg-base-200 rounded-lg p-2 sm:p-4 overflow-auto min-h-[180px] sm:min-h-[300px]">
-                {currentFigure ? (
-                  <div className="h-full flex flex-col">
-                    <TaskFigure
-                      path={currentFigure}
-                      qid={qid}
-                      className="w-full h-auto flex-1 object-contain"
-                    />
-                    {figures.length > 1 && (
-                      <div className="flex justify-center mt-2 gap-2">
-                        <button
-                          className="btn btn-xs"
-                          onClick={() =>
-                            setSubIndex(
-                              (prev) =>
-                                (prev - 1 + figures.length) % figures.length,
-                            )
-                          }
+              {/* Figure Display - Flip Card */}
+              <div className="flex-1 min-h-[180px] sm:min-h-[300px] [perspective:1000px]">
+                <div
+                  className={`relative w-full h-full transition-transform duration-500 [transform-style:preserve-3d] ${
+                    isFlipped ? "[transform:rotateY(180deg)]" : ""
+                  }`}
+                >
+                  {/* Front - Figure */}
+                  <div className="absolute inset-0 bg-base-200 rounded-lg p-2 sm:p-4 overflow-auto [backface-visibility:hidden]">
+                    {currentFigure ? (
+                      <div className="h-full flex flex-col">
+                        <TaskFigure
+                          path={currentFigure}
+                          qid={qid}
+                          className="w-full h-auto flex-1 object-contain"
+                        />
+                        {figures.length > 1 && (
+                          <div className="flex justify-center mt-2 gap-2">
+                            <button
+                              className="btn btn-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSubIndex(
+                                  (prev) =>
+                                    (prev - 1 + figures.length) % figures.length,
+                                );
+                              }}
+                            >
+                              ◀
+                            </button>
+                            <span className="text-xs sm:text-sm">
+                              {subIndex + 1} / {figures.length}
+                            </span>
+                            <button
+                              className="btn btn-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSubIndex((prev) => (prev + 1) % figures.length);
+                              }}
+                            >
+                              ▶
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="alert alert-warning text-sm">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          className="stroke-current shrink-0 w-5 h-5 sm:w-6 sm:h-6"
                         >
-                          ◀
-                        </button>
-                        <span className="text-xs sm:text-sm">
-                          {subIndex + 1} / {figures.length}
-                        </span>
-                        <button
-                          className="btn btn-xs"
-                          onClick={() =>
-                            setSubIndex((prev) => (prev + 1) % figures.length)
-                          }
-                        >
-                          ▶
-                        </button>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                          />
+                        </svg>
+                        <span>No figure available</span>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="alert alert-warning text-sm">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      className="stroke-current shrink-0 w-5 h-5 sm:w-6 sm:h-6"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
-                    <span>No figure available</span>
+
+                  {/* Back - Input/Output Parameters */}
+                  <div className="absolute inset-0 bg-base-200 rounded-lg p-3 sm:p-4 overflow-auto [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                    <div className="h-full flex flex-col gap-2 text-xs">
+                      {/* Input Parameters */}
+                      {selectedTask?.input_parameters && Object.keys(selectedTask.input_parameters).length > 0 && (
+                        <div className="bg-base-100 p-3 rounded-lg">
+                          <h5 className="font-semibold mb-2 flex items-center gap-1">
+                            <span className="text-primary">▸</span> Input
+                          </h5>
+                          <div className="space-y-1">
+                            {Object.entries(selectedTask.input_parameters)
+                              .sort(([a], [b]) => a.localeCompare(b))
+                              .map(([key, value]) => {
+                                const paramValue = (
+                                  typeof value === "object" && value !== null && "value" in value
+                                    ? value
+                                    : { value }
+                                ) as { value: number | string; unit?: string };
+                                return (
+                                  <div key={key} className="flex justify-between">
+                                    <span className="text-base-content/70">{key}:</span>
+                                    <span className="font-medium">
+                                      {typeof paramValue.value === "number"
+                                        ? paramValue.value.toFixed(4)
+                                        : String(paramValue.value)}
+                                      {paramValue.unit ? ` ${paramValue.unit}` : ""}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Output Parameters */}
+                      {selectedTask?.output_parameters && Object.keys(selectedTask.output_parameters).length > 0 && (
+                        <div className="bg-base-100 p-3 rounded-lg">
+                          <h5 className="font-semibold mb-2 flex items-center gap-1">
+                            <span className="text-success">▸</span> Output
+                          </h5>
+                          <div className="space-y-1">
+                            {Object.entries(selectedTask.output_parameters)
+                              .sort(([a], [b]) => a.localeCompare(b))
+                              .map(([key, value]) => {
+                                const paramValue = (
+                                  typeof value === "object" && value !== null && "value" in value
+                                    ? value
+                                    : { value }
+                                ) as { value: number | string; unit?: string };
+                                return (
+                                  <div key={key} className="flex justify-between">
+                                    <span className="text-base-content/70">{key}:</span>
+                                    <span className="font-medium">
+                                      {typeof paramValue.value === "number"
+                                        ? paramValue.value.toFixed(4)
+                                        : String(paramValue.value)}
+                                      {paramValue.unit ? ` ${paramValue.unit}` : ""}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* No parameters */}
+                      {(!selectedTask?.input_parameters || Object.keys(selectedTask.input_parameters).length === 0) &&
+                       (!selectedTask?.output_parameters || Object.keys(selectedTask.output_parameters).length === 0) && (
+                        <div className="flex-1 flex items-center justify-center text-base-content/50">
+                          No parameters available
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Metadata - compact on mobile, full on desktop */}
