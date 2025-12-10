@@ -17,7 +17,12 @@ SAMPLE_USERS = {
         "full_name": "Admin User",
         "email": "admin@example.com",
     },
-    "invalid_user": {"username": "", "password": "short", "full_name": "", "email": "invalid-email"},
+    "invalid_user": {
+        "username": "",
+        "password": "short",
+        "full_name": "",
+        "email": "invalid-email",
+    },
 }
 
 # Chip test data
@@ -40,10 +45,17 @@ SAMPLE_CHIPS = {
         "name": "Complex Test Chip",
         "description": "A complex quantum chip with multiple qubits",
         "qubits": [
-            {"id": i, "frequency": 5.0 + i * 0.1, "anharmonicity": -200.0 - i * 5, "readout_frequency": 6.5 + i * 0.1}
+            {
+                "id": i,
+                "frequency": 5.0 + i * 0.1,
+                "anharmonicity": -200.0 - i * 5,
+                "readout_frequency": 6.5 + i * 0.1,
+            }
             for i in range(5)
         ],
-        "couplers": [{"control": i, "target": i + 1, "coupling_strength": 10.0 - i} for i in range(4)],
+        "couplers": [
+            {"control": i, "target": i + 1, "coupling_strength": 10.0 - i} for i in range(4)
+        ],
         "topology": "linear",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -161,7 +173,12 @@ SAMPLE_TASKS = {
         "name": "Qubit Frequency Calibration",
         "description": "Calibrate qubit transition frequency",
         "type": "calibration",
-        "parameters": {"qubit_id": 0, "frequency_range": [4.9, 5.1], "step_size": 0.001, "measurement_count": 100},
+        "parameters": {
+            "qubit_id": 0,
+            "frequency_range": [4.9, 5.1],
+            "step_size": 0.001,
+            "measurement_count": 100,
+        },
         "dependencies": [],
         "estimated_duration": 120,
     },
@@ -170,7 +187,11 @@ SAMPLE_TASKS = {
         "name": "T1 Measurement",
         "description": "Measure qubit relaxation time T1",
         "type": "characterization",
-        "parameters": {"qubit_id": 0, "delay_times": list(range(0, 200, 10)), "measurement_count": 1000},
+        "parameters": {
+            "qubit_id": 0,
+            "delay_times": list(range(0, 200, 10)),
+            "measurement_count": 1000,
+        },
         "dependencies": ["task_001"],
         "estimated_duration": 300,
     },
@@ -179,7 +200,9 @@ SAMPLE_TASKS = {
 # Error response test data
 SAMPLE_ERROR_RESPONSES = {
     "validation_error": {
-        "detail": [{"loc": ["body", "chip_id"], "msg": "field required", "type": "value_error.missing"}]
+        "detail": [
+            {"loc": ["body", "chip_id"], "msg": "field required", "type": "value_error.missing"}
+        ]
     },
     "not_found_error": {"detail": "Resource not found"},
     "permission_error": {"detail": "Permission denied"},
