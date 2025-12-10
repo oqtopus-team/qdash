@@ -88,14 +88,15 @@ export function CouplingTaskHistoryModal({
 
   return (
     <dialog className="modal modal-open">
-      <div
-        className="modal-box w-full max-w-6xl bg-base-100 rounded-t-xl sm:rounded-xl p-3 sm:p-6 fixed bottom-0 sm:relative sm:bottom-auto max-h-[85vh] sm:max-h-[90vh]"
-      >
+      <div className="modal-box w-full max-w-6xl bg-base-100 rounded-t-xl sm:rounded-xl p-3 sm:p-6 fixed bottom-0 sm:relative sm:bottom-auto max-h-[85vh] sm:max-h-[90vh]">
         <div className="flex justify-between items-center mb-3 sm:mb-4">
           <h3 className="font-bold text-base sm:text-lg truncate pr-2">
             {taskName} - {couplingId}
           </h3>
-          <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="btn btn-sm btn-circle btn-ghost flex-shrink-0"
+          >
             ✕
           </button>
         </div>
@@ -189,7 +190,8 @@ export function CouplingTaskHistoryModal({
                                   e.stopPropagation();
                                   setSubIndex(
                                     (prev) =>
-                                      (prev - 1 + figures.length) % figures.length,
+                                      (prev - 1 + figures.length) %
+                                      figures.length,
                                   );
                                 }}
                               >
@@ -202,7 +204,9 @@ export function CouplingTaskHistoryModal({
                                 className="btn btn-xs"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setSubIndex((prev) => (prev + 1) % figures.length);
+                                  setSubIndex(
+                                    (prev) => (prev + 1) % figures.length,
+                                  );
                                 }}
                               >
                                 ▶
@@ -299,74 +303,106 @@ export function CouplingTaskHistoryModal({
                   <div className="absolute inset-0 bg-base-200 rounded-lg p-3 sm:p-4 overflow-auto [backface-visibility:hidden] [transform:rotateY(180deg)]">
                     <div className="h-full flex flex-col gap-2 text-xs">
                       {/* Input Parameters */}
-                      {selectedTask?.input_parameters && Object.keys(selectedTask.input_parameters).length > 0 && (
-                        <div className="bg-base-100 p-3 rounded-lg">
-                          <h5 className="font-semibold mb-2 flex items-center gap-1">
-                            <span className="text-primary">▸</span> Input
-                          </h5>
-                          <div className="space-y-1">
-                            {Object.entries(selectedTask.input_parameters)
-                              .sort(([a], [b]) => a.localeCompare(b))
-                              .map(([key, value]) => {
-                                const paramValue = (
-                                  typeof value === "object" && value !== null && "value" in value
-                                    ? value
-                                    : { value }
-                                ) as { value: number | string; unit?: string };
-                                return (
-                                  <div key={key} className="flex justify-between">
-                                    <span className="text-base-content/70">{key}:</span>
-                                    <span className="font-medium">
-                                      {typeof paramValue.value === "number"
-                                        ? paramValue.value.toFixed(4)
-                                        : String(paramValue.value)}
-                                      {paramValue.unit ? ` ${paramValue.unit}` : ""}
-                                    </span>
-                                  </div>
-                                );
-                              })}
+                      {selectedTask?.input_parameters &&
+                        Object.keys(selectedTask.input_parameters).length >
+                          0 && (
+                          <div className="bg-base-100 p-3 rounded-lg">
+                            <h5 className="font-semibold mb-2 flex items-center gap-1">
+                              <span className="text-primary">▸</span> Input
+                            </h5>
+                            <div className="space-y-1">
+                              {Object.entries(selectedTask.input_parameters)
+                                .sort(([a], [b]) => a.localeCompare(b))
+                                .map(([key, value]) => {
+                                  const paramValue = (
+                                    typeof value === "object" &&
+                                    value !== null &&
+                                    "value" in value
+                                      ? value
+                                      : { value }
+                                  ) as {
+                                    value: number | string;
+                                    unit?: string;
+                                  };
+                                  return (
+                                    <div
+                                      key={key}
+                                      className="flex justify-between"
+                                    >
+                                      <span className="text-base-content/70">
+                                        {key}:
+                                      </span>
+                                      <span className="font-medium">
+                                        {typeof paramValue.value === "number"
+                                          ? paramValue.value.toFixed(4)
+                                          : String(paramValue.value)}
+                                        {paramValue.unit
+                                          ? ` ${paramValue.unit}`
+                                          : ""}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
                       {/* Output Parameters */}
-                      {selectedTask?.output_parameters && Object.keys(selectedTask.output_parameters).length > 0 && (
-                        <div className="bg-base-100 p-3 rounded-lg">
-                          <h5 className="font-semibold mb-2 flex items-center gap-1">
-                            <span className="text-success">▸</span> Output
-                          </h5>
-                          <div className="space-y-1">
-                            {Object.entries(selectedTask.output_parameters)
-                              .sort(([a], [b]) => a.localeCompare(b))
-                              .map(([key, value]) => {
-                                const paramValue = (
-                                  typeof value === "object" && value !== null && "value" in value
-                                    ? value
-                                    : { value }
-                                ) as { value: number | string; unit?: string };
-                                return (
-                                  <div key={key} className="flex justify-between">
-                                    <span className="text-base-content/70">{key}:</span>
-                                    <span className="font-medium">
-                                      {typeof paramValue.value === "number"
-                                        ? paramValue.value.toFixed(4)
-                                        : String(paramValue.value)}
-                                      {paramValue.unit ? ` ${paramValue.unit}` : ""}
-                                    </span>
-                                  </div>
-                                );
-                              })}
+                      {selectedTask?.output_parameters &&
+                        Object.keys(selectedTask.output_parameters).length >
+                          0 && (
+                          <div className="bg-base-100 p-3 rounded-lg">
+                            <h5 className="font-semibold mb-2 flex items-center gap-1">
+                              <span className="text-success">▸</span> Output
+                            </h5>
+                            <div className="space-y-1">
+                              {Object.entries(selectedTask.output_parameters)
+                                .sort(([a], [b]) => a.localeCompare(b))
+                                .map(([key, value]) => {
+                                  const paramValue = (
+                                    typeof value === "object" &&
+                                    value !== null &&
+                                    "value" in value
+                                      ? value
+                                      : { value }
+                                  ) as {
+                                    value: number | string;
+                                    unit?: string;
+                                  };
+                                  return (
+                                    <div
+                                      key={key}
+                                      className="flex justify-between"
+                                    >
+                                      <span className="text-base-content/70">
+                                        {key}:
+                                      </span>
+                                      <span className="font-medium">
+                                        {typeof paramValue.value === "number"
+                                          ? paramValue.value.toFixed(4)
+                                          : String(paramValue.value)}
+                                        {paramValue.unit
+                                          ? ` ${paramValue.unit}`
+                                          : ""}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
                       {/* No parameters */}
-                      {(!selectedTask?.input_parameters || Object.keys(selectedTask.input_parameters).length === 0) &&
-                       (!selectedTask?.output_parameters || Object.keys(selectedTask.output_parameters).length === 0) && (
-                        <div className="flex-1 flex items-center justify-center text-base-content/50">
-                          No parameters available
-                        </div>
-                      )}
+                      {(!selectedTask?.input_parameters ||
+                        Object.keys(selectedTask.input_parameters).length ===
+                          0) &&
+                        (!selectedTask?.output_parameters ||
+                          Object.keys(selectedTask.output_parameters).length ===
+                            0) && (
+                          <div className="flex-1 flex items-center justify-center text-base-content/50">
+                            No parameters available
+                          </div>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -391,133 +427,145 @@ export function CouplingTaskHistoryModal({
                       </span>
                       <span className="text-base-content/60">
                         {selectedTask.end_at
-                          ? new Date(selectedTask.end_at).toLocaleString("ja-JP", {
-                              timeZone: "Asia/Tokyo",
-                              month: "numeric",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
+                          ? new Date(selectedTask.end_at).toLocaleString(
+                              "ja-JP",
+                              {
+                                timeZone: "Asia/Tokyo",
+                                month: "numeric",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                            )
                           : "N/A"}
                       </span>
                     </div>
                   </div>
                   {/* Desktop: full details */}
                   <div className="hidden sm:block mt-3 space-y-3">
-                  {/* Status */}
-                  <div className="text-xs bg-base-200 p-3 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-semibold">Status:</span>
-                      <span
-                        className={`badge badge-sm ${
-                          selectedTask.status === "completed"
-                            ? "badge-success"
-                            : selectedTask.status === "failed"
-                              ? "badge-error"
-                              : "badge-warning"
-                        }`}
-                      >
-                        {selectedTask.status}
-                      </span>
-                    </div>
-                    {selectedTask.end_at && (
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">Calibrated At:</span>
-                        <span>
-                          {new Date(selectedTask.end_at).toLocaleString(
-                            "ja-JP",
-                            {
-                              timeZone: "Asia/Tokyo",
-                            },
-                          )}
-                        </span>
-                      </div>
-                    )}
-                    {selectedTask.task_id && (
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="font-semibold">Task ID:</span>
-                        <span className="font-mono truncate">
-                          {selectedTask.task_id}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Input Parameters */}
-                  {selectedTask.input_parameters &&
-                    Object.keys(selectedTask.input_parameters).length > 0 && (
-                      <div className="text-xs bg-base-200 p-3 rounded-lg">
-                        <h5 className="font-semibold mb-2">Input Parameters</h5>
-                        <div className="space-y-1">
-                          {Object.entries(selectedTask.input_parameters)
-                            .sort(([a], [b]) => a.localeCompare(b))
-                            .map(([key, value]) => {
-                              const paramValue: ParameterValue =
-                                typeof value === "object" &&
-                                value !== null &&
-                                "value" in value
-                                  ? (value as ParameterValue)
-                                  : { value };
-                              return (
-                                <div key={key} className="flex justify-between">
-                                  <span className="font-medium">{key}:</span>
-                                  <span>
-                                    {typeof paramValue.value === "number"
-                                      ? paramValue.value.toFixed(4)
-                                      : String(paramValue.value)}
-                                    {paramValue.unit
-                                      ? ` ${paramValue.unit}`
-                                      : ""}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      </div>
-                    )}
-
-                  {/* Output Parameters */}
-                  {selectedTask.output_parameters &&
-                    Object.keys(selectedTask.output_parameters).length > 0 && (
-                      <div className="text-xs bg-base-200 p-3 rounded-lg">
-                        <h5 className="font-semibold mb-2">
-                          Output Parameters
-                        </h5>
-                        <div className="space-y-1">
-                          {Object.entries(selectedTask.output_parameters)
-                            .sort(([a], [b]) => a.localeCompare(b))
-                            .map(([key, value]) => {
-                              const paramValue: ParameterValue =
-                                typeof value === "object" &&
-                                value !== null &&
-                                "value" in value
-                                  ? (value as ParameterValue)
-                                  : { value };
-                              return (
-                                <div key={key} className="flex justify-between">
-                                  <span className="font-medium">{key}:</span>
-                                  <span>
-                                    {typeof paramValue.value === "number"
-                                      ? paramValue.value.toFixed(4)
-                                      : String(paramValue.value)}
-                                    {paramValue.unit
-                                      ? ` ${paramValue.unit}`
-                                      : ""}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      </div>
-                    )}
-
-                  {/* Message */}
-                  {selectedTask.message && (
+                    {/* Status */}
                     <div className="text-xs bg-base-200 p-3 rounded-lg">
-                      <h5 className="font-semibold mb-1">Message</h5>
-                      <p>{selectedTask.message}</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-semibold">Status:</span>
+                        <span
+                          className={`badge badge-sm ${
+                            selectedTask.status === "completed"
+                              ? "badge-success"
+                              : selectedTask.status === "failed"
+                                ? "badge-error"
+                                : "badge-warning"
+                          }`}
+                        >
+                          {selectedTask.status}
+                        </span>
+                      </div>
+                      {selectedTask.end_at && (
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">Calibrated At:</span>
+                          <span>
+                            {new Date(selectedTask.end_at).toLocaleString(
+                              "ja-JP",
+                              {
+                                timeZone: "Asia/Tokyo",
+                              },
+                            )}
+                          </span>
+                        </div>
+                      )}
+                      {selectedTask.task_id && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="font-semibold">Task ID:</span>
+                          <span className="font-mono truncate">
+                            {selectedTask.task_id}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
+
+                    {/* Input Parameters */}
+                    {selectedTask.input_parameters &&
+                      Object.keys(selectedTask.input_parameters).length > 0 && (
+                        <div className="text-xs bg-base-200 p-3 rounded-lg">
+                          <h5 className="font-semibold mb-2">
+                            Input Parameters
+                          </h5>
+                          <div className="space-y-1">
+                            {Object.entries(selectedTask.input_parameters)
+                              .sort(([a], [b]) => a.localeCompare(b))
+                              .map(([key, value]) => {
+                                const paramValue: ParameterValue =
+                                  typeof value === "object" &&
+                                  value !== null &&
+                                  "value" in value
+                                    ? (value as ParameterValue)
+                                    : { value };
+                                return (
+                                  <div
+                                    key={key}
+                                    className="flex justify-between"
+                                  >
+                                    <span className="font-medium">{key}:</span>
+                                    <span>
+                                      {typeof paramValue.value === "number"
+                                        ? paramValue.value.toFixed(4)
+                                        : String(paramValue.value)}
+                                      {paramValue.unit
+                                        ? ` ${paramValue.unit}`
+                                        : ""}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Output Parameters */}
+                    {selectedTask.output_parameters &&
+                      Object.keys(selectedTask.output_parameters).length >
+                        0 && (
+                        <div className="text-xs bg-base-200 p-3 rounded-lg">
+                          <h5 className="font-semibold mb-2">
+                            Output Parameters
+                          </h5>
+                          <div className="space-y-1">
+                            {Object.entries(selectedTask.output_parameters)
+                              .sort(([a], [b]) => a.localeCompare(b))
+                              .map(([key, value]) => {
+                                const paramValue: ParameterValue =
+                                  typeof value === "object" &&
+                                  value !== null &&
+                                  "value" in value
+                                    ? (value as ParameterValue)
+                                    : { value };
+                                return (
+                                  <div
+                                    key={key}
+                                    className="flex justify-between"
+                                  >
+                                    <span className="font-medium">{key}:</span>
+                                    <span>
+                                      {typeof paramValue.value === "number"
+                                        ? paramValue.value.toFixed(4)
+                                        : String(paramValue.value)}
+                                      {paramValue.unit
+                                        ? ` ${paramValue.unit}`
+                                        : ""}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Message */}
+                    {selectedTask.message && (
+                      <div className="text-xs bg-base-200 p-3 rounded-lg">
+                        <h5 className="font-semibold mb-1">Message</h5>
+                        <p>{selectedTask.message}</p>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -543,11 +591,27 @@ export function CouplingTaskHistoryModal({
                     >
                       <div className="font-bold text-xs">
                         {item.task.status === "completed" ? (
-                          <span className={idx === selectedIndex ? "" : "text-success"}>OK</span>
+                          <span
+                            className={
+                              idx === selectedIndex ? "" : "text-success"
+                            }
+                          >
+                            OK
+                          </span>
                         ) : item.task.status === "failed" ? (
-                          <span className={idx === selectedIndex ? "" : "text-error"}>Fail</span>
+                          <span
+                            className={
+                              idx === selectedIndex ? "" : "text-error"
+                            }
+                          >
+                            Fail
+                          </span>
                         ) : (
-                          <span className={idx === selectedIndex ? "" : "text-warning"}>
+                          <span
+                            className={
+                              idx === selectedIndex ? "" : "text-warning"
+                            }
+                          >
                             {item.task.status}
                           </span>
                         )}
@@ -576,12 +640,16 @@ export function CouplingTaskHistoryModal({
                   <div className="sm:hidden mt-2 p-2 bg-base-200 rounded-lg text-xs space-y-1">
                     <div className="flex justify-between">
                       <span className="opacity-70">Task ID:</span>
-                      <span className="font-mono truncate max-w-[180px]">{selectedItem.task.task_id}</span>
+                      <span className="font-mono truncate max-w-[180px]">
+                        {selectedItem.task.task_id}
+                      </span>
                     </div>
                     {selectedItem.task.message && (
                       <div className="flex justify-between">
                         <span className="opacity-70">Message:</span>
-                        <span className="truncate max-w-[180px]">{selectedItem.task.message}</span>
+                        <span className="truncate max-w-[180px]">
+                          {selectedItem.task.message}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -602,11 +670,27 @@ export function CouplingTaskHistoryModal({
                         <div>
                           <div className="font-bold text-sm">
                             {item.task.status === "completed" ? (
-                              <span className={idx === selectedIndex ? "" : "text-success"}>Completed</span>
+                              <span
+                                className={
+                                  idx === selectedIndex ? "" : "text-success"
+                                }
+                              >
+                                Completed
+                              </span>
                             ) : item.task.status === "failed" ? (
-                              <span className={idx === selectedIndex ? "" : "text-error"}>Failed</span>
+                              <span
+                                className={
+                                  idx === selectedIndex ? "" : "text-error"
+                                }
+                              >
+                                Failed
+                              </span>
                             ) : (
-                              <span className={idx === selectedIndex ? "" : "text-warning"}>
+                              <span
+                                className={
+                                  idx === selectedIndex ? "" : "text-warning"
+                                }
+                              >
                                 {item.task.status}
                               </span>
                             )}

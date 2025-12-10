@@ -132,11 +132,15 @@ export function ExecutionStats({
         <div className="bg-base-200 rounded-lg p-3 text-center">
           <div className="text-xs text-base-content/60">Total</div>
           <div className="text-lg font-bold">{stats.totalExecutions}</div>
-          <div className="text-xs text-base-content/60">{stats.successRate}% success</div>
+          <div className="text-xs text-base-content/60">
+            {stats.successRate}% success
+          </div>
         </div>
         <div className="bg-base-200 rounded-lg p-3 text-center">
           <div className="text-xs text-base-content/60">Status</div>
-          <div className="text-lg font-bold text-success">{stats.completedExecutions}</div>
+          <div className="text-lg font-bold text-success">
+            {stats.completedExecutions}
+          </div>
           <div className="text-xs">
             <span className="text-error">{stats.failedExecutions}F</span>
             {" / "}
@@ -145,14 +149,18 @@ export function ExecutionStats({
         </div>
         <div className="bg-base-200 rounded-lg p-3 text-center">
           <div className="text-xs text-base-content/60">Avg Time</div>
-          <div className="text-lg font-bold text-primary">{formatTime(stats.averageTime)}</div>
+          <div className="text-lg font-bold text-primary">
+            {formatTime(stats.averageTime)}
+          </div>
         </div>
         <div className="bg-base-200 rounded-lg p-3 text-center">
           <div className="text-xs text-base-content/60">Time Range</div>
           <div className="text-sm font-bold text-secondary">
             {formatTime(stats.minTime)}
           </div>
-          <div className="text-xs text-base-content/60">- {formatTime(stats.maxTime)}</div>
+          <div className="text-xs text-base-content/60">
+            - {formatTime(stats.maxTime)}
+          </div>
         </div>
       </div>
 

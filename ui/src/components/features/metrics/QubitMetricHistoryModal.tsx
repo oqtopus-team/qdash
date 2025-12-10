@@ -130,7 +130,9 @@ export function QubitMetricHistoryModal({
         <div className="hidden sm:block mt-3 text-xs text-base-content/60 space-y-1 bg-base-200 p-3 rounded-lg">
           <div className="flex items-center gap-2">
             <span className="font-semibold">Execution ID:</span>
-            <span className="font-mono truncate">{selectedItem.execution_id}</span>
+            <span className="font-mono truncate">
+              {selectedItem.execution_id}
+            </span>
           </div>
           {selectedItem.task_id && (
             <div className="flex items-center gap-2">
@@ -200,11 +202,17 @@ export function QubitMetricHistoryModal({
             <div className="sm:hidden mt-2 p-2 bg-base-200 rounded-lg text-xs space-y-1">
               <div className="flex justify-between">
                 <span className="opacity-70">Execution ID:</span>
-                <span className="font-mono truncate max-w-[180px]">{selectedItem.execution_id}</span>
+                <span className="font-mono truncate max-w-[180px]">
+                  {selectedItem.execution_id}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="opacity-70">Timestamp:</span>
-                <span>{new Date(selectedItem.timestamp).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</span>
+                <span>
+                  {new Date(selectedItem.timestamp).toLocaleString("ja-JP", {
+                    timeZone: "Asia/Tokyo",
+                  })}
+                </span>
               </div>
             </div>
           )}

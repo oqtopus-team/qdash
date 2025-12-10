@@ -267,7 +267,9 @@ export function CouplingGrid({
             {/* Info */}
             <div className="p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-lg">Coupling: {previewCoupling.couplingId}</span>
+                <span className="font-bold text-lg">
+                  Coupling: {previewCoupling.couplingId}
+                </span>
                 <span
                   className={`badge ${
                     previewCoupling.task.status === "completed"
@@ -282,9 +284,12 @@ export function CouplingGrid({
               </div>
               {previewCoupling.task.end_at && (
                 <div className="text-sm text-base-content/70">
-                  {new Date(previewCoupling.task.end_at).toLocaleString("ja-JP", {
-                    timeZone: "Asia/Tokyo",
-                  })}
+                  {new Date(previewCoupling.task.end_at).toLocaleString(
+                    "ja-JP",
+                    {
+                      timeZone: "Asia/Tokyo",
+                    },
+                  )}
                 </div>
               )}
               <div className="text-xs text-base-content/50">
@@ -399,9 +404,7 @@ export function CouplingGrid({
                 >
                   {/* QID - hidden on mobile in full view */}
                   <span
-                    className={
-                      zoomMode === "full" ? "hidden md:inline" : ""
-                    }
+                    className={zoomMode === "full" ? "hidden md:inline" : ""}
                   >
                     {qid}
                   </span>
@@ -447,10 +450,14 @@ export function CouplingGrid({
                       taskName: selectedTask,
                     });
                   }}
-                  onTouchStart={() => handleLongPressStart(task.couplingId, task)}
+                  onTouchStart={() =>
+                    handleLongPressStart(task.couplingId, task)
+                  }
                   onTouchEnd={handleLongPressEnd}
                   onTouchCancel={handleLongPressEnd}
-                  onMouseDown={() => handleLongPressStart(task.couplingId, task)}
+                  onMouseDown={() =>
+                    handleLongPressStart(task.couplingId, task)
+                  }
                   onMouseUp={handleLongPressEnd}
                   onMouseLeave={handleLongPressEnd}
                   style={{

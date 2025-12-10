@@ -140,9 +140,7 @@ function ProfileModal({
             </div>
           </figure>
           <div className="card-body py-2 px-2 sm:px-4">
-            <h2 className="card-title text-xl sm:text-2xl">
-              {user?.username}
-            </h2>
+            <h2 className="card-title text-xl sm:text-2xl">{user?.username}</h2>
             <ul className="text-left text-sm sm:text-base">
               <li>Full Name: {user?.full_name}</li>
             </ul>

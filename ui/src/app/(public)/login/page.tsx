@@ -35,14 +35,14 @@ export default function LoginPage() {
   }, []);
 
   return (
-    <div className="hero login-page-bg min-h-screen">
+    <div className="hero login-page-bg min-h-screen items-start pt-12 sm:pt-0 sm:items-center">
       {loading && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <LoadingSpinner />
         </div>
       )}
 
-      <div className="hero-content flex-col lg:flex-row gap-8 lg:gap-16 px-4">
+      <div className="hero-content flex-col lg:flex-row gap-6 lg:gap-16 px-4">
         {/* Left side - Logo and description */}
         <div className="text-center lg:text-left max-w-lg">
           <div className="floating-logo inline-block mb-8">

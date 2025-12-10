@@ -313,7 +313,9 @@ export function ExecutionPageContent() {
                 <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-0.5 sm:mt-1 text-xs sm:text-sm text-base-content/60">
                   <span>{new Date(execution.start_at).toLocaleString()}</span>
                   {execution.elapsed_time && (
-                    <span className="hidden sm:inline">Duration: {execution.elapsed_time}</span>
+                    <span className="hidden sm:inline">
+                      Duration: {execution.elapsed_time}
+                    </span>
                   )}
                   {execution.elapsed_time && (
                     <span className="sm:hidden">{execution.elapsed_time}</span>
@@ -362,7 +364,9 @@ export function ExecutionPageContent() {
               </div>
             </div>
             <div>
-              <h3 className="text-base sm:text-xl font-bold mb-3 sm:mb-4">Execution Details</h3>
+              <h3 className="text-base sm:text-xl font-bold mb-3 sm:mb-4">
+                Execution Details
+              </h3>
               {isDetailLoading && <div>Loading details...</div>}
               {isDetailError && <div>Error loading details.</div>}
               {executionDetailData &&
