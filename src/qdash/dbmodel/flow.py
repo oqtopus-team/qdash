@@ -99,11 +99,13 @@ class FlowDocument(Document):
             List of FlowDocument objects
 
         """
+        sort_order: list = [("updated_at", DESCENDING)]
         return list(
             cls.find(
-                {"project_id": project_id, "username": username}, sort=[("updated_at", DESCENDING)]
+                {"project_id": project_id, "username": username},
+                sort=sort_order,
             ).run()
-        )  # type: ignore[list-item]
+        )
 
     @classmethod
     def delete_by_user_and_name(cls, username: str, name: str, project_id: str) -> bool:
