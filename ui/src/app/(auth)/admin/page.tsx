@@ -25,12 +25,15 @@ import {
   useCreateProjectForUser,
 } from "@/client/admin/admin";
 import { useRegisterUser, useResetPassword } from "@/client/auth/auth";
+import { SettingsCard } from "@/components/features/setting/SettingsCard";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function AdminPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"users" | "projects">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "projects" | "system">(
+    "users",
+  );
   const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
   const [selectedProject, setSelectedProject] =
     useState<ProjectListItem | null>(null);
@@ -234,6 +237,12 @@ export default function AdminPage() {
           onClick={() => setActiveTab("projects")}
         >
           Projects ({projectsData?.data?.total || 0})
+        </button>
+        <button
+          className={`tab ${activeTab === "system" ? "tab-active" : ""}`}
+          onClick={() => setActiveTab("system")}
+        >
+          System
         </button>
       </div>
 
@@ -567,6 +576,9 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* System Tab */}
+      {activeTab === "system" && <SettingsCard />}
 
       {/* Edit Modal */}
       {isEditModalOpen && selectedUser && (
