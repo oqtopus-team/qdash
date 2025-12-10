@@ -483,9 +483,11 @@ export function CouplingMetricsGrid({
                     !bgColor ? "bg-base-300/50" : ""
                   }`}
                 >
-                  {/* Coupling ID Label */}
+                  {/* Coupling ID Label - hidden on mobile in full view */}
                   <div
                     className={`absolute top-0.5 left-0.5 md:top-1 md:left-1 backdrop-blur-sm px-1 py-0.5 md:px-2 rounded text-[0.5rem] md:text-xs font-bold shadow-sm ${
+                      zoomMode === "full" ? "hidden md:block" : ""
+                    } ${
                       value !== null && value !== undefined
                         ? "bg-black/30 text-white"
                         : "bg-base-content/20 text-base-content"
@@ -496,11 +498,16 @@ export function CouplingMetricsGrid({
 
                   {/* Value Display */}
                   {value !== null && value !== undefined && (
-                    <div className="flex flex-col items-center justify-center h-full pt-3 md:pt-4">
-                      <div className="text-xs md:text-sm lg:text-base font-bold text-white drop-shadow-md">
+                    <div className="flex flex-col items-center justify-center h-full">
+                      <div className="text-[0.5rem] sm:text-xs md:text-sm lg:text-base font-bold text-white drop-shadow-md">
                         {value.toFixed(2)}
                       </div>
-                      <div className="text-[0.5rem] md:text-xs text-white/90 font-medium drop-shadow">
+                      {/* Unit - hidden on mobile in full view */}
+                      <div
+                        className={`text-[0.4rem] md:text-xs text-white/90 font-medium drop-shadow ${
+                          zoomMode === "full" ? "hidden md:block" : ""
+                        }`}
+                      >
                         {unit}
                       </div>
                     </div>
@@ -508,8 +515,8 @@ export function CouplingMetricsGrid({
 
                   {/* No data indicator */}
                   {(value === null || value === undefined) && (
-                    <div className="flex flex-col items-center justify-center h-full pt-3 md:pt-4">
-                      <div className="text-xs text-base-content/40 font-medium">
+                    <div className="flex flex-col items-center justify-center h-full">
+                      <div className="text-[0.5rem] sm:text-xs text-base-content/40 font-medium">
                         N/A
                       </div>
                     </div>
