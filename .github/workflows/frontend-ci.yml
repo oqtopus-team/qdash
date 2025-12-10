@@ -33,5 +33,5 @@ jobs:
         working-directory: ./ui
         run: bun install
 
-      - name: Run UI formatting and linting
-        run: task fmt-ui
+      - name: Run UI linting
+        run: task lint-ui

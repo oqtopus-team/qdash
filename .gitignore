@@ -194,18 +194,24 @@ sketch
 
 # Databases
 *.db
-.qdash
 memo_store.toml
 prefect.db-shm
 prefect.db-wal
 .next
 next-env.d.ts
 # tailwind.config.js
-data/
-backend/qcflow/storage
-postgres_data/
-mongo_data/
-calib_data/
+postgres_data/*
+!postgres_data/.gitkeep
+mongo_data/*
+!mongo_data/.gitkeep
+!mongo_data/data/
+mongo_data/data/*
+!mongo_data/data/.gitkeep
+!mongo_data/data/db/
+mongo_data/data/db/*
+!mongo_data/data/db/.gitkeep
+calib_data/*
+!calib_data/.gitkeep
 src/qdash/workflow/user_flows/*/
 *.env
 docker_node_modules/

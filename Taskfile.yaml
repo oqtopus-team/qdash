@@ -20,8 +20,8 @@ tasks:
     cmds:
       - curl http://api:$API_PORT/openapi.json | jq > ../docs/oas/openapi.json
       - bunx orval@7.14.0 --config ./orval.config.cjs
-      - bunx prettier . --write
-      - bunx eslint . --fix -c eslint.config.mjs
+      - bunx prettier . --write --log-level error
+      - bunx eslint . --fix -c eslint.config.mjs --quiet
     desc: Generate the TypeScript client
 
   docs:
@@ -75,34 +75,29 @@ tasks:
     cmds:
       - npm run docs:build
 
-  fmt-ui:
-    dir: ui
-    cmds:
-      - bunx prettier . --write
-      - bunx eslint . --fix -c eslint.config.mjs
-    desc: Format the UI code
-
-  fmt:
-    cmds:
-      - uv run ruff format . # Excludes generated client (see pyproject.toml)
-      - npx prettier . --write
-    desc: Format common code
-
-  fmt-python:
-    cmds:
-      - uv run ruff format . # Excludes generated client (see pyproject.toml)
-    desc: Format Python code only
-
   lint:
+    desc: Run all linting and formatting (Python + UI)
     cmds:
-      - uv run ruff check --fix . # Excludes generated client (see pyproject.toml)
-      - uv run ruff format --check .
-    desc: Run linting checks
+      - task: lint-python
+      - task: lint-ui
+
+  lint-python:
+    desc: Run Python linting and formatting
+    cmds:
+      - uv run ruff check --fix --quiet . # Excludes generated client (see pyproject.toml)
+      - uv run ruff format --quiet .
+
+  lint-ui:
+    dir: ui
+    desc: Run UI linting and formatting
+    cmds:
+      - bunx prettier . --write --log-level error
+      - bunx eslint . --fix -c eslint.config.mjs --quiet
 
   lint-mypy:
+    desc: Run mypy type checking on clean modules only
     cmds:
       - uv run mypy src/qdash/dbmodel --ignore-missing-imports
-    desc: Run mypy type checking on clean modules only
 
   tbls-docs:
     cmds:

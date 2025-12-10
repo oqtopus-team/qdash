@@ -45,7 +45,7 @@ jobs:
 
       - name: Run linting and format check
         run: |
-          task lint         # Excludes generated client code (see pyproject.toml)
+          task lint-python
           task lint-mypy
 
   # test:

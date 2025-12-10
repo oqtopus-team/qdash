@@ -12,11 +12,10 @@ git clone https://github.com/oqtopus-team/qdash.git
 
 ## Initial Setup
 
-Run the following commands to create the necessary directories and environment files.
+Create the environment file from the example.
 
 ```bash
-chmod +x scripts/create_directory.sh scripts/create_env.sh scripts/init.sh
-scripts/init.sh
+cp .env.example .env
 ```
 
 ## Start the Application
