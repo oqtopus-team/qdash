@@ -17,7 +17,7 @@ export function ExecutionStats({
 }: ExecutionStatsProps) {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
-  // タグの一覧を取得
+  // Get list of available tags
   useEffect(() => {
     const tags = new Set<string>();
     executions.forEach((exec) => {
@@ -26,12 +26,13 @@ export function ExecutionStats({
     setAvailableTags(Array.from(tags));
   }, [executions]);
 
-  // 選択されたタグでフィルタリング
+  // Filter executions by selected tag
   const filteredExecutions = useMemo(() => {
     if (!selectedTag) return executions;
     return executions.filter((exec) => exec.tags?.includes(selectedTag));
   }, [executions, selectedTag]);
-  // 統計情報の計算
+
+  // Calculate statistics
   const stats = useMemo(() => {
     const totalExecutions = filteredExecutions.length;
     const completedExecutions = filteredExecutions.filter(
@@ -44,7 +45,7 @@ export function ExecutionStats({
       (exec) => exec.status === "running",
     ).length;
 
-    // 実行時間の計算（完了した実行のみ対象）
+    // Calculate execution times (only completed executions)
     const completedExecutionTimes = filteredExecutions
       .filter(
         (exec) => exec.status === "completed" && exec.start_at && exec.end_at,
@@ -77,7 +78,7 @@ export function ExecutionStats({
         ? Math.min(...completedExecutionTimes)
         : 0;
 
-    // 成功率の計算
+    // Calculate success rate
     const successRate =
       totalExecutions > 0
         ? ((completedExecutions / totalExecutions) * 100).toFixed(1)
@@ -104,11 +105,11 @@ export function ExecutionStats({
   };
 
   return (
-    <div className="mb-6 px-10">
-      {/* タグフィルター */}
-      <div className="flex flex-wrap gap-2 mb-4">
+    <div className="mb-4 sm:mb-6 px-4 sm:px-10">
+      {/* Tag filter */}
+      <div className="flex flex-wrap gap-1 sm:gap-2 mb-3 sm:mb-4">
         <button
-          className={`btn btn-sm ${!selectedTag ? "btn-primary" : "btn-ghost"}`}
+          className={`btn btn-xs sm:btn-sm ${!selectedTag ? "btn-primary" : "btn-ghost"}`}
           onClick={() => onTagSelect(null)}
         >
           All
@@ -116,7 +117,7 @@ export function ExecutionStats({
         {availableTags.map((tag) => (
           <button
             key={tag}
-            className={`btn btn-sm ${
+            className={`btn btn-xs sm:btn-sm ${
               selectedTag === tag ? "btn-primary" : "btn-ghost"
             }`}
             onClick={() => onTagSelect(tag)}
@@ -126,9 +127,38 @@ export function ExecutionStats({
         ))}
       </div>
 
-      {/* 統計カード */}
-      <div className="grid grid-cols-4 gap-4">
-        {/* 実行統計 */}
+      {/* Stats cards - Mobile grid */}
+      <div className="grid grid-cols-2 gap-2 sm:hidden">
+        <div className="bg-base-200 rounded-lg p-3 text-center">
+          <div className="text-xs text-base-content/60">Total</div>
+          <div className="text-lg font-bold">{stats.totalExecutions}</div>
+          <div className="text-xs text-base-content/60">{stats.successRate}% success</div>
+        </div>
+        <div className="bg-base-200 rounded-lg p-3 text-center">
+          <div className="text-xs text-base-content/60">Status</div>
+          <div className="text-lg font-bold text-success">{stats.completedExecutions}</div>
+          <div className="text-xs">
+            <span className="text-error">{stats.failedExecutions}F</span>
+            {" / "}
+            <span className="text-info">{stats.runningExecutions}R</span>
+          </div>
+        </div>
+        <div className="bg-base-200 rounded-lg p-3 text-center">
+          <div className="text-xs text-base-content/60">Avg Time</div>
+          <div className="text-lg font-bold text-primary">{formatTime(stats.averageTime)}</div>
+        </div>
+        <div className="bg-base-200 rounded-lg p-3 text-center">
+          <div className="text-xs text-base-content/60">Time Range</div>
+          <div className="text-sm font-bold text-secondary">
+            {formatTime(stats.minTime)}
+          </div>
+          <div className="text-xs text-base-content/60">- {formatTime(stats.maxTime)}</div>
+        </div>
+      </div>
+
+      {/* Stats cards - Desktop */}
+      <div className="hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Execution stats */}
         <div className="stats shadow">
           <div className="stat">
             <div className="stat-title">Total Executions</div>
@@ -137,7 +167,7 @@ export function ExecutionStats({
           </div>
         </div>
 
-        {/* ステータス内訳 */}
+        {/* Status breakdown */}
         <div className="stats shadow">
           <div className="stat">
             <div className="stat-title">Status</div>
@@ -157,7 +187,7 @@ export function ExecutionStats({
           </div>
         </div>
 
-        {/* 平均実行時間 */}
+        {/* Average execution time */}
         <div className="stats shadow">
           <div className="stat">
             <div className="stat-title">Average Time</div>
@@ -168,7 +198,7 @@ export function ExecutionStats({
           </div>
         </div>
 
-        {/* 実行時間範囲 */}
+        {/* Execution time range */}
         <div className="stats shadow">
           <div className="stat">
             <div className="stat-title">Time Range</div>
