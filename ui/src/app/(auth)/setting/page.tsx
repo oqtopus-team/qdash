@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { useTheme } from "@/app/providers/theme-provider";
+import { PasswordChangeCard } from "@/components/features/setting/PasswordChangeCard";
 import { SettingsCard } from "@/components/features/setting/SettingsCard";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -44,7 +45,7 @@ const themes = [
   "silk",
 ];
 
-type Tab = "appearance" | "api" | "system";
+type Tab = "appearance" | "account" | "api" | "system";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
@@ -83,6 +84,12 @@ export default function SettingsPage() {
             onClick={() => setActiveTab("appearance")}
           >
             Appearance
+          </a>
+          <a
+            className={`tab ${activeTab === "account" ? "tab-active" : ""}`}
+            onClick={() => setActiveTab("account")}
+          >
+            Account
           </a>
           <a
             className={`tab ${activeTab === "api" ? "tab-active" : ""}`}
@@ -202,6 +209,8 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          ) : activeTab === "account" ? (
+            <PasswordChangeCard key="account" />
           ) : activeTab === "api" ? (
             <div className="card bg-base-200 shadow-lg" key="api">
               <div className="card-body">
