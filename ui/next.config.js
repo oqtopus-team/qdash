@@ -12,7 +12,7 @@ const nextConfig = {
       },
     ];
   },
-  transpilePackages: ["react-plotly.js", "plotly.js"],
+  transpilePackages: ["react-plotly.js", "plotly.js-basic-dist"],
   images: {
     remotePatterns: [
       {
@@ -25,20 +25,6 @@ const nextConfig = {
   },
   pageExtensions: ["tsx", "ts"],
   useFileSystemPublicRoutes: true,
-  // Turbopack configuration (used with --turbo flag)
-  turbopack: {
-    resolveAlias: {
-      "plotly.js": "plotly.js/dist/plotly",
-    },
-  },
-  // Webpack configuration (fallback when not using Turbopack)
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      "plotly.js": "plotly.js/dist/plotly",
-    };
-    return config;
-  },
 };
 
 module.exports = nextConfig;

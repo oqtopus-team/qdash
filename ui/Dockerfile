@@ -20,8 +20,9 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_PREFECT_URL=$NEXT_PUBLIC_PREFECT_URL
 ENV INTERNAL_API_URL=$INTERNAL_API_URL
 COPY ./ui .
-# Use Turbopack for faster builds
-RUN bun run next build --turbo
+# Use Turbopack for faster builds with build cache
+RUN --mount=type=cache,target=/app/.next/cache \
+    bun run next build --turbo
 
 # Standalone output - no need for bun install in runner
 FROM node:20-alpine AS runner
