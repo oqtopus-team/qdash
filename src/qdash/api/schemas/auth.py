@@ -45,3 +45,17 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     username: str
     default_project_id: str | None = None
+
+
+class PasswordChange(BaseModel):
+    """Password change request model."""
+
+    current_password: str
+    new_password: str
+
+
+class PasswordReset(BaseModel):
+    """Password reset request model (admin only)."""
+
+    username: str
+    new_password: str

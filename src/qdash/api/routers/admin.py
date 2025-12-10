@@ -182,6 +182,14 @@ def update_user_settings(
             detail=f"User '{username}' not found",
         )
 
+    # Prevent admin from changing their own role
+    if request.system_role is not None and username == admin.username:
+        if request.system_role != user.system_role:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot change your own system role",
+            )
+
     # Prevent demoting the last admin
     if request.system_role is not None and request.system_role != user.system_role:
         if user.system_role == SystemRole.ADMIN:
@@ -388,7 +396,9 @@ def admin_delete_project(
     ProjectMembershipDocument.find({"project_id": project_id}).delete().run()
 
     # Clear default_project_id from users who have this as default
-    UserDocument.find({"default_project_id": project_id}).update_many({"$set": {"default_project_id": None}}).run()
+    UserDocument.find({"default_project_id": project_id}).update_many(
+        {"$set": {"default_project_id": None}}
+    ).run()
 
     # Delete the project
     project.delete()
@@ -439,7 +449,9 @@ def list_project_members_admin(
             detail=f"Project '{project_id}' not found",
         )
 
-    memberships = list(ProjectMembershipDocument.find({"project_id": project_id, "status": "active"}).run())
+    memberships = list(
+        ProjectMembershipDocument.find({"project_id": project_id, "status": "active"}).run()
+    )
 
     # Get user details for each member
     members = []
@@ -509,7 +521,9 @@ def add_project_member_admin(
         )
 
     # Check if already a member
-    existing = ProjectMembershipDocument.find_one({"project_id": project_id, "username": request.username}).run()
+    existing = ProjectMembershipDocument.find_one(
+        {"project_id": project_id, "username": request.username}
+    ).run()
 
     if existing:
         if existing.status == "active":
@@ -523,7 +537,9 @@ def add_project_member_admin(
         existing.invited_by = admin.username
         existing.system_info.update_time()
         existing.save()
-        logger.info(f"Admin {admin.username} reactivated {request.username} in project {project_id} as viewer")
+        logger.info(
+            f"Admin {admin.username} reactivated {request.username} in project {project_id} as viewer"
+        )
         return MemberItem(
             username=existing.username,
             full_name=user.full_name,
@@ -544,7 +560,9 @@ def add_project_member_admin(
     )
     membership.insert()
 
-    logger.info(f"Admin {admin.username} added {request.username} to project {project_id} as viewer")
+    logger.info(
+        f"Admin {admin.username} added {request.username} to project {project_id} as viewer"
+    )
 
     return MemberItem(
         username=membership.username,
