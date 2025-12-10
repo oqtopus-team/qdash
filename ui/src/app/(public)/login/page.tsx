@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 
+import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -54,6 +55,9 @@ export default function LoginPage() {
           <h1 className="text-5xl lg:text-6xl font-bold login-title-gradient">
             QDash
           </h1>
+          <div className="mt-4">
+            <EnvironmentBadge size="lg" />
+          </div>
           <p className="py-6 text-base-content/70 text-xl lg:text-2xl">
             Quantum Calibration Dashboard for managing and monitoring qubit
             calibration workflows.

@@ -6,6 +6,7 @@ import { useCallback, useRef } from "react";
 import type { User } from "@/schemas";
 
 import { useLogout } from "@/client/auth/auth";
+import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -177,9 +178,10 @@ function Navbar() {
 
   return (
     <nav className="navbar w-full">
-      <div className="flex flex-1 md:gap-1 lg:gap-2">
+      <div className="flex flex-1 md:gap-1 lg:gap-2 items-center">
         <HiddenIcon />
         <ProjectSelector />
+        <EnvironmentBadge />
       </div>
       <div className="dropdown dropdown-end">
         <div
