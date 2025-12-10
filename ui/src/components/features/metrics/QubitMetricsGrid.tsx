@@ -488,21 +488,20 @@ export function QubitMetricsGrid({
       {/* Qubit Detail Modal */}
       {selectedQubitInfo && (
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4"
+          className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 backdrop-blur-sm sm:p-4"
           onClick={() => setSelectedQubitInfo(null)}
         >
           <div
-            className="bg-base-100 rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+            className="bg-base-100 rounded-t-xl sm:rounded-xl w-full sm:max-w-6xl max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-base-300 flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold">
-                  Qubit {selectedQubitInfo.qid} - {title} History
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg sm:text-2xl font-bold truncate">
+                  {selectedQubitInfo.qid} - {title}
                 </h2>
-                <p className="text-base-content/70 mt-1">
-                  Current Value:{" "}
+                <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
                   {selectedQubitInfo.metric.value !== null
                     ? `${selectedQubitInfo.metric.value.toFixed(4)} ${unit}`
                     : "No data"}
@@ -510,14 +509,14 @@ export function QubitMetricsGrid({
               </div>
               <button
                 onClick={() => setSelectedQubitInfo(null)}
-                className="btn btn-ghost btn-sm btn-circle"
+                className="btn btn-ghost btn-sm btn-circle flex-shrink-0 ml-2"
               >
                 ✕
               </button>
             </div>
 
             {/* Modal Content */}
-            <div className="flex-1 overflow-auto p-6">
+            <div className="flex-1 overflow-auto p-3 sm:p-6">
               <QubitMetricHistoryModal
                 chipId={chipId}
                 qid={selectedQubitInfo.qid}
@@ -527,18 +526,18 @@ export function QubitMetricsGrid({
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-base-300 flex justify-end gap-2">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-end gap-2">
               <button
                 onClick={() => setSelectedQubitInfo(null)}
-                className="btn btn-ghost"
+                className="btn btn-ghost btn-sm sm:btn-md"
               >
                 Close
               </button>
               <a
                 href={`/chip/${chipId}/qubit/${selectedQubitInfo.qid}`}
-                className="btn btn-primary"
+                className="btn btn-primary btn-sm sm:btn-md"
               >
-                View Details
+                Details
               </a>
             </div>
           </div>
