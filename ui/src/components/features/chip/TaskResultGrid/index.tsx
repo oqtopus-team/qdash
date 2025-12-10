@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 import type { Task } from "@/schemas";
 
@@ -31,6 +31,30 @@ export function TaskResultGrid({
 }: TaskResultGridProps) {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
+
+  // Long press preview state
+  const [previewQubit, setPreviewQubit] = useState<{
+    qid: string;
+    task: Task;
+  } | null>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleLongPressStart = (qid: string, task: Task) => {
+    longPressTimerRef.current = setTimeout(() => {
+      setPreviewQubit({ qid, task });
+    }, 300); // 300ms for long press
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleClosePreview = () => {
+    setPreviewQubit(null);
+  };
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -140,6 +164,61 @@ export function TaskResultGrid({
         </div>
       )}
 
+      {/* Long press preview overlay */}
+      {previewQubit && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center pt-16 px-4"
+          onClick={handleClosePreview}
+          onTouchEnd={handleClosePreview}
+        >
+          <div className="bg-base-100 rounded-xl shadow-2xl max-w-sm w-full overflow-hidden">
+            {/* Preview image */}
+            <div className="aspect-square bg-base-200">
+              {previewQubit.task.figure_path && (
+                <TaskFigure
+                  path={
+                    Array.isArray(previewQubit.task.figure_path)
+                      ? previewQubit.task.figure_path[0]
+                      : previewQubit.task.figure_path
+                  }
+                  qid={previewQubit.qid}
+                  className="w-full h-full object-contain"
+                />
+              )}
+            </div>
+            {/* Info */}
+            <div className="p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-lg">
+                  QID: {previewQubit.qid}
+                </span>
+                <span
+                  className={`badge ${
+                    previewQubit.task.status === "completed"
+                      ? "badge-success"
+                      : previewQubit.task.status === "failed"
+                        ? "badge-error"
+                        : "badge-warning"
+                  }`}
+                >
+                  {previewQubit.task.status}
+                </span>
+              </div>
+              {previewQubit.task.end_at && (
+                <div className="text-sm text-base-content/70">
+                  {new Date(previewQubit.task.end_at).toLocaleString("ja-JP", {
+                    timeZone: "Asia/Tokyo",
+                  })}
+                </div>
+              )}
+              <div className="text-xs text-base-content/50">
+                Tap anywhere to close • Tap cell to view history
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Grid Container */}
       <div className="relative">
         <div
@@ -181,8 +260,12 @@ export function TaskResultGrid({
               })}
             </div>
           </div>
-          {/* MUX labels overlay - separate layer on top */}
-          <div className="absolute inset-0 pointer-events-none p-4 z-10">
+          {/* MUX labels overlay - hidden on mobile in full view */}
+          <div
+            className={`absolute inset-0 pointer-events-none p-4 z-10 ${
+              zoomMode === "full" ? "hidden md:block" : ""
+            }`}
+          >
             <div
               className="grid gap-2 w-full h-full"
               style={{
@@ -240,8 +323,15 @@ export function TaskResultGrid({
                 <button
                   key={index}
                   onClick={() => {
+                    handleLongPressEnd();
                     setSelectedTaskInfo({ qid, taskName: selectedTask });
                   }}
+                  onTouchStart={() => handleLongPressStart(qid, task)}
+                  onTouchEnd={handleLongPressEnd}
+                  onTouchCancel={handleLongPressEnd}
+                  onMouseDown={() => handleLongPressStart(qid, task)}
+                  onMouseUp={handleLongPressEnd}
+                  onMouseLeave={handleLongPressEnd}
                   className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 relative w-full ${
                     task.over_threshold
                       ? "border-2 border-primary animate-pulse-light"
@@ -257,7 +347,11 @@ export function TaskResultGrid({
                       />
                     </div>
                   )}
-                  <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
+                  <div
+                    className={`absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium ${
+                      zoomMode === "full" ? "hidden md:block" : ""
+                    }`}
+                  >
                     {qid}
                   </div>
                   <div

@@ -24,13 +24,16 @@ import {
   useRemoveProjectMemberAdmin,
   useCreateProjectForUser,
 } from "@/client/admin/admin";
-import { useRegisterUser } from "@/client/auth/auth";
+import { useRegisterUser, useResetPassword } from "@/client/auth/auth";
+import { SettingsCard } from "@/components/features/setting/SettingsCard";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function AdminPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"users" | "projects">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "projects" | "system">(
+    "users",
+  );
   const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
   const [selectedProject, setSelectedProject] =
     useState<ProjectListItem | null>(null);
@@ -234,6 +237,12 @@ export default function AdminPage() {
           onClick={() => setActiveTab("projects")}
         >
           Projects ({projectsData?.data?.total || 0})
+        </button>
+        <button
+          className={`tab ${activeTab === "system" ? "tab-active" : ""}`}
+          onClick={() => setActiveTab("system")}
+        >
+          System
         </button>
       </div>
 
@@ -568,10 +577,14 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* System Tab */}
+      {activeTab === "system" && <SettingsCard />}
+
       {/* Edit Modal */}
       {isEditModalOpen && selectedUser && (
         <EditUserModal
           user={selectedUser}
+          currentUsername={user?.username}
           onClose={() => {
             setIsEditModalOpen(false);
             setSelectedUser(null);
@@ -709,11 +722,13 @@ export default function AdminPage() {
 // Edit User Modal Component
 function EditUserModal({
   user,
+  currentUsername,
   onClose,
   onSave,
   isLoading,
 }: {
   user: UserListItem;
+  currentUsername?: string;
   onClose: () => void;
   onSave: (updates: { disabled?: boolean; system_role?: SystemRole }) => void;
   isLoading: boolean;
@@ -722,12 +737,50 @@ function EditUserModal({
   const [systemRole, setSystemRole] = useState<SystemRole>(
     user.system_role ?? "user",
   );
+  const isSelf = user.username === currentUsername;
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  const resetPasswordMutation = useResetPassword();
 
   const handleSave = () => {
     onSave({
       disabled,
       system_role: systemRole,
     });
+  };
+
+  const handleResetPassword = async () => {
+    setPasswordError(null);
+    setPasswordSuccess(false);
+
+    if (!newPassword.trim()) {
+      setPasswordError("Password is required");
+      return;
+    }
+    if (newPassword.length < 4) {
+      setPasswordError("Password must be at least 4 characters");
+      return;
+    }
+
+    try {
+      await resetPasswordMutation.mutateAsync({
+        data: {
+          username: user.username,
+          new_password: newPassword,
+        },
+      });
+      setPasswordSuccess(true);
+      setNewPassword("");
+      setTimeout(() => {
+        setShowPasswordReset(false);
+        setPasswordSuccess(false);
+      }, 2000);
+    } catch {
+      setPasswordError("Failed to reset password");
+    }
   };
 
   return (
@@ -763,16 +816,97 @@ function EditUserModal({
               className="select select-bordered"
               value={systemRole}
               onChange={(e) => setSystemRole(e.target.value as SystemRole)}
+              disabled={isSelf}
             >
               <option value="user">User</option>
               <option value="admin">Admin</option>
             </select>
             <label className="label">
               <span className="label-text-alt text-base-content/60">
-                Admin users can manage all users and system settings
+                {isSelf
+                  ? "You cannot change your own system role"
+                  : "Admin users can manage all users and system settings"}
               </span>
             </label>
           </div>
+
+          {/* Password Reset Section */}
+          <div className="divider">Password</div>
+
+          {!showPasswordReset ? (
+            <button
+              className="btn btn-outline btn-warning btn-sm"
+              onClick={() => setShowPasswordReset(true)}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                />
+              </svg>
+              Reset Password
+            </button>
+          ) : (
+            <div className="bg-base-300 p-4 rounded-lg space-y-3">
+              <h4 className="font-medium text-sm">Reset Password</h4>
+
+              {passwordError && (
+                <div className="alert alert-error py-2">
+                  <span className="text-sm">{passwordError}</span>
+                </div>
+              )}
+
+              {passwordSuccess && (
+                <div className="alert alert-success py-2">
+                  <span className="text-sm">Password reset successfully!</span>
+                </div>
+              )}
+
+              <div className="form-control">
+                <input
+                  type="password"
+                  className="input input-bordered input-sm w-full"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  disabled={passwordSuccess}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  className="btn btn-warning btn-sm"
+                  onClick={handleResetPassword}
+                  disabled={resetPasswordMutation.isPending || passwordSuccess}
+                >
+                  {resetPasswordMutation.isPending ? (
+                    <span className="loading loading-spinner loading-xs"></span>
+                  ) : (
+                    "Confirm Reset"
+                  )}
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setShowPasswordReset(false);
+                    setNewPassword("");
+                    setPasswordError(null);
+                  }}
+                  disabled={resetPasswordMutation.isPending}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="modal-action">

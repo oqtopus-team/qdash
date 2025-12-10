@@ -40,11 +40,23 @@ function Sidebar() {
     }
   };
 
+  // Compact style for mobile sidebar
+  const linkClass = (active: boolean) =>
+    `py-3 px-4 mx-4 my-1 text-sm font-bold flex items-center rounded-lg ${
+      active ? "bg-neutral text-neutral-content" : "text-base-content"
+    }`;
+
+  // Desktop expanded style
+  const desktopLinkClass = (active: boolean) =>
+    `py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
+      active ? "bg-neutral text-neutral-content" : "text-base-content"
+    }`;
+
   const sidebarContent = (
     <>
-      <ul className="menu p-4 py-0">
+      <ul className="menu p-2 py-0">
         {(isOpen || isMobileOpen) && (
-          <div className="flex justify-center items-center p-4">
+          <div className="flex justify-center items-center p-3">
             <Link
               href="/"
               className="flex items-center"
@@ -64,13 +76,11 @@ function Sidebar() {
         <li>
           <Link
             href="/metrics"
-            className={`py-4 ${
-              isOpen || isMobileOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
-            } my-2 text-base font-bold flex items-center ${
-              isActive("/metrics")
-                ? "bg-neutral text-neutral-content"
-                : "text-base-content"
-            }`}
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/metrics"))
+                : desktopLinkClass(isActive("/metrics"))
+            }
             title="Metrics"
             onClick={handleLinkClick}
           >
@@ -81,13 +91,11 @@ function Sidebar() {
         <li>
           <Link
             href="/chip"
-            className={`py-4 ${
-              isOpen || isMobileOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
-            } my-2 text-base font-bold flex items-center ${
-              isActive("/chip")
-                ? "bg-neutral text-neutral-content"
-                : "text-base-content"
-            }`}
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/chip"))
+                : desktopLinkClass(isActive("/chip"))
+            }
             title="Chip"
             onClick={handleLinkClick}
           >
@@ -99,15 +107,11 @@ function Sidebar() {
           <li>
             <Link
               href="/flow"
-              className={`py-4 ${
-                isOpen || isMobileOpen
-                  ? "px-4 mx-10"
-                  : "px-2 mx-0 justify-center"
-              } my-2 text-base font-bold flex items-center ${
-                pathname.startsWith("/flow")
-                  ? "bg-neutral text-neutral-content"
-                  : "text-base-content"
-              }`}
+              className={
+                isMobileOpen
+                  ? linkClass(pathname.startsWith("/flow"))
+                  : desktopLinkClass(pathname.startsWith("/flow"))
+              }
               title="Editor"
               onClick={handleLinkClick}
             >
@@ -119,13 +123,11 @@ function Sidebar() {
         <li>
           <Link
             href="/execution"
-            className={`py-4 ${
-              isOpen || isMobileOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
-            } my-2 text-base font-bold flex items-center ${
-              isActive("/execution")
-                ? "bg-neutral text-neutral-content"
-                : "text-base-content"
-            }`}
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/execution"))
+                : desktopLinkClass(isActive("/execution"))
+            }
             title="Execution"
             onClick={handleLinkClick}
           >
@@ -138,13 +140,11 @@ function Sidebar() {
         <li>
           <Link
             href="/analysis"
-            className={`py-4 ${
-              isOpen || isMobileOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
-            } my-2 text-base font-bold flex items-center ${
-              isActive("/analysis")
-                ? "bg-neutral text-neutral-content"
-                : "text-base-content"
-            }`}
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/analysis"))
+                : desktopLinkClass(isActive("/analysis"))
+            }
             title="Analysis"
             onClick={handleLinkClick}
           >
@@ -156,15 +156,11 @@ function Sidebar() {
           <li>
             <Link
               href="/tasks"
-              className={`py-4 ${
-                isOpen || isMobileOpen
-                  ? "px-4 mx-10"
-                  : "px-2 mx-0 justify-center"
-              } my-2 text-base font-bold flex items-center ${
-                isActive("/tasks")
-                  ? "bg-neutral text-neutral-content"
-                  : "text-base-content"
-              }`}
+              className={
+                isMobileOpen
+                  ? linkClass(isActive("/tasks"))
+                  : desktopLinkClass(isActive("/tasks"))
+              }
               title="Tasks"
               onClick={handleLinkClick}
             >
@@ -177,15 +173,11 @@ function Sidebar() {
           <li>
             <Link
               href="/files"
-              className={`py-4 ${
-                isOpen || isMobileOpen
-                  ? "px-4 mx-10"
-                  : "px-2 mx-0 justify-center"
-              } my-2 text-base font-bold flex items-center ${
-                pathname.startsWith("/files")
-                  ? "bg-neutral text-neutral-content"
-                  : "text-base-content"
-              }`}
+              className={
+                isMobileOpen
+                  ? linkClass(pathname.startsWith("/files"))
+                  : desktopLinkClass(pathname.startsWith("/files"))
+              }
               title="Files"
               onClick={handleLinkClick}
             >
@@ -198,13 +190,11 @@ function Sidebar() {
         <li>
           <Link
             href="/setting"
-            className={`py-4 ${
-              isOpen || isMobileOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"
-            } my-2 text-base font-bold flex items-center ${
-              isActive("/setting")
-                ? "bg-neutral text-neutral-content"
-                : "text-base-content"
-            }`}
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/setting"))
+                : desktopLinkClass(isActive("/setting"))
+            }
             title="Settings"
             onClick={handleLinkClick}
           >
@@ -216,15 +206,11 @@ function Sidebar() {
           <li>
             <Link
               href="/admin"
-              className={`py-4 ${
-                isOpen || isMobileOpen
-                  ? "px-4 mx-10"
-                  : "px-2 mx-0 justify-center"
-              } my-2 text-base font-bold flex items-center ${
-                isActive("/admin")
-                  ? "bg-neutral text-neutral-content"
-                  : "text-base-content"
-              }`}
+              className={
+                isMobileOpen
+                  ? linkClass(isActive("/admin"))
+                  : desktopLinkClass(isActive("/admin"))
+              }
               title="Admin"
               onClick={handleLinkClick}
             >
@@ -235,17 +221,15 @@ function Sidebar() {
         )}
         {canEdit && (
           <>
-            <div className="divider"></div>
+            <div className={`divider ${isMobileOpen ? "my-1" : ""}`}></div>
             <li>
               <a
                 href={`${PREFECT_URL}/dashboard`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`py-4 ${
-                  isOpen || isMobileOpen
-                    ? "px-4 mx-10"
-                    : "px-2 mx-0 justify-center"
-                } my-2 text-base font-bold flex items-center`}
+                className={
+                  isMobileOpen ? linkClass(false) : desktopLinkClass(false)
+                }
                 title="Workflow"
                 onClick={handleLinkClick}
               >
@@ -260,11 +244,9 @@ function Sidebar() {
                 href="/api/docs"
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`py-4 ${
-                  isOpen || isMobileOpen
-                    ? "px-4 mx-10"
-                    : "px-2 mx-0 justify-center"
-                } my-2 text-base font-bold flex items-center`}
+                className={
+                  isMobileOpen ? linkClass(false) : desktopLinkClass(false)
+                }
                 title="API Docs"
                 onClick={handleLinkClick}
               >
@@ -285,7 +267,7 @@ function Sidebar() {
       {/* Desktop Sidebar */}
       <aside
         className={`bg-base-200 min-h-screen transition-all duration-300 hidden lg:block ${
-          isOpen ? "w-80" : "w-20"
+          isOpen ? "w-64" : "w-16"
         }`}
       >
         <div className="flex justify-end p-2">
@@ -314,11 +296,11 @@ function Sidebar() {
 
       {/* Mobile Sidebar Drawer */}
       <aside
-        className={`fixed top-0 left-0 h-full w-80 bg-base-200 z-50 transform transition-transform duration-300 lg:hidden ${
+        className={`fixed top-0 left-0 h-full w-56 bg-base-200 z-50 transform transition-transform duration-300 lg:hidden flex flex-col ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex justify-end p-2">
+        <div className="flex justify-end p-2 flex-shrink-0">
           <button
             onClick={() => setMobileSidebarOpen(false)}
             className="btn btn-ghost btn-sm btn-square"
@@ -327,7 +309,7 @@ function Sidebar() {
             <FiX size={20} />
           </button>
         </div>
-        {sidebarContent}
+        <div className="flex-1 overflow-y-auto pb-safe">{sidebarContent}</div>
       </aside>
     </>
   );

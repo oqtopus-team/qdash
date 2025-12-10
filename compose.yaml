@@ -189,6 +189,7 @@ services:
       dockerfile: ./ui/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_ENV: ${ENV}
         NEXT_PUBLIC_PREFECT_URL: ${NEXT_PUBLIC_PREFECT_URL}
         INTERNAL_API_URL: http://api:${API_PORT:-5715}
     restart: always

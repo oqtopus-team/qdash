@@ -62,6 +62,10 @@ export default withMermaid(
           text: "User Guide",
           items: [
             {
+              text: "Authentication",
+              link: "/user-guide/authentication",
+            },
+            {
               text: "Projects and Sharing",
               link: "/user-guide/projects-and-sharing",
             },

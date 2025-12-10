@@ -737,15 +737,15 @@ export function HistogramView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Controls Section */}
       <div className="card bg-base-100 shadow-md">
-        <div className="card-body p-4 gap-4">
+        <div className="card-body p-3 sm:p-4 gap-3 sm:gap-4">
           {/* Row 1: Main Controls */}
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-            {/* Left: Type + Chip + Metric */}
-            <div className="flex items-center gap-3">
-              <div className="tabs tabs-boxed bg-base-200 h-9">
+          <div className="flex flex-col gap-3 sm:gap-4">
+            {/* Row 1a: Type + Chip + Metric */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="tabs tabs-boxed bg-base-200 h-8 sm:h-9">
                 <button
                   className={`tab h-full ${metricType === "qubit" ? "tab-active" : ""}`}
                   onClick={() => handleMetricTypeChange("qubit")}
@@ -760,14 +760,14 @@ export function HistogramView() {
                 </button>
               </div>
 
-              <div className="w-36">
+              <div className="w-28 sm:w-36">
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}
                 />
               </div>
 
-              <div className="w-52">
+              <div className="w-40 sm:w-52">
                 <Select<MetricOption, false>
                   className="text-base-content"
                   classNamePrefix="react-select"
@@ -789,9 +789,9 @@ export function HistogramView() {
               </div>
             </div>
 
-            {/* Center: Time Range + Mode */}
-            <div className="flex items-center gap-3">
-              <div className="join h-9">
+            {/* Row 1b: Time Range + Mode + Display Toggle + Export */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="join h-8 sm:h-9">
                 <button
                   className={`join-item btn btn-sm h-full ${timeRange === "1d" ? "btn-active" : ""}`}
                   onClick={() => setTimeRange("1d")}
@@ -812,15 +812,15 @@ export function HistogramView() {
                 </button>
               </div>
 
-              <div className="join h-9">
+              <div className="join h-8 sm:h-9">
                 <button
-                  className={`join-item btn btn-sm h-full ${selectionMode === "latest" ? "btn-active" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-active" : ""}`}
                   onClick={() => setSelectionMode("latest")}
                 >
                   Latest
                 </button>
                 <button
-                  className={`join-item btn btn-sm h-full ${selectionMode === "best" ? "btn-active" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "best" ? "btn-active" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
                   onClick={() => setSelectionMode("best")}
                   disabled={!isBestModeSupported}
                   title={
@@ -832,25 +832,22 @@ export function HistogramView() {
                   Best
                 </button>
               </div>
-            </div>
 
-            {/* Right: Display Toggle + Export */}
-            <div className="flex items-center gap-3 lg:ml-auto">
               {isPercentageMetric(currentMetricConfig?.unit) && (
-                <label className="cursor-pointer flex items-center gap-2 h-9">
-                  <span className="text-sm">Fidelity</span>
+                <label className="cursor-pointer flex items-center gap-1 sm:gap-2 h-8 sm:h-9">
+                  <span className="text-xs sm:text-sm">Fidelity</span>
                   <input
                     type="checkbox"
-                    className="toggle toggle-primary toggle-sm"
+                    className="toggle toggle-primary toggle-xs sm:toggle-sm"
                     checked={showAsErrorRate}
                     onChange={(e) => setShowAsErrorRate(e.target.checked)}
                   />
-                  <span className="text-sm">Error</span>
+                  <span className="text-xs sm:text-sm">Error</span>
                 </label>
               )}
 
               <button
-                className="btn btn-outline btn-sm h-9"
+                className="btn btn-outline btn-xs sm:btn-sm h-8 sm:h-9 ml-auto sm:ml-0"
                 onClick={handleExportCSV}
                 disabled={histogramData.length === 0}
               >
@@ -860,35 +857,77 @@ export function HistogramView() {
           </div>
 
           {/* Row 2: Threshold Slider */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="text-xs sm:text-sm font-medium shrink-0">
               Threshold: {thresholdDisplayText}
             </span>
-            <span className="text-xs text-base-content/60">
-              {!isPercentageMetric(currentMetricConfig?.unit)
-                ? `${sliderDisplayConfig.min}`
-                : `${sliderDisplayConfig.min.toFixed(0)}%`}
-            </span>
-            <input
-              type="range"
-              className="range range-primary range-sm w-48"
-              min={sliderDisplayConfig.min}
-              max={sliderDisplayConfig.max}
-              step={sliderDisplayConfig.step}
-              value={sliderValue}
-              onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
-            />
-            <span className="text-xs text-base-content/60">
-              {!isPercentageMetric(currentMetricConfig?.unit)
-                ? `${sliderDisplayConfig.max}`
-                : `${sliderDisplayConfig.max.toFixed(0)}%`}
-            </span>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-xs text-base-content/60 shrink-0">
+                {!isPercentageMetric(currentMetricConfig?.unit)
+                  ? `${sliderDisplayConfig.min}`
+                  : `${sliderDisplayConfig.min.toFixed(0)}%`}
+              </span>
+              <input
+                type="range"
+                className="range range-primary range-xs sm:range-sm flex-1 min-w-24 max-w-48"
+                min={sliderDisplayConfig.min}
+                max={sliderDisplayConfig.max}
+                step={sliderDisplayConfig.step}
+                value={sliderValue}
+                onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
+              />
+              <span className="text-xs text-base-content/60 shrink-0">
+                {!isPercentageMetric(currentMetricConfig?.unit)
+                  ? `${sliderDisplayConfig.max}`
+                  : `${sliderDisplayConfig.max.toFixed(0)}%`}
+              </span>
+            </div>
           </div>
 
           {/* Statistics Display */}
           {statistics.count > 0 && (
-            <div className="mt-4">
-              <div className="stats stats-vertical lg:stats-horizontal shadow w-full">
+            <div className="mt-2 sm:mt-4">
+              {/* Mobile: Grid layout */}
+              <div className="grid grid-cols-3 gap-2 sm:hidden">
+                <div className="bg-base-200 rounded-lg p-2 text-center">
+                  <div className="text-xs text-base-content/60">Count</div>
+                  <div className="text-sm font-bold text-primary">
+                    {statistics.count}
+                  </div>
+                </div>
+                <div className="bg-base-200 rounded-lg p-2 text-center">
+                  <div className="text-xs text-base-content/60">Mean</div>
+                  <div className="text-sm font-bold text-secondary">
+                    {statistics.mean.toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-base-200 rounded-lg p-2 text-center">
+                  <div className="text-xs text-base-content/60">Median</div>
+                  <div className="text-sm font-bold text-accent">
+                    {statistics.median.toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-base-200 rounded-lg p-2 text-center">
+                  <div className="text-xs text-base-content/60">Min</div>
+                  <div className="text-sm font-bold">
+                    {statistics.min.toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-base-200 rounded-lg p-2 text-center">
+                  <div className="text-xs text-base-content/60">Max</div>
+                  <div className="text-sm font-bold">
+                    {statistics.max.toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-base-200 rounded-lg p-2 text-center">
+                  <div className="text-xs text-base-content/60">Yield</div>
+                  <div className="text-sm font-bold text-warning">
+                    {statistics.yieldPercent.toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+              {/* Desktop: Stats component */}
+              <div className="stats stats-horizontal shadow w-full hidden sm:inline-grid">
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Count</div>
                   <div className="stat-value text-primary text-lg">

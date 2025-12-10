@@ -23,8 +23,12 @@ import type {
 
 import type {
   BodyLogin,
+  ChangePassword200,
   HTTPValidationError,
   Logout200,
+  PasswordChange,
+  PasswordReset,
+  ResetPassword200,
   TokenResponse,
   User,
   UserCreate,
@@ -493,6 +497,232 @@ export const useLogout = <TError = void, TContext = unknown>(
   TContext
 > => {
   const mutationOptions = getLogoutMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Change the current user's password.
+
+Validates the current password and updates to the new password.
+
+Parameters
+----------
+password_data : PasswordChange
+    Contains current_password and new_password
+current_user : User
+    Current authenticated user injected via dependency
+
+Returns
+-------
+dict[str, str]
+    Success message confirming password change
+
+Raises
+------
+HTTPException
+    400 if current password is incorrect
+    400 if new password is empty
+ * @summary Change user password
+ */
+export const changePassword = (
+  passwordChange: PasswordChange,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ChangePassword200>(
+    {
+      url: `/auth/change-password`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: passwordChange,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getChangePasswordMutationOptions = <
+  TError = void | HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof changePassword>>,
+    TError,
+    { data: PasswordChange },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof changePassword>>,
+  TError,
+  { data: PasswordChange },
+  TContext
+> => {
+  const mutationKey = ["changePassword"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof changePassword>>,
+    { data: PasswordChange }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return changePassword(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ChangePasswordMutationResult = NonNullable<
+  Awaited<ReturnType<typeof changePassword>>
+>;
+export type ChangePasswordMutationBody = PasswordChange;
+export type ChangePasswordMutationError = void | HTTPValidationError;
+
+/**
+ * @summary Change user password
+ */
+export const useChangePassword = <
+  TError = void | HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof changePassword>>,
+      TError,
+      { data: PasswordChange },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof changePassword>>,
+  TError,
+  { data: PasswordChange },
+  TContext
+> => {
+  const mutationOptions = getChangePasswordMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Reset a user's password (admin only).
+
+Allows administrators to reset any user's password without knowing
+the current password. This is useful for password recovery scenarios.
+
+Parameters
+----------
+password_data : PasswordReset
+    Contains username and new_password
+current_user : User
+    Current authenticated admin user
+
+Returns
+-------
+dict[str, str]
+    Success message confirming password reset
+
+Raises
+------
+HTTPException
+    403 if the current user is not an admin
+    404 if the target user is not found
+    400 if new password is empty
+ * @summary Reset user password (admin only)
+ */
+export const resetPassword = (
+  passwordReset: PasswordReset,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ResetPassword200>(
+    {
+      url: `/auth/reset-password`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: passwordReset,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getResetPasswordMutationOptions = <
+  TError = void | HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetPassword>>,
+    TError,
+    { data: PasswordReset },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resetPassword>>,
+  TError,
+  { data: PasswordReset },
+  TContext
+> => {
+  const mutationKey = ["resetPassword"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resetPassword>>,
+    { data: PasswordReset }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return resetPassword(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResetPasswordMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resetPassword>>
+>;
+export type ResetPasswordMutationBody = PasswordReset;
+export type ResetPasswordMutationError = void | HTTPValidationError;
+
+/**
+ * @summary Reset user password (admin only)
+ */
+export const useResetPassword = <
+  TError = void | HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof resetPassword>>,
+      TError,
+      { data: PasswordReset },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof resetPassword>>,
+  TError,
+  { data: PasswordReset },
+  TContext
+> => {
+  const mutationOptions = getResetPasswordMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

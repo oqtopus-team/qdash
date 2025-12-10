@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 
+import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -34,14 +35,14 @@ export default function LoginPage() {
   }, []);
 
   return (
-    <div className="hero login-page-bg min-h-screen">
+    <div className="hero login-page-bg min-h-screen items-start pt-12 sm:pt-0 sm:items-center">
       {loading && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <LoadingSpinner />
         </div>
       )}
 
-      <div className="hero-content flex-col lg:flex-row gap-8 lg:gap-16 px-4">
+      <div className="hero-content flex-col lg:flex-row gap-6 lg:gap-16 px-4">
         {/* Left side - Logo and description */}
         <div className="text-center lg:text-left max-w-lg">
           <div className="floating-logo inline-block mb-8">
@@ -54,6 +55,9 @@ export default function LoginPage() {
           <h1 className="text-5xl lg:text-6xl font-bold login-title-gradient">
             QDash
           </h1>
+          <div className="mt-4">
+            <EnvironmentBadge className="badge-lg" />
+          </div>
           <p className="py-6 text-base-content/70 text-xl lg:text-2xl">
             Quantum Calibration Dashboard for managing and monitoring qubit
             calibration workflows.

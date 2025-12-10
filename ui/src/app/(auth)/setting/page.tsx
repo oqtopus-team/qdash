@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { useTheme } from "@/app/providers/theme-provider";
-import { SettingsCard } from "@/components/features/setting/SettingsCard";
+import { PasswordChangeCard } from "@/components/features/setting/PasswordChangeCard";
 import { useAuth } from "@/contexts/AuthContext";
 
 const themes = [
@@ -44,7 +44,7 @@ const themes = [
   "silk",
 ];
 
-type Tab = "appearance" | "api" | "system";
+type Tab = "appearance" | "account" | "api";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
@@ -85,16 +85,16 @@ export default function SettingsPage() {
             Appearance
           </a>
           <a
+            className={`tab ${activeTab === "account" ? "tab-active" : ""}`}
+            onClick={() => setActiveTab("account")}
+          >
+            Account
+          </a>
+          <a
             className={`tab ${activeTab === "api" ? "tab-active" : ""}`}
             onClick={() => setActiveTab("api")}
           >
             API Token
-          </a>
-          <a
-            className={`tab ${activeTab === "system" ? "tab-active" : ""}`}
-            onClick={() => setActiveTab("system")}
-          >
-            System
           </a>
         </div>
         <div className="w-full h-full space-y-6">
@@ -202,7 +202,9 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-          ) : activeTab === "api" ? (
+          ) : activeTab === "account" ? (
+            <PasswordChangeCard key="account" />
+          ) : (
             <div className="card bg-base-200 shadow-lg" key="api">
               <div className="card-body">
                 <h2 className="card-title text-xl mb-4">API Access Token</h2>
@@ -405,8 +407,6 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-          ) : (
-            <SettingsCard key="system" />
           )}
         </div>
       </div>

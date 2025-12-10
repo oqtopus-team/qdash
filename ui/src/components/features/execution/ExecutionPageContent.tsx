@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 
 import { FaExternalLinkAlt } from "react-icons/fa";
-import JsonView from "react18-json-view";
 
 import { ExecutionStats } from "./ExecutionStats";
 
@@ -193,22 +192,22 @@ export function ExecutionPageContent() {
 
   // Pagination controls component
   const PaginationControls = () => (
-    <div className="flex justify-center items-center gap-4 my-4">
+    <div className="flex justify-center items-center gap-2 sm:gap-4 my-3 sm:my-4 px-4">
       <button
         onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
         disabled={currentPage === 1}
-        className="btn btn-sm btn-outline"
+        className="btn btn-xs sm:btn-sm btn-outline"
       >
-        Previous
+        Prev
       </button>
-      <span className="text-sm">Page {currentPage}</span>
+      <span className="text-xs sm:text-sm">Page {currentPage}</span>
       <button
         onClick={() => setCurrentPage((prev) => prev + 1)}
         disabled={
           !executionData?.data?.executions ||
           executionData.data.executions.length < itemsPerPage
         }
-        className="btn btn-sm btn-outline"
+        className="btn btn-xs sm:btn-sm btn-outline"
       >
         Next
       </button>
@@ -269,7 +268,7 @@ export function ExecutionPageContent() {
       />
       {/* Pagination controls - Top */}
       <PaginationControls />
-      <div className="grid grid-cols-1 gap-2 mx-5">
+      <div className="grid grid-cols-1 gap-1.5 sm:gap-2 mx-2 sm:mx-5">
         {cardData.map((execution) => {
           const executionKey = getExecutionKey(execution);
           const isSelected = selectedExecutionId === execution.execution_id;
@@ -278,8 +277,8 @@ export function ExecutionPageContent() {
           return (
             <div
               key={executionKey}
-              className={`p-3 sm:p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden transition-transform duration-200 bg-base-100 ${
-                isSelected ? "transform scale-100" : "transform scale-95"
+              className={`p-2 sm:p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden transition-transform duration-200 bg-base-100 ${
+                isSelected ? "transform scale-100" : "sm:transform sm:scale-95"
               } ${statusBorderStyle}`}
               onClick={() => handleCardClick(execution)}
             >
@@ -287,12 +286,12 @@ export function ExecutionPageContent() {
                 <div className="absolute inset-0 bg-primary opacity-10 pointer-events-none transition-opacity duration-500" />
               )}
               <div className="relative z-10 w-full">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
-                  <h2 className="text-lg sm:text-xl font-semibold">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-sm sm:text-xl font-semibold truncate">
                     {execution.name}
                   </h2>
                   <span
-                    className={`text-sm font-semibold flex-shrink-0 ${
+                    className={`text-xs sm:text-sm font-semibold flex-shrink-0 ${
                       execution.status === "running"
                         ? "text-info"
                         : execution.status === "completed"
@@ -311,10 +310,15 @@ export function ExecutionPageContent() {
                           : "Failed"}
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-base-content/60">
+                <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-0.5 sm:mt-1 text-xs sm:text-sm text-base-content/60">
                   <span>{new Date(execution.start_at).toLocaleString()}</span>
                   {execution.elapsed_time && (
-                    <span>Duration: {execution.elapsed_time}</span>
+                    <span className="hidden sm:inline">
+                      Duration: {execution.elapsed_time}
+                    </span>
+                  )}
+                  {execution.elapsed_time && (
+                    <span className="sm:hidden">{execution.elapsed_time}</span>
                   )}
                 </div>
               </div>
@@ -334,44 +338,35 @@ export function ExecutionPageContent() {
       >
         <button
           onClick={handleCloseSidebar}
-          className="text-base-content/60 text-2xl font-bold absolute top-4 right-4 hover:text-base-content"
+          className="btn btn-ghost btn-sm btn-circle absolute top-3 right-3 sm:top-4 sm:right-4"
+          aria-label="Close sidebar"
         >
-          ×
+          ✕
         </button>
         {selectedExecutionId && (
           <>
-            <div className="p-4 bg-base-100 mb-6">
-              <h2 className="text-2xl font-bold">
+            <div className="p-2 sm:p-4 bg-base-100 mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-2xl font-bold pr-8">
                 {
                   cardData.find(
                     (exec) => getExecutionKey(exec) === selectedExecutionId,
                   )?.name
                 }
               </h2>
-              <div className="flex space-x-4 mt-4">
+              <div className="mt-3 sm:mt-4">
                 <a
                   href={`/execution/${selectedChip || ""}/${selectedExecutionId}`}
-                  className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
+                  className="btn btn-primary btn-sm sm:btn-md"
                 >
-                  <FaExternalLinkAlt className="mr-2" />
-                  Go to Detail
-                </a>
-                <a
-                  href={String(
-                    cardData.find(
-                      (exec) => getExecutionKey(exec) === selectedExecutionId,
-                    )?.note?.ui_url || "#",
-                  )}
-                  className="bg-accent text-accent-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
-                >
-                  <FaExternalLinkAlt className="mr-2" />
-                  Go to Flow
+                  <FaExternalLinkAlt className="text-xs sm:text-sm" />
+                  View Details
                 </a>
               </div>
             </div>
-            <div className="bg-base-100"></div>
             <div>
-              <h3 className="text-xl font-bold mb-4">Execution Details</h3>
+              <h3 className="text-base sm:text-xl font-bold mb-3 sm:mb-4">
+                Execution Details
+              </h3>
               {isDetailLoading && <div>Loading details...</div>}
               {isDetailError && <div>Error loading details.</div>}
               {executionDetailData &&
@@ -384,97 +379,79 @@ export function ExecutionPageContent() {
                   return (
                     <div
                       key={idx}
-                      className={`mb-4 p-4 rounded-lg shadow-md bg-base-100 cursor-pointer hover:shadow-lg transition-shadow ${taskBorderStyle}`}
+                      className={`mb-2 sm:mb-4 p-2 sm:p-4 rounded-lg shadow-md bg-base-100 cursor-pointer hover:shadow-lg transition-shadow ${taskBorderStyle}`}
                       onClick={() => handleTaskClick(idx)}
                     >
-                      <h4 className="text-lg font-semibold text-left">
-                        {detailTask.qid
-                          ? `${detailTask.qid}-${detailTask.name}`
-                          : detailTask.name}
-                      </h4>
-                      <p className="text-left">
-                        Start at:{" "}
-                        {detailTask.start_at
-                          ? new Date(detailTask.start_at).toLocaleString()
-                          : "N/A"}
-                      </p>
-                      <p className="text-left">
-                        Elapsed time: {detailTask.elapsed_time}
-                      </p>
-                      <p
-                        className={`text-left text-sm font-semibold ${
-                          detailTask.status === "running"
-                            ? "text-info"
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="text-sm sm:text-lg font-semibold text-left truncate flex-1">
+                          {detailTask.qid
+                            ? `${detailTask.qid}-${detailTask.name}`
+                            : detailTask.name}
+                        </h4>
+                        <span
+                          className={`text-xs sm:text-sm font-semibold flex-shrink-0 ${
+                            detailTask.status === "running"
+                              ? "text-info"
+                              : detailTask.status === "completed"
+                                ? "text-success"
+                                : detailTask.status === "scheduled"
+                                  ? "text-warning"
+                                  : "text-error"
+                          }`}
+                        >
+                          {detailTask.status === "running"
+                            ? "Running"
                             : detailTask.status === "completed"
-                              ? "text-success"
+                              ? "Completed"
                               : detailTask.status === "scheduled"
-                                ? "text-warning"
-                                : "text-error"
-                        }`}
-                      >
-                        {detailTask.status === "running"
-                          ? "Running"
-                          : detailTask.status === "completed"
-                            ? "Completed"
-                            : detailTask.status === "scheduled"
-                              ? "Scheduled"
-                              : "Failed"}
-                      </p>
+                                ? "Scheduled"
+                                : "Failed"}
+                        </span>
+                      </div>
+                      <div className="text-xs sm:text-sm text-base-content/60 mt-1">
+                        <span>
+                          {detailTask.start_at
+                            ? new Date(detailTask.start_at).toLocaleString()
+                            : "N/A"}
+                        </span>
+                        {detailTask.elapsed_time && (
+                          <span className="ml-2 sm:ml-3">
+                            {detailTask.elapsed_time}
+                          </span>
+                        )}
+                      </div>
                       {expandedTaskIndex === idx && (
-                        <div className="mt-2">
-                          {Array.isArray(detailTask.figure_path) ? (
+                        <div className="mt-2 sm:mt-3 space-y-2 sm:space-y-3">
+                          {Array.isArray(detailTask.figure_path) &&
+                          detailTask.figure_path.length > 0 ? (
                             detailTask.figure_path.map((path, i) => (
-                              <div key={i} className="mt-2">
-                                <h5 className="text-md font-semibold mb-1 text-left">
+                              <div key={i}>
+                                <h5 className="text-xs sm:text-sm font-semibold mb-1 text-left">
                                   Figure {i + 1}
                                 </h5>
                                 <TaskFigure
                                   path={path}
                                   qid={detailTask.qid || ""}
-                                  className="w-full h-auto max-h-[60vh] object-contain rounded border"
+                                  className="w-full h-auto max-h-[50vh] sm:max-h-[60vh] object-contain rounded border"
                                 />
                               </div>
                             ))
                           ) : detailTask.figure_path ? (
-                            <div className="mt-2">
-                              <h5 className="text-md font-semibold mb-1 text-left">
+                            <div>
+                              <h5 className="text-xs sm:text-sm font-semibold mb-1 text-left">
                                 Figure
                               </h5>
                               <TaskFigure
                                 path={detailTask.figure_path}
                                 qid={detailTask.qid || ""}
-                                className="w-full h-auto max-h-[60vh] object-contain rounded border"
+                                className="w-full h-auto max-h-[50vh] sm:max-h-[60vh] object-contain rounded border"
                               />
                             </div>
-                          ) : null}
-                        </div>
-                      )}
-                      {expandedTaskIndex === idx && (
-                        <div className="mt-2">
-                          <h5 className="text-md font-semibold mb-1 text-left">
-                            Input Parameters
-                          </h5>
-                          <div className="bg-base-200 p-2 rounded">
-                            <JsonView
-                              src={detailTask.input_parameters}
-                              theme="vscode"
-                              collapsed={1}
-                            />
-                          </div>
-                        </div>
-                      )}
-                      {expandedTaskIndex === idx && (
-                        <div className="mt-2">
-                          <h5 className="text-md font-semibold mb-1 text-left">
-                            Output Parameters
-                          </h5>
-                          <div className="bg-base-200 p-2 rounded">
-                            <JsonView
-                              src={detailTask.output_parameters}
-                              theme="vscode"
-                              collapsed={2}
-                            />
-                          </div>
+                          ) : (
+                            <p className="text-xs sm:text-sm text-base-content/50 italic">
+                              No figure available
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>

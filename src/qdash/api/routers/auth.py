@@ -10,9 +10,18 @@ from qdash.api.lib.auth import (
     authenticate_user,
     get_current_active_user,
     get_password_hash,
+    get_user,
+    verify_password,
 )
 from qdash.api.lib.project_service import ProjectService
-from qdash.api.schemas.auth import TokenResponse, User, UserCreate, UserWithToken
+from qdash.api.schemas.auth import (
+    PasswordChange,
+    PasswordReset,
+    TokenResponse,
+    User,
+    UserCreate,
+    UserWithToken,
+)
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.user import UserDocument
@@ -100,7 +109,10 @@ def login(
 
 
 @router.post(
-    "/register", response_model=UserWithToken, summary="Register a new user (admin only)", operation_id="registerUser"
+    "/register",
+    response_model=UserWithToken,
+    summary="Register a new user (admin only)",
+    operation_id="registerUser",
 )
 def register_user(
     user_data: UserCreate,
@@ -219,3 +231,143 @@ def logout() -> dict[str, str]:
 
     """
     return {"message": "Successfully logged out"}
+
+
+@router.post(
+    "/change-password",
+    response_model=dict[str, str],
+    summary="Change user password",
+    operation_id="changePassword",
+)
+def change_password(
+    password_data: PasswordChange,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> dict[str, str]:
+    """Change the current user's password.
+
+    Validates the current password and updates to the new password.
+
+    Parameters
+    ----------
+    password_data : PasswordChange
+        Contains current_password and new_password
+    current_user : User
+        Current authenticated user injected via dependency
+
+    Returns
+    -------
+    dict[str, str]
+        Success message confirming password change
+
+    Raises
+    ------
+    HTTPException
+        400 if current password is incorrect
+        400 if new password is empty
+
+    """
+    logger.debug(f"Password change attempt for user: {current_user.username}")
+
+    # Verify current password
+    user_in_db = get_user(current_user.username)
+    if not user_in_db:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    if not verify_password(password_data.current_password, user_in_db.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+
+    # Validate new password
+    if not password_data.new_password or len(password_data.new_password) < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password cannot be empty",
+        )
+
+    # Update password in database
+    new_hashed_password = get_password_hash(password_data.new_password)
+    user_doc = UserDocument.find_one({"username": current_user.username}).run()
+    if user_doc:
+        user_doc.hashed_password = new_hashed_password
+        user_doc.save()
+        logger.info(f"Password changed successfully for user: {current_user.username}")
+        return {"message": "Password changed successfully"}
+
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Failed to update password",
+    )
+
+
+@router.post(
+    "/reset-password",
+    response_model=dict[str, str],
+    summary="Reset user password (admin only)",
+    operation_id="resetPassword",
+)
+def reset_password(
+    password_data: PasswordReset,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> dict[str, str]:
+    """Reset a user's password (admin only).
+
+    Allows administrators to reset any user's password without knowing
+    the current password. This is useful for password recovery scenarios.
+
+    Parameters
+    ----------
+    password_data : PasswordReset
+        Contains username and new_password
+    current_user : User
+        Current authenticated admin user
+
+    Returns
+    -------
+    dict[str, str]
+        Success message confirming password reset
+
+    Raises
+    ------
+    HTTPException
+        403 if the current user is not an admin
+        404 if the target user is not found
+        400 if new password is empty
+
+    """
+    # Check if current user is admin
+    if current_user.system_role != SystemRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can reset user passwords",
+        )
+
+    logger.debug(
+        f"Admin {current_user.username} attempting to reset password for: {password_data.username}"
+    )
+
+    # Find target user
+    user_doc = UserDocument.find_one({"username": password_data.username}).run()
+    if not user_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User '{password_data.username}' not found",
+        )
+
+    # Validate new password
+    if not password_data.new_password or len(password_data.new_password) < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password cannot be empty",
+        )
+
+    # Update password in database
+    new_hashed_password = get_password_hash(password_data.new_password)
+    user_doc.hashed_password = new_hashed_password
+    user_doc.save()
+    logger.info(f"Admin {current_user.username} reset password for user: {password_data.username}")
+    return {"message": f"Password reset successfully for user '{password_data.username}'"}
