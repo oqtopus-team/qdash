@@ -1,16 +1,16 @@
 import ExecutionDetailClient from "@/components/features/execution/ExecutionClient";
 
 interface ExecutionDetailPageProps {
-  params: {
+  params: Promise<{
     chip_id: string;
     execute_id: string;
-  };
+  }>;
 }
 
-export default function ExecutionDetailPage({
+export default async function ExecutionDetailPage({
   params,
 }: ExecutionDetailPageProps) {
-  const { chip_id, execute_id } = params;
+  const { chip_id, execute_id } = await params;
 
   return <ExecutionDetailClient chip_id={chip_id} execute_id={execute_id} />;
 }

@@ -111,6 +111,11 @@ RUN bun install
 # ========================================
 FROM node-env as final
 
+# Set default file permissions (644 for files, 755 for directories)
+# This ensures files created in devcontainer are readable in Docker builds
+RUN echo "umask 022" >> /etc/profile && \
+    echo "umask 022" >> /etc/bash.bashrc
+
 # Install Claude Code
 ARG CLAUDE_CODE_VERSION=latest
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}

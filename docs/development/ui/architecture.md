@@ -67,7 +67,7 @@ This document describes the architecture of the QDash frontend application, incl
 
 ### Route Structure
 
-QDash uses Next.js 14 App Router with route groups for organization:
+QDash uses Next.js 15 App Router with route groups for organization:
 
 ```
 src/app/
@@ -142,8 +142,9 @@ components/
 │   └── Modal.tsx           # Modal dialog
 │
 ├── charts/                 # Visualization components
-│   ├── TaskFigure.tsx      # Task result figure
-│   └── PlotlyChart.tsx     # Plotly wrapper
+│   ├── Plot.tsx            # Lightweight Plotly wrapper (plotly.js-basic-dist)
+│   ├── PlotCard.tsx        # Reusable plot container
+│   └── TaskFigure.tsx      # Task result figure
 │
 ├── features/               # Feature-specific components
 │   ├── analysis/           # Analysis page components
