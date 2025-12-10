@@ -12,10 +12,10 @@ hero:
   actions:
     - theme: brand
       text: Get Started
-      link: /quick-start
+      link: /getting-started/quick-start
     - theme: alt
       text: What is QDash?
-      link: /what-is-qdash
+      link: /getting-started/what-is-qdash
 
 features:
   - icon: ⚡
