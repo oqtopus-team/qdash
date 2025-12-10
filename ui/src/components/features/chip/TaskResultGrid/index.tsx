@@ -181,8 +181,12 @@ export function TaskResultGrid({
               })}
             </div>
           </div>
-          {/* MUX labels overlay - separate layer on top */}
-          <div className="absolute inset-0 pointer-events-none p-4 z-10">
+          {/* MUX labels overlay - hidden on mobile in full view */}
+          <div
+            className={`absolute inset-0 pointer-events-none p-4 z-10 ${
+              zoomMode === "full" ? "hidden md:block" : ""
+            }`}
+          >
             <div
               className="grid gap-2 w-full h-full"
               style={{
@@ -257,7 +261,11 @@ export function TaskResultGrid({
                       />
                     </div>
                   )}
-                  <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
+                  <div
+                    className={`absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium ${
+                      zoomMode === "full" ? "hidden md:block" : ""
+                    }`}
+                  >
                     {qid}
                   </div>
                   <div

@@ -195,6 +195,19 @@ export function QubitMetricHistoryModal({
               </button>
             ))}
           </div>
+          {/* Mobile: selected item details below cards */}
+          {selectedItem && (
+            <div className="sm:hidden mt-2 p-2 bg-base-200 rounded-lg text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="opacity-70">Execution ID:</span>
+                <span className="font-mono truncate max-w-[180px]">{selectedItem.execution_id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-70">Timestamp:</span>
+                <span>{new Date(selectedItem.timestamp).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</span>
+              </div>
+            </div>
+          )}
           {/* Desktop: vertical list */}
           <div className="hidden sm:flex flex-col gap-2">
             {history.map((item, idx) => (

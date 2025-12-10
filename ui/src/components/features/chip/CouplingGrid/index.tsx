@@ -260,8 +260,12 @@ export function CouplingGrid({
               })}
             </div>
           </div>
-          {/* MUX labels overlay - separate layer on top */}
-          <div className="absolute inset-0 pointer-events-none z-10">
+          {/* MUX labels overlay - hidden on mobile in full view */}
+          <div
+            className={`absolute inset-0 pointer-events-none z-10 ${
+              zoomMode === "full" ? "hidden md:block" : ""
+            }`}
+          >
             <div
               className="grid gap-2 w-full h-full"
               style={{
@@ -316,7 +320,14 @@ export function CouplingGrid({
                     height: displayCellSize,
                   }}
                 >
-                  {qid}
+                  {/* QID - hidden on mobile in full view */}
+                  <span
+                    className={
+                      zoomMode === "full" ? "hidden md:inline" : ""
+                    }
+                  >
+                    {qid}
+                  </span>
                 </div>
               );
             })}
