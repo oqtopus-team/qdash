@@ -51,16 +51,7 @@
 }
 
 .VPHero .image-container img {
-  transition:
-    filter 0.5s ease,
-    transform 0.5s ease;
   filter: drop-shadow(0 4px 20px rgba(31, 31, 221, 0.3));
-}
-
-.VPHero .image-container:hover img {
-  filter: drop-shadow(0 8px 30px rgba(31, 31, 221, 0.5))
-    drop-shadow(0 0 40px rgba(226, 19, 49, 0.3));
-  transform: scale(1.08);
 }
 
 @keyframes hero-float {

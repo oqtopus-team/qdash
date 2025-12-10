@@ -7,7 +7,6 @@ import { SettingsCard } from "@/components/features/setting/SettingsCard";
 import { useAuth } from "@/contexts/AuthContext";
 
 const themes = [
-  "oqtopus",
   "light",
   "dark",
   "cupcake",

@@ -449,9 +449,79 @@ a.card:hover {
   font-weight: 500;
 }
 
-/* Import all DaisyUI themes that users can select */
+/* Import DaisyUI themes */
 @import "daisyui/theme/light.css";
 @import "daisyui/theme/dark.css";
+
+/* ----------------------------------------
+   VitePress-based Light Theme Override
+   Using higher specificity to override DaisyUI defaults
+   ---------------------------------------- */
+html[data-theme="light"],
+:root[data-theme="light"],
+[data-theme="light"] {
+  /* ベース色 - VitePress light mode */
+  --color-base-100: #ffffff !important;
+  --color-base-200: #f6f6f7 !important;
+  --color-base-300: #e2e2e3 !important;
+  --color-base-content: #3c3c43 !important;
+
+  /* プライマリカラー - OQTOPUS brand */
+  --color-primary: #1f1fdd !important;
+  --color-primary-content: #ffffff !important;
+  --color-secondary: #e21331 !important;
+  --color-secondary-content: #ffffff !important;
+  --color-accent: #3b3be8 !important;
+  --color-accent-content: #ffffff !important;
+  --color-neutral: #dddde3 !important;
+  --color-neutral-content: #3c3c43 !important;
+
+  /* ステータスカラー - VitePress palette */
+  --color-info: #3a5ccc !important;
+  --color-info-content: #ffffff !important;
+  --color-success: #18794e !important;
+  --color-success-content: #ffffff !important;
+  --color-warning: #d97706 !important;
+  --color-warning-content: #ffffff !important;
+  --color-error: #b8272c !important;
+  --color-error-content: #ffffff !important;
+}
+
+/* ----------------------------------------
+   VitePress-based Dark Theme Override
+   Using higher specificity to override DaisyUI defaults
+   ---------------------------------------- */
+html[data-theme="dark"],
+:root[data-theme="dark"],
+[data-theme="dark"] {
+  /* ベース色 - VitePress dark mode */
+  --color-base-100: #1b1b1f !important;
+  --color-base-200: #161618 !important;
+  --color-base-300: #2e2e32 !important;
+  --color-base-content: rgba(255, 255, 255, 0.87) !important;
+
+  /* プライマリカラー - OQTOPUS brand (dark variants) */
+  --color-primary: #5555f0 !important;
+  --color-primary-content: #ffffff !important;
+  --color-secondary: #e21331 !important;
+  --color-secondary-content: #ffffff !important;
+  --color-accent: #6b6bf5 !important;
+  --color-accent-content: #ffffff !important;
+  --color-neutral: #515c67 !important;
+  --color-neutral-content: rgba(255, 255, 255, 0.87) !important;
+
+  /* ステータスカラー - VitePress palette (dark variants) */
+  --color-info: #5c73e7 !important;
+  --color-info-content: #ffffff !important;
+  --color-success: #3dd68c !important;
+  --color-success-content: #1b1b1f !important;
+  --color-warning: #fbbf24 !important;
+  --color-warning-content: #1b1b1f !important;
+  --color-error: #f66f81 !important;
+  --color-error-content: #1b1b1f !important;
+}
+
+/* Import other DaisyUI themes that users can select */
 @import "daisyui/theme/cupcake.css";
 @import "daisyui/theme/bumblebee.css";
 @import "daisyui/theme/emerald.css";
@@ -486,37 +556,228 @@ a.card:hover {
 @import "daisyui/theme/abyss.css";
 @import "daisyui/theme/silk.css";
 
+/* ----------------------------------------
+   Login Page Styles - VitePress Hero Inspired
+   ---------------------------------------- */
+
+/* Login page background gradient - Light mode */
+.login-page-bg {
+  background: linear-gradient(
+    135deg,
+    #f8f9ff 0%,
+    #f0f1ff 25%,
+    #fff5f6 75%,
+    #fff 100%
+  );
+  position: relative;
+}
+
+.login-page-bg::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(
+      ellipse at 20% 30%,
+      rgba(31, 31, 221, 0.08) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 80% 70%,
+      rgba(226, 19, 49, 0.06) 0%,
+      transparent 50%
+    );
+  pointer-events: none;
+}
+
+/* Login page background gradient - Dark mode */
+[data-theme="dark"] .login-page-bg {
+  background: linear-gradient(
+    135deg,
+    #1b1b1f 0%,
+    #1e1e24 25%,
+    #1f1a1b 75%,
+    #1b1b1f 100%
+  );
+}
+
+[data-theme="dark"] .login-page-bg::before {
+  background:
+    radial-gradient(
+      ellipse at 20% 30%,
+      rgba(85, 85, 240, 0.12) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 80% 70%,
+      rgba(246, 111, 129, 0.08) 0%,
+      transparent 50%
+    );
+}
+
+/* Login title gradient text - Light mode */
+.login-title-gradient {
+  background: linear-gradient(120deg, #1f1fdd 30%, #e21331 70%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Login title gradient text - Dark mode */
+[data-theme="dark"] .login-title-gradient {
+  background: linear-gradient(120deg, #5555f0 30%, #f66f81 70%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow button effect - Light mode */
+.btn-glow {
+  background: linear-gradient(135deg, #1f1fdd 0%, #3b3be8 100%);
+  border: none;
+  box-shadow:
+    0 4px 15px rgba(31, 31, 221, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.btn-glow:hover:not(:disabled) {
+  background: linear-gradient(135deg, #3b3be8 0%, #5555f0 100%);
+  box-shadow:
+    0 6px 20px rgba(31, 31, 221, 0.4),
+    0 0 30px rgba(31, 31, 221, 0.2),
+    0 4px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.btn-glow:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow:
+    0 2px 10px rgba(31, 31, 221, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Glow button effect - Dark mode */
+[data-theme="dark"] .btn-glow {
+  background: linear-gradient(135deg, #5555f0 0%, #6b6bf5 100%);
+  box-shadow:
+    0 4px 15px rgba(85, 85, 240, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .btn-glow:hover:not(:disabled) {
+  background: linear-gradient(135deg, #6b6bf5 0%, #8080f8 100%);
+  box-shadow:
+    0 6px 20px rgba(85, 85, 240, 0.5),
+    0 0 30px rgba(85, 85, 240, 0.3),
+    0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .btn-glow:active:not(:disabled) {
+  box-shadow:
+    0 2px 10px rgba(85, 85, 240, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
 /* Login page floating logo animation */
 @keyframes float {
   0%,
   100% {
-    transform: translateY(0px) rotate(0deg);
-  }
-  25% {
-    transform: translateY(-8px) rotate(1deg);
+    transform: translateY(0px);
   }
   50% {
-    transform: translateY(-12px) rotate(0deg);
-  }
-  75% {
-    transform: translateY(-8px) rotate(-1deg);
+    transform: translateY(-10px);
   }
 }
 
-@keyframes glow {
+@keyframes glow-light {
   0%,
   100% {
     filter: drop-shadow(0 0 8px rgba(31, 31, 221, 0.3));
   }
   50% {
-    filter: drop-shadow(0 0 20px rgba(31, 31, 221, 0.5));
+    filter: drop-shadow(0 0 15px rgba(31, 31, 221, 0.4))
+      drop-shadow(0 0 25px rgba(226, 19, 49, 0.2));
+  }
+}
+
+@keyframes glow-dark {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(85, 85, 240, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 15px rgba(85, 85, 240, 0.5))
+      drop-shadow(0 0 25px rgba(246, 111, 129, 0.3));
   }
 }
 
 .floating-logo {
   animation:
     float 4s ease-in-out infinite,
-    glow 3s ease-in-out infinite;
+    glow-light 3s ease-in-out infinite;
+}
+
+[data-theme="dark"] .floating-logo {
+  animation:
+    float 4s ease-in-out infinite,
+    glow-dark 3s ease-in-out infinite;
+}
+
+/* 404 Page - Lost logo animation */
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(10px, -5px) rotate(3deg);
+  }
+  50% {
+    transform: translate(-5px, 5px) rotate(-2deg);
+  }
+  75% {
+    transform: translate(-10px, -3px) rotate(2deg);
+  }
+}
+
+@keyframes pulse-fade {
+  0%,
+  100% {
+    opacity: 0.6;
+    filter: drop-shadow(0 0 5px rgba(31, 31, 221, 0.2));
+  }
+  50% {
+    opacity: 0.4;
+    filter: drop-shadow(0 0 15px rgba(31, 31, 221, 0.3));
+  }
+}
+
+@keyframes pulse-fade-dark {
+  0%,
+  100% {
+    opacity: 0.6;
+    filter: drop-shadow(0 0 5px rgba(85, 85, 240, 0.3));
+  }
+  50% {
+    opacity: 0.4;
+    filter: drop-shadow(0 0 15px rgba(85, 85, 240, 0.4));
+  }
+}
+
+.not-found-logo {
+  animation:
+    drift 8s ease-in-out infinite,
+    pulse-fade 4s ease-in-out infinite;
+}
+
+[data-theme="dark"] .not-found-logo {
+  animation:
+    drift 8s ease-in-out infinite,
+    pulse-fade-dark 4s ease-in-out infinite;
 }
 
 /* Dashboard focus styles for hiding non-essential elements */
@@ -625,63 +886,160 @@ a.card:hover {
 .dashboard-focus-execution .pb-6:has(.flex.gap-4) {
   display: none;
 }
-@plugin "daisyui/theme" {
-  name: "oqtopus";
-  default: true; /* set as default */
-  prefersdark: false; /* set as default dark mode (prefers-color-scheme:dark) */
-  color-scheme: light; /* color of browser-provided UI */
 
-  /* ベース色 - より純粋な白を基調に */
-  --color-base-100: oklch(99% 0.005 0);
-  --color-base-200: oklch(97% 0.005 0);
-  --color-base-300: oklch(95% 0.005 0);
-  --color-base-content: oklch(15% 0.01 0);
+/* ----------------------------------------
+   React-Select Theme Integration
+   Applies DaisyUI theme colors to react-select
+   ---------------------------------------- */
 
-  /* プライマリカラー - ロゴの深い青を基調に */
-  --color-primary: oklch(45% 0.4 240);
-  --color-primary-content: oklch(99% 0.01 240);
+/* Control (main input container) */
+.css-13cymwt-control,
+.css-t3ipsp-control,
+[class$="-control"] {
+  background-color: var(--color-base-100) !important;
+  border-color: var(--color-base-300) !important;
+  min-height: 2.5rem !important;
+}
 
-  /* セカンダリカラー - ロゴの赤を基調に */
-  --color-secondary: oklch(60% 0.35 30);
-  --color-secondary-content: oklch(99% 0.01 30);
+[class$="-control"]:hover {
+  border-color: var(--color-primary) !important;
+}
 
-  /* アクセントカラー - 深い紫がかった青 */
-  --color-accent: oklch(50% 0.35 220);
-  --color-accent-content: oklch(99% 0.01 220);
+/* Focused state */
+.css-t3ipsp-control,
+[class$="-control"]:focus-within {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 1px var(--color-primary) !important;
+}
 
-  /* ニュートラル - より純粋なグレー */
-  --color-neutral: oklch(85% 0.01 0);
-  --color-neutral-content: oklch(15% 0.01 0);
+/* Menu (dropdown) */
+.css-1nmdiq5-menu,
+[class$="-menu"] {
+  background-color: var(--color-base-100) !important;
+  border: 1px solid var(--color-base-300) !important;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  z-index: 50 !important;
+}
 
-  /* 情報色 - 深い青 */
-  --color-info: oklch(55% 0.3 220);
-  --color-info-content: oklch(15% 0.01 0);
+/* Menu list */
+.css-1n6sfyn-MenuList,
+[class$="-MenuList"] {
+  padding: 0.25rem !important;
+}
 
-  /* 成功色 - 緑 */
-  --color-success: oklch(70% 0.3 140);
-  --color-success-content: oklch(15% 0.01 0);
+/* Options */
+.css-d7l1ni-option,
+.css-tr4s17-option,
+[class$="-option"] {
+  background-color: transparent !important;
+  color: var(--color-base-content) !important;
+  cursor: pointer !important;
+  padding: 0.5rem 0.75rem !important;
+  border-radius: 0.25rem !important;
+}
 
-  /* 警告色 - 黄色 */
-  --color-warning: oklch(85% 0.3 80);
-  --color-warning-content: oklch(15% 0.01 0);
+/* Option hover */
+.css-d7l1ni-option:hover,
+[class$="-option"]:hover {
+  background-color: var(--color-base-200) !important;
+}
 
-  /* エラー色 - 赤 */
-  --color-error: oklch(70% 0.35 30);
-  --color-error-content: oklch(99% 0.01 0);
+/* Option focused (keyboard navigation) */
+.css-d7l1ni-option,
+[class$="-option"][class*="focused"] {
+  background-color: var(--color-base-200) !important;
+}
 
-  /* border radius */
-  --radius-selector: 1rem;
-  --radius-field: 0.25rem;
-  --radius-box: 0.5rem;
+/* Option selected */
+.css-tr4s17-option,
+[class$="-option"][class*="selected"] {
+  background-color: var(--color-primary) !important;
+  color: var(--color-primary-content) !important;
+}
 
-  /* base sizes */
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
+/* Single value (selected text) */
+.css-1dimb5e-singleValue,
+[class$="-singleValue"] {
+  color: var(--color-base-content) !important;
+}
 
-  /* border size */
-  --border: 1px;
+/* Placeholder */
+.css-1jqq78o-placeholder,
+[class$="-placeholder"] {
+  color: var(--color-base-content) !important;
+  opacity: 0.5 !important;
+}
 
-  /* effects */
-  --depth: 1;
-  --noise: 0;
+/* Input */
+.css-1hac4vs-Input,
+[class$="-Input"] input {
+  color: var(--color-base-content) !important;
+}
+
+/* Dropdown indicator */
+.css-1xc3v61-indicatorContainer,
+.css-15lsz6c-indicatorContainer,
+[class$="-indicatorContainer"] {
+  color: var(--color-base-content) !important;
+  opacity: 0.5 !important;
+}
+
+[class$="-indicatorContainer"]:hover {
+  color: var(--color-base-content) !important;
+  opacity: 0.8 !important;
+}
+
+/* Clear indicator */
+.css-1u9des2-indicatorSeparator,
+[class$="-indicatorSeparator"] {
+  background-color: var(--color-base-300) !important;
+}
+
+/* Multi-value (tags) */
+.css-12a83d4-MultiValueGeneric,
+[class$="-multiValue"] {
+  background-color: var(--color-base-200) !important;
+  border-radius: 0.25rem !important;
+}
+
+[class$="-multiValue"] > div:first-child {
+  color: var(--color-base-content) !important;
+}
+
+/* Multi-value remove button */
+.css-12a83d4-MultiValueRemove,
+[class$="-MultiValueRemove"] {
+  color: var(--color-base-content) !important;
+  opacity: 0.7 !important;
+}
+
+[class$="-MultiValueRemove"]:hover {
+  background-color: var(--color-error) !important;
+  color: var(--color-error-content) !important;
+}
+
+/* No options message */
+.css-1n7v3ny-noOptions,
+[class$="-noOptions"] {
+  color: var(--color-base-content) !important;
+  opacity: 0.6 !important;
+}
+
+/* Loading message */
+.css-1cfo1cf-loadingMessage,
+[class$="-loadingMessage"] {
+  color: var(--color-base-content) !important;
+  opacity: 0.6 !important;
+}
+
+/* Group heading */
+.css-1tkfr4s-group,
+[class$="-group"] > div:first-child {
+  color: var(--color-base-content) !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+  text-transform: uppercase !important;
+  opacity: 0.7 !important;
 }
