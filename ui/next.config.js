@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "standalone",
   async rewrites() {
     // Proxy /api/* to backend API server
     // This allows UI-only deployment without exposing API port
@@ -11,7 +12,7 @@ const nextConfig = {
       },
     ];
   },
-  transpilePackages: ["react-plotly.js", "plotly.js"],
+  transpilePackages: ["react-plotly.js", "plotly.js-basic-dist"],
   images: {
     remotePatterns: [
       {
@@ -24,13 +25,6 @@ const nextConfig = {
   },
   pageExtensions: ["tsx", "ts"],
   useFileSystemPublicRoutes: true,
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      "plotly.js": "plotly.js/dist/plotly",
-    };
-    return config;
-  },
 };
 
 module.exports = nextConfig;

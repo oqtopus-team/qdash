@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import Plot from "react-plotly.js";
+import Plot from "@/components/charts/Plot";
 
 export default function PlotlyRenderer({
   fullPath,

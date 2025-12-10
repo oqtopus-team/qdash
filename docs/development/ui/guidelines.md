@@ -23,20 +23,20 @@ This document defines the UI development conventions and standards for the QDash
 
 | Technology | Version | Purpose                         |
 | ---------- | ------- | ------------------------------- |
-| Next.js    | 14.x    | React framework with App Router |
+| Next.js    | 15.x    | React framework with App Router |
 | React      | 18.x    | UI library                      |
 | TypeScript | 5.x     | Type-safe JavaScript            |
 | Bun        | 1.x+    | Package manager and runtime     |
 
 ### UI Libraries
 
-| Library      | Purpose                             |
-| ------------ | ----------------------------------- |
-| Tailwind CSS | Utility-first CSS framework         |
-| DaisyUI      | Component library built on Tailwind |
-| Plotly.js    | Data visualization and charts       |
-| React Flow   | Node-based diagrams and workflows   |
-| React Icons  | Icon components                     |
+| Library              | Purpose                             |
+| -------------------- | ----------------------------------- |
+| Tailwind CSS         | Utility-first CSS framework         |
+| DaisyUI              | Component library built on Tailwind |
+| plotly.js-basic-dist | Lightweight data visualization      |
+| React Flow           | Node-based diagrams and workflows   |
+| React Icons          | Icon components                     |
 
 ### State Management
 

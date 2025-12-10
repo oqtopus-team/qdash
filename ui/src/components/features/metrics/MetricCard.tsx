@@ -5,7 +5,7 @@ import React, { useMemo } from "react";
 
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 
-const Plot = dynamic(() => import("react-plotly.js"), {
+const Plot = dynamic(() => import("@/components/charts/Plot"), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-[500px]">

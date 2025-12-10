@@ -4,7 +4,7 @@ import { useMemo } from "react";
 
 import type { PlotData, Layout, Config } from "plotly.js";
 
-const Plot = dynamic(() => import("react-plotly.js"), {
+const Plot = dynamic(() => import("@/components/charts/Plot"), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-full">
