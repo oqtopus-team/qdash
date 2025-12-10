@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 import type { Task } from "@/schemas";
 
@@ -33,10 +33,22 @@ export function CouplingTaskHistoryModal({
   isOpen,
   onClose,
 }: CouplingTaskHistoryModalProps) {
+  const modalRef = useRef<HTMLDialogElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [subIndex, setSubIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [isFlipped, setIsFlipped] = useState(false);
+
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    if (isOpen) {
+      modal.showModal();
+    } else {
+      modal.close();
+    }
+  }, [isOpen]);
 
   const { data, isLoading, isError } = useGetCouplingTaskHistory(
     couplingId,
@@ -47,8 +59,6 @@ export function CouplingTaskHistoryModal({
       },
     },
   );
-
-  if (!isOpen) return null;
 
   // Convert the data object to an array sorted by timestamp (newest first)
   const historyData = data?.data?.data || {};
@@ -87,8 +97,8 @@ export function CouplingTaskHistoryModal({
   };
 
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box w-full max-w-6xl bg-base-100 rounded-t-xl sm:rounded-xl p-3 sm:p-6 fixed bottom-0 sm:relative sm:bottom-auto max-h-[85vh] sm:max-h-[90vh]">
+    <dialog ref={modalRef} className="modal modal-bottom sm:modal-middle" onClose={onClose}>
+      <div className="modal-box w-full sm:w-11/12 max-w-5xl bg-base-100 p-3 sm:p-6 max-h-[85vh] sm:max-h-[90vh]">
         <div className="flex justify-between items-center mb-3 sm:mb-4">
           <h3 className="font-bold text-base sm:text-lg truncate pr-2">
             {taskName} - {couplingId}

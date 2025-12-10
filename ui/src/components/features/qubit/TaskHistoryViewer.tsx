@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 
 import {
   BsCheckCircle,
@@ -40,6 +40,19 @@ export function TaskHistoryViewer({
     null,
   );
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
+  const figureModalRef = useRef<HTMLDialogElement>(null);
+
+  // Control figure modal with native dialog API
+  useEffect(() => {
+    const modal = figureModalRef.current;
+    if (!modal) return;
+
+    if (expandedFigureIdx !== null) {
+      modal.showModal();
+    } else {
+      modal.close();
+    }
+  }, [expandedFigureIdx]);
 
   const { data, isLoading, error } = useGetQubitTaskHistory(
     qubitId,
@@ -478,109 +491,108 @@ export function TaskHistoryViewer({
       )}
 
       {/* Figure Expansion Modal (for List View) */}
-      {expandedFigureIdx !== null &&
-        selectedTask &&
-        selectedTask.figure_path && (
-          <dialog className="modal modal-open">
-            <div className="modal-box max-w-5xl w-11/12 max-h-[90vh] p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg">
-                  Figure {expandedFigureIdx + 1} of{" "}
-                  {selectedTask.figure_path.length}
-                </h3>
-                <div className="flex items-center gap-2">
-                  {expandedFigureIdx > 0 && (
-                    <button
-                      onClick={() =>
-                        setExpandedFigureIdx(expandedFigureIdx - 1)
-                      }
-                      className="btn btn-sm btn-circle"
-                    >
-                      ←
-                    </button>
-                  )}
-                  {expandedFigureIdx < selectedTask.figure_path.length - 1 && (
-                    <button
-                      onClick={() =>
-                        setExpandedFigureIdx(expandedFigureIdx + 1)
-                      }
-                      className="btn btn-sm btn-circle"
-                    >
-                      →
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setExpandedFigureIdx(null);
-                      setViewMode("static");
-                    }}
-                    className="btn btn-sm btn-circle btn-ghost"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-
-              {viewMode === "static" ? (
-                <>
-                  <div className="bg-white rounded-lg p-4 flex items-center justify-center max-h-[75vh]">
-                    <TaskFigure
-                      path={selectedTask.figure_path[expandedFigureIdx]}
-                      qid={qubitId}
-                      className="w-full h-full object-contain max-h-[70vh]"
-                    />
-                  </div>
-                  {selectedTask.json_figure_path &&
-                    selectedTask.json_figure_path[expandedFigureIdx] && (
-                      <div className="mt-4 flex justify-center">
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={() => setViewMode("interactive")}
-                        >
-                          Interactive View
-                        </button>
-                      </div>
+      <dialog
+        ref={figureModalRef}
+        className="modal modal-bottom sm:modal-middle"
+        onClose={() => {
+          setExpandedFigureIdx(null);
+          setViewMode("static");
+        }}
+      >
+        <div className="modal-box max-w-5xl w-full sm:w-11/12 max-h-[90vh] p-4 sm:p-6">
+          {expandedFigureIdx !== null &&
+            selectedTask &&
+            selectedTask.figure_path && (
+              <>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-lg">
+                    Figure {expandedFigureIdx + 1} of{" "}
+                    {selectedTask.figure_path.length}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    {expandedFigureIdx > 0 && (
+                      <button
+                        onClick={() =>
+                          setExpandedFigureIdx(expandedFigureIdx - 1)
+                        }
+                        className="btn btn-sm btn-circle"
+                      >
+                        ←
+                      </button>
                     )}
-                </>
-              ) : (
-                <>
-                  <div className="w-full h-[70vh] bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
-                    <div className="w-full h-full flex justify-center items-center">
-                      <div className="w-fit h-fit m-auto">
-                        <PlotlyRenderer
-                          className="w-full h-full"
-                          fullPath={`/api/executions/figure?path=${encodeURIComponent(
-                            selectedTask.json_figure_path?.[
-                              expandedFigureIdx
-                            ] || "",
-                          )}`}
-                        />
+                    {expandedFigureIdx < selectedTask.figure_path.length - 1 && (
+                      <button
+                        onClick={() =>
+                          setExpandedFigureIdx(expandedFigureIdx + 1)
+                        }
+                        className="btn btn-sm btn-circle"
+                      >
+                        →
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setExpandedFigureIdx(null)}
+                      className="btn btn-sm btn-circle btn-ghost"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                {viewMode === "static" ? (
+                  <>
+                    <div className="bg-white rounded-lg p-4 flex items-center justify-center max-h-[75vh]">
+                      <TaskFigure
+                        path={selectedTask.figure_path[expandedFigureIdx]}
+                        qid={qubitId}
+                        className="w-full h-full object-contain max-h-[70vh]"
+                      />
+                    </div>
+                    {selectedTask.json_figure_path &&
+                      selectedTask.json_figure_path[expandedFigureIdx] && (
+                        <div className="mt-4 flex justify-center">
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={() => setViewMode("interactive")}
+                          >
+                            Interactive View
+                          </button>
+                        </div>
+                      )}
+                  </>
+                ) : (
+                  <>
+                    <div className="w-full h-[70vh] bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
+                      <div className="w-full h-full flex justify-center items-center">
+                        <div className="w-fit h-fit m-auto">
+                          <PlotlyRenderer
+                            className="w-full h-full"
+                            fullPath={`/api/executions/figure?path=${encodeURIComponent(
+                              selectedTask.json_figure_path?.[
+                                expandedFigureIdx
+                              ] || "",
+                            )}`}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-4 flex justify-center">
-                    <button
-                      className="btn btn-sm"
-                      onClick={() => setViewMode("static")}
-                    >
-                      Back to Static View
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-            <form method="dialog" className="modal-backdrop">
-              <button
-                onClick={() => {
-                  setExpandedFigureIdx(null);
-                  setViewMode("static");
-                }}
-              >
-                close
-              </button>
-            </form>
-          </dialog>
-        )}
+                    <div className="mt-4 flex justify-center">
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => setViewMode("static")}
+                      >
+                        Back to Static View
+                      </button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
     </div>
   );
 }
