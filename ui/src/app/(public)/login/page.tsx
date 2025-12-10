@@ -56,7 +56,7 @@ export default function LoginPage() {
             QDash
           </h1>
           <div className="mt-4">
-            <EnvironmentBadge size="lg" />
+            <EnvironmentBadge className="badge-lg" />
           </div>
           <p className="py-6 text-base-content/70 text-xl lg:text-2xl">
             Quantum Calibration Dashboard for managing and monitoring qubit

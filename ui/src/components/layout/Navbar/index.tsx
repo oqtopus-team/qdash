@@ -129,29 +129,34 @@ function ProfileModal({
   user: User | null;
 }) {
   return (
-    <dialog ref={modalRef} className="modal">
-      <div className="modal-box w-96">
+    <dialog ref={modalRef} className="modal modal-bottom sm:modal-middle">
+      <div className="modal-box w-full sm:w-96 sm:max-w-sm">
         <div className="card">
-          <figure className="relative w-full h-64">
+          <figure className="relative w-full h-32 sm:h-64">
             <div className="bg-gray-200 w-full h-full flex items-center justify-center">
-              <span className="text-4xl">
+              <span className="text-3xl sm:text-4xl">
                 {user?.username?.[0]?.toUpperCase()}
               </span>
             </div>
           </figure>
-          <div className="card-body py-2">
-            <h2 className="card-title text-2xl">{user?.username}</h2>
-            <ul className="text-left">
+          <div className="card-body py-2 px-2 sm:px-4">
+            <h2 className="card-title text-xl sm:text-2xl">
+              {user?.username}
+            </h2>
+            <ul className="text-left text-sm sm:text-base">
               <li>Full Name: {user?.full_name}</li>
             </ul>
             <div className="modal-action">
               <form method="dialog">
-                <button className="btn">Close</button>
+                <button className="btn btn-sm sm:btn-md">Close</button>
               </form>
             </div>
           </div>
         </div>
       </div>
+      <form method="dialog" className="modal-backdrop">
+        <button>close</button>
+      </form>
     </dialog>
   );
 }
@@ -181,17 +186,17 @@ function Navbar() {
       <div className="flex flex-1 md:gap-1 lg:gap-2 items-center">
         <HiddenIcon />
         <ProjectSelector />
-        <EnvironmentBadge />
+        <EnvironmentBadge className="badge-sm sm:badge-md" />
       </div>
       <div className="dropdown dropdown-end">
         <div
           tabIndex={0}
           role="button"
-          className="btn btn-ghost btn-circle avatar"
+          className="btn btn-ghost btn-circle avatar btn-sm sm:btn-md"
         >
-          <div className="relative w-10 h-10 rounded-full shadow overflow-hidden">
+          <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full shadow overflow-hidden">
             <div className="bg-gray-200 w-full h-full flex items-center justify-center">
-              <span className="text-2xl">
+              <span className="text-xl sm:text-2xl">
                 {user?.username?.[0]?.toUpperCase()}
               </span>
             </div>
