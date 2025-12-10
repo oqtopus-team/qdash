@@ -20,11 +20,11 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_PREFECT_URL=$NEXT_PUBLIC_PREFECT_URL
 ENV INTERNAL_API_URL=$INTERNAL_API_URL
 COPY ./ui .
-# Fix file permissions (may be restrictive when created in devcontainer)
-RUN chmod -R a+r .
-RUN bun run build
+# Use Turbopack for faster builds
+RUN bun run next build --turbo
 
-FROM oven/bun:1 AS runner
+# Standalone output - no need for bun install in runner
+FROM node:20-alpine AS runner
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_PREFECT_URL
 ARG INTERNAL_API_URL
@@ -36,13 +36,14 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_PREFECT_URL=$NEXT_PUBLIC_PREFECT_URL
 ENV INTERNAL_API_URL=$INTERNAL_API_URL
 
-COPY ./ui/package.json ./package.json
-COPY ./ui/bun.lock ./bun.lock
-RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --frozen-lockfile --production
-
+# Copy standalone output (includes minimal node_modules)
+COPY --from=builder /app/.next/standalone ./
+# Copy static files
+COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY ./ui/next.config.js ./next.config.js
 
-CMD ["sh", "-c", "bun run start --hostname 0.0.0.0 --port ${UI_PORT:-${PORT:-5714}}"]
+# Next.js standalone uses PORT and HOSTNAME env vars
+ENV PORT=5714
+ENV HOSTNAME=0.0.0.0
+
+CMD ["node", "server.js"]
