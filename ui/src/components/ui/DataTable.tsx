@@ -108,29 +108,29 @@ export function DataTable({
 
   return (
     <div
-      className={`card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300 ${className}`}
+      className={`card bg-base-100 shadow-xl rounded-xl p-4 sm:p-8 border border-base-300 ${className}`}
     >
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-semibold">{title}</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+          <h2 className="text-lg sm:text-2xl font-semibold">{title}</h2>
           {actions}
         </div>
 
         {/* Search and Info */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
           {searchable && (
-            <div className="form-control">
+            <div className="form-control flex-1 sm:flex-none">
               <input
                 type="text"
                 placeholder={searchPlaceholder}
-                className="input input-bordered input-sm w-64"
+                className="input input-bordered input-xs sm:input-sm w-full sm:w-64"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
               />
             </div>
           )}
-          <div className="text-sm text-base-content/70">
+          <div className="text-xs sm:text-sm text-base-content/70 whitespace-nowrap">
             {filter
               ? `${processedData.length} filtered`
               : `${data.length} total`}
@@ -139,20 +139,23 @@ export function DataTable({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto" style={{ minHeight: "400px" }}>
+      <div
+        className="overflow-x-auto -mx-4 sm:mx-0"
+        style={{ minHeight: "300px" }}
+      >
         {processedData.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-base-content/50">
             {emptyMessage}
           </div>
         ) : (
           <>
-            <table className="table table-compact table-zebra w-full border border-base-300 bg-base-100">
+            <table className="table table-xs sm:table-compact table-zebra w-full border border-base-300 bg-base-100">
               <thead className="sticky top-0 bg-base-200">
                 <tr>
                   {columns.map((column) => (
                     <th
                       key={column.key}
-                      className={`${column.className || "text-center"} ${
+                      className={`${column.className || "text-center"} text-xs sm:text-sm px-2 sm:px-4 ${
                         column.sortable
                           ? "cursor-pointer hover:bg-base-300"
                           : ""
@@ -160,11 +163,13 @@ export function DataTable({
                       onClick={() => column.sortable && handleSort(column.key)}
                     >
                       <div className="flex items-center gap-1 justify-center">
-                        {column.label}
+                        <span className="truncate max-w-[80px] sm:max-w-none">
+                          {column.label}
+                        </span>
                         {column.sortable && sortField === column.key && (
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            className={`w-4 h-4 transition-transform ${
+                            className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform flex-shrink-0 ${
                               sortDirection === "desc" ? "rotate-180" : ""
                             }`}
                             viewBox="0 0 24 24"
@@ -188,7 +193,7 @@ export function DataTable({
                     {columns.map((column) => (
                       <td
                         key={column.key}
-                        className={column.className || "text-center"}
+                        className={`${column.className || "text-center"} text-xs sm:text-sm px-2 sm:px-4`}
                       >
                         {column.render
                           ? column.render(row[column.key], row)
@@ -202,24 +207,24 @@ export function DataTable({
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex justify-between items-center mt-4">
-                <div className="text-sm text-base-content/70">
-                  Showing {Math.min(pageSize, processedData.length)} of{" "}
-                  {processedData.length} entries
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-2 mt-4 px-4 sm:px-0">
+                <div className="text-xs sm:text-sm text-base-content/70">
+                  {Math.min(pageSize, processedData.length)} /{" "}
+                  {processedData.length}
                 </div>
                 <div className="join">
                   <button
-                    className="join-item btn btn-sm"
+                    className="join-item btn btn-xs sm:btn-sm"
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                   >
-                    Previous
+                    Prev
                   </button>
-                  <button className="join-item btn btn-sm btn-disabled">
-                    Page {currentPage} of {totalPages}
+                  <button className="join-item btn btn-xs sm:btn-sm btn-disabled">
+                    {currentPage}/{totalPages}
                   </button>
                   <button
-                    className="join-item btn btn-sm"
+                    className="join-item btn btn-xs sm:btn-sm"
                     onClick={() =>
                       setCurrentPage((p) => Math.min(totalPages, p + 1))
                     }
