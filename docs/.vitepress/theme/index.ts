@@ -4,6 +4,8 @@ import DefaultTheme from "vitepress/theme";
 import { theme, useOpenapi } from "vitepress-openapi";
 import "vitepress-openapi/dist/style.css";
 
+import "./custom.css";
+
 import spec from "../../oas/openapi.json" assert { type: "json" };
 
 export default {
