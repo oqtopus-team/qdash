@@ -64,7 +64,7 @@ export default function FlowListPage() {
               href={`/flow/${flow.name}`}
               className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow"
             >
-              <div className="card-body">
+              <div className="card-body p-4 sm:p-6">
                 <h2 className="card-title">{flow.name}</h2>
                 <p className="text-sm opacity-70">
                   {flow.description || "No description"}

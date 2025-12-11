@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 import type { Task } from "@/schemas";
 
@@ -33,10 +33,22 @@ export function CouplingTaskHistoryModal({
   isOpen,
   onClose,
 }: CouplingTaskHistoryModalProps) {
+  const modalRef = useRef<HTMLDialogElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [subIndex, setSubIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
-  const [isFlipped, setIsFlipped] = useState(false);
+  const [showParams, setShowParams] = useState(false);
+
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    if (isOpen && !modal.open) {
+      modal.showModal();
+    } else if (!isOpen && modal.open) {
+      modal.close();
+    }
+  }, [isOpen]);
 
   const { data, isLoading, isError } = useGetCouplingTaskHistory(
     couplingId,
@@ -47,8 +59,6 @@ export function CouplingTaskHistoryModal({
       },
     },
   );
-
-  if (!isOpen) return null;
 
   // Convert the data object to an array sorted by timestamp (newest first)
   const historyData = data?.data?.data || {};
@@ -87,8 +97,12 @@ export function CouplingTaskHistoryModal({
   };
 
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box w-full max-w-6xl bg-base-100 rounded-t-xl sm:rounded-xl p-3 sm:p-6 fixed bottom-0 sm:relative sm:bottom-auto max-h-[85vh] sm:max-h-[90vh]">
+    <dialog
+      ref={modalRef}
+      className="modal modal-bottom sm:modal-middle"
+      onClose={onClose}
+    >
+      <div className="modal-box w-full sm:w-11/12 max-w-5xl bg-base-100 p-3 sm:p-6">
         <div className="flex justify-between items-center mb-3 sm:mb-4">
           <h3 className="font-bold text-base sm:text-lg truncate pr-2">
             {taskName} - {couplingId}
@@ -123,7 +137,7 @@ export function CouplingTaskHistoryModal({
             <span>No history available</span>
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 h-[70vh] sm:h-[70vh]">
+          <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 max-h-[70vh] sm:max-h-[75vh]">
             {/* Detail View - shown first on mobile (top), second on desktop (right) */}
             <div className="order-1 lg:order-2 lg:w-2/3 flex flex-col min-h-0 overflow-y-auto">
               <div className="flex items-center justify-between mb-2 sm:mb-3 flex-shrink-0">
@@ -158,255 +172,246 @@ export function CouplingTaskHistoryModal({
                   </button>
                 </div>
                 <button
-                  className={`btn btn-xs sm:btn-sm ${isFlipped ? "btn-primary" : "btn-ghost"}`}
-                  onClick={() => setIsFlipped(!isFlipped)}
+                  className={`btn btn-xs sm:btn-sm ${showParams ? "btn-primary" : "btn-ghost"}`}
+                  onClick={() => setShowParams(!showParams)}
                 >
-                  {isFlipped ? "◀ Figure" : "Parameters ▶"}
+                  {showParams ? "◀ Figure" : "Parameters ▶"}
                 </button>
               </div>
 
-              {/* Figure Display - Flip Card */}
-              <div className="flex-1 min-h-[180px] sm:min-h-[300px] [perspective:1000px]">
-                <div
-                  className={`relative w-full h-full transition-transform duration-500 [transform-style:preserve-3d] ${
-                    isFlipped ? "[transform:rotateY(180deg)]" : ""
-                  }`}
-                >
-                  {/* Front - Figure */}
-                  <div className="absolute inset-0 bg-base-200 rounded-lg p-2 sm:p-4 overflow-auto [backface-visibility:hidden]">
-                    {viewMode === "static" && currentFigure ? (
-                      <div className="h-full flex flex-col">
-                        <TaskFigure
-                          path={currentFigure}
-                          qid={couplingId}
-                          className="w-full h-auto flex-1 object-contain"
-                        />
-                        <div className="flex justify-center mt-2 gap-2 items-center">
-                          {figures.length > 1 && (
-                            <>
-                              <button
-                                className="btn btn-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSubIndex(
-                                    (prev) =>
-                                      (prev - 1 + figures.length) %
-                                      figures.length,
-                                  );
-                                }}
-                              >
-                                ◀
-                              </button>
-                              <span className="text-xs sm:text-sm">
-                                {subIndex + 1} / {figures.length}
-                              </span>
-                              <button
-                                className="btn btn-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSubIndex(
-                                    (prev) => (prev + 1) % figures.length,
-                                  );
-                                }}
-                              >
-                                ▶
-                              </button>
-                            </>
-                          )}
-                          {currentJsonFigure && (
+              {/* Figure or Parameters Display */}
+              {!showParams ? (
+                <div className="bg-base-200 rounded-lg p-2 sm:p-4">
+                  {viewMode === "static" && currentFigure ? (
+                    <div className="flex flex-col">
+                      <TaskFigure
+                        path={currentFigure}
+                        qid={couplingId}
+                        className="w-full h-auto object-contain"
+                      />
+                      <div className="flex justify-center mt-2 gap-2 items-center">
+                        {figures.length > 1 && (
+                          <>
                             <button
-                              className="btn btn-xs btn-primary ml-2"
+                              className="btn btn-xs"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setViewMode("interactive");
+                                setSubIndex(
+                                  (prev) =>
+                                    (prev - 1 + figures.length) %
+                                    figures.length,
+                                );
                               }}
                             >
-                              Interactive
+                              ◀
                             </button>
-                          )}
-                        </div>
-                      </div>
-                    ) : viewMode === "interactive" && currentJsonFigure ? (
-                      <div className="h-full flex flex-col">
-                        <div className="flex-1 flex justify-center items-center">
-                          <PlotlyRenderer
-                            className="w-full h-full"
-                            fullPath={`/api/executions/figure?path=${encodeURIComponent(
-                              currentJsonFigure,
-                            )}`}
-                          />
-                        </div>
-                        <div className="flex justify-center mt-2 gap-2 items-center">
-                          {jsonFigures.length > 1 && (
-                            <>
-                              <button
-                                className="btn btn-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSubIndex(
-                                    (prev) =>
-                                      (prev - 1 + jsonFigures.length) %
-                                      jsonFigures.length,
-                                  );
-                                }}
-                              >
-                                ◀
-                              </button>
-                              <span className="text-xs sm:text-sm">
-                                {subIndex + 1} / {jsonFigures.length}
-                              </span>
-                              <button
-                                className="btn btn-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSubIndex(
-                                    (prev) => (prev + 1) % jsonFigures.length,
-                                  );
-                                }}
-                              >
-                                ▶
-                              </button>
-                            </>
-                          )}
+                            <span className="text-xs sm:text-sm">
+                              {subIndex + 1} / {figures.length}
+                            </span>
+                            <button
+                              className="btn btn-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSubIndex(
+                                  (prev) => (prev + 1) % figures.length,
+                                );
+                              }}
+                            >
+                              ▶
+                            </button>
+                          </>
+                        )}
+                        {currentJsonFigure && (
                           <button
-                            className="btn btn-xs btn-ghost ml-2"
+                            className="btn btn-xs btn-primary ml-2"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setViewMode("static");
+                              setViewMode("interactive");
                             }}
                           >
-                            Static
+                            Interactive
                           </button>
-                        </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="alert alert-warning text-sm">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          className="stroke-current shrink-0 w-5 h-5 sm:w-6 sm:h-6"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                          />
-                        </svg>
-                        <span>No figure available</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Back - Input/Output Parameters */}
-                  <div className="absolute inset-0 bg-base-200 rounded-lg p-3 sm:p-4 overflow-auto [backface-visibility:hidden] [transform:rotateY(180deg)]">
-                    <div className="h-full flex flex-col gap-2 text-xs">
-                      {/* Input Parameters */}
-                      {selectedTask?.input_parameters &&
-                        Object.keys(selectedTask.input_parameters).length >
-                          0 && (
-                          <div className="bg-base-100 p-3 rounded-lg">
-                            <h5 className="font-semibold mb-2 flex items-center gap-1">
-                              <span className="text-primary">▸</span> Input
-                            </h5>
-                            <div className="space-y-1">
-                              {Object.entries(selectedTask.input_parameters)
-                                .sort(([a], [b]) => a.localeCompare(b))
-                                .map(([key, value]) => {
-                                  const paramValue = (
-                                    typeof value === "object" &&
-                                    value !== null &&
-                                    "value" in value
-                                      ? value
-                                      : { value }
-                                  ) as {
-                                    value: number | string;
-                                    unit?: string;
-                                  };
-                                  return (
-                                    <div
-                                      key={key}
-                                      className="flex justify-between"
-                                    >
-                                      <span className="text-base-content/70">
-                                        {key}:
-                                      </span>
-                                      <span className="font-medium">
-                                        {typeof paramValue.value === "number"
-                                          ? paramValue.value.toFixed(4)
-                                          : String(paramValue.value)}
-                                        {paramValue.unit
-                                          ? ` ${paramValue.unit}`
-                                          : ""}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          </div>
-                        )}
-
-                      {/* Output Parameters */}
-                      {selectedTask?.output_parameters &&
-                        Object.keys(selectedTask.output_parameters).length >
-                          0 && (
-                          <div className="bg-base-100 p-3 rounded-lg">
-                            <h5 className="font-semibold mb-2 flex items-center gap-1">
-                              <span className="text-success">▸</span> Output
-                            </h5>
-                            <div className="space-y-1">
-                              {Object.entries(selectedTask.output_parameters)
-                                .sort(([a], [b]) => a.localeCompare(b))
-                                .map(([key, value]) => {
-                                  const paramValue = (
-                                    typeof value === "object" &&
-                                    value !== null &&
-                                    "value" in value
-                                      ? value
-                                      : { value }
-                                  ) as {
-                                    value: number | string;
-                                    unit?: string;
-                                  };
-                                  return (
-                                    <div
-                                      key={key}
-                                      className="flex justify-between"
-                                    >
-                                      <span className="text-base-content/70">
-                                        {key}:
-                                      </span>
-                                      <span className="font-medium">
-                                        {typeof paramValue.value === "number"
-                                          ? paramValue.value.toFixed(4)
-                                          : String(paramValue.value)}
-                                        {paramValue.unit
-                                          ? ` ${paramValue.unit}`
-                                          : ""}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          </div>
-                        )}
-
-                      {/* No parameters */}
-                      {(!selectedTask?.input_parameters ||
-                        Object.keys(selectedTask.input_parameters).length ===
-                          0) &&
-                        (!selectedTask?.output_parameters ||
-                          Object.keys(selectedTask.output_parameters).length ===
-                            0) && (
-                          <div className="flex-1 flex items-center justify-center text-base-content/50">
-                            No parameters available
-                          </div>
-                        )}
                     </div>
+                  ) : viewMode === "interactive" && currentJsonFigure ? (
+                    <div className="flex flex-col">
+                      <div className="min-h-[300px] flex justify-center items-center">
+                        <PlotlyRenderer
+                          className="w-full h-full"
+                          fullPath={`/api/executions/figure?path=${encodeURIComponent(
+                            currentJsonFigure,
+                          )}`}
+                        />
+                      </div>
+                      <div className="flex justify-center mt-2 gap-2 items-center">
+                        {jsonFigures.length > 1 && (
+                          <>
+                            <button
+                              className="btn btn-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSubIndex(
+                                  (prev) =>
+                                    (prev - 1 + jsonFigures.length) %
+                                    jsonFigures.length,
+                                );
+                              }}
+                            >
+                              ◀
+                            </button>
+                            <span className="text-xs sm:text-sm">
+                              {subIndex + 1} / {jsonFigures.length}
+                            </span>
+                            <button
+                              className="btn btn-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSubIndex(
+                                  (prev) => (prev + 1) % jsonFigures.length,
+                                );
+                              }}
+                            >
+                              ▶
+                            </button>
+                          </>
+                        )}
+                        <button
+                          className="btn btn-xs btn-ghost ml-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewMode("static");
+                          }}
+                        >
+                          Static
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="alert alert-warning text-sm">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        className="stroke-current shrink-0 w-5 h-5 sm:w-6 sm:h-6"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                        />
+                      </svg>
+                      <span>No figure available</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-base-200 rounded-lg p-3 sm:p-4 overflow-auto max-h-[50vh]">
+                  <div className="flex flex-col gap-2 text-xs">
+                    {/* Input Parameters */}
+                    {selectedTask?.input_parameters &&
+                      Object.keys(selectedTask.input_parameters).length > 0 && (
+                        <div className="bg-base-100 p-3 rounded-lg">
+                          <h5 className="font-semibold mb-2 flex items-center gap-1">
+                            <span className="text-primary">▸</span> Input
+                          </h5>
+                          <div className="space-y-1">
+                            {Object.entries(selectedTask.input_parameters)
+                              .sort(([a], [b]) => a.localeCompare(b))
+                              .map(([key, value]) => {
+                                const paramValue = (
+                                  typeof value === "object" &&
+                                  value !== null &&
+                                  "value" in value
+                                    ? value
+                                    : { value }
+                                ) as {
+                                  value: number | string;
+                                  unit?: string;
+                                };
+                                return (
+                                  <div
+                                    key={key}
+                                    className="flex justify-between"
+                                  >
+                                    <span className="text-base-content/70">
+                                      {key}:
+                                    </span>
+                                    <span className="font-medium">
+                                      {typeof paramValue.value === "number"
+                                        ? paramValue.value.toFixed(4)
+                                        : String(paramValue.value)}
+                                      {paramValue.unit
+                                        ? ` ${paramValue.unit}`
+                                        : ""}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Output Parameters */}
+                    {selectedTask?.output_parameters &&
+                      Object.keys(selectedTask.output_parameters).length >
+                        0 && (
+                        <div className="bg-base-100 p-3 rounded-lg">
+                          <h5 className="font-semibold mb-2 flex items-center gap-1">
+                            <span className="text-success">▸</span> Output
+                          </h5>
+                          <div className="space-y-1">
+                            {Object.entries(selectedTask.output_parameters)
+                              .sort(([a], [b]) => a.localeCompare(b))
+                              .map(([key, value]) => {
+                                const paramValue = (
+                                  typeof value === "object" &&
+                                  value !== null &&
+                                  "value" in value
+                                    ? value
+                                    : { value }
+                                ) as {
+                                  value: number | string;
+                                  unit?: string;
+                                };
+                                return (
+                                  <div
+                                    key={key}
+                                    className="flex justify-between"
+                                  >
+                                    <span className="text-base-content/70">
+                                      {key}:
+                                    </span>
+                                    <span className="font-medium">
+                                      {typeof paramValue.value === "number"
+                                        ? paramValue.value.toFixed(4)
+                                        : String(paramValue.value)}
+                                      {paramValue.unit
+                                        ? ` ${paramValue.unit}`
+                                        : ""}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* No parameters */}
+                    {(!selectedTask?.input_parameters ||
+                      Object.keys(selectedTask.input_parameters).length ===
+                        0) &&
+                      (!selectedTask?.output_parameters ||
+                        Object.keys(selectedTask.output_parameters).length ===
+                          0) && (
+                        <div className="flex items-center justify-center py-8 text-base-content/50">
+                          No parameters available
+                        </div>
+                      )}
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Metadata - compact on mobile, full on desktop */}
               {selectedTask && (
