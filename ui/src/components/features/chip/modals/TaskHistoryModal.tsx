@@ -116,7 +116,7 @@ export function TaskHistoryModal({
             <span>No history available</span>
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 h-[70vh] sm:h-[70vh]">
+          <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
             {/* Detail View - shown first on mobile (top), second on desktop (right) */}
             <div className="order-1 lg:order-2 lg:w-2/3 flex flex-col min-h-0 overflow-y-auto">
               <div className="flex items-center justify-between mb-2 sm:mb-3 flex-shrink-0">
