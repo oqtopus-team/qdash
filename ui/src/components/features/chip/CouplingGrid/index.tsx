@@ -16,13 +16,13 @@ interface CouplingGridProps {
   onDateChange?: (date: string) => void;
 }
 
-interface ExtendedTask extends Task {
-  couplingId: string;
-}
-
 interface SelectedTaskInfo {
   couplingId: string;
   taskName: string;
+}
+
+interface ExtendedTask extends Task {
+  couplingId: string;
 }
 
 const MUX_SIZE = 2;
@@ -59,30 +59,6 @@ export function CouplingGrid({
     useState<SelectedTaskInfo | null>(null);
   const [cellSize, setCellSize] = useState(60);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // Long press preview state
-  const [previewCoupling, setPreviewCoupling] = useState<{
-    couplingId: string;
-    task: ExtendedTask;
-  } | null>(null);
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleLongPressStart = (couplingId: string, task: ExtendedTask) => {
-    longPressTimerRef.current = setTimeout(() => {
-      setPreviewCoupling({ couplingId, task });
-    }, 300);
-  };
-
-  const handleLongPressEnd = () => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  };
-
-  const handleClosePreview = () => {
-    setPreviewCoupling(null);
-  };
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -242,64 +218,6 @@ export function CouplingGrid({
         </div>
       )}
 
-      {/* Long press preview overlay */}
-      {previewCoupling && (
-        <div
-          className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center pt-16 px-4"
-          onClick={handleClosePreview}
-          onTouchEnd={handleClosePreview}
-        >
-          <div className="bg-base-100 rounded-xl shadow-2xl max-w-sm w-full overflow-hidden">
-            {/* Preview image */}
-            <div className="aspect-square bg-base-200">
-              {previewCoupling.task.figure_path && (
-                <TaskFigure
-                  path={
-                    Array.isArray(previewCoupling.task.figure_path)
-                      ? previewCoupling.task.figure_path[0]
-                      : previewCoupling.task.figure_path
-                  }
-                  qid={previewCoupling.couplingId}
-                  className="w-full h-full object-contain"
-                />
-              )}
-            </div>
-            {/* Info */}
-            <div className="p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-lg">
-                  Coupling: {previewCoupling.couplingId}
-                </span>
-                <span
-                  className={`badge ${
-                    previewCoupling.task.status === "completed"
-                      ? "badge-success"
-                      : previewCoupling.task.status === "failed"
-                        ? "badge-error"
-                        : "badge-warning"
-                  }`}
-                >
-                  {previewCoupling.task.status}
-                </span>
-              </div>
-              {previewCoupling.task.end_at && (
-                <div className="text-sm text-base-content/70">
-                  {new Date(previewCoupling.task.end_at).toLocaleString(
-                    "ja-JP",
-                    {
-                      timeZone: "Asia/Tokyo",
-                    },
-                  )}
-                </div>
-              )}
-              <div className="text-xs text-base-content/50">
-                Tap anywhere to close • Tap cell to view history
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Grid Container */}
       <div className="relative w-full flex justify-center">
         <div
@@ -444,22 +362,11 @@ export function CouplingGrid({
                 <button
                   key={normKey}
                   onClick={() => {
-                    handleLongPressEnd();
                     setSelectedTaskInfo({
                       couplingId: task.couplingId,
                       taskName: selectedTask,
                     });
                   }}
-                  onTouchStart={() =>
-                    handleLongPressStart(task.couplingId, task)
-                  }
-                  onTouchEnd={handleLongPressEnd}
-                  onTouchCancel={handleLongPressEnd}
-                  onMouseDown={() =>
-                    handleLongPressStart(task.couplingId, task)
-                  }
-                  onMouseUp={handleLongPressEnd}
-                  onMouseLeave={handleLongPressEnd}
                   style={{
                     position: "absolute",
                     top: centerY,

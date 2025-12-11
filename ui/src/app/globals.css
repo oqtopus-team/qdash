@@ -306,6 +306,38 @@ a.card:hover {
   backdrop-filter: blur(4px);
 }
 
+/* Modal animation - mobile only (slide up from bottom) */
+@keyframes modal-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modal-backdrop-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Apply slide-up animation only on mobile for modal-bottom */
+@media (max-width: 639px) {
+  .modal-bottom[open] .modal-box {
+    animation: modal-slide-up 0.2s ease-out;
+  }
+
+  .modal-bottom[open]::backdrop {
+    animation: modal-backdrop-fade 0.2s ease-out;
+  }
+}
+
 /* ----------------------------------------
    Alert Styles - Rich
    ---------------------------------------- */

@@ -86,6 +86,20 @@ export function CouplingMetricsGrid({
   // Modal state
   const [selectedCouplingInfo, setSelectedCouplingInfo] =
     useState<SelectedCouplingInfo | null>(null);
+  const modalRef = useRef<HTMLDialogElement>(null);
+
+  // Control modal with native dialog API
+  const isModalOpen = selectedCouplingInfo !== null;
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    if (isModalOpen && !modal.open) {
+      modal.showModal();
+    } else if (!isModalOpen && modal.open) {
+      modal.close();
+    }
+  }, [isModalOpen]);
 
   const [cellSize, setCellSize] = useState(60);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -586,57 +600,60 @@ export function CouplingMetricsGrid({
       </div>
 
       {/* Coupling Detail Modal with History */}
-      {selectedCouplingInfo && (
-        <div
-          className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 backdrop-blur-sm sm:p-4"
-          onClick={() => setSelectedCouplingInfo(null)}
-        >
-          <div
-            className="bg-base-100 rounded-t-xl sm:rounded-xl w-full sm:max-w-6xl max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <h2 className="text-lg sm:text-2xl font-bold truncate">
-                  {selectedCouplingInfo.couplingId} - {title}
-                </h2>
-                <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
-                  {selectedCouplingInfo.metric.value !== null
-                    ? `${selectedCouplingInfo.metric.value.toFixed(4)} ${unit}`
-                    : "No data"}
-                </p>
+      <dialog
+        ref={modalRef}
+        className="modal modal-bottom sm:modal-middle"
+        onClose={() => setSelectedCouplingInfo(null)}
+      >
+        <div className="modal-box w-full sm:w-11/12 max-w-5xl bg-base-100 p-0 max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+          {selectedCouplingInfo && (
+            <>
+              {/* Modal Header */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg sm:text-2xl font-bold truncate">
+                    {selectedCouplingInfo.couplingId} - {title}
+                  </h2>
+                  <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+                    {selectedCouplingInfo.metric.value !== null
+                      ? `${selectedCouplingInfo.metric.value.toFixed(4)} ${unit}`
+                      : "No data"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedCouplingInfo(null)}
+                  className="btn btn-ghost btn-sm btn-circle flex-shrink-0 ml-2"
+                >
+                  ✕
+                </button>
               </div>
-              <button
-                onClick={() => setSelectedCouplingInfo(null)}
-                className="btn btn-ghost btn-sm btn-circle flex-shrink-0 ml-2"
-              >
-                ✕
-              </button>
-            </div>
 
-            {/* Modal Content - History */}
-            <div className="flex-1 overflow-auto p-3 sm:p-6">
-              <CouplingMetricHistoryModal
-                chipId={chipId}
-                couplingId={selectedCouplingInfo.couplingId}
-                metricName={metricKey}
-                metricUnit={unit}
-              />
-            </div>
+              {/* Modal Content - History */}
+              <div className="flex-1 overflow-auto p-3 sm:p-6">
+                <CouplingMetricHistoryModal
+                  chipId={chipId}
+                  couplingId={selectedCouplingInfo.couplingId}
+                  metricName={metricKey}
+                  metricUnit={unit}
+                />
+              </div>
 
-            {/* Modal Footer */}
-            <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-end gap-2">
-              <button
-                onClick={() => setSelectedCouplingInfo(null)}
-                className="btn btn-ghost btn-sm sm:btn-md"
-              >
-                Close
-              </button>
-            </div>
-          </div>
+              {/* Modal Footer */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-end gap-2">
+                <button
+                  onClick={() => setSelectedCouplingInfo(null)}
+                  className="btn btn-ghost btn-sm sm:btn-md"
+                >
+                  Close
+                </button>
+              </div>
+            </>
+          )}
         </div>
-      )}
+        <form method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
     </div>
   );
 }

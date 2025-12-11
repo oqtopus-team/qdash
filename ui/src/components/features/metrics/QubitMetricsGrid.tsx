@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 
 import { QubitMetricHistoryModal } from "./QubitMetricHistoryModal";
 
@@ -76,6 +76,20 @@ export function QubitMetricsGrid({
   // Modal state
   const [selectedQubitInfo, setSelectedQubitInfo] =
     useState<SelectedQubitInfo | null>(null);
+  const modalRef = useRef<HTMLDialogElement>(null);
+
+  // Control modal with native dialog API
+  const isModalOpen = selectedQubitInfo !== null;
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    if (isModalOpen && !modal.open) {
+      modal.showModal();
+    } else if (!isModalOpen && modal.open) {
+      modal.close();
+    }
+  }, [isModalOpen]);
 
   const regionSize = 4; // 4×4 qubits per region
   const numRegions = Math.floor(gridSize / regionSize);
@@ -486,63 +500,66 @@ export function QubitMetricsGrid({
       </div>
 
       {/* Qubit Detail Modal */}
-      {selectedQubitInfo && (
-        <div
-          className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 backdrop-blur-sm sm:p-4"
-          onClick={() => setSelectedQubitInfo(null)}
-        >
-          <div
-            className="bg-base-100 rounded-t-xl sm:rounded-xl w-full sm:max-w-6xl max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <h2 className="text-lg sm:text-2xl font-bold truncate">
-                  {selectedQubitInfo.qid} - {title}
-                </h2>
-                <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
-                  {selectedQubitInfo.metric.value !== null
-                    ? `${selectedQubitInfo.metric.value.toFixed(4)} ${unit}`
-                    : "No data"}
-                </p>
+      <dialog
+        ref={modalRef}
+        className="modal modal-bottom sm:modal-middle"
+        onClose={() => setSelectedQubitInfo(null)}
+      >
+        <div className="modal-box w-full sm:w-11/12 max-w-5xl bg-base-100 p-0 max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+          {selectedQubitInfo && (
+            <>
+              {/* Modal Header */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg sm:text-2xl font-bold truncate">
+                    {selectedQubitInfo.qid} - {title}
+                  </h2>
+                  <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+                    {selectedQubitInfo.metric.value !== null
+                      ? `${selectedQubitInfo.metric.value.toFixed(4)} ${unit}`
+                      : "No data"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedQubitInfo(null)}
+                  className="btn btn-ghost btn-sm btn-circle flex-shrink-0 ml-2"
+                >
+                  ✕
+                </button>
               </div>
-              <button
-                onClick={() => setSelectedQubitInfo(null)}
-                className="btn btn-ghost btn-sm btn-circle flex-shrink-0 ml-2"
-              >
-                ✕
-              </button>
-            </div>
 
-            {/* Modal Content */}
-            <div className="flex-1 overflow-auto p-3 sm:p-6">
-              <QubitMetricHistoryModal
-                chipId={chipId}
-                qid={selectedQubitInfo.qid}
-                metricName={metricKey}
-                metricUnit={unit}
-              />
-            </div>
+              {/* Modal Content */}
+              <div className="flex-1 overflow-auto p-3 sm:p-6">
+                <QubitMetricHistoryModal
+                  chipId={chipId}
+                  qid={selectedQubitInfo.qid}
+                  metricName={metricKey}
+                  metricUnit={unit}
+                />
+              </div>
 
-            {/* Modal Footer */}
-            <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-end gap-2">
-              <button
-                onClick={() => setSelectedQubitInfo(null)}
-                className="btn btn-ghost btn-sm sm:btn-md"
-              >
-                Close
-              </button>
-              <a
-                href={`/chip/${chipId}/qubit/${selectedQubitInfo.qid}`}
-                className="btn btn-primary btn-sm sm:btn-md"
-              >
-                Details
-              </a>
-            </div>
-          </div>
+              {/* Modal Footer */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-end gap-2">
+                <button
+                  onClick={() => setSelectedQubitInfo(null)}
+                  className="btn btn-ghost btn-sm sm:btn-md"
+                >
+                  Close
+                </button>
+                <a
+                  href={`/chip/${chipId}/qubit/${selectedQubitInfo.qid}`}
+                  className="btn btn-primary btn-sm sm:btn-md"
+                >
+                  Details
+                </a>
+              </div>
+            </>
+          )}
         </div>
-      )}
+        <form method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
     </div>
   );
 }
