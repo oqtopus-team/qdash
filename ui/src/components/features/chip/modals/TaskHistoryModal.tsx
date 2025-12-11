@@ -31,9 +31,9 @@ export function TaskHistoryModal({
     const modal = modalRef.current;
     if (!modal) return;
 
-    if (isOpen) {
+    if (isOpen && !modal.open) {
       modal.showModal();
-    } else {
+    } else if (!isOpen && modal.open) {
       modal.close();
     }
   }, [isOpen]);
@@ -76,7 +76,11 @@ export function TaskHistoryModal({
   };
 
   return (
-    <dialog ref={modalRef} className="modal modal-bottom sm:modal-middle" onClose={onClose}>
+    <dialog
+      ref={modalRef}
+      className="modal modal-bottom sm:modal-middle"
+      onClose={onClose}
+    >
       <div className="modal-box w-full sm:w-11/12 max-w-5xl bg-base-100 p-3 sm:p-6 max-h-[85vh] sm:max-h-[90vh]">
         <div className="flex justify-between items-center mb-3 sm:mb-4">
           <h3 className="font-bold text-base sm:text-lg truncate pr-2">

@@ -43,16 +43,17 @@ export function TaskHistoryViewer({
   const figureModalRef = useRef<HTMLDialogElement>(null);
 
   // Control figure modal with native dialog API
+  const isModalOpen = expandedFigureIdx !== null;
   useEffect(() => {
     const modal = figureModalRef.current;
     if (!modal) return;
 
-    if (expandedFigureIdx !== null) {
+    if (isModalOpen && !modal.open) {
       modal.showModal();
-    } else {
+    } else if (!isModalOpen && modal.open) {
       modal.close();
     }
-  }, [expandedFigureIdx]);
+  }, [isModalOpen]);
 
   const { data, isLoading, error } = useGetQubitTaskHistory(
     qubitId,
@@ -348,10 +349,7 @@ export function TaskHistoryViewer({
                                   <div className="mt-2 flex justify-center">
                                     <button
                                       className="btn btn-sm btn-primary"
-                                      onClick={() => {
-                                        setExpandedFigureIdx(idx);
-                                        setViewMode("interactive");
-                                      }}
+                                      onClick={() => setExpandedFigureIdx(idx)}
                                     >
                                       Interactive View
                                     </button>
@@ -520,7 +518,8 @@ export function TaskHistoryViewer({
                         ←
                       </button>
                     )}
-                    {expandedFigureIdx < selectedTask.figure_path.length - 1 && (
+                    {expandedFigureIdx <
+                      selectedTask.figure_path.length - 1 && (
                       <button
                         onClick={() =>
                           setExpandedFigureIdx(expandedFigureIdx + 1)
