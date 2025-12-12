@@ -3,16 +3,11 @@
 import { Suspense } from "react";
 
 import { ExecutionPageContent } from "@/components/features/execution/ExecutionPageContent";
+import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
 export default function ExecutionPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="w-full flex justify-center py-12">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
-      }
-    >
+    <Suspense fallback={<ExecutionPageSkeleton />}>
       <ExecutionPageContent />
     </Suspense>
   );

@@ -6,6 +6,7 @@ import { CDFView } from "@/components/features/analysis/CDFView";
 import { CorrelationView } from "@/components/features/analysis/CorrelationView";
 import { HistogramView } from "@/components/features/analysis/HistogramView";
 import { TimeSeriesView } from "@/components/features/analysis/TimeSeriesView";
+import { AnalysisPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useAnalysisUrlState } from "@/hooks/useUrlState";
 
 type AnalyzeView = "timeseries" | "histogram" | "cdf" | "correlation";
@@ -81,13 +82,7 @@ function AnalyzePageContent() {
 
 export default function AnalyzePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="w-full flex justify-center py-12">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
-      }
-    >
+    <Suspense fallback={<AnalysisPageSkeleton />}>
       <AnalyzePageContent />
     </Suspense>
   );

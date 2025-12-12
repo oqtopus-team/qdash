@@ -3,16 +3,11 @@
 import { Suspense } from "react";
 
 import { MetricsPageContent } from "@/components/features/metrics/MetricsPageContent";
+import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
 export default function MetricsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="w-full flex justify-center py-12">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
-      }
-    >
+    <Suspense fallback={<MetricsPageSkeleton />}>
       <MetricsPageContent />
     </Suspense>
   );

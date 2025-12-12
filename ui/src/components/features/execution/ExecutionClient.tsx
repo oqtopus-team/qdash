@@ -252,7 +252,11 @@ export default function ExecutionDetailClient({
       case "failed":
         return <span className="badge badge-error badge-sm">Failed</span>;
       case "running":
-        return <span className="badge badge-info badge-sm">Running</span>;
+        return (
+          <span className="badge badge-info badge-sm status-pulse">
+            Running
+          </span>
+        );
       case "scheduled":
         return <span className="badge badge-warning badge-sm">Scheduled</span>;
       default:

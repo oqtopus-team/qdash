@@ -293,7 +293,7 @@ export function ExecutionPageContent() {
                   <span
                     className={`text-xs sm:text-sm font-semibold flex-shrink-0 ${
                       execution.status === "running"
-                        ? "text-info"
+                        ? "text-info status-pulse"
                         : execution.status === "completed"
                           ? "text-success"
                           : execution.status === "scheduled"
@@ -391,7 +391,7 @@ export function ExecutionPageContent() {
                         <span
                           className={`text-xs sm:text-sm font-semibold flex-shrink-0 ${
                             detailTask.status === "running"
-                              ? "text-info"
+                              ? "text-info status-pulse"
                               : detailTask.status === "completed"
                                 ? "text-success"
                                 : detailTask.status === "scheduled"
