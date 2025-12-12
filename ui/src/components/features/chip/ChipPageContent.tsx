@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
-import { BsGrid, BsListUl } from "react-icons/bs";
+import { LayoutGrid, List } from "lucide-react";
 
 import { CouplingGrid } from "./CouplingGrid";
 import { TaskResultGrid } from "./TaskResultGrid";
@@ -354,7 +354,7 @@ export function ChipPageContent() {
                   }`}
                   onClick={() => setViewMode("1q")}
                 >
-                  <BsGrid className="text-base sm:text-lg" />
+                  <LayoutGrid className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span className="ml-1 sm:ml-2">1Q</span>
                 </button>
                 <button
@@ -363,7 +363,7 @@ export function ChipPageContent() {
                   }`}
                   onClick={() => setViewMode("2q")}
                 >
-                  <BsGrid className="text-base sm:text-lg" />
+                  <LayoutGrid className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span className="ml-1 sm:ml-2">2Q</span>
                 </button>
                 <button
@@ -372,7 +372,7 @@ export function ChipPageContent() {
                   }`}
                   onClick={() => setViewMode("mux")}
                 >
-                  <BsListUl className="text-base sm:text-lg" />
+                  <List className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span className="ml-1 sm:ml-2">MUX</span>
                 </button>
               </div>

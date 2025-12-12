@@ -4,6 +4,8 @@ import React, { useState } from "react";
 
 import type { Task } from "@/schemas";
 
+import { FluentEmoji } from "@/components/ui/FluentEmoji";
+
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
 
@@ -68,7 +70,7 @@ export function TaskGridView({
     return (
       <div className="flex justify-center items-center h-96">
         <div className="text-center text-base-content/60">
-          <div className="text-4xl mb-2">📭</div>
+          <FluentEmoji name="empty" size={48} className="mb-2" />
           <div className="text-sm">{emptyMessage}</div>
         </div>
       </div>
@@ -113,7 +115,7 @@ export function TaskGridView({
                 ) : (
                   <div className="bg-base-200 rounded-lg p-2 aspect-square flex items-center justify-center mb-3">
                     <div className="text-center text-base-content/40">
-                      <div className="text-4xl mb-2">📊</div>
+                      <FluentEmoji name="chart" size={40} className="mb-2" />
                       <div className="text-xs">No Figure</div>
                     </div>
                   </div>

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { useState, useMemo, useEffect } from "react";
 
+import { EmptyState } from "./EmptyState";
+
 interface Column {
   key: string;
   label: string;
@@ -144,9 +146,14 @@ export function DataTable({
         style={{ minHeight: "300px" }}
       >
         {processedData.length === 0 ? (
-          <div className="flex items-center justify-center h-32 text-base-content/50">
-            {emptyMessage}
-          </div>
+          <EmptyState
+            title={filter ? "No results found" : emptyMessage}
+            description={
+              filter ? "Try adjusting your search criteria." : undefined
+            }
+            emoji={filter ? "magnifying-glass" : "empty"}
+            size="sm"
+          />
         ) : (
           <>
             <table className="table table-xs sm:table-compact table-zebra w-full border border-base-300 bg-base-100">
@@ -189,7 +196,10 @@ export function DataTable({
               </thead>
               <tbody>
                 {paginatedData.map((row, index) => (
-                  <tr key={index}>
+                  <tr
+                    key={index}
+                    className="transition-colors hover:bg-base-200/80"
+                  >
                     {columns.map((column) => (
                       <td
                         key={column.key}

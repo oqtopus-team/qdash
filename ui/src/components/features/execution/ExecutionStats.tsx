@@ -2,6 +2,10 @@
 
 import { useMemo, useState, useEffect } from "react";
 
+import {
+  AnimatedCounter,
+  AnimatedPercentage,
+} from "@/components/ui/AnimatedCounter";
 import type { ExecutionResponseSummary } from "@/schemas";
 
 interface ExecutionStatsProps {
@@ -170,8 +174,16 @@ export function ExecutionStats({
         <div className="stats shadow">
           <div className="stat">
             <div className="stat-title">Total Executions</div>
-            <div className="stat-value">{stats.totalExecutions}</div>
-            <div className="stat-desc">Success Rate: {stats.successRate}%</div>
+            <div className="stat-value">
+              <AnimatedCounter value={stats.totalExecutions} duration={800} />
+            </div>
+            <div className="stat-desc">
+              Success Rate:{" "}
+              <AnimatedPercentage
+                value={parseFloat(stats.successRate)}
+                duration={800}
+              />
+            </div>
           </div>
         </div>
 
@@ -180,16 +192,27 @@ export function ExecutionStats({
           <div className="stat">
             <div className="stat-title">Status</div>
             <div className="stat-value text-success">
-              {stats.completedExecutions}
+              <AnimatedCounter
+                value={stats.completedExecutions}
+                duration={800}
+              />
             </div>
             <div className="stat-desc">
               <span className="text-success">Completed</span> /{" "}
               <span className="text-error">
-                {stats.failedExecutions} Failed
+                <AnimatedCounter
+                  value={stats.failedExecutions}
+                  duration={800}
+                />{" "}
+                Failed
               </span>{" "}
               /{" "}
               <span className="text-info">
-                {stats.runningExecutions} Running
+                <AnimatedCounter
+                  value={stats.runningExecutions}
+                  duration={800}
+                />{" "}
+                Running
               </span>
             </div>
           </div>

@@ -5,18 +5,18 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { SiPython } from "react-icons/si";
 import {
-  VscFolder,
-  VscFolderOpened,
-  VscFile,
-  VscLock,
-  VscUnlock,
-  VscCopy,
-  VscListTree,
-  VscSymbolClass,
-  VscLayoutSidebarLeft,
-} from "react-icons/vsc";
+  Braces,
+  Copy,
+  File,
+  FileCode2,
+  Folder,
+  FolderOpen,
+  ListTree,
+  Lock,
+  LockOpen,
+  PanelLeft,
+} from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 
 import type {
@@ -253,18 +253,22 @@ export default function TasksPage() {
   const getFileIcon = (node: TaskFileTreeNode, isOpen = false) => {
     if (node.type === "directory") {
       return isOpen ? (
-        <VscFolderOpened className="inline-block mr-1 text-yellow-600" />
+        <FolderOpen className="inline-block mr-1 text-yellow-600" size={14} />
       ) : (
-        <VscFolder className="inline-block mr-1 text-yellow-600" />
+        <Folder className="inline-block mr-1 text-yellow-600" size={14} />
       );
     }
 
     // Python files
     if (node.name.endsWith(".py")) {
-      return <SiPython className="inline-block mr-1 text-blue-400" />;
+      return (
+        <FileCode2 className="inline-block mr-1 text-blue-400" size={14} />
+      );
     }
 
-    return <VscFile className="inline-block mr-1 text-base-content/50" />;
+    return (
+      <File className="inline-block mr-1 text-base-content/50" size={14} />
+    );
   };
 
   const renderFileTree = (
@@ -359,7 +363,10 @@ export default function TasksPage() {
                   onClick={() => handleTaskClick(task)}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <VscSymbolClass className="text-purple-400 flex-shrink-0" />
+                    <Braces
+                      className="text-purple-400 flex-shrink-0"
+                      size={14}
+                    />
                     <span className="text-sm text-base-content/80 truncate">
                       {task.name}
                     </span>
@@ -372,7 +379,10 @@ export default function TasksPage() {
                     className="opacity-0 group-hover/item:opacity-100 p-1 hover:bg-base-300 rounded transition-opacity"
                     title="Copy task name"
                   >
-                    <VscCopy className="text-base-content/50 hover:text-base-content" />
+                    <Copy
+                      className="text-base-content/50 hover:text-base-content"
+                      size={14}
+                    />
                   </button>
                 </div>
               ))}
@@ -430,7 +440,7 @@ export default function TasksPage() {
               className="btn btn-sm btn-ghost"
               title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
             >
-              <VscLayoutSidebarLeft />
+              <PanelLeft size={16} />
             </button>
             <div className="flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
               <span className="text-sm font-medium flex-shrink-0 hidden sm:inline">
@@ -478,9 +488,9 @@ export default function TasksPage() {
               title={isEditorLocked ? "Unlock editor to edit" : "Lock editor"}
             >
               {isEditorLocked ? (
-                <VscLock className="inline-block" />
+                <Lock className="inline-block" size={16} />
               ) : (
-                <VscUnlock className="inline-block" />
+                <LockOpen className="inline-block" size={16} />
               )}
               <span className="hidden sm:inline ml-1">
                 {isEditorLocked ? "Locked" : "Unlocked"}
@@ -524,7 +534,7 @@ export default function TasksPage() {
                     : "text-base-content/50 hover:text-base-content/80 hover:bg-base-200"
                 }`}
               >
-                <VscListTree />
+                <ListTree size={14} />
                 Files
               </button>
               <button
@@ -535,7 +545,7 @@ export default function TasksPage() {
                     : "text-base-content/50 hover:text-base-content/80 hover:bg-base-200"
                 }`}
               >
-                <VscSymbolClass />
+                <Braces size={14} />
                 Tasks
               </button>
             </div>
@@ -634,7 +644,10 @@ export default function TasksPage() {
             ) : (
               <div className="flex items-center justify-center h-full text-base-content/50">
                 <div className="text-center">
-                  <SiPython className="text-6xl mx-auto mb-4 text-blue-400/50" />
+                  <FileCode2
+                    className="mx-auto mb-4 text-blue-400/50"
+                    size={64}
+                  />
                   <p className="text-lg mb-2">No file selected</p>
                   <p className="text-sm">
                     Select a Python file from the tree to view or edit

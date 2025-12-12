@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 
-import { FaExternalLinkAlt } from "react-icons/fa";
+import { ExternalLink } from "lucide-react";
 
 import { ExecutionStats } from "./ExecutionStats";
 
@@ -293,7 +293,7 @@ export function ExecutionPageContent() {
                   <span
                     className={`text-xs sm:text-sm font-semibold flex-shrink-0 ${
                       execution.status === "running"
-                        ? "text-info"
+                        ? "text-info status-pulse"
                         : execution.status === "completed"
                           ? "text-success"
                           : execution.status === "scheduled"
@@ -358,7 +358,7 @@ export function ExecutionPageContent() {
                   href={`/execution/${selectedChip || ""}/${selectedExecutionId}`}
                   className="btn btn-primary btn-sm sm:btn-md"
                 >
-                  <FaExternalLinkAlt className="text-xs sm:text-sm" />
+                  <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4" />
                   View Details
                 </a>
               </div>
@@ -391,7 +391,7 @@ export function ExecutionPageContent() {
                         <span
                           className={`text-xs sm:text-sm font-semibold flex-shrink-0 ${
                             detailTask.status === "running"
-                              ? "text-info"
+                              ? "text-info status-pulse"
                               : detailTask.status === "completed"
                                 ? "text-success"
                                 : detailTask.status === "scheduled"
