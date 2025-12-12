@@ -48,7 +48,63 @@ const EMOJI_MAP: Record<string, string> = {
   clock: "Alarm%20clock/3D/alarm_clock_3d.png",
   hourglass: "Hourglass%20not%20done/3D/hourglass_not_done_3d.png",
   empty: "Empty%20nest/3D/empty_nest_3d.png",
+
+  // Avatar - Animals
+  fox: "Fox/3D/fox_3d.png",
+  cat: "Cat/3D/cat_3d.png",
+  dog: "Dog%20face/3D/dog_face_3d.png",
+  rabbit: "Rabbit%20face/3D/rabbit_face_3d.png",
+  bear: "Bear/3D/bear_3d.png",
+  panda: "Panda/3D/panda_3d.png",
+  koala: "Koala/3D/koala_3d.png",
+  tiger: "Tiger%20face/3D/tiger_face_3d.png",
+  lion: "Lion/3D/lion_3d.png",
+  unicorn: "Unicorn/3D/unicorn_3d.png",
+  owl: "Owl/3D/owl_3d.png",
+  octopus: "Octopus/3D/octopus_3d.png",
+  butterfly: "Butterfly/3D/butterfly_3d.png",
+  dolphin: "Dolphin/3D/dolphin_3d.png",
+  whale: "Spouting%20whale/3D/spouting_whale_3d.png",
+  penguin: "Penguin/3D/penguin_3d.png",
+
+  // Avatar - Nature & Objects
+  sun: "Sun/3D/sun_3d.png",
+  moon: "Full%20moon/3D/full_moon_3d.png",
+  star: "Star/3D/star_3d.png",
+  rainbow: "Rainbow/3D/rainbow_3d.png",
+  cloud: "Cloud/3D/cloud_3d.png",
+  snowflake: "Snowflake/3D/snowflake_3d.png",
+  cherry: "Cherry%20blossom/3D/cherry_blossom_3d.png",
+  tulip: "Tulip/3D/tulip_3d.png",
+  sunflower: "Sunflower/3D/sunflower_3d.png",
+  mushroom: "Mushroom/3D/mushroom_3d.png",
+  crystal: "Gem%20stone/3D/gem_stone_3d.png",
+  planet: "Ringed%20planet/3D/ringed_planet_3d.png",
 };
+
+// Avatar emoji keys for random selection
+const AVATAR_EMOJIS = [
+  "fox", "cat", "dog", "rabbit", "bear", "panda", "koala", "tiger",
+  "lion", "unicorn", "owl", "octopus", "butterfly", "dolphin", "whale", "penguin",
+  "sun", "moon", "star", "rainbow", "cloud", "snowflake", "cherry", "tulip",
+  "sunflower", "mushroom", "crystal", "planet",
+];
+
+/**
+ * Generate a consistent emoji key from a username
+ */
+export function getAvatarEmoji(username: string): string {
+  if (!username) return "star";
+  // Simple hash function to get consistent index
+  let hash = 0;
+  for (let i = 0; i < username.length; i++) {
+    const char = username.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  const index = Math.abs(hash) % AVATAR_EMOJIS.length;
+  return AVATAR_EMOJIS[index];
+}
 
 const CDN_BASE =
   "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets";
