@@ -9,6 +9,7 @@ import Select, {
 } from "react-select";
 
 import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
+import { MetricsStatsCards } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
@@ -375,29 +376,51 @@ export function MetricsPageContent() {
             <span>Failed to load metrics data</span>
           </div>
         ) : currentMetricConfig ? (
-          metricType === "qubit" ? (
-            <QubitMetricsGrid
+          <>
+            {/* Metric Title */}
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl md:text-2xl font-bold">
+                {currentMetricConfig.title}
+              </h2>
+              <span className="badge badge-outline badge-sm">
+                {currentMetricConfig.unit}
+              </span>
+            </div>
+
+            {/* Stats Summary Cards */}
+            <MetricsStatsCards
               metricData={metricData}
               title={currentMetricConfig.title}
-              metricKey={currentMetricConfig.key}
               unit={currentMetricConfig.unit}
-              colorScale={{ min: 0, max: 0, colors: hexColors }}
               gridSize={gridSize}
-              chipId={selectedChip}
-              selectedDate="latest"
+              metricType={metricType}
             />
-          ) : (
-            <CouplingMetricsGrid
-              metricData={metricData}
-              title={currentMetricConfig.title}
-              metricKey={currentMetricConfig.key}
-              unit={currentMetricConfig.unit}
-              colorScale={{ min: 0, max: 0, colors: hexColors }}
-              gridSize={gridSize}
-              chipId={selectedChip}
-              selectedDate="latest"
-            />
-          )
+
+            {/* Metric Grid */}
+            {metricType === "qubit" ? (
+              <QubitMetricsGrid
+                metricData={metricData}
+                title={currentMetricConfig.title}
+                metricKey={currentMetricConfig.key}
+                unit={currentMetricConfig.unit}
+                colorScale={{ min: 0, max: 0, colors: hexColors }}
+                gridSize={gridSize}
+                chipId={selectedChip}
+                selectedDate="latest"
+              />
+            ) : (
+              <CouplingMetricsGrid
+                metricData={metricData}
+                title={currentMetricConfig.title}
+                metricKey={currentMetricConfig.key}
+                unit={currentMetricConfig.unit}
+                colorScale={{ min: 0, max: 0, colors: hexColors }}
+                gridSize={gridSize}
+                chipId={selectedChip}
+                selectedDate="latest"
+              />
+            )}
+          </>
         ) : (
           <div className="alert alert-info">
             <span>Select a metric to display</span>
