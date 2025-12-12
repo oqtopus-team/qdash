@@ -50,7 +50,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       theme,
       setTheme,
     }),
-    [theme, setTheme]
+    [theme, setTheme],
   );
 
   return (

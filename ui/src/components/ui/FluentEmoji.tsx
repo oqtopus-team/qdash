@@ -84,10 +84,34 @@ const EMOJI_MAP: Record<string, string> = {
 
 // Avatar emoji keys for random selection
 const AVATAR_EMOJIS = [
-  "fox", "cat", "dog", "rabbit", "bear", "panda", "koala", "tiger",
-  "lion", "unicorn", "owl", "octopus", "butterfly", "dolphin", "whale", "penguin",
-  "sun", "moon", "star", "rainbow", "cloud", "snowflake", "cherry", "tulip",
-  "sunflower", "mushroom", "crystal", "planet",
+  "fox",
+  "cat",
+  "dog",
+  "rabbit",
+  "bear",
+  "panda",
+  "koala",
+  "tiger",
+  "lion",
+  "unicorn",
+  "owl",
+  "octopus",
+  "butterfly",
+  "dolphin",
+  "whale",
+  "penguin",
+  "sun",
+  "moon",
+  "star",
+  "rainbow",
+  "cloud",
+  "snowflake",
+  "cherry",
+  "tulip",
+  "sunflower",
+  "mushroom",
+  "crystal",
+  "planet",
 ];
 
 /**
@@ -99,7 +123,7 @@ export function getAvatarEmoji(username: string): string {
   let hash = 0;
   for (let i = 0; i < username.length; i++) {
     const char = username.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32bit integer
   }
   const index = Math.abs(hash) % AVATAR_EMOJIS.length;

@@ -46,7 +46,16 @@ function Sidebar() {
   const { user, logout: authLogout } = useAuth();
   const { theme, setTheme } = useTheme();
   const isAdmin = user?.system_role === "admin";
-  const darkThemes = ["dark", "night", "dracula", "business", "coffee", "dim", "sunset", "abyss"];
+  const darkThemes = [
+    "dark",
+    "night",
+    "dracula",
+    "business",
+    "coffee",
+    "dim",
+    "sunset",
+    "abyss",
+  ];
   const isDarkTheme = darkThemes.includes(theme);
 
   const logoutMutation = useLogout();
@@ -339,14 +348,17 @@ function Sidebar() {
 
   const userSection = (
     <div
-      className={`border-t border-base-300 p-2 ${isMobileOpen ? "" : isOpen ? "mx-4" : "mx-1"}`}
+      className={`border-t border-base-300 ${isMobileOpen ? "p-2" : isOpen ? "p-2 mx-2" : "p-1"}`}
     >
       <button
         onClick={openProfileModal}
-        className={`btn btn-ghost w-full ${isOpen || isMobileOpen ? "justify-start gap-3" : "justify-center"} h-auto py-2`}
+        className={`btn btn-ghost w-full ${isOpen || isMobileOpen ? "justify-start gap-3" : "justify-center p-0"} h-auto py-2`}
       >
-        <div className="w-8 h-8 flex items-center justify-center">
-          <FluentEmoji name={avatarEmoji} size={28} />
+        <div className="flex items-center justify-center">
+          <FluentEmoji
+            name={avatarEmoji}
+            size={isOpen || isMobileOpen ? 28 : 40}
+          />
         </div>
         {(isOpen || isMobileOpen) && (
           <div className="flex-1 text-left min-w-0">
