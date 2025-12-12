@@ -341,7 +341,9 @@ export default function ExecutionDetailClient({
 
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <h1 className="text-2xl sm:text-3xl font-bold break-all">{execution.name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold break-all">
+              {execution.name}
+            </h1>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
               <a
                 href={`/execution/${execute_id}/experiment`}
@@ -364,12 +366,16 @@ export default function ExecutionDetailClient({
             <div className="flex items-center text-base-content/70">
               <FaCalendarAlt className="mr-2 text-info/70 flex-shrink-0" />
               <span className="font-medium mr-1">Start:</span>
-              <time className="truncate">{new Date(execution.start_at).toLocaleString()}</time>
+              <time className="truncate">
+                {new Date(execution.start_at).toLocaleString()}
+              </time>
             </div>
             <div className="flex items-center text-base-content/70">
               <FaCalendarAlt className="mr-2 text-info/70 flex-shrink-0" />
               <span className="font-medium mr-1">End:</span>
-              <time className="truncate">{new Date(execution.end_at).toLocaleString()}</time>
+              <time className="truncate">
+                {new Date(execution.end_at).toLocaleString()}
+              </time>
             </div>
             <div
               className="flex items-center text-base-content/70 tooltip tooltip-bottom"
