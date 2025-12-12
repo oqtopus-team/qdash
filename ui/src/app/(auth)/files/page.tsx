@@ -6,13 +6,13 @@ import { useState, useEffect } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  VscFolder,
-  VscFolderOpened,
-  VscFile,
-  VscJson,
-  VscLock,
-  VscUnlock,
-} from "react-icons/vsc";
+  File,
+  FileJson,
+  Folder,
+  FolderOpen,
+  Lock,
+  LockOpen,
+} from "lucide-react";
 
 import type {
   FileTreeNode,
@@ -203,24 +203,26 @@ export default function FilesEditorPage() {
   const getFileIcon = (node: FileTreeNode, isOpen = false) => {
     if (node.type === "directory") {
       return isOpen ? (
-        <VscFolderOpened className="inline-block mr-1 text-yellow-600" />
+        <FolderOpen className="inline-block mr-1 text-yellow-600" size={14} />
       ) : (
-        <VscFolder className="inline-block mr-1 text-yellow-600" />
+        <Folder className="inline-block mr-1 text-yellow-600" size={14} />
       );
     }
 
     // File type specific icons
     if (node.name.endsWith(".json")) {
-      return <VscJson className="inline-block mr-1 text-yellow-500" />;
+      return (
+        <FileJson className="inline-block mr-1 text-yellow-500" size={14} />
+      );
     }
     if (node.name.endsWith(".yaml") || node.name.endsWith(".yml")) {
-      return <VscFile className="inline-block mr-1 text-red-400" />;
+      return <File className="inline-block mr-1 text-red-400" size={14} />;
     }
     if (node.name.endsWith(".toml")) {
-      return <VscFile className="inline-block mr-1 text-purple-400" />;
+      return <File className="inline-block mr-1 text-purple-400" size={14} />;
     }
 
-    return <VscFile className="inline-block mr-1 text-gray-400" />;
+    return <File className="inline-block mr-1 text-gray-400" size={14} />;
   };
 
   const renderFileTree = (nodes: FileTreeNode[], level = 0): JSX.Element[] => {
@@ -297,7 +299,7 @@ export default function FilesEditorPage() {
               className="btn btn-sm btn-ghost sm:hidden"
               title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
             >
-              <VscFolder />
+              <Folder size={16} />
             </button>
             <div className="flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
               <span className="text-sm font-medium flex-shrink-0 hidden sm:inline">
@@ -325,9 +327,9 @@ export default function FilesEditorPage() {
               title={isEditorLocked ? "Unlock editor to edit" : "Lock editor"}
             >
               {isEditorLocked ? (
-                <VscLock className="inline-block" />
+                <Lock className="inline-block" size={16} />
               ) : (
-                <VscUnlock className="inline-block" />
+                <LockOpen className="inline-block" size={16} />
               )}
               <span className="hidden sm:inline ml-1">
                 {isEditorLocked ? "Locked" : "Unlocked"}

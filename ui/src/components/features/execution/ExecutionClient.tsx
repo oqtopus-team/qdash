@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { BsCheckCircle, BsClock, BsXCircle } from "react-icons/bs";
 import {
-  FaExternalLinkAlt,
-  FaDownload,
-  FaCalendarAlt,
-  FaClock,
-  FaArrowLeft,
-  FaThLarge,
-  FaList,
-} from "react-icons/fa";
+  ArrowLeft,
+  Calendar,
+  CheckCircle,
+  Clock,
+  Download,
+  ExternalLink,
+  LayoutGrid,
+  List,
+  XCircle,
+} from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
 import ExecutionDAG from "./ExecutionDAG";
@@ -234,13 +235,13 @@ export default function ExecutionDetailClient({
   const getStatusIcon = (status?: string) => {
     switch (status) {
       case "completed":
-        return <BsCheckCircle className="text-success" />;
+        return <CheckCircle className="text-success" size={18} />;
       case "failed":
-        return <BsXCircle className="text-error" />;
+        return <XCircle className="text-error" size={18} />;
       case "running":
-        return <BsClock className="text-info" />;
+        return <Clock className="text-info" size={18} />;
       default:
-        return <BsClock className="text-warning" />;
+        return <Clock className="text-warning" size={18} />;
     }
   };
 
@@ -335,7 +336,7 @@ export default function ExecutionDetailClient({
       <div className="space-y-6">
         {/* Back navigation */}
         <Link href="/execution" className="btn btn-ghost btn-sm gap-2 w-fit">
-          <FaArrowLeft />
+          <ArrowLeft size={16} />
           Back to Executions
         </Link>
 
@@ -349,14 +350,14 @@ export default function ExecutionDetailClient({
                 href={`/execution/${execute_id}/experiment`}
                 className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base"
               >
-                <FaExternalLinkAlt className="mr-2" />
+                <ExternalLink className="mr-2" size={16} />
                 Go to Experiment
               </a>
               <a
                 href={(execution.note as { [key: string]: any })?.ui_url || "#"}
                 className="bg-accent text-accent-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base"
               >
-                <FaExternalLinkAlt className="mr-2" />
+                <ExternalLink className="mr-2" size={16} />
                 Go to Flow
               </a>
             </div>
@@ -364,14 +365,14 @@ export default function ExecutionDetailClient({
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-sm bg-base-100/50 px-4 py-3 rounded-lg">
             <div className="flex items-center text-base-content/70">
-              <FaCalendarAlt className="mr-2 text-info/70 flex-shrink-0" />
+              <Calendar className="mr-2 text-info/70 flex-shrink-0" size={14} />
               <span className="font-medium mr-1">Start:</span>
               <time className="truncate">
                 {new Date(execution.start_at).toLocaleString()}
               </time>
             </div>
             <div className="flex items-center text-base-content/70">
-              <FaCalendarAlt className="mr-2 text-info/70 flex-shrink-0" />
+              <Calendar className="mr-2 text-info/70 flex-shrink-0" size={14} />
               <span className="font-medium mr-1">End:</span>
               <time className="truncate">
                 {new Date(execution.end_at).toLocaleString()}
@@ -384,7 +385,7 @@ export default function ExecutionDetailClient({
                 execution.end_at,
               )}
             >
-              <FaClock className="mr-2 text-info/70 flex-shrink-0" />
+              <Clock className="mr-2 text-info/70 flex-shrink-0" size={14} />
               <span className="font-medium mr-1">Duration:</span>
               <span>{execution.elapsed_time}</span>
             </div>
@@ -430,7 +431,7 @@ export default function ExecutionDetailClient({
                         }}
                         className="btn btn-sm btn-primary gap-2"
                       >
-                        <FaDownload />
+                        <Download size={14} />
                         Download JSON
                       </button>
                     </div>
@@ -460,7 +461,7 @@ export default function ExecutionDetailClient({
                 }`}
                 onClick={() => setTaskViewMode("list")}
               >
-                <FaList />
+                <List size={16} />
                 List
               </button>
               <button
@@ -469,7 +470,7 @@ export default function ExecutionDetailClient({
                 }`}
                 onClick={() => setTaskViewMode("grid")}
               >
-                <FaThLarge />
+                <LayoutGrid size={16} />
                 Grid
               </button>
             </div>
@@ -727,7 +728,7 @@ export default function ExecutionDetailClient({
                                       }}
                                       className="btn btn-sm btn-primary"
                                     >
-                                      <FaDownload className="mr-2" />
+                                      <Download className="mr-2" size={14} />
                                       Download
                                     </button>
                                   </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 
-import { FaExternalLinkAlt } from "react-icons/fa";
+import { ExternalLink } from "lucide-react";
 
 import { ExecutionStats } from "./ExecutionStats";
 
@@ -358,7 +358,7 @@ export function ExecutionPageContent() {
                   href={`/execution/${selectedChip || ""}/${selectedExecutionId}`}
                   className="btn btn-primary btn-sm sm:btn-md"
                 >
-                  <FaExternalLinkAlt className="text-xs sm:text-sm" />
+                  <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4" />
                   View Details
                 </a>
               </div>

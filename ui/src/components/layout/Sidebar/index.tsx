@@ -4,16 +4,22 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { BsListTask, BsGrid, BsCpu } from "react-icons/bs";
-import { FaCode } from "react-icons/fa";
-import { FaBolt } from "react-icons/fa6";
-import { FiChevronLeft, FiChevronRight, FiX } from "react-icons/fi";
-import { GoWorkflow } from "react-icons/go";
-import { IoMdSettings } from "react-icons/io";
-import { IoAnalytics } from "react-icons/io5";
-import { MdAdminPanelSettings } from "react-icons/md";
-import { SiSwagger } from "react-icons/si";
-import { VscFiles } from "react-icons/vsc";
+import {
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  Code,
+  Cpu,
+  FileJson2,
+  Files,
+  LayoutGrid,
+  ListTodo,
+  Settings,
+  ShieldCheck,
+  Workflow,
+  X,
+  Zap,
+} from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
@@ -84,7 +90,7 @@ function Sidebar() {
             title="Metrics"
             onClick={handleLinkClick}
           >
-            <BsGrid />
+            <LayoutGrid size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Metrics</span>}
           </Link>
         </li>
@@ -99,7 +105,7 @@ function Sidebar() {
             title="Chip"
             onClick={handleLinkClick}
           >
-            <BsCpu />
+            <Cpu size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Chip</span>}
           </Link>
         </li>
@@ -115,7 +121,7 @@ function Sidebar() {
               title="Editor"
               onClick={handleLinkClick}
             >
-              <FaCode />
+              <Code size={18} />
               {(isOpen || isMobileOpen) && <span className="ml-2">Editor</span>}
             </Link>
           </li>
@@ -131,7 +137,7 @@ function Sidebar() {
             title="Execution"
             onClick={handleLinkClick}
           >
-            <FaBolt />
+            <Zap size={18} />
             {(isOpen || isMobileOpen) && (
               <span className="ml-2">Execution</span>
             )}
@@ -148,7 +154,7 @@ function Sidebar() {
             title="Analysis"
             onClick={handleLinkClick}
           >
-            <IoAnalytics />
+            <BarChart3 size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Analysis</span>}
           </Link>
         </li>
@@ -164,7 +170,7 @@ function Sidebar() {
               title="Tasks"
               onClick={handleLinkClick}
             >
-              <BsListTask />
+              <ListTodo size={18} />
               {(isOpen || isMobileOpen) && <span className="ml-2">Tasks</span>}
             </Link>
           </li>
@@ -181,7 +187,7 @@ function Sidebar() {
               title="Files"
               onClick={handleLinkClick}
             >
-              <VscFiles />
+              <Files size={18} />
               {(isOpen || isMobileOpen) && <span className="ml-2">Files</span>}
             </Link>
           </li>
@@ -198,7 +204,7 @@ function Sidebar() {
             title="Settings"
             onClick={handleLinkClick}
           >
-            <IoMdSettings />
+            <Settings size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Settings</span>}
           </Link>
         </li>
@@ -214,7 +220,7 @@ function Sidebar() {
               title="Admin"
               onClick={handleLinkClick}
             >
-              <MdAdminPanelSettings />
+              <ShieldCheck size={18} />
               {(isOpen || isMobileOpen) && <span className="ml-2">Admin</span>}
             </Link>
           </li>
@@ -233,7 +239,7 @@ function Sidebar() {
                 title="Workflow"
                 onClick={handleLinkClick}
               >
-                <GoWorkflow />
+                <Workflow size={18} />
                 {(isOpen || isMobileOpen) && (
                   <span className="ml-2">Workflow</span>
                 )}
@@ -250,7 +256,7 @@ function Sidebar() {
                 title="API Docs"
                 onClick={handleLinkClick}
               >
-                <SiSwagger />
+                <FileJson2 size={18} />
                 {(isOpen || isMobileOpen) && (
                   <span className="ml-2">API Docs</span>
                 )}
@@ -276,11 +282,7 @@ function Sidebar() {
             className="btn btn-ghost btn-sm btn-square"
             aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
           >
-            {isOpen ? (
-              <FiChevronLeft size={20} />
-            ) : (
-              <FiChevronRight size={20} />
-            )}
+            {isOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
           </button>
         </div>
         {sidebarContent}
@@ -306,7 +308,7 @@ function Sidebar() {
             className="btn btn-ghost btn-sm btn-square"
             aria-label="Close menu"
           >
-            <FiX size={20} />
+            <X size={20} />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto pb-safe">{sidebarContent}</div>
