@@ -26,11 +26,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
   // Authenticated pages - render with sidebar and navbar
   return (
     <SidebarProvider>
-      <div className="flex w-full">
+      <div className="flex w-full h-screen overflow-hidden">
         <Sidebar />
-        <div className="flex-1 flex flex-col min-h-screen w-0">
+        <div className="flex-1 flex flex-col h-screen w-0">
           <Navbar />
-          <main className="flex-1 overflow-y-auto bg-base-100">{children}</main>
+          <main className="flex-1 overflow-y-auto bg-base-100">
+            <div key={pathname} className="page-transition">
+              {children}
+            </div>
+          </main>
         </div>
       </div>
     </SidebarProvider>

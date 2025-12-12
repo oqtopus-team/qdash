@@ -1,13 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback, useRef } from "react";
-
-import type { User } from "@/schemas";
-
-import { useLogout } from "@/client/auth/auth";
 import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
-import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
 
@@ -121,64 +114,7 @@ function ProjectSelector() {
   );
 }
 
-function ProfileModal({
-  modalRef,
-  user,
-}: {
-  modalRef: React.RefObject<HTMLDialogElement>;
-  user: User | null;
-}) {
-  return (
-    <dialog ref={modalRef} className="modal modal-bottom sm:modal-middle">
-      <div className="modal-box w-full sm:w-96 sm:max-w-sm">
-        <div className="card">
-          <figure className="relative w-full h-32 sm:h-64">
-            <div className="bg-gray-200 w-full h-full flex items-center justify-center">
-              <span className="text-3xl sm:text-4xl">
-                {user?.username?.[0]?.toUpperCase()}
-              </span>
-            </div>
-          </figure>
-          <div className="card-body py-2 px-2 sm:px-4">
-            <h2 className="card-title text-xl sm:text-2xl">{user?.username}</h2>
-            <ul className="text-left text-sm sm:text-base">
-              <li>Full Name: {user?.full_name}</li>
-            </ul>
-            <div className="modal-action">
-              <form method="dialog">
-                <button className="btn btn-sm sm:btn-md">Close</button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button>close</button>
-      </form>
-    </dialog>
-  );
-}
-
 function Navbar() {
-  const modalRef = useRef<HTMLDialogElement>(null);
-  const router = useRouter();
-  const { user, logout: authLogout } = useAuth();
-
-  const openModal = useCallback(() => {
-    modalRef.current?.showModal();
-  }, []);
-
-  const logoutMutation = useLogout();
-  const handleLogout = useCallback(async () => {
-    try {
-      await logoutMutation.mutateAsync();
-      authLogout();
-      router.push("/login");
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  }, [logoutMutation, authLogout, router]);
-
   return (
     <nav className="navbar w-full">
       <div className="flex flex-1 md:gap-1 lg:gap-2 items-center">
@@ -186,35 +122,6 @@ function Navbar() {
         <ProjectSelector />
         <EnvironmentBadge className="badge-sm sm:badge-md" />
       </div>
-      <div className="dropdown dropdown-end">
-        <div
-          tabIndex={0}
-          role="button"
-          className="btn btn-ghost btn-circle avatar btn-sm sm:btn-md"
-        >
-          <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full shadow overflow-hidden">
-            <div className="bg-gray-200 w-full h-full flex items-center justify-center">
-              <span className="text-xl sm:text-2xl">
-                {user?.username?.[0]?.toUpperCase()}
-              </span>
-            </div>
-          </div>
-        </div>
-        <ul
-          tabIndex={0}
-          className="mt-3 z-[1] p-2 shadow menu menu-sm dropdown-content bg-base-100 rounded-box w-52"
-        >
-          <li>
-            <button className="justify-between" onClick={openModal}>
-              Profile
-            </button>
-          </li>
-          <li>
-            <button onClick={handleLogout}>Logout</button>
-          </li>
-        </ul>
-      </div>
-      <ProfileModal modalRef={modalRef} user={user} />
     </nav>
   );
 }

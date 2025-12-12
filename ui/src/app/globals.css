@@ -25,11 +25,39 @@
   transition-duration: 200ms;
 }
 
+/* Button active press effect */
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Button focus ring improvement */
+.btn:focus-visible {
+  outline: 2px solid oklch(var(--p) / 0.5);
+  outline-offset: 2px;
+}
+
 /* Cards - only apply transition if not already set by component */
 .card:not([class*="transition-"]) {
   transition-property: box-shadow, transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 200ms;
+}
+
+/* Tab active state improvement */
+.tab.tab-active {
+  position: relative;
+}
+
+.tabs-boxed .tab.tab-active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 2px;
+  background: oklch(var(--p));
+  border-radius: 1px;
 }
 
 /* Form elements - only border and shadow */
@@ -42,6 +70,14 @@ select,
   transition-property: border-color, box-shadow;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
+}
+
+/* Enhanced input focus states */
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: oklch(var(--p));
+  box-shadow: 0 0 0 3px oklch(var(--p) / 0.15);
 }
 
 /* Disable transitions during page load and for reduced motion preference */
@@ -712,6 +748,266 @@ html[data-theme="dark"],
   box-shadow:
     0 2px 10px rgba(85, 85, 240, 0.4),
     0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* ========================================
+   Status Animations & Effects
+   ======================================== */
+
+/* Pulse animation for active/running status */
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+.status-pulse {
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
+/* Glow effect for status indicators */
+@keyframes status-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 4px currentColor;
+  }
+  50% {
+    box-shadow:
+      0 0 12px currentColor,
+      0 0 20px currentColor;
+  }
+}
+
+.status-glow {
+  animation: status-glow 2s ease-in-out infinite;
+}
+
+/* Running status - combines pulse and color */
+.status-running {
+  animation: status-pulse 1.5s ease-in-out infinite;
+}
+
+.status-running::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(45deg, oklch(var(--p)), oklch(var(--s)));
+  opacity: 0;
+  animation: status-glow 1.5s ease-in-out infinite;
+  z-index: -1;
+}
+
+/* Success pulse - one-time animation */
+@keyframes success-pop {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-success {
+  animation: success-pop 0.4s ease-out;
+}
+
+/* ========================================
+   Glass & Card Effects
+   ======================================== */
+
+/* Glass card effect */
+.card-glass {
+  background: oklch(var(--b2) / 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid oklch(var(--b3) / 0.5);
+}
+
+[data-theme="dark"] .card-glass,
+[data-theme="night"] .card-glass,
+[data-theme="dracula"] .card-glass,
+[data-theme="dim"] .card-glass,
+[data-theme="abyss"] .card-glass {
+  background: oklch(var(--b2) / 0.5);
+  border: 1px solid oklch(var(--b3) / 0.3);
+}
+
+/* Default card hover effect - subtle for all cards */
+.card {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.card:hover {
+  box-shadow:
+    0 4px 12px -2px oklch(var(--bc) / 0.08),
+    0 2px 6px -2px oklch(var(--bc) / 0.04);
+}
+
+/* Card hover lift effect - more pronounced */
+.card-hover {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 25px -5px oklch(var(--bc) / 0.1),
+    0 4px 10px -5px oklch(var(--bc) / 0.05);
+}
+
+/* Interactive card - for clickable cards */
+.card-interactive {
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 20px -4px oklch(var(--bc) / 0.12),
+    0 4px 8px -4px oklch(var(--bc) / 0.06);
+  border-color: oklch(var(--p) / 0.3);
+}
+
+.card-interactive:active {
+  transform: translateY(0);
+}
+
+/* Gradient border for highlighted cards */
+.card-gradient-border {
+  position: relative;
+  background: oklch(var(--b1));
+}
+
+.card-gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, oklch(var(--p)), oklch(var(--s)));
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ========================================
+   Number/Value Transitions
+   ======================================== */
+
+.value-transition {
+  transition: all 0.3s ease-out;
+}
+
+/* ========================================
+   Page Transition Animations
+   ======================================== */
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-fade-in-fast {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page-transition {
+  animation: page-fade-in 0.3s ease-out;
+}
+
+.page-transition-fast {
+  animation: page-fade-in-fast 0.2s ease-out;
+}
+
+/* Stagger animation for list items */
+@keyframes stagger-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-item {
+  animation: stagger-fade-in 0.4s ease-out backwards;
+}
+
+.stagger-item:nth-child(1) {
+  animation-delay: 0ms;
+}
+.stagger-item:nth-child(2) {
+  animation-delay: 50ms;
+}
+.stagger-item:nth-child(3) {
+  animation-delay: 100ms;
+}
+.stagger-item:nth-child(4) {
+  animation-delay: 150ms;
+}
+.stagger-item:nth-child(5) {
+  animation-delay: 200ms;
+}
+.stagger-item:nth-child(6) {
+  animation-delay: 250ms;
+}
+.stagger-item:nth-child(7) {
+  animation-delay: 300ms;
+}
+.stagger-item:nth-child(8) {
+  animation-delay: 350ms;
+}
+
+/* Modal animations */
+@keyframes modal-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-box {
+  animation: modal-slide-up 0.2s ease-out;
 }
 
 /* Login page floating logo animation */

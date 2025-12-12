@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { BsCheckCircle, BsClock, BsXCircle } from "react-icons/bs";
 import {
-  FaExternalLinkAlt,
-  FaDownload,
-  FaCalendarAlt,
-  FaClock,
-  FaArrowLeft,
-  FaThLarge,
-  FaList,
-} from "react-icons/fa";
+  ArrowLeft,
+  Calendar,
+  CheckCircle,
+  Clock,
+  Download,
+  ExternalLink,
+  LayoutGrid,
+  List,
+  XCircle,
+} from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
 import ExecutionDAG from "./ExecutionDAG";
@@ -234,13 +235,13 @@ export default function ExecutionDetailClient({
   const getStatusIcon = (status?: string) => {
     switch (status) {
       case "completed":
-        return <BsCheckCircle className="text-success" />;
+        return <CheckCircle className="text-success" size={18} />;
       case "failed":
-        return <BsXCircle className="text-error" />;
+        return <XCircle className="text-error" size={18} />;
       case "running":
-        return <BsClock className="text-info" />;
+        return <Clock className="text-info" size={18} />;
       default:
-        return <BsClock className="text-warning" />;
+        return <Clock className="text-warning" size={18} />;
     }
   };
 
@@ -251,7 +252,11 @@ export default function ExecutionDetailClient({
       case "failed":
         return <span className="badge badge-error badge-sm">Failed</span>;
       case "running":
-        return <span className="badge badge-info badge-sm">Running</span>;
+        return (
+          <span className="badge badge-info badge-sm status-pulse">
+            Running
+          </span>
+        );
       case "scheduled":
         return <span className="badge badge-warning badge-sm">Scheduled</span>;
       default:
@@ -335,41 +340,47 @@ export default function ExecutionDetailClient({
       <div className="space-y-6">
         {/* Back navigation */}
         <Link href="/execution" className="btn btn-ghost btn-sm gap-2 w-fit">
-          <FaArrowLeft />
+          <ArrowLeft size={16} />
           Back to Executions
         </Link>
 
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold">{execution.name}</h1>
-            <div className="flex space-x-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <h1 className="text-2xl sm:text-3xl font-bold break-all">
+              {execution.name}
+            </h1>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
               <a
                 href={`/execution/${execute_id}/experiment`}
-                className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
+                className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base"
               >
-                <FaExternalLinkAlt className="mr-2" />
+                <ExternalLink className="mr-2" size={16} />
                 Go to Experiment
               </a>
               <a
                 href={(execution.note as { [key: string]: any })?.ui_url || "#"}
-                className="bg-accent text-accent-content px-4 py-2 rounded flex items-center hover:opacity-80 transition-colors"
+                className="bg-accent text-accent-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base"
               >
-                <FaExternalLinkAlt className="mr-2" />
+                <ExternalLink className="mr-2" size={16} />
                 Go to Flow
               </a>
             </div>
           </div>
 
-          <div className="flex items-center gap-6 text-sm bg-base-100/50 px-4 py-3 rounded-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-sm bg-base-100/50 px-4 py-3 rounded-lg">
             <div className="flex items-center text-base-content/70">
-              <FaCalendarAlt className="mr-2 text-info/70" />
+              <Calendar className="mr-2 text-info/70 flex-shrink-0" size={14} />
               <span className="font-medium mr-1">Start:</span>
-              <time>{new Date(execution.start_at).toLocaleString()}</time>
+              <time className="truncate">
+                {new Date(execution.start_at).toLocaleString()}
+              </time>
             </div>
             <div className="flex items-center text-base-content/70">
-              <FaCalendarAlt className="mr-2 text-info/70" />
+              <Calendar className="mr-2 text-info/70 flex-shrink-0" size={14} />
               <span className="font-medium mr-1">End:</span>
-              <time>{new Date(execution.end_at).toLocaleString()}</time>
+              <time className="truncate">
+                {new Date(execution.end_at).toLocaleString()}
+              </time>
             </div>
             <div
               className="flex items-center text-base-content/70 tooltip tooltip-bottom"
@@ -378,7 +389,7 @@ export default function ExecutionDetailClient({
                 execution.end_at,
               )}
             >
-              <FaClock className="mr-2 text-info/70" />
+              <Clock className="mr-2 text-info/70 flex-shrink-0" size={14} />
               <span className="font-medium mr-1">Duration:</span>
               <span>{execution.elapsed_time}</span>
             </div>
@@ -424,7 +435,7 @@ export default function ExecutionDetailClient({
                         }}
                         className="btn btn-sm btn-primary gap-2"
                       >
-                        <FaDownload />
+                        <Download size={14} />
                         Download JSON
                       </button>
                     </div>
@@ -437,9 +448,9 @@ export default function ExecutionDetailClient({
             </div>
           )}
 
-        <div className="bg-base-100 rounded-lg shadow-md p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">
+        <div className="bg-base-100 rounded-lg shadow-md p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
+            <h2 className="text-lg sm:text-xl font-bold">
               Tasks
               <span className="badge badge-primary ml-2">
                 {filteredTasks.length}
@@ -447,14 +458,14 @@ export default function ExecutionDetailClient({
                   ` / ${execution.task?.length || 0}`}
               </span>
             </h2>
-            <div className="btn-group">
+            <div className="btn-group self-start sm:self-auto">
               <button
                 className={`btn btn-sm ${
                   taskViewMode === "list" ? "btn-active" : ""
                 }`}
                 onClick={() => setTaskViewMode("list")}
               >
-                <FaList />
+                <List size={16} />
                 List
               </button>
               <button
@@ -463,15 +474,15 @@ export default function ExecutionDetailClient({
                 }`}
                 onClick={() => setTaskViewMode("grid")}
               >
-                <FaThLarge />
+                <LayoutGrid size={16} />
                 Grid
               </button>
             </div>
           </div>
 
           {/* Filter Controls */}
-          <div className="flex gap-4 mb-4">
-            <div className="form-control flex-1">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
+            <div className="form-control flex-1 min-w-0">
               <label className="label py-1">
                 <span className="label-text text-xs font-semibold">
                   Qubit ID
@@ -495,7 +506,7 @@ export default function ExecutionDetailClient({
               />
             </div>
 
-            <div className="form-control flex-1">
+            <div className="form-control flex-1 min-w-0">
               <label className="label py-1">
                 <span className="label-text text-xs font-semibold">
                   Task Name
@@ -520,8 +531,8 @@ export default function ExecutionDetailClient({
             </div>
 
             {(filterQubitId !== "all" || filterTaskName !== "all") && (
-              <div className="form-control">
-                <label className="label py-1">
+              <div className="form-control sm:self-end">
+                <label className="label py-1 hidden sm:flex">
                   <span className="label-text text-xs font-semibold opacity-0">
                     Clear
                   </span>
@@ -540,10 +551,10 @@ export default function ExecutionDetailClient({
           </div>
 
           {taskViewMode === "list" ? (
-            <div className="flex gap-4 h-[calc(100vh-400px)]">
+            <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-400px)]">
               {/* Left Panel - Task Timeline */}
-              <div className="w-96 flex-shrink-0">
-                <div className="card bg-base-100 shadow-xl h-full">
+              <div className="w-full lg:w-96 lg:flex-shrink-0">
+                <div className="card bg-base-100 shadow-xl h-64 lg:h-full">
                   <div className="card-body p-4 overflow-hidden flex flex-col">
                     <h3 className="card-title text-lg mb-2">Timeline</h3>
 
@@ -623,17 +634,17 @@ export default function ExecutionDetailClient({
               {/* Right Panel - Task Details */}
               <div className="flex-1 overflow-hidden">
                 {selectedTask ? (
-                  <div className="card bg-base-100 shadow-xl h-full">
-                    <div className="card-body p-6 overflow-y-auto">
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="card-title text-xl">
+                  <div className="card bg-base-100 shadow-xl h-auto lg:h-full">
+                    <div className="card-body p-4 sm:p-6 overflow-y-auto">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+                        <h3 className="card-title text-lg sm:text-xl break-all">
                           {selectedTask.name}
                         </h3>
                         {getStatusBadge(selectedTask.status)}
                       </div>
 
                       {/* Task Information */}
-                      <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                         <div>
                           <div className="text-sm text-base-content/60 mb-1">
                             Task ID
@@ -721,7 +732,7 @@ export default function ExecutionDetailClient({
                                       }}
                                       className="btn btn-sm btn-primary"
                                     >
-                                      <FaDownload className="mr-2" />
+                                      <Download className="mr-2" size={14} />
                                       Download
                                     </button>
                                   </div>
@@ -892,7 +903,7 @@ export default function ExecutionDetailClient({
                     </div>
                   </div>
                 ) : (
-                  <div className="card bg-base-100 shadow-xl h-full">
+                  <div className="card bg-base-100 shadow-xl h-auto lg:h-full min-h-32">
                     <div className="card-body flex items-center justify-center">
                       <div className="text-center text-base-content/60">
                         Select a task from the timeline to view details

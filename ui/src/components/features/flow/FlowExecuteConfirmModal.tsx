@@ -1,6 +1,6 @@
 "use client";
 
-import { BsPlus, BsLock } from "react-icons/bs";
+import { Lock, Plus } from "lucide-react";
 
 interface FlowExecuteConfirmModalProps {
   flowName: string;
@@ -50,7 +50,7 @@ export function FlowExecuteConfirmModal({
             onClick={onClose}
             className="btn btn-ghost btn-sm btn-square hover:rotate-90 transition-transform"
           >
-            <BsPlus className="text-xl rotate-45" />
+            <Plus className="rotate-45" size={20} />
           </button>
         </div>
 
@@ -96,7 +96,7 @@ export function FlowExecuteConfirmModal({
 
             {isLocked && (
               <div className="alert alert-warning">
-                <BsLock className="h-5 w-5" />
+                <Lock className="h-5 w-5" />
                 <span>
                   Execution is locked. Another calibration is currently running.
                   Please wait until it completes.
@@ -117,7 +117,7 @@ export function FlowExecuteConfirmModal({
           >
             {isLocked ? (
               <>
-                <BsLock className="mr-2" />
+                <Lock className="mr-2" size={16} />
                 Locked
               </>
             ) : (

@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import React, { useEffect, Suspense } from "react";
 
-import { BsGraphUp, BsEye, BsClock } from "react-icons/bs";
-import { FaArrowLeft } from "react-icons/fa";
+import { ArrowLeft, Clock, Eye, TrendingUp } from "lucide-react";
 
 import type { Task, TaskInfo } from "@/schemas";
+
+import { FluentEmoji } from "@/components/ui/FluentEmoji";
 
 import { useGetChip } from "@/client/chip/chip";
 import {
@@ -141,7 +142,7 @@ function QubitDetailPageContent() {
       <div className="space-y-6">
         {/* Back navigation */}
         <Link href="/chip" className="btn btn-ghost btn-sm gap-2 w-fit">
-          <FaArrowLeft />
+          <ArrowLeft size={16} />
           Back to Chip View
         </Link>
 
@@ -158,7 +159,7 @@ function QubitDetailPageContent() {
                 }`}
                 onClick={() => setViewMode("dashboard")}
               >
-                <BsEye className="text-lg" />
+                <Eye size={18} />
                 <span className="ml-2">Dashboard</span>
               </button>
               <button
@@ -167,7 +168,7 @@ function QubitDetailPageContent() {
                 }`}
                 onClick={() => setViewMode("history")}
               >
-                <BsClock className="text-lg" />
+                <Clock size={18} />
                 <span className="ml-2">History</span>
               </button>
               <button
@@ -176,7 +177,7 @@ function QubitDetailPageContent() {
                 }`}
                 onClick={() => setViewMode("timeseries")}
               >
-                <BsGraphUp className="text-lg" />
+                <TrendingUp size={18} />
                 <span className="ml-2">Time Series</span>
               </button>
               <button
@@ -399,7 +400,11 @@ function QubitDetailPageContent() {
                         </div>
                       ) : (
                         <div className="text-center text-base-content/60 py-8">
-                          <div className="text-4xl mb-2">🚫</div>
+                          <FluentEmoji
+                            name="prohibited"
+                            size={48}
+                            className="mb-2"
+                          />
                           <div className="text-sm">No data available</div>
                         </div>
                       )}

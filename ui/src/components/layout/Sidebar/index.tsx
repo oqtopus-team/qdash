@@ -2,19 +2,33 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useRef } from "react";
 
-import { BsListTask, BsGrid, BsCpu } from "react-icons/bs";
-import { FaCode } from "react-icons/fa";
-import { FaBolt } from "react-icons/fa6";
-import { FiChevronLeft, FiChevronRight, FiX } from "react-icons/fi";
-import { GoWorkflow } from "react-icons/go";
-import { IoMdSettings } from "react-icons/io";
-import { IoAnalytics } from "react-icons/io5";
-import { MdAdminPanelSettings } from "react-icons/md";
-import { SiSwagger } from "react-icons/si";
-import { VscFiles } from "react-icons/vsc";
+import {
+  BarChart3,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Code,
+  Cpu,
+  FileJson2,
+  Files,
+  LayoutGrid,
+  ListTodo,
+  LogOut,
+  Moon,
+  Settings,
+  ShieldCheck,
+  Sun,
+  Workflow,
+  X,
+  Zap,
+} from "lucide-react";
 
+import { useTheme } from "@/app/providers/theme-provider";
+import { useLogout } from "@/client/auth/auth";
+import { FluentEmoji, getAvatarEmoji } from "@/components/ui/FluentEmoji";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -24,11 +38,60 @@ const PREFECT_URL =
 
 function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const modalRef = useRef<HTMLDialogElement>(null);
   const { isOpen, isMobileOpen, toggleSidebar, setMobileSidebarOpen } =
     useSidebar();
   const { canEdit } = useProject();
-  const { user } = useAuth();
+  const { user, logout: authLogout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const isAdmin = user?.system_role === "admin";
+  const darkThemes = [
+    "dark",
+    "night",
+    "dracula",
+    "business",
+    "coffee",
+    "dim",
+    "sunset",
+    "abyss",
+  ];
+  const isDarkTheme = darkThemes.includes(theme);
+
+  const logoutMutation = useLogout();
+  const handleLogout = useCallback(async () => {
+    try {
+      await logoutMutation.mutateAsync();
+      authLogout();
+      router.push("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  }, [logoutMutation, authLogout, router]);
+
+  const openProfileModal = useCallback(() => {
+    if (modalRef.current) {
+      modalRef.current.showModal();
+    }
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(isDarkTheme ? "light" : "dark");
+  }, [isDarkTheme, setTheme]);
+
+  const handleSettingsClick = useCallback(() => {
+    modalRef.current?.close();
+    if (isMobileOpen) {
+      setMobileSidebarOpen(false);
+    }
+    router.push("/setting");
+  }, [isMobileOpen, setMobileSidebarOpen, router]);
+
+  const handleModalLogout = useCallback(async () => {
+    modalRef.current?.close();
+    await handleLogout();
+  }, [handleLogout]);
+
   const isActive = (path: string) => {
     return pathname === path;
   };
@@ -40,16 +103,20 @@ function Sidebar() {
     }
   };
 
-  // Compact style for mobile sidebar
+  // Mobile sidebar style
   const linkClass = (active: boolean) =>
-    `py-3 px-4 mx-4 my-1 text-sm font-bold flex items-center rounded-lg ${
-      active ? "bg-neutral text-neutral-content" : "text-base-content"
+    `py-2.5 px-3 mx-1 my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
+      active
+        ? "bg-neutral text-neutral-content"
+        : "text-base-content hover:bg-base-300"
     }`;
 
-  // Desktop expanded style
+  // Desktop sidebar style
   const desktopLinkClass = (active: boolean) =>
-    `py-4 ${isOpen ? "px-4 mx-10" : "px-2 mx-0 justify-center"} my-2 text-base font-bold flex items-center ${
-      active ? "bg-neutral text-neutral-content" : "text-base-content"
+    `py-2.5 ${isOpen ? "px-3 mx-1" : "px-2 mx-1 justify-center"} my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
+      active
+        ? "bg-neutral text-neutral-content"
+        : "text-base-content hover:bg-base-300"
     }`;
 
   const sidebarContent = (
@@ -84,7 +151,7 @@ function Sidebar() {
             title="Metrics"
             onClick={handleLinkClick}
           >
-            <BsGrid />
+            <LayoutGrid size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Metrics</span>}
           </Link>
         </li>
@@ -99,7 +166,7 @@ function Sidebar() {
             title="Chip"
             onClick={handleLinkClick}
           >
-            <BsCpu />
+            <Cpu size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Chip</span>}
           </Link>
         </li>
@@ -115,7 +182,7 @@ function Sidebar() {
               title="Editor"
               onClick={handleLinkClick}
             >
-              <FaCode />
+              <Code size={18} />
               {(isOpen || isMobileOpen) && <span className="ml-2">Editor</span>}
             </Link>
           </li>
@@ -131,7 +198,7 @@ function Sidebar() {
             title="Execution"
             onClick={handleLinkClick}
           >
-            <FaBolt />
+            <Zap size={18} />
             {(isOpen || isMobileOpen) && (
               <span className="ml-2">Execution</span>
             )}
@@ -148,7 +215,7 @@ function Sidebar() {
             title="Analysis"
             onClick={handleLinkClick}
           >
-            <IoAnalytics />
+            <BarChart3 size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Analysis</span>}
           </Link>
         </li>
@@ -164,7 +231,7 @@ function Sidebar() {
               title="Tasks"
               onClick={handleLinkClick}
             >
-              <BsListTask />
+              <ListTodo size={18} />
               {(isOpen || isMobileOpen) && <span className="ml-2">Tasks</span>}
             </Link>
           </li>
@@ -181,7 +248,7 @@ function Sidebar() {
               title="Files"
               onClick={handleLinkClick}
             >
-              <VscFiles />
+              <Files size={18} />
               {(isOpen || isMobileOpen) && <span className="ml-2">Files</span>}
             </Link>
           </li>
@@ -198,7 +265,7 @@ function Sidebar() {
             title="Settings"
             onClick={handleLinkClick}
           >
-            <IoMdSettings />
+            <Settings size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Settings</span>}
           </Link>
         </li>
@@ -214,14 +281,29 @@ function Sidebar() {
               title="Admin"
               onClick={handleLinkClick}
             >
-              <MdAdminPanelSettings />
+              <ShieldCheck size={18} />
               {(isOpen || isMobileOpen) && <span className="ml-2">Admin</span>}
             </Link>
           </li>
         )}
+        <div className={`divider ${isMobileOpen ? "my-1" : ""}`}></div>
+        <li>
+          <a
+            href="https://oqtopus-team.github.io/qdash/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={
+              isMobileOpen ? linkClass(false) : desktopLinkClass(false)
+            }
+            title="Docs"
+            onClick={handleLinkClick}
+          >
+            <BookOpen size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">Docs</span>}
+          </a>
+        </li>
         {canEdit && (
           <>
-            <div className={`divider ${isMobileOpen ? "my-1" : ""}`}></div>
             <li>
               <a
                 href={`${PREFECT_URL}/dashboard`}
@@ -233,7 +315,7 @@ function Sidebar() {
                 title="Workflow"
                 onClick={handleLinkClick}
               >
-                <GoWorkflow />
+                <Workflow size={18} />
                 {(isOpen || isMobileOpen) && (
                   <span className="ml-2">Workflow</span>
                 )}
@@ -250,7 +332,7 @@ function Sidebar() {
                 title="API Docs"
                 onClick={handleLinkClick}
               >
-                <SiSwagger />
+                <FileJson2 size={18} />
                 {(isOpen || isMobileOpen) && (
                   <span className="ml-2">API Docs</span>
                 )}
@@ -262,12 +344,97 @@ function Sidebar() {
     </>
   );
 
+  const avatarEmoji = getAvatarEmoji(user?.username || "");
+
+  const userSection = (
+    <div
+      className={`border-t border-base-300 ${isMobileOpen ? "p-2" : isOpen ? "p-2 mx-2" : "p-1"}`}
+    >
+      <button
+        onClick={openProfileModal}
+        className={`btn btn-ghost w-full ${isOpen || isMobileOpen ? "justify-start gap-3" : "justify-center p-0"} h-auto py-2`}
+      >
+        <div className="flex items-center justify-center">
+          <FluentEmoji
+            name={avatarEmoji}
+            size={isOpen || isMobileOpen ? 28 : 40}
+          />
+        </div>
+        {(isOpen || isMobileOpen) && (
+          <div className="flex-1 text-left min-w-0">
+            <div className="text-sm font-medium truncate">
+              {user?.username || "User"}
+            </div>
+            <div className="text-xs opacity-60 truncate">
+              {user?.full_name || ""}
+            </div>
+          </div>
+        )}
+      </button>
+    </div>
+  );
+
+  const userModal = (
+    <dialog ref={modalRef} className="modal modal-bottom sm:modal-middle">
+      <div className="modal-box w-full sm:w-96 sm:max-w-sm">
+        {/* Profile Section */}
+        <div className="flex flex-col items-center py-4 border-b border-base-300">
+          <div className="mb-3">
+            <FluentEmoji name={avatarEmoji} size={64} />
+          </div>
+          <h2 className="text-lg font-bold">{user?.username}</h2>
+          {user?.full_name && (
+            <p className="text-sm text-base-content/60">{user?.full_name}</p>
+          )}
+        </div>
+
+        {/* Menu Section */}
+        <div className="py-2">
+          {/* Theme Toggle */}
+          <label className="flex items-center justify-between w-full px-4 h-12 cursor-pointer hover:bg-base-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              {isDarkTheme ? <Moon size={18} /> : <Sun size={18} />}
+              <span>Dark Mode</span>
+            </div>
+            <input
+              type="checkbox"
+              className="toggle toggle-sm"
+              checked={isDarkTheme}
+              onChange={toggleTheme}
+            />
+          </label>
+
+          {/* Settings Link */}
+          <button
+            onClick={handleSettingsClick}
+            className="btn btn-ghost w-full justify-start gap-3 h-12"
+          >
+            <Settings size={18} />
+            <span>Settings</span>
+          </button>
+
+          {/* Logout */}
+          <button
+            onClick={handleModalLogout}
+            className="btn btn-ghost w-full justify-start gap-3 h-12 text-error"
+          >
+            <LogOut size={18} />
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
+      <form method="dialog" className="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
+  );
+
   return (
     <>
       {/* Desktop Sidebar */}
       <aside
-        className={`bg-base-200 min-h-screen transition-all duration-300 hidden lg:block ${
-          isOpen ? "w-64" : "w-16"
+        className={`bg-base-200 h-full transition-all duration-300 hidden lg:flex lg:flex-col ${
+          isOpen ? "w-52" : "w-16"
         }`}
       >
         <div className="flex justify-end p-2">
@@ -276,14 +443,11 @@ function Sidebar() {
             className="btn btn-ghost btn-sm btn-square"
             aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
           >
-            {isOpen ? (
-              <FiChevronLeft size={20} />
-            ) : (
-              <FiChevronRight size={20} />
-            )}
+            {isOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
           </button>
         </div>
-        {sidebarContent}
+        <div className="flex-1 overflow-y-auto">{sidebarContent}</div>
+        {userSection}
       </aside>
 
       {/* Mobile Sidebar Overlay */}
@@ -306,11 +470,15 @@ function Sidebar() {
             className="btn btn-ghost btn-sm btn-square"
             aria-label="Close menu"
           >
-            <FiX size={20} />
+            <X size={20} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto pb-safe">{sidebarContent}</div>
+        <div className="flex-1 overflow-y-auto">{sidebarContent}</div>
+        {userSection}
       </aside>
+
+      {/* User Modal - Rendered outside sidebar for proper z-index stacking */}
+      {userModal}
     </>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { FluentEmoji } from "@/components/ui/FluentEmoji";
+
 import { useToastContext } from "./ToastContext";
 
 const alertClass: Record<string, string> = {
@@ -7,6 +9,13 @@ const alertClass: Record<string, string> = {
   error: "alert-error",
   info: "alert-info",
   warning: "alert-warning",
+};
+
+const toastEmoji: Record<string, string> = {
+  success: "success",
+  error: "error",
+  info: "info",
+  warning: "warning",
 };
 
 export function ToastContainer() {
@@ -22,6 +31,7 @@ export function ToastContainer() {
           className={`alert ${alertClass[toast.type]} cursor-pointer shadow-lg`}
           onClick={() => removeToast(toast.id)}
         >
+          <FluentEmoji name={toastEmoji[toast.type]} size={20} />
           <span>{toast.message}</span>
         </div>
       ))}

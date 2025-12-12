@@ -2,13 +2,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
 
-import {
-  BsCheckCircle,
-  BsXCircle,
-  BsClock,
-  BsListUl,
-  BsGrid3X3Gap,
-} from "react-icons/bs";
+import { CheckCircle, XCircle, Clock, List, Grid3x3 } from "lucide-react";
 
 import type { Task } from "@/schemas";
 
@@ -125,11 +119,11 @@ export function TaskHistoryViewer({
   const getStatusIcon = (status?: string) => {
     switch (status) {
       case "completed":
-        return <BsCheckCircle className="text-success" />;
+        return <CheckCircle className="text-success" size={18} />;
       case "failed":
-        return <BsXCircle className="text-error" />;
+        return <XCircle className="text-error" size={18} />;
       default:
-        return <BsClock className="text-warning" />;
+        return <Clock className="text-warning" size={18} />;
     }
   };
 
@@ -183,7 +177,7 @@ export function TaskHistoryViewer({
             onClick={() => setHistoryViewMode("list")}
             title="List View"
           >
-            <BsListUl />
+            <List size={16} />
             <span className="ml-2">List</span>
           </button>
           <button
@@ -193,7 +187,7 @@ export function TaskHistoryViewer({
             onClick={() => setHistoryViewMode("grid")}
             title="Grid View"
           >
-            <BsGrid3X3Gap />
+            <Grid3x3 size={16} />
             <span className="ml-2">Grid</span>
           </button>
         </div>
