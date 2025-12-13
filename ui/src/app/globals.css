@@ -702,6 +702,38 @@ html[data-theme="dark"],
   background-clip: text;
 }
 
+/* ----------------------------------------
+   Page Title Gradient (Generic)
+   ---------------------------------------- */
+
+/* Subtle gradient for page titles - Light mode */
+.title-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--color-base-content) 0%,
+    var(--color-primary) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Subtle gradient for page titles - Dark mode */
+[data-theme="dark"] .title-gradient,
+[data-theme="night"] .title-gradient,
+[data-theme="dracula"] .title-gradient,
+[data-theme="dim"] .title-gradient,
+[data-theme="abyss"] .title-gradient {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    var(--color-primary) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 /* Glow button effect - Light mode */
 .btn-glow {
   background: linear-gradient(135deg, #1f1fdd 0%, #3b3be8 100%);

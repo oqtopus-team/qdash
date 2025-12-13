@@ -3,7 +3,7 @@
 ## Quick Reference
 
 - **Repository**: https://github.com/oqtopus-team/qdash
-- **Documentation**: https://qdash.readthedocs.io/
+- **Documentation**: https://oqtopus-team.github.io/qdash/
 - **License**: Apache 2.0
 
 ## Project Overview

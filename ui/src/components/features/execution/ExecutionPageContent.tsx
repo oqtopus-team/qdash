@@ -221,6 +221,9 @@ export function ExecutionPageContent() {
         <h1 className="text-left text-2xl sm:text-3xl font-bold">
           Execution History
         </h1>
+        <p className="text-sm text-base-content/70 mt-1">
+          Monitor workflow runs and task results
+        </p>
       </div>
       <div className="px-3 sm:px-10 pb-4 sm:pb-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="flex flex-col gap-1">

@@ -228,9 +228,14 @@ export function MetricsPageContent() {
         {/* Header Section */}
         <div className="flex flex-col gap-4 md:gap-6">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <h1 className="text-xl md:text-2xl font-bold">
-              Chip Metrics Dashboard
-            </h1>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold">
+                Chip Metrics Dashboard
+              </h1>
+              <p className="text-sm text-base-content/70 mt-1">
+                View and compare qubit performance metrics
+              </p>
+            </div>
           </div>
 
           {/* Metric Type Tabs */}
