@@ -16,6 +16,7 @@ import {
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
+import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/hooks/useUrlState";
 
@@ -150,7 +151,7 @@ export function ExecutionPageContent() {
     setCurrentPage(1);
   }, [selectedDate]);
 
-  if (isLoading) return <div>Loading...</div>;
+  if (isLoading) return <ExecutionPageSkeleton />;
   if (isError) return <div>Error</div>;
 
   // Generate unique key for execution
@@ -220,6 +221,9 @@ export function ExecutionPageContent() {
         <h1 className="text-left text-2xl sm:text-3xl font-bold">
           Execution History
         </h1>
+        <p className="text-sm text-base-content/70 mt-1">
+          Monitor workflow runs and task results
+        </p>
       </div>
       <div className="px-3 sm:px-10 pb-4 sm:pb-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="flex flex-col gap-1">

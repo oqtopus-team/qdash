@@ -26,6 +26,7 @@ import {
 } from "@/client/admin/admin";
 import { useRegisterUser, useResetPassword } from "@/client/auth/auth";
 import { SettingsCard } from "@/components/features/setting/SettingsCard";
+import { AdminPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function AdminPage() {
@@ -196,11 +197,7 @@ export default function AdminPage() {
   };
 
   if (isLoading || projectsLoading) {
-    return (
-      <div className="w-full px-6 flex justify-center items-center min-h-[400px]">
-        <span className="loading loading-spinner loading-lg"></span>
-      </div>
-    );
+    return <AdminPageSkeleton />;
   }
 
   if (error || projectsError) {

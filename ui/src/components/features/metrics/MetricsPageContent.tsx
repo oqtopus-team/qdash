@@ -15,6 +15,7 @@ import { QubitMetricsGrid } from "./QubitMetricsGrid";
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
+import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
 type TimeRange = "1d" | "7d" | "30d";
@@ -47,7 +48,7 @@ export function MetricsPageContent() {
   // Select appropriate metrics config based on type
   const metricsConfig = metricType === "qubit" ? qubitMetrics : couplingMetrics;
 
-  const { data: chipsData } = useListChips();
+  const { data: chipsData, isLoading: isChipsLoading } = useListChips();
   const { data: chipData } = useGetChip(selectedChip);
 
   // Set default chip when data loads
@@ -216,15 +217,25 @@ export function MetricsPageContent() {
     return scaledData;
   }, [data, currentMetricConfig, metricType]);
 
+  // Show skeleton during initial loading
+  if (isConfigLoading || isChipsLoading) {
+    return <MetricsPageSkeleton />;
+  }
+
   return (
     <div className="w-full min-h-screen bg-base-100/50 px-4 md:px-6 py-6 md:py-8">
       <div className="h-full flex flex-col space-y-4 md:space-y-6">
         {/* Header Section */}
         <div className="flex flex-col gap-4 md:gap-6">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <h1 className="text-xl md:text-2xl font-bold">
-              Chip Metrics Dashboard
-            </h1>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold">
+                Chip Metrics Dashboard
+              </h1>
+              <p className="text-sm text-base-content/70 mt-1">
+                View and compare qubit performance metrics
+              </p>
+            </div>
           </div>
 
           {/* Metric Type Tabs */}

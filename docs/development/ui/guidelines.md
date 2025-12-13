@@ -30,13 +30,13 @@ This document defines the UI development conventions and standards for the QDash
 
 ### UI Libraries
 
-| Library              | Purpose                             |
-| -------------------- | ----------------------------------- |
-| Tailwind CSS         | Utility-first CSS framework         |
-| DaisyUI              | Component library built on Tailwind |
-| plotly.js-basic-dist | Lightweight data visualization      |
-| React Flow           | Node-based diagrams and workflows   |
-| React Icons          | Icon components                     |
+| Library              | Purpose                                |
+| -------------------- | -------------------------------------- |
+| Tailwind CSS         | Utility-first CSS framework            |
+| DaisyUI              | Component library built on Tailwind    |
+| plotly.js-basic-dist | Lightweight data visualization         |
+| React Flow           | Node-based diagrams and workflows      |
+| Lucide React         | Icon components (see [design-policy.md](design-policy.md)) |
 
 ### State Management
 

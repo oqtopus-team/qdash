@@ -93,6 +93,7 @@ export default withMermaid(
               collapsed: true,
               items: [
                 { text: "Guidelines", link: "/development/ui/guidelines" },
+                { text: "Design Policy", link: "/development/ui/design-policy" },
                 { text: "Architecture", link: "/development/ui/architecture" },
                 { text: "Testing", link: "/development/ui/testing" },
               ],

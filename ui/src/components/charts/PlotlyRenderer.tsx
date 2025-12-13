@@ -27,7 +27,7 @@ export default function PlotlyRenderer({
       });
   }, [fullPath]);
 
-  if (error) return <div className="text-red-500">{error}</div>;
+  if (error) return <div className="text-error">{error}</div>;
   if (!figure) return <div>Loading...</div>;
 
   return (

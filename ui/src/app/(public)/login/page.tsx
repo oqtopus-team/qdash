@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 
+import { Book, Github } from "lucide-react";
+
 import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -66,6 +68,26 @@ export default function LoginPage() {
             <span className="badge badge-outline badge-lg">Calibration</span>
             <span className="badge badge-outline badge-lg">Monitoring</span>
             <span className="badge badge-outline badge-lg">Workflow</span>
+          </div>
+          <div className="flex gap-4 mt-6 justify-center lg:justify-start">
+            <a
+              href="https://oqtopus-team.github.io/qdash/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm gap-2"
+            >
+              <Book size={18} />
+              Docs
+            </a>
+            <a
+              href="https://github.com/oqtopus-team/qdash"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm gap-2"
+            >
+              <Github size={18} />
+              GitHub
+            </a>
           </div>
         </div>
 

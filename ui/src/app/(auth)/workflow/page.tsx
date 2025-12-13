@@ -8,6 +8,7 @@ import type { FlowSummary } from "@/schemas";
 
 import { listFlows } from "@/client/flow/flow";
 import { FlowSchedulesSection } from "@/components/features/flow/FlowSchedulesSection";
+import { WorkflowListPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
 export default function FlowListPage() {
   const { data, isLoading, error } = useQuery({
@@ -16,13 +17,7 @@ export default function FlowListPage() {
   });
 
   if (isLoading) {
-    return (
-      <div className="container mx-auto p-3 sm:p-6">
-        <div className="flex items-center justify-center h-64">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
-      </div>
-    );
+    return <WorkflowListPageSkeleton />;
   }
 
   if (error) {
@@ -41,7 +36,7 @@ export default function FlowListPage() {
     <div className="container mx-auto p-3 sm:p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold">User Flows</h1>
-        <Link href="/flow/new" className="btn btn-primary">
+        <Link href="/workflow/new" className="btn btn-primary">
           + New Flow
         </Link>
       </div>
@@ -51,7 +46,7 @@ export default function FlowListPage() {
           <div className="card-body items-center text-center">
             <h2 className="card-title">No flows yet</h2>
             <p>Create your first custom flow to get started</p>
-            <Link href="/flow/new" className="btn btn-primary mt-4">
+            <Link href="/workflow/new" className="btn btn-primary mt-4">
               Create Flow
             </Link>
           </div>
@@ -61,7 +56,7 @@ export default function FlowListPage() {
           {flows.map((flow: FlowSummary) => (
             <Link
               key={flow.name}
-              href={`/flow/${flow.name}`}
+              href={`/workflow/${flow.name}`}
               className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow"
             >
               <div className="card-body p-4 sm:p-6">
