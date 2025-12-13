@@ -89,7 +89,7 @@ const CustomNode = ({ data }: NodeProps) => {
         borderWidth: "2px",
         minWidth: "150px",
         maxWidth: "300px",
-        height: "60px", // 固定の高さ
+        height: "60px", // Fixed height
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",

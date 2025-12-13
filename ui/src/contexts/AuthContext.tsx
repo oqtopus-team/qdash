@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 認証情報の保存
+  // Save authentication info
   const saveAuth = useCallback((token: string, user: string) => {
     const maxAge = 365 * 24 * 60 * 60; // 1 year (long-term token)
     // Save access token and username cookies
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsername(user);
   }, []);
 
-  // 認証情報の削除
+  // Remove authentication info
   const removeAuth = useCallback(() => {
     // Remove access token and username cookies
     document.cookie =
@@ -57,13 +57,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsername(null);
   }, []);
 
-  // ログイン処理
+  // Login mutation
   const loginMutation = useLogin();
 
-  // ログアウト処理
+  // Logout mutation
   const logoutMutation = useLogout();
 
-  // ユーザー情報の取得
+  // Get user info
   const { data: userData, error: userError } = useGetCurrentUser({
     query: {
       enabled: !!accessToken,
@@ -71,14 +71,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // ユーザー情報の更新
+  // Update user info
   useEffect(() => {
     if (userData?.data) {
       setUser(userData.data);
     }
   }, [userData]);
 
-  // エラー時の処理
+  // Handle errors
   useEffect(() => {
     if (userError) {
       console.error("Failed to fetch user info:", userError);
@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [userError, removeAuth]);
 
-  // 初期化処理
+  // Initialization
   useEffect(() => {
     const token = document.cookie
       .split("; ")
@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (username: string, password: string) => {
       try {
-        setLoading(true); // ローディング開始
+        setLoading(true); // Start loading
         const response = await loginMutation.mutateAsync({
           data: {
             username,
@@ -124,19 +124,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
 
-        // 認証情報を保存 (access_token と username)
+        // Save auth info (access_token and username)
         saveAuth(response.data.access_token, response.data.username);
 
-        // 即座にリダイレクト
+        // Redirect immediately
         router.replace("/execution");
       } catch (error) {
         console.error("Login failed:", error);
-        // 認証情報をクリア
+        // Clear auth info
         removeAuth();
         setUser(null);
         throw error;
       } finally {
-        setLoading(false); // ローディング終了
+        setLoading(false); // End loading
       }
     },
     [loginMutation, saveAuth, router, removeAuth],
@@ -144,19 +144,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      // まずログアウトAPIを呼び出し
+      // Call logout API first
       await logoutMutation.mutateAsync();
-      // キャッシュをクリア
+      // Clear cache
       await Promise.all([loginMutation.reset(), logoutMutation.reset()]);
-      // 状態をクリア
+      // Clear state
       setUser(null);
-      // 認証情報を削除（これによりmiddlewareが自動的にリダイレクトを行う）
+      // Remove auth info (middleware will handle redirect automatically)
       removeAuth();
-      // 明示的にログインページに遷移
+      // Explicitly navigate to login page
       window.location.href = "/login";
     } catch (error) {
       console.error("Logout failed:", error);
-      // エラー時も同様の処理
+      // Same handling on error
       setUser(null);
       removeAuth();
       window.location.href = "/login";

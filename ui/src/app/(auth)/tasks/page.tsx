@@ -623,6 +623,7 @@ export default function TasksPage() {
                       cursorStyle: "line",
                       cursorBlinking: "blink",
                       readOnly: isEditorLocked,
+                      domReadOnly: isEditorLocked,
                     }}
                   />
                 )}

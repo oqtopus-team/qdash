@@ -423,6 +423,7 @@ export default function EditFlowPage() {
                   cursorStyle: "line",
                   cursorBlinking: "blink",
                   readOnly: isEditorLocked,
+                  domReadOnly: isEditorLocked,
                 }}
               />
             ) : (

@@ -8,18 +8,18 @@ export const AXIOS_INSTANCE = Axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "/api",
 });
 
-// リクエストインターセプターを追加
+// Add request interceptor
 AXIOS_INSTANCE.interceptors.request.use((config) => {
-  // クッキーからトークンを取得
+  // Get token from cookie
   const token = document.cookie
     .split("; ")
     .find((row) => row.startsWith("access_token="))
     ?.split("=")[1];
 
   if (token) {
-    // トークンをデコード
+    // Decode token
     const decodedToken = decodeURIComponent(token);
-    // Authorization: Bearer ヘッダーを設定
+    // Set Authorization: Bearer header
     if (!config.headers) {
       config.headers = new AxiosHeaders();
     }

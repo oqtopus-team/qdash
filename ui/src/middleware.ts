@@ -13,16 +13,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 1. 認証不要なページの処理
+  // 1. Handle pages that don't require authentication
   if (isLoginPage || isSignupPage) {
-    // ログインページで認証済みの場合はexecutionにリダイレクト
+    // Redirect to execution if already authenticated on login page
     if (isLoginPage && token) {
       return NextResponse.redirect(new URL("/execution", request.url));
     }
     return NextResponse.next();
   }
 
-  // 2. その他のページは認証が必要
+  // 2. Other pages require authentication
   if (!token) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
@@ -30,14 +30,14 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// 認証が必要なパスを指定
+// Specify paths that require authentication
 export const config = {
   matcher: [
     /*
-     * 以下のパスに対してミドルウェアを適用:
-     * - すべてのパス（/:path*）
-     * - ルートパス（/）
-     * 除外: _next/static, _next/image, favicon, 静的ファイル（画像等）
+     * Apply middleware to the following paths:
+     * - All paths (/:path*)
+     * - Root path (/)
+     * Exclude: _next/static, _next/image, favicon, static files (images, etc.)
      */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.svg$|.*\\.jpg$|.*\\.jpeg$|.*\\.gif$|.*\\.ico$).*)",
   ],

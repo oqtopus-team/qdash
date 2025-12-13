@@ -437,6 +437,7 @@ export default function FilesEditorPage() {
                       cursorStyle: "line",
                       cursorBlinking: "blink",
                       readOnly: isEditorLocked,
+                      domReadOnly: isEditorLocked,
                     }}
                   />
                 )}
