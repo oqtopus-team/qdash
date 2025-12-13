@@ -58,7 +58,7 @@ export function ExecutionStats({
         try {
           const start = new Date(exec.start_at).getTime();
           const end = new Date(exec.end_at).getTime();
-          const duration = (end - start) / 1000; // 秒単位
+          const duration = (end - start) / 1000; // In seconds
           return duration > 0 ? duration : 0;
         } catch (error) {
           console.error("Error calculating duration:", error);

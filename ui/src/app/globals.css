@@ -528,13 +528,13 @@ a.card:hover {
 html[data-theme="light"],
 :root[data-theme="light"],
 [data-theme="light"] {
-  /* ベース色 - VitePress light mode */
+  /* Base colors - VitePress light mode */
   --color-base-100: #ffffff !important;
   --color-base-200: #f6f6f7 !important;
   --color-base-300: #e2e2e3 !important;
   --color-base-content: #3c3c43 !important;
 
-  /* プライマリカラー - OQTOPUS brand */
+  /* Primary colors - OQTOPUS brand */
   --color-primary: #1f1fdd !important;
   --color-primary-content: #ffffff !important;
   --color-secondary: #e21331 !important;
@@ -544,7 +544,7 @@ html[data-theme="light"],
   --color-neutral: #dddde3 !important;
   --color-neutral-content: #3c3c43 !important;
 
-  /* ステータスカラー - VitePress palette */
+  /* Status colors - VitePress palette */
   --color-info: #3a5ccc !important;
   --color-info-content: #ffffff !important;
   --color-success: #18794e !important;
@@ -562,13 +562,13 @@ html[data-theme="light"],
 html[data-theme="dark"],
 :root[data-theme="dark"],
 [data-theme="dark"] {
-  /* ベース色 - VitePress dark mode */
+  /* Base colors - VitePress dark mode */
   --color-base-100: #1b1b1f !important;
   --color-base-200: #161618 !important;
   --color-base-300: #2e2e32 !important;
   --color-base-content: rgba(255, 255, 255, 0.87) !important;
 
-  /* プライマリカラー - OQTOPUS brand (dark variants) */
+  /* Primary colors - OQTOPUS brand (dark variants) */
   --color-primary: #5555f0 !important;
   --color-primary-content: #ffffff !important;
   --color-secondary: #e21331 !important;
@@ -578,7 +578,7 @@ html[data-theme="dark"],
   --color-neutral: #515c67 !important;
   --color-neutral-content: rgba(255, 255, 255, 0.87) !important;
 
-  /* ステータスカラー - VitePress palette (dark variants) */
+  /* Status colors - VitePress palette (dark variants) */
   --color-info: #5c73e7 !important;
   --color-info-content: #ffffff !important;
   --color-success: #3dd68c !important;
@@ -587,6 +587,74 @@ html[data-theme="dark"],
   --color-warning-content: #1b1b1f !important;
   --color-error: #f66f81 !important;
   --color-error-content: #1b1b1f !important;
+}
+
+/* ----------------------------------------
+   Dev Environment Light Theme
+   Vivid purple/magenta for clear visual distinction
+   ---------------------------------------- */
+html[data-theme="dev-light"],
+:root[data-theme="dev-light"],
+[data-theme="dev-light"] {
+  /* Base colors - noticeably purple-tinted */
+  --color-base-100: #f5f0ff !important;
+  --color-base-200: #ebe0ff !important;
+  --color-base-300: #d8c8f5 !important;
+  --color-base-content: #2d1f4e !important;
+
+  /* Primary colors - Vivid Purple */
+  --color-primary: #7c3aed !important;
+  --color-primary-content: #ffffff !important;
+  --color-secondary: #db2777 !important;
+  --color-secondary-content: #ffffff !important;
+  --color-accent: #c026d3 !important;
+  --color-accent-content: #ffffff !important;
+  --color-neutral: #c4b5fd !important;
+  --color-neutral-content: #2d1f4e !important;
+
+  /* Status colors */
+  --color-info: #8b5cf6 !important;
+  --color-info-content: #ffffff !important;
+  --color-success: #059669 !important;
+  --color-success-content: #ffffff !important;
+  --color-warning: #d97706 !important;
+  --color-warning-content: #ffffff !important;
+  --color-error: #dc2626 !important;
+  --color-error-content: #ffffff !important;
+}
+
+/* ----------------------------------------
+   Dev Environment Dark Theme
+   Vivid purple/magenta for clear visual distinction
+   ---------------------------------------- */
+html[data-theme="dev-dark"],
+:root[data-theme="dev-dark"],
+[data-theme="dev-dark"] {
+  /* Base colors - deep purple-tinted dark */
+  --color-base-100: #1e1033 !important;
+  --color-base-200: #150a24 !important;
+  --color-base-300: #2d1b4e !important;
+  --color-base-content: rgba(255, 255, 255, 0.92) !important;
+
+  /* Primary colors - Vivid Purple (dark variants) */
+  --color-primary: #a78bfa !important;
+  --color-primary-content: #1e1033 !important;
+  --color-secondary: #f472b6 !important;
+  --color-secondary-content: #1e1033 !important;
+  --color-accent: #e879f9 !important;
+  --color-accent-content: #1e1033 !important;
+  --color-neutral: #5b4380 !important;
+  --color-neutral-content: rgba(255, 255, 255, 0.92) !important;
+
+  /* Status colors */
+  --color-info: #a78bfa !important;
+  --color-info-content: #1e1033 !important;
+  --color-success: #34d399 !important;
+  --color-success-content: #1e1033 !important;
+  --color-warning: #fbbf24 !important;
+  --color-warning-content: #1e1033 !important;
+  --color-error: #fb7185 !important;
+  --color-error-content: #1e1033 !important;
 }
 
 /* Import other DaisyUI themes that users can select */
@@ -702,6 +770,72 @@ html[data-theme="dark"],
   background-clip: text;
 }
 
+/* Login page background gradient - Dev Light mode */
+[data-theme="dev-light"] .login-page-bg {
+  background: linear-gradient(
+    135deg,
+    #f5f0ff 0%,
+    #ebe0ff 25%,
+    #fce7f3 75%,
+    #f5f0ff 100%
+  );
+}
+
+[data-theme="dev-light"] .login-page-bg::before {
+  background:
+    radial-gradient(
+      ellipse at 20% 30%,
+      rgba(124, 58, 237, 0.15) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 80% 70%,
+      rgba(219, 39, 119, 0.12) 0%,
+      transparent 50%
+    );
+}
+
+/* Login title gradient text - Dev Light mode */
+[data-theme="dev-light"] .login-title-gradient {
+  background: linear-gradient(120deg, #7c3aed 30%, #db2777 70%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Login page background gradient - Dev Dark mode */
+[data-theme="dev-dark"] .login-page-bg {
+  background: linear-gradient(
+    135deg,
+    #1e1033 0%,
+    #2d1b4e 25%,
+    #2a1f3d 75%,
+    #1e1033 100%
+  );
+}
+
+[data-theme="dev-dark"] .login-page-bg::before {
+  background:
+    radial-gradient(
+      ellipse at 20% 30%,
+      rgba(167, 139, 250, 0.2) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 80% 70%,
+      rgba(244, 114, 182, 0.15) 0%,
+      transparent 50%
+    );
+}
+
+/* Login title gradient text - Dev Dark mode */
+[data-theme="dev-dark"] .login-title-gradient {
+  background: linear-gradient(120deg, #a78bfa 30%, #f472b6 70%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 /* ----------------------------------------
    Page Title Gradient (Generic)
    ---------------------------------------- */
@@ -779,6 +913,50 @@ html[data-theme="dark"],
 [data-theme="dark"] .btn-glow:active:not(:disabled) {
   box-shadow:
     0 2px 10px rgba(85, 85, 240, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Glow button effect - Dev Light mode */
+[data-theme="dev-light"] .btn-glow {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  box-shadow:
+    0 4px 15px rgba(124, 58, 237, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dev-light"] .btn-glow:hover:not(:disabled) {
+  background: linear-gradient(135deg, #a855f7 0%, #c084fc 100%);
+  box-shadow:
+    0 6px 20px rgba(124, 58, 237, 0.5),
+    0 0 30px rgba(124, 58, 237, 0.3),
+    0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dev-light"] .btn-glow:active:not(:disabled) {
+  box-shadow:
+    0 2px 10px rgba(124, 58, 237, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Glow button effect - Dev Dark mode */
+[data-theme="dev-dark"] .btn-glow {
+  background: linear-gradient(135deg, #a78bfa 0%, #c4b5fd 100%);
+  box-shadow:
+    0 4px 15px rgba(167, 139, 250, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dev-dark"] .btn-glow:hover:not(:disabled) {
+  background: linear-gradient(135deg, #c4b5fd 0%, #ddd6fe 100%);
+  box-shadow:
+    0 6px 20px rgba(167, 139, 250, 0.6),
+    0 0 30px rgba(167, 139, 250, 0.4),
+    0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dev-dark"] .btn-glow:active:not(:disabled) {
+  box-shadow:
+    0 2px 10px rgba(167, 139, 250, 0.5),
     0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -1075,6 +1253,28 @@ html[data-theme="dark"],
   }
 }
 
+@keyframes glow-dev-light {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(124, 58, 237, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 15px rgba(124, 58, 237, 0.5))
+      drop-shadow(0 0 25px rgba(219, 39, 119, 0.3));
+  }
+}
+
+@keyframes glow-dev-dark {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 10px rgba(167, 139, 250, 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 0 18px rgba(167, 139, 250, 0.6))
+      drop-shadow(0 0 30px rgba(244, 114, 182, 0.4));
+  }
+}
+
 .floating-logo {
   animation:
     float 4s ease-in-out infinite,
@@ -1085,6 +1285,18 @@ html[data-theme="dark"],
   animation:
     float 4s ease-in-out infinite,
     glow-dark 3s ease-in-out infinite;
+}
+
+[data-theme="dev-light"] .floating-logo {
+  animation:
+    float 4s ease-in-out infinite,
+    glow-dev-light 3s ease-in-out infinite;
+}
+
+[data-theme="dev-dark"] .floating-logo {
+  animation:
+    float 4s ease-in-out infinite,
+    glow-dev-dark 3s ease-in-out infinite;
 }
 
 /* 404 Page - Lost logo animation */
