@@ -186,7 +186,10 @@ export function TaskResultGrid({
       )}
 
       {/* Grid Container - scrollable for non-square or large grids */}
-      <div className="relative overflow-x-auto p-1 md:p-4" ref={containerRef}>
+      <div
+        className="relative overflow-x-auto p-1 md:p-4 flex justify-center"
+        ref={containerRef}
+      >
         <div
           className="grid gap-1 md:gap-2 p-2 md:p-4 bg-base-200/50 rounded-xl relative"
           style={{
