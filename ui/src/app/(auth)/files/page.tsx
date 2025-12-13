@@ -6,12 +6,15 @@ import { useState, useEffect } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowDown,
+  ArrowUp,
   File,
   FileJson,
   Folder,
   FolderOpen,
-  Lock,
-  LockOpen,
+  Pencil,
+  Plus,
+  Save,
 } from "lucide-react";
 
 import type {
@@ -288,19 +291,6 @@ export default function FilesEditorPage() {
       <div className="h-screen flex flex-col bg-base-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-            <button
-              onClick={() => router.push("/")}
-              className="btn btn-sm btn-ghost"
-            >
-              ←
-            </button>
-            <button
-              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="btn btn-sm btn-ghost sm:hidden"
-              title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
-            >
-              <Folder size={16} />
-            </button>
             <div className="flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
               <span className="text-sm font-medium flex-shrink-0 hidden sm:inline">
                 Config Files
@@ -323,16 +313,12 @@ export default function FilesEditorPage() {
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 overflow-x-auto">
             <button
               onClick={toggleEditorLock}
-              className={`btn btn-sm ${isEditorLocked ? "btn-ghost" : "btn-primary"}`}
-              title={isEditorLocked ? "Unlock editor to edit" : "Lock editor"}
+              className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-warning"}`}
+              title={isEditorLocked ? "Click to edit" : "Currently editing"}
             >
-              {isEditorLocked ? (
-                <Lock className="inline-block" size={16} />
-              ) : (
-                <LockOpen className="inline-block" size={16} />
-              )}
-              <span className="hidden sm:inline ml-1">
-                {isEditorLocked ? "Locked" : "Unlocked"}
+              <Pencil size={16} />
+              <span className="ml-1">
+                {isEditorLocked ? "Edit" : "Editing"}
               </span>
             </button>
             {(gitStatusData as any)?.is_git_repo && (
@@ -351,33 +337,33 @@ export default function FilesEditorPage() {
             )}
             <button
               onClick={handlePull}
-              className="btn btn-sm btn-ghost"
+              className="btn btn-sm btn-info hidden sm:flex"
               disabled={pullMutation.isPending}
               title="Pull latest changes from Git repository"
             >
               {pullMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                "↓"
+                <ArrowDown size={16} />
               )}
-              <span className="hidden sm:inline ml-1">Pull</span>
+              <span className="ml-1">Pull</span>
             </button>
             <button
               onClick={handlePush}
-              className="btn btn-sm btn-ghost"
+              className="btn btn-sm btn-secondary hidden sm:flex"
               disabled={pushMutation.isPending}
               title="Push changes to Git repository"
             >
               {pushMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                "↑"
+                <ArrowUp size={16} />
               )}
-              <span className="hidden sm:inline ml-1">Push</span>
+              <span className="ml-1">Push</span>
             </button>
             <button
               onClick={handleSave}
-              className="btn btn-sm btn-primary"
+              className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-success"}`}
               disabled={
                 !selectedFile ||
                 !hasUnsavedChanges ||
@@ -389,8 +375,8 @@ export default function FilesEditorPage() {
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
                 <>
-                  <span className="hidden sm:inline">Save (Ctrl+S)</span>
-                  <span className="sm:hidden">Save</span>
+                  <Save size={16} />
+                  <span className="ml-1">Save</span>
                 </>
               )}
             </button>
@@ -487,6 +473,92 @@ export default function FilesEditorPage() {
             {selectedFile && (
               <span>{fileContent.split("\n").length} lines</span>
             )}
+          </div>
+        </div>
+
+        {/* Mobile FAB */}
+        <div className="fab fixed bottom-20 right-4 z-30 sm:hidden">
+          <div
+            tabIndex={0}
+            role="button"
+            className="btn btn-circle btn-primary shadow-lg"
+          >
+            <Plus size={20} />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
+              Sidebar
+            </span>
+            <button
+              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+              className="btn btn-circle btn-outline bg-base-100 shadow-lg"
+            >
+              <Folder size={20} />
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
+              {isEditorLocked ? "Edit" : "Editing"}
+            </span>
+            <button
+              onClick={toggleEditorLock}
+              className={`btn btn-circle shadow-lg ${isEditorLocked ? "btn-outline bg-base-100" : "btn-warning"}`}
+            >
+              <Pencil size={20} />
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
+              Pull
+            </span>
+            <button
+              onClick={handlePull}
+              className="btn btn-circle btn-info shadow-lg"
+              disabled={pullMutation.isPending}
+            >
+              {pullMutation.isPending ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : (
+                <ArrowDown size={20} />
+              )}
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
+              Push
+            </span>
+            <button
+              onClick={handlePush}
+              className="btn btn-circle btn-secondary shadow-lg"
+              disabled={pushMutation.isPending}
+            >
+              {pushMutation.isPending ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : (
+                <ArrowUp size={20} />
+              )}
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
+              Save
+            </span>
+            <button
+              onClick={handleSave}
+              className={`btn btn-circle shadow-lg ${isEditorLocked ? "btn-outline bg-base-100" : "btn-success"}`}
+              disabled={
+                !selectedFile ||
+                !hasUnsavedChanges ||
+                saveMutation.isPending ||
+                isEditorLocked
+              }
+            >
+              {saveMutation.isPending ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : (
+                <Save size={20} />
+              )}
+            </button>
           </div>
         </div>
       </div>

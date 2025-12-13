@@ -19,7 +19,21 @@ import {
   saveFlow,
   deleteFlow,
   useExecuteFlow,
+  listFlowSchedules,
 } from "@/client/flow/flow";
+import {
+  ArrowLeft,
+  Clock,
+  Lock,
+  Pencil,
+  Play,
+  Plus,
+  Save,
+  Settings,
+  Trash2,
+  X,
+} from "lucide-react";
+
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
 import { FlowImportsPanel } from "@/components/features/flow/FlowImportsPanel";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
@@ -44,7 +58,8 @@ export default function EditFlowPage() {
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [activeTab, setActiveTab] = useState<"code" | "helpers">("code");
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [showPropertiesModal, setShowPropertiesModal] = useState(false);
+  const [isEditorLocked, setIsEditorLocked] = useState(true);
 
   // Fetch current user
   const { data: userData } = useGetCurrentUser();
@@ -59,6 +74,19 @@ export default function EditFlowPage() {
         refetchInterval: 5000,
       },
     });
+
+  // Fetch schedules for this flow
+  const { data: schedulesData } = useQuery({
+    queryKey: ["flow-schedules", name],
+    queryFn: () => listFlowSchedules(name),
+    refetchInterval: 10000,
+  });
+
+  const activeSchedules =
+    (schedulesData?.data &&
+      "schedules" in schedulesData.data &&
+      schedulesData.data.schedules?.filter((s) => s.active)) ||
+    [];
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["flow", name],
@@ -201,20 +229,22 @@ export default function EditFlowPage() {
               className="btn btn-sm btn-ghost"
               disabled={saveMutation.isPending || deleteMutation.isPending}
             >
-              ←
-            </button>
-            <button
-              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="btn btn-sm btn-ghost sm:hidden"
-              title={isSidebarVisible ? "Hide properties" : "Show properties"}
-            >
-              ☰
+              <ArrowLeft size={16} />
             </button>
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-sm text-base-content/50">●</span>
               <span className="text-sm font-medium text-base-content truncate">
                 {name}.py
               </span>
+              {activeSchedules.length > 0 && (
+                <span
+                  className="badge badge-sm badge-info gap-1"
+                  title={`${activeSchedules.length} active schedule(s)`}
+                >
+                  <Clock size={12} />
+                  {activeSchedules.length}
+                </span>
+              )}
             </div>
             {data?.data?.updated_at && (
               <span className="text-xs text-base-content/50 hidden lg:inline">
@@ -222,13 +252,24 @@ export default function EditFlowPage() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          {/* Desktop action buttons - hidden on mobile, use FAB instead */}
+          <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
             <button
-              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="btn btn-sm btn-ghost hidden sm:flex"
-              title={isSidebarVisible ? "Hide properties" : "Show properties"}
+              onClick={() => setShowPropertiesModal(true)}
+              className="btn btn-sm btn-ghost"
+              title="Properties"
             >
-              ☰
+              <Settings size={16} />
+            </button>
+            <button
+              onClick={() => setIsEditorLocked(!isEditorLocked)}
+              className={`btn btn-sm ${isEditorLocked ? "btn-outline" : "btn-warning"}`}
+              title={isEditorLocked ? "Click to edit" : "Currently editing"}
+            >
+              <Pencil size={16} />
+              <span className="ml-1">
+                {isEditorLocked ? "Edit" : "Editing"}
+              </span>
             </button>
             <button
               onClick={() => setShowExecuteConfirm(true)}
@@ -250,11 +291,11 @@ export default function EditFlowPage() {
               {executeMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : lockStatus?.data.lock ? (
-                "🔒"
+                <Lock size={16} />
               ) : (
-                "▶"
+                <Play size={16} />
               )}
-              <span className="hidden sm:inline ml-1">
+              <span className="ml-1">
                 {lockStatus?.data.lock ? "Locked" : "Execute"}
               </span>
             </button>
@@ -263,20 +304,24 @@ export default function EditFlowPage() {
               className="btn btn-sm btn-error"
               disabled={saveMutation.isPending || deleteMutation.isPending}
             >
-              <span className="hidden sm:inline">Delete</span>
-              <span className="sm:hidden">✕</span>
+              <Trash2 size={16} />
+              <span className="ml-1">Delete</span>
             </button>
             <button
               onClick={handleSave}
-              className="btn btn-sm btn-primary"
-              disabled={saveMutation.isPending || deleteMutation.isPending}
+              className={`btn btn-sm ${isEditorLocked ? "btn-outline" : "btn-success"}`}
+              disabled={
+                saveMutation.isPending ||
+                deleteMutation.isPending ||
+                isEditorLocked
+              }
             >
               {saveMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
                 <>
-                  <span className="hidden sm:inline">Save Changes</span>
-                  <span className="sm:hidden">Save</span>
+                  <Save size={16} />
+                  <span className="ml-1">Save</span>
                 </>
               )}
             </button>
@@ -382,37 +427,141 @@ export default function EditFlowPage() {
                   renderLineHighlight: "all",
                   cursorStyle: "line",
                   cursorBlinking: "blink",
+                  readOnly: isEditorLocked,
                 }}
               />
             ) : (
               <FlowImportsPanel />
             )}
           </div>
+        </div>
 
-          {/* Mobile Sidebar Overlay */}
-          {isSidebarVisible && (
-            <div
-              className="fixed inset-0 bg-black/50 z-10 sm:hidden"
-              onClick={() => setIsSidebarVisible(false)}
-            />
-          )}
+        {/* Status Bar */}
+        <div className="flex items-center justify-between px-4 py-1 bg-primary text-primary-content text-xs">
+          <div className="flex items-center gap-4">
+            <span>
+              Ln {cursorPosition.line}, Col {cursorPosition.column}
+            </span>
+            <span>Python</span>
+            <span>UTF-8</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span>{code.split("\n").length} lines</span>
+          </div>
+        </div>
 
-          {/* Right Sidebar - Metadata */}
+        {/* Mobile FAB / Speed Dial - only visible on mobile */}
+        <div className="fab fixed bottom-20 right-4 z-30 sm:hidden">
           <div
-            className={`${isSidebarVisible ? "w-72 sm:w-80" : "w-0"} bg-base-100 border-l border-base-300 overflow-y-auto transition-all duration-200 overflow-hidden flex-shrink-0 ${isSidebarVisible ? "fixed sm:relative right-0 top-0 h-full z-20 sm:z-auto" : ""}`}
+            tabIndex={0}
+            role="button"
+            className="btn btn-circle btn-primary shadow-lg"
           >
-            <div className="p-4">
-              {/* Mobile Close Button */}
-              <div className="flex justify-between items-center mb-4 sm:hidden">
-                <span className="text-sm font-semibold">Properties</span>
+            <Plus size={20} />
+          </div>
+          {/* Properties Button */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
+              Properties
+            </span>
+            <button
+              onClick={() => setShowPropertiesModal(true)}
+              className="btn btn-circle btn-outline bg-base-100 shadow-lg"
+            >
+              <Settings size={20} />
+            </button>
+          </div>
+          {/* Editor Lock Toggle Button */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
+              {isEditorLocked ? "Edit" : "Editing"}
+            </span>
+            <button
+              onClick={() => setIsEditorLocked(!isEditorLocked)}
+              className={`btn btn-circle shadow-lg ${isEditorLocked ? "btn-outline bg-base-100" : "btn-warning"}`}
+            >
+              <Pencil size={20} />
+            </button>
+          </div>
+          {/* Execute Button */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
+              {lockStatus?.data.lock ? "Locked" : "Execute"}
+            </span>
+            <button
+              onClick={() => setShowExecuteConfirm(true)}
+              className={`btn btn-circle shadow-lg ${
+                lockStatus?.data.lock ? "btn-disabled" : "btn-success"
+              }`}
+              disabled={
+                saveMutation.isPending ||
+                deleteMutation.isPending ||
+                executeMutation.isPending ||
+                isLockStatusLoading
+              }
+            >
+              {executeMutation.isPending ? (
+                <span className="loading loading-spinner loading-sm"></span>
+              ) : lockStatus?.data.lock ? (
+                <Lock size={20} />
+              ) : (
+                <Play size={20} />
+              )}
+            </button>
+          </div>
+          {/* Save Button */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
+              Save
+            </span>
+            <button
+              onClick={handleSave}
+              className={`btn btn-circle shadow-lg ${isEditorLocked ? "btn-outline bg-base-100" : "btn-success"}`}
+              disabled={
+                saveMutation.isPending ||
+                deleteMutation.isPending ||
+                isEditorLocked
+              }
+            >
+              {saveMutation.isPending ? (
+                <span className="loading loading-spinner loading-sm"></span>
+              ) : (
+                <Save size={20} />
+              )}
+            </button>
+          </div>
+          {/* Delete Button */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
+              Delete
+            </span>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="btn btn-circle btn-error shadow-lg"
+              disabled={saveMutation.isPending || deleteMutation.isPending}
+            >
+              <Trash2 size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Properties Modal */}
+        {showPropertiesModal && (
+          <div className="modal modal-open">
+            <div
+              className="modal-backdrop"
+              onClick={() => setShowPropertiesModal(false)}
+            />
+            <div className="modal-box max-w-md">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg">Properties</h3>
                 <button
-                  onClick={() => setIsSidebarVisible(false)}
+                  onClick={() => setShowPropertiesModal(false)}
                   className="btn btn-ghost btn-sm btn-square"
                 >
-                  ✕
+                  <X size={16} />
                 </button>
               </div>
-              <h2 className="text-sm font-semibold mb-4">PROPERTIES</h2>
 
               <div className="space-y-4">
                 <div className="form-control">
@@ -522,30 +671,23 @@ export default function EditFlowPage() {
                     disabled
                   />
                 </div>
+
+                {/* Flow Schedules Section */}
+                <div className="divider my-2"></div>
+                <FlowSchedulePanel flowName={name} />
               </div>
 
-              {/* Flow Schedules Section */}
-              <div className="divider my-2"></div>
-              <div className="px-4 pb-4">
-                <FlowSchedulePanel flowName={name} />
+              <div className="modal-action">
+                <button
+                  onClick={() => setShowPropertiesModal(false)}
+                  className="btn"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Status Bar */}
-        <div className="flex items-center justify-between px-4 py-1 bg-primary text-primary-content text-xs">
-          <div className="flex items-center gap-4">
-            <span>
-              Ln {cursorPosition.line}, Col {cursorPosition.column}
-            </span>
-            <span>Python</span>
-            <span>UTF-8</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span>{code.split("\n").length} lines</span>
-          </div>
-        </div>
+        )}
 
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && (
