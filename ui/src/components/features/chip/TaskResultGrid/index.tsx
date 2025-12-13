@@ -92,14 +92,6 @@ export function TaskResultGrid({
     keepPrevious: true,
   });
 
-  // Use grid layout hook for responsive sizing
-  const { containerRef, cellSize, getContainerWidth } = useGridLayout({
-    cols: gridCols,
-    rows: gridRows,
-    reservedHeight: { mobile: 250, desktop: 300 },
-    deps: [taskResponse, topologyQubits],
-  });
-
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
@@ -113,6 +105,18 @@ export function TaskResultGrid({
   } | null>(null);
 
   const numRegions = Math.floor(gridSize / regionSize);
+
+  // Calculate displayed grid size based on zoom mode
+  const displayCols = zoomMode === "region" ? regionSize : gridCols;
+  const displayRows = zoomMode === "region" ? regionSize : gridRows;
+
+  // Use grid layout hook for responsive sizing - pass display size for proper zoom
+  const { containerRef, cellSize, getContainerWidth } = useGridLayout({
+    cols: displayCols,
+    rows: displayRows,
+    reservedHeight: { mobile: 250, desktop: 300 },
+    deps: [taskResponse, topologyQubits, zoomMode, selectedRegion],
+  });
 
   if (isLoadingTask)
     return (
