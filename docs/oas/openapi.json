@@ -4941,6 +4941,113 @@
           }
         }
       }
+    },
+    "/topology/list": {
+      "get": {
+        "tags": [
+          "topology"
+        ],
+        "summary": "List available topologies",
+        "description": "List all available topology definitions.\n\nArgs:\n----\n    size: Optional filter by number of qubits\n\nReturns:\n-------\n    dict: List of topology summaries with id, name, and num_qubits",
+        "operationId": "listTopologies",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Listtopologies"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/topology/{topology_id}": {
+      "get": {
+        "tags": [
+          "topology"
+        ],
+        "summary": "Get topology by ID",
+        "description": "Get a specific topology definition.\n\nArgs:\n----\n    topology_id: Topology identifier (e.g., \"square-lattice-mux-64\")\n\nReturns:\n-------\n    dict: Complete topology definition with qubits and couplings",
+        "operationId": "getTopologyById",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Topology Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Gettopologybyid"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5102,6 +5209,17 @@
             "title": "Size",
             "default": 64
           },
+          "topology_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topology Id"
+          },
           "qubits": {
             "additionalProperties": true,
             "type": "object",
@@ -5125,7 +5243,7 @@
           "chip_id"
         ],
         "title": "ChipResponse",
-        "description": "Chip is a Pydantic model that represents a chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    qubits (dict): Qubit information.\n    couplings (dict): Coupling information.\n    installed_at (str): Installation timestamp."
+        "description": "Chip is a Pydantic model that represents a chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubits (dict): Qubit information.\n    couplings (dict): Coupling information.\n    installed_at (str): Installation timestamp."
       },
       "Condition": {
         "properties": {
@@ -5254,6 +5372,17 @@
             "type": "integer",
             "title": "Size",
             "default": 64
+          },
+          "topology_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topology Id"
           }
         },
         "type": "object",
@@ -5261,7 +5390,7 @@
           "chip_id"
         ],
         "title": "CreateChipRequest",
-        "description": "Request model for creating a new chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip to create.\n    size (int): The size of the chip (64, 144, 256, or 1024)."
+        "description": "Request model for creating a new chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip to create.\n    size (int): The size of the chip (64, 144, 256, or 1024).\n    topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'."
       },
       "DeleteScheduleResponse": {
         "properties": {

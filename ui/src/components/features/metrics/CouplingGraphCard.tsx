@@ -4,6 +4,11 @@ import dynamic from "next/dynamic";
 import React, { useMemo } from "react";
 
 import { useGetChipMetrics } from "@/client/metrics/metrics";
+import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import {
+  getQubitGridPosition,
+  type TopologyLayoutParams,
+} from "@/utils/gridPosition";
 
 const Plot = dynamic(() => import("@/components/charts/Plot"), {
   ssr: false,
@@ -18,6 +23,7 @@ type TimeRange = "current" | "24h" | "48h" | "72h";
 
 interface CouplingGraphCardProps {
   chipId: string;
+  topologyId: string;
   metricKey: string;
   title: string;
   unit: string;
@@ -26,22 +32,12 @@ interface CouplingGraphCardProps {
   scale?: number;
 }
 
-// 64-qubit chip layout: 8x8 grid
-const GRID_SIZE = 8;
+// Node size for visualization
 const NODE_SIZE = 24;
-
-// Calculate node positions in an 8x8 grid
-function getNodePosition(qid: number): { x: number; y: number } {
-  const row = Math.floor(qid / GRID_SIZE);
-  const col = qid % GRID_SIZE;
-  return {
-    x: col * NODE_SIZE * 3,
-    y: row * NODE_SIZE * 3,
-  };
-}
 
 export function CouplingGraphCard({
   chipId,
+  topologyId,
   metricKey,
   title,
   unit,
@@ -49,6 +45,13 @@ export function CouplingGraphCard({
   timeRange,
   scale = 1,
 }: CouplingGraphCardProps) {
+  // Get topology configuration
+  const {
+    muxSize = 2,
+    hasMux = false,
+    layoutType = "grid",
+  } = useTopologyConfig(topologyId) ?? {};
+
   // Fetch metrics data
   const withinHours = timeRange === "current" ? undefined : parseInt(timeRange);
   const { data, isLoading, isError } = useGetChipMetrics(
@@ -85,17 +88,51 @@ export function CouplingGraphCard({
     return scaledData;
   }, [data, metricKey, scale]);
 
+  // Calculate grid size from coupling data (find max qubit ID)
+  const gridSize = useMemo(() => {
+    if (!couplingData) return 8;
+    let maxQid = 0;
+    Object.keys(couplingData).forEach((couplingId) => {
+      const [q1Str, q2Str] = couplingId.split("-");
+      maxQid = Math.max(maxQid, parseInt(q1Str), parseInt(q2Str));
+    });
+    return Math.ceil(Math.sqrt(maxQid + 1));
+  }, [couplingData]);
+
+  // Layout params for grid position calculations
+  const layoutParams: TopologyLayoutParams = useMemo(
+    () => ({
+      muxEnabled: hasMux,
+      muxSize,
+      gridSize,
+      layoutType,
+    }),
+    [hasMux, muxSize, gridSize, layoutType],
+  );
+
+  // Helper function to get node position based on topology
+  const getNodePosition = useMemo(() => {
+    return (qid: number): { x: number; y: number } => {
+      const pos = getQubitGridPosition(qid, layoutParams);
+      return {
+        x: pos.col * NODE_SIZE * 3,
+        y: pos.row * NODE_SIZE * 3,
+      };
+    };
+  }, [layoutParams]);
+
   // Create graph traces
   const plotData = useMemo(() => {
     if (!couplingData) return null;
 
-    // Node positions
+    // Node positions - calculate number of qubits dynamically
     const nodeX: number[] = [];
     const nodeY: number[] = [];
     const nodeText: string[] = [];
     const nodeHovertext: string[] = [];
+    const numQubits = gridSize * gridSize;
 
-    for (let i = 0; i < 64; i++) {
+    for (let i = 0; i < numQubits; i++) {
       const pos = getNodePosition(i);
       nodeX.push(pos.x);
       nodeY.push(pos.y);
@@ -173,7 +210,7 @@ export function CouplingGraphCard({
     };
 
     return [...edgeTraces, nodeTrace];
-  }, [couplingData, colorscale, unit]);
+  }, [couplingData, colorscale, unit, gridSize, getNodePosition]);
 
   if (isLoading) {
     return (
@@ -208,8 +245,8 @@ export function CouplingGraphCard({
         <Plot
           data={plotData}
           layout={{
-            width: GRID_SIZE * NODE_SIZE * 3,
-            height: GRID_SIZE * NODE_SIZE * 3,
+            width: gridSize * NODE_SIZE * 3,
+            height: gridSize * NODE_SIZE * 3,
             margin: { t: 30, r: 30, b: 30, l: 30 },
             xaxis: {
               ticks: "",

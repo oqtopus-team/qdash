@@ -1,6 +1,18 @@
 "use client";
 
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, {
+  useMemo,
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+} from "react";
+
+import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import {
+  getQubitGridPosition,
+  type TopologyLayoutParams,
+} from "@/utils/gridPosition";
 
 import { QubitMetricHistoryModal } from "./QubitMetricHistoryModal";
 
@@ -22,33 +34,13 @@ interface QubitMetricsGridProps {
   };
   gridSize?: number;
   chipId: string;
+  topologyId: string;
   selectedDate: string;
 }
 
 interface SelectedQubitInfo {
   qid: string;
   metric: MetricValue;
-}
-
-const MUX_SIZE = 2; // 2x2 qubits per MUX
-
-// Calculate grid position for a qubit based on MUX layout
-function getQubitGridPosition(
-  qid: string,
-  gridSize: number,
-): { row: number; col: number } {
-  const qidNum = parseInt(qid.replace("Q", ""));
-  const muxIndex = Math.floor(qidNum / 4);
-  const muxRow = Math.floor(muxIndex / (gridSize / MUX_SIZE));
-  const muxCol = muxIndex % (gridSize / MUX_SIZE);
-  const localIndex = qidNum % 4;
-  const localRow = Math.floor(localIndex / 2);
-  const localCol = localIndex % 2;
-
-  return {
-    row: muxRow * MUX_SIZE + localRow,
-    col: muxCol * MUX_SIZE + localCol,
-  };
 }
 
 export function QubitMetricsGrid({
@@ -59,8 +51,50 @@ export function QubitMetricsGrid({
   colorScale,
   gridSize = 8,
   chipId,
+  topologyId,
   selectedDate: _selectedDate,
 }: QubitMetricsGridProps) {
+  // Get topology configuration
+  const {
+    muxSize = 2,
+    regionSize = 4,
+    hasMux = false,
+    layoutType = "grid",
+    showMuxBoundaries = false,
+    qubits: topologyQubits,
+    gridSize: topologyGridSize,
+  } = useTopologyConfig(topologyId) ?? {};
+
+  // Calculate actual grid dimensions from topology qubit positions
+  const { gridRows, gridCols } = useMemo(() => {
+    if (topologyQubits) {
+      let maxRow = 0;
+      let maxCol = 0;
+      Object.values(topologyQubits).forEach((pos) => {
+        if (pos.row > maxRow) maxRow = pos.row;
+        if (pos.col > maxCol) maxCol = pos.col;
+      });
+      return { gridRows: maxRow + 1, gridCols: maxCol + 1 };
+    }
+    // Fallback to square grid
+    const size = topologyGridSize ?? gridSize;
+    return { gridRows: size, gridCols: size };
+  }, [topologyQubits, topologyGridSize, gridSize]);
+
+  // Use the larger dimension for calculations
+  const effectiveGridSize = Math.max(gridRows, gridCols);
+
+  // Layout params for grid position calculations
+  const layoutParams: TopologyLayoutParams = useMemo(
+    () => ({
+      muxEnabled: hasMux,
+      muxSize,
+      gridSize: effectiveGridSize,
+      layoutType,
+    }),
+    [hasMux, muxSize, effectiveGridSize, layoutType],
+  );
+
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
@@ -78,6 +112,11 @@ export function QubitMetricsGrid({
     useState<SelectedQubitInfo | null>(null);
   const modalRef = useRef<HTMLDialogElement>(null);
 
+  // Cell size calculation for responsive grid
+  const [cellSize, setCellSize] = useState(60);
+  const [isMobile, setIsMobile] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Control modal with native dialog API
   const isModalOpen = selectedQubitInfo !== null;
   useEffect(() => {
@@ -91,8 +130,61 @@ export function QubitMetricsGrid({
     }
   }, [isModalOpen]);
 
-  const regionSize = 4; // 4×4 qubits per region
-  const numRegions = Math.floor(gridSize / regionSize);
+  // Calculate cell size based on container and viewport
+  const updateSize = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const displayCols = zoomMode === "region" ? regionSize : gridCols;
+    const displayRows = zoomMode === "region" ? regionSize : gridRows;
+
+    // Get available space - use viewport width for mobile
+    const viewportWidth = window.innerWidth;
+    const mobile = viewportWidth < 768;
+    setIsMobile(mobile);
+    const padding = mobile ? 16 : 32;
+    const containerWidth =
+      Math.min(container.offsetWidth, viewportWidth) - padding * 2;
+    const viewportHeight = window.innerHeight;
+    // Reserve space for header, controls, stats cards
+    const availableHeight = viewportHeight - (mobile ? 300 : 350);
+
+    const gap = mobile ? 4 : 8;
+    const totalGapX = gap * (displayCols - 1);
+    const totalGapY = gap * (displayRows - 1);
+
+    // Calculate max cell size that fits both dimensions
+    const maxCellByWidth = Math.floor(
+      (containerWidth - totalGapX) / displayCols,
+    );
+    const maxCellByHeight = Math.floor(
+      (availableHeight - totalGapY) / displayRows,
+    );
+
+    // Use smaller dimension, with min size (smaller on mobile)
+    const minSize = isMobile ? 28 : 40;
+    const calculatedSize = Math.min(maxCellByWidth, maxCellByHeight);
+    setCellSize(Math.max(minSize, calculatedSize));
+  }, [gridCols, gridRows, zoomMode, regionSize]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(updateSize, 0);
+    window.addEventListener("resize", updateSize);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener("resize", updateSize);
+    };
+  }, [updateSize]);
+
+  // Recalculate when data loads
+  useEffect(() => {
+    if (metricData) {
+      updateSize();
+    }
+  }, [metricData, updateSize]);
+
+  const numRegions = Math.floor(effectiveGridSize / regionSize);
+  const isSquareGrid = gridRows === gridCols;
 
   // Helper function to interpolate between two hex colors
   const interpolateColor = (
@@ -188,16 +280,13 @@ export function QubitMetricsGrid({
     };
   }, [metricData]);
 
-  if (!metricData || !stats) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-base-content/60">No data available</div>
-      </div>
-    );
-  }
+  // Use empty object if no data, so grid structure is still shown
+  const displayData = metricData ?? {};
 
   // Calculate displayed grid size based on zoom mode
-  const displayGridSize = zoomMode === "region" ? regionSize : gridSize;
+  const displayGridRows = zoomMode === "region" ? regionSize : gridRows;
+  const displayGridCols = zoomMode === "region" ? regionSize : gridCols;
+  const displayCellSize = zoomMode === "region" ? cellSize * 0.9 : cellSize;
   const displayGridStart = selectedRegion
     ? {
         row: selectedRegion.row * regionSize,
@@ -207,8 +296,8 @@ export function QubitMetricsGrid({
 
   return (
     <div className="flex flex-col h-full space-y-4">
-      {/* Zoom mode toggle - only show in full view mode */}
-      {zoomMode === "full" && (
+      {/* Zoom mode toggle - only show in full view mode for square grids */}
+      {zoomMode === "full" && isSquareGrid && (
         <div
           className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all duration-200 cursor-pointer select-none ${
             regionSelectionEnabled
@@ -291,100 +380,80 @@ export function QubitMetricsGrid({
       )}
 
       {/* Grid display */}
-      <div className="flex-1 p-2 md:p-4 relative">
+      <div
+        className="flex-1 p-1 md:p-4 relative overflow-x-auto"
+        ref={containerRef}
+      >
         <div
-          className="grid gap-1 md:gap-2 lg:gap-3 p-3 md:p-4 lg:p-6 bg-base-200/50 rounded-xl max-w-full relative"
+          className="grid gap-1 md:gap-2 p-2 md:p-4 bg-base-200/50 rounded-xl relative mx-auto"
           style={{
-            gridTemplateColumns: `repeat(${displayGridSize}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${displayGridCols}, minmax(${displayCellSize}px, 1fr))`,
+            gridTemplateRows: `repeat(${displayGridRows}, minmax(${displayCellSize}px, 1fr))`,
+            maxWidth: `${displayGridCols * (displayCellSize + (isMobile ? 4 : 8)) + (isMobile ? 16 : 32)}px`,
           }}
         >
-          {/* MUX highlight overlay */}
-          <div className="absolute inset-0 pointer-events-none p-3 md:p-4 lg:p-6">
-            <div
-              className="grid gap-1 md:gap-2 lg:gap-3 w-full h-full"
-              style={{
-                gridTemplateColumns: `repeat(${Math.floor(displayGridSize / MUX_SIZE)}, minmax(0, 1fr))`,
-              }}
-            >
-              {Array.from({
-                length: Math.pow(Math.floor(displayGridSize / MUX_SIZE), 2),
-              }).map((_, muxIndex) => {
-                const muxRow = Math.floor(
-                  muxIndex / Math.floor(displayGridSize / MUX_SIZE),
-                );
-                const muxCol =
-                  muxIndex % Math.floor(displayGridSize / MUX_SIZE);
-                const isEvenMux = (muxRow + muxCol) % 2 === 0;
-
-                return (
-                  <div
-                    key={muxIndex}
-                    className={`rounded-lg relative ${
-                      isEvenMux
-                        ? "bg-primary/5 border border-primary/10"
-                        : "bg-secondary/5 border border-secondary/10"
-                    }`}
-                    style={{
-                      gridColumn: `span 1`,
-                      gridRow: `span 1`,
-                    }}
-                  >
-                    {/* MUX number label - positioned absolutely relative to grid container */}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          {/* MUX labels overlay - hidden on mobile in full view */}
-          <div
-            className={`absolute inset-0 pointer-events-none p-3 md:p-4 lg:p-6 z-10 ${
-              zoomMode === "full" ? "hidden md:block" : ""
-            }`}
-          >
-            <div
-              className="grid gap-1 md:gap-2 lg:gap-3 w-full h-full"
-              style={{
-                gridTemplateColumns: `repeat(${Math.floor(displayGridSize / MUX_SIZE)}, minmax(0, 1fr))`,
-              }}
-            >
-              {Array.from({
-                length: Math.pow(Math.floor(displayGridSize / MUX_SIZE), 2),
-              }).map((_, muxIndex) => (
-                <div key={muxIndex} className="relative">
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
-                    MUX{muxIndex}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          {Array.from({ length: displayGridSize * displayGridSize }).map(
+          {Array.from({ length: displayGridRows * displayGridCols }).map(
             (_, index) => {
-              const localRow = Math.floor(index / displayGridSize);
-              const localCol = index % displayGridSize;
+              const localRow = Math.floor(index / displayGridCols);
+              const localCol = index % displayGridCols;
               const actualRow = displayGridStart.row + localRow;
               const actualCol = displayGridStart.col + localCol;
 
-              // Find which qubit should be at this grid position
-              const qid = Object.keys(metricData || {}).find((key) => {
-                const pos = getQubitGridPosition(key, gridSize);
-                return pos.row === actualRow && pos.col === actualCol;
-              });
+              // Calculate MUX position for this cell
+              const muxRow = Math.floor(actualRow / muxSize);
+              const muxCol = Math.floor(actualCol / muxSize);
+              const isEvenMux = (muxRow + muxCol) % 2 === 0;
 
-              const metric = qid ? metricData?.[qid] : null;
+              // Find which qubit should be at this grid position
+              // Use topology positions if available
+              let qid: string | undefined;
+              if (topologyQubits) {
+                // Find qubit ID from topology by position
+                const foundEntry = Object.entries(topologyQubits).find(
+                  ([, pos]) => pos.row === actualRow && pos.col === actualCol,
+                );
+                if (foundEntry) {
+                  qid = `Q${foundEntry[0].padStart(2, "0")}`;
+                }
+              } else {
+                // Fallback: try to find from metricData or compute
+                qid = Object.keys(displayData).find((key) => {
+                  const pos = getQubitGridPosition(key, layoutParams);
+                  return pos.row === actualRow && pos.col === actualCol;
+                });
+                // If no metric data, compute expected qid for this position
+                if (!qid) {
+                  const expectedQid = actualRow * gridSize + actualCol;
+                  if (expectedQid < gridSize * gridSize) {
+                    qid = `Q${expectedQid.toString().padStart(2, "0")}`;
+                  }
+                }
+              }
+
+              const metric = qid ? displayData[qid] : null;
               const value = metric?.value ?? null;
 
-              // Empty cell if no qubit at this position
+              // MUX background class
+              const muxBgClass =
+                hasMux && showMuxBoundaries
+                  ? isEvenMux
+                    ? "ring-2 ring-inset ring-primary/20"
+                    : "ring-2 ring-inset ring-secondary/20"
+                  : "";
+
+              // Empty cell if no qubit at this position (outside topology)
               if (!qid) {
                 return (
                   <div
                     key={index}
-                    className="aspect-square bg-base-300/50 rounded-lg"
+                    className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`}
                   />
                 );
               }
 
-              const bgColor = getColor(value, stats.min, stats.max);
+              const bgColor = stats
+                ? getColor(value, stats.min, stats.max)
+                : null;
 
               return (
                 <button
@@ -394,7 +463,7 @@ export function QubitMetricsGrid({
                   }
                   className={`aspect-square rounded-lg shadow-md flex flex-col items-center justify-center transition-all hover:shadow-xl hover:scale-105 relative group cursor-pointer ${
                     !bgColor ? "bg-base-300/50" : ""
-                  }`}
+                  } ${muxBgClass}`}
                   style={{
                     backgroundColor: bgColor || undefined,
                   }}
@@ -448,61 +517,124 @@ export function QubitMetricsGrid({
               );
             },
           )}
-        </div>
 
-        {/* Region selection overlay - only when enabled and in full view mode */}
-        {zoomMode === "full" && regionSelectionEnabled && (
-          <div className="absolute inset-0 pointer-events-none p-3 md:p-4 lg:p-6 z-20">
+          {/* MUX labels overlay - centered in each MUX group */}
+          {hasMux && showMuxBoundaries && (
             <div
-              className="grid gap-1 md:gap-2 lg:gap-3 w-full h-full"
-              style={{
-                gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,
-                gridTemplateRows: `repeat(${gridSize}, minmax(0, 1fr))`,
-              }}
+              className={`absolute inset-0 pointer-events-none p-2 md:p-4 z-10 ${
+                zoomMode === "full" ? "hidden md:block" : ""
+              }`}
             >
-              {Array.from({ length: numRegions * numRegions }).map(
-                (_, index) => {
-                  const regionRow = Math.floor(index / numRegions);
-                  const regionCol = index % numRegions;
-                  const isHovered =
-                    hoveredRegion?.row === regionRow &&
-                    hoveredRegion?.col === regionCol;
+              <div
+                className="grid gap-1 md:gap-2 w-full h-full"
+                style={{
+                  gridTemplateColumns: `repeat(${displayGridCols}, minmax(${displayCellSize}px, 1fr))`,
+                  gridTemplateRows: `repeat(${displayGridRows}, minmax(${displayCellSize}px, 1fr))`,
+                }}
+              >
+                {Array.from({
+                  length: Math.pow(Math.ceil(displayGridCols / muxSize), 2),
+                }).map((_, idx) => {
+                  const numMuxCols = Math.ceil(displayGridCols / muxSize);
+                  const muxLocalRow = Math.floor(idx / numMuxCols);
+                  const muxLocalCol = idx % numMuxCols;
+
+                  // Calculate actual MUX position considering zoom offset
+                  const muxActualRow =
+                    Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
+                  const muxActualCol =
+                    Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
+                  const muxIndex =
+                    muxActualRow * Math.floor(effectiveGridSize / muxSize) +
+                    muxActualCol;
+
+                  // Calculate grid position for this MUX label (centered)
+                  const startCol = muxLocalCol * muxSize + 1;
+                  const startRow = muxLocalRow * muxSize + 1;
+                  const spanCols = Math.min(
+                    muxSize,
+                    displayGridCols - muxLocalCol * muxSize,
+                  );
+                  const spanRows = Math.min(
+                    muxSize,
+                    displayGridRows - muxLocalRow * muxSize,
+                  );
+
+                  if (spanCols <= 0 || spanRows <= 0) return null;
 
                   return (
-                    <button
-                      key={index}
-                      className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
-                        isHovered
-                          ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
-                          : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
-                      }`}
+                    <div
+                      key={idx}
+                      className="flex items-center justify-center"
                       style={{
-                        gridColumn: `${regionCol * regionSize + 1} / span ${regionSize}`,
-                        gridRow: `${regionRow * regionSize + 1} / span ${regionSize}`,
+                        gridColumn: `${startCol} / span ${spanCols}`,
+                        gridRow: `${startRow} / span ${spanRows}`,
                       }}
-                      onMouseEnter={() =>
-                        setHoveredRegion({ row: regionRow, col: regionCol })
-                      }
-                      onMouseLeave={() => setHoveredRegion(null)}
-                      onClick={() => {
-                        setSelectedRegion({
-                          row: regionRow,
-                          col: regionCol,
-                        });
-                        setZoomMode("region");
-                      }}
-                      title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
                     >
-                      <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
-                        {regionRow},{regionCol}
-                      </span>
-                    </button>
+                      <div className="text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
+                        MUX{muxIndex}
+                      </div>
+                    </div>
                   );
-                },
-              )}
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Region selection overlay - only when enabled and in full view mode for square grids */}
+          {zoomMode === "full" && regionSelectionEnabled && isSquareGrid && (
+            <div className="absolute inset-0 pointer-events-none p-2 md:p-4 z-20">
+              <div
+                className="grid gap-1 md:gap-2 w-full h-full"
+                style={{
+                  gridTemplateColumns: `repeat(${displayGridCols}, minmax(${displayCellSize}px, 1fr))`,
+                  gridTemplateRows: `repeat(${displayGridRows}, minmax(${displayCellSize}px, 1fr))`,
+                }}
+              >
+                {Array.from({ length: numRegions * numRegions }).map(
+                  (_, index) => {
+                    const regionRow = Math.floor(index / numRegions);
+                    const regionCol = index % numRegions;
+                    const isHovered =
+                      hoveredRegion?.row === regionRow &&
+                      hoveredRegion?.col === regionCol;
+
+                    return (
+                      <button
+                        key={index}
+                        className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
+                          isHovered
+                            ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
+                            : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
+                        }`}
+                        style={{
+                          gridColumn: `${regionCol * regionSize + 1} / span ${regionSize}`,
+                          gridRow: `${regionRow * regionSize + 1} / span ${regionSize}`,
+                        }}
+                        onMouseEnter={() =>
+                          setHoveredRegion({ row: regionRow, col: regionCol })
+                        }
+                        onMouseLeave={() => setHoveredRegion(null)}
+                        onClick={() => {
+                          setSelectedRegion({
+                            row: regionRow,
+                            col: regionCol,
+                          });
+                          setZoomMode("region");
+                        }}
+                        title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
+                      >
+                        <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                          {regionRow},{regionCol}
+                        </span>
+                      </button>
+                    );
+                  },
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Qubit Detail Modal */}

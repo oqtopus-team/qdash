@@ -20,6 +20,7 @@ from qdash.api.routers import (
     task,
     task_file,
     task_result,
+    topology,
 )
 
 
@@ -96,4 +97,9 @@ app.include_router(tag.router, tags=["tag"], dependencies=auth_dependency)
 app.include_router(device_topology.router, tags=["device-topology"], dependencies=auth_dependency)
 app.include_router(backend.router, tags=["backend"], dependencies=auth_dependency)
 app.include_router(flow.router, tags=["flow"], dependencies=auth_dependency)
-app.include_router(metrics.router, prefix="/metrics", tags=["metrics"], dependencies=auth_dependency)
+app.include_router(
+    metrics.router, prefix="/metrics", tags=["metrics"], dependencies=auth_dependency
+)
+app.include_router(
+    topology.router, prefix="/topology", tags=["topology"], dependencies=auth_dependency
+)

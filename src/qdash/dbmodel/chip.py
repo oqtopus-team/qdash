@@ -28,6 +28,9 @@ class ChipDocument(Document):
     chip_id: str = Field("SAMPLE", description="The chip ID")
     username: str = Field(..., description="The username of the user who created the chip")
     size: int = Field(64, description="The size of the chip")
+    topology_id: str | None = Field(
+        None, description="Topology template ID (e.g., 'square-lattice-mux-64')"
+    )
     qubits: dict[str, QubitModel] = Field({}, description="The qubits of the chip")
     couplings: dict[str, CouplingModel] = Field({}, description="The couplings of the chip")
     installed_at: str = Field(
@@ -46,8 +49,13 @@ class ChipDocument(Document):
 
         name = "chip"
         indexes: ClassVar = [
-            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING), ("username", ASCENDING)], unique=True),
-            IndexModel([("project_id", ASCENDING), ("username", ASCENDING), ("installed_at", DESCENDING)]),
+            IndexModel(
+                [("project_id", ASCENDING), ("chip_id", ASCENDING), ("username", ASCENDING)],
+                unique=True,
+            ),
+            IndexModel(
+                [("project_id", ASCENDING), ("username", ASCENDING), ("installed_at", DESCENDING)]
+            ),
         ]
 
     def update_qubit(self, qid: str, qubit_data: QubitModel) -> "ChipDocument":
