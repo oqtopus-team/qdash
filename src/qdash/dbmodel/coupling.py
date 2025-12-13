@@ -34,7 +34,9 @@ class CouplingDocument(Document):
         default_factory=dict,
         description="The best calibration results, focusing on fidelity metrics",
     )
-    edge_info: EdgeInfoModel = Field(..., description="The edge information")
+    edge_info: EdgeInfoModel | None = Field(
+        default=None, description="The edge information (deprecated)"
+    )
 
     system_info: SystemInfoModel = Field(..., description="The system information")
 
@@ -48,7 +50,12 @@ class CouplingDocument(Document):
         name = "coupling"
         indexes: ClassVar = [
             IndexModel(
-                [("project_id", ASCENDING), ("chip_id", ASCENDING), ("qid", ASCENDING), ("username", ASCENDING)],
+                [
+                    ("project_id", ASCENDING),
+                    ("chip_id", ASCENDING),
+                    ("qid", ASCENDING),
+                    ("username", ASCENDING),
+                ],
                 unique=True,
             ),
             IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING)]),
@@ -81,7 +88,9 @@ class CouplingDocument(Document):
                 new_param = new_data[metric]
                 new_value = new_param.value if hasattr(new_param, "value") else 0.0
                 # Initialize if metric doesn't exist in best_data or new value is better
-                current_value = current_best[metric].get("value", 0.0) if metric in current_best else 0.0
+                current_value = (
+                    current_best[metric].get("value", 0.0) if metric in current_best else 0.0
+                )
                 if metric not in current_best or new_value > current_value:
                     # Convert OutputParameterModel to dict for storage
                     current_best[metric] = {
@@ -112,7 +121,9 @@ class CouplingDocument(Document):
             raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
         coupling_doc.data = CouplingDocument.merge_calib_data(coupling_doc.data, output_parameters)
         # Update best_data if new results are better
-        coupling_doc.best_data = CouplingDocument.update_best_data(coupling_doc.best_data, output_parameters)
+        coupling_doc.best_data = CouplingDocument.update_best_data(
+            coupling_doc.best_data, output_parameters
+        )
         coupling_doc.system_info.update_time()
         coupling_doc.save()
         chip_doc = ChipDocument.find_one({"username": username, "chip_id": chip_id}).run()

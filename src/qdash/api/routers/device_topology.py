@@ -22,10 +22,15 @@ from qdash.api.schemas.device_topology import (
     QubitGateDuration,
     QubitLifetime,
 )
+from qdash.api.lib.topology_config import load_topology
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 
 router = APIRouter()
+
+# Constants for position calculation
+POSITION_SCALE = 50  # Grid spacing used in topology
+POSITION_DIVISOR = 30  # Divisor for final position
 
 
 def search_coupling_data_by_control_qid(cr_params: dict, search_term: str) -> dict:
@@ -186,6 +191,8 @@ def get_device_topology(
     drag_pi_params = latest.note["drag_pi_params"]
     # chip_docs = ChipDocument.find_one({"chip_id": chip_id, "username": latest.username}).run()
     chip_docs = ChipDocument.get_current_chip(username=latest.username)
+    # Load topology config for position calculation
+    topology = load_topology(chip_docs.topology_id)
     # Sort physical qubit indices and create id mapping
     sorted_physical_ids = sorted(request.qubits, key=lambda x: int(x))
     id_mapping = {pid: idx for idx, pid in enumerate(sorted_physical_ids)}
@@ -203,9 +210,13 @@ def get_device_topology(
             x90_data, request.condition.qubit_fidelity.is_within_24h, fallback=0.25
         )
         # t1 = t1_data["value"] if is_within_24h(t1_data.get("calibrated_at")) else 100.0
-        t1 = get_value_within_24h_fallback(t1_data, request.condition.qubit_fidelity.is_within_24h, fallback=100.0)
+        t1 = get_value_within_24h_fallback(
+            t1_data, request.condition.qubit_fidelity.is_within_24h, fallback=100.0
+        )
         # t2 = t2_data["value"] if is_within_24h(t2_data.get("calibrated_at")) else 100.0
-        t2 = get_value_within_24h_fallback(t2_data, request.condition.qubit_fidelity.is_within_24h, fallback=100.0)
+        t2 = get_value_within_24h_fallback(
+            t2_data, request.condition.qubit_fidelity.is_within_24h, fallback=100.0
+        )
         drag_hpi_duration = drag_hpi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
         drag_pi_duration = drag_pi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
         # readout_fidelity_0 = (
@@ -226,13 +237,15 @@ def get_device_topology(
         # Calculate readout assignment error
         readout_fidelity = (readout_fidelity_0 + readout_fidelity_1) / 2
         readout_assignment_error = 1 - readout_fidelity
+        # Calculate position from topology config
+        qubit_pos = topology.qubits[int(qid)]
         qubits.append(
             Qubit(
                 id=id_mapping[qid],  # Map to new sequential id
                 physical_id=int(qid),
                 position=Position(
-                    x=chip_docs.qubits[qid].node_info.position.x / 30,
-                    y=chip_docs.qubits[qid].node_info.position.y / 30,
+                    x=qubit_pos.col * POSITION_SCALE / POSITION_DIVISOR,
+                    y=qubit_pos.row * POSITION_SCALE / POSITION_DIVISOR,
                 ),
                 fidelity=x90_gate_fidelity,
                 meas_error=MeasError(
@@ -269,7 +282,9 @@ def get_device_topology(
             control, target = split_q_string(cr_key)
             cr_duration = cr_value.get("duration", 20)
             # Get coupling fidelity data with timestamp check
-            coupling_data = chip_docs.couplings[f"{control}-{target}"].data.get("bell_state_fidelity", {})
+            coupling_data = chip_docs.couplings[f"{control}-{target}"].data.get(
+                "bell_state_fidelity", {}
+            )
             # zx90_gate_fidelity = (
             #     coupling_data["value"]
             #     if is_within_24h(coupling_data.get("calibrated_at"))
@@ -285,7 +300,8 @@ def get_device_topology(
                 # Normalize both the current coupling key and all excluded couplings
                 current_coupling = normalize_coupling_key(control, target)
                 excluded_couplings = {
-                    normalize_coupling_key(*coupling.split("-")) for coupling in request.exclude_couplings
+                    normalize_coupling_key(*coupling.split("-"))
+                    for coupling in request.exclude_couplings
                 }
 
                 if current_coupling not in excluded_couplings:
@@ -305,7 +321,11 @@ def get_device_topology(
     filtered_qubits = [
         qubit
         for qubit in qubits
-        if (request.condition.qubit_fidelity.min <= qubit.fidelity <= request.condition.qubit_fidelity.max)
+        if (
+            request.condition.qubit_fidelity.min
+            <= qubit.fidelity
+            <= request.condition.qubit_fidelity.max
+        )
     ]
 
     filtered_qubits = [
@@ -325,7 +345,9 @@ def get_device_topology(
         coupling
         for coupling in couplings
         if (
-            request.condition.coupling_fidelity.min <= coupling.fidelity <= request.condition.coupling_fidelity.max
+            request.condition.coupling_fidelity.min
+            <= coupling.fidelity
+            <= request.condition.coupling_fidelity.max
             and coupling.control in valid_qubit_ids
             and coupling.target in valid_qubit_ids
         )
@@ -409,7 +431,10 @@ def generate_device_plot(data: dict) -> bytes:
     nx.draw_networkx_edges(g, pos, width=3)
 
     # Add physical ID and fidelity labels in white
-    labels = {node: f"Q{g.nodes[node]['physical_id']}\n{g.nodes[node]['fidelity']*100:.2f}%" for node in g.nodes}
+    labels = {
+        node: f"Q{g.nodes[node]['physical_id']}\n{g.nodes[node]['fidelity']*100:.2f}%"
+        for node in g.nodes
+    }
     nx.draw_networkx_labels(g, pos, labels, font_size=12, font_weight="bold", font_color="white")
 
     # Add edge labels with adjusted position

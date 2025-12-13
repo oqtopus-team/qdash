@@ -34,7 +34,9 @@ class CouplingHistoryDocument(Document):
         default_factory=dict,
         description="The best calibration results, focusing on fidelity metrics",
     )
-    edge_info: EdgeInfoModel = Field(..., description="The edge information")
+    edge_info: EdgeInfoModel | None = Field(
+        default=None, description="The edge information (deprecated)"
+    )
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
         default_factory=lambda: pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD"),
@@ -60,7 +62,9 @@ class CouplingHistoryDocument(Document):
                 ],
                 unique=True,
             ),
-            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING), ("recorded_date", DESCENDING)]),
+            IndexModel(
+                [("project_id", ASCENDING), ("chip_id", ASCENDING), ("recorded_date", DESCENDING)]
+            ),
         ]
 
     @classmethod

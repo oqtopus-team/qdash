@@ -1,7 +1,7 @@
 """Chip initialization module."""
 
-from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
-from qdash.datamodel.qubit import NodeInfoModel, PositionModel, QubitModel
+from qdash.datamodel.coupling import CouplingModel
+from qdash.datamodel.qubit import QubitModel
 from qdash.db.init.coupling import bi_direction, generate_coupling
 from qdash.db.init.qubit import (
     generate_dummy_data,  # qubit_lattice
@@ -22,7 +22,7 @@ def generate_qubit_data(num_qubits: int, pos: dict, chip_id: str, username: str)
     Args:
     ----
         num_qubits (int): Number of qubits.
-        pos (dict): Dictionary of positions for each qubit.
+        pos (dict): Dictionary of positions for each qubit (deprecated, kept for compatibility).
         chip_id (str): Chip ID.
         username (str): Username of the user creating the qubits.
 
@@ -38,12 +38,6 @@ def generate_qubit_data(num_qubits: int, pos: dict, chip_id: str, username: str)
             chip_id=chip_id,
             qid=f"{i}",
             status="pending",
-            node_info=NodeInfoModel(
-                position=PositionModel(
-                    x=pos[i][0],
-                    y=pos[i][1],
-                ),
-            ),
             data={},
             best_data={},
         )
@@ -74,7 +68,6 @@ def generate_coupling_data(edges: list[tuple[int, int]], chip_id: str, username:
             chip_id=chip_id,
             data={},
             best_data={},
-            edge_info=EdgeInfoModel(size=4, fill="", source=f"{edge[0]}", target=f"{edge[1]}"),
         )
     return coupling
 
