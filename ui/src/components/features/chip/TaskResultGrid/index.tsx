@@ -262,14 +262,14 @@ export function TaskResultGrid({
                 onClick={() => {
                   setSelectedTaskInfo({ qid, taskName: selectedTask });
                 }}
-                className={`aspect-square rounded-lg bg-base-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 relative w-full ${
+                className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${
                   task.over_threshold
-                    ? "border-2 border-primary animate-pulse-light"
+                    ? "ring-2 ring-primary ring-offset-1 animate-pulse-light"
                     : ""
                 } ${muxBgClass}`}
               >
                 {task.figure_path && figurePath && (
-                  <div className="absolute inset-0">
+                  <div className="absolute inset-1">
                     <TaskFigure
                       path={figurePath}
                       qid={qid}
