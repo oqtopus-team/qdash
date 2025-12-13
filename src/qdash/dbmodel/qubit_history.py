@@ -34,7 +34,9 @@ class QubitHistoryDocument(Document):
         default_factory=dict,
         description="The best calibration results, focusing on fidelity metrics",
     )
-    node_info: NodeInfoModel = Field(..., description="The node information")
+    node_info: NodeInfoModel | None = Field(
+        default=None, description="The node information (deprecated)"
+    )
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
         default_factory=lambda: pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD"),
@@ -60,7 +62,9 @@ class QubitHistoryDocument(Document):
                 ],
                 unique=True,
             ),
-            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING), ("recorded_date", DESCENDING)]),
+            IndexModel(
+                [("project_id", ASCENDING), ("chip_id", ASCENDING), ("recorded_date", DESCENDING)]
+            ),
         ]
 
     @classmethod

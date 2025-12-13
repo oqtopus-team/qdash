@@ -141,7 +141,7 @@ export function MetricsPageContent() {
   const groupedMetricOptions: GroupBase<MetricOption>[] = useMemo(
     () => [
       {
-        label: "Single-Qubit Metrics",
+        label: "Qubit Metrics",
         options: metricOptions,
       },
     ],
@@ -247,7 +247,7 @@ export function MetricsPageContent() {
                 setSelectedMetric("t1"); // Reset to default qubit metric
               }}
             >
-              Single-Qubit Metrics
+              Qubit
             </button>
             <button
               className={`tab ${metricType === "coupling" ? "tab-active" : ""}`}
@@ -256,7 +256,7 @@ export function MetricsPageContent() {
                 setSelectedMetric("zx90_gate_fidelity"); // Reset to default coupling metric
               }}
             >
-              Two-Qubit Metrics
+              Coupling
             </button>
           </div>
 
@@ -318,17 +318,14 @@ export function MetricsPageContent() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-1 w-full sm:w-auto">
+            <div className="w-full sm:w-auto">
               <ChipSelector
                 selectedChip={selectedChip}
                 onChipSelect={setSelectedChip}
               />
             </div>
 
-            <div className="flex flex-col gap-1 w-full sm:w-auto">
-              <label className="text-xs text-base-content/60 font-medium">
-                Metric
-              </label>
+            <div className="w-full sm:w-auto">
               <Select<MetricOption, false, GroupBase<MetricOption>>
                 className="w-full sm:w-64 text-base-content"
                 classNamePrefix="react-select"
@@ -417,6 +414,10 @@ export function MetricsPageContent() {
                 colorScale={{ min: 0, max: 0, colors: hexColors }}
                 gridSize={gridSize}
                 chipId={selectedChip}
+                topologyId={
+                  chipData?.data?.topology_id ??
+                  `square-lattice-mux-${chipData?.data?.size ?? 64}`
+                }
                 selectedDate="latest"
               />
             ) : (
@@ -428,6 +429,10 @@ export function MetricsPageContent() {
                 colorScale={{ min: 0, max: 0, colors: hexColors }}
                 gridSize={gridSize}
                 chipId={selectedChip}
+                topologyId={
+                  chipData?.data?.topology_id ??
+                  `square-lattice-mux-${chipData?.data?.size ?? 64}`
+                }
                 selectedDate="latest"
               />
             )}

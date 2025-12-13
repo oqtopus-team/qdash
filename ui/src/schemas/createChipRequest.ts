@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { CreateChipRequestTopologyId } from "./createChipRequestTopologyId";
 
 /**
  * Request model for creating a new chip.
@@ -13,8 +14,10 @@ Attributes
 ----------
     chip_id (str): The ID of the chip to create.
     size (int): The size of the chip (64, 144, 256, or 1024).
+    topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'.
  */
 export interface CreateChipRequest {
   chip_id: string;
   size?: number;
+  topology_id?: CreateChipRequestTopologyId;
 }

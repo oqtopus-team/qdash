@@ -7,6 +7,7 @@ import Select from "react-select";
 import type { SingleValue } from "react-select";
 
 import { useListChips } from "@/client/chip/chip";
+import { useSelectStyles } from "@/hooks/useSelectStyles";
 
 interface ChipOption {
   value: string;
@@ -18,6 +19,8 @@ interface ChipSelectorProps {
   selectedChip: string;
   onChipSelect: (chipId: string) => void;
 }
+
+const PLACEHOLDER = "Select a chip";
 
 export function ChipSelector({
   selectedChip,
@@ -45,10 +48,15 @@ export function ChipSelector({
       }));
   }, [chips]);
 
+  const { minWidth, styles } = useSelectStyles<ChipOption>({
+    labels: sortedOptions.map((opt) => opt.label),
+    placeholder: PLACEHOLDER,
+  });
+
   if (isLoading) {
     return (
-      <div className="w-full animate-pulse">
-        <div className="h-9 bg-base-300 rounded"></div>
+      <div className="animate-pulse" style={{ minWidth }}>
+        <div className="h-[38px] bg-base-300 rounded"></div>
       </div>
     );
   }
@@ -68,8 +76,9 @@ export function ChipSelector({
       options={sortedOptions}
       value={sortedOptions.find((option) => option.value === selectedChip)}
       onChange={handleChange}
-      placeholder="Select a chip"
-      className="text-base-content w-full"
+      placeholder={PLACEHOLDER}
+      className="text-base-content"
+      styles={styles}
     />
   );
 }

@@ -700,10 +700,7 @@ export function TimeSeriesView() {
           </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-base-content/70">
-              Chip
-            </label>
+          <div>
             <ChipSelector
               selectedChip={selectedChip}
               onChipSelect={setSelectedChip}
@@ -755,10 +752,7 @@ export function TimeSeriesView() {
               }}
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-base-content/70">
-              Tag
-            </label>
+          <div>
             <TagSelector
               tags={tags}
               selectedTag={selectedTag}

@@ -4,6 +4,11 @@ import dynamic from "next/dynamic";
 import React, { useMemo } from "react";
 
 import { useGetChipMetrics } from "@/client/metrics/metrics";
+import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import {
+  getQubitGridPosition,
+  type TopologyLayoutParams,
+} from "@/utils/gridPosition";
 
 const Plot = dynamic(() => import("@/components/charts/Plot"), {
   ssr: false,
@@ -18,6 +23,7 @@ type TimeRange = "current" | "24h" | "48h" | "72h";
 
 interface MetricCardProps {
   chipId: string;
+  topologyId: string;
   metricKey: string;
   title: string;
   unit: string;
@@ -29,6 +35,7 @@ interface MetricCardProps {
 
 export function MetricCard({
   chipId,
+  topologyId,
   metricKey,
   title,
   unit,
@@ -37,6 +44,13 @@ export function MetricCard({
   scale = 1,
   isCoupling = false,
 }: MetricCardProps) {
+  // Get topology configuration
+  const {
+    muxSize = 2,
+    hasMux = false,
+    layoutType = "grid",
+  } = useTopologyConfig(topologyId) ?? {};
+
   // Fetch metrics data
   const withinHours = timeRange === "current" ? undefined : parseInt(timeRange);
   const { data, isLoading, isError } = useGetChipMetrics(
@@ -80,8 +94,26 @@ export function MetricCard({
   const heatmapData = useMemo(() => {
     if (!metricData || isCoupling) return null;
 
-    // Create 8x8 grid for 64 qubits
-    const gridSize = 8;
+    // Calculate grid size from the number of qubits
+    const numQubits = Object.keys(metricData).length;
+    const gridSize = Math.ceil(Math.sqrt(numQubits));
+
+    // Layout params for grid position calculations
+    const layoutParams: TopologyLayoutParams = {
+      muxEnabled: hasMux,
+      muxSize,
+      gridSize,
+      layoutType,
+    };
+
+    // Create a position-to-qubit map based on topology layout
+    const positionMap: Map<string, string> = new Map();
+    Object.keys(metricData).forEach((qid) => {
+      const qidNum = parseInt(qid.replace(/\D/g, ""));
+      const pos = getQubitGridPosition(qidNum, layoutParams);
+      positionMap.set(`${pos.row}-${pos.col}`, qid);
+    });
+
     const values: (number | null)[][] = [];
     const texts: string[][] = [];
     const hovertexts: string[][] = [];
@@ -92,19 +124,21 @@ export function MetricCard({
       const rowHovertexts: string[] = [];
 
       for (let col = 0; col < gridSize; col++) {
-        const qid = `Q${String(row * gridSize + col).padStart(2, "0")}`;
-        const value = metricData[qid];
+        const qid = positionMap.get(`${row}-${col}`);
+        const value = qid ? metricData[qid] : null;
 
         rowValues.push(value);
         rowTexts.push(
-          value !== null && value !== undefined
+          value !== null && value !== undefined && qid
             ? `${qid}\n${value.toFixed(metricKey.includes("fidelity") ? 1 : 2)}\n${unit}`
             : "N/A",
         );
         rowHovertexts.push(
-          value !== null && value !== undefined
+          value !== null && value !== undefined && qid
             ? `${qid}: ${value.toFixed(3)} ${unit}`
-            : `${qid}: N/A`,
+            : qid
+              ? `${qid}: N/A`
+              : "N/A",
         );
       }
 
@@ -114,7 +148,7 @@ export function MetricCard({
     }
 
     return { values, texts, hovertexts };
-  }, [metricData, isCoupling, unit, metricKey]);
+  }, [metricData, isCoupling, unit, metricKey, hasMux, muxSize, layoutType]);
 
   if (isLoading) {
     return (

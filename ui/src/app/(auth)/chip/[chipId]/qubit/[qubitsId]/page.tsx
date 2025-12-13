@@ -71,13 +71,11 @@ function QubitDetailPageContent() {
     }
   }, [isInitialized, chipId, selectedChip, setSelectedChip]);
 
-  const {
-    navigateToPreviousDay,
-    navigateToNextDay,
-    canNavigatePrevious,
-    canNavigateNext,
-    formatDate,
-  } = useDateNavigation(chipId, selectedDate, setSelectedDate);
+  const { formatDate } = useDateNavigation(
+    chipId,
+    selectedDate,
+    setSelectedDate,
+  );
 
   // Get filtered tasks for qubit type
   const filteredTasks = (taskInfoData?.data?.tasks || []).filter(
@@ -218,61 +216,29 @@ function QubitDetailPageContent() {
 
           {/* Controls */}
           <div className="flex gap-4">
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-center gap-1 opacity-0">
-                <button className="btn btn-xs btn-ghost invisible">←</button>
-                <button className="btn btn-xs btn-ghost invisible">→</button>
-              </div>
-              <ChipSelector
-                selectedChip={chipId}
-                onChipSelect={(newChipId) => {
-                  // Navigate to the new chip's qubit detail page
-                  window.location.href = `/chip/${newChipId}/qubit/${qubitId}`;
-                }}
-              />
-            </div>
+            <ChipSelector
+              selectedChip={chipId}
+              onChipSelect={(newChipId) => {
+                // Navigate to the new chip's qubit detail page
+                window.location.href = `/chip/${newChipId}/qubit/${qubitId}`;
+              }}
+            />
 
             {viewMode !== "history" && (
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-center gap-1">
-                  <button
-                    onClick={navigateToPreviousDay}
-                    disabled={!canNavigatePrevious}
-                    className="btn btn-xs btn-ghost"
-                    title="Previous Day"
-                  >
-                    ←
-                  </button>
-                  <button
-                    onClick={navigateToNextDay}
-                    disabled={!canNavigateNext}
-                    className="btn btn-xs btn-ghost"
-                    title="Next Day"
-                  >
-                    →
-                  </button>
-                </div>
-                <DateSelector
-                  chipId={chipId}
-                  selectedDate={selectedDate}
-                  onDateSelect={setSelectedDate}
-                  disabled={!chipId}
-                />
-              </div>
+              <DateSelector
+                chipId={chipId}
+                selectedDate={selectedDate}
+                onDateSelect={setSelectedDate}
+                disabled={!chipId}
+              />
             )}
 
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-center gap-1 opacity-0">
-                <button className="btn btn-xs btn-ghost invisible">←</button>
-                <button className="btn btn-xs btn-ghost invisible">→</button>
-              </div>
-              <TaskSelector
-                tasks={filteredTasks}
-                selectedTask={selectedTask}
-                onTaskSelect={setSelectedTask}
-                disabled={false}
-              />
-            </div>
+            <TaskSelector
+              tasks={filteredTasks}
+              selectedTask={selectedTask}
+              onTaskSelect={setSelectedTask}
+              disabled={false}
+            />
           </div>
         </div>
 

@@ -1,6 +1,5 @@
 """Coupling initialization module."""
 
-from qdash.datamodel.coupling import EdgeInfoModel
 from qdash.dbmodel.coupling import CouplingDocument
 
 
@@ -31,7 +30,6 @@ def generate_coupling(edges: list, username: str, chip_id: str) -> list:
             chip_id=chip_id,
             data={},
             best_data={},
-            edge_info=EdgeInfoModel(size=4, fill="", source=f"{edge[0]}", target=f"{edge[1]}"),
             system_info={},
         )
         for edge in edges

@@ -21,6 +21,9 @@ class ChipModel(BaseModel):
     chip_id: str = Field(..., description="The chip ID")
     username: str = Field(..., description="The username of the user who created the chip")
     size: int = Field(..., description="The size of the chip")
+    topology_id: str | None = Field(
+        None, description="Topology template ID (e.g., 'square-lattice-mux-64')"
+    )
     qubits: dict[str, QubitModel] = Field(..., description="The qubits of the chip")
     couplings: dict[str, CouplingModel] = Field(..., description="The couplings of the chip")
     installed_at: str = Field(..., description="The time when the system information was created")

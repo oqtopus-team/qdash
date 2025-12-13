@@ -81,6 +81,78 @@ python src/tools/cr_schedule_generator.py
 
 ---
 
+## API Tools
+
+### get_latest_task_results.py
+
+CLI tool for fetching latest task results and JSON figures from the QDash API. Supports both local and remote (Cloudflare Access protected) deployments.
+
+**Features:**
+
+- Fetch latest task results by chip ID and task name
+- Support for qubit and coupling task types
+- Download Plotly JSON figures for visualization
+- Filter by specific qubit/coupling IDs
+- Query historical results by date
+- Multiple output formats (table, JSON)
+
+**Environment Variables (`.env`):**
+
+```bash
+# Required for remote access
+CF_ACCESS_CLIENT_ID="your-client-id.access"
+CF_ACCESS_CLIENT_SECRET="your-client-secret"
+CF_ACCESS_DOMAIN="https://your-domain.example.com"
+QDASH_API_TOKEN="your-api-token"
+
+# Optional for local development
+API_PORT=2004  # Default local port
+```
+
+**Usage:**
+
+```bash
+# Basic usage - get latest results
+python src/tools/get_latest_task_results.py --chip-id 64Qv3 --task CheckRabi
+
+# Get coupling task results
+python src/tools/get_latest_task_results.py --chip-id 64Qv3 --task CheckCZ --type coupling
+
+# Get historical results for a specific date
+python src/tools/get_latest_task_results.py --chip-id 64Qv3 --task CheckRabi --date 20241213
+
+# Output as JSON
+python src/tools/get_latest_task_results.py --chip-id 64Qv3 --task CheckRabi --output json
+
+# Download all JSON figures
+python src/tools/get_latest_task_results.py --chip-id 64Qv3 --task CheckRabi --download-figures ./figures
+
+# Download figures for specific qubit IDs only
+python src/tools/get_latest_task_results.py --chip-id 64Qv3 --task CheckRabi --download-figures ./figures --qids 0,1,2
+```
+
+**Command-line Options:**
+
+- `--chip-id CHIP_ID` - Chip ID (required)
+- `--task TASK` - Task name (required, e.g., CheckRabi, CheckCZ)
+- `--type {qubit,coupling}` - Task type (default: qubit)
+- `--date YYYYMMDD` - Date for historical results
+- `--output {table,json}` - Output format (default: table)
+- `--download-figures DIR` - Download JSON figures to directory
+- `--qids IDS` - Comma-separated qubit/coupling IDs to filter
+- `--base-url URL` - Override API base URL
+- `--token TOKEN` - API token (or set `QDASH_API_TOKEN`)
+- `--cf-client-id ID` - Cloudflare Access Client ID
+- `--cf-client-secret SECRET` - Cloudflare Access Client Secret
+
+**Output:**
+
+- Table format: Summary with ID, status, timestamps, and figure count
+- JSON format: Raw API response
+- Figures: Plotly JSON files named `{task}_{id}.json`
+
+---
+
 ## Other Tools
 
 - `device_topology_generator.py`: Generate device topology configurations

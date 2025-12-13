@@ -43,7 +43,9 @@ logger.setLevel(logging.DEBUG)
 # =============================================================================
 
 
-@router.get("/chips", response_model=ListChipsResponse, summary="List all chips", operation_id="listChips")
+@router.get(
+    "/chips", response_model=ListChipsResponse, summary="List all chips", operation_id="listChips"
+)
 def list_chips(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> ListChipsResponse:
@@ -67,6 +69,7 @@ def list_chips(
             ChipResponse(
                 chip_id=chip.chip_id,
                 size=chip.size,
+                topology_id=chip.topology_id,
                 qubits=chip.qubits,
                 couplings=chip.couplings,
                 installed_at=chip.installed_at,
@@ -76,7 +79,9 @@ def list_chips(
     )
 
 
-@router.post("/chips", response_model=ChipResponse, summary="Create a new chip", operation_id="createChip")
+@router.post(
+    "/chips", response_model=ChipResponse, summary="Create a new chip", operation_id="createChip"
+)
 def create_chip(
     request: CreateChipRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
@@ -110,11 +115,13 @@ def create_chip(
             chip_id=request.chip_id,
             size=request.size,
             project_id=ctx.project_id,
+            topology_id=request.topology_id,
         )
 
         return ChipResponse(
             chip_id=chip.chip_id,
             size=chip.size,
+            topology_id=chip.topology_id,
             qubits=chip.qubits,
             couplings=chip.couplings,
             installed_at=chip.installed_at,
@@ -154,7 +161,9 @@ def get_chip_dates(
 
     """
     logger.debug(f"Fetching dates for chip {chip_id}, project: {ctx.project_id}")
-    counter_list = ExecutionCounterDocument.find({"project_id": ctx.project_id, "chip_id": chip_id}).run()
+    counter_list = ExecutionCounterDocument.find(
+        {"project_id": ctx.project_id, "chip_id": chip_id}
+    ).run()
     if not counter_list:
         # Return empty list for newly created chips with no execution history
         logger.debug(f"No execution counter found for chip {chip_id}, returning empty dates list")
@@ -165,7 +174,9 @@ def get_chip_dates(
     return ChipDatesResponse(data=dates)
 
 
-@router.get("/chips/{chip_id}", response_model=ChipResponse, summary="Get a chip", operation_id="getChip")
+@router.get(
+    "/chips/{chip_id}", response_model=ChipResponse, summary="Get a chip", operation_id="getChip"
+)
 def get_chip(
     chip_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
@@ -199,6 +210,7 @@ def get_chip(
     return ChipResponse(
         chip_id=chip.chip_id,
         size=chip.size,
+        topology_id=chip.topology_id,
         qubits=chip.qubits,
         couplings=chip.couplings,
         installed_at=chip.installed_at,
@@ -373,7 +385,9 @@ def list_chip_muxes(
     # Get chip info
     chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
     if chip is None:
-        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}")
+        raise HTTPException(
+            status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}"
+        )
 
     # Calculate mux number
     mux_num = int(chip.size // 4)

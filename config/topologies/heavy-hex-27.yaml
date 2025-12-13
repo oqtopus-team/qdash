@@ -1,0 +1,142 @@
+name: Heavy Hex 27
+description: IBM-style heavy hexagonal topology (27 qubits, similar to Falcon)
+grid_size: 8
+num_qubits: 27
+layout_type: hex
+mux:
+  enabled: false
+qubits:
+  # Row 0: horizontal chain
+  0:
+    row: 0
+    col: 0
+  1:
+    row: 0
+    col: 1
+  2:
+    row: 0
+    col: 2
+  3:
+    row: 0
+    col: 3
+  4:
+    row: 0
+    col: 4
+  # Row 1: bridge qubits
+  5:
+    row: 1
+    col: 1
+  6:
+    row: 1
+    col: 3
+  # Row 2: horizontal chain
+  7:
+    row: 2
+    col: 0
+  8:
+    row: 2
+    col: 1
+  9:
+    row: 2
+    col: 2
+  10:
+    row: 2
+    col: 3
+  11:
+    row: 2
+    col: 4
+  # Row 3: bridge qubits
+  12:
+    row: 3
+    col: 1
+  13:
+    row: 3
+    col: 3
+  # Row 4: horizontal chain
+  14:
+    row: 4
+    col: 0
+  15:
+    row: 4
+    col: 1
+  16:
+    row: 4
+    col: 2
+  17:
+    row: 4
+    col: 3
+  18:
+    row: 4
+    col: 4
+  # Row 5: bridge qubits
+  19:
+    row: 5
+    col: 1
+  20:
+    row: 5
+    col: 3
+  # Row 6: horizontal chain
+  21:
+    row: 6
+    col: 0
+  22:
+    row: 6
+    col: 1
+  23:
+    row: 6
+    col: 2
+  24:
+    row: 6
+    col: 3
+  25:
+    row: 6
+    col: 4
+  # Row 7: single bridge qubit
+  26:
+    row: 7
+    col: 2
+couplings:
+  # Row 0 horizontal
+  - [0, 1]
+  - [1, 2]
+  - [2, 3]
+  - [3, 4]
+  # Row 0 to Row 1 (bridges)
+  - [1, 5]
+  - [3, 6]
+  # Row 1 to Row 2 (bridges)
+  - [5, 8]
+  - [6, 10]
+  # Row 2 horizontal
+  - [7, 8]
+  - [8, 9]
+  - [9, 10]
+  - [10, 11]
+  # Row 2 to Row 3 (bridges)
+  - [8, 12]
+  - [10, 13]
+  # Row 3 to Row 4 (bridges)
+  - [12, 15]
+  - [13, 17]
+  # Row 4 horizontal
+  - [14, 15]
+  - [15, 16]
+  - [16, 17]
+  - [17, 18]
+  # Row 4 to Row 5 (bridges)
+  - [15, 19]
+  - [17, 20]
+  # Row 5 to Row 6 (bridges)
+  - [19, 22]
+  - [20, 24]
+  # Row 6 horizontal
+  - [21, 22]
+  - [22, 23]
+  - [23, 24]
+  - [24, 25]
+  # Row 6 to Row 7 (single bridge)
+  - [23, 26]
+visualization:
+  show_mux_boundaries: false
+  region_size: 4
+id: heavy-hex-27

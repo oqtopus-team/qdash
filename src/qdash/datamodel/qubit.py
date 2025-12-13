@@ -52,7 +52,9 @@ class QubitModel(BaseModel):
         default_factory=dict,
         description="The best calibration results, focusing on fidelity metrics",
     )
-    node_info: NodeInfoModel = Field(..., description="The node information")
+    node_info: NodeInfoModel | None = Field(
+        default=None, description="The node information (deprecated)"
+    )
 
     @field_validator("data", mode="before")
     @classmethod
