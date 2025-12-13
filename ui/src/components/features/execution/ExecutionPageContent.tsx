@@ -45,13 +45,8 @@ export function ExecutionPageContent() {
   // Track if we've already set the default chip to prevent race conditions
   const hasSetDefaultChip = useRef(false);
 
-  // Use custom hook for date navigation
-  const {
-    navigateToPreviousDay,
-    navigateToNextDay,
-    canNavigatePrevious,
-    canNavigateNext,
-  } = useDateNavigation(selectedChip || "", selectedDate, setSelectedDate);
+  // Use custom hook for date navigation (unused but kept for potential future use)
+  useDateNavigation(selectedChip || "", selectedDate, setSelectedDate);
 
   // Get list of chips to set default
   const { data: chipsData } = useListChips();
@@ -226,43 +221,16 @@ export function ExecutionPageContent() {
         </p>
       </div>
       <div className="px-3 sm:px-10 pb-4 sm:pb-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex justify-center gap-1 opacity-0">
-            <button className="btn btn-xs btn-ghost invisible">←</button>
-            <button className="btn btn-xs btn-ghost invisible">→</button>
-          </div>
-          <ChipSelector
-            selectedChip={selectedChip || ""}
-            onChipSelect={handleChipChange}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <div className="flex justify-center gap-1">
-            <button
-              onClick={navigateToPreviousDay}
-              disabled={!canNavigatePrevious}
-              className="btn btn-xs btn-ghost"
-              title="Previous Day"
-            >
-              ←
-            </button>
-            <button
-              onClick={navigateToNextDay}
-              disabled={!canNavigateNext}
-              className="btn btn-xs btn-ghost"
-              title="Next Day"
-            >
-              →
-            </button>
-          </div>
-          <DateSelector
-            chipId={selectedChip || ""}
-            selectedDate={selectedDate}
-            onDateSelect={setSelectedDate}
-            disabled={!selectedChip}
-          />
-        </div>
+        <ChipSelector
+          selectedChip={selectedChip || ""}
+          onChipSelect={handleChipChange}
+        />
+        <DateSelector
+          chipId={selectedChip || ""}
+          selectedDate={selectedDate}
+          onDateSelect={setSelectedDate}
+          disabled={!selectedChip}
+        />
       </div>
       {/* Statistics display */}
       <ExecutionStats

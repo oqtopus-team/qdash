@@ -402,40 +402,14 @@ export function ChipPageContent() {
           {/* Selection Controls */}
           <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
             <div className="flex flex-col sm:flex-row gap-4 flex-shrink-0">
-              <div className="flex flex-col gap-1 w-full sm:w-auto">
-                <label className="text-xs text-base-content/60 font-medium">
-                  Chip
-                </label>
+              <div className="w-full sm:w-auto">
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}
                 />
               </div>
 
-              <div className="flex flex-col gap-1 w-full sm:w-auto">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs text-base-content/60 font-medium">
-                    Date
-                  </label>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={navigateToPreviousDay}
-                      disabled={!canNavigatePrevious}
-                      className="btn btn-xs btn-ghost px-1"
-                      title="Previous Day"
-                    >
-                      ←
-                    </button>
-                    <button
-                      onClick={navigateToNextDay}
-                      disabled={!canNavigateNext}
-                      className="btn btn-xs btn-ghost px-1"
-                      title="Next Day"
-                    >
-                      →
-                    </button>
-                  </div>
-                </div>
+              <div className="w-full sm:w-auto">
                 <DateSelector
                   chipId={selectedChip}
                   selectedDate={selectedDate}
@@ -444,10 +418,7 @@ export function ChipPageContent() {
                 />
               </div>
 
-              <div className="flex flex-col gap-1 w-full sm:w-auto">
-                <label className="text-xs text-base-content/60 font-medium">
-                  Task
-                </label>
+              <div className="w-full sm:w-auto">
                 <TaskSelector
                   tasks={filteredTasks}
                   selectedTask={selectedTask}
