@@ -381,18 +381,20 @@ export function CouplingGrid({
                     width: displayCellSize * 0.6,
                     height: displayCellSize * 0.6,
                   }}
-                  className={`rounded-lg bg-base-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 -translate-x-1/2 -translate-y-1/2 ${
+                  className={`rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
                     task.over_threshold
-                      ? "border-2 border-primary animate-pulse-light"
+                      ? "ring-2 ring-primary ring-offset-1 animate-pulse-light"
                       : ""
                   }`}
                 >
                   {figurePath && (
-                    <TaskFigure
-                      path={figurePath}
-                      qid={String(task.couplingId)}
-                      className="w-full h-full object-contain"
-                    />
+                    <div className="absolute inset-1">
+                      <TaskFigure
+                        path={figurePath}
+                        qid={String(task.couplingId)}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
                   )}
                 </button>
               );
