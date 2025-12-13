@@ -82,7 +82,7 @@ export function FlowSchedulesSection() {
               {cronSchedules.map((schedule) => (
                 <Link
                   key={schedule.schedule_id}
-                  href={`/flow/${schedule.flow_name}`}
+                  href={`/workflow/${schedule.flow_name}`}
                   className={`block p-3 rounded hover:bg-base-300 transition-colors ${
                     schedule.active ? "bg-base-200" : "bg-base-300 opacity-60"
                   }`}
@@ -129,7 +129,7 @@ export function FlowSchedulesSection() {
               {oneTimeSchedules.map((schedule) => (
                 <Link
                   key={schedule.schedule_id}
-                  href={`/flow/${schedule.flow_name}`}
+                  href={`/workflow/${schedule.flow_name}`}
                   className={`block p-3 rounded hover:bg-base-300 transition-colors ${
                     schedule.active ? "bg-base-200" : "bg-base-300 opacity-60"
                   }`}

@@ -78,7 +78,7 @@ export default function EditFlowPage() {
     mutationFn: () => deleteFlow(name),
     onSuccess: () => {
       toast.success("Flow deleted successfully!");
-      router.push("/flow");
+      router.push("/workflow");
     },
   });
 
@@ -181,7 +181,7 @@ export default function EditFlowPage() {
           <span>Failed to load flow: {(error as Error)?.message}</span>
         </div>
         <button
-          onClick={() => router.push("/flow")}
+          onClick={() => router.push("/workflow")}
           className="btn btn-ghost mt-4"
         >
           ← Back to Flows
@@ -197,7 +197,7 @@ export default function EditFlowPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
-              onClick={() => router.push("/flow")}
+              onClick={() => router.push("/workflow")}
               className="btn btn-sm btn-ghost"
               disabled={saveMutation.isPending || deleteMutation.isPending}
             >
