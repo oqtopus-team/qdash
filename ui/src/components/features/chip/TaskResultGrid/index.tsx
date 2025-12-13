@@ -80,11 +80,24 @@ export function TaskResultGrid({
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
 
+  // Fetch task results
+  const {
+    data: taskResponse,
+    isLoading: isLoadingTask,
+    isError: isTaskError,
+  } = useQubitTaskResults({
+    chipId,
+    task: selectedTask,
+    selectedDate,
+    keepPrevious: true,
+  });
+
   // Use grid layout hook for responsive sizing
   const { containerRef, cellSize, getContainerWidth } = useGridLayout({
     cols: gridCols,
     rows: gridRows,
     reservedHeight: { mobile: 250, desktop: 300 },
+    deps: [taskResponse, topologyQubits],
   });
 
   // Region selection state
@@ -100,17 +113,6 @@ export function TaskResultGrid({
   } | null>(null);
 
   const numRegions = Math.floor(gridSize / regionSize);
-
-  const {
-    data: taskResponse,
-    isLoading: isLoadingTask,
-    isError: isTaskError,
-  } = useQubitTaskResults({
-    chipId,
-    task: selectedTask,
-    selectedDate,
-    keepPrevious: true,
-  });
 
   if (isLoadingTask)
     return (
