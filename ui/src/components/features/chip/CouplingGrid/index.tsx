@@ -6,6 +6,7 @@ import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CouplingTaskHistoryModal } from "@/components/features/chip/modals/CouplingTaskHistoryModal";
+import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
@@ -232,19 +233,11 @@ export function CouplingGrid({
     <div ref={containerRef} className="space-y-4 px-4">
       {/* Zoom mode toggle - only show in full view mode for square grids */}
       {zoomMode === "full" && gridRows === gridCols && (
-        <div className="flex items-center gap-2 px-4">
-          <label className="text-sm font-medium">Region Zoom:</label>
-          <input
-            type="checkbox"
-            checked={regionSelectionEnabled}
-            onChange={(e) => setRegionSelectionEnabled(e.target.checked)}
-            className="toggle toggle-sm toggle-primary"
+        <div className="px-4">
+          <RegionZoomToggle
+            enabled={regionSelectionEnabled}
+            onToggle={setRegionSelectionEnabled}
           />
-          <span className="text-xs text-base-content/70">
-            {regionSelectionEnabled
-              ? "Enabled - Click a region to zoom"
-              : "Disabled"}
-          </span>
         </div>
       )}
 

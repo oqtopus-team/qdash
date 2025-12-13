@@ -318,20 +318,14 @@ export function MetricsPageContent() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-1 w-full sm:w-auto">
-              <label className="text-xs text-base-content/60 font-medium">
-                Chip
-              </label>
+            <div className="w-full sm:w-auto">
               <ChipSelector
                 selectedChip={selectedChip}
                 onChipSelect={setSelectedChip}
               />
             </div>
 
-            <div className="flex flex-col gap-1 w-full sm:w-auto">
-              <label className="text-xs text-base-content/60 font-medium">
-                Metric
-              </label>
+            <div className="w-full sm:w-auto">
               <Select<MetricOption, false, GroupBase<MetricOption>>
                 className="w-full sm:w-64 text-base-content"
                 classNamePrefix="react-select"

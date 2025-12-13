@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 
+import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
   getQubitGridPosition,
@@ -328,61 +329,10 @@ export function CouplingMetricsGrid({
     <div className="flex flex-col h-full space-y-4" ref={containerRef}>
       {/* Zoom mode toggle - only show in full view mode for square grids */}
       {zoomMode === "full" && isSquareGrid && (
-        <div
-          className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all duration-200 cursor-pointer select-none ${
-            regionSelectionEnabled
-              ? "bg-primary/10 border-primary"
-              : "bg-base-200/50 border-base-300 hover:border-primary/50"
-          }`}
-          onClick={() => setRegionSelectionEnabled(!regionSelectionEnabled)}
-        >
-          <div
-            className={`p-2 rounded-lg ${
-              regionSelectionEnabled
-                ? "bg-primary text-primary-content"
-                : "bg-base-300"
-            }`}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-              <path d="M11 8v6" />
-              <path d="M8 11h6" />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-sm">Region Zoom</span>
-              {regionSelectionEnabled && (
-                <span className="badge badge-primary badge-xs">Active</span>
-              )}
-            </div>
-            <p className="text-xs text-base-content/60">
-              {regionSelectionEnabled
-                ? "Click any 2×2 region on the grid to zoom in"
-                : "Enable to zoom into specific regions"}
-            </p>
-          </div>
-          <input
-            type="checkbox"
-            checked={regionSelectionEnabled}
-            onChange={(e) => {
-              e.stopPropagation();
-              setRegionSelectionEnabled(e.target.checked);
-            }}
-            className="toggle toggle-primary"
-          />
-        </div>
+        <RegionZoomToggle
+          enabled={regionSelectionEnabled}
+          onToggle={setRegionSelectionEnabled}
+        />
       )}
 
       {/* Back button when in region mode */}

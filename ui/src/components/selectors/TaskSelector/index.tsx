@@ -4,6 +4,8 @@ import Select from "react-select";
 
 import type { SingleValue } from "react-select";
 
+import { useSelectStyles } from "@/hooks/useSelectStyles";
+
 interface TaskOption {
   value: string;
   label: string;
@@ -21,6 +23,8 @@ interface TaskSelectorProps {
   disabled?: boolean;
 }
 
+const PLACEHOLDER = "Select a task";
+
 export function TaskSelector({
   tasks,
   selectedTask,
@@ -31,6 +35,11 @@ export function TaskSelector({
     value: task.name,
     label: task.name,
   }));
+
+  const { styles } = useSelectStyles<TaskOption>({
+    labels: options.map((opt) => opt.label),
+    placeholder: PLACEHOLDER,
+  });
 
   const handleChange = (option: SingleValue<TaskOption>) => {
     if (option) {
@@ -43,9 +52,10 @@ export function TaskSelector({
       options={options}
       value={options.find((option) => option.value === selectedTask)}
       onChange={handleChange}
-      placeholder="Select a task"
-      className="text-base-content w-full"
+      placeholder={PLACEHOLDER}
+      className="text-base-content"
       isDisabled={disabled}
+      styles={styles}
     />
   );
 }

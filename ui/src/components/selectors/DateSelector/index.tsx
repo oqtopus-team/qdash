@@ -7,6 +7,7 @@ import Select from "react-select";
 import type { SingleValue } from "react-select";
 
 import { useGetChipDates } from "@/client/chip/chip";
+import { useSelectStyles } from "@/hooks/useSelectStyles";
 
 interface DateOption {
   value: string;
@@ -19,6 +20,8 @@ interface DateSelectorProps {
   onDateSelect: (date: string) => void;
   disabled?: boolean;
 }
+
+const PLACEHOLDER = "Select a date";
 
 /**
  * Component for selecting a date from available dates
@@ -69,11 +72,16 @@ export function DateSelector({
     }));
   }, [datesResponse]);
 
+  const { minWidth, styles } = useSelectStyles<DateOption>({
+    labels: dateOptions.map((opt) => opt.label),
+    placeholder: PLACEHOLDER,
+  });
+
   // Show loading state but keep the current selection visible
   if (isLoading) {
     return (
-      <div className="w-full animate-pulse">
-        <div className="h-9 bg-base-300 rounded"></div>
+      <div className="animate-pulse" style={{ minWidth }}>
+        <div className="h-[38px] bg-base-300 rounded"></div>
       </div>
     );
   }
@@ -86,7 +94,8 @@ export function DateSelector({
         value={{ value: "latest", label: "Latest" }}
         onChange={handleChange}
         isDisabled={disabled}
-        className="text-base-content w-full"
+        className="text-base-content"
+        styles={styles}
       />
     );
   }
@@ -96,9 +105,10 @@ export function DateSelector({
       options={dateOptions}
       value={dateOptions.find((option) => option.value === selectedDate)}
       onChange={handleChange}
-      placeholder="Select a date"
-      className="text-base-content w-full"
+      placeholder={PLACEHOLDER}
+      className="text-base-content"
       isDisabled={disabled}
+      styles={styles}
     />
   );
 }
