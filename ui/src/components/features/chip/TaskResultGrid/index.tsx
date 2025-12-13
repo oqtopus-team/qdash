@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { useMemo, useState } from "react";
 
 import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskHistoryModal } from "@/components/features/chip/modals/TaskHistoryModal";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import { useGridLayout } from "@/hooks/useGridLayout";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
@@ -79,56 +80,12 @@ export function TaskResultGrid({
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
 
-  // Cell size calculation for responsive grid
-  const [cellSize, setCellSize] = useState(60);
-  const [isMobile, setIsMobile] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Calculate cell size based on container and viewport
-  const updateSize = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const displayCols = gridCols;
-    const displayRows = gridRows;
-
-    // Get available space - use viewport width for mobile
-    const viewportWidth = window.innerWidth;
-    const mobile = viewportWidth < 768;
-    setIsMobile(mobile);
-    const padding = mobile ? 16 : 32;
-    const containerWidth =
-      Math.min(container.offsetWidth, viewportWidth) - padding * 2;
-    const viewportHeight = window.innerHeight;
-    // Reserve space for header, controls (~300px)
-    const availableHeight = viewportHeight - (mobile ? 250 : 300);
-
-    const gap = mobile ? 4 : 8;
-    const totalGapX = gap * (displayCols - 1);
-    const totalGapY = gap * (displayRows - 1);
-
-    // Calculate max cell size that fits both dimensions
-    const maxCellByWidth = Math.floor(
-      (containerWidth - totalGapX) / displayCols,
-    );
-    const maxCellByHeight = Math.floor(
-      (availableHeight - totalGapY) / displayRows,
-    );
-
-    // Use smaller dimension, with min size (smaller on mobile)
-    const minSize = mobile ? 32 : 50;
-    const calculatedSize = Math.min(maxCellByWidth, maxCellByHeight);
-    setCellSize(Math.max(minSize, calculatedSize));
-  }, [gridCols, gridRows]);
-
-  useEffect(() => {
-    const timeoutId = setTimeout(updateSize, 0);
-    window.addEventListener("resize", updateSize);
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener("resize", updateSize);
-    };
-  }, [updateSize]);
+  // Use grid layout hook for responsive sizing
+  const { containerRef, cellSize, getContainerWidth } = useGridLayout({
+    cols: gridCols,
+    rows: gridRows,
+    reservedHeight: { mobile: 250, desktop: 300 },
+  });
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -231,11 +188,13 @@ export function TaskResultGrid({
       {/* Grid Container - scrollable for non-square or large grids */}
       <div className="relative overflow-x-auto p-1 md:p-4" ref={containerRef}>
         <div
-          className="grid gap-1 md:gap-2 p-2 md:p-4 bg-base-200/50 rounded-xl relative mx-auto"
+          className="grid gap-1 md:gap-2 p-2 md:p-4 bg-base-200/50 rounded-xl relative"
           style={{
             gridTemplateColumns: `repeat(${zoomMode === "region" ? displayGridSize : gridCols}, minmax(${cellSize}px, 1fr))`,
             gridTemplateRows: `repeat(${zoomMode === "region" ? displayGridSize : gridRows}, minmax(${cellSize}px, 1fr))`,
-            maxWidth: `${(zoomMode === "region" ? displayGridSize : gridCols) * (cellSize + (isMobile ? 4 : 8)) + (isMobile ? 16 : 32)}px`,
+            width: getContainerWidth(
+              zoomMode === "region" ? displayGridSize : gridCols,
+            ),
           }}
         >
           {Array.from({
