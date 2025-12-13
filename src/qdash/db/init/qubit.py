@@ -1,6 +1,5 @@
 """Qubit initialization module."""
 
-from qdash.datamodel.qubit import NodeInfoModel, PositionModel
 from qdash.dbmodel.qubit import QubitDocument
 
 
@@ -67,7 +66,7 @@ def generate_dummy_data(num_qubits: int, pos: dict, username: str, chip_id: str)
     Args:
     ----
         num_qubits (int): Number of qubits
-        pos (dict): Position dictionary
+        pos (dict): Position dictionary (deprecated, kept for compatibility)
         username (str): Username
         chip_id (str): Chip ID
 
@@ -83,12 +82,6 @@ def generate_dummy_data(num_qubits: int, pos: dict, username: str, chip_id: str)
             chip_id=chip_id,
             qid=f"{i}",
             status="pending",
-            node_info=NodeInfoModel(
-                position=PositionModel(
-                    x=pos[i][0],
-                    y=pos[i][1],
-                ),
-            ),
             data={},
             best_data={},
             system_info={},

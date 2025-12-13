@@ -3,8 +3,8 @@
 import logging
 
 from qdash.api.lib.topology_config import load_topology
-from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
-from qdash.datamodel.qubit import NodeInfoModel, PositionModel, QubitModel
+from qdash.datamodel.coupling import CouplingModel
+from qdash.datamodel.qubit import QubitModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -56,19 +56,13 @@ class ChipInitializer:
 
         """
         qubits = {}
-        for qid, pos in topology_qubits.items():
+        for qid in topology_qubits:
             qubits[f"{qid}"] = QubitModel(
                 project_id=project_id,
                 username=username,
                 chip_id=chip_id,
                 qid=f"{qid}",
                 status="pending",
-                node_info=NodeInfoModel(
-                    position=PositionModel(
-                        x=float(pos.col * 50),  # Simple grid spacing
-                        y=float(pos.row * 50),
-                    ),
-                ),
                 data={},
                 best_data={},
             )
@@ -105,7 +99,6 @@ class ChipInitializer:
                 chip_id=chip_id,
                 data={},
                 best_data={},
-                edge_info=EdgeInfoModel(size=4, fill="", source=f"{edge[0]}", target=f"{edge[1]}"),
             )
         return couplings
 
@@ -131,19 +124,13 @@ class ChipInitializer:
 
         """
         documents = []
-        for qid, pos in topology_qubits.items():
+        for qid in topology_qubits:
             qubit_doc = QubitDocument(
                 project_id=project_id,
                 username=username,
                 chip_id=chip_id,
                 qid=f"{qid}",
                 status="pending",
-                node_info=NodeInfoModel(
-                    position=PositionModel(
-                        x=float(pos.col * 50),
-                        y=float(pos.row * 50),
-                    ),
-                ),
                 data={},
                 best_data={},
                 system_info={},
@@ -182,7 +169,6 @@ class ChipInitializer:
                 chip_id=chip_id,
                 data={},
                 best_data={},
-                edge_info=EdgeInfoModel(size=4, fill="", source=f"{edge[0]}", target=f"{edge[1]}"),
                 system_info={},
             )
             documents.append(coupling_doc)

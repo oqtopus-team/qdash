@@ -33,7 +33,9 @@ class QubitDocument(Document):
         default_factory=dict,
         description="The best calibration results, focusing on fidelity metrics",
     )
-    node_info: NodeInfoModel = Field(..., description="The node information")
+    node_info: NodeInfoModel | None = Field(
+        default=None, description="The node information (deprecated)"
+    )
 
     system_info: SystemInfoModel = Field(..., description="The system information")
 
@@ -47,7 +49,12 @@ class QubitDocument(Document):
         name = "qubit"
         indexes: ClassVar = [
             IndexModel(
-                [("project_id", ASCENDING), ("chip_id", ASCENDING), ("qid", ASCENDING), ("username", ASCENDING)],
+                [
+                    ("project_id", ASCENDING),
+                    ("chip_id", ASCENDING),
+                    ("qid", ASCENDING),
+                    ("username", ASCENDING),
+                ],
                 unique=True,
             ),
             IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING)]),
@@ -86,7 +93,9 @@ class QubitDocument(Document):
                 new_param = new_data[metric]
                 new_value = new_param.value if hasattr(new_param, "value") else 0.0
                 # Initialize if metric doesn't exist in best_data or new value is better
-                current_value = current_best[metric].get("value", 0.0) if metric in current_best else 0.0
+                current_value = (
+                    current_best[metric].get("value", 0.0) if metric in current_best else 0.0
+                )
                 if metric not in current_best or new_value > current_value:
                     # Convert OutputParameterModel to dict for storage
                     current_best[metric] = {
@@ -131,7 +140,6 @@ class QubitDocument(Document):
             chip_id=chip_id,
             data=qubit_doc.data,
             best_data=qubit_doc.best_data,
-            node_info=qubit_doc.node_info,
             username=username,
         )
         chip_doc.update_qubit(qid, qubit_model)
