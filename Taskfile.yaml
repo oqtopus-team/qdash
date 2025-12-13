@@ -136,12 +136,12 @@ tasks:
       - task export-workflow
       - docker compose build --no-cache workflow
 
-  deploy-dev:
+  deploy-local:
     cmds:
       - docker compose up -d --build
     desc: Deploy the application with Docker Compose in dev mode
 
-  deploy-prod:
+  deploy:
     cmds:
       - docker compose --profile tunnel up -d --build
     desc: Deploy the application with Docker Compose

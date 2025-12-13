@@ -6,7 +6,10 @@ import { useTheme } from "@/app/providers/theme-provider";
 import { PasswordChangeCard } from "@/components/features/setting/PasswordChangeCard";
 import { useAuth } from "@/contexts/AuthContext";
 
-const themes = [
+// In dev environment, only light/dark available (auto-converted to dev-light/dev-dark)
+const devThemes = ["light", "dark"];
+
+const allThemes = [
   "light",
   "dark",
   "cupcake",
@@ -47,9 +50,12 @@ const themes = [
 type Tab = "appearance" | "account" | "api";
 
 export default function SettingsPage() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, isDevEnv } = useTheme();
   const { accessToken } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("appearance");
+
+  // Limit theme options in dev environment
+  const themes = isDevEnv ? devThemes : allThemes;
   const [copied, setCopied] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [showToken, setShowToken] = useState(false);
@@ -102,6 +108,26 @@ export default function SettingsPage() {
             <div className="card bg-base-200 shadow-lg" key="appearance">
               <div className="card-body">
                 <h2 className="card-title text-xl mb-4">Theme Settings</h2>
+                {isDevEnv && (
+                  <div className="alert alert-warning mb-4">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="stroke-current shrink-0 h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                    <span>
+                      Dev environment: Using purple theme for visual distinction
+                    </span>
+                  </div>
+                )}
                 <div className="flex flex-col gap-6">
                   <div className="flex flex-col gap-3">
                     <label className="text-sm font-medium">Select Theme</label>
@@ -118,26 +144,28 @@ export default function SettingsPage() {
                         </button>
                       ))}
                     </div>
-                    <details className="collapse collapse-arrow bg-base-100">
-                      <summary className="collapse-title text-sm font-medium">
-                        More themes
-                      </summary>
-                      <div className="collapse-content">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2">
-                          {themes.slice(8).map((t) => (
-                            <button
-                              key={t}
-                              className={`btn btn-sm w-full ${
-                                theme === t ? "btn-primary" : "btn-ghost"
-                              }`}
-                              onClick={() => setTheme(t)}
-                            >
-                              {t.charAt(0).toUpperCase() + t.slice(1)}
-                            </button>
-                          ))}
+                    {!isDevEnv && themes.length > 8 && (
+                      <details className="collapse collapse-arrow bg-base-100">
+                        <summary className="collapse-title text-sm font-medium">
+                          More themes
+                        </summary>
+                        <div className="collapse-content">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2">
+                            {themes.slice(8).map((t) => (
+                              <button
+                                key={t}
+                                className={`btn btn-sm w-full ${
+                                  theme === t ? "btn-primary" : "btn-ghost"
+                                }`}
+                                onClick={() => setTheme(t)}
+                              >
+                                {t.charAt(0).toUpperCase() + t.slice(1)}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </details>
+                      </details>
+                    )}
                   </div>
 
                   {/* Color palette */}

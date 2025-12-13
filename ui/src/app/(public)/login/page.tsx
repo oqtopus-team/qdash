@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 
-import { Book, Github } from "lucide-react";
+import { Book, Github, Moon, Sun } from "lucide-react";
 
+import { useTheme } from "@/app/providers/theme-provider";
 import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +16,13 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const router = useRouter();
   const { login: authLogin, loading } = useAuth();
+  const { theme, setTheme } = useTheme();
+
+  const isDarkTheme = theme === "dark";
+
+  const toggleTheme = useCallback(() => {
+    setTheme(isDarkTheme ? "light" : "dark");
+  }, [isDarkTheme, setTheme]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,7 +77,7 @@ export default function LoginPage() {
             <span className="badge badge-outline badge-lg">Monitoring</span>
             <span className="badge badge-outline badge-lg">Workflow</span>
           </div>
-          <div className="flex gap-4 mt-6 justify-center lg:justify-start">
+          <div className="flex gap-2 sm:gap-4 mt-6 justify-center lg:justify-start flex-wrap">
             <a
               href="https://oqtopus-team.github.io/qdash/"
               target="_blank"
@@ -88,6 +96,14 @@ export default function LoginPage() {
               <Github size={18} />
               GitHub
             </a>
+            <button
+              onClick={toggleTheme}
+              className="btn btn-ghost btn-sm gap-2"
+              aria-label="Toggle theme"
+            >
+              {isDarkTheme ? <Sun size={18} /> : <Moon size={18} />}
+              Theme
+            </button>
           </div>
         </div>
 
