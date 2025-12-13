@@ -358,8 +358,12 @@ export function CouplingMetricsGrid({
         <div
           className="relative flex-shrink-0"
           style={{
-            width: displayGridSize * (displayCellSize + (isMobile ? 4 : 8)),
-            height: displayGridSize * (displayCellSize + (isMobile ? 4 : 8)),
+            width:
+              displayGridSize * displayCellSize +
+              (displayGridSize - 1) * (isMobile ? 4 : 8),
+            height:
+              displayGridSize * displayCellSize +
+              (displayGridSize - 1) * (isMobile ? 4 : 8),
             maxWidth: "100%",
           }}
         >

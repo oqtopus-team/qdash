@@ -266,12 +266,16 @@ export function CouplingGrid({
           style={{
             width:
               zoomMode === "region"
-                ? displayGridSize * (displayCellSize + (isMobile ? 4 : 8))
-                : gridCols * (displayCellSize + (isMobile ? 4 : 8)),
+                ? displayGridSize * displayCellSize +
+                  (displayGridSize - 1) * (isMobile ? 4 : 8)
+                : gridCols * displayCellSize +
+                  (gridCols - 1) * (isMobile ? 4 : 8),
             height:
               zoomMode === "region"
-                ? displayGridSize * (displayCellSize + (isMobile ? 4 : 8))
-                : gridRows * (displayCellSize + (isMobile ? 4 : 8)),
+                ? displayGridSize * displayCellSize +
+                  (displayGridSize - 1) * (isMobile ? 4 : 8)
+                : gridRows * displayCellSize +
+                  (gridRows - 1) * (isMobile ? 4 : 8),
             maxWidth: "100%",
           }}
         >

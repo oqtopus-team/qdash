@@ -335,11 +335,11 @@ export function QubitMetricsGrid({
         ref={containerRef}
       >
         <div
-          className="grid gap-1 md:gap-2 p-2 md:p-4 bg-base-200/50 rounded-xl relative mx-auto"
+          className="grid gap-1 md:gap-2 p-2 md:p-4 bg-base-200/50 rounded-xl relative"
           style={{
             gridTemplateColumns: `repeat(${displayGridCols}, minmax(${displayCellSize}px, 1fr))`,
             gridTemplateRows: `repeat(${displayGridRows}, minmax(${displayCellSize}px, 1fr))`,
-            maxWidth: `${displayGridCols * (displayCellSize + (isMobile ? 4 : 8)) + (isMobile ? 16 : 32)}px`,
+            width: `${displayGridCols * displayCellSize + (displayGridCols - 1) * (isMobile ? 4 : 8) + (isMobile ? 16 : 32)}px`,
           }}
         >
           {Array.from({ length: displayGridRows * displayGridCols }).map(

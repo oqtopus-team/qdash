@@ -231,11 +231,18 @@ export function TaskResultGrid({
       {/* Grid Container - scrollable for non-square or large grids */}
       <div className="relative overflow-x-auto p-1 md:p-4" ref={containerRef}>
         <div
-          className="grid gap-1 md:gap-2 p-2 md:p-4 bg-base-200/50 rounded-xl relative mx-auto"
+          className="grid gap-1 md:gap-2 p-2 md:p-4 bg-base-200/50 rounded-xl relative"
           style={{
             gridTemplateColumns: `repeat(${zoomMode === "region" ? displayGridSize : gridCols}, minmax(${cellSize}px, 1fr))`,
             gridTemplateRows: `repeat(${zoomMode === "region" ? displayGridSize : gridRows}, minmax(${cellSize}px, 1fr))`,
-            maxWidth: `${(zoomMode === "region" ? displayGridSize : gridCols) * (cellSize + (isMobile ? 4 : 8)) + (isMobile ? 16 : 32)}px`,
+            width: `${(() => {
+              const cols = zoomMode === "region" ? displayGridSize : gridCols;
+              return (
+                cols * cellSize +
+                (cols - 1) * (isMobile ? 4 : 8) +
+                (isMobile ? 16 : 32)
+              );
+            })()}px`,
           }}
         >
           {Array.from({
