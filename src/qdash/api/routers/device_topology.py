@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends
 from fastapi.logger import logger
 from fastapi.responses import Response
 from qdash.api.lib.project import ProjectContext, get_project_context
+from qdash.api.lib.topology_config import load_topology
 from qdash.api.schemas.device_topology import (
     Coupling,
     CouplingGateDuration,
@@ -22,7 +23,6 @@ from qdash.api.schemas.device_topology import (
     QubitGateDuration,
     QubitLifetime,
 )
-from qdash.api.lib.topology_config import load_topology
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 
@@ -283,7 +283,7 @@ def get_device_topology(
             cr_duration = cr_value.get("duration", 20)
             # Get coupling fidelity data with timestamp check
             coupling_data = chip_docs.couplings[f"{control}-{target}"].data.get(
-                "bell_state_fidelity", {}
+                "zx90_gate_fidelity", {}
             )
             # zx90_gate_fidelity = (
             #     coupling_data["value"]
