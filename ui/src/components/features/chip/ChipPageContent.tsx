@@ -22,6 +22,7 @@ import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailMod
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
+import { ChipPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useProject } from "@/contexts/ProjectContext";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useChipUrlState } from "@/hooks/useUrlState";
@@ -50,7 +51,7 @@ export function ChipPageContent() {
   const [gridSize, setGridSize] = useState<number>(8);
 
   const { data: chipData } = useGetChip(selectedChip);
-  const { data: chipsData } = useListChips();
+  const { data: chipsData, isLoading: isChipsLoading } = useListChips();
 
   // Set default chip only when URL is initialized and no chip is selected from URL
   useEffect(() => {
@@ -317,13 +318,25 @@ export function ChipPageContent() {
     },
   );
 
+  // Show skeleton during initial loading
+  if (!isInitialized || isChipsLoading) {
+    return <ChipPageSkeleton />;
+  }
+
   return (
     <div className="w-full px-3 sm:px-6 py-4 sm:py-6">
       <div className="space-y-6">
         {/* Header Section */}
         <div className="flex flex-col gap-4 sm:gap-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h1 className="text-xl sm:text-2xl font-bold">Chip Experiments</h1>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold">
+                Chip Experiments
+              </h1>
+              <p className="text-sm text-base-content/70 mt-1">
+                View calibration tasks and qubit results
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
               {canEdit && (
                 <button

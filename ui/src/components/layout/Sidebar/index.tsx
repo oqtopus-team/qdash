@@ -173,17 +173,19 @@ function Sidebar() {
         {canEdit && (
           <li>
             <Link
-              href="/flow"
+              href="/workflow"
               className={
                 isMobileOpen
-                  ? linkClass(pathname.startsWith("/flow"))
-                  : desktopLinkClass(pathname.startsWith("/flow"))
+                  ? linkClass(pathname.startsWith("/workflow"))
+                  : desktopLinkClass(pathname.startsWith("/workflow"))
               }
-              title="Editor"
+              title="Workflow"
               onClick={handleLinkClick}
             >
               <Code size={18} />
-              {(isOpen || isMobileOpen) && <span className="ml-2">Editor</span>}
+              {(isOpen || isMobileOpen) && (
+                <span className="ml-2">Workflow</span>
+              )}
             </Link>
           </li>
         )}
@@ -368,6 +370,15 @@ function Sidebar() {
             <div className="text-xs opacity-60 truncate">
               {user?.full_name || ""}
             </div>
+            {user?.system_role && (
+              <div className="mt-0.5">
+                <span
+                  className={`badge badge-xs ${user.system_role === "admin" ? "badge-primary" : "badge-ghost"}`}
+                >
+                  {user.system_role}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </button>
@@ -385,6 +396,13 @@ function Sidebar() {
           <h2 className="text-lg font-bold">{user?.username}</h2>
           {user?.full_name && (
             <p className="text-sm text-base-content/60">{user?.full_name}</p>
+          )}
+          {user?.system_role && (
+            <span
+              className={`badge badge-sm mt-2 ${user.system_role === "admin" ? "badge-primary" : "badge-ghost"}`}
+            >
+              {user.system_role}
+            </span>
           )}
         </div>
 

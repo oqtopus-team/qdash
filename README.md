@@ -25,7 +25,7 @@ QDash is a web application that provides a user-friendly interface to manage and
 
 ## Documentation
 
-- [Documentation Home](https://qdash.readthedocs.io/en/stable/)
+- [Documentation Home](https://oqtopus-team.github.io/qdash/)
 
 ## CITATION
 

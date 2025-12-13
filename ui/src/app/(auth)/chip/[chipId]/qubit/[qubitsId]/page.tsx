@@ -9,6 +9,7 @@ import { ArrowLeft, Clock, Eye, TrendingUp } from "lucide-react";
 import type { Task, TaskInfo } from "@/schemas";
 
 import { FluentEmoji } from "@/components/ui/FluentEmoji";
+import { QubitDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
 import { useGetChip } from "@/client/chip/chip";
 import {
@@ -51,14 +52,17 @@ function QubitDetailPageContent() {
     | "history";
   const setViewMode = setQubitViewMode;
 
-  const { data: chipData } = useGetChip(chipId);
+  const { data: chipData, isLoading: isChipLoading } = useGetChip(chipId);
 
   // Get task file settings to determine default backend
-  const { data: taskFileSettings } = useGetTaskFileSettings();
+  const { data: taskFileSettings, isLoading: isSettingsLoading } =
+    useGetTaskFileSettings();
   const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
 
   // Get task list from task-files API
-  const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
+  const { data: taskInfoData, isLoading: isTaskInfoLoading } = useListTaskInfo({
+    backend: defaultBackend,
+  });
 
   // Update selected chip if different from URL
   useEffect(() => {
@@ -135,7 +139,15 @@ function QubitDetailPageContent() {
     }
   }, [isInitialized, selectedTask, filteredTasks, setSelectedTask]);
 
-  const isLoading = false;
+  // Show skeleton during initial loading
+  if (
+    !isInitialized ||
+    isChipLoading ||
+    isSettingsLoading ||
+    isTaskInfoLoading
+  ) {
+    return <QubitDetailPageSkeleton />;
+  }
 
   return (
     <div className="w-full px-6 py-6">
@@ -266,11 +278,7 @@ function QubitDetailPageContent() {
 
         {/* Content Section */}
         <div className="pt-4">
-          {isLoading ? (
-            <div className="w-full flex justify-center py-12">
-              <span className="loading loading-spinner loading-lg"></span>
-            </div>
-          ) : viewMode === "dashboard" ? (
+          {viewMode === "dashboard" ? (
             <div className="space-y-6">
               {/* Qubit Information Header */}
               <div className="stats shadow w-full">
@@ -419,7 +427,7 @@ function QubitDetailPageContent() {
             <QubitRadarChart
               qubitId={qubitId}
               taskData={allTasksData}
-              isLoading={isLoading}
+              isLoading={false}
             />
           ) : (
             <TaskHistoryViewer
@@ -436,13 +444,7 @@ function QubitDetailPageContent() {
 
 export default function QubitDetailPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="w-full flex justify-center py-12">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
-      }
-    >
+    <Suspense fallback={<QubitDetailPageSkeleton />}>
       <QubitDetailPageContent />
     </Suspense>
   );

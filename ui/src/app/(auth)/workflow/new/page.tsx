@@ -139,7 +139,7 @@ export default function NewFlowPage() {
   const saveMutation = useMutation({
     mutationFn: (request: SaveFlowRequest) => saveFlow(request),
     onSuccess: (response: AxiosResponse<SaveFlowResponse>) => {
-      router.push(`/flow/${response.data.name}`);
+      router.push(`/workflow/${response.data.name}`);
     },
   });
 
