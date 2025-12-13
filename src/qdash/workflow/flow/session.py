@@ -64,7 +64,9 @@ def generate_execution_id(username: str, chip_id: str, project_id: str | None = 
 
     """
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
-    execution_index = ExecutionCounterDocument.get_next_index(date_str, username, chip_id, project_id=project_id)
+    execution_index = ExecutionCounterDocument.get_next_index(
+        date_str, username, chip_id, project_id=project_id
+    )
     return f"{date_str}-{execution_index:03d}"
 
 
@@ -170,7 +172,9 @@ class CalService:
         # GitHub configuration
         self.enable_github = enable_github
         # enable_github_pull: explicit value > enable_github default
-        self._enable_github_pull = enable_github_pull if enable_github_pull is not None else enable_github
+        self._enable_github_pull = (
+            enable_github_pull if enable_github_pull is not None else enable_github
+        )
 
         # Auto-resolve project_id from username if not provided
         # This works because only owners can run calibrations (1 user = 1 project policy)
@@ -222,7 +226,9 @@ class CalService:
 
         # Auto-generate execution_id if not provided
         if self.execution_id is None:
-            self.execution_id = generate_execution_id(self.username, self.chip_id, project_id=self.project_id)
+            self.execution_id = generate_execution_id(
+                self.username, self.chip_id, project_id=self.project_id
+            )
 
         # Initialize GitHub integration
         self.github_integration = GitHubIntegration(
@@ -576,7 +582,9 @@ class CalService:
         if upstream_id is not None:
             execution_task_manager._upstream_task_id = upstream_id
         else:
-            execution_task_manager._upstream_task_id = self._last_executed_task_id_by_qid.get(qid, "")
+            execution_task_manager._upstream_task_id = self._last_executed_task_id_by_qid.get(
+                qid, ""
+            )
 
         # Execute task with the dedicated task manager
         execution_manager, executed_task_manager = execute_dynamic_task_by_qid.with_options(
@@ -800,12 +808,15 @@ class CalService:
                 try:
                     # Use chip_id from session instead of "current" chip to avoid
                     # updating wrong chip's history when calibrating older chips
-                    chip_doc = ChipDocument.get_chip_by_id(username=self.username, chip_id=self.chip_id)
+                    chip_doc = ChipDocument.get_chip_by_id(
+                        username=self.username, chip_id=self.chip_id
+                    )
                     if chip_doc is not None:
                         ChipHistoryDocument.create_history(chip_doc)
                     else:
                         logger.warning(
-                            f"Chip '{self.chip_id}' not found for user '{self.username}', " "skipping history update"
+                            f"Chip '{self.chip_id}' not found for user '{self.username}', "
+                            "skipping history update"
                         )
                 except Exception as e:
                     # If chip history update fails, log but don't fail the calibration
@@ -830,15 +841,21 @@ class CalService:
                             f"{self.execution_manager.calib_data_path}/calib_note/{self.task_manager.id}.json"
                         )
                         note_path.parent.mkdir(parents=True, exist_ok=True)
-                        note_path.write_text(json.dumps(latest_doc.note, indent=2, ensure_ascii=False))
+                        note_path.write_text(
+                            json.dumps(latest_doc.note, indent=2, ensure_ascii=False)
+                        )
                         logger.info(f"Exported calibration note to {note_path}")
                     else:
-                        logger.warning(f"No calibration note found for task_id={self.task_manager.id}")
+                        logger.warning(
+                            f"No calibration note found for task_id={self.task_manager.id}"
+                        )
                 except Exception as e:
                     logger.error(f"Failed to export calibration note: {e}")
 
             # Push to GitHub if configured
-            should_push = push_to_github if push_to_github is not None else self.github_push_config.enabled
+            should_push = (
+                push_to_github if push_to_github is not None else self.github_push_config.enabled
+            )
 
             if should_push:
                 self._sync_backend_params_before_push(logger)
@@ -1006,6 +1023,7 @@ class CalService:
                 "ReadoutClassification",
                 "RandomizedBenchmarking",
                 "X90InterleavedRandomizedBenchmarking",
+                "CheckRamsey",
             ]
         if tasks_2q is None:
             tasks_2q = ["CheckCrossResonance", "CreateZX90", "CheckZX90", "CheckBellState"]
@@ -1149,7 +1167,14 @@ class CalService:
         logger = get_run_logger()
 
         if tasks is None:
-            tasks = ["CheckCrossResonance", "CreateZX90", "CheckZX90", "CheckBellState"]
+            tasks = [
+                "CheckCrossResonance",
+                "CreateZX90",
+                "CheckZX90",
+                "CheckBellState",
+                "CheckBellStateTomography",
+                "ZX90InterleavedRandomizedBenchmarking",
+            ]
 
         coupling_qids = [f"{c}-{t}" for c, t in pairs]
         all_qids = list(set(q for pair in pairs for q in pair))
