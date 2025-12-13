@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
-import { LayoutGrid, List } from "lucide-react";
 
 import { CouplingGrid } from "./CouplingGrid";
 import { TaskResultGrid } from "./TaskResultGrid";
@@ -25,6 +24,7 @@ import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { ChipPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useProject } from "@/contexts/ProjectContext";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
+import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { useChipUrlState } from "@/hooks/useUrlState";
 
 interface SelectedTaskInfo {
@@ -53,6 +53,12 @@ export function ChipPageContent() {
   const { data: chipData } = useGetChip(selectedChip);
   const { data: chipsData, isLoading: isChipsLoading } = useListChips();
 
+  // Get topology config to check if MUX is enabled
+  const topologyId =
+    chipData?.data?.topology_id ??
+    `square-lattice-mux-${chipData?.data?.size ?? 64}`;
+  const { hasMux = true } = useTopologyConfig(topologyId) ?? {};
+
   // Set default chip only when URL is initialized and no chip is selected from URL
   useEffect(() => {
     if (
@@ -76,6 +82,14 @@ export function ChipPageContent() {
       setGridSize(Math.sqrt(chipData.data.size));
     }
   }, [chipData?.data?.size]);
+
+  // Reset viewMode to "grid" if MUX is disabled but viewMode is "mux"
+  useEffect(() => {
+    if (!hasMux && viewMode === "mux") {
+      setViewMode("grid");
+    }
+  }, [hasMux, viewMode, setViewMode]);
+
   const [expandedMuxes, setExpandedMuxes] = useState<{
     [key: string]: boolean;
   }>({});
@@ -324,125 +338,123 @@ export function ChipPageContent() {
   }
 
   return (
-    <div className="w-full px-3 sm:px-6 py-4 sm:py-6">
-      <div className="space-y-6">
+    <div className="w-full min-h-screen bg-base-100/50 px-4 md:px-6 py-6 md:py-8">
+      <div className="h-full flex flex-col space-y-4 md:space-y-6">
         {/* Header Section */}
-        <div className="flex flex-col gap-4 sm:gap-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col gap-4 md:gap-6">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold">
+              <h1 className="text-xl md:text-2xl font-bold">
                 Chip Experiments
               </h1>
               <p className="text-sm text-base-content/70 mt-1">
                 View calibration tasks and qubit results
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
-              {canEdit && (
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setIsCreateChipModalOpen(true)}
+            {canEdit && (
+              <button
+                className="btn btn-primary btn-sm w-fit"
+                onClick={() => setIsCreateChipModalOpen(true)}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                  Create Chip
-                </button>
-              )}
-              <div className="join rounded-lg overflow-hidden">
-                <button
-                  className={`join-item btn btn-xs sm:btn-sm ${
-                    viewMode === "1q" ? "btn-active" : ""
-                  }`}
-                  onClick={() => setViewMode("1q")}
-                >
-                  <LayoutGrid className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="ml-1 sm:ml-2">1Q</span>
-                </button>
-                <button
-                  className={`join-item btn btn-xs sm:btn-sm ${
-                    viewMode === "2q" ? "btn-active" : ""
-                  }`}
-                  onClick={() => setViewMode("2q")}
-                >
-                  <LayoutGrid className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="ml-1 sm:ml-2">2Q</span>
-                </button>
-                <button
-                  className={`join-item btn btn-xs sm:btn-sm ${
-                    viewMode === "mux" ? "btn-active" : ""
-                  }`}
-                  onClick={() => setViewMode("mux")}
-                >
-                  <List className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="ml-1 sm:ml-2">MUX</span>
-                </button>
-              </div>
-            </div>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Create Chip
+              </button>
+            )}
+          </div>
+
+          {/* View Mode Tabs */}
+          <div className="tabs tabs-boxed bg-base-200 w-fit">
+            <button
+              className={`tab ${viewMode === "1q" ? "tab-active" : ""}`}
+              onClick={() => setViewMode("1q")}
+            >
+              Qubit
+            </button>
+            <button
+              className={`tab ${viewMode === "2q" ? "tab-active" : ""}`}
+              onClick={() => setViewMode("2q")}
+            >
+              Coupling
+            </button>
+            {hasMux && (
+              <button
+                className={`tab ${viewMode === "mux" ? "tab-active" : ""}`}
+                onClick={() => setViewMode("mux")}
+              >
+                MUX View
+              </button>
+            )}
           </div>
 
           {/* Selection Controls */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-center gap-1 opacity-0">
-                <button className="btn btn-xs btn-ghost invisible">←</button>
-                <button className="btn btn-xs btn-ghost invisible">→</button>
+          <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+            <div className="flex flex-col sm:flex-row gap-4 flex-shrink-0">
+              <div className="flex flex-col gap-1 w-full sm:w-auto">
+                <label className="text-xs text-base-content/60 font-medium">
+                  Chip
+                </label>
+                <ChipSelector
+                  selectedChip={selectedChip}
+                  onChipSelect={setSelectedChip}
+                />
               </div>
-              <ChipSelector
-                selectedChip={selectedChip}
-                onChipSelect={setSelectedChip}
-              />
-            </div>
 
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-center gap-1">
-                <button
-                  onClick={navigateToPreviousDay}
-                  disabled={!canNavigatePrevious}
-                  className="btn btn-xs btn-ghost"
-                  title="Previous Day"
-                >
-                  ←
-                </button>
-                <button
-                  onClick={navigateToNextDay}
-                  disabled={!canNavigateNext}
-                  className="btn btn-xs btn-ghost"
-                  title="Next Day"
-                >
-                  →
-                </button>
+              <div className="flex flex-col gap-1 w-full sm:w-auto">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-base-content/60 font-medium">
+                    Date
+                  </label>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={navigateToPreviousDay}
+                      disabled={!canNavigatePrevious}
+                      className="btn btn-xs btn-ghost px-1"
+                      title="Previous Day"
+                    >
+                      ←
+                    </button>
+                    <button
+                      onClick={navigateToNextDay}
+                      disabled={!canNavigateNext}
+                      className="btn btn-xs btn-ghost px-1"
+                      title="Next Day"
+                    >
+                      →
+                    </button>
+                  </div>
+                </div>
+                <DateSelector
+                  chipId={selectedChip}
+                  selectedDate={selectedDate}
+                  onDateSelect={setSelectedDate}
+                  disabled={!selectedChip}
+                />
               </div>
-              <DateSelector
-                chipId={selectedChip}
-                selectedDate={selectedDate}
-                onDateSelect={setSelectedDate}
-                disabled={!selectedChip}
-              />
-            </div>
 
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-center gap-1 opacity-0">
-                <button className="btn btn-xs btn-ghost invisible">←</button>
-                <button className="btn btn-xs btn-ghost invisible">→</button>
+              <div className="flex flex-col gap-1 w-full sm:w-auto">
+                <label className="text-xs text-base-content/60 font-medium">
+                  Task
+                </label>
+                <TaskSelector
+                  tasks={filteredTasks}
+                  selectedTask={selectedTask}
+                  onTaskSelect={setSelectedTask}
+                  disabled={viewMode === "mux"}
+                />
               </div>
-              <TaskSelector
-                tasks={filteredTasks}
-                selectedTask={selectedTask}
-                onTaskSelect={setSelectedTask}
-                disabled={viewMode === "mux"}
-              />
             </div>
           </div>
         </div>
@@ -490,6 +502,10 @@ export function ChipPageContent() {
           ) : viewMode === "1q" ? (
             <TaskResultGrid
               chipId={selectedChip}
+              topologyId={
+                chipData?.data?.topology_id ??
+                `square-lattice-mux-${chipData?.data?.size ?? 64}`
+              }
               selectedTask={selectedTask}
               selectedDate={selectedDate}
               gridSize={gridSize}
@@ -498,6 +514,10 @@ export function ChipPageContent() {
           ) : viewMode === "2q" ? (
             <CouplingGrid
               chipId={selectedChip}
+              topologyId={
+                chipData?.data?.topology_id ??
+                `square-lattice-mux-${chipData?.data?.size ?? 64}`
+              }
               selectedTask={selectedTask}
               selectedDate={selectedDate}
               gridSize={gridSize}

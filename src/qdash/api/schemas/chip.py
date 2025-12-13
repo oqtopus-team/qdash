@@ -12,6 +12,7 @@ class ChipResponse(BaseModel):
     ----------
         chip_id (str): The ID of the chip.
         size (int): The size of the chip.
+        topology_id (str | None): Topology template ID.
         qubits (dict): Qubit information.
         couplings (dict): Coupling information.
         installed_at (str): Installation timestamp.
@@ -20,6 +21,7 @@ class ChipResponse(BaseModel):
 
     chip_id: str
     size: int = 64
+    topology_id: str | None = None
     qubits: dict[str, Any] = {}
     couplings: dict[str, Any] = {}
     installed_at: str = ""
@@ -32,11 +34,13 @@ class CreateChipRequest(BaseModel):
     ----------
         chip_id (str): The ID of the chip to create.
         size (int): The size of the chip (64, 144, 256, or 1024).
+        topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'.
 
     """
 
     chip_id: str
     size: int = 64
+    topology_id: str | None = None
 
 
 class ChipDatesResponse(BaseModel):

@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ChipResponseTopologyId } from "./chipResponseTopologyId";
 import type { ChipResponseQubits } from "./chipResponseQubits";
 import type { ChipResponseCouplings } from "./chipResponseCouplings";
 
@@ -15,6 +16,7 @@ Attributes
 ----------
     chip_id (str): The ID of the chip.
     size (int): The size of the chip.
+    topology_id (str | None): Topology template ID.
     qubits (dict): Qubit information.
     couplings (dict): Coupling information.
     installed_at (str): Installation timestamp.
@@ -22,6 +24,7 @@ Attributes
 export interface ChipResponse {
   chip_id: string;
   size?: number;
+  topology_id?: ChipResponseTopologyId;
   qubits?: ChipResponseQubits;
   couplings?: ChipResponseCouplings;
   installed_at?: string;

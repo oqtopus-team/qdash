@@ -34,6 +34,7 @@ class ChipHistoryDocument(Document):
     chip_id: str = Field(..., description="The chip ID")
     username: str = Field(..., description="The username of the user who created the chip")
     size: int = Field(..., description="The size of the chip")
+    topology_id: str | None = Field(None, description="Topology template ID")
     qubits: dict[str, QubitModel] = Field({}, description="The qubits of the chip")
     couplings: dict[str, CouplingModel] = Field({}, description="The couplings of the chip")
     installed_at: str = Field(..., description="The time when the system information was created")
@@ -61,11 +62,15 @@ class ChipHistoryDocument(Document):
                 ],
                 unique=True,
             ),
-            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING), ("recorded_date", DESCENDING)]),
+            IndexModel(
+                [("project_id", ASCENDING), ("chip_id", ASCENDING), ("recorded_date", DESCENDING)]
+            ),
         ]
 
     @classmethod
-    def get_yesterday_history(cls, chip_id: str, username: str, project_id: str) -> "ChipHistoryDocument | None":
+    def get_yesterday_history(
+        cls, chip_id: str, username: str, project_id: str
+    ) -> "ChipHistoryDocument | None":
         """Get yesterday's history record for a chip.
 
         Parameters
@@ -119,6 +124,7 @@ class ChipHistoryDocument(Document):
                 chip_id=chip_doc.chip_id,
                 username=chip_doc.username,
                 size=chip_doc.size,
+                topology_id=chip_doc.topology_id,
                 qubits=chip_doc.qubits,
                 couplings=chip_doc.couplings,
                 installed_at=chip_doc.installed_at,
@@ -129,7 +135,9 @@ class ChipHistoryDocument(Document):
 
         except DuplicateKeyError:
             # If duplicate key error occurs, find and update the existing document
-            logger.info(f"History record already exists for chip {chip_doc.chip_id}, updating existing record")
+            logger.info(
+                f"History record already exists for chip {chip_doc.chip_id}, updating existing record"
+            )
             existing_doc = cls.find_one(
                 {
                     "project_id": chip_doc.project_id,
@@ -142,6 +150,7 @@ class ChipHistoryDocument(Document):
             if existing_doc:
                 # Update the existing document
                 existing_doc.size = chip_doc.size
+                existing_doc.topology_id = chip_doc.topology_id
                 existing_doc.qubits = chip_doc.qubits
                 existing_doc.couplings = chip_doc.couplings
                 existing_doc.installed_at = chip_doc.installed_at

@@ -217,7 +217,6 @@ src/qdash/workflow/user_flows/*/
 docker_node_modules/
 .venv/src/
 log/
-quel.json
 .pnpm-store/
 qpu_data/
 docs/.vitepress/cache/
@@ -230,9 +229,9 @@ src/qdash/workflow/.calibration/*.json
 src/qdash/workflow/.classifier/*/*
 # Ignore all files in config directory except metrics.yaml
 /config/*
-!/config/
-!/config/metrics.yaml
-!/config/settings.yaml
+!config/metrics.yaml
+!config/settings.yaml
+!config/topologies/
 src/tools/schedule/*
 .serena/cache/*
 .mcp.json
