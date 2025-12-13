@@ -15,6 +15,7 @@ import { QubitMetricsGrid } from "./QubitMetricsGrid";
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
+import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
 type TimeRange = "1d" | "7d" | "30d";
@@ -47,7 +48,7 @@ export function MetricsPageContent() {
   // Select appropriate metrics config based on type
   const metricsConfig = metricType === "qubit" ? qubitMetrics : couplingMetrics;
 
-  const { data: chipsData } = useListChips();
+  const { data: chipsData, isLoading: isChipsLoading } = useListChips();
   const { data: chipData } = useGetChip(selectedChip);
 
   // Set default chip when data loads
@@ -215,6 +216,11 @@ export function MetricsPageContent() {
 
     return scaledData;
   }, [data, currentMetricConfig, metricType]);
+
+  // Show skeleton during initial loading
+  if (isConfigLoading || isChipsLoading) {
+    return <MetricsPageSkeleton />;
+  }
 
   return (
     <div className="w-full min-h-screen bg-base-100/50 px-4 md:px-6 py-6 md:py-8">

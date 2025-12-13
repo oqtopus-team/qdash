@@ -16,6 +16,7 @@ import {
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
+import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/hooks/useUrlState";
 
@@ -150,7 +151,7 @@ export function ExecutionPageContent() {
     setCurrentPage(1);
   }, [selectedDate]);
 
-  if (isLoading) return <div>Loading...</div>;
+  if (isLoading) return <ExecutionPageSkeleton />;
   if (isError) return <div>Error</div>;
 
   // Generate unique key for execution

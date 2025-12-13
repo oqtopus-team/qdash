@@ -37,6 +37,7 @@ import {
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
 import { FlowImportsPanel } from "@/components/features/flow/FlowImportsPanel";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
+import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -193,13 +194,7 @@ export default function EditFlowPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
-      </div>
-    );
+    return <WorkflowEditorPageSkeleton />;
   }
 
   if (error) {

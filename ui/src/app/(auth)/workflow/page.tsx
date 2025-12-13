@@ -8,6 +8,7 @@ import type { FlowSummary } from "@/schemas";
 
 import { listFlows } from "@/client/flow/flow";
 import { FlowSchedulesSection } from "@/components/features/flow/FlowSchedulesSection";
+import { WorkflowListPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
 export default function FlowListPage() {
   const { data, isLoading, error } = useQuery({
@@ -16,13 +17,7 @@ export default function FlowListPage() {
   });
 
   if (isLoading) {
-    return (
-      <div className="container mx-auto p-3 sm:p-6">
-        <div className="flex items-center justify-center h-64">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
-      </div>
-    );
+    return <WorkflowListPageSkeleton />;
   }
 
   if (error) {

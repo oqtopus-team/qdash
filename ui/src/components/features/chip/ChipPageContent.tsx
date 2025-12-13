@@ -22,6 +22,7 @@ import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailMod
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
+import { ChipPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useProject } from "@/contexts/ProjectContext";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useChipUrlState } from "@/hooks/useUrlState";
@@ -50,7 +51,7 @@ export function ChipPageContent() {
   const [gridSize, setGridSize] = useState<number>(8);
 
   const { data: chipData } = useGetChip(selectedChip);
-  const { data: chipsData } = useListChips();
+  const { data: chipsData, isLoading: isChipsLoading } = useListChips();
 
   // Set default chip only when URL is initialized and no chip is selected from URL
   useEffect(() => {
@@ -316,6 +317,11 @@ export function ChipPageContent() {
       return task.task_type === "qubit";
     },
   );
+
+  // Show skeleton during initial loading
+  if (!isInitialized || isChipsLoading) {
+    return <ChipPageSkeleton />;
+  }
 
   return (
     <div className="w-full px-3 sm:px-6 py-4 sm:py-6">

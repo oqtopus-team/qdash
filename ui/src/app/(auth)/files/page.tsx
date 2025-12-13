@@ -36,6 +36,7 @@ import {
   gitPullConfig,
   gitPushConfig,
 } from "@/client/file/file";
+import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useToast } from "@/components/ui/Toast";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -264,13 +265,7 @@ export default function FilesEditorPage() {
   };
 
   if (isTreeLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
-      </div>
-    );
+    return <EditorPageSkeleton />;
   }
 
   if (treeError) {

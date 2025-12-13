@@ -2,22 +2,34 @@
 
 import { Suspense } from "react";
 
+import { useListChips } from "@/client/chip/chip";
 import { CDFView } from "@/components/features/analysis/CDFView";
 import { CorrelationView } from "@/components/features/analysis/CorrelationView";
 import { HistogramView } from "@/components/features/analysis/HistogramView";
 import { TimeSeriesView } from "@/components/features/analysis/TimeSeriesView";
 import { AnalysisPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useAnalysisUrlState } from "@/hooks/useUrlState";
 
 type AnalyzeView = "timeseries" | "histogram" | "cdf" | "correlation";
 
 function AnalyzePageContent() {
   // URL state management for view type
-  const { analysisViewType, setAnalysisViewType } = useAnalysisUrlState();
+  const { analysisViewType, setAnalysisViewType, isInitialized } =
+    useAnalysisUrlState();
   const currentView = (analysisViewType || "timeseries") as AnalyzeView;
   const setCurrentView = (view: string) => {
     setAnalysisViewType(view);
   };
+
+  // Check loading state for initial skeleton
+  const { isLoading: isChipsLoading } = useListChips();
+  const { isLoading: isConfigLoading } = useMetricsConfig();
+
+  // Show skeleton during initial loading
+  if (!isInitialized || isChipsLoading || isConfigLoading) {
+    return <AnalysisPageSkeleton />;
+  }
 
   return (
     <div className="w-full min-h-screen bg-base-100/50 px-3 sm:px-6 py-4 sm:py-8">

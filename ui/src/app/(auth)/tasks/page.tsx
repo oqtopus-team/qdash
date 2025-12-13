@@ -41,6 +41,7 @@ import {
   getTaskFileSettings,
   listTaskInfo,
 } from "@/client/task-file/task-file";
+import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -400,13 +401,7 @@ export default function TasksPage() {
   }, [fileContent]);
 
   if (isBackendsLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
-      </div>
-    );
+    return <EditorPageSkeleton />;
   }
 
   if (backendsError) {
