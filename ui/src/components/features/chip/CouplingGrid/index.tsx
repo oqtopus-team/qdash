@@ -214,7 +214,7 @@ export function CouplingGrid({
       )}
 
       {/* Grid Container - scrollable for non-square or large grids */}
-      <div className="relative overflow-x-auto p-1 md:p-4">
+      <div className="relative overflow-x-auto p-1 md:p-4 flex justify-center">
         <div
           className="relative flex-shrink-0 mx-auto"
           style={{

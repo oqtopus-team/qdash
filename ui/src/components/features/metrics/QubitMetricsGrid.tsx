@@ -277,7 +277,7 @@ export function QubitMetricsGrid({
 
       {/* Grid display */}
       <div
-        className="flex-1 p-1 md:p-4 relative overflow-x-auto"
+        className="flex-1 p-1 md:p-4 relative overflow-x-auto flex justify-center"
         ref={containerRef}
       >
         <div
