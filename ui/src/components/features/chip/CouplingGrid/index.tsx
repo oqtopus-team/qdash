@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useMemo } from "react";
 
 import type { Task } from "@/schemas";
 
@@ -8,11 +8,13 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CouplingTaskHistoryModal } from "@/components/features/chip/modals/CouplingTaskHistoryModal";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
+import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
   getQubitGridPosition,
   type TopologyLayoutParams,
 } from "@/utils/gridPosition";
+import { calculateGridDimension } from "@/utils/gridLayout";
 
 interface CouplingGridProps {
   chipId: string;
@@ -82,9 +84,6 @@ export function CouplingGrid({
 
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
-  const [cellSize, setCellSize] = useState(60);
-  const [isMobile, setIsMobile] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -110,60 +109,15 @@ export function CouplingGrid({
     selectedDate,
   });
 
-  // Calculate cell size based on container width
-  const updateSize = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const displayCols = zoomMode === "region" ? regionSize : gridCols;
-    const displayRows = zoomMode === "region" ? regionSize : gridRows;
-
-    // Get available space - use viewport width for mobile
-    const viewportWidth = window.innerWidth;
-    const mobile = viewportWidth < 768;
-    setIsMobile(mobile);
-    const padding = mobile ? 16 : 32;
-    const containerWidth =
-      Math.min(container.offsetWidth, viewportWidth) - padding * 2;
-    const viewportHeight = window.innerHeight;
-    // Reserve space for header, controls (~300px)
-    const availableHeight = viewportHeight - (mobile ? 250 : 300);
-
-    const gap = mobile ? 4 : 8;
-    const totalGapX = gap * (displayCols - 1);
-    const totalGapY = gap * (displayRows - 1);
-
-    // Calculate max cell size that fits both dimensions
-    const maxCellByWidth = Math.floor(
-      (containerWidth - totalGapX) / displayCols,
-    );
-    const maxCellByHeight = Math.floor(
-      (availableHeight - totalGapY) / displayRows,
-    );
-
-    // Use smaller dimension, with min size (smaller on mobile)
-    const minSize = mobile ? 28 : 40;
-    const calculatedSize = Math.min(maxCellByWidth, maxCellByHeight);
-    setCellSize(Math.max(minSize, calculatedSize));
-  }, [gridCols, gridRows, zoomMode, regionSize]);
-
-  useEffect(() => {
-    // Initial calculation with a small delay to ensure container is rendered
-    const timeoutId = setTimeout(updateSize, 0);
-
-    window.addEventListener("resize", updateSize);
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener("resize", updateSize);
-    };
-  }, [updateSize]);
-
-  // Recalculate when data loads
-  useEffect(() => {
-    if (taskResponse?.data) {
-      updateSize();
-    }
-  }, [taskResponse?.data, updateSize]);
+  // Use grid layout hook for responsive sizing
+  const displayCols = zoomMode === "region" ? regionSize : gridCols;
+  const displayRows = zoomMode === "region" ? regionSize : gridRows;
+  const { containerRef, cellSize, isMobile, gap } = useGridLayout({
+    cols: displayCols,
+    rows: displayRows,
+    reservedHeight: { mobile: 250, desktop: 300 },
+    deps: [taskResponse?.data],
+  });
 
   const normalizedResultMap: Record<string, ExtendedTask[]> = {};
   if (taskResponse?.data?.result) {
@@ -264,18 +218,16 @@ export function CouplingGrid({
         <div
           className="relative flex-shrink-0 mx-auto"
           style={{
-            width:
-              zoomMode === "region"
-                ? displayGridSize * displayCellSize +
-                  (displayGridSize - 1) * (isMobile ? 4 : 8)
-                : gridCols * displayCellSize +
-                  (gridCols - 1) * (isMobile ? 4 : 8),
-            height:
-              zoomMode === "region"
-                ? displayGridSize * displayCellSize +
-                  (displayGridSize - 1) * (isMobile ? 4 : 8)
-                : gridRows * displayCellSize +
-                  (gridRows - 1) * (isMobile ? 4 : 8),
+            width: calculateGridDimension(
+              zoomMode === "region" ? displayGridSize : gridCols,
+              displayCellSize,
+              isMobile,
+            ),
+            height: calculateGridDimension(
+              zoomMode === "region" ? displayGridSize : gridRows,
+              displayCellSize,
+              isMobile,
+            ),
             maxWidth: "100%",
           }}
         >
@@ -285,8 +237,6 @@ export function CouplingGrid({
             const qubitIds = topologyQubits
               ? Object.keys(topologyQubits).map(Number)
               : Array.from({ length: gridRows * gridCols }, (_, i) => i);
-
-            const gap = isMobile ? 4 : 8;
 
             return qubitIds
               .filter((qid) => isQubitInRegion(qid))
@@ -354,7 +304,6 @@ export function CouplingGrid({
                 const muxIndex =
                   muxActualRow * Math.floor(gridSize / muxSize) + muxActualCol;
 
-                const gap = isMobile ? 4 : 8;
                 // Calculate center position of MUX group
                 const muxCenterX =
                   (muxLocalCol * muxSize + muxSize / 2) *
@@ -406,7 +355,6 @@ export function CouplingGrid({
               const col2 = pos2.col;
 
               // Adjust position for region mode
-              const gap = isMobile ? 4 : 8;
               const displayRow1 = row1 - displayGridStart.row;
               const displayCol1 = col1 - displayGridStart.col;
               const displayRow2 = row2 - displayGridStart.row;
@@ -463,7 +411,6 @@ export function CouplingGrid({
                       hoveredRegion?.row === regionRow &&
                       hoveredRegion?.col === regionCol;
 
-                    const gap = isMobile ? 4 : 8;
                     const regionX =
                       regionCol * regionSize * (displayCellSize + gap);
                     const regionY =

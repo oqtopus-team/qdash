@@ -1,19 +1,15 @@
 "use client";
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
   getQubitGridPosition,
   type TopologyLayoutParams,
 } from "@/utils/gridPosition";
+import { calculateGridDimension } from "@/utils/gridLayout";
 
 import { CouplingMetricHistoryModal } from "./CouplingMetricHistoryModal";
 
@@ -128,9 +124,15 @@ export function CouplingMetricsGrid({
     }
   }, [isModalOpen]);
 
-  const [cellSize, setCellSize] = useState(60);
-  const [isMobile, setIsMobile] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Use grid layout hook for responsive sizing
+  const displayCols = zoomMode === "region" ? regionSize : gridCols;
+  const displayRows = zoomMode === "region" ? regionSize : gridRows;
+  const { containerRef, cellSize, isMobile, gap } = useGridLayout({
+    cols: displayCols,
+    rows: displayRows,
+    reservedHeight: { mobile: 300, desktop: 350 },
+    deps: [metricData],
+  });
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
 
@@ -223,59 +225,6 @@ export function CouplingMetricsGrid({
     };
   }, [metricData]);
 
-  // Calculate cell size based on container and viewport
-  const updateSize = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const displayCols = zoomMode === "region" ? regionSize : gridCols;
-    const displayRows = zoomMode === "region" ? regionSize : gridRows;
-
-    // Get available space - use viewport width for mobile
-    const viewportWidth = window.innerWidth;
-    const mobile = viewportWidth < 768;
-    setIsMobile(mobile);
-    const padding = mobile ? 16 : 32;
-    const containerWidth =
-      Math.min(container.offsetWidth, viewportWidth) - padding * 2;
-    const viewportHeight = window.innerHeight;
-    // Reserve space for header, controls, stats cards
-    const availableHeight = viewportHeight - (mobile ? 300 : 350);
-
-    const gap = mobile ? 4 : 8;
-    const totalGapX = gap * (displayCols - 1);
-    const totalGapY = gap * (displayRows - 1);
-
-    // Calculate max cell size that fits both dimensions
-    const maxCellByWidth = Math.floor(
-      (containerWidth - totalGapX) / displayCols,
-    );
-    const maxCellByHeight = Math.floor(
-      (availableHeight - totalGapY) / displayRows,
-    );
-
-    // Use smaller dimension, with min size (smaller on mobile)
-    const minSize = mobile ? 28 : 40;
-    const calculatedSize = Math.min(maxCellByWidth, maxCellByHeight);
-    setCellSize(Math.max(minSize, calculatedSize));
-  }, [gridCols, gridRows, zoomMode, regionSize]);
-
-  useEffect(() => {
-    const timeoutId = setTimeout(updateSize, 0);
-    window.addEventListener("resize", updateSize);
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener("resize", updateSize);
-    };
-  }, [updateSize]);
-
-  // Recalculate when data loads
-  useEffect(() => {
-    if (metricData) {
-      updateSize();
-    }
-  }, [metricData, updateSize]);
-
   // Helper function to get qubit position from topology (explicit) or computed
   const getQubitPosition = (qid: number) => {
     // Try explicit position from topology first
@@ -358,12 +307,16 @@ export function CouplingMetricsGrid({
         <div
           className="relative flex-shrink-0"
           style={{
-            width:
-              displayGridSize * displayCellSize +
-              (displayGridSize - 1) * (isMobile ? 4 : 8),
-            height:
-              displayGridSize * displayCellSize +
-              (displayGridSize - 1) * (isMobile ? 4 : 8),
+            width: calculateGridDimension(
+              displayGridSize,
+              displayCellSize,
+              isMobile,
+            ),
+            height: calculateGridDimension(
+              displayGridSize,
+              displayCellSize,
+              isMobile,
+            ),
             maxWidth: "100%",
           }}
         >
@@ -376,8 +329,6 @@ export function CouplingMetricsGrid({
                   { length: effectiveGridSize * effectiveGridSize },
                   (_, i) => i,
                 );
-
-            const gap = isMobile ? 4 : 8;
 
             return qubitList
               .filter((qid) => isQubitInRegion(qid))
@@ -438,7 +389,6 @@ export function CouplingMetricsGrid({
                   muxActualRow * Math.floor(effectiveGridSize / muxSize) +
                   muxActualCol;
 
-                const gap = isMobile ? 4 : 8;
                 // Calculate center position of MUX group
                 const muxCenterX =
                   (muxLocalCol * muxSize + muxSize / 2) *
@@ -480,7 +430,6 @@ export function CouplingMetricsGrid({
                   return [a, b] as [number, number];
                 });
 
-            const gap = isMobile ? 4 : 8;
             return couplingList
               .filter(([qid1, qid2]) => isCouplingInRegion(qid1, qid2))
               .map(([qid1, qid2]) => {
@@ -591,7 +540,6 @@ export function CouplingMetricsGrid({
                     hoveredRegion?.row === regionRow &&
                     hoveredRegion?.col === regionCol;
 
-                  const gap = isMobile ? 4 : 8;
                   const regionX =
                     regionCol * regionSize * (displayCellSize + gap);
                   const regionY =
