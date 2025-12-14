@@ -3,7 +3,7 @@
 # Backend Pydantic models define the actual fields, this file only provides UI metadata.
 
 qubit_metrics:
-  bare_frequency:
+  qubit_frequency:
     title: Qubit Frequency
     unit: GHz
     scale: 1

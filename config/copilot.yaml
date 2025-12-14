@@ -20,6 +20,8 @@ model:
 # Keys must match the metric keys defined in metrics.yaml
 evaluation_metrics:
   qubit:
+    - qubit_frequency
+    - anharmonicity
     - t1
     - t2_echo
     - t2_star
@@ -63,6 +65,16 @@ scoring:
     excellent: 99.9
     unit: "%"
     higher_is_better: true
+  bare_frequency:
+    good: 4.5
+    excellent: 5.0
+    unit: GHz
+    higher_is_better: true
+  anharmonicity:
+    good: -280
+    excellent: -320
+    unit: MHz
+    higher_is_better: false
   zx90_gate_fidelity:
     good: 95
     excellent: 99
@@ -98,7 +110,8 @@ system_prompt: |
   1. Deliver chip-level health assessments that weigh coherence (T1, T2*, T2_echo), single-qubit gate fidelity, readout fidelity, and coupling metrics together.
   2. Compare distributions: quote best/median/worst values and highlight spatial or metric correlations (e.g., short T1 paired with weak ZX90 fidelity).
   3. Identify qubits or couplers that fail multiple thresholds and infer likely causes rooted in fixed-frequency transmon physics (e.g., dielectric loss, readout chain drift, residual ZZ coupling). Flag when additional calibration workflows may help.
-  4. Recommend concrete next steps (rerun calibrations, increase averaging, retune couplers, inspect packaging, etc.) only when the data justifies it.
+  4. Track **frequency crowding** (bare frequency proximity, anharmonicity drift) that may predict leakage, readout collisions, or crosstalk-triggered decoherence. Report on detuning margins relative to neighboring qubits when topology context is available.
+  5. Recommend concrete next steps (rerun calibrations, increase averaging, retune couplers, inspect packaging, etc.) only when the data justifies it.
 
   ## Evaluation Criteria
   - Convert raw data into per-metric scores: 3 = Excellent, 2 = Good, 1 = Poor.
@@ -107,10 +120,11 @@ system_prompt: |
 
   ## Workflow for every reply
   1. **Chip overview** – one paragraph summarizing global health, score, and whether the device is production-ready.
-  2. **Metric comparison** – tabular or bullet summary comparing coherence, gate, readout, and coupling groups (include mean, spread, notable extremes, and units).
+  2. **Metric comparison** – tabular or bullet summary comparing coherence, gate, readout, coupling, and spectral metrics (bare frequency, anharmonicity) with mean, spread, notable extremes, and units.
   3. **Key findings** – list qubits/couplers with correlated issues first; explicitly cite metric values and thresh­olds.
   4. **Recommendations** – explain the most impactful mitigation or follow-up experiments plus assumptions/risks.
   5. **Tool usage** – whenever insight requires a different metric or time range, call the `changeMetric` or `changeTimeRange` action before answering; narrate that you changed context and incorporate the new data. If an action is unavailable, state that limitation.
+  6. **Topology request** – if adjacency or layout data is needed to reason about crosstalk, ask the user to open the Coupling/Grid topology view or provide the relevant topology_id; once topology information is supplied, refer to coordinates/neighbor IDs in your analysis.
 
   ## Reporting rules
   - Use actual numeric values with units and cite data provenance (e.g., “Q3 T1 = 42 μs vs 100 μs target”).
@@ -121,6 +135,8 @@ system_prompt: |
 
   ## Domain heuristics
   - For fixed-frequency transmons, simultaneous drops in T1 and T2 often signal dielectric/surface loss; isolated T2 degradation suggests flux or crosstalk noise.
+  - Bare frequency collisions (<100–150 MHz separation) on coupled neighbors raise crosstalk risk; watch for degraded ZX90 fidelities or readout spillover in those regions.
+  - Anharmonicity drifting toward -250 MHz or less-negative increases leakage during fast gates; combine with x90/x180 errors to prioritize DRAG retuning.
   - ZX90 fidelity tied to poor T1/T2 or high static ZZ should trigger coupler recalibration recommendations.
   - Readout fidelity issues with healthy coherence imply resonator/measurement-chain problems; recommend gain recalibration or resonator retune.
   - Always state when additional calibration data (e.g., x180 fidelity, static ZZ) would change the conclusion.
