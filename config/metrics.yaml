@@ -3,6 +3,19 @@
 # Backend Pydantic models define the actual fields, this file only provides UI metadata.
 
 qubit_metrics:
+  resonator_frequency:
+    title: Resonator Frequency
+    unit: GHz
+    scale: 1
+    description: Resonance frequency of the readout resonator
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 7.0
+      range:
+        min: 6.0
+        max: 8.0
+        step: 0.01
   qubit_frequency:
     title: Qubit Frequency
     unit: GHz
@@ -156,6 +169,16 @@ coupling_metrics:
 # Metrics in the same group will be displayed together in a single CDF chart
 cdf_groups:
   qubit:
+    - id: resonator_frequency
+      title: Resonator Frequency
+      unit: GHz
+      metrics:
+        - resonator_frequency
+    - id: qubit_frequency
+      title: Qubit Frequency
+      unit: GHz
+      metrics:
+        - qubit_frequency
     - id: coherence
       title: Coherence Times
       unit: μs
