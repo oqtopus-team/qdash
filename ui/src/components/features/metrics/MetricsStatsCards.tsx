@@ -61,13 +61,9 @@ export function MetricsStatsCards({
       };
     }
 
-    // Calculate median
+    // Calculate median (same method as CDF chart)
     const sorted = [...values].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    const median =
-      sorted.length % 2 !== 0
-        ? sorted[mid]
-        : (sorted[mid - 1] + sorted[mid]) / 2;
+    const median = sorted[Math.floor(sorted.length / 2)];
 
     const min = Math.min(...values);
     const max = Math.max(...values);

@@ -46,12 +46,29 @@ class MetricMetadata(BaseModel):
     threshold: ThresholdConfig | None = None
 
 
+class CdfGroup(BaseModel):
+    """CDF chart group configuration."""
+
+    id: str
+    title: str
+    unit: str
+    metrics: list[str]
+
+
+class CdfGroupsConfig(BaseModel):
+    """CDF groups configuration by metric type."""
+
+    qubit: list[CdfGroup] = []
+    coupling: list[CdfGroup] = []
+
+
 class MetricsConfig(BaseModel):
     """Complete metrics configuration."""
 
     qubit_metrics: dict[str, MetricMetadata]
     coupling_metrics: dict[str, MetricMetadata]
     color_scale: dict[str, Any]
+    cdf_groups: CdfGroupsConfig = CdfGroupsConfig()
 
 
 @lru_cache(maxsize=1)

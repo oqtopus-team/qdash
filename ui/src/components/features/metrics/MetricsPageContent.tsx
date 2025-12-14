@@ -9,6 +9,7 @@ import Select, {
 } from "react-select";
 
 import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
+import { MetricsCdfChart } from "./MetricsCdfChart";
 import { MetricsPdfDownloadButton } from "./MetricsPdfDownloadButton";
 import { MetricsStatsCards } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
@@ -45,6 +46,7 @@ export function MetricsPageContent() {
     qubitMetrics,
     couplingMetrics,
     colorScale,
+    cdfGroups,
     isLoading: isConfigLoading,
     isError: isConfigError,
   } = useMetricsConfig();
@@ -220,6 +222,57 @@ export function MetricsPageContent() {
 
     return scaledData;
   }, [data, currentMetricConfig, metricType]);
+
+  // Process all metrics data for CDF groups
+  const allMetricsData = useMemo(() => {
+    if (!data?.data) return {};
+
+    const metricsSource =
+      metricType === "qubit"
+        ? data.data.qubit_metrics
+        : data.data.coupling_metrics;
+
+    if (!metricsSource) return {};
+
+    const result: Record<
+      string,
+      { [key: string]: { value: number | null } }
+    > = {};
+
+    const configList = metricType === "qubit" ? qubitMetrics : couplingMetrics;
+
+    configList.forEach((metricConfig) => {
+      const rawData =
+        metricsSource[metricConfig.key as keyof typeof metricsSource];
+      if (!rawData) return;
+
+      const scaledData: { [key: string]: { value: number | null } } = {};
+      Object.entries(rawData).forEach(([key, metricValue]: [string, any]) => {
+        const formattedKey =
+          metricType === "qubit"
+            ? key.startsWith("Q")
+              ? key
+              : `Q${key.padStart(2, "0")}`
+            : key;
+        const value = metricValue?.value;
+        scaledData[formattedKey] = {
+          value:
+            value !== null && value !== undefined && typeof value === "number"
+              ? value * metricConfig.scale
+              : null,
+        };
+      });
+      result[metricConfig.key] = scaledData;
+    });
+
+    return result;
+  }, [data, metricType, qubitMetrics, couplingMetrics]);
+
+  // Get CDF group that contains the selected metric
+  const currentCdfGroup = useMemo(() => {
+    const groups = metricType === "qubit" ? cdfGroups.qubit : cdfGroups.coupling;
+    return groups.find((group) => group.metrics.includes(selectedMetric)) || null;
+  }, [metricType, cdfGroups, selectedMetric]);
 
   // Show skeleton during initial loading
   if (isConfigLoading || isChipsLoading) {
@@ -417,6 +470,32 @@ export function MetricsPageContent() {
               gridSize={gridSize}
               metricType={metricType}
             />
+
+            {/* CDF Chart for current metric's group */}
+            {currentCdfGroup && (
+              <MetricsCdfChart
+                metricsData={currentCdfGroup.metrics
+                  .map((metricKey) => {
+                    const config = metricsConfig.find(
+                      (m) => m.key === metricKey
+                    );
+                    return config
+                      ? {
+                          key: metricKey,
+                          title: config.title,
+                          data: allMetricsData[metricKey] || null,
+                        }
+                      : null;
+                  })
+                  .filter(Boolean) as {
+                  key: string;
+                  title: string;
+                  data: { [key: string]: { value: number | null } } | null;
+                }[]}
+                groupTitle={currentCdfGroup.title}
+                unit={currentCdfGroup.unit}
+              />
+            )}
 
             {/* Metric Grid */}
             {metricType === "qubit" ? (
