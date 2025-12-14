@@ -11,8 +11,9 @@ import Select, {
 import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
 import { MetricsCdfChart } from "./MetricsCdfChart";
 import { MetricsPdfDownloadButton } from "./MetricsPdfDownloadButton";
-import { MetricsStatsCards } from "./MetricsStatsCards";
+import { MetricsStatsCards, useMetricStats } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
+import { LinearGauge } from "@/components/ui/LinearGauge";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
@@ -86,7 +87,9 @@ export function MetricsPageContent() {
   // Extract topology data for Copilot
   const topologyData = useMemo(() => {
     // The API returns { data: TopologyDefinition }
-    const responseData = topologyResponse?.data as { data?: Record<string, unknown> } | undefined;
+    const responseData = topologyResponse?.data as
+      | { data?: Record<string, unknown> }
+      | undefined;
     const data = responseData?.data;
     if (!data) return null;
     return {
@@ -530,31 +533,15 @@ export function MetricsPageContent() {
               metricType={metricType}
             />
 
-            {/* CDF Chart for current metric's group */}
+            {/* CDF Chart + Coverage Progress */}
             {currentCdfGroup && (
-              <MetricsCdfChart
-                metricsData={
-                  currentCdfGroup.metrics
-                    .map((metricKey) => {
-                      const config = metricsConfig.find(
-                        (m) => m.key === metricKey,
-                      );
-                      return config
-                        ? {
-                            key: metricKey,
-                            title: config.title,
-                            data: allMetricsData[metricKey] || null,
-                          }
-                        : null;
-                    })
-                    .filter(Boolean) as {
-                    key: string;
-                    title: string;
-                    data: { [key: string]: { value: number | null } } | null;
-                  }[]
-                }
-                groupTitle={currentCdfGroup.title}
-                unit={currentCdfGroup.unit}
+              <CdfWithCoverage
+                currentCdfGroup={currentCdfGroup}
+                metricsConfig={metricsConfig}
+                allMetricsData={allMetricsData}
+                metricData={metricData}
+                gridSize={gridSize}
+                metricType={metricType}
               />
             )}
 
@@ -605,5 +592,71 @@ export function MetricsPageContent() {
         </div>
       )}
     </PageContainer>
+  );
+}
+
+// CDF Chart with Coverage Progress side by side
+interface CdfWithCoverageProps {
+  currentCdfGroup: {
+    title: string;
+    unit: string;
+    metrics: string[];
+  };
+  metricsConfig: { key: string; title: string }[];
+  allMetricsData: Record<
+    string,
+    { [key: string]: { value: number | null } } | null
+  >;
+  metricData: { [key: string]: { value: number | null } } | null;
+  gridSize: number;
+  metricType: "qubit" | "coupling";
+}
+
+function CdfWithCoverage({
+  currentCdfGroup,
+  metricsConfig,
+  allMetricsData,
+  metricData,
+  gridSize,
+  metricType,
+}: CdfWithCoverageProps) {
+  const stats = useMetricStats(metricData, gridSize, metricType);
+
+  return (
+    <div className="space-y-2">
+      {/* Linear Gauge for Coverage */}
+      <div className="bg-base-100 rounded-lg shadow-sm border border-base-300 px-4 py-2">
+        <LinearGauge
+          value={stats.coverage}
+          current={stats.withData}
+          total={stats.total}
+          duration={800}
+        />
+      </div>
+
+      {/* CDF Chart */}
+      <MetricsCdfChart
+        metricsData={
+          currentCdfGroup.metrics
+            .map((metricKey) => {
+              const config = metricsConfig.find((m) => m.key === metricKey);
+              return config
+                ? {
+                    key: metricKey,
+                    title: config.title,
+                    data: allMetricsData[metricKey] || null,
+                  }
+                : null;
+            })
+            .filter(Boolean) as {
+            key: string;
+            title: string;
+            data: { [key: string]: { value: number | null } } | null;
+          }[]
+        }
+        groupTitle={currentCdfGroup.title}
+        unit={currentCdfGroup.unit}
+      />
+    </div>
   );
 }

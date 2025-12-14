@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { FluentEmoji } from "@/components/ui/FluentEmoji";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -165,6 +166,8 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
   const title = isGrouped ? props.groupTitle : props.title;
   const unit = props.unit;
 
+  const [isCompact, setIsCompact] = useState(true);
+
   if (!plotData) {
     return (
       <div className="flex items-center justify-center h-48 bg-base-200 rounded-lg">
@@ -174,10 +177,24 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
   }
 
   return (
-    <div className="collapse collapse-arrow bg-base-100 rounded-lg shadow-sm border border-base-300 max-w-2xl mx-auto">
+    <div
+      className={`collapse collapse-arrow bg-base-100 rounded-lg shadow-sm border border-base-300 transition-all ${isCompact ? "max-w-xl mx-auto" : ""}`}
+    >
       <input type="checkbox" defaultChecked />
-      <div className="collapse-title px-4 py-2 min-h-0 font-semibold text-sm">
-        CDF - {title}
+      <div className="collapse-title px-4 py-2 min-h-0 font-semibold text-sm flex items-center">
+        <span>CDF - {title}</span>
+        <button
+          type="button"
+          className={`btn btn-xs btn-ghost ml-auto mr-6 z-10 gap-1`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsCompact(!isCompact);
+          }}
+          title={isCompact ? "Expand width" : "Compact width"}
+        >
+          <FluentEmoji name={isCompact ? "left-right" : "compress"} size={14} />
+          <span className="text-xs">{isCompact ? "Expand" : "Compact"}</span>
+        </button>
       </div>
       <div className="collapse-content p-0">
         <div

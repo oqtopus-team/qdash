@@ -48,6 +48,17 @@ const EMOJI_MAP: Record<string, string> = {
   clock: "Alarm%20clock/3D/alarm_clock_3d.png",
   hourglass: "Hourglass%20not%20done/3D/hourglass_not_done_3d.png",
   empty: "Empty%20nest/3D/empty_nest_3d.png",
+  target: "Bullseye/3D/bullseye_3d.png",
+
+  // Medals & Trophies
+  "medal-gold": "1st%20place%20medal/3D/1st_place_medal_3d.png",
+  "medal-silver": "2nd%20place%20medal/3D/2nd_place_medal_3d.png",
+  "medal-bronze": "3rd%20place%20medal/3D/3rd_place_medal_3d.png",
+  trophy: "Trophy/3D/trophy_3d.png",
+
+  // Arrows & Controls
+  "left-right": "Left-right%20arrow/3D/left-right_arrow_3d.png",
+  compress: "Collision/3D/collision_3d.png",
 
   // Avatar - Animals
   fox: "Fox/3D/fox_3d.png",
