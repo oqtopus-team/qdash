@@ -147,6 +147,6 @@ tasks:
   deploy:
     cmds:
       - docker compose --profile tunnel up -d --build
-      - sleep 5
+      - sleep 3
       - docker compose restart api
     desc: Deploy the application with Docker Compose
