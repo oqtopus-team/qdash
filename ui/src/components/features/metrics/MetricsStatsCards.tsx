@@ -2,10 +2,7 @@
 
 import { useMemo } from "react";
 
-import {
-  AnimatedCounter,
-  AnimatedPercentage,
-} from "@/components/ui/AnimatedCounter";
+import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 
 interface MetricDataItem {
   value: number | null;
@@ -37,6 +34,7 @@ export function MetricsStatsCards({
         median: 0,
         min: 0,
         max: 0,
+        avg: 0,
       };
     }
 
@@ -58,6 +56,7 @@ export function MetricsStatsCards({
         median: 0,
         min: 0,
         max: 0,
+        avg: 0,
       };
     }
 
@@ -68,6 +67,9 @@ export function MetricsStatsCards({
     const min = Math.min(...values);
     const max = Math.max(...values);
 
+    // Calculate average
+    const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+
     return {
       total,
       withData,
@@ -75,6 +77,7 @@ export function MetricsStatsCards({
       median,
       min,
       max,
+      avg,
     };
   }, [metricData, gridSize, metricType]);
 
@@ -87,21 +90,18 @@ export function MetricsStatsCards({
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-      {/* Coverage */}
+      {/* Average */}
       <div className="stats shadow-sm bg-base-200">
         <div className="stat py-3 px-4">
-          <div className="stat-title text-xs">Data Coverage</div>
+          <div className="stat-title text-xs">Average {title}</div>
           <div className="stat-value text-xl text-primary">
-            <AnimatedPercentage
-              value={stats.coverage}
+            <AnimatedCounter
+              value={stats.avg}
               duration={800}
-              decimals={1}
+              decimals={getDecimals(stats.avg)}
             />
           </div>
-          <div className="stat-desc text-xs">
-            <AnimatedCounter value={stats.withData} duration={600} /> /{" "}
-            {stats.total} {metricType === "qubit" ? "qubits" : "couplings"}
-          </div>
+          <div className="stat-desc text-xs">{unit}</div>
         </div>
       </div>
 
@@ -151,4 +151,28 @@ export function MetricsStatsCards({
       </div>
     </div>
   );
+}
+
+// Export stats calculation for use in other components
+export function useMetricStats(
+  metricData: { [key: string]: MetricDataItem } | null,
+  gridSize: number,
+  metricType: "qubit" | "coupling",
+) {
+  return useMemo(() => {
+    if (!metricData) {
+      return { total: 0, withData: 0, coverage: 0 };
+    }
+
+    const values = Object.values(metricData)
+      .map((item) => item.value)
+      .filter((v): v is number => v !== null && !isNaN(v));
+
+    const total =
+      metricType === "qubit" ? gridSize * gridSize : gridSize * gridSize * 2;
+    const withData = values.length;
+    const coverage = total > 0 ? (withData / total) * 100 : 0;
+
+    return { total, withData, coverage };
+  }, [metricData, gridSize, metricType]);
 }
