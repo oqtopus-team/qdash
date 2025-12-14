@@ -15,13 +15,20 @@ import { MetricsStatsCards } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
-import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
+import { useGetTopologyById } from "@/client/topology/topology";
+import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
+import { useCopilotConfig } from "@/hooks/useCopilotConfig";
+import {
+  COPILOT_ENABLED,
+  MetricsCopilot,
+  useMetricsCopilot,
+} from "@/features/copilot";
 
 type TimeRange = "1d" | "7d" | "30d";
 type SelectionMode = "latest" | "best";
@@ -51,11 +58,46 @@ export function MetricsPageContent() {
     isError: isConfigError,
   } = useMetricsConfig();
 
+  // Load Copilot configuration
+  const { config: aiConfig } = useCopilotConfig();
+
   // Select appropriate metrics config based on type
   const metricsConfig = metricType === "qubit" ? qubitMetrics : couplingMetrics;
 
   const { data: chipsData, isLoading: isChipsLoading } = useListChips();
   const { data: chipData } = useGetChip(selectedChip);
+
+  // Get topology ID from chip data
+  const topologyId = useMemo(() => {
+    return (
+      chipData?.data?.topology_id ??
+      `square-lattice-mux-${chipData?.data?.size ?? 64}`
+    );
+  }, [chipData?.data?.topology_id, chipData?.data?.size]);
+
+  // Fetch topology data for Copilot spatial analysis
+  const { data: topologyResponse } = useGetTopologyById(topologyId, {
+    query: {
+      enabled: !!topologyId,
+      staleTime: Infinity,
+    },
+  });
+
+  // Extract topology data for Copilot
+  const topologyData = useMemo(() => {
+    // The API returns { data: TopologyDefinition }
+    const responseData = topologyResponse?.data as { data?: Record<string, unknown> } | undefined;
+    const data = responseData?.data;
+    if (!data) return null;
+    return {
+      id: data.id as string,
+      name: data.name as string,
+      grid_size: data.grid_size as number,
+      num_qubits: data.num_qubits as number,
+      qubits: data.qubits as Record<string, { row: number; col: number }>,
+      couplings: data.couplings as number[][],
+    };
+  }, [topologyResponse]);
 
   // Set default chip when data loads
   useEffect(() => {
@@ -274,6 +316,22 @@ export function MetricsPageContent() {
       groups.find((group) => group.metrics.includes(selectedMetric)) || null
     );
   }, [metricType, cdfGroups, selectedMetric]);
+
+  // CopilotKit integration for AI-assisted analysis
+  useMetricsCopilot({
+    chipId: selectedChip,
+    metricType,
+    selectedMetric,
+    metricsConfig,
+    metricData,
+    allMetricsData,
+    timeRange,
+    selectionMode,
+    aiConfig,
+    topologyData,
+    onMetricChange: setSelectedMetric,
+    onTimeRangeChange: (range) => setTimeRange(range as TimeRange),
+  });
 
   // Show skeleton during initial loading
   if (isConfigLoading || isChipsLoading) {
@@ -539,6 +597,13 @@ export function MetricsPageContent() {
           </div>
         )}
       </div>
+
+      {/* AI Analysis Assistant */}
+      {COPILOT_ENABLED && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <MetricsCopilot aiConfig={aiConfig} />
+        </div>
+      )}
     </PageContainer>
   );
 }
