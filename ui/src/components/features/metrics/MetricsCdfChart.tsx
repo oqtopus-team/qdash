@@ -104,6 +104,7 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
         if (!cdf) return;
 
         const color = COLORS[index % COLORS.length];
+        const n = cdf.cdfX.length - 2; // Subtract the extension points
 
         // CDF line
         traces.push({
@@ -111,9 +112,21 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
           y: cdf.cdfY,
           type: "scatter",
           mode: "lines",
-          name: metric.title,
+          name: `${metric.title} (n=${n})`,
           line: { color, width: 2, shape: "hv" },
           hovertemplate: `${metric.title}: %{x:.3f}<br>Percentile: %{y:.1f}%<extra></extra>`,
+        });
+
+        // Median reference line (vertical)
+        traces.push({
+          x: [cdf.median, cdf.median],
+          y: [0, 50],
+          type: "scatter",
+          mode: "lines",
+          name: `Median: ${cdf.median.toFixed(2)}`,
+          line: { color, width: 1, dash: "dot" },
+          showlegend: false,
+          hoverinfo: "skip",
         });
       });
 
@@ -123,15 +136,27 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
       const cdf = calculateCdf(props.metricData);
       if (!cdf) return null;
 
+      const n = cdf.cdfX.length - 2;
+
       return [
         {
           x: cdf.cdfX,
           y: cdf.cdfY,
           type: "scatter",
           mode: "lines",
-          name: props.title,
+          name: `${props.title} (n=${n})`,
           line: { color: "#3b82f6", width: 2, shape: "hv" },
           hovertemplate: `${props.title}: %{x:.3f} ${props.unit}<br>Percentile: %{y:.1f}%<extra></extra>`,
+        },
+        {
+          x: [cdf.median, cdf.median],
+          y: [0, 50],
+          type: "scatter",
+          mode: "lines",
+          name: `Median: ${cdf.median.toFixed(2)}`,
+          line: { color: "#3b82f6", width: 1, dash: "dot" },
+          showlegend: false,
+          hoverinfo: "skip",
         },
       ];
     }

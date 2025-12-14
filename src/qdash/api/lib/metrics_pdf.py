@@ -9,7 +9,7 @@ from __future__ import annotations
 import io
 import logging
 import math
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Any, Literal
 
 import numpy as np
@@ -25,6 +25,9 @@ from qdash.api.lib.topology_config import TopologyDefinition, load_topology
 from qdash.api.schemas.metrics import ChipMetricsResponse
 
 logger = logging.getLogger(__name__)
+
+# JST timezone (UTC+9)
+JST = timezone(timedelta(hours=9))
 
 # Figure sizing constants - larger for better visibility
 NODE_SIZE = 48  # Doubled for larger figures
@@ -178,7 +181,7 @@ class MetricsPDFGenerator:
         c.drawCentredString(
             self.width / 2,
             self.height - 150,
-            f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"Generated on {datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')} (JST)",
         )
 
         # Info box
@@ -339,7 +342,7 @@ class MetricsPDFGenerator:
         c.setFillColor(colors.Color(0.6, 0.6, 0.6))
         c.setFont("Helvetica", 9)
         c.drawString(50, 25, f"Chip: {self.metrics_response.chip_id}")
-        c.drawCentredString(self.width / 2, 25, datetime.now().strftime("%Y-%m-%d"))
+        c.drawCentredString(self.width / 2, 25, datetime.now(JST).strftime("%Y-%m-%d"))
         c.drawRightString(self.width - 50, 25, f"Page {page_num}")
 
     def _calculate_statistics(
@@ -898,7 +901,7 @@ class MetricsPDFGenerator:
         c.setFillColor(colors.Color(0.6, 0.6, 0.6))
         c.setFont("Helvetica", 9)
         c.drawString(50, 25, f"Chip: {self.metrics_response.chip_id}")
-        c.drawCentredString(self.width / 2, 25, datetime.now().strftime("%Y-%m-%d"))
+        c.drawCentredString(self.width / 2, 25, datetime.now(JST).strftime("%Y-%m-%d"))
         c.drawRightString(self.width - 50, 25, f"Page {page_num}")
 
     def _create_cdf_chart(
@@ -974,14 +977,31 @@ class MetricsPDFGenerator:
 
             color = line_colors[idx % len(line_colors)]
 
+            # Calculate median
+            median = values[n // 2]
+
+            # CDF line trace with sample count
             fig.add_trace(
                 go.Scatter(
                     x=cdf_x,
                     y=cdf_y,
                     mode="lines",
-                    name=metric_meta.title,
+                    name=f"{metric_meta.title} (n={n})",
                     line=dict(color=color, width=2, shape="hv"),
                     hovertemplate=f"{metric_meta.title}: %{{x:.3f}}<br>Percentile: %{{y:.1f}}%<extra></extra>",
+                )
+            )
+
+            # Median reference line (vertical dotted line from 0 to 50%)
+            fig.add_trace(
+                go.Scatter(
+                    x=[median, median],
+                    y=[0, 50],
+                    mode="lines",
+                    name=f"Median: {median:.2f}",
+                    line=dict(color=color, width=1, dash="dot"),
+                    showlegend=False,
+                    hoverinfo="skip",
                 )
             )
 
