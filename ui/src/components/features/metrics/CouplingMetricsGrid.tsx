@@ -496,7 +496,7 @@ export function CouplingMetricsGrid({
                     {value !== null && value !== undefined && (
                       <div className="flex flex-col items-center justify-center h-full">
                         <div className="text-[0.5rem] sm:text-xs md:text-sm lg:text-base font-bold text-white drop-shadow-md">
-                          {value.toFixed(2)}
+                          {(unit === "%" ? value * 100 : value).toFixed(2)}
                         </div>
                         {/* Unit - hidden on mobile in full view */}
                         <div
@@ -521,7 +521,7 @@ export function CouplingMetricsGrid({
                     {/* Hover tooltip */}
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                       {value !== null && value !== undefined
-                        ? `${couplingId}: ${value.toFixed(4)} ${unit}`
+                        ? `${couplingId}: ${(unit === "%" ? value * 100 : value).toFixed(4)} ${unit}`
                         : `${couplingId}: No data`}
                     </div>
                   </button>
@@ -602,7 +602,7 @@ export function CouplingMetricsGrid({
                   </h2>
                   <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
                     {selectedCouplingInfo.metric.value !== null
-                      ? `${selectedCouplingInfo.metric.value.toFixed(4)} ${unit}`
+                      ? `${(unit === "%" ? selectedCouplingInfo.metric.value * 100 : selectedCouplingInfo.metric.value).toFixed(4)} ${unit}`
                       : "No data"}
                   </p>
                 </div>

@@ -16,6 +16,8 @@ import {
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
+import { PageContainer } from "@/components/ui/PageContainer";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/hooks/useUrlState";
@@ -211,16 +213,12 @@ export function ExecutionPageContent() {
   );
 
   return (
-    <div className="w-full px-2 sm:px-4 relative">
-      <div className="px-3 sm:px-10 pb-3">
-        <h1 className="text-left text-2xl sm:text-3xl font-bold">
-          Execution History
-        </h1>
-        <p className="text-sm text-base-content/70 mt-1">
-          Monitor workflow runs and task results
-        </p>
-      </div>
-      <div className="px-3 sm:px-10 pb-4 sm:pb-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
+    <PageContainer>
+      <PageHeader
+        title="Execution History"
+        description="Monitor workflow runs and task results"
+      />
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
         <ChipSelector
           selectedChip={selectedChip || ""}
           onChipSelect={handleChipChange}
@@ -240,7 +238,7 @@ export function ExecutionPageContent() {
       />
       {/* Pagination controls - Top */}
       <PaginationControls />
-      <div className="grid grid-cols-1 gap-1.5 sm:gap-2 mx-2 sm:mx-5">
+      <div className="grid grid-cols-1 gap-1.5 sm:gap-2">
         {cardData.map((execution) => {
           const executionKey = getExecutionKey(execution);
           const isSelected = selectedExecutionId === execution.execution_id;
@@ -433,6 +431,6 @@ export function ExecutionPageContent() {
           </>
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 }
