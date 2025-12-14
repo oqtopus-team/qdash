@@ -447,7 +447,7 @@ export function useMetricsCopilot({
             Object.entries(topologyData.qubits).map(([id, pos]) => [
               `Q${String(id).padStart(2, "0")}`,
               { row: pos.row, col: pos.col },
-            ])
+            ]),
           ),
           couplings: topologyData.couplings.map(([q1, q2]) => [
             `Q${String(q1).padStart(2, "0")}`,
