@@ -19,8 +19,16 @@ export interface EvaluationMetrics {
   coupling: string[];
 }
 
+export interface ModelConfig {
+  provider: "openai" | "anthropic";
+  name: string;
+  temperature: number;
+  max_tokens: number;
+}
+
 export interface CopilotConfig {
   enabled: boolean;
+  model: ModelConfig;
   evaluation_metrics: EvaluationMetrics;
   scoring: Record<string, ScoringThreshold>;
   system_prompt: string;

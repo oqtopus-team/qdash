@@ -31,10 +31,20 @@ class EvaluationMetrics(BaseModel):
     coupling: list[str] = []
 
 
+class ModelConfig(BaseModel):
+    """Model configuration for CopilotKit."""
+
+    provider: str = "openai"
+    name: str = "gpt-4o"
+    temperature: float = 0.7
+    max_tokens: int = 2048
+
+
 class CopilotConfig(BaseModel):
     """Copilot configuration."""
 
     enabled: bool = False
+    model: ModelConfig = ModelConfig()
     evaluation_metrics: EvaluationMetrics = EvaluationMetrics()
     scoring: dict[str, ScoringThreshold] = {}
     system_prompt: str = ""
