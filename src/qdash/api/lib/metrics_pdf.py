@@ -1086,7 +1086,6 @@ class MetricsPDFGenerator:
         ]
 
         fig = go.Figure()
-        annotations = []
 
         metrics_source = (
             self.metrics_response.qubit_metrics
@@ -1158,28 +1157,15 @@ class MetricsPDFGenerator:
                 )
             )
 
-            # Median reference line (vertical dotted line from 0 to 50%)
+            # Median reference line (vertical dotted line from 0 to 50%) - shown in legend
             fig.add_trace(
                 go.Scatter(
                     x=[median, median],
                     y=[0, 50],
                     mode="lines",
+                    name=f"{metric_meta.title} Median: {median:.2f}",
                     line=dict(color=color, width=1, dash="dot"),
-                    showlegend=False,
                     hoverinfo="skip",
-                )
-            )
-
-            # Median annotation
-            annotations.append(
-                dict(
-                    x=median,
-                    y=55,
-                    text=f"{metric_meta.title}<br>{median:.2f}",
-                    showarrow=False,
-                    font=dict(size=10, color=color),
-                    xanchor="center",
-                    yanchor="bottom",
                 )
             )
 
@@ -1209,8 +1195,7 @@ class MetricsPDFGenerator:
                 font=dict(size=11),
                 bgcolor="rgba(255,255,255,0.8)",
             ),
-            annotations=annotations,
-            margin=dict(l=70, r=40, t=50, b=100),
+            margin=dict(l=70, r=40, t=30, b=100),
             width=500,
             height=450,
             plot_bgcolor="white",

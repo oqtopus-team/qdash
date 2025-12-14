@@ -94,9 +94,8 @@ function calculateCdf(
 export function MetricsCdfChart(props: MetricsCdfChartProps) {
   const isGrouped = isGroupedProps(props);
 
-  const { plotData, annotations } = useMemo(() => {
+  const plotData = useMemo(() => {
     const traces: any[] = [];
-    const annots: any[] = [];
 
     if (isGrouped) {
       // Grouped metrics mode
@@ -118,37 +117,23 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
           hovertemplate: `${metric.title}: %{x:.3f}<br>Percentile: %{y:.1f}%<extra></extra>`,
         });
 
-        // Median reference line (vertical)
+        // Median reference line (vertical) - shown in legend
         traces.push({
           x: [cdf.median, cdf.median],
           y: [0, 50],
           type: "scatter",
           mode: "lines",
+          name: `${metric.title} Median: ${cdf.median.toFixed(2)}`,
           line: { color, width: 1, dash: "dot" },
-          showlegend: false,
           hoverinfo: "skip",
-        });
-
-        // Median annotation
-        annots.push({
-          x: cdf.median,
-          y: 55,
-          text: `${metric.title}<br>${cdf.median.toFixed(2)}`,
-          showarrow: false,
-          font: { size: 9, color },
-          xanchor: "center",
-          yanchor: "bottom",
         });
       });
 
-      return {
-        plotData: traces.length > 0 ? traces : null,
-        annotations: annots,
-      };
+      return traces.length > 0 ? traces : null;
     } else {
       // Single metric mode
       const cdf = calculateCdf(props.metricData);
-      if (!cdf) return { plotData: null, annotations: [] };
+      if (!cdf) return null;
 
       const n = cdf.cdfX.length - 2;
 
@@ -167,23 +152,13 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
           y: [0, 50],
           type: "scatter",
           mode: "lines",
+          name: `Median: ${cdf.median.toFixed(2)}`,
           line: { color: "#3b82f6", width: 1, dash: "dot" },
-          showlegend: false,
           hoverinfo: "skip",
         },
       );
 
-      annots.push({
-        x: cdf.median,
-        y: 55,
-        text: `Median<br>${cdf.median.toFixed(2)}`,
-        showarrow: false,
-        font: { size: 9, color: "#3b82f6" },
-        xanchor: "center",
-        yanchor: "bottom",
-      });
-
-      return { plotData: traces, annotations: annots };
+      return traces;
     }
   }, [isGrouped, props]);
 
@@ -214,7 +189,7 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
             layout={{
               autosize: true,
               height: 250,
-              margin: { l: 50, r: 20, t: 30, b: 50 },
+              margin: { l: 50, r: 20, t: 10, b: 50 },
               xaxis: {
                 title: { text: `${title} (${unit})`, font: { size: 11 } },
                 gridcolor: "rgba(128,128,128,0.2)",
@@ -234,7 +209,6 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
                 xanchor: "center",
                 font: { size: 10 },
               },
-              annotations: annotations,
               paper_bgcolor: "rgba(0,0,0,0)",
               plot_bgcolor: "rgba(0,0,0,0)",
               hovermode: "x unified",
