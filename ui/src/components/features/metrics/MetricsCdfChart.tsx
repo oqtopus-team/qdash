@@ -31,7 +31,7 @@ type MetricsCdfChartProps = SingleMetricCdfProps | GroupedMetricsCdfProps;
 
 // Type guard to check if props are for grouped metrics
 function isGroupedProps(
-  props: MetricsCdfChartProps
+  props: MetricsCdfChartProps,
 ): props is GroupedMetricsCdfProps {
   return "metricsData" in props;
 }
@@ -53,7 +53,7 @@ interface CdfDataPoint {
 }
 
 function calculateCdf(
-  data: { [key: string]: MetricDataItem } | null
+  data: { [key: string]: MetricDataItem } | null,
 ): CdfDataPoint | null {
   if (!data) return null;
 

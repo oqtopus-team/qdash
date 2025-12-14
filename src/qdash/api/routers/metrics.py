@@ -50,7 +50,9 @@ def normalize_qid(qid: str) -> str:
     return qid.replace("Q", "").lstrip("0") or "0"
 
 
-def _extract_metric_output_info(metric_data: Any) -> tuple[float | int | None, str | None, str | None]:
+def _extract_metric_output_info(
+    metric_data: Any,
+) -> tuple[float | int | None, str | None, str | None]:
     """Extract value, calibrated_at, and task_id from metric output data."""
 
     if metric_data is None:
@@ -151,7 +153,9 @@ def _extract_latest_metrics(
                     include_param = True
                     if within_hours and "calibrated_at" in param_data:
                         try:
-                            calibrated_at = pendulum.parse(param_data["calibrated_at"], tz="Asia/Tokyo")
+                            calibrated_at = pendulum.parse(
+                                param_data["calibrated_at"], tz="Asia/Tokyo"
+                            )
                             include_param = calibrated_at >= cutoff_time
                         except Exception:
                             include_param = False
@@ -207,7 +211,9 @@ def _extract_best_metrics(
     metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
 
     # Filter to only metrics that support best mode (evaluation.mode != "none")
-    best_mode_metrics = [key for key in valid_metric_keys if metrics_config[key].evaluation.mode != "none"]
+    best_mode_metrics = [
+        key for key in valid_metric_keys if metrics_config[key].evaluation.mode != "none"
+    ]
 
     if not best_mode_metrics:
         return metrics_data
@@ -231,12 +237,16 @@ def _extract_best_metrics(
         raise HTTPException(status_code=500, detail=f"Database query failed: {e}") from e
 
     if not task_results:
-        logger.warning(f"No task result history found for chip={chip.chip_id}, username={chip.username}")
+        logger.warning(
+            f"No task result history found for chip={chip.chip_id}, username={chip.username}"
+        )
         return metrics_data
 
     # Collect all values for each metric/entity_id combination
     # Structure: metric_name -> entity_id -> list of (value, task_id, execution_id, calibrated_at)
-    metric_values: dict[str, dict[str, list[tuple[float, str, str, str]]]] = {key: {} for key in valid_metric_keys}
+    metric_values: dict[str, dict[str, list[tuple[float, str, str, str]]]] = {
+        key: {} for key in valid_metric_keys
+    }
 
     for task_doc in task_results:
         entity_id = task_doc.qid
@@ -268,7 +278,9 @@ def _extract_best_metrics(
             if value is not None and isinstance(value, (int, float)):
                 if entity_id not in metric_values[metric_name]:
                     metric_values[metric_name][entity_id] = []
-                metric_values[metric_name][entity_id].append((float(value), task_id or "", execution_id, calibrated_at))
+                metric_values[metric_name][entity_id].append(
+                    (float(value), task_id or "", execution_id, calibrated_at)
+                )
 
     # Select best value for each metric/entity_id based on evaluation mode
     for metric_name in valid_metric_keys:
@@ -330,9 +342,13 @@ def extract_qubit_metrics(
 
     # Extract metrics based on selection mode
     if selection_mode == "latest":
-        metrics_data = _extract_latest_metrics(chip.qubits, valid_metric_keys, cutoff_time, within_hours)
+        metrics_data = _extract_latest_metrics(
+            chip.qubits, valid_metric_keys, cutoff_time, within_hours
+        )
     else:
-        metrics_data = _extract_best_metrics(chip, "qubit", valid_metric_keys, config.qubit_metrics, cutoff_time)
+        metrics_data = _extract_best_metrics(
+            chip, "qubit", valid_metric_keys, config.qubit_metrics, cutoff_time
+        )
 
     # Build QubitMetrics response
     return QubitMetrics(
@@ -376,9 +392,13 @@ def extract_coupling_metrics(
 
     # Extract metrics based on selection mode
     if selection_mode == "latest":
-        metrics_data = _extract_latest_metrics(chip.couplings, valid_metric_keys, cutoff_time, within_hours)
+        metrics_data = _extract_latest_metrics(
+            chip.couplings, valid_metric_keys, cutoff_time, within_hours
+        )
     else:
-        metrics_data = _extract_best_metrics(chip, "coupling", valid_metric_keys, config.coupling_metrics, cutoff_time)
+        metrics_data = _extract_best_metrics(
+            chip, "coupling", valid_metric_keys, config.coupling_metrics, cutoff_time
+        )
 
     return CouplingMetrics(
         zx90_gate_fidelity=metrics_data.get("zx90_gate_fidelity") or None,
@@ -387,11 +407,15 @@ def extract_coupling_metrics(
     )
 
 
-@router.get("/chips/{chip_id}/metrics", response_model=ChipMetricsResponse, operation_id="getChipMetrics")
+@router.get(
+    "/chips/{chip_id}/metrics", response_model=ChipMetricsResponse, operation_id="getChipMetrics"
+)
 async def get_chip_metrics(
     chip_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
-    within_hours: Annotated[int | None, Query(description="Filter to data within N hours (e.g., 24)")] = None,
+    within_hours: Annotated[
+        int | None, Query(description="Filter to data within N hours (e.g., 24)")
+    ] = None,
     selection_mode: Annotated[
         Literal["latest", "best"],
         Query(description="Selection mode: 'latest' for most recent, 'best' for optimal values"),
@@ -420,7 +444,9 @@ async def get_chip_metrics(
     chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
 
     if not chip:
-        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}")
+        raise HTTPException(
+            status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}"
+        )
 
     # Extract metrics
     qubit_metrics = extract_qubit_metrics(chip, within_hours, selection_mode)
@@ -446,7 +472,9 @@ async def get_qubit_metric_history(
     qid: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     metric: Annotated[str, Query(description="Metric name (e.g., t1, qubit_frequency)")],
-    limit: Annotated[int | None, Query(description="Max number of history items (None for unlimited)", ge=1)] = None,
+    limit: Annotated[
+        int | None, Query(description="Max number of history items (None for unlimited)", ge=1)
+    ] = None,
     within_days: Annotated[int | None, Query(description="Filter to last N days", ge=1)] = 30,
 ) -> QubitMetricHistoryResponse:
     """Get historical metric data for a specific qubit with task_id for figure display.
@@ -543,8 +571,12 @@ async def get_coupling_metric_history(
     chip_id: str,
     coupling_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
-    metric: Annotated[str, Query(description="Metric name (e.g., zx90_gate_fidelity, bell_state_fidelity)")],
-    limit: Annotated[int | None, Query(description="Max number of history items (None for unlimited)", ge=1)] = None,
+    metric: Annotated[
+        str, Query(description="Metric name (e.g., zx90_gate_fidelity, bell_state_fidelity)")
+    ],
+    limit: Annotated[
+        int | None, Query(description="Max number of history items (None for unlimited)", ge=1)
+    ] = None,
     within_days: Annotated[int | None, Query(description="Filter to last N days", ge=1)] = 30,
 ) -> QubitMetricHistoryResponse:
     """Get historical metric data for a specific coupling with task_id for figure display.

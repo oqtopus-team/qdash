@@ -104,7 +104,9 @@ def load_metrics_config() -> MetricsConfig:
             break
 
     if not config_path:
-        raise FileNotFoundError(f"Metrics config file not found. Tried: {[str(p) for p in possible_paths if p]}")
+        raise FileNotFoundError(
+            f"Metrics config file not found. Tried: {[str(p) for p in possible_paths if p]}"
+        )
 
     with open(config_path) as f:
         data = yaml.safe_load(f)

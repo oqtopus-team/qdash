@@ -234,10 +234,8 @@ export function MetricsPageContent() {
 
     if (!metricsSource) return {};
 
-    const result: Record<
-      string,
-      { [key: string]: { value: number | null } }
-    > = {};
+    const result: Record<string, { [key: string]: { value: number | null } }> =
+      {};
 
     const configList = metricType === "qubit" ? qubitMetrics : couplingMetrics;
 
@@ -270,8 +268,11 @@ export function MetricsPageContent() {
 
   // Get CDF group that contains the selected metric
   const currentCdfGroup = useMemo(() => {
-    const groups = metricType === "qubit" ? cdfGroups.qubit : cdfGroups.coupling;
-    return groups.find((group) => group.metrics.includes(selectedMetric)) || null;
+    const groups =
+      metricType === "qubit" ? cdfGroups.qubit : cdfGroups.coupling;
+    return (
+      groups.find((group) => group.metrics.includes(selectedMetric)) || null
+    );
   }, [metricType, cdfGroups, selectedMetric]);
 
   // Show skeleton during initial loading
@@ -474,24 +475,26 @@ export function MetricsPageContent() {
             {/* CDF Chart for current metric's group */}
             {currentCdfGroup && (
               <MetricsCdfChart
-                metricsData={currentCdfGroup.metrics
-                  .map((metricKey) => {
-                    const config = metricsConfig.find(
-                      (m) => m.key === metricKey
-                    );
-                    return config
-                      ? {
-                          key: metricKey,
-                          title: config.title,
-                          data: allMetricsData[metricKey] || null,
-                        }
-                      : null;
-                  })
-                  .filter(Boolean) as {
-                  key: string;
-                  title: string;
-                  data: { [key: string]: { value: number | null } } | null;
-                }[]}
+                metricsData={
+                  currentCdfGroup.metrics
+                    .map((metricKey) => {
+                      const config = metricsConfig.find(
+                        (m) => m.key === metricKey,
+                      );
+                      return config
+                        ? {
+                            key: metricKey,
+                            title: config.title,
+                            data: allMetricsData[metricKey] || null,
+                          }
+                        : null;
+                    })
+                    .filter(Boolean) as {
+                    key: string;
+                    title: string;
+                    data: { [key: string]: { value: number | null } } | null;
+                  }[]
+                }
                 groupTitle={currentCdfGroup.title}
                 unit={currentCdfGroup.unit}
               />
