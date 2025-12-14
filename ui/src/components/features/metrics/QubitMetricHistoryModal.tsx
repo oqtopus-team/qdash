@@ -243,7 +243,8 @@ export function QubitMetricHistoryModal({
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="font-bold text-lg">
-                      {formatMetricValue(item.value, metricUnit, 4)} {metricUnit}
+                      {formatMetricValue(item.value, metricUnit, 4)}{" "}
+                      {metricUnit}
                     </div>
                     <div className="text-xs opacity-70 mt-1">
                       {new Date(item.timestamp).toLocaleString("ja-JP", {
