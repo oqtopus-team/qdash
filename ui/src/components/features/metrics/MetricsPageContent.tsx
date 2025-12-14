@@ -22,6 +22,12 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
+import { useCopilotConfig } from "@/hooks/useCopilotConfig";
+import {
+  COPILOT_ENABLED,
+  MetricsCopilot,
+  useMetricsCopilot,
+} from "@/features/copilot";
 
 type TimeRange = "1d" | "7d" | "30d";
 type SelectionMode = "latest" | "best";
@@ -50,6 +56,9 @@ export function MetricsPageContent() {
     isLoading: isConfigLoading,
     isError: isConfigError,
   } = useMetricsConfig();
+
+  // Load Copilot configuration
+  const { config: aiConfig } = useCopilotConfig();
 
   // Select appropriate metrics config based on type
   const metricsConfig = metricType === "qubit" ? qubitMetrics : couplingMetrics;
@@ -274,6 +283,21 @@ export function MetricsPageContent() {
       groups.find((group) => group.metrics.includes(selectedMetric)) || null
     );
   }, [metricType, cdfGroups, selectedMetric]);
+
+  // CopilotKit integration for AI-assisted analysis
+  useMetricsCopilot({
+    chipId: selectedChip,
+    metricType,
+    selectedMetric,
+    metricsConfig,
+    metricData,
+    allMetricsData,
+    timeRange,
+    selectionMode,
+    aiConfig,
+    onMetricChange: setSelectedMetric,
+    onTimeRangeChange: (range) => setTimeRange(range as TimeRange),
+  });
 
   // Show skeleton during initial loading
   if (isConfigLoading || isChipsLoading) {
@@ -539,6 +563,13 @@ export function MetricsPageContent() {
           </div>
         )}
       </div>
+
+      {/* AI Analysis Assistant */}
+      {COPILOT_ENABLED && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <MetricsCopilot aiConfig={aiConfig} />
+        </div>
+      )}
     </PageContainer>
   );
 }

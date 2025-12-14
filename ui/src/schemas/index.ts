@@ -63,6 +63,7 @@ export * from "./flowTemplate";
 export * from "./flowTemplateWithCode";
 export * from "./getChipMetricsParams";
 export * from "./getChipMetricsSelectionMode";
+export * from "./getCopilotConfig200";
 export * from "./getCouplingMetricHistoryParams";
 export * from "./getCouplingTaskHistoryParams";
 export * from "./getFigureByPathParams";

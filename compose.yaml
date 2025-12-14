@@ -192,11 +192,13 @@ services:
         NEXT_PUBLIC_ENV: ${ENV}
         NEXT_PUBLIC_PREFECT_URL: ${NEXT_PUBLIC_PREFECT_URL}
         INTERNAL_API_URL: http://api:${API_PORT:-5715}
+        NEXT_PUBLIC_COPILOT_ENABLED: ${NEXT_PUBLIC_COPILOT_ENABLED:-}
     restart: always
     env_file:
       - .env
     environment:
       - PORT=${UI_PORT:-5714}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     ports:
       - "${UI_PORT:-5714}:${UI_PORT:-5714}"
     depends_on:
