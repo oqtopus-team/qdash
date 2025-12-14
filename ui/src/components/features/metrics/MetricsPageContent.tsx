@@ -87,7 +87,9 @@ export function MetricsPageContent() {
   // Extract topology data for Copilot
   const topologyData = useMemo(() => {
     // The API returns { data: TopologyDefinition }
-    const responseData = topologyResponse?.data as { data?: Record<string, unknown> } | undefined;
+    const responseData = topologyResponse?.data as
+      | { data?: Record<string, unknown> }
+      | undefined;
     const data = responseData?.data;
     if (!data) return null;
     return {
@@ -601,7 +603,10 @@ interface CdfWithCoverageProps {
     metrics: string[];
   };
   metricsConfig: { key: string; title: string }[];
-  allMetricsData: Record<string, { [key: string]: { value: number | null } } | null>;
+  allMetricsData: Record<
+    string,
+    { [key: string]: { value: number | null } } | null
+  >;
   metricData: { [key: string]: { value: number | null } } | null;
   gridSize: number;
   metricType: "qubit" | "coupling";

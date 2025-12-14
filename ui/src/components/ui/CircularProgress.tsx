@@ -82,11 +82,7 @@ export function CircularProgress({
   return (
     <div className={`flex flex-col items-center ${className}`}>
       <div className="relative" style={{ width: size, height: size }}>
-        <svg
-          className="transform -rotate-90"
-          width={size}
-          height={size}
-        >
+        <svg className="transform -rotate-90" width={size} height={size}>
           {/* Background circle */}
           <circle
             cx={size / 2}
@@ -117,7 +113,9 @@ export function CircularProgress({
         {/* Center content */}
         {showLabel && (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={`text-2xl font-bold ${getTextColor(animatedValue)}`}>
+            <span
+              className={`text-2xl font-bold ${getTextColor(animatedValue)}`}
+            >
               {animatedValue.toFixed(1)}%
             </span>
             {label && (

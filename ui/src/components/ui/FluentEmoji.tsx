@@ -56,6 +56,10 @@ const EMOJI_MAP: Record<string, string> = {
   "medal-bronze": "3rd%20place%20medal/3D/3rd_place_medal_3d.png",
   trophy: "Trophy/3D/trophy_3d.png",
 
+  // Arrows & Controls
+  "left-right": "Left-right%20arrow/3D/left-right_arrow_3d.png",
+  compress: "Collision/3D/collision_3d.png",
+
   // Avatar - Animals
   fox: "Fox/3D/fox_3d.png",
   cat: "Cat/3D/cat_3d.png",

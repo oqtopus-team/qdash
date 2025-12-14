@@ -84,7 +84,9 @@ export function LinearGauge({
       </div>
 
       {/* Percentage and count */}
-      <span className={`text-sm font-bold whitespace-nowrap ${getTextColor(animatedValue)}`}>
+      <span
+        className={`text-sm font-bold whitespace-nowrap ${getTextColor(animatedValue)}`}
+      >
         {animatedValue.toFixed(1)}%
       </span>
       <span className="text-xs text-base-content/50 whitespace-nowrap">
