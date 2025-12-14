@@ -10,7 +10,9 @@ tasks:
       - task -l
 
   restart-api:
+    dir: "{{.USER_WORKING_DIR}}"
     cmds:
+      - echo "tRestarting API service..."
       - docker compose restart api
     desc: Restart the API service
 
@@ -18,6 +20,7 @@ tasks:
     dir: ui
     dotenv: [.env]
     cmds:
+      - docker compose -f ../compose.yaml restart api && sleep 2
       - curl http://api:$API_PORT/openapi.json | jq > ../docs/oas/openapi.json
       - bunx orval@7.14.0 --config ./orval.config.cjs
       - bunx prettier . --write --log-level error

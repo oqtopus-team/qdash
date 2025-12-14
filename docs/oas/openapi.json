@@ -3486,6 +3486,51 @@
         }
       }
     },
+    "/task-results/figures/download": {
+      "post": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Download multiple figures as a ZIP file",
+        "description": "Download multiple calibration figures as a ZIP file.\n\nCreates a ZIP archive containing all requested figure files and returns it\nas a streaming response.\n\nParameters\n----------\npaths : list[str]\n    List of absolute file paths to the calibration figures\nfilename : str\n    Filename for the ZIP archive (default: \"figures.zip\")\n\nReturns\n-------\nStreamingResponse\n    ZIP archive containing all requested files\n\nRaises\n------\nHTTPException\n    400 if no paths are provided or if any path does not exist",
+        "operationId": "downloadFiguresAsZip",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_downloadFiguresAsZip"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/tags": {
       "get": {
         "tags": [
@@ -5084,6 +5129,29 @@
         ],
         "title": "BackendResponseModel",
         "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
+      },
+      "Body_downloadFiguresAsZip": {
+        "properties": {
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Paths",
+            "description": "List of file paths to include in the ZIP"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Filename for the ZIP archive",
+            "default": "figures.zip"
+          }
+        },
+        "type": "object",
+        "required": [
+          "paths"
+        ],
+        "title": "Body_downloadFiguresAsZip"
       },
       "Body_login": {
         "properties": {
