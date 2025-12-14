@@ -231,6 +231,7 @@ src/qdash/workflow/.classifier/*/*
 /config/*
 !config/metrics.yaml
 !config/settings.yaml
+!config/copilot.yaml
 !config/topologies/
 src/tools/schedule/*
 .serena/cache/*
