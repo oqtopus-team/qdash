@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import os
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
+from filelock import FileLock
 from qdash.datamodel.task import OutputParameterModel
 from qdash.workflow.worker.flows.push_props.formatter import represent_none
 from ruamel.yaml import YAML
@@ -167,34 +170,50 @@ class _QubexParamsUpdater:
         return value
 
     def _update_yaml(self, file_path: Path, qubit_label: str, value: float | int | str) -> None:
+        """Update YAML file with file locking and atomic write to prevent race conditions."""
         if not file_path.exists():
             return
 
-        with file_path.open("r") as fp:
-            data = self._yaml.load(fp) or CommentedMap()
+        lock_path = file_path.with_suffix(file_path.suffix + ".lock")
 
-        if not isinstance(data, CommentedMap):
-            data = CommentedMap(data)
+        with FileLock(lock_path):
+            # Read current data under lock
+            with file_path.open("r") as fp:
+                data = self._yaml.load(fp) or CommentedMap()
 
-        section = data.get("data")
-        if section is None or not isinstance(section, dict):
-            section = CommentedMap()
-            data["data"] = section
-        elif not isinstance(section, CommentedMap):
-            section = CommentedMap(section)
-            data["data"] = section
+            if not isinstance(data, CommentedMap):
+                data = CommentedMap(data)
 
-        current_value = section.get(qubit_label)
-        if self._values_equal(current_value, value):
-            return
+            section = data.get("data")
+            if section is None or not isinstance(section, dict):
+                section = CommentedMap()
+                data["data"] = section
+            elif not isinstance(section, CommentedMap):
+                section = CommentedMap(section)
+                data["data"] = section
 
-        if isinstance(section, CommentedMap):
-            self._set_ordered(section, qubit_label, value)
-        else:
-            section[qubit_label] = value
+            current_value = section.get(qubit_label)
+            if self._values_equal(current_value, value):
+                return
 
-        with file_path.open("w") as fp:
-            self._yaml.dump(data, fp)
+            if isinstance(section, CommentedMap):
+                self._set_ordered(section, qubit_label, value)
+            else:
+                section[qubit_label] = value
+
+            # Atomic write: write to temp file then rename
+            dir_path = file_path.parent
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                dir=dir_path,
+                suffix=".tmp",
+                delete=False,
+            ) as tmp_fp:
+                tmp_path = Path(tmp_fp.name)
+                self._yaml.dump(data, tmp_fp)
+
+            # Atomic rename (overwrites target)
+            os.replace(tmp_path, file_path)
 
     @staticmethod
     def _values_equal(current: Any, new: Any) -> bool:
