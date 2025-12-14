@@ -1,9 +1,11 @@
 "use client";
 
+import { Check, Download, X } from "lucide-react";
 import { useState, useMemo } from "react";
 
 import type { Task } from "@/schemas";
 
+import { downloadFiguresAsZip } from "@/client/task-result/task-result";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CouplingTaskHistoryModal } from "@/components/features/chip/modals/CouplingTaskHistoryModal";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
@@ -84,6 +86,14 @@ export function CouplingGrid({
 
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
+
+  // Download selection mode state
+  const [downloadSelectionEnabled, setDownloadSelectionEnabled] =
+    useState(false);
+  const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -183,15 +193,160 @@ export function CouplingGrid({
     return isQubitInRegion(qid1) && isQubitInRegion(qid2);
   };
 
+  // Download selection helpers
+  const toggleDownloadSelection = (couplingId: string) => {
+    setSelectedForDownload((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(couplingId)) {
+        newSet.delete(couplingId);
+      } else {
+        newSet.add(couplingId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllForDownload = () => {
+    const allCouplingIds = Object.entries(taskResponse?.data?.result || {})
+      .filter(([, task]) => task.json_figure_path)
+      .map(([couplingId]) => couplingId);
+    setSelectedForDownload(new Set(allCouplingIds));
+  };
+
+  const clearDownloadSelection = () => {
+    setSelectedForDownload(new Set());
+  };
+
+  const handleDownload = async () => {
+    if (selectedForDownload.size === 0) return;
+
+    const paths: string[] = [];
+    selectedForDownload.forEach((couplingId) => {
+      const task = taskResponse?.data?.result?.[couplingId];
+      if (task?.json_figure_path) {
+        const jsonPaths = Array.isArray(task.json_figure_path)
+          ? task.json_figure_path
+          : [task.json_figure_path];
+        paths.push(...jsonPaths);
+      }
+    });
+
+    if (paths.length === 0) return;
+
+    setIsDownloading(true);
+    try {
+      const filename = `${chipId}_${selectedTask}_${selectedDate}_coupling_json_figures.zip`;
+      const response = await downloadFiguresAsZip(
+        { paths, filename },
+        { responseType: "blob" },
+      );
+
+      const blob = new Blob([response.data as BlobPart], {
+        type: "application/zip",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      // Reset selection after successful download
+      setDownloadSelectionEnabled(false);
+      setSelectedForDownload(new Set());
+    } catch (error) {
+      console.error("Download error:", error);
+      alert("Download failed. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const hasJsonFigures = (couplingId: string): boolean => {
+    const task = taskResponse?.data?.result?.[couplingId];
+    return !!task?.json_figure_path;
+  };
+
+  const availableForDownloadCount = Object.entries(
+    taskResponse?.data?.result || {},
+  ).filter(([, task]) => task.json_figure_path).length;
+
   return (
     <div ref={containerRef} className="space-y-4 px-4">
-      {/* Zoom mode toggle - only show in full view mode for square grids */}
-      {zoomMode === "full" && gridRows === gridCols && (
-        <div className="px-4">
-          <RegionZoomToggle
-            enabled={regionSelectionEnabled}
-            onToggle={setRegionSelectionEnabled}
-          />
+      {/* Toolbar - zoom toggle and download controls */}
+      {zoomMode === "full" && (
+        <div className="px-4 flex items-center justify-between">
+          {gridRows === gridCols && !downloadSelectionEnabled ? (
+            <RegionZoomToggle
+              enabled={regionSelectionEnabled}
+              onToggle={setRegionSelectionEnabled}
+            />
+          ) : (
+            <div />
+          )}
+
+          {/* Download selection controls */}
+          {downloadSelectionEnabled ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-base-content/70">
+                {selectedForDownload.size} / {availableForDownloadCount}{" "}
+                selected
+              </span>
+              <button
+                className="btn btn-xs btn-ghost"
+                onClick={selectAllForDownload}
+                title="Select all"
+              >
+                All
+              </button>
+              <button
+                className="btn btn-xs btn-ghost"
+                onClick={clearDownloadSelection}
+                title="Clear selection"
+              >
+                Clear
+              </button>
+              <button
+                className="btn btn-sm btn-primary gap-1"
+                onClick={handleDownload}
+                disabled={selectedForDownload.size === 0 || isDownloading}
+              >
+                {isDownloading ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <Download size={16} />
+                )}
+                Download
+              </button>
+              <button
+                className="btn btn-sm btn-ghost btn-circle"
+                onClick={() => {
+                  setDownloadSelectionEnabled(false);
+                  setSelectedForDownload(new Set());
+                }}
+                title="Cancel"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <button
+              className="btn btn-sm btn-outline gap-2"
+              onClick={() => {
+                setDownloadSelectionEnabled(true);
+                setRegionSelectionEnabled(false);
+                // Default to all selected
+                selectAllForDownload();
+              }}
+              title="Select figures to download"
+              disabled={availableForDownloadCount === 0}
+            >
+              <Download size={16} />
+              Download
+            </button>
+          )}
         </div>
       )}
 
@@ -365,14 +520,26 @@ export function CouplingGrid({
               const centerY =
                 ((displayRow1 + displayRow2) / 2) * (displayCellSize + gap) +
                 displayCellSize / 2;
+
+              const isSelectedForDownload = selectedForDownload.has(
+                task.couplingId,
+              );
+              const canBeDownloaded = hasJsonFigures(task.couplingId);
+
               return (
                 <button
                   key={normKey}
                   onClick={() => {
-                    setSelectedTaskInfo({
-                      couplingId: task.couplingId,
-                      taskName: selectedTask,
-                    });
+                    if (downloadSelectionEnabled) {
+                      if (canBeDownloaded) {
+                        toggleDownloadSelection(task.couplingId);
+                      }
+                    } else {
+                      setSelectedTaskInfo({
+                        couplingId: task.couplingId,
+                        taskName: selectedTask,
+                      });
+                    }
                   }}
                   style={{
                     position: "absolute",
@@ -385,6 +552,14 @@ export function CouplingGrid({
                     task.over_threshold
                       ? "ring-2 ring-primary ring-offset-1 animate-pulse-light"
                       : ""
+                  } ${
+                    downloadSelectionEnabled && isSelectedForDownload
+                      ? "ring-2 ring-primary ring-offset-2"
+                      : ""
+                  } ${
+                    downloadSelectionEnabled && !canBeDownloaded
+                      ? "opacity-40 cursor-not-allowed"
+                      : ""
                   }`}
                 >
                   {figurePath && (
@@ -394,6 +569,22 @@ export function CouplingGrid({
                         qid={String(task.couplingId)}
                         className="w-full h-full object-contain"
                       />
+                    </div>
+                  )}
+                  {/* Download selection overlay */}
+                  {downloadSelectionEnabled && canBeDownloaded && (
+                    <div
+                      className={`absolute inset-0 flex items-center justify-center transition-colors ${
+                        isSelectedForDownload
+                          ? "bg-primary/20"
+                          : "bg-transparent hover:bg-base-content/10"
+                      }`}
+                    >
+                      {isSelectedForDownload && (
+                        <div className="bg-primary text-primary-content rounded-full p-1">
+                          <Check size={16} />
+                        </div>
+                      )}
                     </div>
                   )}
                 </button>

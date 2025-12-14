@@ -9,6 +9,7 @@
 export * from "./addMemberRequest";
 export * from "./adminDeleteProject200";
 export * from "./backendResponseModel";
+export * from "./bodyDownloadFiguresAsZip";
 export * from "./bodyLogin";
 export * from "./calibrationNoteResponse";
 export * from "./calibrationNoteResponseNote";

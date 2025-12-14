@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import io
 import logging
+import zipfile
+from pathlib import Path
 from typing import Annotated
 
 import pendulum
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
+from fastapi.responses import StreamingResponse
+from starlette.exceptions import HTTPException
 from pymongo import ASCENDING, DESCENDING
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.task_result import (
@@ -73,7 +78,9 @@ def get_latest_qubit_task_results(
         If the chip is not found for the current project
 
     """
-    logger.debug(f"Getting latest qubit task results for chip {chip_id}, task {task}, project: {ctx.project_id}")
+    logger.debug(
+        f"Getting latest qubit task results for chip {chip_id}, task {task}, project: {ctx.project_id}"
+    )
 
     # Get chip info (scoped by project)
     chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
@@ -178,10 +185,14 @@ def get_historical_qubit_task_results(
         If the chip history is not found for the specified date
 
     """
-    logger.debug(f"Getting historical qubit task results for chip {chip_id}, task {task}, date {date}")
+    logger.debug(
+        f"Getting historical qubit task results for chip {chip_id}, task {task}, date {date}"
+    )
 
     # Get chip info (scoped by project)
-    chip = ChipHistoryDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}).run()
+    chip = ChipHistoryDocument.find_one(
+        {"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}
+    ).run()
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
@@ -220,7 +231,9 @@ def get_historical_qubit_task_results(
             calibrated_at = None
 
         fidelity_map[k] = (
-            value > QUBIT_FIDELITY_THRESHOLD and calibrated_at is not None and start_time <= calibrated_at <= end_time
+            value > QUBIT_FIDELITY_THRESHOLD
+            and calibrated_at is not None
+            and start_time <= calibrated_at <= end_time
         )
     # Organize results by qid
     task_results: dict[str, TaskResultHistoryDocument] = {}
@@ -388,7 +401,9 @@ def get_latest_coupling_task_results(
         If the chip is not found for the current project
 
     """
-    logger.debug(f"Getting latest coupling task results for chip {chip_id}, task {task}, project: {ctx.project_id}")
+    logger.debug(
+        f"Getting latest coupling task results for chip {chip_id}, task {task}, project: {ctx.project_id}"
+    )
 
     # Get chip info (scoped by project)
     chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
@@ -494,10 +509,14 @@ def get_historical_coupling_task_results(
         If the chip history is not found for the specified date
 
     """
-    logger.debug(f"Getting historical coupling task results for chip {chip_id}, task {task}, date {date}")
+    logger.debug(
+        f"Getting historical coupling task results for chip {chip_id}, task {task}, date {date}"
+    )
 
     # Get chip info (scoped by project)
-    chip = ChipHistoryDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}).run()
+    chip = ChipHistoryDocument.find_one(
+        {"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}
+    ).run()
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
@@ -620,7 +639,9 @@ def get_coupling_task_history(
         If the chip is not found for the current project
 
     """
-    logger.debug(f"Getting coupling task history for chip {chip_id}, coupling {coupling_id}, task {task}")
+    logger.debug(
+        f"Getting coupling task history for chip {chip_id}, coupling {coupling_id}, task {task}"
+    )
 
     # Get chip info (scoped by project)
     chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
@@ -798,5 +819,82 @@ def get_timeseries_task_results(
         parameter values with timestamps
 
     """
-    logger.debug(f"Getting timeseries task results for chip {chip_id}, tag {tag}, parameter {parameter}, qid {qid}")
+    logger.debug(
+        f"Getting timeseries task results for chip {chip_id}, tag {tag}, parameter {parameter}, qid {qid}"
+    )
     return _fetch_timeseries_data(chip_id, tag, parameter, ctx.project_id, qid, start_at, end_at)
+
+
+# =============================================================================
+# Figure Download
+# =============================================================================
+
+
+@router.post(
+    "/task-results/figures/download",
+    summary="Download multiple figures as a ZIP file",
+    operation_id="downloadFiguresAsZip",
+)
+def download_figures_as_zip(
+    paths: Annotated[list[str], Body(description="List of file paths to include in the ZIP")],
+    filename: Annotated[str, Body(description="Filename for the ZIP archive")] = "figures.zip",
+):
+    """Download multiple calibration figures as a ZIP file.
+
+    Creates a ZIP archive containing all requested figure files and returns it
+    as a streaming response.
+
+    Parameters
+    ----------
+    paths : list[str]
+        List of absolute file paths to the calibration figures
+    filename : str
+        Filename for the ZIP archive (default: "figures.zip")
+
+    Returns
+    -------
+    StreamingResponse
+        ZIP archive containing all requested files
+
+    Raises
+    ------
+    HTTPException
+        400 if no paths are provided or if any path does not exist
+
+    """
+    if not paths:
+        raise HTTPException(
+            status_code=400,
+            detail="No paths provided",
+        )
+
+    # Validate all paths exist
+    missing_paths = [p for p in paths if not Path(p).exists()]
+    if missing_paths:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Files not found: {', '.join(missing_paths[:5])}{'...' if len(missing_paths) > 5 else ''}",
+        )
+
+    # Create ZIP in memory
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for file_path in paths:
+            path = Path(file_path)
+            # Use the filename as the archive name
+            zip_file.write(path, path.name)
+
+    zip_buffer.seek(0)
+
+    # Sanitize filename
+    safe_filename = (
+        "".join(c for c in filename if c.isalnum() or c in "._-").strip() or "figures.zip"
+    )
+    if not safe_filename.endswith(".zip"):
+        safe_filename += ".zip"
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={safe_filename}"},
+    )
