@@ -1615,3 +1615,116 @@ html[data-theme="dev-dark"],
   text-transform: uppercase !important;
   opacity: 0.7 !important;
 }
+
+/* ========================================
+   Quantum Loader Animation
+   ======================================== */
+
+@keyframes quantum-orbit {
+  0% {
+    transform: rotate(0deg) translateX(20px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(20px) rotate(-360deg);
+  }
+}
+
+@keyframes quantum-orbit-reverse {
+  0% {
+    transform: rotate(0deg) translateX(16px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(-360deg) translateX(16px) rotate(360deg);
+  }
+}
+
+@keyframes quantum-core-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 10px var(--color-primary),
+      0 0 20px color-mix(in oklch, var(--color-primary) 50%, transparent);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow:
+      0 0 15px var(--color-primary),
+      0 0 30px color-mix(in oklch, var(--color-primary) 60%, transparent),
+      0 0 40px color-mix(in oklch, var(--color-secondary) 30%, transparent);
+  }
+}
+
+.quantum-loader {
+  position: relative;
+  width: 60px;
+  height: 60px;
+}
+
+.quantum-loader-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary),
+    var(--color-secondary)
+  );
+  border-radius: 50%;
+  animation: quantum-core-pulse 2s ease-in-out infinite;
+}
+
+.quantum-loader-orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+}
+
+.quantum-loader-orbit-1 {
+  background: var(--color-primary);
+  animation: quantum-orbit 1.5s linear infinite;
+  box-shadow: 0 0 8px var(--color-primary);
+}
+
+.quantum-loader-orbit-2 {
+  background: var(--color-secondary);
+  animation: quantum-orbit-reverse 2s linear infinite;
+  box-shadow: 0 0 8px var(--color-secondary);
+}
+
+.quantum-loader-orbit-3 {
+  background: var(--color-accent);
+  animation: quantum-orbit 2.5s linear infinite;
+  animation-delay: 0.5s;
+  box-shadow: 0 0 8px var(--color-accent);
+}
+
+/* Quantum trail effect */
+.quantum-loader-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 2px solid transparent;
+  border-top-color: color-mix(in oklch, var(--color-primary) 40%, transparent);
+  border-radius: 50%;
+  animation: quantum-orbit 3s linear infinite;
+}
+
+.quantum-loader-ring:nth-child(2) {
+  border-top-color: color-mix(
+    in oklch,
+    var(--color-secondary) 30%,
+    transparent
+  );
+  animation-duration: 2.5s;
+  animation-direction: reverse;
+}

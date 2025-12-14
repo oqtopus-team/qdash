@@ -13,6 +13,7 @@ import { MetricsStatsCards } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
+import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -365,12 +366,19 @@ export function MetricsPageContent() {
           </div>
         ) : isLoading ? (
           <div className="flex items-center justify-center h-96">
-            <span className="loading loading-spinner loading-lg"></span>
+            <QuantumLoader
+              size="lg"
+              showLabel
+              label="Loading metrics data..."
+            />
           </div>
         ) : isConfigLoading ? (
           <div className="flex items-center justify-center h-96">
-            <span className="loading loading-spinner loading-lg"></span>
-            <span className="ml-2">Loading metrics configuration...</span>
+            <QuantumLoader
+              size="lg"
+              showLabel
+              label="Loading metrics configuration..."
+            />
           </div>
         ) : isConfigError ? (
           <div className="alert alert-error">

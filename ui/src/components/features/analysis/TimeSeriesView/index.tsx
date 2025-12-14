@@ -16,6 +16,7 @@ import { TagSelector } from "@/components/selectors/TagSelector";
 import { DataTable } from "@/components/ui/DataTable";
 import { DateTimePicker } from "@/components/ui/DateTimePicker";
 import { ErrorCard } from "@/components/ui/ErrorCard";
+import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useTimeRange } from "@/hooks/useTimeRange";
@@ -649,7 +650,7 @@ export function TimeSeriesView() {
   if (isConfigLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <span className="loading loading-spinner loading-lg"></span>
+        <QuantumLoader size="lg" />
       </div>
     );
   }
