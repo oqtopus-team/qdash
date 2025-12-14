@@ -1,6 +1,30 @@
-# Metrics Configuration
-# This file defines display metadata for calibration metrics.
-# Backend Pydantic models define the actual fields, this file only provides UI metadata.
+# Custom Metrics Configuration Template
+# =====================================
+# Copy this file to `metrics.yaml` in this directory to customize metrics settings.
+# Or set METRICS_CONFIG_PATH environment variable to point to your custom config file.
+#
+# Priority order:
+#   1. METRICS_CONFIG_PATH environment variable (highest priority)
+#   2. config/custom/metrics.yaml
+#   3. /app/config/metrics.yaml (Docker)
+#   4. config/metrics.yaml (default)
+#
+# Example usage:
+#   cp config/custom/metrics.yaml.template config/custom/metrics.yaml
+#   # Edit config/custom/metrics.yaml as needed
+#
+# Or with environment variable:
+#   METRICS_CONFIG_PATH=/path/to/your/metrics.yaml
+
+# Qubit Metrics
+# -------------
+# Each metric requires:
+#   - title: Display name in UI
+#   - unit: Unit string (e.g., "GHz", "μs", "%")
+#   - scale: Multiplier for display (e.g., 1000 to convert GHz to MHz)
+#   - description: Tooltip text (optional)
+#   - evaluation.mode: "maximize", "minimize", or "none"
+#   - threshold: Default threshold with slider range (optional)
 
 qubit_metrics:
   resonator_frequency:
@@ -16,6 +40,7 @@ qubit_metrics:
         min: 6.0
         max: 8.0
         step: 0.01
+
   qubit_frequency:
     title: Qubit Frequency
     unit: GHz
@@ -128,6 +153,8 @@ qubit_metrics:
         max: 0.9999
         step: 0.0001
 
+# Coupling Metrics
+# ----------------
 coupling_metrics:
   zx90_gate_fidelity:
     title: ZX90 Gate Fidelity
@@ -165,8 +192,10 @@ coupling_metrics:
     evaluation:
       mode: minimize
 
-# CDF chart grouping configuration
-# Metrics in the same group will be displayed together in a single CDF chart
+# CDF Chart Grouping
+# ------------------
+# Metrics in the same group will be displayed together in a single CDF chart.
+# You can customize groups to organize metrics according to your needs.
 cdf_groups:
   qubit:
     - id: resonator_frequency
@@ -205,9 +234,10 @@ cdf_groups:
         - zx90_gate_fidelity
         - bell_state_fidelity
 
-# Color scale configuration (Viridis palette with very smooth gradations)
-# 21-color high-resolution Viridis colormap for maximum color discrimination
-# Especially useful for metrics with narrow value ranges (e.g., 99.0% - 99.9%)
+# Color Scale Configuration
+# -------------------------
+# Viridis palette for heatmap visualization.
+# Customize colors as needed for your visualization preferences.
 color_scale:
   colors:
     - "#440154" # 0 - Dark purple (lowest values)

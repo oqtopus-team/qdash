@@ -84,17 +84,30 @@ def load_metrics_config() -> MetricsConfig:
         FileNotFoundError: If config file doesn't exist
         ValueError: If config file is invalid
 
+    Priority order for config file:
+        1. METRICS_CONFIG_PATH environment variable (highest priority)
+        2. /app/config/custom/metrics.yaml (Docker custom)
+        3. config/custom/metrics.yaml (local custom)
+        4. /app/config/metrics.yaml (Docker default)
+        5. config/metrics.yaml (local default)
+
     """
     import os
 
-    # Try multiple possible locations for the config file
+    project_root = Path(__file__).parent.parent.parent.parent.parent
+
+    # Try multiple possible locations for the config file (in priority order)
     possible_paths = [
-        # Docker environment: mounted at /app/config
-        Path("/app/config/metrics.yaml"),
-        # Local development: relative to project root
-        Path(__file__).parent.parent.parent.parent.parent / "config" / "metrics.yaml",
-        # Environment variable override
+        # 1. Environment variable override (highest priority)
         Path(os.getenv("METRICS_CONFIG_PATH", "")) if os.getenv("METRICS_CONFIG_PATH") else None,
+        # 2. Custom configuration in config/custom/ (Docker environment)
+        Path("/app/config/custom/metrics.yaml"),
+        # 3. Custom configuration in config/custom/ (local development)
+        project_root / "config" / "custom" / "metrics.yaml",
+        # 4. Docker environment: mounted at /app/config
+        Path("/app/config/metrics.yaml"),
+        # 5. Local development: default config
+        project_root / "config" / "metrics.yaml",
     ]
 
     config_path = None

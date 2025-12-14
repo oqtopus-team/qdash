@@ -228,7 +228,8 @@ src/qdash/workflow/*.json
 src/qdash/workflow/.calibration/*.json
 src/qdash/workflow/.classifier/*/*
 # Ignore all files in config directory except metrics.yaml
-/config/*
+config/qubex/*
+!config/custom/*.template
 !config/metrics.yaml
 !config/settings.yaml
 !config/copilot.yaml
