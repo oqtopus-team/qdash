@@ -43,14 +43,17 @@ def pull_github(target_dir: str | Path = "/app/config/qubex") -> str:
         auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
         auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
 
-        # Create temporary directory and clone repository
+        # Create temporary directory and clone repository (shallow clone for efficiency)
         temp_dir = tempfile.mkdtemp()
         logger.info("Cloning repository to temporary directory")
-        repo = Repo.clone_from(auth_url, temp_dir)
+        repo = Repo.clone_from(auth_url, temp_dir, depth=1)
 
         # Create backup of current config if it exists
         if target_dir.exists():
-            backup_dir = target_dir.parent / f"config_backup_{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+            backup_dir = (
+                target_dir.parent
+                / f"config_backup_{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+            )
             shutil.copytree(target_dir, backup_dir)
             logger.info(f"Created backup at: {backup_dir}")
 
@@ -83,7 +86,9 @@ def pull_github(target_dir: str | Path = "/app/config/qubex") -> str:
         # Mask credentials in error message
         error_msg = str(e.stderr)
         parsed = urlparse(repo_url)
-        masked_url = urlunparse((parsed.scheme, parsed.netloc.split("@")[-1], parsed.path, "", "", ""))
+        masked_url = urlunparse(
+            (parsed.scheme, parsed.netloc.split("@")[-1], parsed.path, "", "", "")
+        )
         raise RuntimeError(f"Git operation failed for {masked_url}: {error_msg}")
 
     except Exception as e:

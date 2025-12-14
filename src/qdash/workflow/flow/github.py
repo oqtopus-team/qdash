@@ -222,7 +222,9 @@ class GitHubIntegration:
 
         # 1. Fetch master note from MongoDB
         latest = (
-            CalibrationNoteDocument.find({"username": self.username, "task_id": "master", "chip_id": self.chip_id})
+            CalibrationNoteDocument.find(
+                {"username": self.username, "task_id": "master", "chip_id": self.chip_id}
+            )
             .sort([("timestamp", -1)])  # Sort by timestamp descending
             .limit(1)
             .run()
@@ -246,7 +248,9 @@ class GitHubIntegration:
 
         # 3. Push to GitHub
         repo_subpath = f"{self.chip_id}/calibration/calib_note.json"
-        commit_message = config.commit_message or f"Update calib_note.json from execution {self.execution_id}"
+        commit_message = (
+            config.commit_message or f"Update calib_note.json from execution {self.execution_id}"
+        )
 
         commit_sha = push_github(
             source_path=source_path,
@@ -287,7 +291,9 @@ class GitHubIntegration:
             chip_id=self.chip_id,
         )
 
-        commit_message = config.commit_message or f"Update props.yaml from execution {self.execution_id}"
+        commit_message = (
+            config.commit_message or f"Update props.yaml from execution {self.execution_id}"
+        )
 
         commit_sha = push_github(
             source_path=source_path,
@@ -320,7 +326,9 @@ class GitHubIntegration:
             msg = f"params.yaml not found: {source_path}"
             raise FileNotFoundError(msg)
 
-        commit_message = config.commit_message or f"Update params.yaml from execution {self.execution_id}"
+        commit_message = (
+            config.commit_message or f"Update params.yaml from execution {self.execution_id}"
+        )
 
         commit_sha = push_github(
             source_path=source_path,
@@ -333,39 +341,47 @@ class GitHubIntegration:
         return str(commit_sha)
 
     def _push_all_params(self, config: GitHubPushConfig) -> dict[str, str]:
-        """Push all yaml files in params directory.
+        """Push all yaml files in params directory in a single commit.
 
         Args:
             config: Push configuration
 
         Returns:
-            Dictionary mapping file names to commit SHAs or error messages
+            Dictionary with commit SHA and list of pushed files
         """
-        from qdash.workflow.worker.tasks.push_github import push_github
+        from qdash.workflow.worker.tasks.push_github import push_github_batch
 
         params_dir = Path(f"/app/config/qubex/{self.chip_id}/params")
-        results: dict[str, str] = {}
 
         if not params_dir.exists():
             self.logger.warning(f"Params directory not found: {params_dir}")
             return {"error": f"Directory not found: {params_dir}"}
 
+        # Collect all yaml files
+        files: list[tuple[str, str]] = []
         for yaml_file in params_dir.glob("*.yaml"):
             source_path = str(yaml_file)
             repo_subpath = f"{self.chip_id}/params/{yaml_file.name}"
+            files.append((source_path, repo_subpath))
 
-            try:
-                commit_sha = push_github(
-                    source_path=source_path,
-                    repo_subpath=repo_subpath,
-                    commit_message=config.commit_message
-                    or f"Update {yaml_file.name} from execution {self.execution_id}",
-                    branch=config.branch,
-                )
-                results[yaml_file.name] = str(commit_sha)
-                self.logger.info(f"Pushed {yaml_file.name}: {commit_sha}")
-            except Exception as e:
-                self.logger.error(f"Failed to push {yaml_file.name}: {e}")
-                results[yaml_file.name] = f"Error: {e}"
+        if not files:
+            self.logger.info("No yaml files found in params directory")
+            return {"status": "No files to push"}
 
-        return results
+        # Push all files in single commit
+        commit_message = (
+            config.commit_message or f"Update params from execution {self.execution_id}"
+        )
+
+        try:
+            commit_sha = push_github_batch(
+                files=files,
+                commit_message=commit_message,
+                branch=config.branch,
+            )
+            file_names = [Path(f[0]).name for f in files]
+            self.logger.info(f"Pushed {len(files)} param files in single commit: {commit_sha}")
+            return {"commit": str(commit_sha), "files": file_names}
+        except Exception as e:
+            self.logger.error(f"Failed to push params: {e}")
+            return {"error": str(e)}
