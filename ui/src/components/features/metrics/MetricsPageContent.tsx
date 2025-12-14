@@ -9,6 +9,7 @@ import Select, {
 } from "react-select";
 
 import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
+import { MetricsPdfDownloadButton } from "./MetricsPdfDownloadButton";
 import { MetricsStatsCards } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 
@@ -230,11 +231,19 @@ export function MetricsPageContent() {
       <div className="h-full flex flex-col space-y-4 md:space-y-6">
         {/* Header Section */}
         <div className="flex flex-col gap-4 md:gap-6">
-          <PageHeader
-            title="Chip Metrics Dashboard"
-            description="View and compare qubit performance metrics"
-            className="mb-0"
-          />
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <PageHeader
+              title="Chip Metrics Dashboard"
+              description="View and compare qubit performance metrics"
+              className="mb-0"
+            />
+            <MetricsPdfDownloadButton
+              chipId={selectedChip}
+              withinHours={withinHours}
+              selectionMode={selectionMode}
+              disabled={!selectedChip || isLoading}
+            />
+          </div>
 
           {/* Metric Type Tabs */}
           <div className="tabs tabs-boxed bg-base-200 w-fit">

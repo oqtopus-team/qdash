@@ -5,21 +5,25 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
 import type {
   ChipMetricsResponse,
+  DownloadMetricsPdfParams,
   GetChipMetricsParams,
   GetCouplingMetricHistoryParams,
   GetMetricsConfig200,
@@ -787,3 +791,109 @@ export function useGetCouplingMetricHistory<
 
   return query;
 }
+
+/**
+ * Download chip metrics as a PDF report.
+
+Generates a comprehensive PDF report containing:
+- Cover page with chip information and report metadata
+- Heatmap visualizations for each metric
+- Statistics for each metric (coverage, average, min, max, std dev)
+
+The report includes all qubit metrics (8 types) and coupling metrics (3 types)
+that have data available.
+
+Args:
+    chip_id: Chip identifier
+    within_hours: Optional time filter in hours
+    selection_mode: "latest" for most recent values, "best" for optimal values
+ * @summary Download metrics as PDF report
+ */
+export const downloadMetricsPdf = (
+  chipId: string,
+  params?: DownloadMetricsPdfParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<unknown>(
+    {
+      url: `/metrics/chips/${chipId}/metrics/pdf`,
+      method: "POST",
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getDownloadMetricsPdfMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof downloadMetricsPdf>>,
+    TError,
+    { chipId: string; params?: DownloadMetricsPdfParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof downloadMetricsPdf>>,
+  TError,
+  { chipId: string; params?: DownloadMetricsPdfParams },
+  TContext
+> => {
+  const mutationKey = ["downloadMetricsPdf"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof downloadMetricsPdf>>,
+    { chipId: string; params?: DownloadMetricsPdfParams }
+  > = (props) => {
+    const { chipId, params } = props ?? {};
+
+    return downloadMetricsPdf(chipId, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DownloadMetricsPdfMutationResult = NonNullable<
+  Awaited<ReturnType<typeof downloadMetricsPdf>>
+>;
+
+export type DownloadMetricsPdfMutationError = HTTPValidationError;
+
+/**
+ * @summary Download metrics as PDF report
+ */
+export const useDownloadMetricsPdf = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof downloadMetricsPdf>>,
+      TError,
+      { chipId: string; params?: DownloadMetricsPdfParams },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof downloadMetricsPdf>>,
+  TError,
+  { chipId: string; params?: DownloadMetricsPdfParams },
+  TContext
+> => {
+  const mutationOptions = getDownloadMetricsPdfMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};

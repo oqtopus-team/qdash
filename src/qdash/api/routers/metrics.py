@@ -625,3 +625,129 @@ async def get_coupling_metric_history(
         username=ctx.user.username,
         history=history_items,
     )
+
+
+@router.post(
+    "/chips/{chip_id}/metrics/pdf",
+    summary="Download metrics as PDF report",
+    operation_id="downloadMetricsPdf",
+    responses={
+        200: {
+            "content": {"application/pdf": {}},
+            "description": "PDF report file",
+        }
+    },
+)
+async def download_metrics_pdf(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    within_hours: Annotated[int | None, Query(description="Filter to data within N hours")] = None,
+    selection_mode: Annotated[
+        Literal["latest", "best"], Query(description="Selection mode: 'latest' or 'best'")
+    ] = "latest",
+):
+    """Download chip metrics as a PDF report.
+
+    Generates a comprehensive PDF report containing:
+    - Cover page with chip information and report metadata
+    - Heatmap visualizations for each metric
+    - Statistics for each metric (coverage, average, min, max, std dev)
+
+    The report includes all qubit metrics (8 types) and coupling metrics (3 types)
+    that have data available.
+
+    Args:
+        chip_id: Chip identifier
+        within_hours: Optional time filter in hours
+        selection_mode: "latest" for most recent values, "best" for optimal values
+    """
+    from fastapi.responses import StreamingResponse
+
+    from qdash.api.lib.metrics_pdf import MetricsPDFGenerator
+
+    # Get chip document
+    chip = ChipDocument.find_one(
+        ChipDocument.project_id == ctx.project_id,
+        ChipDocument.chip_id == chip_id,
+        ChipDocument.username == ctx.user.username,
+    ).run()
+
+    if not chip:
+        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
+
+    # Calculate cutoff time if time filter specified
+    cutoff_time = None
+    if within_hours:
+        cutoff_time = pendulum.now("Asia/Tokyo").subtract(hours=within_hours)
+
+    # Load metrics configuration
+    config = load_metrics_config()
+
+    # Extract metrics based on selection mode
+    if selection_mode == "latest":
+        qubit_metrics_data = _extract_latest_metrics(
+            entity_models=chip.qubits,
+            valid_metric_keys=set(config.qubit_metrics.keys()),
+            cutoff_time=cutoff_time,
+            within_hours=within_hours,
+        )
+        coupling_metrics_data = _extract_latest_metrics(
+            entity_models=chip.couplings,
+            valid_metric_keys=set(config.coupling_metrics.keys()),
+            cutoff_time=cutoff_time,
+            within_hours=within_hours,
+        )
+    else:
+        qubit_metrics_data = _extract_best_metrics(
+            chip=chip,
+            entity_type="qubit",
+            valid_metric_keys=set(config.qubit_metrics.keys()),
+            metrics_config=config.qubit_metrics,
+            cutoff_time=cutoff_time,
+        )
+        coupling_metrics_data = _extract_best_metrics(
+            chip=chip,
+            entity_type="coupling",
+            valid_metric_keys=set(config.coupling_metrics.keys()),
+            metrics_config=config.coupling_metrics,
+            cutoff_time=cutoff_time,
+        )
+
+    # Build response model (reuse logic from getChipMetrics)
+    # Map config keys to schema keys for qubit metrics
+    qubit_metrics_mapped = {}
+    for config_key, data in qubit_metrics_data.items():
+        schema_key = "qubit_frequency" if config_key == "bare_frequency" else config_key
+        qubit_metrics_mapped[schema_key] = data
+
+    metrics_response = ChipMetricsResponse(
+        chip_id=chip_id,
+        username=ctx.user.username,
+        qubit_count=len(chip.qubits),
+        within_hours=within_hours,
+        qubit_metrics=QubitMetrics(**qubit_metrics_mapped),
+        coupling_metrics=CouplingMetrics(**coupling_metrics_data),
+    )
+
+    # Generate PDF
+    try:
+        generator = MetricsPDFGenerator(
+            metrics_response=metrics_response,
+            within_hours=within_hours,
+            selection_mode=selection_mode,
+            topology_id=chip.topology_id,
+        )
+        pdf_buffer = generator.generate_pdf()
+    except Exception as e:
+        logger.error(f"Failed to generate PDF report: {e}")
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e!s}") from e
+
+    # Generate filename
+    timestamp = pendulum.now("Asia/Tokyo").format("YYYYMMDD_HHmmss")
+    filename = f"metrics_report_{chip_id}_{timestamp}.pdf"
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
