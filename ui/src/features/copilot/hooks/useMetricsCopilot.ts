@@ -18,6 +18,20 @@ interface MetricConfig {
   scale: number;
 }
 
+interface QubitPosition {
+  row: number;
+  col: number;
+}
+
+interface TopologyData {
+  id: string;
+  name: string;
+  grid_size: number;
+  num_qubits: number;
+  qubits: Record<string, QubitPosition>;
+  couplings: number[][];
+}
+
 interface UseMetricsCopilotProps {
   chipId: string;
   metricType: "qubit" | "coupling";
@@ -31,6 +45,7 @@ interface UseMetricsCopilotProps {
   timeRange: string;
   selectionMode: string;
   aiConfig: CopilotConfig | null;
+  topologyData: TopologyData | null;
   onMetricChange?: (metric: string) => void;
   onTimeRangeChange?: (range: string) => void;
 }
@@ -48,6 +63,7 @@ export function useMetricsCopilot({
   timeRange,
   selectionMode,
   aiConfig,
+  topologyData,
   onMetricChange,
   onTimeRangeChange,
 }: UseMetricsCopilotProps) {
@@ -399,6 +415,48 @@ export function useMetricsCopilot({
     value: scoringThresholds,
     available:
       Object.keys(scoringThresholds).length > 0 ? "enabled" : "disabled",
+  });
+
+  // Compute neighbor map from topology for crosstalk analysis
+  const neighborMap = useMemo(() => {
+    if (!topologyData?.couplings) return null;
+
+    const neighbors: Record<string, string[]> = {};
+    for (const [q1, q2] of topologyData.couplings) {
+      const id1 = `Q${String(q1).padStart(2, "0")}`;
+      const id2 = `Q${String(q2).padStart(2, "0")}`;
+      if (!neighbors[id1]) neighbors[id1] = [];
+      if (!neighbors[id2]) neighbors[id2] = [];
+      neighbors[id1].push(id2);
+      neighbors[id2].push(id1);
+    }
+    return neighbors;
+  }, [topologyData]);
+
+  // Share topology information for spatial/crosstalk analysis
+  useCopilotReadable({
+    description:
+      "Chip topology: qubit positions (row, col) and coupling connections for spatial and crosstalk analysis",
+    value: topologyData
+      ? {
+          topology_id: topologyData.id,
+          name: topologyData.name,
+          grid_size: topologyData.grid_size,
+          num_qubits: topologyData.num_qubits,
+          qubit_positions: Object.fromEntries(
+            Object.entries(topologyData.qubits).map(([id, pos]) => [
+              `Q${String(id).padStart(2, "0")}`,
+              { row: pos.row, col: pos.col },
+            ])
+          ),
+          couplings: topologyData.couplings.map(([q1, q2]) => [
+            `Q${String(q1).padStart(2, "0")}`,
+            `Q${String(q2).padStart(2, "0")}`,
+          ]),
+          neighbor_map: neighborMap,
+        }
+      : null,
+    available: topologyData ? "enabled" : "disabled",
   });
 
   // Action to change metric

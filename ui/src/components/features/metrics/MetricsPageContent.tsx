@@ -15,8 +15,9 @@ import { MetricsStatsCards } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
-import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
+import { useGetTopologyById } from "@/client/topology/topology";
+import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -65,6 +66,38 @@ export function MetricsPageContent() {
 
   const { data: chipsData, isLoading: isChipsLoading } = useListChips();
   const { data: chipData } = useGetChip(selectedChip);
+
+  // Get topology ID from chip data
+  const topologyId = useMemo(() => {
+    return (
+      chipData?.data?.topology_id ??
+      `square-lattice-mux-${chipData?.data?.size ?? 64}`
+    );
+  }, [chipData?.data?.topology_id, chipData?.data?.size]);
+
+  // Fetch topology data for Copilot spatial analysis
+  const { data: topologyResponse } = useGetTopologyById(topologyId, {
+    query: {
+      enabled: !!topologyId,
+      staleTime: Infinity,
+    },
+  });
+
+  // Extract topology data for Copilot
+  const topologyData = useMemo(() => {
+    // The API returns { data: TopologyDefinition }
+    const responseData = topologyResponse?.data as { data?: Record<string, unknown> } | undefined;
+    const data = responseData?.data;
+    if (!data) return null;
+    return {
+      id: data.id as string,
+      name: data.name as string,
+      grid_size: data.grid_size as number,
+      num_qubits: data.num_qubits as number,
+      qubits: data.qubits as Record<string, { row: number; col: number }>,
+      couplings: data.couplings as number[][],
+    };
+  }, [topologyResponse]);
 
   // Set default chip when data loads
   useEffect(() => {
@@ -295,6 +328,7 @@ export function MetricsPageContent() {
     timeRange,
     selectionMode,
     aiConfig,
+    topologyData,
     onMetricChange: setSelectedMetric,
     onTimeRangeChange: (range) => setTimeRange(range as TimeRange),
   });
