@@ -23,6 +23,7 @@ import { DateSelector } from "@/components/selectors/DateSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { ChipPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useProject } from "@/contexts/ProjectContext";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
@@ -433,7 +434,7 @@ export function ChipPageContent() {
         <div className="pt-4">
           {isLoadingMux ? (
             <div className="w-full flex justify-center py-12">
-              <span className="loading loading-spinner loading-lg"></span>
+              <QuantumLoader size="lg" />
             </div>
           ) : isMuxError ? (
             <div className="alert alert-error">

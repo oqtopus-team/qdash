@@ -10,6 +10,7 @@ import { PlotCard } from "@/components/charts/PlotCard";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DataTable } from "@/components/ui/DataTable";
 import { ErrorCard } from "@/components/ui/ErrorCard";
+import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useCorrelationUrlState } from "@/hooks/useUrlState";
@@ -549,7 +550,7 @@ export function CorrelationView() {
   if (!isInitialized || isConfigLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <span className="loading loading-spinner loading-lg"></span>
+        <QuantumLoader size="lg" />
       </div>
     );
   }
