@@ -50,7 +50,9 @@ def normalize_qid(qid: str) -> str:
     return qid.replace("Q", "").lstrip("0") or "0"
 
 
-def _extract_metric_output_info(metric_data: Any) -> tuple[float | int | None, str | None, str | None]:
+def _extract_metric_output_info(
+    metric_data: Any,
+) -> tuple[float | int | None, str | None, str | None]:
     """Extract value, calibrated_at, and task_id from metric output data."""
 
     if metric_data is None:
@@ -151,7 +153,9 @@ def _extract_latest_metrics(
                     include_param = True
                     if within_hours and "calibrated_at" in param_data:
                         try:
-                            calibrated_at = pendulum.parse(param_data["calibrated_at"], tz="Asia/Tokyo")
+                            calibrated_at = pendulum.parse(
+                                param_data["calibrated_at"], tz="Asia/Tokyo"
+                            )
                             include_param = calibrated_at >= cutoff_time
                         except Exception:
                             include_param = False
@@ -207,7 +211,9 @@ def _extract_best_metrics(
     metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
 
     # Filter to only metrics that support best mode (evaluation.mode != "none")
-    best_mode_metrics = [key for key in valid_metric_keys if metrics_config[key].evaluation.mode != "none"]
+    best_mode_metrics = [
+        key for key in valid_metric_keys if metrics_config[key].evaluation.mode != "none"
+    ]
 
     if not best_mode_metrics:
         return metrics_data
@@ -231,12 +237,16 @@ def _extract_best_metrics(
         raise HTTPException(status_code=500, detail=f"Database query failed: {e}") from e
 
     if not task_results:
-        logger.warning(f"No task result history found for chip={chip.chip_id}, username={chip.username}")
+        logger.warning(
+            f"No task result history found for chip={chip.chip_id}, username={chip.username}"
+        )
         return metrics_data
 
     # Collect all values for each metric/entity_id combination
     # Structure: metric_name -> entity_id -> list of (value, task_id, execution_id, calibrated_at)
-    metric_values: dict[str, dict[str, list[tuple[float, str, str, str]]]] = {key: {} for key in valid_metric_keys}
+    metric_values: dict[str, dict[str, list[tuple[float, str, str, str]]]] = {
+        key: {} for key in valid_metric_keys
+    }
 
     for task_doc in task_results:
         entity_id = task_doc.qid
@@ -268,7 +278,9 @@ def _extract_best_metrics(
             if value is not None and isinstance(value, (int, float)):
                 if entity_id not in metric_values[metric_name]:
                     metric_values[metric_name][entity_id] = []
-                metric_values[metric_name][entity_id].append((float(value), task_id or "", execution_id, calibrated_at))
+                metric_values[metric_name][entity_id].append(
+                    (float(value), task_id or "", execution_id, calibrated_at)
+                )
 
     # Select best value for each metric/entity_id based on evaluation mode
     for metric_name in valid_metric_keys:
@@ -330,9 +342,13 @@ def extract_qubit_metrics(
 
     # Extract metrics based on selection mode
     if selection_mode == "latest":
-        metrics_data = _extract_latest_metrics(chip.qubits, valid_metric_keys, cutoff_time, within_hours)
+        metrics_data = _extract_latest_metrics(
+            chip.qubits, valid_metric_keys, cutoff_time, within_hours
+        )
     else:
-        metrics_data = _extract_best_metrics(chip, "qubit", valid_metric_keys, config.qubit_metrics, cutoff_time)
+        metrics_data = _extract_best_metrics(
+            chip, "qubit", valid_metric_keys, config.qubit_metrics, cutoff_time
+        )
 
     # Build QubitMetrics response
     return QubitMetrics(
@@ -376,9 +392,13 @@ def extract_coupling_metrics(
 
     # Extract metrics based on selection mode
     if selection_mode == "latest":
-        metrics_data = _extract_latest_metrics(chip.couplings, valid_metric_keys, cutoff_time, within_hours)
+        metrics_data = _extract_latest_metrics(
+            chip.couplings, valid_metric_keys, cutoff_time, within_hours
+        )
     else:
-        metrics_data = _extract_best_metrics(chip, "coupling", valid_metric_keys, config.coupling_metrics, cutoff_time)
+        metrics_data = _extract_best_metrics(
+            chip, "coupling", valid_metric_keys, config.coupling_metrics, cutoff_time
+        )
 
     return CouplingMetrics(
         zx90_gate_fidelity=metrics_data.get("zx90_gate_fidelity") or None,
@@ -387,11 +407,15 @@ def extract_coupling_metrics(
     )
 
 
-@router.get("/chips/{chip_id}/metrics", response_model=ChipMetricsResponse, operation_id="getChipMetrics")
+@router.get(
+    "/chips/{chip_id}/metrics", response_model=ChipMetricsResponse, operation_id="getChipMetrics"
+)
 async def get_chip_metrics(
     chip_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
-    within_hours: Annotated[int | None, Query(description="Filter to data within N hours (e.g., 24)")] = None,
+    within_hours: Annotated[
+        int | None, Query(description="Filter to data within N hours (e.g., 24)")
+    ] = None,
     selection_mode: Annotated[
         Literal["latest", "best"],
         Query(description="Selection mode: 'latest' for most recent, 'best' for optimal values"),
@@ -420,7 +444,9 @@ async def get_chip_metrics(
     chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
 
     if not chip:
-        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}")
+        raise HTTPException(
+            status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}"
+        )
 
     # Extract metrics
     qubit_metrics = extract_qubit_metrics(chip, within_hours, selection_mode)
@@ -446,7 +472,9 @@ async def get_qubit_metric_history(
     qid: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     metric: Annotated[str, Query(description="Metric name (e.g., t1, qubit_frequency)")],
-    limit: Annotated[int | None, Query(description="Max number of history items (None for unlimited)", ge=1)] = None,
+    limit: Annotated[
+        int | None, Query(description="Max number of history items (None for unlimited)", ge=1)
+    ] = None,
     within_days: Annotated[int | None, Query(description="Filter to last N days", ge=1)] = 30,
 ) -> QubitMetricHistoryResponse:
     """Get historical metric data for a specific qubit with task_id for figure display.
@@ -543,8 +571,12 @@ async def get_coupling_metric_history(
     chip_id: str,
     coupling_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
-    metric: Annotated[str, Query(description="Metric name (e.g., zx90_gate_fidelity, bell_state_fidelity)")],
-    limit: Annotated[int | None, Query(description="Max number of history items (None for unlimited)", ge=1)] = None,
+    metric: Annotated[
+        str, Query(description="Metric name (e.g., zx90_gate_fidelity, bell_state_fidelity)")
+    ],
+    limit: Annotated[
+        int | None, Query(description="Max number of history items (None for unlimited)", ge=1)
+    ] = None,
     within_days: Annotated[int | None, Query(description="Filter to last N days", ge=1)] = 30,
 ) -> QubitMetricHistoryResponse:
     """Get historical metric data for a specific coupling with task_id for figure display.
@@ -624,4 +656,130 @@ async def get_coupling_metric_history(
         metric_name=metric,
         username=ctx.user.username,
         history=history_items,
+    )
+
+
+@router.post(
+    "/chips/{chip_id}/metrics/pdf",
+    summary="Download metrics as PDF report",
+    operation_id="downloadMetricsPdf",
+    responses={
+        200: {
+            "content": {"application/pdf": {}},
+            "description": "PDF report file",
+        }
+    },
+)
+async def download_metrics_pdf(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    within_hours: Annotated[int | None, Query(description="Filter to data within N hours")] = None,
+    selection_mode: Annotated[
+        Literal["latest", "best"], Query(description="Selection mode: 'latest' or 'best'")
+    ] = "latest",
+):
+    """Download chip metrics as a PDF report.
+
+    Generates a comprehensive PDF report containing:
+    - Cover page with chip information and report metadata
+    - Heatmap visualizations for each metric
+    - Statistics for each metric (coverage, average, min, max, std dev)
+
+    The report includes all qubit metrics (8 types) and coupling metrics (3 types)
+    that have data available.
+
+    Args:
+        chip_id: Chip identifier
+        within_hours: Optional time filter in hours
+        selection_mode: "latest" for most recent values, "best" for optimal values
+    """
+    from fastapi.responses import StreamingResponse
+
+    from qdash.api.lib.metrics_pdf import MetricsPDFGenerator
+
+    # Get chip document
+    chip = ChipDocument.find_one(
+        ChipDocument.project_id == ctx.project_id,
+        ChipDocument.chip_id == chip_id,
+        ChipDocument.username == ctx.user.username,
+    ).run()
+
+    if not chip:
+        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
+
+    # Calculate cutoff time if time filter specified
+    cutoff_time = None
+    if within_hours:
+        cutoff_time = pendulum.now("Asia/Tokyo").subtract(hours=within_hours)
+
+    # Load metrics configuration
+    config = load_metrics_config()
+
+    # Extract metrics based on selection mode
+    if selection_mode == "latest":
+        qubit_metrics_data = _extract_latest_metrics(
+            entity_models=chip.qubits,
+            valid_metric_keys=set(config.qubit_metrics.keys()),
+            cutoff_time=cutoff_time,
+            within_hours=within_hours,
+        )
+        coupling_metrics_data = _extract_latest_metrics(
+            entity_models=chip.couplings,
+            valid_metric_keys=set(config.coupling_metrics.keys()),
+            cutoff_time=cutoff_time,
+            within_hours=within_hours,
+        )
+    else:
+        qubit_metrics_data = _extract_best_metrics(
+            chip=chip,
+            entity_type="qubit",
+            valid_metric_keys=set(config.qubit_metrics.keys()),
+            metrics_config=config.qubit_metrics,
+            cutoff_time=cutoff_time,
+        )
+        coupling_metrics_data = _extract_best_metrics(
+            chip=chip,
+            entity_type="coupling",
+            valid_metric_keys=set(config.coupling_metrics.keys()),
+            metrics_config=config.coupling_metrics,
+            cutoff_time=cutoff_time,
+        )
+
+    # Build response model (reuse logic from getChipMetrics)
+    # Map config keys to schema keys for qubit metrics
+    qubit_metrics_mapped = {}
+    for config_key, data in qubit_metrics_data.items():
+        schema_key = "qubit_frequency" if config_key == "bare_frequency" else config_key
+        qubit_metrics_mapped[schema_key] = data
+
+    metrics_response = ChipMetricsResponse(
+        chip_id=chip_id,
+        username=ctx.user.username,
+        qubit_count=len(chip.qubits),
+        within_hours=within_hours,
+        qubit_metrics=QubitMetrics(**qubit_metrics_mapped),
+        coupling_metrics=CouplingMetrics(**coupling_metrics_data),
+    )
+
+    # Generate PDF
+    try:
+        generator = MetricsPDFGenerator(
+            metrics_response=metrics_response,
+            within_hours=within_hours,
+            selection_mode=selection_mode,
+            topology_id=chip.topology_id,
+        )
+        pdf_buffer = generator.generate_pdf()
+    except Exception as e:
+        logger.error(f"Failed to generate PDF report: {e}")
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e!s}") from e
+
+    # Generate filename
+    timestamp = pendulum.now("Asia/Tokyo").format("YYYYMMDD_HHmmss")
+    filename = f"metrics_report_{chip_id}_{timestamp}.pdf"
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )

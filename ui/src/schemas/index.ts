@@ -40,6 +40,8 @@ export * from "./detail";
 export * from "./device";
 export * from "./deviceTopologyRequest";
 export * from "./downloadFileParams";
+export * from "./downloadMetricsPdfParams";
+export * from "./downloadMetricsPdfSelectionMode";
 export * from "./downloadZipFileParams";
 export * from "./executeFlowRequest";
 export * from "./executeFlowRequestParameters";

@@ -46,12 +46,29 @@ class MetricMetadata(BaseModel):
     threshold: ThresholdConfig | None = None
 
 
+class CdfGroup(BaseModel):
+    """CDF chart group configuration."""
+
+    id: str
+    title: str
+    unit: str
+    metrics: list[str]
+
+
+class CdfGroupsConfig(BaseModel):
+    """CDF groups configuration by metric type."""
+
+    qubit: list[CdfGroup] = []
+    coupling: list[CdfGroup] = []
+
+
 class MetricsConfig(BaseModel):
     """Complete metrics configuration."""
 
     qubit_metrics: dict[str, MetricMetadata]
     coupling_metrics: dict[str, MetricMetadata]
     color_scale: dict[str, Any]
+    cdf_groups: CdfGroupsConfig = CdfGroupsConfig()
 
 
 @lru_cache(maxsize=1)
@@ -87,7 +104,9 @@ def load_metrics_config() -> MetricsConfig:
             break
 
     if not config_path:
-        raise FileNotFoundError(f"Metrics config file not found. Tried: {[str(p) for p in possible_paths if p]}")
+        raise FileNotFoundError(
+            f"Metrics config file not found. Tried: {[str(p) for p in possible_paths if p]}"
+        )
 
     with open(config_path) as f:
         data = yaml.safe_load(f)

@@ -4987,6 +4987,103 @@
         }
       }
     },
+    "/metrics/chips/{chip_id}/metrics/pdf": {
+      "post": {
+        "tags": [
+          "metrics"
+        ],
+        "summary": "Download metrics as PDF report",
+        "description": "Download chip metrics as a PDF report.\n\nGenerates a comprehensive PDF report containing:\n- Cover page with chip information and report metadata\n- Heatmap visualizations for each metric\n- Statistics for each metric (coverage, average, min, max, std dev)\n\nThe report includes all qubit metrics (8 types) and coupling metrics (3 types)\nthat have data available.\n\nArgs:\n    chip_id: Chip identifier\n    within_hours: Optional time filter in hours\n    selection_mode: \"latest\" for most recent values, \"best\" for optimal values",
+        "operationId": "downloadMetricsPdf",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "within_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to data within N hours",
+              "title": "Within Hours"
+            },
+            "description": "Filter to data within N hours"
+          },
+          {
+            "name": "selection_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "latest",
+                "best"
+              ],
+              "type": "string",
+              "description": "Selection mode: 'latest' or 'best'",
+              "default": "latest",
+              "title": "Selection Mode"
+            },
+            "description": "Selection mode: 'latest' or 'best'"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF report file",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/pdf": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/topology/list": {
       "get": {
         "tags": [

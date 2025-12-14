@@ -152,6 +152,36 @@ coupling_metrics:
     evaluation:
       mode: minimize
 
+# CDF chart grouping configuration
+# Metrics in the same group will be displayed together in a single CDF chart
+cdf_groups:
+  qubit:
+    - id: coherence
+      title: Coherence Times
+      unit: μs
+      metrics:
+        - t1
+        - t2_echo
+        - t2_star
+    - id: fidelity
+      title: Fidelity
+      unit: "%"
+      metrics:
+        - x90_gate_fidelity
+        - x180_gate_fidelity
+    - id: readout
+      title: Readout Fidelity
+      unit: "%"
+      metrics:
+        - average_readout_fidelity
+  coupling:
+    - id: coupling_fidelity
+      title: Coupling Fidelity
+      unit: "%"
+      metrics:
+        - zx90_gate_fidelity
+        - bell_state_fidelity
+
 # Color scale configuration (Viridis palette with very smooth gradations)
 # 21-color high-resolution Viridis colormap for maximum color discrimination
 # Especially useful for metrics with narrow value ranges (e.g., 99.0% - 99.9%)

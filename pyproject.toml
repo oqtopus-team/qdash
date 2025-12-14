@@ -96,6 +96,10 @@ api = [
     "gitpython>=3.1.44",  # For Git operations in file router
     "pendulum>=3.1.0",  # For timestamp formatting in Git commits
     "pydantic-settings>=2.0.0",  # For Settings configuration
+    "reportlab>=4.4.1",  # For PDF generation
+    "plotly>=5.18.0",  # For chart generation
+    "kaleido>=0.2.1",  # For Plotly image export
+    "pillow>=10.0.0",  # For image processing
 ]
 workflow = [
     "pymongo==4.8.0",

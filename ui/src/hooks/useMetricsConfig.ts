@@ -33,12 +33,32 @@ interface MetricMetadata {
   threshold?: ThresholdConfig;
 }
 
+interface CdfGroup {
+  id: string;
+  title: string;
+  unit: string;
+  metrics: string[];
+}
+
+interface CdfGroupsConfig {
+  qubit: CdfGroup[];
+  coupling: CdfGroup[];
+}
+
 interface MetricsConfig {
   qubit_metrics: Record<string, MetricMetadata>;
   coupling_metrics: Record<string, MetricMetadata>;
   color_scale: {
     colors: string[];
   };
+  cdf_groups?: CdfGroupsConfig;
+}
+
+export interface CdfGroupConfig {
+  id: string;
+  title: string;
+  unit: string;
+  metrics: string[];
 }
 
 export interface MetricConfig {
@@ -81,6 +101,7 @@ export function useMetricsConfig() {
         couplingMetrics: [],
         allMetrics: [],
         colorScale: { colors: [] },
+        cdfGroups: { qubit: [], coupling: [] },
       };
     }
 
@@ -126,11 +147,18 @@ export function useMetricsConfig() {
     // Combined metrics for histogram view (all metrics with thresholds)
     const allMetrics = [...qubitMetrics, ...couplingMetrics];
 
+    // Parse CDF groups
+    const cdfGroups: { qubit: CdfGroupConfig[]; coupling: CdfGroupConfig[] } = {
+      qubit: config.cdf_groups?.qubit || [],
+      coupling: config.cdf_groups?.coupling || [],
+    };
+
     return {
       qubitMetrics,
       couplingMetrics,
       allMetrics,
       colorScale: config.color_scale || { colors: [] },
+      cdfGroups,
     };
   }, [data]);
 
