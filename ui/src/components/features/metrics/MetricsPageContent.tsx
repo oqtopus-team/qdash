@@ -15,6 +15,8 @@ import { QubitMetricsGrid } from "./QubitMetricsGrid";
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
+import { PageContainer } from "@/components/ui/PageContainer";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
@@ -223,20 +225,15 @@ export function MetricsPageContent() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-base-100/50 px-4 md:px-6 py-6 md:py-8">
+    <PageContainer>
       <div className="h-full flex flex-col space-y-4 md:space-y-6">
         {/* Header Section */}
         <div className="flex flex-col gap-4 md:gap-6">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold">
-                Chip Metrics Dashboard
-              </h1>
-              <p className="text-sm text-base-content/70 mt-1">
-                View and compare qubit performance metrics
-              </p>
-            </div>
-          </div>
+          <PageHeader
+            title="Chip Metrics Dashboard"
+            description="View and compare qubit performance metrics"
+            className="mb-0"
+          />
 
           {/* Metric Type Tabs */}
           <div className="tabs tabs-boxed bg-base-200 w-fit">
@@ -443,6 +440,6 @@ export function MetricsPageContent() {
           </div>
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 }

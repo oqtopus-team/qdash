@@ -26,6 +26,8 @@ import {
 } from "@/client/admin/admin";
 import { useRegisterUser, useResetPassword } from "@/client/auth/auth";
 import { SettingsCard } from "@/components/features/setting/SettingsCard";
+import { PageContainer } from "@/components/ui/PageContainer";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { AdminPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -62,7 +64,7 @@ export default function AdminPage() {
   // Check if current user is admin
   if (user?.system_role !== "admin") {
     return (
-      <div className="w-full px-3 sm:px-6">
+      <PageContainer>
         <div className="alert alert-error">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -79,7 +81,7 @@ export default function AdminPage() {
           </svg>
           <span>Access denied. Admin privileges required.</span>
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
@@ -202,7 +204,7 @@ export default function AdminPage() {
 
   if (error || projectsError) {
     return (
-      <div className="w-full px-6">
+      <PageContainer>
         <div className="alert alert-error">
           <span>
             Failed to load data:{" "}
@@ -211,15 +213,16 @@ export default function AdminPage() {
               "Unknown error"}
           </span>
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="w-full px-3 sm:px-6">
-      <h1 className="text-left text-2xl sm:text-3xl font-bold pb-4 sm:pb-6">
-        Admin Panel
-      </h1>
+    <PageContainer>
+      <PageHeader
+        title="Admin Panel"
+        description="Manage users, projects, and system settings"
+      />
 
       {/* Tabs */}
       <div className="tabs tabs-boxed mb-4 sm:mb-6 w-full sm:w-fit">
@@ -712,7 +715,7 @@ export default function AdminPage() {
           addMemberError={addMemberMutation.error}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 

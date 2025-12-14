@@ -382,7 +382,7 @@ export function QubitMetricsGrid({
                 {value !== null && value !== undefined && (
                   <div className="flex flex-col items-center justify-center h-full">
                     <div className="text-[0.6rem] sm:text-sm md:text-base lg:text-lg font-bold text-white drop-shadow-md">
-                      {value.toFixed(2)}
+                      {(unit === "%" ? value * 100 : value).toFixed(2)}
                     </div>
                     {/* Unit - hidden on mobile in full view */}
                     <div
@@ -407,7 +407,7 @@ export function QubitMetricsGrid({
                 {/* Hover tooltip */}
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                   {value !== null && value !== undefined
-                    ? `${qid}: ${value.toFixed(4)} ${unit}`
+                    ? `${qid}: ${(unit === "%" ? value * 100 : value).toFixed(4)} ${unit}`
                     : `${qid}: No data`}
                 </div>
               </button>
@@ -550,7 +550,7 @@ export function QubitMetricsGrid({
                   </h2>
                   <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
                     {selectedQubitInfo.metric.value !== null
-                      ? `${selectedQubitInfo.metric.value.toFixed(4)} ${unit}`
+                      ? `${(unit === "%" ? selectedQubitInfo.metric.value * 100 : selectedQubitInfo.metric.value).toFixed(4)} ${unit}`
                       : "No data"}
                   </p>
                 </div>

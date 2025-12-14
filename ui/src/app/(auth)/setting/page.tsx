@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { useTheme } from "@/app/providers/theme-provider";
 import { PasswordChangeCard } from "@/components/features/setting/PasswordChangeCard";
+import { PageContainer } from "@/components/ui/PageContainer";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { useAuth } from "@/contexts/AuthContext";
 
 // In dev environment, only light/dark available (auto-converted to dev-light/dev-dark)
@@ -78,10 +80,11 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="w-full px-3 sm:px-6">
-      <h1 className="text-left text-2xl sm:text-3xl font-bold pb-4 sm:pb-6">
-        Settings
-      </h1>
+    <PageContainer>
+      <PageHeader
+        title="Settings"
+        description="Customize your experience and manage account"
+      />
       <div className="w-full gap-8">
         <div className="tabs tabs-boxed mb-4 sm:mb-6 w-full sm:w-fit overflow-x-auto flex-nowrap">
           <a
@@ -438,6 +441,6 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }
