@@ -25,6 +25,7 @@ import type {
   ChipMetricsResponse,
   DownloadMetricsPdfParams,
   GetChipMetricsParams,
+  GetCopilotConfig200,
   GetCouplingMetricHistoryParams,
   GetMetricsConfig200,
   GetQubitMetricHistoryParams,
@@ -181,6 +182,163 @@ export function useGetMetricsConfig<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getGetMetricsConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get Copilot configuration for the metrics assistant.
+
+Retrieves the Copilot configuration from YAML, including:
+- enabled: Whether Copilot is enabled
+- evaluation_metrics: Which metrics to use for multi-metric evaluation
+- scoring: Thresholds for good/excellent ratings per metric
+- system_prompt: The AI assistant's system prompt
+- initial_message: The initial greeting message
+
+Returns
+-------
+dict[str, Any]
+    Copilot configuration dictionary
+ * @summary Get Copilot configuration
+ */
+export const getCopilotConfig = (
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<GetCopilotConfig200>(
+    { url: `/metrics/copilot/config`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getGetCopilotConfigQueryKey = () => {
+  return [`/metrics/copilot/config`] as const;
+};
+
+export const getGetCopilotConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCopilotConfig>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getCopilotConfig>>, TError, TData>
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCopilotConfigQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCopilotConfig>>
+  > = ({ signal }) => getCopilotConfig(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCopilotConfig>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetCopilotConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCopilotConfig>>
+>;
+export type GetCopilotConfigQueryError = unknown;
+
+export function useGetCopilotConfig<
+  TData = Awaited<ReturnType<typeof getCopilotConfig>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getCopilotConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotConfig>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotConfig>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetCopilotConfig<
+  TData = Awaited<ReturnType<typeof getCopilotConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getCopilotConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotConfig>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotConfig>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetCopilotConfig<
+  TData = Awaited<ReturnType<typeof getCopilotConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getCopilotConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get Copilot configuration
+ */
+
+export function useGetCopilotConfig<
+  TData = Awaited<ReturnType<typeof getCopilotConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getCopilotConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetCopilotConfigQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
