@@ -1,9 +1,11 @@
 "use client";
 
+import { Check, Download, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { Task } from "@/schemas";
 
+import { downloadFiguresAsZip } from "@/client/task-result/task-result";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskHistoryModal } from "@/components/features/chip/modals/TaskHistoryModal";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
@@ -80,6 +82,14 @@ export function TaskResultGrid({
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
 
+  // Download selection mode state
+  const [downloadSelectionEnabled, setDownloadSelectionEnabled] =
+    useState(false);
+  const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isDownloading, setIsDownloading] = useState(false);
+
   // Fetch task results
   const {
     data: taskResponse,
@@ -90,14 +100,6 @@ export function TaskResultGrid({
     task: selectedTask,
     selectedDate,
     keepPrevious: true,
-  });
-
-  // Use grid layout hook for responsive sizing
-  const { containerRef, cellSize, getContainerWidth } = useGridLayout({
-    cols: gridCols,
-    rows: gridRows,
-    reservedHeight: { mobile: 250, desktop: 300 },
-    deps: [taskResponse, topologyQubits],
   });
 
   // Region selection state
@@ -113,6 +115,18 @@ export function TaskResultGrid({
   } | null>(null);
 
   const numRegions = Math.floor(gridSize / regionSize);
+
+  // Calculate displayed grid size based on zoom mode
+  const displayCols = zoomMode === "region" ? regionSize : gridCols;
+  const displayRows = zoomMode === "region" ? regionSize : gridRows;
+
+  // Use grid layout hook for responsive sizing - pass display size for proper zoom
+  const { containerRef, cellSize, getContainerWidth } = useGridLayout({
+    cols: displayCols,
+    rows: displayRows,
+    reservedHeight: { mobile: 250, desktop: 300 },
+    deps: [taskResponse, topologyQubits, zoomMode, selectedRegion],
+  });
 
   if (isLoadingTask)
     return (
@@ -142,6 +156,86 @@ export function TaskResultGrid({
   const getTaskResult = (qid: string): Task | null =>
     taskResponse?.data?.result?.[qid] || null;
 
+  // Download selection helpers
+  const toggleDownloadSelection = (qid: string) => {
+    setSelectedForDownload((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(qid)) {
+        newSet.delete(qid);
+      } else {
+        newSet.add(qid);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllForDownload = () => {
+    const allQids = Object.entries(taskResponse?.data?.result || {})
+      .filter(([, task]) => task.json_figure_path)
+      .map(([qid]) => qid);
+    setSelectedForDownload(new Set(allQids));
+  };
+
+  const clearDownloadSelection = () => {
+    setSelectedForDownload(new Set());
+  };
+
+  const handleDownload = async () => {
+    if (selectedForDownload.size === 0) return;
+
+    const paths: string[] = [];
+    selectedForDownload.forEach((qid) => {
+      const task = taskResponse?.data?.result?.[qid];
+      if (task?.json_figure_path) {
+        const jsonPaths = Array.isArray(task.json_figure_path)
+          ? task.json_figure_path
+          : [task.json_figure_path];
+        paths.push(...jsonPaths);
+      }
+    });
+
+    if (paths.length === 0) return;
+
+    setIsDownloading(true);
+    try {
+      const filename = `${chipId}_${selectedTask}_${selectedDate}_json_figures.zip`;
+      const response = await downloadFiguresAsZip(
+        { paths, filename },
+        { responseType: "blob" },
+      );
+
+      const blob = new Blob([response.data as BlobPart], {
+        type: "application/zip",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      // Reset selection after successful download
+      setDownloadSelectionEnabled(false);
+      setSelectedForDownload(new Set());
+    } catch (error) {
+      console.error("Download error:", error);
+      alert("Download failed. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const hasJsonFigures = (qid: string): boolean => {
+    const task = taskResponse?.data?.result?.[qid];
+    return !!task?.json_figure_path;
+  };
+
+  const availableForDownloadCount = Object.entries(
+    taskResponse?.data?.result || {},
+  ).filter(([, task]) => task.json_figure_path).length;
+
   // Calculate displayed grid size based on zoom mode
   const displayGridSize = zoomMode === "region" ? regionSize : gridSize;
   const displayGridStart = selectedRegion
@@ -153,13 +247,78 @@ export function TaskResultGrid({
 
   return (
     <div className="space-y-4">
-      {/* Zoom mode toggle - only show in full view mode for square grids */}
-      {zoomMode === "full" && gridRows === gridCols && (
-        <div className="px-4">
-          <RegionZoomToggle
-            enabled={regionSelectionEnabled}
-            onToggle={setRegionSelectionEnabled}
-          />
+      {/* Toolbar - zoom toggle and download controls */}
+      {zoomMode === "full" && (
+        <div className="px-4 flex items-center justify-between">
+          {gridRows === gridCols && !downloadSelectionEnabled ? (
+            <RegionZoomToggle
+              enabled={regionSelectionEnabled}
+              onToggle={setRegionSelectionEnabled}
+            />
+          ) : (
+            <div />
+          )}
+
+          {/* Download selection controls */}
+          {downloadSelectionEnabled ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-base-content/70">
+                {selectedForDownload.size} / {availableForDownloadCount}{" "}
+                selected
+              </span>
+              <button
+                className="btn btn-xs btn-ghost"
+                onClick={selectAllForDownload}
+                title="Select all"
+              >
+                All
+              </button>
+              <button
+                className="btn btn-xs btn-ghost"
+                onClick={clearDownloadSelection}
+                title="Clear selection"
+              >
+                Clear
+              </button>
+              <button
+                className="btn btn-sm btn-primary gap-1"
+                onClick={handleDownload}
+                disabled={selectedForDownload.size === 0 || isDownloading}
+              >
+                {isDownloading ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <Download size={16} />
+                )}
+                Download
+              </button>
+              <button
+                className="btn btn-sm btn-ghost btn-circle"
+                onClick={() => {
+                  setDownloadSelectionEnabled(false);
+                  setSelectedForDownload(new Set());
+                }}
+                title="Cancel"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <button
+              className="btn btn-sm btn-outline gap-2"
+              onClick={() => {
+                setDownloadSelectionEnabled(true);
+                setRegionSelectionEnabled(false);
+                // Default to all selected
+                selectAllForDownload();
+              }}
+              title="Select figures to download"
+              disabled={availableForDownloadCount === 0}
+            >
+              <Download size={16} />
+              Download
+            </button>
+          )}
         </div>
       )}
 
@@ -256,17 +415,34 @@ export function TaskResultGrid({
             const figurePath = Array.isArray(task.figure_path)
               ? task.figure_path[0]
               : task.figure_path || null;
+            const isSelectedForDownload = selectedForDownload.has(qid);
+            const canBeDownloaded = hasJsonFigures(qid);
+
             return (
               <button
                 key={index}
                 onClick={() => {
-                  setSelectedTaskInfo({ qid, taskName: selectedTask });
+                  if (downloadSelectionEnabled) {
+                    if (canBeDownloaded) {
+                      toggleDownloadSelection(qid);
+                    }
+                  } else {
+                    setSelectedTaskInfo({ qid, taskName: selectedTask });
+                  }
                 }}
                 className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${
                   task.over_threshold
                     ? "ring-2 ring-primary ring-offset-1 animate-pulse-light"
                     : ""
-                } ${muxBgClass}`}
+                } ${muxBgClass} ${
+                  downloadSelectionEnabled && isSelectedForDownload
+                    ? "ring-2 ring-primary ring-offset-2"
+                    : ""
+                } ${
+                  downloadSelectionEnabled && !canBeDownloaded
+                    ? "opacity-40 cursor-not-allowed"
+                    : ""
+                }`}
               >
                 {task.figure_path && figurePath && (
                   <div className="absolute inset-1">
@@ -293,6 +469,22 @@ export function TaskResultGrid({
                         : "bg-warning"
                   }`}
                 />
+                {/* Download selection overlay */}
+                {downloadSelectionEnabled && canBeDownloaded && (
+                  <div
+                    className={`absolute inset-0 flex items-center justify-center transition-colors ${
+                      isSelectedForDownload
+                        ? "bg-primary/20"
+                        : "bg-transparent hover:bg-base-content/10"
+                    }`}
+                  >
+                    {isSelectedForDownload && (
+                      <div className="bg-primary text-primary-content rounded-full p-1">
+                        <Check size={16} />
+                      </div>
+                    )}
+                  </div>
+                )}
               </button>
             );
           })}

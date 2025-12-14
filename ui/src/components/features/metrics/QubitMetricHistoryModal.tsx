@@ -20,6 +20,18 @@ interface QubitMetricHistoryModalProps {
   metricUnit: string;
 }
 
+// Helper function to format metric value based on unit
+function formatMetricValue(
+  value: number | null,
+  unit: string,
+  precision: number = 2,
+): string {
+  if (value === null || value === undefined) return "N/A";
+  // For percentage units, multiply by 100 to display correctly
+  const displayValue = unit === "%" ? value * 100 : value;
+  return displayValue.toFixed(precision);
+}
+
 export function QubitMetricHistoryModal({
   chipId,
   qid,
@@ -178,7 +190,7 @@ export function QubitMetricHistoryModal({
                 }`}
               >
                 <div className="font-bold text-sm">
-                  {item.value?.toFixed(2)} {metricUnit}
+                  {formatMetricValue(item.value, metricUnit, 2)} {metricUnit}
                 </div>
                 <div className="text-[0.65rem] opacity-70">
                   {new Date(item.timestamp).toLocaleString("ja-JP", {
@@ -231,7 +243,8 @@ export function QubitMetricHistoryModal({
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="font-bold text-lg">
-                      {item.value?.toFixed(4)} {metricUnit}
+                      {formatMetricValue(item.value, metricUnit, 4)}{" "}
+                      {metricUnit}
                     </div>
                     <div className="text-xs opacity-70 mt-1">
                       {new Date(item.timestamp).toLocaleString("ja-JP", {

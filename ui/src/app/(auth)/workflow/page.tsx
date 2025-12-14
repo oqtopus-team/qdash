@@ -8,6 +8,8 @@ import type { FlowSummary } from "@/schemas";
 
 import { listFlows } from "@/client/flow/flow";
 import { FlowSchedulesSection } from "@/components/features/flow/FlowSchedulesSection";
+import { PageContainer } from "@/components/ui/PageContainer";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { WorkflowListPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
 export default function FlowListPage() {
@@ -22,24 +24,27 @@ export default function FlowListPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto p-3 sm:p-6">
+      <PageContainer>
         <div className="alert alert-error">
           <span>Failed to load flows: {(error as Error)?.message}</span>
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
   const flows = data?.data?.flows || [];
 
   return (
-    <div className="container mx-auto p-3 sm:p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold">User Flows</h1>
-        <Link href="/workflow/new" className="btn btn-primary">
-          + New Flow
-        </Link>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="User Flows"
+        description="Create and manage workflow configurations"
+        actions={
+          <Link href="/workflow/new" className="btn btn-primary">
+            + New Flow
+          </Link>
+        }
+      />
 
       {flows.length === 0 ? (
         <div className="card bg-base-200">
@@ -98,6 +103,6 @@ export default function FlowListPage() {
           <FlowSchedulesSection />
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

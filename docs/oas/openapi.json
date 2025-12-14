@@ -3486,6 +3486,51 @@
         }
       }
     },
+    "/task-results/figures/download": {
+      "post": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Download multiple figures as a ZIP file",
+        "description": "Download multiple calibration figures as a ZIP file.\n\nCreates a ZIP archive containing all requested figure files and returns it\nas a streaming response.\n\nParameters\n----------\npaths : list[str]\n    List of absolute file paths to the calibration figures\nfilename : str\n    Filename for the ZIP archive (default: \"figures.zip\")\n\nReturns\n-------\nStreamingResponse\n    ZIP archive containing all requested files\n\nRaises\n------\nHTTPException\n    400 if no paths are provided or if any path does not exist",
+        "operationId": "downloadFiguresAsZip",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_downloadFiguresAsZip"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/tags": {
       "get": {
         "tags": [
@@ -4942,6 +4987,103 @@
         }
       }
     },
+    "/metrics/chips/{chip_id}/metrics/pdf": {
+      "post": {
+        "tags": [
+          "metrics"
+        ],
+        "summary": "Download metrics as PDF report",
+        "description": "Download chip metrics as a PDF report.\n\nGenerates a comprehensive PDF report containing:\n- Cover page with chip information and report metadata\n- Heatmap visualizations for each metric\n- Statistics for each metric (coverage, average, min, max, std dev)\n\nThe report includes all qubit metrics (8 types) and coupling metrics (3 types)\nthat have data available.\n\nArgs:\n    chip_id: Chip identifier\n    within_hours: Optional time filter in hours\n    selection_mode: \"latest\" for most recent values, \"best\" for optimal values",
+        "operationId": "downloadMetricsPdf",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "within_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to data within N hours",
+              "title": "Within Hours"
+            },
+            "description": "Filter to data within N hours"
+          },
+          {
+            "name": "selection_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "latest",
+                "best"
+              ],
+              "type": "string",
+              "description": "Selection mode: 'latest' or 'best'",
+              "default": "latest",
+              "title": "Selection Mode"
+            },
+            "description": "Selection mode: 'latest' or 'best'"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF report file",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/pdf": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/topology/list": {
       "get": {
         "tags": [
@@ -5084,6 +5226,29 @@
         ],
         "title": "BackendResponseModel",
         "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
+      },
+      "Body_downloadFiguresAsZip": {
+        "properties": {
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Paths",
+            "description": "List of file paths to include in the ZIP"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Filename for the ZIP archive",
+            "default": "figures.zip"
+          }
+        },
+        "type": "object",
+        "required": [
+          "paths"
+        ],
+        "title": "Body_downloadFiguresAsZip"
       },
       "Body_login": {
         "properties": {

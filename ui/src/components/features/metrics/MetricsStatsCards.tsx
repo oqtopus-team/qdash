@@ -34,10 +34,9 @@ export function MetricsStatsCards({
         total: 0,
         withData: 0,
         coverage: 0,
-        average: 0,
+        median: 0,
         min: 0,
         max: 0,
-        stdDev: 0,
       };
     }
 
@@ -56,32 +55,26 @@ export function MetricsStatsCards({
         total,
         withData: 0,
         coverage: 0,
-        average: 0,
+        median: 0,
         min: 0,
         max: 0,
-        stdDev: 0,
       };
     }
 
-    const sum = values.reduce((a, b) => a + b, 0);
-    const average = sum / values.length;
+    // Calculate median (same method as CDF chart)
+    const sorted = [...values].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+
     const min = Math.min(...values);
     const max = Math.max(...values);
-
-    // Standard deviation
-    const squaredDiffs = values.map((v) => Math.pow(v - average, 2));
-    const avgSquaredDiff =
-      squaredDiffs.reduce((a, b) => a + b, 0) / values.length;
-    const stdDev = Math.sqrt(avgSquaredDiff);
 
     return {
       total,
       withData,
       coverage,
-      average,
+      median,
       min,
       max,
-      stdDev,
     };
   }, [metricData, gridSize, metricType]);
 
@@ -112,15 +105,15 @@ export function MetricsStatsCards({
         </div>
       </div>
 
-      {/* Average */}
+      {/* Median */}
       <div className="stats shadow-sm bg-base-200">
         <div className="stat py-3 px-4">
-          <div className="stat-title text-xs">Average {title}</div>
+          <div className="stat-title text-xs">Median {title}</div>
           <div className="stat-value text-xl text-secondary">
             <AnimatedCounter
-              value={stats.average}
+              value={stats.median}
               duration={800}
-              decimals={getDecimals(stats.average)}
+              decimals={getDecimals(stats.median)}
             />
           </div>
           <div className="stat-desc text-xs">{unit}</div>

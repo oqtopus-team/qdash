@@ -158,8 +158,9 @@ export function CouplingGraphCard({
       const pos2 = getNodePosition(q2);
 
       edgeValues.push(value);
-      edgeTexts.push(value.toFixed(1));
-      edgeHoverTexts.push(`${couplingId}: ${value.toFixed(2)} ${unit}`);
+      const displayValue = unit === "%" ? value * 100 : value;
+      edgeTexts.push(displayValue.toFixed(1));
+      edgeHoverTexts.push(`${couplingId}: ${displayValue.toFixed(2)} ${unit}`);
 
       edgeTraces.push({
         type: "scatter",

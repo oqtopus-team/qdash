@@ -3,10 +3,13 @@
 import io
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+
+from qdash.workflow.engine.calibration.params_updater import _QubexParamsUpdater
 
 
 class TestParamsUpdaterNoneHandling:
@@ -97,3 +100,114 @@ class TestParamsUpdaterNoneHandling:
             assert "Q00: null" in content, "File should contain explicit 'null'"
         finally:
             Path(temp_path).unlink()
+
+
+class TestUpdateYaml:
+    """Test _update_yaml method with file locking and atomic write."""
+
+    @pytest.fixture
+    def updater(self):
+        """Create a _QubexParamsUpdater instance with mocked backend."""
+        backend = MagicMock()
+        backend.config = {}
+        return _QubexParamsUpdater(backend, chip_id=None)
+
+    @pytest.fixture
+    def yaml_file(self, tmp_path):
+        """Create a temporary YAML file with initial data."""
+        yaml_path = tmp_path / "test_params.yaml"
+        yaml_path.write_text(
+            """meta:
+  description: Test parameter file
+  unit: μs
+
+data:
+  Q00: 10.5
+  Q01: 20.3
+  Q02: null
+"""
+        )
+        return yaml_path
+
+    def test_update_existing_value(self, updater, yaml_file):
+        """Test updating an existing qubit value."""
+        updater._update_yaml(yaml_file, "Q00", 15.0)
+
+        content = yaml_file.read_text()
+        assert "Q00: 15.0" in content
+        assert "meta:" in content  # meta section preserved
+        assert "description: Test parameter file" in content
+
+    def test_add_new_qubit_value(self, updater, yaml_file):
+        """Test adding a new qubit value in correct order."""
+        updater._update_yaml(yaml_file, "Q03", 30.5)
+
+        content = yaml_file.read_text()
+        assert "Q03: 30.5" in content
+        assert "meta:" in content
+
+    def test_meta_section_preserved(self, updater, yaml_file):
+        """Test that meta section is preserved after update."""
+        updater._update_yaml(yaml_file, "Q01", 25.0)
+
+        content = yaml_file.read_text()
+        assert "meta:" in content
+        assert "description: Test parameter file" in content
+        assert "unit: μs" in content
+
+    def test_lock_file_created(self, updater, yaml_file):
+        """Test that lock file is created during update."""
+        updater._update_yaml(yaml_file, "Q00", 99.0)
+
+        lock_path = yaml_file.with_suffix(".yaml.lock")
+        assert lock_path.exists()
+
+    def test_atomic_write_no_partial_content(self, updater, yaml_file):
+        """Test that atomic write prevents partial content."""
+        # Read original content
+        original_content = yaml_file.read_text()
+
+        # Update should be atomic
+        updater._update_yaml(yaml_file, "Q00", 100.0)
+
+        # File should be valid YAML
+        yaml = YAML(typ="rt")
+        with yaml_file.open("r") as f:
+            data = yaml.load(f)
+
+        assert data is not None
+        assert "data" in data
+        assert data["data"]["Q00"] == 100.0
+
+    def test_no_change_when_value_equal(self, updater, yaml_file):
+        """Test that file is not modified when value is unchanged."""
+        original_mtime = yaml_file.stat().st_mtime
+
+        # Update with same value
+        updater._update_yaml(yaml_file, "Q00", 10.5)
+
+        # File should not be modified
+        new_mtime = yaml_file.stat().st_mtime
+        assert original_mtime == new_mtime
+
+    def test_nonexistent_file_is_skipped(self, updater, tmp_path):
+        """Test that nonexistent file is gracefully skipped."""
+        nonexistent = tmp_path / "nonexistent.yaml"
+
+        # Should not raise
+        updater._update_yaml(nonexistent, "Q00", 10.0)
+
+    def test_insert_ordered_between_existing(self, updater, yaml_file):
+        """Test that new qubit is inserted in correct order."""
+        # Add Q05 first
+        updater._update_yaml(yaml_file, "Q05", 50.0)
+
+        # Then add Q03 - should be inserted between Q02 and Q05
+        updater._update_yaml(yaml_file, "Q03", 30.0)
+
+        content = yaml_file.read_text()
+        q02_pos = content.find("Q02:")
+        q03_pos = content.find("Q03:")
+        q05_pos = content.find("Q05:")
+
+        assert q02_pos < q03_pos < q05_pos, "Q03 should be between Q02 and Q05"

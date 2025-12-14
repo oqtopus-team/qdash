@@ -21,6 +21,9 @@ import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailMod
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
+import { PageContainer } from "@/components/ui/PageContainer";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { ChipPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useProject } from "@/contexts/ProjectContext";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
@@ -338,42 +341,39 @@ export function ChipPageContent() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-base-100/50 px-4 md:px-6 py-6 md:py-8">
+    <PageContainer>
       <div className="h-full flex flex-col space-y-4 md:space-y-6">
         {/* Header Section */}
         <div className="flex flex-col gap-4 md:gap-6">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold">
-                Chip Experiments
-              </h1>
-              <p className="text-sm text-base-content/70 mt-1">
-                View calibration tasks and qubit results
-              </p>
-            </div>
-            {canEdit && (
-              <button
-                className="btn btn-primary btn-sm w-fit"
-                onClick={() => setIsCreateChipModalOpen(true)}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+          <PageHeader
+            title="Chip Experiments"
+            description="View calibration tasks and qubit results"
+            actions={
+              canEdit && (
+                <button
+                  className="btn btn-primary btn-sm w-fit"
+                  onClick={() => setIsCreateChipModalOpen(true)}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Create Chip
-              </button>
-            )}
-          </div>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Create Chip
+                </button>
+              )
+            }
+            className="mb-0"
+          />
 
           {/* View Mode Tabs */}
           <div className="tabs tabs-boxed bg-base-200 w-fit">
@@ -434,7 +434,7 @@ export function ChipPageContent() {
         <div className="pt-4">
           {isLoadingMux ? (
             <div className="w-full flex justify-center py-12">
-              <span className="loading loading-spinner loading-lg"></span>
+              <QuantumLoader size="lg" />
             </div>
           ) : isMuxError ? (
             <div className="alert alert-error">
@@ -687,6 +687,6 @@ export function ChipPageContent() {
           setSelectedChip(chipId);
         }}
       />
-    </div>
+    </PageContainer>
   );
 }

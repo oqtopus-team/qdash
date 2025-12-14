@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import io
 import logging
+import zipfile
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Body, Depends, Query
+from fastapi.responses import FileResponse, StreamingResponse
 from pymongo import DESCENDING
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.error import Detail
@@ -205,7 +207,9 @@ def list_executions(
         Wrapped list of executions for the chip
 
     """
-    logger.debug(f"Listing executions for chip {chip_id}, project: {ctx.project_id}, skip: {skip}, limit: {limit}")
+    logger.debug(
+        f"Listing executions for chip {chip_id}, project: {ctx.project_id}, skip: {skip}, limit: {limit}"
+    )
     executions = (
         ExecutionHistoryDocument.find(
             {"project_id": ctx.project_id, "chip_id": chip_id}, sort=[("start_at", DESCENDING)]
@@ -259,7 +263,9 @@ def get_execution(
 
     """
     logger.debug(f"Fetching execution {execution_id}, project: {ctx.project_id}")
-    execution = ExecutionHistoryDocument.find_one({"project_id": ctx.project_id, "execution_id": execution_id}).run()
+    execution = ExecutionHistoryDocument.find_one(
+        {"project_id": ctx.project_id, "execution_id": execution_id}
+    ).run()
     if execution is None:
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
     flat_tasks = flatten_tasks(execution.task_results)

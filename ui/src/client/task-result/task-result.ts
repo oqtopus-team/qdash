@@ -5,20 +5,24 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
 import type {
+  BodyDownloadFiguresAsZip,
   GetCouplingTaskHistoryParams,
   GetHistoricalCouplingTaskResultsParams,
   GetHistoricalQubitTaskResultsParams,
@@ -1394,3 +1398,116 @@ export function useGetTimeseriesTaskResults<
 
   return query;
 }
+
+/**
+ * Download multiple calibration figures as a ZIP file.
+
+Creates a ZIP archive containing all requested figure files and returns it
+as a streaming response.
+
+Parameters
+----------
+paths : list[str]
+    List of absolute file paths to the calibration figures
+filename : str
+    Filename for the ZIP archive (default: "figures.zip")
+
+Returns
+-------
+StreamingResponse
+    ZIP archive containing all requested files
+
+Raises
+------
+HTTPException
+    400 if no paths are provided or if any path does not exist
+ * @summary Download multiple figures as a ZIP file
+ */
+export const downloadFiguresAsZip = (
+  bodyDownloadFiguresAsZip: BodyDownloadFiguresAsZip,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<unknown>(
+    {
+      url: `/task-results/figures/download`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: bodyDownloadFiguresAsZip,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getDownloadFiguresAsZipMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof downloadFiguresAsZip>>,
+    TError,
+    { data: BodyDownloadFiguresAsZip },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof downloadFiguresAsZip>>,
+  TError,
+  { data: BodyDownloadFiguresAsZip },
+  TContext
+> => {
+  const mutationKey = ["downloadFiguresAsZip"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof downloadFiguresAsZip>>,
+    { data: BodyDownloadFiguresAsZip }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return downloadFiguresAsZip(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DownloadFiguresAsZipMutationResult = NonNullable<
+  Awaited<ReturnType<typeof downloadFiguresAsZip>>
+>;
+export type DownloadFiguresAsZipMutationBody = BodyDownloadFiguresAsZip;
+export type DownloadFiguresAsZipMutationError = HTTPValidationError;
+
+/**
+ * @summary Download multiple figures as a ZIP file
+ */
+export const useDownloadFiguresAsZip = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof downloadFiguresAsZip>>,
+      TError,
+      { data: BodyDownloadFiguresAsZip },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof downloadFiguresAsZip>>,
+  TError,
+  { data: BodyDownloadFiguresAsZip },
+  TContext
+> => {
+  const mutationOptions = getDownloadFiguresAsZipMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};

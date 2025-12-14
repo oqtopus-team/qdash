@@ -9,12 +9,17 @@ import Select, {
 } from "react-select";
 
 import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
+import { MetricsCdfChart } from "./MetricsCdfChart";
+import { MetricsPdfDownloadButton } from "./MetricsPdfDownloadButton";
 import { MetricsStatsCards } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
+import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
+import { PageContainer } from "@/components/ui/PageContainer";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
@@ -41,6 +46,7 @@ export function MetricsPageContent() {
     qubitMetrics,
     couplingMetrics,
     colorScale,
+    cdfGroups,
     isLoading: isConfigLoading,
     isError: isConfigError,
   } = useMetricsConfig();
@@ -217,25 +223,80 @@ export function MetricsPageContent() {
     return scaledData;
   }, [data, currentMetricConfig, metricType]);
 
+  // Process all metrics data for CDF groups
+  const allMetricsData = useMemo(() => {
+    if (!data?.data) return {};
+
+    const metricsSource =
+      metricType === "qubit"
+        ? data.data.qubit_metrics
+        : data.data.coupling_metrics;
+
+    if (!metricsSource) return {};
+
+    const result: Record<string, { [key: string]: { value: number | null } }> =
+      {};
+
+    const configList = metricType === "qubit" ? qubitMetrics : couplingMetrics;
+
+    configList.forEach((metricConfig) => {
+      const rawData =
+        metricsSource[metricConfig.key as keyof typeof metricsSource];
+      if (!rawData) return;
+
+      const scaledData: { [key: string]: { value: number | null } } = {};
+      Object.entries(rawData).forEach(([key, metricValue]: [string, any]) => {
+        const formattedKey =
+          metricType === "qubit"
+            ? key.startsWith("Q")
+              ? key
+              : `Q${key.padStart(2, "0")}`
+            : key;
+        const value = metricValue?.value;
+        scaledData[formattedKey] = {
+          value:
+            value !== null && value !== undefined && typeof value === "number"
+              ? value * metricConfig.scale
+              : null,
+        };
+      });
+      result[metricConfig.key] = scaledData;
+    });
+
+    return result;
+  }, [data, metricType, qubitMetrics, couplingMetrics]);
+
+  // Get CDF group that contains the selected metric
+  const currentCdfGroup = useMemo(() => {
+    const groups =
+      metricType === "qubit" ? cdfGroups.qubit : cdfGroups.coupling;
+    return (
+      groups.find((group) => group.metrics.includes(selectedMetric)) || null
+    );
+  }, [metricType, cdfGroups, selectedMetric]);
+
   // Show skeleton during initial loading
   if (isConfigLoading || isChipsLoading) {
     return <MetricsPageSkeleton />;
   }
 
   return (
-    <div className="w-full min-h-screen bg-base-100/50 px-4 md:px-6 py-6 md:py-8">
+    <PageContainer>
       <div className="h-full flex flex-col space-y-4 md:space-y-6">
         {/* Header Section */}
         <div className="flex flex-col gap-4 md:gap-6">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold">
-                Chip Metrics Dashboard
-              </h1>
-              <p className="text-sm text-base-content/70 mt-1">
-                View and compare qubit performance metrics
-              </p>
-            </div>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <PageHeader
+              title="Chip Metrics Dashboard"
+              description="View and compare qubit performance metrics"
+              className="mb-0"
+            />
+            <MetricsPdfDownloadButton
+              chipId={selectedChip}
+              withinHours={withinHours}
+              selectionMode={selectionMode}
+              disabled={!selectedChip || isLoading}
+            />
           </div>
 
           {/* Metric Type Tabs */}
@@ -368,12 +429,19 @@ export function MetricsPageContent() {
           </div>
         ) : isLoading ? (
           <div className="flex items-center justify-center h-96">
-            <span className="loading loading-spinner loading-lg"></span>
+            <QuantumLoader
+              size="lg"
+              showLabel
+              label="Loading metrics data..."
+            />
           </div>
         ) : isConfigLoading ? (
           <div className="flex items-center justify-center h-96">
-            <span className="loading loading-spinner loading-lg"></span>
-            <span className="ml-2">Loading metrics configuration...</span>
+            <QuantumLoader
+              size="lg"
+              showLabel
+              label="Loading metrics configuration..."
+            />
           </div>
         ) : isConfigError ? (
           <div className="alert alert-error">
@@ -403,6 +471,34 @@ export function MetricsPageContent() {
               gridSize={gridSize}
               metricType={metricType}
             />
+
+            {/* CDF Chart for current metric's group */}
+            {currentCdfGroup && (
+              <MetricsCdfChart
+                metricsData={
+                  currentCdfGroup.metrics
+                    .map((metricKey) => {
+                      const config = metricsConfig.find(
+                        (m) => m.key === metricKey,
+                      );
+                      return config
+                        ? {
+                            key: metricKey,
+                            title: config.title,
+                            data: allMetricsData[metricKey] || null,
+                          }
+                        : null;
+                    })
+                    .filter(Boolean) as {
+                    key: string;
+                    title: string;
+                    data: { [key: string]: { value: number | null } } | null;
+                  }[]
+                }
+                groupTitle={currentCdfGroup.title}
+                unit={currentCdfGroup.unit}
+              />
+            )}
 
             {/* Metric Grid */}
             {metricType === "qubit" ? (
@@ -443,6 +539,6 @@ export function MetricsPageContent() {
           </div>
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 }
