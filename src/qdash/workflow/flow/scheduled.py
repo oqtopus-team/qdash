@@ -40,35 +40,12 @@ from prefect import get_run_logger, task
 from qdash.workflow.engine.calibration import CRScheduler, OneQubitScheduler
 from qdash.workflow.flow.github import ConfigFileType, GitHubPushConfig
 from qdash.workflow.flow.session import finish_calibration, get_session, init_calibration
-
-# =============================================================================
-# Default Task Lists
-# =============================================================================
-
-FULL_1Q_TASKS = [
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CheckT1",
-    "CheckT2Echo",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "ReadoutClassification",
-    "RandomizedBenchmarking",
-    "X90InterleavedRandomizedBenchmarking",
-]
-
-FULL_2Q_TASKS = [
-    "CheckCrossResonance",
-    "CreateZX90",
-    "CheckZX90",
-    "CheckBellState",
-]
-
+from qdash.workflow.flow.tasks import (
+    CHECK_1Q_TASKS,
+    FULL_1Q_TASKS,
+    FULL_1Q_TASKS_AFTER_CHECK,
+    FULL_2Q_TASKS,
+)
 
 # =============================================================================
 # Internal Prefect Tasks
@@ -188,7 +165,11 @@ def extract_candidate_qubits(
             x90_fidelity_param = irb_result.get("x90_gate_fidelity")
 
             if x90_fidelity_param is not None:
-                x90_fidelity = x90_fidelity_param.value if hasattr(x90_fidelity_param, "value") else x90_fidelity_param
+                x90_fidelity = (
+                    x90_fidelity_param.value
+                    if hasattr(x90_fidelity_param, "value")
+                    else x90_fidelity_param
+                )
                 if x90_fidelity >= x90_fidelity_threshold:
                     candidates.append(qid)
 
@@ -269,6 +250,7 @@ def calibrate_one_qubit_scheduled(
             chip_id,
             stage_info.qids,
             flow_name=f"{flow_name}_{stage_name}" if flow_name else stage_name,
+            tags=[flow_name] if flow_name else None,
             project_id=project_id,
             enable_github_pull=True,
             github_push_config=GitHubPushConfig(
@@ -283,7 +265,9 @@ def calibrate_one_qubit_scheduled(
         )
 
         # Execute MUX groups in parallel, qubits within each group sequentially
-        futures = [_calibrate_mux_qubits.submit(qids=group, tasks=tasks) for group in parallel_groups]
+        futures = [
+            _calibrate_mux_qubits.submit(qids=group, tasks=tasks) for group in parallel_groups
+        ]
         mux_results = [f.result() for f in futures]
 
         # Combine results
@@ -376,7 +360,9 @@ def calibrate_one_qubit_synchronized(
 
             # Start new session
             current_box_type = step.box_type
-            box_qids = [qid for s in schedule.get_steps_by_box(current_box_type) for qid in s.parallel_qids]
+            box_qids = [
+                qid for s in schedule.get_steps_by_box(current_box_type) for qid in s.parallel_qids
+            ]
 
             stage_name = f"Box_{current_box_type}"
             init_calibration(
@@ -384,6 +370,7 @@ def calibrate_one_qubit_synchronized(
                 chip_id,
                 box_qids,
                 flow_name=f"{flow_name}_{stage_name}" if flow_name else stage_name,
+                tags=[flow_name] if flow_name else None,
                 project_id=project_id,
                 enable_github_pull=True,
                 github_push_config=GitHubPushConfig(
@@ -493,6 +480,7 @@ def calibrate_two_qubit_scheduled(
         chip_id,
         candidate_qubits,
         flow_name=f"{flow_name}_2Qubit" if flow_name else "2Qubit",
+        tags=[flow_name] if flow_name else None,
         project_id=project_id,
         enable_github_pull=False,
         github_push_config=GitHubPushConfig(
