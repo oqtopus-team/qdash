@@ -17,6 +17,12 @@ from qdash.workflow.flow.scheduled import (
     calibrate_two_qubit_scheduled,
     extract_candidate_qubits,
 )
+from qdash.workflow.flow.tasks import (
+    CHECK_1Q_TASKS,
+    FULL_1Q_TASKS,
+    FULL_1Q_TASKS_AFTER_CHECK,
+    FULL_2Q_TASKS,
+)
 from qdash.workflow.flow.session import (
     CalService,
     generate_execution_id,
@@ -31,6 +37,11 @@ __all__ = [
     "calibrate_one_qubit_synchronized",
     "calibrate_two_qubit_scheduled",
     "extract_candidate_qubits",
+    # === Task Lists ===
+    "CHECK_1Q_TASKS",
+    "FULL_1Q_TASKS",
+    "FULL_1Q_TASKS_AFTER_CHECK",
+    "FULL_2Q_TASKS",
     # === GitHub Integration ===
     "GitHubIntegration",
     "GitHubPushConfig",
