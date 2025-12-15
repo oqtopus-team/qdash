@@ -966,27 +966,32 @@ class CalService:
         self,
         mux_ids: list[int] | None = None,
         exclude_qids: list[str] | None = None,
-        tasks_1q: list[str] | None = None,
+        tasks_1q_check: list[str] | None = None,
+        tasks_1q_full: list[str] | None = None,
         tasks_2q: list[str] | None = None,
         mode: str = "synchronized",
         fidelity_threshold: float = 0.90,
         max_parallel_ops: int = 10,
     ) -> dict:
-        """Run full chip calibration (1-qubit + 2-qubit).
+        """Run full chip calibration (1Q Check -> 1Q Full -> 2Q).
 
-        Performs complete chip calibration with automatic quality filtering.
+        Performs complete chip calibration in 3 separate executions:
+        1. 1Q Check: Basic characterization (Rabi, HPI, T1, T2, Ramsey)
+        2. 1Q Full: Advanced calibration (DRAG, RB, IRB)
+        3. 2Q: Coupling calibration (CR, ZX90, Bell)
 
         Args:
             mux_ids: MUX IDs to calibrate (default: all 16)
             exclude_qids: Qubit IDs to exclude
-            tasks_1q: 1-qubit tasks (default: standard suite)
-            tasks_2q: 2-qubit tasks (default: standard suite)
+            tasks_1q_check: 1Q check tasks (default: CHECK_1Q_TASKS)
+            tasks_1q_full: 1Q full tasks (default: FULL_1Q_TASKS_AFTER_CHECK)
+            tasks_2q: 2-qubit tasks (default: FULL_2Q_TASKS)
             mode: "synchronized" or "scheduled"
             fidelity_threshold: Minimum X90 fidelity for 2Q candidates
             max_parallel_ops: Max parallel CR operations
 
         Returns:
-            Results with "1qubit" and "2qubit" keys
+            Results with "1qubit_check", "1qubit_full", and "2qubit" keys
 
         Example:
             ```python
@@ -995,6 +1000,9 @@ class CalService:
             ```
         """
         from qdash.workflow.flow.scheduled import (
+            CHECK_1Q_TASKS,
+            FULL_1Q_TASKS_AFTER_CHECK,
+            FULL_2Q_TASKS,
             calibrate_one_qubit_scheduled,
             calibrate_one_qubit_synchronized,
             calibrate_two_qubit_scheduled,
@@ -1007,71 +1015,90 @@ class CalService:
             mux_ids = list(range(16))
         if exclude_qids is None:
             exclude_qids = []
-        if tasks_1q is None:
-            tasks_1q = [
-                "CheckRabi",
-                "CreateHPIPulse",
-                "CheckHPIPulse",
-                "CreatePIPulse",
-                "CheckPIPulse",
-                "CheckT1",
-                "CheckT2Echo",
-                "CreateDRAGHPIPulse",
-                "CheckDRAGHPIPulse",
-                "CreateDRAGPIPulse",
-                "CheckDRAGPIPulse",
-                "ReadoutClassification",
-                "RandomizedBenchmarking",
-                "X90InterleavedRandomizedBenchmarking",
-                "CheckRamsey",
-            ]
+        if tasks_1q_check is None:
+            tasks_1q_check = CHECK_1Q_TASKS
+        if tasks_1q_full is None:
+            tasks_1q_full = FULL_1Q_TASKS_AFTER_CHECK
         if tasks_2q is None:
-            tasks_2q = ["CheckCrossResonance", "CreateZX90", "CheckZX90", "CheckBellState"]
+            tasks_2q = FULL_2Q_TASKS
 
         logger.info(f"Running full chip calibration: mode={mode}")
 
-        # Stage 1: 1-qubit calibration
+        # Stage 1: 1Q Check (separate execution)
+        logger.info("Stage 1: 1Q Check calibration")
         if mode == "synchronized":
-            results_1q = calibrate_one_qubit_synchronized(
+            results_1q_check = calibrate_one_qubit_synchronized(
                 username=self.username,
                 chip_id=self.chip_id,
                 mux_ids=mux_ids,
                 exclude_qids=exclude_qids,
-                tasks=tasks_1q,
-                flow_name=self.flow_name,
+                tasks=tasks_1q_check,
+                flow_name=f"{self.flow_name}_1QCheck" if self.flow_name else "1QCheck",
                 project_id=self.project_id,
             )
         else:
-            results_1q = calibrate_one_qubit_scheduled(
+            results_1q_check = calibrate_one_qubit_scheduled(
                 username=self.username,
                 chip_id=self.chip_id,
                 mux_ids=mux_ids,
                 exclude_qids=exclude_qids,
-                tasks=tasks_1q,
-                flow_name=self.flow_name,
+                tasks=tasks_1q_check,
+                flow_name=f"{self.flow_name}_1QCheck" if self.flow_name else "1QCheck",
                 project_id=self.project_id,
             )
 
-        # Stage 2: Extract candidates
-        candidates = extract_candidate_qubits(results_1q, fidelity_threshold)
-        logger.info(f"1-qubit success: {len(candidates)} qubits")
+        # Stage 2: 1Q Full (separate execution)
+        logger.info("Stage 2: 1Q Full calibration")
+        if mode == "synchronized":
+            results_1q_full = calibrate_one_qubit_synchronized(
+                username=self.username,
+                chip_id=self.chip_id,
+                mux_ids=mux_ids,
+                exclude_qids=exclude_qids,
+                tasks=tasks_1q_full,
+                flow_name=f"{self.flow_name}_1QFull" if self.flow_name else "1QFull",
+                project_id=self.project_id,
+            )
+        else:
+            results_1q_full = calibrate_one_qubit_scheduled(
+                username=self.username,
+                chip_id=self.chip_id,
+                mux_ids=mux_ids,
+                exclude_qids=exclude_qids,
+                tasks=tasks_1q_full,
+                flow_name=f"{self.flow_name}_1QFull" if self.flow_name else "1QFull",
+                project_id=self.project_id,
+            )
+
+        # Stage 3: Extract candidates from 1Q Full results (IRB results)
+        candidates = extract_candidate_qubits(results_1q_full, fidelity_threshold)
+        logger.info(f"1Q Full complete: {len(candidates)} candidate qubits for 2Q")
 
         if len(candidates) == 0:
             logger.warning("No candidates, skipping 2-qubit")
-            return {"1qubit": results_1q, "2qubit": {}}
+            return {
+                "1qubit_check": results_1q_check,
+                "1qubit_full": results_1q_full,
+                "2qubit": {},
+            }
 
-        # Stage 3: 2-qubit calibration
+        # Stage 4: 2Q calibration (separate execution)
+        logger.info("Stage 3: 2Q calibration")
         results_2q = calibrate_two_qubit_scheduled(
             username=self.username,
             chip_id=self.chip_id,
             candidate_qubits=candidates,
             tasks=tasks_2q,
-            flow_name=self.flow_name,
+            flow_name=f"{self.flow_name}_2Q" if self.flow_name else "2Q",
             project_id=self.project_id,
             max_parallel_ops=max_parallel_ops,
         )
 
-        return {"1qubit": results_1q, "2qubit": results_2q}
+        return {
+            "1qubit_check": results_1q_check,
+            "1qubit_full": results_1q_full,
+            "2qubit": results_2q,
+        }
 
     def sweep(
         self,

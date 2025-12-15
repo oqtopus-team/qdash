@@ -8,12 +8,28 @@
     "function_name": "simple_calibration"
   },
   {
-    "id": "full_chip",
-    "name": "Full Chip Calibration",
-    "description": "Complete chip calibration: 1-qubit + CR scheduling + 2-qubit with automatic quality filtering.",
+    "id": "one_qubit_check",
+    "name": "1Q Check",
+    "description": "Basic 1-qubit characterization (Rabi, HPI, T1, T2, Ramsey). Run before 1Q Full.",
     "category": "production",
-    "filename": "full_chip.py",
-    "function_name": "full_chip_calibration"
+    "filename": "one_qubit_check.py",
+    "function_name": "one_qubit_check"
+  },
+  {
+    "id": "one_qubit_full",
+    "name": "1Q Full",
+    "description": "Advanced 1-qubit calibration (DRAG, RB, IRB). Run after 1Q Check.",
+    "category": "production",
+    "filename": "one_qubit_full.py",
+    "function_name": "one_qubit_full"
+  },
+  {
+    "id": "full_calibration",
+    "name": "Full Calibration",
+    "description": "Complete calibration sequence: 1Q Check -> 1Q Full -> 2Q (3 separate executions).",
+    "category": "production",
+    "filename": "full_calibration.py",
+    "function_name": "full_calibration"
   },
   {
     "id": "parameter_sweep",
