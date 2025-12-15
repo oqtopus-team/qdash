@@ -1275,7 +1275,9 @@ class CalService:
                     return {}
 
                 # Flatten all qubits for initialization
-                all_qids = list(set(q for group in parallel_groups for c, t in group for q in (c, t)))
+                all_qids = list(
+                    set(q for group in parallel_groups for c, t in group for q in (c, t))
+                )
                 coupling_groups = [[f"{c}-{t}" for c, t in group] for group in parallel_groups]
                 logger.info(
                     f"Running 2-qubit calibration: {len(parallel_groups)} groups, "
@@ -1298,7 +1300,9 @@ class CalService:
                 results = {}
                 for group_idx, group in enumerate(parallel_groups):
                     coupling_qids = [f"{c}-{t}" for c, t in group]
-                    logger.info(f"Executing group {group_idx + 1}/{len(parallel_groups)}: {coupling_qids}")
+                    logger.info(
+                        f"Executing group {group_idx + 1}/{len(parallel_groups)}: {coupling_qids}"
+                    )
                     futures = [_execute_coupling.submit(self, qid, tasks) for qid in coupling_qids]
                     group_results = {qid: f.result() for qid, f in zip(coupling_qids, futures)}
                     results.update(group_results)

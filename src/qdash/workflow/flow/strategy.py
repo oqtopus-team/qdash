@@ -158,9 +158,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
             parallel_groups = stage_info.parallel_groups
 
             # Determine flow name for this stage
-            stage_flow_name = (
-                f"{config.flow_name}_{stage_name}" if config.flow_name else stage_name
-            )
+            stage_flow_name = f"{config.flow_name}_{stage_name}" if config.flow_name else stage_name
 
             init_calibration(
                 cal_service.username,
