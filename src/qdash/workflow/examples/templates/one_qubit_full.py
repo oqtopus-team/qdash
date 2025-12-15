@@ -16,7 +16,7 @@ Tasks:
 Execution flow:
     1. Run one_qubit_check -> basic characterization
     2. Run one_qubit_full (this template) -> advanced calibration
-    3. Run two_qubit_rerun -> 2Q calibration (use candidate_qubits from this execution)
+    3. Run two_qubit -> 2Q calibration (use candidate_qubits from this execution)
 
 Example:
     one_qubit_full(
@@ -27,7 +27,7 @@ Example:
 """
 
 from prefect import flow
-from qdash.workflow.flow.scheduled import calibrate_one_qubit_synchronized
+from qdash.workflow.flow import CalService
 from qdash.workflow.flow.tasks import FULL_1Q_TASKS_AFTER_CHECK
 
 
@@ -38,6 +38,7 @@ def one_qubit_full(
     mux_ids: list[int] | None = None,
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
+    mode: str = "synchronized",
     flow_name: str | None = None,
     project_id: str | None = None,
 ):
@@ -51,6 +52,7 @@ def one_qubit_full(
         mux_ids: MUX IDs to calibrate (default: all 16)
         exclude_qids: Qubit IDs to exclude
         qids: Not used (for UI compatibility)
+        mode: Execution mode - "synchronized" or "scheduled"
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
     """
@@ -70,12 +72,10 @@ def one_qubit_full(
     # Execution
     # =========================================================================
 
-    return calibrate_one_qubit_synchronized(
-        username=username,
-        chip_id=chip_id,
+    cal = CalService(username, chip_id, flow_name=flow_name, project_id=project_id)
+    return cal.one_qubit(
         mux_ids=mux_ids,
         exclude_qids=exclude_qids,
         tasks=tasks,
-        flow_name=flow_name,
-        project_id=project_id,
+        mode=mode,
     )

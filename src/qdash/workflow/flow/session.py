@@ -962,6 +962,66 @@ class CalService:
             self.fail_calibration(str(e))
             raise
 
+    def one_qubit(
+        self,
+        mux_ids: list[int] | None = None,
+        exclude_qids: list[str] | None = None,
+        tasks: list[str] | None = None,
+        mode: str = "synchronized",
+        flow_name: str | None = None,
+    ) -> dict:
+        """Run 1-qubit calibration with configurable execution strategy.
+
+        Args:
+            mux_ids: MUX IDs to calibrate (default: all 16)
+            exclude_qids: Qubit IDs to exclude
+            tasks: 1-qubit task names (default: FULL_1Q_TASKS)
+            mode: Execution mode - "synchronized" or "scheduled"
+                - "synchronized": Step-based, all MUXes execute same step simultaneously
+                - "scheduled": Box-based, MUX groups run in parallel
+            flow_name: Override flow name for this execution
+
+        Returns:
+            Results dictionary organized by Box stage
+
+        Example:
+            ```python
+            cal = CalService("alice", "64Qv3")
+
+            # Synchronized mode (default)
+            results = cal.one_qubit(mux_ids=[0, 1, 2, 3])
+
+            # Scheduled mode
+            results = cal.one_qubit(
+                mux_ids=[0, 1, 2, 3],
+                mode="scheduled",
+            )
+            ```
+        """
+        from qdash.workflow.flow.strategy import OneQubitConfig, get_one_qubit_strategy
+        from qdash.workflow.flow.tasks import FULL_1Q_TASKS
+
+        if mux_ids is None:
+            mux_ids = list(range(16))
+        if exclude_qids is None:
+            exclude_qids = []
+        if tasks is None:
+            tasks = FULL_1Q_TASKS
+
+        # Use flow_name override or fall back to self.flow_name
+        effective_flow_name = flow_name if flow_name is not None else self.flow_name
+
+        config = OneQubitConfig(
+            mux_ids=mux_ids,
+            exclude_qids=exclude_qids,
+            tasks=tasks,
+            flow_name=effective_flow_name,
+            project_id=self.project_id,
+        )
+
+        strategy = get_one_qubit_strategy(mode)
+        return strategy.execute(self, config)
+
     def run_full_chip(
         self,
         mux_ids: list[int] | None = None,
@@ -999,14 +1059,11 @@ class CalService:
             results = cal.run_full_chip(mux_ids=[0, 1, 2, 3])
             ```
         """
-        from qdash.workflow.flow.scheduled import (
+        from qdash.workflow.flow.scheduled import extract_candidate_qubits
+        from qdash.workflow.flow.tasks import (
             CHECK_1Q_TASKS,
             FULL_1Q_TASKS_AFTER_CHECK,
             FULL_2Q_TASKS,
-            calibrate_one_qubit_scheduled,
-            calibrate_one_qubit_synchronized,
-            calibrate_two_qubit_scheduled,
-            extract_candidate_qubits,
         )
 
         logger = get_run_logger()
@@ -1024,51 +1081,25 @@ class CalService:
 
         logger.info(f"Running full chip calibration: mode={mode}")
 
-        # Stage 1: 1Q Check (separate execution)
+        # Stage 1: 1Q Check
         logger.info("Stage 1: 1Q Check calibration")
-        if mode == "synchronized":
-            results_1q_check = calibrate_one_qubit_synchronized(
-                username=self.username,
-                chip_id=self.chip_id,
-                mux_ids=mux_ids,
-                exclude_qids=exclude_qids,
-                tasks=tasks_1q_check,
-                flow_name=f"{self.flow_name}_1QCheck" if self.flow_name else "1QCheck",
-                project_id=self.project_id,
-            )
-        else:
-            results_1q_check = calibrate_one_qubit_scheduled(
-                username=self.username,
-                chip_id=self.chip_id,
-                mux_ids=mux_ids,
-                exclude_qids=exclude_qids,
-                tasks=tasks_1q_check,
-                flow_name=f"{self.flow_name}_1QCheck" if self.flow_name else "1QCheck",
-                project_id=self.project_id,
-            )
+        results_1q_check = self.one_qubit(
+            mux_ids=mux_ids,
+            exclude_qids=exclude_qids,
+            tasks=tasks_1q_check,
+            mode=mode,
+            flow_name=f"{self.flow_name}_1QCheck" if self.flow_name else "1QCheck",
+        )
 
-        # Stage 2: 1Q Full (separate execution)
+        # Stage 2: 1Q Full
         logger.info("Stage 2: 1Q Full calibration")
-        if mode == "synchronized":
-            results_1q_full = calibrate_one_qubit_synchronized(
-                username=self.username,
-                chip_id=self.chip_id,
-                mux_ids=mux_ids,
-                exclude_qids=exclude_qids,
-                tasks=tasks_1q_full,
-                flow_name=f"{self.flow_name}_1QFull" if self.flow_name else "1QFull",
-                project_id=self.project_id,
-            )
-        else:
-            results_1q_full = calibrate_one_qubit_scheduled(
-                username=self.username,
-                chip_id=self.chip_id,
-                mux_ids=mux_ids,
-                exclude_qids=exclude_qids,
-                tasks=tasks_1q_full,
-                flow_name=f"{self.flow_name}_1QFull" if self.flow_name else "1QFull",
-                project_id=self.project_id,
-            )
+        results_1q_full = self.one_qubit(
+            mux_ids=mux_ids,
+            exclude_qids=exclude_qids,
+            tasks=tasks_1q_full,
+            mode=mode,
+            flow_name=f"{self.flow_name}_1QFull" if self.flow_name else "1QFull",
+        )
 
         # Stage 3: Extract candidates from 1Q Full results (IRB results)
         candidates = extract_candidate_qubits(results_1q_full, fidelity_threshold)
@@ -1082,16 +1113,13 @@ class CalService:
                 "2qubit": {},
             }
 
-        # Stage 4: 2Q calibration (separate execution)
+        # Stage 4: 2Q calibration
         logger.info("Stage 3: 2Q calibration")
-        results_2q = calibrate_two_qubit_scheduled(
-            username=self.username,
-            chip_id=self.chip_id,
+        results_2q = self.two_qubit(
             candidate_qubits=candidates,
             tasks=tasks_2q,
-            flow_name=f"{self.flow_name}_2Q" if self.flow_name else "2Q",
-            project_id=self.project_id,
             max_parallel_ops=max_parallel_ops,
+            flow_name=f"{self.flow_name}_2Q" if self.flow_name else "2Q",
         )
 
         return {
@@ -1169,16 +1197,27 @@ class CalService:
 
     def two_qubit(
         self,
-        pairs: list[tuple[str, str]],
+        pairs: list[tuple[str, str]] | None = None,
+        candidate_qubits: list[str] | None = None,
         tasks: list[str] | None = None,
+        max_parallel_ops: int = 10,
+        flow_name: str | None = None,
     ) -> dict:
         """Run 2-qubit coupling calibration.
 
-        Calibrates coupling between qubit pairs.
+        Calibrates coupling between qubit pairs. Supports two modes:
+        1. Explicit pairs: Provide `pairs` directly (all run in parallel)
+        2. Scheduled: Provide `candidate_qubits` to use CRScheduler for
+           automatic parallel group generation with MUX conflict handling
 
         Args:
-            pairs: List of (control, target) qubit pairs
+            pairs: List of (control, target) qubit pairs (all run in parallel)
+            candidate_qubits: List of candidate qubit IDs for automatic scheduling.
+                CRScheduler will generate parallel groups based on MUX conflicts.
+                If provided, `pairs` is ignored.
             tasks: 2-qubit task names (default: standard suite)
+            max_parallel_ops: Maximum parallel operations per group (default: 10)
+            flow_name: Override flow name for this execution (default: use self.flow_name)
 
         Returns:
             Results keyed by coupling ID (e.g., "0-1")
@@ -1186,12 +1225,27 @@ class CalService:
         Example:
             ```python
             cal = CalService("alice", "64Qv3")
+
+            # Mode 1: Explicit pairs (all run in parallel)
             results = cal.two_qubit(
                 pairs=[("0", "1"), ("2", "3")]
             )
+
+            # Mode 2: Automatic scheduling with candidate qubits
+            results = cal.two_qubit(
+                candidate_qubits=["0", "1", "2", "3", "4", "5"],
+                max_parallel_ops=10,
+            )
             ```
         """
+        from qdash.workflow.engine.calibration import CRScheduler
+
         logger = get_run_logger()
+
+        # Allow flow_name override for internal calls (e.g., from run_full_chip)
+        original_flow_name = self.flow_name
+        if flow_name is not None:
+            self.flow_name = flow_name
 
         if tasks is None:
             tasks = [
@@ -1203,12 +1257,72 @@ class CalService:
                 "ZX90InterleavedRandomizedBenchmarking",
             ]
 
-        coupling_qids = [f"{c}-{t}" for c, t in pairs]
-        all_qids = list(set(q for pair in pairs for q in pair))
-        logger.info(f"Running 2-qubit calibration: {len(pairs)} pairs")
-
         try:
-            self._initialize(all_qids)
+            # Mode 2: Automatic scheduling with CRScheduler
+            if candidate_qubits is not None:
+                wiring_config_path = f"/app/config/qubex/{self.chip_id}/config/wiring.yaml"
+                scheduler = CRScheduler(
+                    self.username, self.chip_id, wiring_config_path=wiring_config_path
+                )
+                schedule = scheduler.generate(
+                    candidate_qubits=candidate_qubits,
+                    max_parallel_ops=max_parallel_ops,
+                )
+                parallel_groups = schedule.parallel_groups
+
+                if not parallel_groups:
+                    logger.warning("No valid CR pairs after scheduling")
+                    return {}
+
+                # Flatten all qubits for initialization
+                all_qids = list(set(q for group in parallel_groups for c, t in group for q in (c, t)))
+                coupling_groups = [[f"{c}-{t}" for c, t in group] for group in parallel_groups]
+                logger.info(
+                    f"Running 2-qubit calibration: {len(parallel_groups)} groups, "
+                    f"{sum(len(g) for g in parallel_groups)} pairs"
+                )
+
+                self._initialize(
+                    all_qids,
+                    note={
+                        "type": "2-qubit",
+                        "mode": "scheduled",
+                        "candidate_qubits": candidate_qubits,
+                        "schedule": coupling_groups,
+                        "total_groups": len(parallel_groups),
+                        "total_pairs": sum(len(g) for g in parallel_groups),
+                    },
+                )
+
+                # Execute groups sequentially, pairs within group in parallel
+                results = {}
+                for group_idx, group in enumerate(parallel_groups):
+                    coupling_qids = [f"{c}-{t}" for c, t in group]
+                    logger.info(f"Executing group {group_idx + 1}/{len(parallel_groups)}: {coupling_qids}")
+                    futures = [_execute_coupling.submit(self, qid, tasks) for qid in coupling_qids]
+                    group_results = {qid: f.result() for qid, f in zip(coupling_qids, futures)}
+                    results.update(group_results)
+
+                self.finish_calibration()
+                return results
+
+            # Mode 1: Explicit pairs (legacy mode, all run in parallel)
+            if pairs is None:
+                raise ValueError("Either 'pairs' or 'candidate_qubits' must be provided")
+
+            coupling_qids = [f"{c}-{t}" for c, t in pairs]
+            all_qids = list(set(q for pair in pairs for q in pair))
+            logger.info(f"Running 2-qubit calibration: {len(pairs)} pairs")
+
+            self._initialize(
+                all_qids,
+                note={
+                    "type": "2-qubit",
+                    "mode": "explicit_pairs",
+                    "pairs": [f"{c}-{t}" for c, t in pairs],
+                    "total_pairs": len(pairs),
+                },
+            )
 
             futures = [_execute_coupling.submit(self, qid, tasks) for qid in coupling_qids]
             results = {qid: f.result() for qid, f in zip(coupling_qids, futures)}
@@ -1220,6 +1334,9 @@ class CalService:
             logger.error(f"Calibration failed: {e}")
             self.fail_calibration(str(e))
             raise
+        finally:
+            # Restore original flow_name
+            self.flow_name = original_flow_name
 
     def check_skew(self, muxes: list[int] | None = None) -> dict:
         """Run system-level skew check.

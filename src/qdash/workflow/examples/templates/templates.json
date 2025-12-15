@@ -10,7 +10,7 @@
   {
     "id": "one_qubit_check",
     "name": "1Q Check",
-    "description": "Basic 1-qubit characterization (Rabi, HPI, T1, T2, Ramsey). Run before 1Q Full.",
+    "description": "Basic 1-qubit characterization (Rabi, HPI, T1, T2, Ramsey). Supports synchronized/scheduled modes.",
     "category": "production",
     "filename": "one_qubit_check.py",
     "function_name": "one_qubit_check"
@@ -18,7 +18,7 @@
   {
     "id": "one_qubit_full",
     "name": "1Q Full",
-    "description": "Advanced 1-qubit calibration (DRAG, RB, IRB). Run after 1Q Check.",
+    "description": "Advanced 1-qubit calibration (DRAG, RB, IRB). Supports synchronized/scheduled modes.",
     "category": "production",
     "filename": "one_qubit_full.py",
     "function_name": "one_qubit_full"
@@ -50,7 +50,7 @@
   {
     "id": "two_qubit",
     "name": "Two-Qubit Calibration",
-    "description": "2-qubit coupling calibration (Cross Resonance, ZX90, Bell state) with parallel execution.",
+    "description": "2-qubit coupling calibration (CR, ZX90, Bell) with automatic CRScheduler for MUX conflict handling.",
     "category": "coupling",
     "filename": "two_qubit.py",
     "function_name": "two_qubit_calibration"
