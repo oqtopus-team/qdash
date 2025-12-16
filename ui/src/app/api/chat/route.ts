@@ -212,7 +212,9 @@ async function getCopilotConfig(): Promise<CopilotConfig | null> {
     // Fetch config from backend API (same endpoint as generated client)
     const internalApiUrl =
       process.env.INTERNAL_API_URL || "http://localhost:5715";
-    const response = await fetch(`${internalApiUrl}/api/metrics/copilot/config`);
+    const response = await fetch(
+      `${internalApiUrl}/api/metrics/copilot/config`,
+    );
 
     if (!response.ok) {
       console.warn("Failed to fetch copilot config:", response.status);
@@ -243,9 +245,7 @@ export async function POST(request: NextRequest) {
       process.env.OLLAMA_URL || "http://host.docker.internal:11434";
     // Use model from config, fallback to env var, then default
     const modelName =
-      copilotConfig?.model?.name ||
-      process.env.OLLAMA_MODEL ||
-      "gpt-oss:20b";
+      copilotConfig?.model?.name || process.env.OLLAMA_MODEL || "gpt-oss:20b";
 
     const ollama = new Ollama({ host: ollamaUrl });
 
@@ -283,7 +283,7 @@ export async function POST(request: NextRequest) {
     console.error("Chat API error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

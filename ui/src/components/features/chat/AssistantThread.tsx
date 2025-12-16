@@ -25,7 +25,9 @@ const MarkdownText: FC = () => {
   const content = useMessage((m) => m.content);
 
   const textContent = content
-    .filter((part): part is { type: "text"; text: string } => part.type === "text")
+    .filter(
+      (part): part is { type: "text"; text: string } => part.type === "text",
+    )
     .map((part) => part.text)
     .join("\n");
 
@@ -78,16 +80,16 @@ const MarkdownText: FC = () => {
             </pre>
           ),
           ul: ({ children }) => (
-            <ul className="list-disc list-inside my-2 space-y-1 pl-1">{children}</ul>
+            <ul className="list-disc list-inside my-2 space-y-1 pl-1">
+              {children}
+            </ul>
           ),
           ol: ({ children }) => (
             <ol className="list-decimal list-inside my-2 space-y-1 pl-1">
               {children}
             </ol>
           ),
-          li: ({ children }) => (
-            <li className="my-0.5">{children}</li>
-          ),
+          li: ({ children }) => <li className="my-0.5">{children}</li>,
           p: ({ children }) => <p className="my-2">{children}</p>,
           h1: ({ children }) => (
             <h1 className="text-xl font-bold my-3">{children}</h1>
@@ -131,7 +133,9 @@ const SimpleText: FC = () => {
   const content = useMessage((m) => m.content);
 
   const textContent = content
-    .filter((part): part is { type: "text"; text: string } => part.type === "text")
+    .filter(
+      (part): part is { type: "text"; text: string } => part.type === "text",
+    )
     .map((part) => part.text)
     .join("\n");
 
@@ -145,7 +149,9 @@ const CopyButton: FC = () => {
 
   const handleCopy = () => {
     const textContent = content
-      .filter((part): part is { type: "text"; text: string } => part.type === "text")
+      .filter(
+        (part): part is { type: "text"; text: string } => part.type === "text",
+      )
       .map((part) => part.text)
       .join("\n");
     navigator.clipboard.writeText(textContent);
@@ -193,10 +199,7 @@ const AssistantMessage: FC = () => {
           <ActionBarPrimitive.Root className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <CopyButton />
             <ActionBarPrimitive.Reload asChild>
-              <button
-                className="btn btn-ghost btn-xs"
-                title="Regenerate"
-              >
+              <button className="btn btn-ghost btn-xs" title="Regenerate">
                 <RefreshCw className="w-3 h-3" />
               </button>
             </ActionBarPrimitive.Reload>

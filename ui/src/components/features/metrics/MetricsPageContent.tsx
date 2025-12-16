@@ -539,7 +539,6 @@ export function MetricsPageContent() {
           </div>
         )}
       </div>
-
     </PageContainer>
   );
 }

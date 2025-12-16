@@ -32,7 +32,7 @@ export function ChatAssistant() {
       const chipId = args.chipId as string;
       const qubitId = args.qubitId as string;
       router.push(
-        `/chip/${encodeURIComponent(chipId)}/qubit/${encodeURIComponent(qubitId)}`
+        `/chip/${encodeURIComponent(chipId)}/qubit/${encodeURIComponent(qubitId)}`,
       );
       return `Navigated to qubit ${qubitId} on chip ${chipId}`;
     });
@@ -47,7 +47,7 @@ export function ChatAssistant() {
       const chipId = args.chipId as string;
       const executeId = args.executeId as string;
       router.push(
-        `/execution/${encodeURIComponent(chipId)}/${encodeURIComponent(executeId)}`
+        `/execution/${encodeURIComponent(chipId)}/${encodeURIComponent(executeId)}`,
       );
       return `Navigated to execution ${executeId}`;
     });

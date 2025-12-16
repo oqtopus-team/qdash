@@ -42,7 +42,7 @@ export function unregisterTool(name: string) {
 
 async function executeTool(
   name: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): Promise<string> {
   const handler = toolHandlers.get(name);
   if (!handler) {
@@ -96,7 +96,7 @@ export function AssistantRuntimeProvider({
                 : m.content
                     ?.map((c) => (c.type === "text" ? c.text : ""))
                     .join("") || "",
-          })
+          }),
         );
 
         // Call Ollama API
@@ -123,7 +123,7 @@ export function AssistantRuntimeProvider({
           for (const toolCall of assistantMsg.tool_calls) {
             const result = await executeTool(
               toolCall.function.name,
-              toolCall.function.arguments
+              toolCall.function.arguments,
             );
             toolResults.push(`${toolCall.function.name}: ${result}`);
           }
@@ -158,12 +158,14 @@ export function AssistantRuntimeProvider({
               content: [
                 {
                   type: "text",
-                  text:
-                    followUpData.message.content || toolResults.join("\n"),
+                  text: followUpData.message.content || toolResults.join("\n"),
                 },
               ],
             };
-            setMessages((currentMessages) => [...currentMessages, finalMessage]);
+            setMessages((currentMessages) => [
+              ...currentMessages,
+              finalMessage,
+            ]);
           } else {
             // If follow-up fails, show tool results
             const toolResultMessage: ThreadMessageLike = {
@@ -202,7 +204,7 @@ export function AssistantRuntimeProvider({
         setIsRunning(false);
       }
     },
-    [messages, context]
+    [messages, context],
   );
 
   const runtime = useExternalStoreRuntime({

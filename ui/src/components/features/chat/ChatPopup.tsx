@@ -61,7 +61,9 @@ export function ChatPopup() {
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-base-300 bg-base-200 rounded-t-xl shrink-0">
-        <h3 className="font-semibold text-base-content text-sm">QDash Assistant</h3>
+        <h3 className="font-semibold text-base-content text-sm">
+          QDash Assistant
+        </h3>
         <div className="flex gap-0.5">
           <ClearMessagesButton />
           <button

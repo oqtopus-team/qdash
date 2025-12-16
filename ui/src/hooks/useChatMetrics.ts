@@ -49,7 +49,7 @@ export function useChatMetrics({
     const values = Object.entries(metricData)
       .map(([key, data]) => ({ key, value: data.value }))
       .filter(
-        (item): item is { key: string; value: number } => item.value !== null
+        (item): item is { key: string; value: number } => item.value !== null,
       );
 
     if (values.length === 0) return null;
