@@ -12,11 +12,15 @@ export function ChatPopup() {
   // Fetch copilot config using generated client
   const { data: copilotConfig } = useGetCopilotConfig();
 
-  // Get initial message from config
+  // Get initial message and suggestions from config
   const configData = copilotConfig?.data as
-    | { initial_message?: string }
+    | {
+        initial_message?: string;
+        suggestions?: Array<{ label: string; prompt: string }>;
+      }
     | undefined;
   const initialMessage = configData?.initial_message;
+  const suggestions = configData?.suggestions;
 
   const toggleOpen = () => setIsOpen((prev) => !prev);
 
@@ -90,7 +94,10 @@ export function ChatPopup() {
 
       {/* Thread */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        <AssistantThread initialMessage={initialMessage} />
+        <AssistantThread
+          initialMessage={initialMessage}
+          suggestions={suggestions}
+        />
       </div>
     </div>
   );

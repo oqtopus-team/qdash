@@ -1,12 +1,13 @@
 "use client";
 
-import { type FC } from "react";
+import { type FC, useCallback } from "react";
 import {
   ThreadPrimitive,
   ComposerPrimitive,
   MessagePrimitive,
   ActionBarPrimitive,
   useMessage,
+  useThreadRuntime,
 } from "@assistant-ui/react";
 import {
   SendHorizontal,
@@ -276,12 +277,50 @@ const ScrollToBottom: FC = () => {
   );
 };
 
+interface Suggestion {
+  label: string;
+  prompt: string;
+}
+
+// Suggestion buttons component that can send messages
+const SuggestionButtons: FC<{ suggestions: Suggestion[] }> = ({
+  suggestions,
+}) => {
+  const threadRuntime = useThreadRuntime();
+
+  const handleClick = useCallback(
+    (prompt: string) => {
+      threadRuntime.append({
+        role: "user",
+        content: [{ type: "text", text: prompt }],
+      });
+    },
+    [threadRuntime],
+  );
+
+  return (
+    <div className="flex flex-wrap gap-2 justify-center max-w-sm">
+      {suggestions.map((suggestion, index) => (
+        <button
+          key={index}
+          onClick={() => handleClick(suggestion.prompt)}
+          className="btn btn-sm btn-outline btn-primary hover:btn-primary transition-all"
+        >
+          {suggestion.label}
+        </button>
+      ))}
+    </div>
+  );
+};
+
 interface AssistantThreadProps {
   initialMessage?: string;
+  suggestions?: Suggestion[];
 }
 
 export const AssistantThread: FC<AssistantThreadProps> = ({
   initialMessage,
+  suggestions,
 }) => {
   return (
     <ThreadPrimitive.Root className="relative flex flex-col h-full bg-base-100">
@@ -294,33 +333,13 @@ export const AssistantThread: FC<AssistantThreadProps> = ({
             <h3 className="text-lg font-semibold text-base-content mb-2">
               QDash Assistant
             </h3>
-            <div className="text-base-content/70 max-w-sm">
-              <ReactMarkdown
-                components={{
-                  ul: ({ children }) => (
-                    <ul className="list-none space-y-2 mt-3 text-left">
-                      {children}
-                    </ul>
-                  ),
-                  li: ({ children }) => (
-                    <li className="flex items-center gap-2 text-sm bg-base-200 rounded-lg px-3 py-2 hover:bg-base-300 cursor-pointer transition-colors">
-                      <span className="text-primary">*</span>
-                      {children}
-                    </li>
-                  ),
-                  p: ({ children }) => (
-                    <p className="text-sm opacity-80">{children}</p>
-                  ),
-                }}
-              >
-                {initialMessage ||
-                  `How can I help you today?
-
-- Show me the metrics dashboard
-- Navigate to chip list
-- Open workflow editor`}
-              </ReactMarkdown>
-            </div>
+            <p className="text-sm text-base-content/70 mb-4 max-w-sm">
+              {initialMessage ||
+                "I can help you analyze chip calibration metrics."}
+            </p>
+            {suggestions && suggestions.length > 0 && (
+              <SuggestionButtons suggestions={suggestions} />
+            )}
           </div>
         </ThreadPrimitive.Empty>
 

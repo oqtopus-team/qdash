@@ -85,28 +85,51 @@ export function ChatAssistant() {
           targetChipId = chips[0].chip_id;
         }
 
-        const response = await getChipMetrics(targetChipId, {
-          within_hours: withinHours,
-          selection_mode: "latest",
-        });
+        // Fetch metrics config and data in parallel
+        const [configResponse, metricsResponse] = await Promise.all([
+          getMetricsConfig(),
+          getChipMetrics(targetChipId, {
+            within_hours: withinHours,
+            selection_mode: "latest",
+          }),
+        ]);
 
-        const metrics = response.data;
+        const config = configResponse.data;
+        const metrics = metricsResponse.data;
+
         if (!metrics) {
           return `No metrics data found for chip ${targetChipId}`;
         }
 
-        // Build summary using typed schema
-        const qubitMetrics = metrics.qubit_metrics;
-        const couplingMetrics = metrics.coupling_metrics;
+        // Get metric configs
+        type MetricConfig = {
+          title: string;
+          unit: string;
+          scale: number;
+        };
+        const qubitMetricConfigs = (config?.qubit_metrics || {}) as Record<
+          string,
+          MetricConfig
+        >;
+        const couplingMetricConfigs = (config?.coupling_metrics ||
+          {}) as Record<string, MetricConfig>;
+
+        // Build summary using config
+        const qubitMetricsData = metrics.qubit_metrics as Record<
+          string,
+          Record<string, { value: number | null }> | undefined
+        >;
+        const couplingMetricsData = metrics.coupling_metrics as Record<
+          string,
+          Record<string, { value: number | null }> | undefined
+        >;
 
         const qubitCount = metrics.qubit_count;
-        const couplingCount = Object.keys(
-          couplingMetrics?.zx90_gate_fidelity || {},
-        ).length;
 
-        // Calculate statistics for key metrics
-        type MetricData = Record<string, { value: number | null }>;
-        const calcStats = (data: MetricData | undefined) => {
+        // Calculate statistics for a metric
+        const calcStats = (
+          data: Record<string, { value: number | null }> | undefined,
+        ) => {
           if (!data) return null;
           const values = Object.values(data)
             .map((d) => d.value)
@@ -119,31 +142,41 @@ export function ChatAssistant() {
           return { count: values.length, avg, min, max };
         };
 
-        const t1Stats = calcStats(qubitMetrics?.t1 as MetricData | undefined);
-        const t2Stats = calcStats(
-          qubitMetrics?.t2_echo as MetricData | undefined,
-        );
-        const x90FidelityStats = calcStats(
-          qubitMetrics?.x90_gate_fidelity as MetricData | undefined,
-        );
-        const readoutFidelityStats = calcStats(
-          qubitMetrics?.average_readout_fidelity as MetricData | undefined,
-        );
+        // Format value with scale
+        const formatValue = (value: number, scale: number, decimals = 2) => {
+          return (value * scale).toFixed(decimals);
+        };
 
         let summary = `Chip: ${targetChipId} (last ${withinHours / 24} days)\n`;
-        summary += `Qubits: ${qubitCount}, Couplings: ${couplingCount}\n\n`;
+        summary += `Qubits: ${qubitCount}\n\n`;
 
-        if (t1Stats) {
-          summary += `T1: avg=${(t1Stats.avg * 1e6).toFixed(1)}µs, range=[${(t1Stats.min * 1e6).toFixed(1)}-${(t1Stats.max * 1e6).toFixed(1)}]µs (${t1Stats.count} qubits)\n`;
+        // Process qubit metrics dynamically
+        summary += "**Qubit Metrics:**\n";
+        for (const [key, cfg] of Object.entries(qubitMetricConfigs)) {
+          const data = qubitMetricsData[key];
+          const stats = calcStats(data);
+          if (stats) {
+            const scale = cfg.scale || 1;
+            const decimals = cfg.unit === "%" ? 2 : 1;
+            summary += `${cfg.title}: avg=${formatValue(stats.avg, scale, decimals)}${cfg.unit}, range=[${formatValue(stats.min, scale, decimals)}-${formatValue(stats.max, scale, decimals)}]${cfg.unit} (${stats.count} qubits)\n`;
+          }
         }
-        if (t2Stats) {
-          summary += `T2 Echo: avg=${(t2Stats.avg * 1e6).toFixed(1)}µs, range=[${(t2Stats.min * 1e6).toFixed(1)}-${(t2Stats.max * 1e6).toFixed(1)}]µs (${t2Stats.count} qubits)\n`;
-        }
-        if (x90FidelityStats) {
-          summary += `X90 Gate Fidelity: avg=${(x90FidelityStats.avg * 100).toFixed(2)}%, range=[${(x90FidelityStats.min * 100).toFixed(2)}-${(x90FidelityStats.max * 100).toFixed(2)}]% (${x90FidelityStats.count} qubits)\n`;
-        }
-        if (readoutFidelityStats) {
-          summary += `Readout Fidelity: avg=${(readoutFidelityStats.avg * 100).toFixed(2)}%, range=[${(readoutFidelityStats.min * 100).toFixed(2)}-${(readoutFidelityStats.max * 100).toFixed(2)}]% (${readoutFidelityStats.count} qubits)\n`;
+
+        // Process coupling metrics dynamically
+        const hasCouplingData = Object.values(couplingMetricsData).some(
+          (d) => d && Object.keys(d).length > 0,
+        );
+        if (hasCouplingData) {
+          summary += "\n**Coupling Metrics:**\n";
+          for (const [key, cfg] of Object.entries(couplingMetricConfigs)) {
+            const data = couplingMetricsData[key];
+            const stats = calcStats(data);
+            if (stats) {
+              const scale = cfg.scale || 1;
+              const decimals = cfg.unit === "%" ? 2 : 1;
+              summary += `${cfg.title}: avg=${formatValue(stats.avg, scale, decimals)}${cfg.unit}, range=[${formatValue(stats.min, scale, decimals)}-${formatValue(stats.max, scale, decimals)}]${cfg.unit} (${stats.count} couplings)\n`;
+            }
+          }
         }
 
         return summary;

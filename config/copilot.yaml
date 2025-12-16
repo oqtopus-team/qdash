@@ -1,8 +1,12 @@
 # Copilot Configuration
-# Settings for the CopilotKit-powered metrics analysis assistant
+# Settings for the AI-powered metrics analysis assistant
 # This file is separate from metrics.yaml to keep Copilot-specific settings isolated
 
 enabled: true
+
+# Language configuration
+# Supported: "ja" (Japanese), "en" (English)
+language: ja
 
 # Model configuration
 model:
@@ -143,11 +147,18 @@ system_prompt: |
   - Always state when additional calibration data (e.g., x180 fidelity, static ZZ) would change the conclusion.
 
 # Initial greeting message shown in the chat UI
+# This is displayed when the chat is empty
 initial_message: |
-  I specialize in whole-chip evaluations for fixed-frequency transmon lattices. I can combine T1/T2, gate fidelities, readout performance, and coupling metrics into a single readiness report.
+  QDashアシスタントです。チップのキャリブレーションメトリクスの分析をサポートします。
 
-  Try asking things like:
-  - "Give me the overall score and readiness of this chip"
-  - "Which qubits or couplers fail multiple thresholds?"
-  - "Correlate weak ZX90 fidelities with coherence times"
-  - "What calibrations are needed before production deployment?"
+  下のボタンから質問を選ぶか、自由に質問してください。
+
+# Suggested questions shown as clickable buttons
+# These help users get started with common queries
+suggestions:
+  - label: チップを評価する
+    prompt: 最新のチップを評価してください。メトリクスの統計を取得して、チップの状態を分析してください。
+  - label: メトリクス一覧
+    prompt: 利用可能なメトリクスの種類を教えてください。
+  - label: メトリクスダッシュボードを開く
+    prompt: メトリクスダッシュボードに移動してください。
