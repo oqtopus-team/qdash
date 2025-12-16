@@ -162,6 +162,8 @@ export function AssistantRuntimeProvider({
                 },
               ],
             };
+            // Set running to false before adding message to avoid double AI icon
+            setIsRunning(false);
             setMessages((currentMessages) => [
               ...currentMessages,
               finalMessage,
@@ -172,6 +174,7 @@ export function AssistantRuntimeProvider({
               role: "assistant",
               content: [{ type: "text", text: toolResults.join("\n") }],
             };
+            setIsRunning(false);
             setMessages((currentMessages) => [
               ...currentMessages,
               toolResultMessage,
@@ -183,6 +186,7 @@ export function AssistantRuntimeProvider({
             role: "assistant",
             content: [{ type: "text", text: assistantMsg.content }],
           };
+          setIsRunning(false);
           setMessages((currentMessages) => [
             ...currentMessages,
             assistantMessage,
@@ -199,9 +203,8 @@ export function AssistantRuntimeProvider({
             },
           ],
         };
-        setMessages((currentMessages) => [...currentMessages, errorMessage]);
-      } finally {
         setIsRunning(false);
+        setMessages((currentMessages) => [...currentMessages, errorMessage]);
       }
     },
     [messages, context],

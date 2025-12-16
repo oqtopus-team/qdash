@@ -166,6 +166,56 @@ const TOOLS: Tool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "getChipList",
+      description:
+        "Fetch the list of all available chips in the system. Use this to find what chips exist before analyzing metrics.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getChipMetricsData",
+      description:
+        "Fetch calibration metrics data for a chip. Returns statistics for T1, T2, gate fidelity, readout fidelity. If no chipId is specified, uses the latest chip. Default time range is 7 days.",
+      parameters: {
+        type: "object",
+        properties: {
+          chipId: {
+            type: "string",
+            description:
+              "The chip ID to fetch metrics for. If not specified, uses the latest chip.",
+          },
+          withinHours: {
+            type: "number",
+            description:
+              "Time range in hours (e.g., 24 for 1 day, 168 for 7 days). Defaults to 168 (7 days).",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getMetricsConfiguration",
+      description:
+        "Get the list of available metrics types (qubit and coupling metrics)",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
 ];
 
 // Default system prompt (fallback if config is unavailable)
@@ -173,8 +223,18 @@ const DEFAULT_SYSTEM_PROMPT = `You are QDash Assistant, a helpful AI for the QDa
 
 Your capabilities:
 1. Navigate users to different pages in the application
-2. Help analyze metrics data when available
+2. Fetch and analyze metrics data autonomously
 3. Answer questions about quantum computing and calibration
+
+Data fetching tools:
+- Use getChipList to find available chips
+- Use getChipMetricsData to fetch metrics (defaults to latest chip, 7 days of data)
+- Use getMetricsConfiguration to see available metric types
+
+IMPORTANT: When users ask to "evaluate", "analyze", or "check" chip metrics without specifying a chip:
+- Use getChipMetricsData without arguments to get the latest chip's metrics for 7 days
+- Provide a summary with T1, T2, gate fidelity, and readout fidelity statistics
+- Highlight any concerning values or trends
 
 Available pages:
 - /metrics - Main metrics dashboard showing calibration metrics
