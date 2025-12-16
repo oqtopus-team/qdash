@@ -6,10 +6,10 @@ enabled: true
 
 # Model configuration
 model:
-  # Provider: "openai" or "anthropic"
-  provider: openai
-  # Model name (e.g., "gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet-20241022")
-  name: gpt-4o
+  # Provider: "openai", "anthropic", or "ollama"
+  provider: ollama
+  # Model name (e.g., "gpt-4o", "gpt-4o-mini", "gpt-oss:20b" for Ollama)
+  name: gpt-oss:20b
   # Temperature for response generation (0.0 - 2.0)
   temperature: 0.7
   # Maximum tokens for response

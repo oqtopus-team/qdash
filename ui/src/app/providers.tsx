@@ -11,12 +11,11 @@ import { ThemeProvider } from "./providers/theme-provider";
 import { ToastProvider, ToastContainer } from "@/components/ui/Toast";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
-import { COPILOT_ENABLED, CopilotProvider } from "@/features/copilot";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
 
-  const content = (
+  return (
     <AxiosProvider>
       <QueryClientProvider client={queryClient}>
         <NuqsAdapter>
@@ -34,11 +33,4 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       </QueryClientProvider>
     </AxiosProvider>
   );
-
-  // Wrap with CopilotKit only when enabled via feature flag
-  if (COPILOT_ENABLED) {
-    return <CopilotProvider>{content}</CopilotProvider>;
-  }
-
-  return content;
 }

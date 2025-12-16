@@ -6,6 +6,7 @@ import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { ChatAssistant } from "@/components/features/chat";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -13,6 +14,9 @@ interface AppLayoutProps {
 
 // Pages that should not show sidebar and navbar
 const PUBLIC_PATHS = ["/login"];
+
+// Feature flag for chat/AI assistant
+const CHAT_ENABLED = process.env.NEXT_PUBLIC_COPILOT_ENABLED === "true";
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
@@ -37,6 +41,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </main>
         </div>
       </div>
+      {/* Global AI Chat Assistant */}
+      {CHAT_ENABLED && <ChatAssistant />}
     </SidebarProvider>
   );
 }
