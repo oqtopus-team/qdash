@@ -40,15 +40,24 @@ class ModelConfig(BaseModel):
     max_tokens: int = 2048
 
 
+class Suggestion(BaseModel):
+    """Suggestion item for chat UI."""
+
+    label: str
+    prompt: str
+
+
 class CopilotConfig(BaseModel):
     """Copilot configuration."""
 
     enabled: bool = False
+    language: str = "en"
     model: ModelConfig = ModelConfig()
     evaluation_metrics: EvaluationMetrics = EvaluationMetrics()
     scoring: dict[str, ScoringThreshold] = {}
     system_prompt: str = ""
     initial_message: str = ""
+    suggestions: list[Suggestion] = []
 
 
 @lru_cache(maxsize=1)
