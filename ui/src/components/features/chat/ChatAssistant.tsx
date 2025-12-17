@@ -10,11 +10,28 @@ import {
 } from "./AssistantRuntimeProvider";
 import { listChips } from "@/client/chip/chip";
 import { getChipMetrics, getMetricsConfig } from "@/client/metrics/metrics";
+import { useGetCopilotConfig } from "@/client/copilot/copilot";
 
 export function ChatAssistant() {
   const router = useRouter();
   const pathname = usePathname();
   const [clearKey, setClearKey] = useState(0);
+
+  // Fetch copilot config once here
+  const { data: copilotConfigResponse } = useGetCopilotConfig();
+  const copilotConfigData = copilotConfigResponse?.data as
+    | {
+        initial_message?: string;
+        suggestions?: Array<{ label: string; prompt: string }>;
+        system_prompt?: string;
+        model?: {
+          provider?: string;
+          name?: string;
+          temperature?: number;
+          max_tokens?: number;
+        };
+      }
+    | undefined;
 
   // Clear messages by remounting the runtime provider
   const handleClearMessages = useCallback(() => {
@@ -224,8 +241,19 @@ export function ChatAssistant() {
   }, [router]);
 
   return (
-    <AssistantRuntimeProvider key={clearKey} context={{ pathname }}>
-      <ChatPopup onClear={handleClearMessages} />
+    <AssistantRuntimeProvider
+      key={clearKey}
+      context={{ pathname }}
+      copilotConfig={{
+        system_prompt: copilotConfigData?.system_prompt,
+        model: copilotConfigData?.model,
+      }}
+    >
+      <ChatPopup
+        onClear={handleClearMessages}
+        initialMessage={copilotConfigData?.initial_message}
+        suggestions={copilotConfigData?.suggestions}
+      />
     </AssistantRuntimeProvider>
   );
 }

@@ -5,7 +5,7 @@
  * a consistent interface with typed configuration.
  */
 
-import { useGetCopilotConfig } from "@/client/metrics/metrics";
+import { useGetCopilotConfig } from "@/client/copilot/copilot";
 
 export interface ScoringThreshold {
   good: number;
