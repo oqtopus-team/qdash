@@ -8,9 +8,10 @@ import {
   registerTool,
   unregisterTool,
 } from "./AssistantRuntimeProvider";
-import { listChips } from "@/client/chip/chip";
+import { listChips, getChip } from "@/client/chip/chip";
 import { getChipMetrics, getMetricsConfig } from "@/client/metrics/metrics";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import { getTopologyById } from "@/client/topology/topology";
 
 export function ChatAssistant() {
   const router = useRouter();
@@ -77,6 +78,20 @@ export function ChatAssistant() {
       return `Navigated to execution ${executeId}`;
     });
 
+    // Helper function to find the latest chip by installed_at
+    const findLatestChip = (
+      chips: Array<{ chip_id: string; installed_at?: string }>,
+    ) => {
+      if (chips.length === 0) return null;
+      return chips.reduce((latest, chip) => {
+        if (!latest.installed_at) return chip;
+        if (!chip.installed_at) return latest;
+        return new Date(chip.installed_at) > new Date(latest.installed_at)
+          ? chip
+          : latest;
+      });
+    };
+
     // Data fetching tools
     registerTool("getChipList", async () => {
       try {
@@ -86,7 +101,8 @@ export function ChatAssistant() {
           return "No chips found in the system.";
         }
         const chipList = chips.map((chip) => chip.chip_id).join(", ");
-        return `Available chips: ${chipList}. Latest chip: ${chips[0].chip_id}`;
+        const latestChip = findLatestChip(chips);
+        return `Available chips: ${chipList}. Latest chip: ${latestChip?.chip_id || chips[0].chip_id}`;
       } catch (error) {
         return `Error fetching chips: ${error instanceof Error ? error.message : "Unknown error"}`;
       }
@@ -97,15 +113,16 @@ export function ChatAssistant() {
         const chipId = args.chipId as string | undefined;
         const withinHours = (args.withinHours as number) || 168; // Default 7 days
 
-        // If no chipId, get the latest chip
+        // If no chipId or chipId is "latest", get the latest chip from the list
         let targetChipId = chipId;
-        if (!targetChipId) {
+        if (!targetChipId || targetChipId.toLowerCase() === "latest") {
           const chipsResponse = await listChips();
           const chips = chipsResponse.data?.chips || [];
           if (chips.length === 0) {
             return "No chips found. Cannot fetch metrics.";
           }
-          targetChipId = chips[0].chip_id;
+          const latestChip = findLatestChip(chips);
+          targetChipId = latestChip?.chip_id || chips[0].chip_id;
         }
 
         // Fetch metrics config and data in parallel
@@ -228,6 +245,82 @@ export function ChatAssistant() {
       }
     });
 
+    registerTool("getChipTopology", async (args) => {
+      try {
+        const chipId = args.chipId as string | undefined;
+
+        // Get chip ID (use latest if not specified)
+        let targetChipId = chipId;
+        if (!targetChipId || targetChipId.toLowerCase() === "latest") {
+          const chipsResponse = await listChips();
+          const chips = chipsResponse.data?.chips || [];
+          if (chips.length === 0) {
+            return "No chips found. Cannot fetch topology.";
+          }
+          const latestChip = findLatestChip(chips);
+          targetChipId = latestChip?.chip_id || chips[0].chip_id;
+        }
+
+        // Get chip info to find topology_id
+        const chipResponse = await getChip(targetChipId);
+        const chip = chipResponse.data;
+        if (!chip) {
+          return `Chip ${targetChipId} not found.`;
+        }
+
+        const topologyId = chip.topology_id;
+        if (!topologyId) {
+          return `Chip ${targetChipId} has no topology_id configured.`;
+        }
+
+        // Fetch topology definition
+        const topologyResponse = await getTopologyById(topologyId);
+        const topology = topologyResponse.data?.data;
+        if (!topology) {
+          return `Topology ${topologyId} not found.`;
+        }
+
+        // Format topology information
+        const qubits = topology.qubits || {};
+        const couplings = topology.couplings || {};
+
+        // Build qubit position map
+        const qubitPositions: string[] = [];
+        const neighborMap: Record<string, string[]> = {};
+
+        for (const [qid, qubitData] of Object.entries(qubits)) {
+          const q = qubitData as { position?: { row?: number; col?: number } };
+          if (q.position) {
+            qubitPositions.push(
+              `${qid}: (row=${q.position.row}, col=${q.position.col})`,
+            );
+          }
+          neighborMap[qid] = [];
+        }
+
+        // Build coupling list and neighbor map
+        const couplingList: string[] = [];
+        for (const [cid, couplingData] of Object.entries(couplings)) {
+          const c = couplingData as { qubit_ids?: string[] };
+          if (c.qubit_ids && c.qubit_ids.length === 2) {
+            const [q1, q2] = c.qubit_ids;
+            couplingList.push(`${cid}: ${q1} <-> ${q2}`);
+            if (neighborMap[q1]) neighborMap[q1].push(q2);
+            if (neighborMap[q2]) neighborMap[q2].push(q1);
+          }
+        }
+
+        // Format neighbor map
+        const neighborSummary = Object.entries(neighborMap)
+          .map(([qid, neighbors]) => `${qid}: [${neighbors.join(", ")}]`)
+          .join("\n");
+
+        return `Chip: ${targetChipId}\nTopology ID: ${topologyId}\nQubits: ${Object.keys(qubits).length}\nCouplings: ${Object.keys(couplings).length}\n\n**Qubit Positions:**\n${qubitPositions.join("\n")}\n\n**Couplings:**\n${couplingList.join("\n")}\n\n**Neighbor Map:**\n${neighborSummary}`;
+      } catch (error) {
+        return `Error fetching topology: ${error instanceof Error ? error.message : "Unknown error"}`;
+      }
+    });
+
     return () => {
       unregisterTool("navigateTo");
       unregisterTool("navigateToChip");
@@ -237,6 +330,7 @@ export function ChatAssistant() {
       unregisterTool("getChipList");
       unregisterTool("getChipMetricsData");
       unregisterTool("getMetricsConfiguration");
+      unregisterTool("getChipTopology");
     };
   }, [router]);
 
