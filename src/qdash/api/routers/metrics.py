@@ -7,7 +7,6 @@ from typing import Annotated, Any, Literal
 
 import pendulum
 from fastapi import APIRouter, Depends, HTTPException, Query
-from qdash.api.lib.copilot_config import load_copilot_config
 from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.metrics import (
@@ -111,31 +110,6 @@ async def get_metrics_config() -> dict[str, Any]:
 
     """
     config = load_metrics_config()
-    return config.model_dump()
-
-
-@router.get(
-    "/copilot/config",
-    summary="Get Copilot configuration",
-    operation_id="getCopilotConfig",
-)
-async def get_copilot_config() -> dict[str, Any]:
-    """Get Copilot configuration for the metrics assistant.
-
-    Retrieves the Copilot configuration from YAML, including:
-    - enabled: Whether Copilot is enabled
-    - evaluation_metrics: Which metrics to use for multi-metric evaluation
-    - scoring: Thresholds for good/excellent ratings per metric
-    - system_prompt: The AI assistant's system prompt
-    - initial_message: The initial greeting message
-
-    Returns
-    -------
-    dict[str, Any]
-        Copilot configuration dictionary
-
-    """
-    config = load_copilot_config()
     return config.model_dump()
 
 

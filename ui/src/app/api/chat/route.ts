@@ -17,15 +17,13 @@ interface ToolCall {
 }
 
 interface CopilotConfig {
-  enabled: boolean;
-  model: {
-    provider: string;
-    name: string;
-    temperature: number;
-    max_tokens: number;
+  system_prompt?: string;
+  model?: {
+    provider?: string;
+    name?: string;
+    temperature?: number;
+    max_tokens?: number;
   };
-  system_prompt: string;
-  initial_message: string;
 }
 
 // Tool definitions for QDash
@@ -255,55 +253,18 @@ Available pages:
 When users ask to see something or go somewhere, use the navigation tools.
 Be helpful, concise, and technical when needed.`;
 
-// Cache for copilot config
-let cachedConfig: CopilotConfig | null = null;
-let configFetchedAt: number = 0;
-const CONFIG_CACHE_TTL = 60000; // 1 minute
-
-async function getCopilotConfig(): Promise<CopilotConfig | null> {
-  const now = Date.now();
-
-  // Return cached config if still valid
-  if (cachedConfig && now - configFetchedAt < CONFIG_CACHE_TTL) {
-    return cachedConfig;
-  }
-
-  try {
-    // Fetch config from backend API (same endpoint as generated client)
-    const internalApiUrl =
-      process.env.INTERNAL_API_URL || "http://localhost:5715";
-    const response = await fetch(
-      `${internalApiUrl}/api/metrics/copilot/config`,
-    );
-
-    if (!response.ok) {
-      console.warn("Failed to fetch copilot config:", response.status);
-      return null;
-    }
-
-    cachedConfig = await response.json();
-    configFetchedAt = now;
-    return cachedConfig;
-  } catch (error) {
-    console.warn("Error fetching copilot config:", error);
-    return null;
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { messages, context } = body as {
+    const { messages, context, copilotConfig } = body as {
       messages: Message[];
       context?: Record<string, unknown>;
+      copilotConfig?: CopilotConfig;
     };
-
-    // Get copilot config from backend
-    const copilotConfig = await getCopilotConfig();
 
     const ollamaUrl =
       process.env.OLLAMA_URL || "http://host.docker.internal:11434";
-    // Use model from config, fallback to env var, then default
+    // Use model from config (passed from client), fallback to env var, then default
     const modelName =
       copilotConfig?.model?.name || process.env.OLLAMA_MODEL || "gpt-oss:20b";
 

@@ -9,6 +9,7 @@ from qdash.api.routers import (
     backend,
     calibration,
     chip,
+    copilot,
     device_topology,
     execution,
     file,
@@ -84,6 +85,9 @@ app.include_router(project.router, tags=["projects"])
 # These routers handle their own auth for write operations
 app.include_router(execution.router, tags=["execution"])
 app.include_router(file.router, tags=["file"])
+
+# Copilot router without auth (for server-side API calls from Next.js)
+app.include_router(copilot.router, prefix="/copilot", tags=["copilot"])
 
 # All other routers with global auth dependency
 auth_dependency = [Depends(get_current_active_user)]

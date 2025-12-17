@@ -3,29 +3,21 @@
 import { useState } from "react";
 import { MessageCircle, X, Trash2, Maximize2, Minimize2 } from "lucide-react";
 import Image from "next/image";
-import { useGetCopilotConfig } from "@/client/metrics/metrics";
 import { AssistantThread } from "./AssistantThread";
 
 interface ChatPopupProps {
   onClear: () => void;
+  initialMessage?: string;
+  suggestions?: Array<{ label: string; prompt: string }>;
 }
 
-export function ChatPopup({ onClear }: ChatPopupProps) {
+export function ChatPopup({
+  onClear,
+  initialMessage,
+  suggestions,
+}: ChatPopupProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-
-  // Fetch copilot config using generated client
-  const { data: copilotConfig } = useGetCopilotConfig();
-
-  // Get initial message and suggestions from config
-  const configData = copilotConfig?.data as
-    | {
-        initial_message?: string;
-        suggestions?: Array<{ label: string; prompt: string }>;
-      }
-    | undefined;
-  const initialMessage = configData?.initial_message;
-  const suggestions = configData?.suggestions;
 
   const toggleOpen = () => setIsOpen((prev) => !prev);
   const toggleExpanded = () => setIsExpanded((prev) => !prev);
