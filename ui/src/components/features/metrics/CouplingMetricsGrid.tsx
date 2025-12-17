@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useGridLayout } from "@/hooks/useGridLayout";
@@ -111,9 +111,9 @@ export function CouplingMetricsGrid({
     useState<SelectedCouplingInfo | null>(null);
   const modalRef = useRef<HTMLDialogElement>(null);
 
-  // Control modal with native dialog API
+  // Control modal with native dialog API (useLayoutEffect for instant response)
   const isModalOpen = selectedCouplingInfo !== null;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const modal = modalRef.current;
     if (!modal) return;
 

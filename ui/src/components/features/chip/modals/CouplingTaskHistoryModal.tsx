@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useLayoutEffect } from "react";
 
 import type { Task } from "@/schemas";
 
@@ -39,7 +39,8 @@ export function CouplingTaskHistoryModal({
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [showParams, setShowParams] = useState(false);
 
-  useEffect(() => {
+  // Use useLayoutEffect for immediate modal open/close (before paint)
+  useLayoutEffect(() => {
     const modal = modalRef.current;
     if (!modal) return;
 
@@ -56,6 +57,8 @@ export function CouplingTaskHistoryModal({
     {
       query: {
         enabled: isOpen && !!chipId && !!couplingId && !!taskName,
+        staleTime: 30000, // Cache for 30 seconds
+        gcTime: 60000, // Keep in cache for 1 minute
       },
     },
   );

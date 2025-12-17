@@ -44,6 +44,12 @@ export function CouplingMetricHistoryModal({
     chipId,
     couplingId,
     { metric: metricName, limit: 20, within_days: 30 },
+    {
+      query: {
+        staleTime: 30000, // Cache for 30 seconds
+        gcTime: 60000, // Keep in cache for 1 minute
+      },
+    },
   );
 
   const history = (data?.data?.history || []) as MetricHistoryItem[];
