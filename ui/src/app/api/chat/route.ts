@@ -214,6 +214,25 @@ const TOOLS: Tool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "getChipTopology",
+      description:
+        "Get the topology (qubit positions, coupling pairs, neighbor map) for a chip. Use this for spatial analysis of metrics, identifying crosstalk candidates, and reasoning about frequency crowding among neighbors.",
+      parameters: {
+        type: "object",
+        properties: {
+          chipId: {
+            type: "string",
+            description:
+              "The chip ID to fetch topology for. If not specified or 'latest', uses the latest chip.",
+          },
+        },
+        required: [],
+      },
+    },
+  },
 ];
 
 // Default system prompt (fallback if config is unavailable)
@@ -228,6 +247,7 @@ Data fetching tools:
 - Use getChipList to find available chips
 - Use getChipMetricsData to fetch metrics (defaults to latest chip, 7 days of data)
 - Use getMetricsConfiguration to see available metric types
+- Use getChipTopology to get chip topology (qubit positions, couplings, neighbor map) for spatial analysis
 
 IMPORTANT: When users ask to "evaluate", "analyze", or "check" chip metrics without specifying a chip:
 - Use getChipMetricsData without arguments to get the latest chip's metrics for 7 days
