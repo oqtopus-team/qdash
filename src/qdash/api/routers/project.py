@@ -110,7 +110,11 @@ def list_projects(
     logger.debug(f"Listing projects for user {current_user.username}")
 
     # Find all active memberships for this user
-    memberships = list(ProjectMembershipDocument.find({"username": current_user.username, "status": "active"}).run())
+    memberships = list(
+        ProjectMembershipDocument.find(
+            {"username": current_user.username, "status": "active"}
+        ).run()
+    )
 
     project_ids = [m.project_id for m in memberships]
     projects = list(ProjectDocument.find({"project_id": {"$in": project_ids}}).run())
@@ -235,7 +239,9 @@ def invite_member(
         )
 
     # Check if already a member
-    existing = ProjectMembershipDocument.find_one({"project_id": project_id, "username": invite_data.username}).run()
+    existing = ProjectMembershipDocument.find_one(
+        {"project_id": project_id, "username": invite_data.username}
+    ).run()
 
     if existing:
         if existing.status == "active":
@@ -264,7 +270,9 @@ def invite_member(
     )
     membership.insert()
 
-    logger.info(f"Admin {admin.username} invited {invite_data.username} to project {project_id} as {invite_data.role}")
+    logger.info(
+        f"Admin {admin.username} invited {invite_data.username} to project {project_id} as {invite_data.role}"
+    )
 
     return _to_member_response(membership)
 
@@ -295,7 +303,9 @@ def update_member(
             detail="Cannot change the owner's role",
         )
 
-    membership = ProjectMembershipDocument.find_one({"project_id": project_id, "username": username}).run()
+    membership = ProjectMembershipDocument.find_one(
+        {"project_id": project_id, "username": username}
+    ).run()
 
     if not membership:
         raise HTTPException(
@@ -335,7 +345,9 @@ def remove_member(
             detail="Cannot remove the project owner",
         )
 
-    membership = ProjectMembershipDocument.find_one({"project_id": project_id, "username": username}).run()
+    membership = ProjectMembershipDocument.find_one(
+        {"project_id": project_id, "username": username}
+    ).run()
 
     if not membership:
         raise HTTPException(
@@ -423,6 +435,8 @@ def transfer_ownership(
     project.system_info.update_time()
     project.save()
 
-    logger.warning(f"Admin {admin.username} transferred project {project_id} ownership to {new_owner.username}")
+    logger.warning(
+        f"Admin {admin.username} transferred project {project_id} ownership to {new_owner.username}"
+    )
 
     return _to_project_response(project)

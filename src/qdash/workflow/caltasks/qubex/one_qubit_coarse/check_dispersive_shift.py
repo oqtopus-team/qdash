@@ -31,7 +31,9 @@ class CheckDispersiveShift(QubexTask):
         ),
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "optimal_readout_frequency": OutputParameterModel(unit="GHz", description="Optimal Readout Frequency"),
+        "optimal_readout_frequency": OutputParameterModel(
+            unit="GHz", description="Optimal Readout Frequency"
+        ),
         "dispersive_shift": OutputParameterModel(unit="MHz", description="Dispersive shift"),
     }
 
@@ -41,7 +43,9 @@ class CheckDispersiveShift(QubexTask):
         """Process the results of the task."""
         result = run_result.raw_result
         self.output_parameters["optimal_readout_frequency"].value = result["optimal_frequency"]
-        self.output_parameters["dispersive_shift"].value = result["dispersive_shift"] * 1000  # convert to MHz
+        self.output_parameters["dispersive_shift"].value = (
+            result["dispersive_shift"] * 1000
+        )  # convert to MHz
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result["fig"]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)

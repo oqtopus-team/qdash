@@ -60,9 +60,13 @@ def list_tasks(
                 description=task.description,
                 task_type=task.task_type,
                 backend=task.backend,
-                input_parameters={name: InputParameterModel(**param) for name, param in task.input_parameters.items()},
+                input_parameters={
+                    name: InputParameterModel(**param)
+                    for name, param in task.input_parameters.items()
+                },
                 output_parameters={
-                    name: InputParameterModel(**param) for name, param in task.output_parameters.items()
+                    name: InputParameterModel(**param)
+                    for name, param in task.output_parameters.items()
                 },
             )
             for task in tasks
@@ -93,7 +97,9 @@ def get_task_result(
 
     """
     # Find task result by task_id (scoped to project)
-    task_result = TaskResultHistoryDocument.find_one({"project_id": ctx.project_id, "task_id": task_id}).run()
+    task_result = TaskResultHistoryDocument.find_one(
+        {"project_id": ctx.project_id, "task_id": task_id}
+    ).run()
 
     if not task_result:
         raise HTTPException(status_code=404, detail=f"Task result with task_id {task_id} not found")

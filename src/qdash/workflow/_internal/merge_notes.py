@@ -3,7 +3,9 @@ from typing import Any
 import pendulum
 
 
-def merge_notes_by_timestamp(master_note: dict[str, Any], task_note: dict[str, Any]) -> dict[str, Any]:
+def merge_notes_by_timestamp(
+    master_note: dict[str, Any], task_note: dict[str, Any]
+) -> dict[str, Any]:
     """Merge master note and task note based on timestamp for each parameter type and qubit.
 
     Args:
@@ -25,7 +27,9 @@ def merge_notes_by_timestamp(master_note: dict[str, Any], task_note: dict[str, A
         merged[param_type] = {}
 
         # Get all qubits for this parameter type
-        all_qubits = set(master_note.get(param_type, {}).keys()) | set(task_note.get(param_type, {}).keys())
+        all_qubits = set(master_note.get(param_type, {}).keys()) | set(
+            task_note.get(param_type, {}).keys()
+        )
 
         for qubit in all_qubits:
             master_data = master_note.get(param_type, {}).get(qubit)

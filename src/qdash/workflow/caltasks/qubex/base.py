@@ -156,7 +156,9 @@ class QubexTask(BaseTask):
             NotImplementedError: Always raised for tasks that don't support batch execution
 
         """
-        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")
+        raise NotImplementedError(
+            f"Batch run is not implemented for {self.name} task. Use run method instead."
+        )
 
     def get_experiment(self, backend: "QubexBackend"):
         """Get the experiment session from QubexBackend.

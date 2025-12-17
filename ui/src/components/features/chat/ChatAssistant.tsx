@@ -275,47 +275,51 @@ export function ChatAssistant() {
 
         // Fetch topology definition
         const topologyResponse = await getTopologyById(topologyId);
-        const topology = topologyResponse.data?.data;
+        const topology = topologyResponse.data?.data as
+          | {
+              qubits?: Record<string, { row: number; col: number }>;
+              couplings?: number[][];
+            }
+          | undefined;
         if (!topology) {
           return `Topology ${topologyId} not found.`;
         }
 
         // Format topology information
+        // qubits: { "0": { row: 0, col: 0 }, "1": { row: 0, col: 1 }, ... }
         const qubits = topology.qubits || {};
-        const couplings = topology.couplings || {};
+        // couplings: [[0, 1], [1, 2], ...] - pairs of qubit IDs
+        const couplings = topology.couplings || [];
 
         // Build qubit position map
         const qubitPositions: string[] = [];
         const neighborMap: Record<string, string[]> = {};
 
-        for (const [qid, qubitData] of Object.entries(qubits)) {
-          const q = qubitData as { position?: { row?: number; col?: number } };
-          if (q.position) {
-            qubitPositions.push(
-              `${qid}: (row=${q.position.row}, col=${q.position.col})`,
-            );
-          }
+        for (const [qid, pos] of Object.entries(qubits)) {
+          qubitPositions.push(`Q${qid}: (row=${pos.row}, col=${pos.col})`);
           neighborMap[qid] = [];
         }
 
         // Build coupling list and neighbor map
         const couplingList: string[] = [];
-        for (const [cid, couplingData] of Object.entries(couplings)) {
-          const c = couplingData as { qubit_ids?: string[] };
-          if (c.qubit_ids && c.qubit_ids.length === 2) {
-            const [q1, q2] = c.qubit_ids;
-            couplingList.push(`${cid}: ${q1} <-> ${q2}`);
-            if (neighborMap[q1]) neighborMap[q1].push(q2);
-            if (neighborMap[q2]) neighborMap[q2].push(q1);
+        for (let i = 0; i < couplings.length; i++) {
+          const pair = couplings[i];
+          if (pair && pair.length === 2) {
+            const [q1, q2] = pair;
+            couplingList.push(`C${i}: Q${q1} <-> Q${q2}`);
+            const q1Str = String(q1);
+            const q2Str = String(q2);
+            if (neighborMap[q1Str]) neighborMap[q1Str].push(`Q${q2}`);
+            if (neighborMap[q2Str]) neighborMap[q2Str].push(`Q${q1}`);
           }
         }
 
         // Format neighbor map
         const neighborSummary = Object.entries(neighborMap)
-          .map(([qid, neighbors]) => `${qid}: [${neighbors.join(", ")}]`)
+          .map(([qid, neighbors]) => `Q${qid}: [${neighbors.join(", ")}]`)
           .join("\n");
 
-        return `Chip: ${targetChipId}\nTopology ID: ${topologyId}\nQubits: ${Object.keys(qubits).length}\nCouplings: ${Object.keys(couplings).length}\n\n**Qubit Positions:**\n${qubitPositions.join("\n")}\n\n**Couplings:**\n${couplingList.join("\n")}\n\n**Neighbor Map:**\n${neighborSummary}`;
+        return `Chip: ${targetChipId}\nTopology ID: ${topologyId}\nQubits: ${Object.keys(qubits).length}\nCouplings: ${couplings.length}\n\n**Qubit Positions:**\n${qubitPositions.join("\n")}\n\n**Couplings:**\n${couplingList.join("\n")}\n\n**Neighbor Map:**\n${neighborSummary}`;
       } catch (error) {
         return `Error fetching topology: ${error instanceof Error ? error.message : "Unknown error"}`;
       }

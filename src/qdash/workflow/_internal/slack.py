@@ -127,7 +127,9 @@ class SlackContents:
                     channel=self.channel,
                     text=self.header,
                     thread_ts=self.ts if self.ts != "" else None,
-                    reply_broadcast=self.broadcast if self.ts != "" else False,  # スレッド内の返信時のみ有効
+                    reply_broadcast=self.broadcast
+                    if self.ts != ""
+                    else False,  # スレッド内の返信時のみ有効
                     attachments=attachments,
                 )
                 return str(resp["ts"])
@@ -144,7 +146,9 @@ class SlackContents:
                 channel=self.channel,
                 text=self.header,
                 thread_ts=self.ts if self.ts != "" else None,
-                reply_broadcast=self.broadcast if self.ts != "" else False,  # スレッド内の返信時のみ有効
+                reply_broadcast=self.broadcast
+                if self.ts != ""
+                else False,  # スレッド内の返信時のみ有効
                 attachments=attachments,
             )
             message_ts = str(resp["ts"])

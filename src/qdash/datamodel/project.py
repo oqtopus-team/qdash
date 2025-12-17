@@ -32,7 +32,9 @@ class ProjectMembershipModel(BaseModel):
 
     project_id: str = Field(..., description="Project identifier")
     username: str = Field(..., description="Member username")
-    role: ProjectRole = Field(default=ProjectRole.VIEWER, description="Member role within the project")
+    role: ProjectRole = Field(
+        default=ProjectRole.VIEWER, description="Member role within the project"
+    )
     invited_by: str | None = Field(default=None, description="User who invited this member")
     status: str = Field(default="pending", description="Invitation status")
     system_info: SystemInfoModel = Field(default_factory=SystemInfoModel)

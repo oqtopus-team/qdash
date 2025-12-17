@@ -301,7 +301,9 @@ class ExecutionStateManager(BaseModel):
             start_at=model.start_at,
             end_at=model.end_at,
             elapsed_time=model.elapsed_time,
-            calib_data=CalibDataModel(**model.calib_data) if isinstance(model.calib_data, dict) else model.calib_data,
+            calib_data=CalibDataModel(**model.calib_data)
+            if isinstance(model.calib_data, dict)
+            else model.calib_data,
             message=model.message,
             system_info=SystemInfoModel(**model.system_info)
             if isinstance(model.system_info, dict)

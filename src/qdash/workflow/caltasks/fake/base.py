@@ -35,7 +35,9 @@ class FakeTask(BaseTask):
             NotImplementedError: Always raised for tasks that don't support batch execution
 
         """
-        raise NotImplementedError(f"Batch run is not implemented for {self.name} task. Use run method instead.")
+        raise NotImplementedError(
+            f"Batch run is not implemented for {self.name} task. Use run method instead."
+        )
 
     def get_label(self, qid: str) -> str:
         """Convert qubit ID to label.

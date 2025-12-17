@@ -172,7 +172,9 @@ class CRScheduler:
             if self.wiring_config_path is not None:
                 wiring_path = Path(self.wiring_config_path)
             else:
-                wiring_path = Path(f"/workspace/qdash/config/qubex/{self.chip_id}/config/wiring.yaml")
+                wiring_path = Path(
+                    f"/workspace/qdash/config/qubex/{self.chip_id}/config/wiring.yaml"
+                )
 
             if not wiring_path.exists():
                 msg = f"Wiring config not found: {wiring_path}"
@@ -385,7 +387,9 @@ class CRScheduler:
                 continue
 
             # Conflict 3: MUX resource conflicts
-            conflict_muxes = mux_conflict_map.get(mux_a1, set()) | mux_conflict_map.get(mux_a2, set())
+            conflict_muxes = mux_conflict_map.get(mux_a1, set()) | mux_conflict_map.get(
+                mux_a2, set()
+            )
             if mux_b1 in conflict_muxes or mux_b2 in conflict_muxes:
                 conflict_graph.add_edge(pair_a, pair_b)
 
@@ -412,10 +416,20 @@ class CRScheduler:
         return groups
 
     @staticmethod
-    def _split_fast_slow_pairs(cr_pairs: list[str], qid_to_mux: dict[str, int]) -> tuple[list[str], list[str]]:
+    def _split_fast_slow_pairs(
+        cr_pairs: list[str], qid_to_mux: dict[str, int]
+    ) -> tuple[list[str], list[str]]:
         """Separate CR pairs into fast (intra-MUX) and slow (inter-MUX) categories."""
-        fast_pairs = [p for p in cr_pairs if qid_to_mux.get(p.split("-")[0]) == qid_to_mux.get(p.split("-")[1])]
-        slow_pairs = [p for p in cr_pairs if qid_to_mux.get(p.split("-")[0]) != qid_to_mux.get(p.split("-")[1])]
+        fast_pairs = [
+            p
+            for p in cr_pairs
+            if qid_to_mux.get(p.split("-")[0]) == qid_to_mux.get(p.split("-")[1])
+        ]
+        slow_pairs = [
+            p
+            for p in cr_pairs
+            if qid_to_mux.get(p.split("-")[0]) != qid_to_mux.get(p.split("-")[1])
+        ]
         return fast_pairs, slow_pairs
 
     @staticmethod
@@ -484,7 +498,9 @@ class CRScheduler:
             ScheduleContext,
         )
 
-        logger.info(f"Generating CR schedule (plugin mode) for chip_id={self.chip_id}, username={self.username}")
+        logger.info(
+            f"Generating CR schedule (plugin mode) for chip_id={self.chip_id}, username={self.username}"
+        )
 
         # Load chip data
         chip_doc = self._load_chip_data()
@@ -525,7 +541,9 @@ class CRScheduler:
             filtered_pairs = filter_obj.filter(filtered_pairs, filter_context)
             stats = filter_obj.get_stats()
             filter_stats.append(stats)
-            logger.info(f"  Filter {i} ({stats['filter_name']}): {stats['input_pairs']} → {stats['output_pairs']}")
+            logger.info(
+                f"  Filter {i} ({stats['filter_name']}): {stats['input_pairs']} → {stats['output_pairs']}"
+            )
 
         if len(filtered_pairs) == 0:
             msg = "No valid CR pairs after filtering"
@@ -535,7 +553,9 @@ class CRScheduler:
         # Use default scheduler if not provided
         if scheduler is None:
             scheduler = IntraThenInterMuxScheduler(
-                inner_scheduler=MuxConflictScheduler(max_parallel_ops=10, coloring_strategy="largest_first")
+                inner_scheduler=MuxConflictScheduler(
+                    max_parallel_ops=10, coloring_strategy="largest_first"
+                )
             )
 
         # Create schedule context
@@ -637,7 +657,9 @@ class CRScheduler:
         logger.info(f"Generating CR schedule for chip_id={self.chip_id}, username={self.username}")
         logger.info(f"  max_parallel_ops={max_parallel_ops}")
         if candidate_qubits is not None:
-            logger.info(f"  Using {len(candidate_qubits)} candidate qubits from stage1: {candidate_qubits}")
+            logger.info(
+                f"  Using {len(candidate_qubits)} candidate qubits from stage1: {candidate_qubits}"
+            )
 
         # Load chip data
         chip_doc = self._load_chip_data()
@@ -663,7 +685,9 @@ class CRScheduler:
                 and qubits[0] in candidate_set
                 and qubits[1] in candidate_set
             ]
-            logger.info(f"Filtered to {len(all_pairs)} pairs using {len(candidate_qubits)} candidate qubits")
+            logger.info(
+                f"Filtered to {len(all_pairs)} pairs using {len(candidate_qubits)} candidate qubits"
+            )
 
         # Filter by frequency directionality
         # Default: Use design-based inference (checkerboard pattern)
@@ -721,7 +745,9 @@ class CRScheduler:
         fast, slow = self._split_fast_slow_pairs(cr_pairs, qid_to_mux)
         grouped = self._group_cr_pairs_by_conflict(
             fast, qid_to_mux, mux_conflict_map, max_parallel_ops, coloring_strategy
-        ) + self._group_cr_pairs_by_conflict(slow, qid_to_mux, mux_conflict_map, max_parallel_ops, coloring_strategy)
+        ) + self._group_cr_pairs_by_conflict(
+            slow, qid_to_mux, mux_conflict_map, max_parallel_ops, coloring_strategy
+        )
 
         # Convert to parallel_groups format
         parallel_groups = self._convert_to_parallel_groups(grouped)
@@ -740,7 +766,9 @@ class CRScheduler:
             "num_groups": len(parallel_groups),
             "max_parallel_ops": max_parallel_ops,
             "coloring_strategy": coloring_strategy,
-            "candidate_qubits_count": len(candidate_qubits) if candidate_qubits is not None else None,
+            "candidate_qubits_count": len(candidate_qubits)
+            if candidate_qubits is not None
+            else None,
             "direction_method": "design_based" if use_design_based else "measured",
             "grid_size": grid_size,
         }

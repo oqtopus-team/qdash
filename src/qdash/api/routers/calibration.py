@@ -31,7 +31,9 @@ def generate_execution_id(username: str, chip_id: str, project_id: str | None = 
 
     """
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
-    execution_index = ExecutionCounterDocument.get_next_index(date_str, username, chip_id, project_id)
+    execution_index = ExecutionCounterDocument.get_next_index(
+        date_str, username, chip_id, project_id
+    )
     return f"{date_str}-{execution_index:03d}"
 
 

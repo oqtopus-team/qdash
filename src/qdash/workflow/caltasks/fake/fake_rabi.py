@@ -58,7 +58,9 @@ class CustomSimulationResult(SimulationResult):
                 populations[f"|{basis}〉"].append(prob)
 
         sampled_times = self.get_times(n_samples=n_samples)
-        sampled_populations = {key: downsample(np.asarray(value), n_samples) for key, value in populations.items()}
+        sampled_populations = {
+            key: downsample(np.asarray(value), n_samples) for key, value in populations.items()
+        }
 
         fig = go.Figure()
         for key, value in sampled_populations.items():

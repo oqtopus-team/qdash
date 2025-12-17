@@ -271,14 +271,22 @@ class ExecutionService:
                     model.calib_data = {"qubit": {}, "coupling": {}}
                 if isinstance(model.calib_data, dict):
                     model.calib_data.setdefault("qubit", {}).setdefault(qid, {}).update(
-                        data if isinstance(data, dict) else data.model_dump() if hasattr(data, "model_dump") else data
+                        data
+                        if isinstance(data, dict)
+                        else data.model_dump()
+                        if hasattr(data, "model_dump")
+                        else data
                     )
 
             # Merge coupling data
             for qid, data in calib_data.coupling.items():
                 if isinstance(model.calib_data, dict):
                     model.calib_data.setdefault("coupling", {}).setdefault(qid, {}).update(
-                        data if isinstance(data, dict) else data.model_dump() if hasattr(data, "model_dump") else data
+                        data
+                        if isinstance(data, dict)
+                        else data.model_dump()
+                        if hasattr(data, "model_dump")
+                        else data
                     )
 
         self._update_with_lock(update_func)

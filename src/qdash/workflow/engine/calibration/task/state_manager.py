@@ -229,7 +229,9 @@ class TaskStateManager(BaseModel):
         task.end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
         task.elapsed_time = task.calculate_elapsed_time(task.start_at, task.end_at)
 
-    def update_task_status_to_completed(self, task_name: str, message: str, task_type: str, qid: str) -> None:
+    def update_task_status_to_completed(
+        self, task_name: str, message: str, task_type: str, qid: str
+    ) -> None:
         """Update task status to COMPLETED.
 
         Parameters
@@ -248,7 +250,9 @@ class TaskStateManager(BaseModel):
         task.status = TaskStatusModel.COMPLETED
         task.message = message
 
-    def update_task_status_to_failed(self, task_name: str, message: str, task_type: str, qid: str) -> None:
+    def update_task_status_to_failed(
+        self, task_name: str, message: str, task_type: str, qid: str
+    ) -> None:
         """Update task status to FAILED.
 
         Parameters
@@ -267,7 +271,9 @@ class TaskStateManager(BaseModel):
         task.status = TaskStatusModel.FAILED
         task.message = message
 
-    def update_task_status_to_skipped(self, task_name: str, message: str, task_type: str, qid: str) -> None:
+    def update_task_status_to_skipped(
+        self, task_name: str, message: str, task_type: str, qid: str
+    ) -> None:
         """Update task status to SKIPPED.
 
         Parameters
@@ -314,7 +320,9 @@ class TaskStateManager(BaseModel):
         task.status = new_status
         task.message = message
 
-    def put_input_parameters(self, task_name: str, input_parameters: dict, task_type: str, qid: str) -> None:
+    def put_input_parameters(
+        self, task_name: str, input_parameters: dict, task_type: str, qid: str
+    ) -> None:
         """Store input parameters for a task.
 
         Parameters
@@ -433,7 +441,9 @@ class TaskStateManager(BaseModel):
         for qid in qids:
             self.start_task(task_name, task_type, qid)
 
-    def update_not_executed_tasks_to_skipped(self, task_type: str, qid: str, message: str = "Not executed") -> None:
+    def update_not_executed_tasks_to_skipped(
+        self, task_type: str, qid: str, message: str = "Not executed"
+    ) -> None:
         """Mark all scheduled tasks as skipped.
 
         Parameters
@@ -566,7 +576,9 @@ class TaskStateManager(BaseModel):
         task.figure_path = png_paths
         task.json_figure_path = json_paths
 
-    def set_raw_data_paths(self, task_name: str, task_type: str, qid: str, paths: list[str]) -> None:
+    def set_raw_data_paths(
+        self, task_name: str, task_type: str, qid: str, paths: list[str]
+    ) -> None:
         """Set raw data paths for a task.
 
         Parameters
@@ -698,7 +710,9 @@ class TaskStateManager(BaseModel):
         """
         self._clear_qubit_calib_data(qid, list(parameter_names))
 
-    def update_task_status_to_running(self, task_name: str, message: str, task_type: str, qid: str) -> None:
+    def update_task_status_to_running(
+        self, task_name: str, message: str, task_type: str, qid: str
+    ) -> None:
         """Update task status to RUNNING.
 
         Parameters

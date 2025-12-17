@@ -74,7 +74,9 @@ class ProjectService:
         invited_by: str | None = None,
     ) -> ProjectMembershipDocument:
         """Insert or update a membership entry."""
-        membership = ProjectMembershipDocument.find_one({"project_id": project_id, "username": username}).run()
+        membership = ProjectMembershipDocument.find_one(
+            {"project_id": project_id, "username": username}
+        ).run()
         if membership:
             membership.role = role
             membership.status = status
@@ -93,7 +95,9 @@ class ProjectService:
         membership.insert()
         return membership
 
-    def invite_viewer(self, project_id: str, username: str, invited_by: str) -> ProjectMembershipDocument:
+    def invite_viewer(
+        self, project_id: str, username: str, invited_by: str
+    ) -> ProjectMembershipDocument:
         """Create/update a pending viewer membership invitation."""
         return self._ensure_membership(
             project_id=project_id,

@@ -40,7 +40,9 @@ class CreateDRAGHPIPulse(QubexTask):
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "drag_hpi_beta": OutputParameterModel(unit="a.u.", description="DRAG HPI pulse beta"),
-        "drag_hpi_amplitude": OutputParameterModel(unit="a.u.", description="DRAG HPI pulse amplitude"),
+        "drag_hpi_amplitude": OutputParameterModel(
+            unit="a.u.", description="DRAG HPI pulse amplitude"
+        ),
     }
 
     def postprocess(

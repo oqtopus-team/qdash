@@ -204,7 +204,9 @@ def download_zip_file(path: str) -> FileResponse:
         if source_path.is_dir():
             # If it's a directory, zip its contents
             # make_archive returns the path to the created zip file
-            actual_zip_path = Path(shutil.make_archive(str(temp_dir_path / source_path.name), "zip", source_path))
+            actual_zip_path = Path(
+                shutil.make_archive(str(temp_dir_path / source_path.name), "zip", source_path)
+            )
         else:
             # If it's a file, create a zip containing just that file
             actual_zip_path = temp_dir_path / zip_filename
@@ -255,7 +257,9 @@ def get_file_tree() -> list[FileTreeNode]:
 
     """
     if not CONFIG_BASE_PATH.exists():
-        raise HTTPException(status_code=404, detail=f"Config directory not found: {CONFIG_BASE_PATH}")
+        raise HTTPException(
+            status_code=404, detail=f"Config directory not found: {CONFIG_BASE_PATH}"
+        )
 
     return build_file_tree(CONFIG_BASE_PATH, CONFIG_BASE_PATH)
 
@@ -292,7 +296,9 @@ def get_file_content(path: str) -> dict[str, Any]:
             "path": path,
             "name": file_path.name,
             "size": file_path.stat().st_size,
-            "modified": datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc).isoformat(),
+            "modified": datetime.fromtimestamp(
+                file_path.stat().st_mtime, tz=timezone.utc
+            ).isoformat(),
         }
     except UnicodeDecodeError:
         raise HTTPException(status_code=400, detail="File is not a text file")
@@ -369,7 +375,9 @@ def validate_file_content(request: ValidateFileRequest) -> dict[str, Any]:
             json.loads(request.content)
             return {"valid": True, "message": "Valid JSON"}
         else:
-            raise HTTPException(status_code=400, detail="Unsupported file type. Use 'yaml' or 'json'")
+            raise HTTPException(
+                status_code=400, detail="Unsupported file type. Use 'yaml' or 'json'"
+            )
     except yaml.YAMLError as e:
         return {
             "valid": False,
@@ -402,7 +410,9 @@ def get_git_status() -> dict[str, Any]:
     """
     try:
         if not CONFIG_BASE_PATH.exists():
-            raise HTTPException(status_code=404, detail=f"Config directory not found: {CONFIG_BASE_PATH}")
+            raise HTTPException(
+                status_code=404, detail=f"Config directory not found: {CONFIG_BASE_PATH}"
+            )
 
         # Check if directory is a Git repository
         git_dir = CONFIG_BASE_PATH / ".git"
@@ -488,7 +498,8 @@ def git_pull_config(
             # Create backup of current config if it exists
             if CONFIG_BASE_PATH.exists():
                 backup_dir = (
-                    CONFIG_BASE_PATH.parent / f"config_backup_{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+                    CONFIG_BASE_PATH.parent
+                    / f"config_backup_{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}"
                 )
                 shutil.copytree(CONFIG_BASE_PATH, backup_dir)
                 logger.info(f"Created backup at: {backup_dir}")

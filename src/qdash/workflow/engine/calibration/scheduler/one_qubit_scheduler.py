@@ -279,7 +279,9 @@ class OneQubitScheduler:
             if self.wiring_config_path is not None:
                 wiring_path = Path(self.wiring_config_path)
             else:
-                wiring_path = Path(f"/workspace/qdash/config/qubex/{self.chip_id}/config/wiring.yaml")
+                wiring_path = Path(
+                    f"/workspace/qdash/config/qubex/{self.chip_id}/config/wiring.yaml"
+                )
 
             if not wiring_path.exists():
                 msg = f"Wiring config not found: {wiring_path}"
@@ -559,7 +561,9 @@ class OneQubitScheduler:
             )
 
             for mux_id in mux_groups:
-                mux_groups[mux_id] = ordering_strategy.order_qids_in_mux(mux_id, mux_groups[mux_id], context)
+                mux_groups[mux_id] = ordering_strategy.order_qids_in_mux(
+                    mux_id, mux_groups[mux_id], context
+                )
         else:
             # Default: sort by qubit ID
             for mux_id in mux_groups:
@@ -1028,7 +1032,9 @@ class OneQubitScheduler:
             # Each group gets 4 steps, so 2 groups = 8 steps total
             for group_idx, mux_group in enumerate(mux_groups):
                 # Get qubits for this MUX group
-                group_qids = [qid for qid in mixed_qids if qid in qid_to_mux and qid_to_mux[qid] in mux_group]
+                group_qids = [
+                    qid for qid in mixed_qids if qid in qid_to_mux and qid_to_mux[qid] in mux_group
+                ]
 
                 if group_qids:
                     # Generate synchronized steps for this group
@@ -1046,7 +1052,9 @@ class OneQubitScheduler:
 
         logger.info(f"Generated {len(all_steps)} synchronized steps")
         for step in all_steps:
-            logger.info(f"  Step {step.step_index} ({step.box_type}): {len(step.parallel_qids)} qubits")
+            logger.info(
+                f"  Step {step.step_index} ({step.box_type}): {len(step.parallel_qids)} qubits"
+            )
 
         # Build metadata
         metadata = {

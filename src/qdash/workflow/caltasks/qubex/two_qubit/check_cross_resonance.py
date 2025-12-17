@@ -19,17 +19,27 @@ class CheckCrossResonance(QubexTask):
     timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "cr_amplitude": OutputParameterModel(unit="a.u.", value_type="float", description="Amplitude of the CR pulse."),
-        "cr_phase": OutputParameterModel(unit="a.u.", value_type="float", description="Phase of the CR pulse."),
+        "cr_amplitude": OutputParameterModel(
+            unit="a.u.", value_type="float", description="Amplitude of the CR pulse."
+        ),
+        "cr_phase": OutputParameterModel(
+            unit="a.u.", value_type="float", description="Phase of the CR pulse."
+        ),
         "cancel_amplitude": OutputParameterModel(
             unit="a.u.", value_type="float", description="Amplitude of the cancel pulse."
         ),
-        "cancel_phase": OutputParameterModel(unit="a.u.", value_type="float", description="Phase of the cancel pulse."),
-        "cancel_beta": OutputParameterModel(unit="a.u.", value_type="float", description="Beta of the cancel pulse."),
+        "cancel_phase": OutputParameterModel(
+            unit="a.u.", value_type="float", description="Phase of the cancel pulse."
+        ),
+        "cancel_beta": OutputParameterModel(
+            unit="a.u.", value_type="float", description="Beta of the cancel pulse."
+        ),
         "rotary_amplitude": OutputParameterModel(
             unit="a.u.", value_type="float", description="Amplitude of the rotary pulse."
         ),
-        "zx_rotation_rate": OutputParameterModel(unit="a.u.", value_type="float", description="ZX rotation rate."),
+        "zx_rotation_rate": OutputParameterModel(
+            unit="a.u.", value_type="float", description="ZX rotation rate."
+        ),
     }
 
     def _plot_coeffs_history(self, coeffs_history: dict, label: str) -> go.Figure:
@@ -55,7 +65,9 @@ class CheckCrossResonance(QubexTask):
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         exp = self.get_experiment(backend)
-        label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
+        label = "-".join(
+            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
+        )  # e.g., "0-1" → "Q00-Q01"
         result = run_result.raw_result
         self.output_parameters["cr_amplitude"].value = result["cr_amplitude"]
         self.output_parameters["cr_phase"].value = result["cr_phase"]
@@ -69,12 +81,18 @@ class CheckCrossResonance(QubexTask):
         fig = self._plot_coeffs_history(result["coeffs_history"], label=label)
         figures: list = [fig]
         raw_data: list = []
-        return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
+        return PostProcessResult(
+            output_parameters=output_parameters, figures=figures, raw_data=raw_data
+        )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
-        label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
-        control, target = (exp.get_qubit_label(int(q)) for q in qid.split("-"))  # e.g., "0-1" → "Q00","Q01"
+        label = "-".join(
+            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
+        )  # e.g., "0-1" → "Q00-Q01"
+        control, target = (
+            exp.get_qubit_label(int(q)) for q in qid.split("-")
+        )  # e.g., "0-1" → "Q00","Q01"
 
         raw_result = exp.obtain_cr_params(
             control,
