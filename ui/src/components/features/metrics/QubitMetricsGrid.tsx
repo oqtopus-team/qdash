@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef, useLayoutEffect } from "react";
 
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useGridLayout } from "@/hooks/useGridLayout";
@@ -119,9 +119,9 @@ export function QubitMetricsGrid({
     deps: [metricData],
   });
 
-  // Control modal with native dialog API
+  // Control modal with native dialog API (useLayoutEffect for instant response)
   const isModalOpen = selectedQubitInfo !== null;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const modal = modalRef.current;
     if (!modal) return;
 
