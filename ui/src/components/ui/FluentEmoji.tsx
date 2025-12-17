@@ -28,6 +28,7 @@ const EMOJI_MAP: Record<string, string> = {
 
   // Data & Charts
   chart: "Bar%20chart/3D/bar_chart_3d.png",
+  "chart-bar": "Bar%20chart/3D/bar_chart_3d.png",
   "chart-up": "Chart%20increasing/3D/chart_increasing_3d.png",
   "chart-down": "Chart%20decreasing/3D/chart_decreasing_3d.png",
 
@@ -41,6 +42,8 @@ const EMOJI_MAP: Record<string, string> = {
 
   // Science & Tech
   atom: "Atom%20symbol/3D/atom_symbol_3d.png",
+  microchip: "Desktop%20computer/3D/desktop_computer_3d.png",
+  computer: "Desktop%20computer/3D/desktop_computer_3d.png",
   "test-tube": "Test%20tube/3D/test_tube_3d.png",
   dna: "Dna/3D/dna_3d.png",
 

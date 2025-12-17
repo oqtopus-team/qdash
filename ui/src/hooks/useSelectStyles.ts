@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
-import type { StylesConfig } from "react-select";
+import type { StylesConfig, GroupBase } from "react-select";
+import { getDaisySelectStyles } from "@/lib/reactSelectTheme";
 
 interface UseSelectStylesOptions {
   labels: string[];
@@ -9,7 +10,14 @@ interface UseSelectStylesOptions {
   padding?: number;
 }
 
-export function useSelectStyles<T>({
+/**
+ * Hook that provides DaisyUI-compatible React-Select styles with dynamic width calculation
+ */
+export function useSelectStyles<
+  T,
+  IsMulti extends boolean = false,
+  Group extends GroupBase<T> = GroupBase<T>,
+>({
   labels,
   placeholder,
   charWidth = 8,
@@ -23,24 +31,21 @@ export function useSelectStyles<T>({
     return maxLength * charWidth + padding;
   }, [labels, placeholder, charWidth, padding]);
 
-  const styles = useMemo<StylesConfig<T, false>>(
-    () => ({
+  const styles = useMemo<StylesConfig<T, IsMulti, Group>>(() => {
+    const baseStyles = getDaisySelectStyles<T, IsMulti, Group>();
+
+    return {
+      ...baseStyles,
       container: (provided) => ({
         ...provided,
         minWidth,
       }),
-      control: (provided) => ({
-        ...provided,
-        minHeight: 38,
-      }),
-      menu: (provided) => ({
-        ...provided,
-        zIndex: 20,
+      menu: (provided, state) => ({
+        ...(baseStyles.menu?.(provided, state) || provided),
         minWidth,
       }),
-    }),
-    [minWidth],
-  );
+    };
+  }, [minWidth]);
 
   return { minWidth, styles };
 }

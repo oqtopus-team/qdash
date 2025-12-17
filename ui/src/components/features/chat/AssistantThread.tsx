@@ -16,10 +16,42 @@ import {
   Copy,
   Check,
   RefreshCw,
+  Sparkles,
+  BarChart3,
+  Cpu,
+  Zap,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useState } from "react";
+import Image from "next/image";
+
+// AI Avatar component using OQTOPUS logo
+const AIAvatar: FC<{ size?: "sm" | "md" | "lg"; animate?: boolean }> = ({
+  size = "md",
+  animate = false,
+}) => {
+  const sizeMap = { sm: 24, md: 28, lg: 48 };
+  const containerSize = { sm: "w-7 h-7", md: "w-8 h-8", lg: "w-14 h-14" };
+
+  return (
+    <div
+      className={`${containerSize[size]} rounded-xl flex items-center justify-center shadow-sm flex-shrink-0 ${animate ? "animate-pulse" : ""}`}
+      style={{
+        background:
+          "linear-gradient(135deg, oklch(var(--p) / 0.15) 0%, oklch(var(--s) / 0.15) 100%)",
+      }}
+    >
+      <Image
+        src="/oqtopus_logo.svg"
+        alt="OQTOPUS"
+        width={sizeMap[size]}
+        height={sizeMap[size]}
+        className="object-contain"
+      />
+    </div>
+  );
+};
 
 // Custom text component for markdown rendering
 const MarkdownText: FC = () => {
@@ -33,50 +65,50 @@ const MarkdownText: FC = () => {
     .join("\n");
 
   return (
-    <div className="text-base-content text-sm leading-relaxed">
+    <div className="text-base-content text-sm leading-relaxed prose prose-sm max-w-none">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           table: ({ children }) => (
-            <div className="overflow-x-auto my-3">
-              <table className="table table-xs table-zebra w-full border border-base-300 rounded-lg">
+            <div className="overflow-x-auto my-3 rounded-lg border border-base-300">
+              <table className="table table-xs table-zebra w-full">
                 {children}
               </table>
             </div>
           ),
           thead: ({ children }) => (
-            <thead className="bg-base-300">{children}</thead>
+            <thead className="bg-base-200">{children}</thead>
           ),
           th: ({ children }) => (
-            <th className="text-base-content font-semibold text-left px-3 py-2 border-b border-base-300">
+            <th className="text-base-content font-semibold text-left px-3 py-2">
               {children}
             </th>
           ),
           td: ({ children }) => (
-            <td className="text-base-content px-3 py-2 border-b border-base-200">
-              {children}
-            </td>
+            <td className="text-base-content px-3 py-2">{children}</td>
           ),
           tr: ({ children }) => (
-            <tr className="hover:bg-base-200/50">{children}</tr>
+            <tr className="hover:bg-base-200/50 transition-colors">
+              {children}
+            </tr>
           ),
           code: ({ children, className }) => {
             const isBlock = className?.includes("language-");
             if (isBlock) {
               return (
-                <code className="block bg-base-300 p-3 rounded-lg text-xs overflow-x-auto font-mono">
+                <code className="block bg-base-300/80 p-3 rounded-lg text-xs overflow-x-auto font-mono">
                   {children}
                 </code>
               );
             }
             return (
-              <code className="bg-base-300 px-1.5 py-0.5 rounded text-xs font-mono">
+              <code className="bg-base-300/80 px-1.5 py-0.5 rounded text-xs font-mono text-primary">
                 {children}
               </code>
             );
           },
           pre: ({ children }) => (
-            <pre className="bg-base-300 rounded-lg text-xs overflow-x-auto my-3 p-0">
+            <pre className="bg-base-300/80 rounded-lg text-xs overflow-x-auto my-3 p-0">
               {children}
             </pre>
           ),
@@ -91,20 +123,26 @@ const MarkdownText: FC = () => {
             </ol>
           ),
           li: ({ children }) => <li className="my-0.5">{children}</li>,
-          p: ({ children }) => <p className="my-2">{children}</p>,
+          p: ({ children }) => <p className="my-2 first:mt-0">{children}</p>,
           h1: ({ children }) => (
-            <h1 className="text-xl font-bold my-3">{children}</h1>
+            <h1 className="text-xl font-bold my-3 text-base-content">
+              {children}
+            </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-lg font-bold my-2">{children}</h2>
+            <h2 className="text-lg font-bold my-2 text-base-content">
+              {children}
+            </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-base font-bold my-2">{children}</h3>
+            <h3 className="text-base font-bold my-2 text-base-content">
+              {children}
+            </h3>
           ),
           a: ({ children, href }) => (
             <a
               href={href}
-              className="text-primary hover:underline"
+              className="text-primary hover:text-primary/80 hover:underline transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -112,13 +150,15 @@ const MarkdownText: FC = () => {
             </a>
           ),
           blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-primary pl-4 my-3 italic opacity-80 bg-base-200/50 py-2 rounded-r">
+            <blockquote className="border-l-4 border-primary/50 pl-4 my-3 italic text-base-content/80 bg-base-200/30 py-2 rounded-r-lg">
               {children}
             </blockquote>
           ),
           hr: () => <hr className="my-4 border-base-300" />,
           strong: ({ children }) => (
-            <strong className="font-semibold">{children}</strong>
+            <strong className="font-semibold text-base-content">
+              {children}
+            </strong>
           ),
           em: ({ children }) => <em className="italic">{children}</em>,
         }}
@@ -163,10 +203,14 @@ const CopyButton: FC = () => {
   return (
     <button
       onClick={handleCopy}
-      className="btn btn-ghost btn-xs opacity-0 group-hover:opacity-100 transition-opacity"
-      title="Copy message"
+      className={`btn btn-ghost btn-xs transition-all ${copied ? "text-success" : "opacity-0 group-hover:opacity-100"}`}
+      title={copied ? "Copied!" : "Copy message"}
     >
-      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+      {copied ? (
+        <Check className="w-3.5 h-3.5" />
+      ) : (
+        <Copy className="w-3.5 h-3.5" />
+      )}
     </button>
   );
 };
@@ -179,7 +223,14 @@ const UserMessage: FC = () => {
         <ActionBarPrimitive.Root className="flex items-center">
           <CopyButton />
         </ActionBarPrimitive.Root>
-        <div className="bg-primary text-primary-content rounded-2xl rounded-br-md px-4 py-2.5 shadow-sm">
+        <div
+          className="rounded-2xl rounded-br-sm px-4 py-2.5 shadow-sm text-sm"
+          style={{
+            background:
+              "linear-gradient(135deg, oklch(var(--p)) 0%, oklch(var(--p) / 0.9) 100%)",
+            color: "oklch(var(--pc))",
+          }}
+        >
           <SimpleText />
         </div>
       </div>
@@ -187,21 +238,22 @@ const UserMessage: FC = () => {
   );
 };
 
-// Assistant message component - ChatGPT style without bubble
+// Assistant message component
 const AssistantMessage: FC = () => {
   return (
-    <MessagePrimitive.Root className="group py-4 px-4 hover:bg-base-200/30 transition-colors">
+    <MessagePrimitive.Root className="group py-4 px-4 hover:bg-base-200/20 transition-colors rounded-lg mx-2">
       <div className="flex gap-3 max-w-full">
-        <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-secondary to-accent flex items-center justify-center text-white text-[10px] font-bold mt-0.5">
-          AI
-        </div>
+        <AIAvatar size="sm" />
         <div className="flex-1 min-w-0">
           <MarkdownText />
-          <ActionBarPrimitive.Root className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <ActionBarPrimitive.Root className="flex items-center gap-1 mt-2">
             <CopyButton />
             <ActionBarPrimitive.Reload asChild>
-              <button className="btn btn-ghost btn-xs" title="Regenerate">
-                <RefreshCw className="w-3 h-3" />
+              <button
+                className="btn btn-ghost btn-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Regenerate"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
               </button>
             </ActionBarPrimitive.Reload>
           </ActionBarPrimitive.Root>
@@ -211,25 +263,23 @@ const AssistantMessage: FC = () => {
   );
 };
 
-// Loading indicator with animation - ChatGPT style
+// Loading indicator with animation
 const LoadingIndicator: FC = () => {
   return (
-    <div className="py-4 px-4">
+    <div className="py-4 px-4 mx-2">
       <div className="flex gap-3">
-        <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-secondary to-accent flex items-center justify-center text-white text-[10px] font-bold animate-pulse">
-          AI
-        </div>
-        <div className="flex items-center gap-1">
+        <AIAvatar size="sm" animate />
+        <div className="flex items-center gap-1.5 py-2">
           <span
-            className="w-2 h-2 bg-base-content/40 rounded-full animate-bounce"
+            className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
             style={{ animationDelay: "0ms" }}
           />
           <span
-            className="w-2 h-2 bg-base-content/40 rounded-full animate-bounce"
+            className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
             style={{ animationDelay: "150ms" }}
           />
           <span
-            className="w-2 h-2 bg-base-content/40 rounded-full animate-bounce"
+            className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
             style={{ animationDelay: "300ms" }}
           />
         </div>
@@ -241,16 +291,22 @@ const LoadingIndicator: FC = () => {
 // Composer component
 const Composer: FC = () => {
   return (
-    <ComposerPrimitive.Root className="flex items-end gap-2 p-3 border-t border-base-300 bg-base-100">
+    <ComposerPrimitive.Root className="flex items-end gap-2 p-3 border-t border-base-300 bg-base-100/80 backdrop-blur-sm">
       <ComposerPrimitive.Input
         rows={1}
         autoFocus
-        placeholder="Type a message..."
-        className="textarea textarea-bordered flex-1 min-h-[44px] max-h-32 resize-none text-sm leading-relaxed py-2.5"
+        placeholder="Ask about metrics, qubits, or workflows..."
+        className="textarea textarea-bordered flex-1 min-h-[44px] max-h-32 resize-none text-sm leading-relaxed py-2.5 focus:textarea-primary transition-colors"
       />
       <ThreadPrimitive.If running={false}>
         <ComposerPrimitive.Send asChild>
-          <button className="btn btn-primary btn-sm h-11 w-11 rounded-xl shadow-sm">
+          <button
+            className="btn btn-primary btn-sm h-11 w-11 rounded-xl shadow-sm hover:shadow-md transition-all"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(var(--p)) 0%, oklch(var(--s)) 100%)",
+            }}
+          >
             <SendHorizontal className="w-4 h-4" />
           </button>
         </ComposerPrimitive.Send>
@@ -270,7 +326,7 @@ const Composer: FC = () => {
 const ScrollToBottom: FC = () => {
   return (
     <ThreadPrimitive.ScrollToBottom asChild>
-      <button className="absolute bottom-20 right-4 btn btn-circle btn-sm btn-ghost bg-base-200 shadow-md hover:bg-base-300 z-10">
+      <button className="absolute bottom-20 right-4 btn btn-circle btn-sm bg-base-100 shadow-lg hover:bg-base-200 z-10 border border-base-300">
         <ArrowDown className="w-4 h-4" />
       </button>
     </ThreadPrimitive.ScrollToBottom>
@@ -281,6 +337,32 @@ interface Suggestion {
   label: string;
   prompt: string;
 }
+
+// Suggestion card component
+const SuggestionCard: FC<{
+  suggestion: Suggestion;
+  icon: React.ReactNode;
+  onClick: () => void;
+}> = ({ suggestion, icon, onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      className="group flex items-start gap-3 p-3 rounded-xl border border-base-300 bg-base-100 hover:border-primary/50 hover:bg-base-200/50 transition-all text-left w-full"
+    >
+      <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-base-content truncate">
+          {suggestion.label}
+        </p>
+        <p className="text-xs text-base-content/50 truncate mt-0.5">
+          {suggestion.prompt.slice(0, 50)}...
+        </p>
+      </div>
+    </button>
+  );
+};
 
 // Suggestion buttons component that can send messages
 const SuggestionButtons: FC<{ suggestions: Suggestion[] }> = ({
@@ -298,17 +380,61 @@ const SuggestionButtons: FC<{ suggestions: Suggestion[] }> = ({
     [threadRuntime],
   );
 
+  // Map suggestions to icons
+  const icons = [
+    <BarChart3 key="0" className="w-4 h-4" />,
+    <Cpu key="1" className="w-4 h-4" />,
+    <Zap key="2" className="w-4 h-4" />,
+    <Sparkles key="3" className="w-4 h-4" />,
+  ];
+
   return (
-    <div className="flex flex-wrap gap-2 justify-center max-w-sm">
-      {suggestions.map((suggestion, index) => (
-        <button
+    <div className="grid grid-cols-1 gap-2 w-full max-w-sm">
+      {suggestions.slice(0, 4).map((suggestion, index) => (
+        <SuggestionCard
           key={index}
+          suggestion={suggestion}
+          icon={icons[index % icons.length]}
           onClick={() => handleClick(suggestion.prompt)}
-          className="btn btn-sm btn-outline btn-primary hover:btn-primary transition-all"
-        >
-          {suggestion.label}
-        </button>
+        />
       ))}
+    </div>
+  );
+};
+
+// Welcome screen component
+const WelcomeScreen: FC<{
+  initialMessage?: string;
+  suggestions?: Suggestion[];
+}> = ({ initialMessage, suggestions }) => {
+  return (
+    <div className="flex flex-col items-center p-4 pt-6 text-center min-h-full">
+      {/* Animated avatar */}
+      <div className="relative mb-4">
+        <AIAvatar size="lg" />
+      </div>
+
+      {/* Title */}
+      <h3 className="text-lg font-bold text-base-content mb-1 flex items-center gap-2">
+        <span>QDash Assistant</span>
+        <Sparkles className="w-4 h-4 text-warning" />
+      </h3>
+
+      {/* Description */}
+      <p className="text-sm text-base-content/60 mb-4 max-w-xs leading-relaxed">
+        {initialMessage ||
+          "I can help you analyze chip calibration metrics, explore qubit performance, and navigate workflows."}
+      </p>
+
+      {/* Suggestions */}
+      {suggestions && suggestions.length > 0 && (
+        <div className="w-full">
+          <p className="text-xs text-base-content/40 mb-2 uppercase tracking-wider font-medium">
+            Try asking
+          </p>
+          <SuggestionButtons suggestions={suggestions} />
+        </div>
+      )}
     </div>
   );
 };
@@ -326,21 +452,10 @@ export const AssistantThread: FC<AssistantThreadProps> = ({
     <ThreadPrimitive.Root className="relative flex flex-col h-full bg-base-100">
       <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto scroll-smooth">
         <ThreadPrimitive.Empty>
-          <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-secondary to-accent flex items-center justify-center text-white text-xl font-bold shadow-lg mb-4">
-              AI
-            </div>
-            <h3 className="text-lg font-semibold text-base-content mb-2">
-              QDash Assistant
-            </h3>
-            <p className="text-sm text-base-content/70 mb-4 max-w-sm">
-              {initialMessage ||
-                "I can help you analyze chip calibration metrics."}
-            </p>
-            {suggestions && suggestions.length > 0 && (
-              <SuggestionButtons suggestions={suggestions} />
-            )}
-          </div>
+          <WelcomeScreen
+            initialMessage={initialMessage}
+            suggestions={suggestions}
+          />
         </ThreadPrimitive.Empty>
 
         <ThreadPrimitive.Messages

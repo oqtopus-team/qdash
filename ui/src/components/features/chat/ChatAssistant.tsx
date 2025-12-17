@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { ChatPopup } from "./ChatPopup";
 import {
@@ -14,6 +14,12 @@ import { getChipMetrics, getMetricsConfig } from "@/client/metrics/metrics";
 export function ChatAssistant() {
   const router = useRouter();
   const pathname = usePathname();
+  const [clearKey, setClearKey] = useState(0);
+
+  // Clear messages by remounting the runtime provider
+  const handleClearMessages = useCallback(() => {
+    setClearKey((prev) => prev + 1);
+  }, []);
 
   // Register navigation tools
   useEffect(() => {
@@ -218,8 +224,8 @@ export function ChatAssistant() {
   }, [router]);
 
   return (
-    <AssistantRuntimeProvider context={{ pathname }}>
-      <ChatPopup />
+    <AssistantRuntimeProvider key={clearKey} context={{ pathname }}>
+      <ChatPopup onClear={handleClearMessages} />
     </AssistantRuntimeProvider>
   );
 }
