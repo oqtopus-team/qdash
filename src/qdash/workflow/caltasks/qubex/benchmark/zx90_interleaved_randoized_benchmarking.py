@@ -54,18 +54,24 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         exp = self.get_experiment(backend)
-        label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
+        label = "-".join(
+            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
+        )  # e.g., "0-1" → "Q00-Q01"
         result = run_result.raw_result
         self.output_parameters["zx90_gate_fidelity"].value = result[label]["gate_fidelity"]
         self.output_parameters["zx90_gate_fidelity"].error = result[label]["gate_fidelity_err"]
-        self.output_parameters["zx90_depolarizing_rate"].value = result[label]["rb_fit_result"]["depolarizing_rate"]
+        self.output_parameters["zx90_depolarizing_rate"].value = result[label]["rb_fit_result"][
+            "depolarizing_rate"
+        ]
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result[label]["fig"]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
-        label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
+        label = "-".join(
+            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
+        )  # e.g., "0-1" → "Q00-Q01"
         result = exp.interleaved_randomized_benchmarking(
             targets=label,
             interleaved_clifford="ZX90",

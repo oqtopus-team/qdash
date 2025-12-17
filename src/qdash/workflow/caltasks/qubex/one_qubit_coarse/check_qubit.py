@@ -36,8 +36,12 @@ class CheckQubit(QubexTask):
         ),
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "rabi_amplitude": OutputParameterModel(unit="a.u.", description="Rabi oscillation amplitude"),
-        "rabi_frequency": OutputParameterModel(unit="MHz", description="Rabi oscillation frequency"),
+        "rabi_amplitude": OutputParameterModel(
+            unit="a.u.", description="Rabi oscillation amplitude"
+        ),
+        "rabi_frequency": OutputParameterModel(
+            unit="MHz", description="Rabi oscillation frequency"
+        ),
     }
 
     def postprocess(
@@ -49,15 +53,21 @@ class CheckQubit(QubexTask):
         result = run_result.raw_result
         self.output_parameters["rabi_amplitude"].value = result.rabi_params[label].amplitude
         self.output_parameters["rabi_amplitude"].error = result.data[label].fit()["amplitude_err"]
-        self.output_parameters["rabi_frequency"].value = result.rabi_params[label].frequency * 1000  # convert to MHz
-        self.output_parameters["rabi_frequency"].error = result.data[label].fit()["frequency_err"] * 1000
+        self.output_parameters["rabi_frequency"].value = (
+            result.rabi_params[label].frequency * 1000
+        )  # convert to MHz
+        self.output_parameters["rabi_frequency"].error = (
+            result.data[label].fit()["frequency_err"] * 1000
+        )
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
         raw_data = [result.data[label].data]
         r2 = result.rabi_params[label].r2
         if self.r2_is_lower_than_threshold(r2):
             raise ValueError(f"R^2 value of Rabi oscillation is too low: {r2}")
-        return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
+        return PostProcessResult(
+            output_parameters=output_parameters, figures=figures, raw_data=raw_data
+        )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""

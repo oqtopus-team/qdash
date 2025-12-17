@@ -36,7 +36,9 @@ class QubexBackend(BaseBackend):
             from qubex import Experiment
 
             if self._config.get("task_type") == "qubit":
-                qubits = [int(qid) for qid in self._config.get("qids", [])]  # e.g. : ["0", "1", "2"] → [0, 1, 2]
+                qubits = [
+                    int(qid) for qid in self._config.get("qids", [])
+                ]  # e.g. : ["0", "1", "2"] → [0, 1, 2]
             elif self._config.get("task_type") == "coupling":
                 qubits = sorted(
                     {int(q) for qid in self._config.get("qids", []) for q in qid.split("-")}
@@ -74,7 +76,13 @@ class QubexBackend(BaseBackend):
         return str(exp.calib_note)
 
     def save_note(
-        self, username: str, chip_id: str, calib_dir: str, execution_id: str, task_manager_id: str, project_id: str
+        self,
+        username: str,
+        chip_id: str,
+        calib_dir: str,
+        execution_id: str,
+        task_manager_id: str,
+        project_id: str,
     ) -> None:
         """Save the calibration note to the experiment."""
         # Initialize calibration note
@@ -82,7 +90,9 @@ class QubexBackend(BaseBackend):
         note_path.parent.mkdir(parents=True, exist_ok=True)
 
         master_doc = (
-            CalibrationNoteDocument.find({"task_id": "master", "chip_id": chip_id, "project_id": project_id})
+            CalibrationNoteDocument.find(
+                {"task_id": "master", "chip_id": chip_id, "project_id": project_id}
+            )
             .sort([("timestamp", -1)])
             .limit(1)
             .run()
@@ -102,7 +112,13 @@ class QubexBackend(BaseBackend):
         note_path.write_text(json.dumps(master_doc.note, indent=2))
 
     def update_note(
-        self, username: str, chip_id: str, calib_dir: str, execution_id: str, task_manager_id: str, project_id: str
+        self,
+        username: str,
+        chip_id: str,
+        calib_dir: str,
+        execution_id: str,
+        task_manager_id: str,
+        project_id: str,
     ) -> None:
         """Update the master calibration note in MongoDB only.
 

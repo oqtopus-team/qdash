@@ -54,7 +54,9 @@ class RandomizedBenchmarking(QubexTask):
         label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
         self.output_parameters["average_gate_fidelity"].value = result[label]["avg_gate_fidelity"]
-        self.output_parameters["average_gate_fidelity"].error = result[label]["avg_gate_fidelity_err"]
+        self.output_parameters["average_gate_fidelity"].error = result[label][
+            "avg_gate_fidelity_err"
+        ]
         self.output_parameters["depolarizing_rate"].value = result[label]["depolarizing_rate"]
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result[label]["fig"]]

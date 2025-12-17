@@ -180,7 +180,9 @@ def list_task_file_backends() -> ListTaskFileBackendsResponse:
 
     """
     if not CALTASKS_BASE_PATH.exists():
-        raise HTTPException(status_code=404, detail=f"Caltasks directory not found: {CALTASKS_BASE_PATH}")
+        raise HTTPException(
+            status_code=404, detail=f"Caltasks directory not found: {CALTASKS_BASE_PATH}"
+        )
 
     backends = []
     try:
@@ -260,7 +262,9 @@ def get_task_file_content(path: str) -> dict[str, Any]:
             "path": path,
             "name": file_path.name,
             "size": file_path.stat().st_size,
-            "modified": datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc).isoformat(),
+            "modified": datetime.fromtimestamp(
+                file_path.stat().st_mtime, tz=timezone.utc
+            ).isoformat(),
         }
     except UnicodeDecodeError:
         raise HTTPException(status_code=400, detail="File is not a text file")

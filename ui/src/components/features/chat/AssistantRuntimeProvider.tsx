@@ -126,28 +126,44 @@ export function AssistantRuntimeProvider({
           throw new Error(`API error: ${response.status}`);
         }
 
-        const data = await response.json();
-        const assistantMsg = data.message;
+        let currentData = await response.json();
+        let currentMsg = currentData.message;
+        let currentMessages = [...apiMessages];
+        const maxToolRounds = 5; // Prevent infinite loops
+        let toolRound = 0;
 
-        // Check for tool calls
-        if (assistantMsg.tool_calls && assistantMsg.tool_calls.length > 0) {
+        // Loop to handle multiple rounds of tool calls
+        while (
+          currentMsg.tool_calls &&
+          currentMsg.tool_calls.length > 0 &&
+          toolRound < maxToolRounds
+        ) {
+          toolRound++;
+          console.log(`Tool round ${toolRound}:`, currentMsg.tool_calls);
+
           // Execute tool calls
           const toolResults: string[] = [];
-          for (const toolCall of assistantMsg.tool_calls) {
+          for (const toolCall of currentMsg.tool_calls) {
+            console.log(
+              "Executing tool:",
+              toolCall.function.name,
+              toolCall.function.arguments,
+            );
             const result = await executeTool(
               toolCall.function.name,
               toolCall.function.arguments,
             );
+            console.log("Tool result:", result.substring(0, 200) + "...");
             toolResults.push(`${toolCall.function.name}: ${result}`);
           }
 
-          // Send tool results back and get final response
-          const messagesWithTools: OllamaMessage[] = [
-            ...apiMessages,
+          // Add assistant message and tool results to conversation
+          currentMessages = [
+            ...currentMessages,
             {
               role: "assistant" as const,
-              content: assistantMsg.content || "",
-              tool_calls: assistantMsg.tool_calls,
+              content: currentMsg.content || "",
+              tool_calls: currentMsg.tool_calls,
             },
             {
               role: "tool" as const,
@@ -155,56 +171,75 @@ export function AssistantRuntimeProvider({
             },
           ];
 
+          // Send follow-up request
+          console.log(`Sending follow-up request (round ${toolRound})`);
           const followUpResponse = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              messages: messagesWithTools,
+              messages: currentMessages,
               context,
               copilotConfig,
             }),
           });
 
-          if (followUpResponse.ok) {
-            const followUpData = await followUpResponse.json();
-            const finalMessage: ThreadMessageLike = {
-              role: "assistant",
-              content: [
-                {
-                  type: "text",
-                  text: followUpData.message.content || toolResults.join("\n"),
-                },
-              ],
-            };
-            // Set running to false before adding message to avoid double AI icon
-            setIsRunning(false);
-            setMessages((currentMessages) => [
-              ...currentMessages,
-              finalMessage,
-            ]);
-          } else {
-            // If follow-up fails, show tool results
+          if (!followUpResponse.ok) {
+            // If follow-up fails, show tool results collected so far
             const toolResultMessage: ThreadMessageLike = {
               role: "assistant",
               content: [{ type: "text", text: toolResults.join("\n") }],
             };
             setIsRunning(false);
-            setMessages((currentMessages) => [
-              ...currentMessages,
-              toolResultMessage,
-            ]);
+            setMessages((prev) => [...prev, toolResultMessage]);
+            return;
           }
-        } else {
-          // No tool calls, just add the response
-          const assistantMessage: ThreadMessageLike = {
+
+          currentData = await followUpResponse.json();
+          currentMsg = currentData.message;
+          console.log(
+            "Follow-up response has tool_calls:",
+            !!(currentMsg.tool_calls && currentMsg.tool_calls.length > 0),
+          );
+        }
+
+        // Final response (no more tool calls)
+        if (currentMsg.content) {
+          const finalMessage: ThreadMessageLike = {
             role: "assistant",
-            content: [{ type: "text", text: assistantMsg.content }],
+            content: [{ type: "text", text: currentMsg.content }],
           };
           setIsRunning(false);
-          setMessages((currentMessages) => [
-            ...currentMessages,
-            assistantMessage,
-          ]);
+          setMessages((prev) => [...prev, finalMessage]);
+        } else if (toolRound > 0) {
+          // If we had tool calls but no final content, show last tool results
+          const lastToolMsg = currentMessages[currentMessages.length - 1];
+          const finalMessage: ThreadMessageLike = {
+            role: "assistant",
+            content: [
+              {
+                type: "text",
+                text:
+                  typeof lastToolMsg.content === "string"
+                    ? lastToolMsg.content
+                    : "Tool execution completed.",
+              },
+            ],
+          };
+          setIsRunning(false);
+          setMessages((prev) => [...prev, finalMessage]);
+        } else {
+          // No tool calls and no content - shouldn't happen, but handle gracefully
+          const assistantMessage: ThreadMessageLike = {
+            role: "assistant",
+            content: [
+              {
+                type: "text",
+                text: currentMsg.content || "No response generated.",
+              },
+            ],
+          };
+          setIsRunning(false);
+          setMessages((prev) => [...prev, assistantMessage]);
         }
       } catch (error) {
         console.error("Chat error:", error);

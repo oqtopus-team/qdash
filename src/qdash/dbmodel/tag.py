@@ -29,7 +29,10 @@ class TagDocument(Document):
 
         name = "tag"
         indexes: ClassVar = [
-            IndexModel([("project_id", ASCENDING), ("name", ASCENDING), ("username", ASCENDING)], unique=True),
+            IndexModel(
+                [("project_id", ASCENDING), ("name", ASCENDING), ("username", ASCENDING)],
+                unique=True,
+            ),
             IndexModel([("project_id", ASCENDING), ("username", ASCENDING)]),
         ]
 

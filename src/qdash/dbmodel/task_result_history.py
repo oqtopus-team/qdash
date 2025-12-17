@@ -66,11 +66,15 @@ class TaskResultHistoryDocument(Document):
         indexes: ClassVar = [
             IndexModel([("project_id", ASCENDING), ("task_id", ASCENDING)], unique=True),
             IndexModel([("project_id", ASCENDING), ("execution_id", ASCENDING)]),
-            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING), ("start_at", DESCENDING)]),
+            IndexModel(
+                [("project_id", ASCENDING), ("chip_id", ASCENDING), ("start_at", DESCENDING)]
+            ),
         ]
 
     @classmethod
-    def from_datamodel(cls, task: BaseTaskResultModel, execution_model: ExecutionModel) -> "TaskResultHistoryDocument":
+    def from_datamodel(
+        cls, task: BaseTaskResultModel, execution_model: ExecutionModel
+    ) -> "TaskResultHistoryDocument":
         return cls(
             project_id=execution_model.project_id,
             username=execution_model.username,
@@ -98,8 +102,12 @@ class TaskResultHistoryDocument(Document):
         )
 
     @classmethod
-    def upsert_document(cls, task: BaseTaskResultModel, execution_model: ExecutionModel) -> "TaskResultHistoryDocument":
-        doc = cls.find_one({"project_id": execution_model.project_id, "task_id": task.task_id}).run()
+    def upsert_document(
+        cls, task: BaseTaskResultModel, execution_model: ExecutionModel
+    ) -> "TaskResultHistoryDocument":
+        doc = cls.find_one(
+            {"project_id": execution_model.project_id, "task_id": task.task_id}
+        ).run()
         if doc is None:
             doc = cls.from_datamodel(task=task, execution_model=execution_model)
             doc.save()

@@ -37,7 +37,9 @@ class CheckOptimalReadoutAmplitude(QubexTask):
         ),
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "optimal_readout_amplitude": OutputParameterModel(unit="a.u.", description="Optimal Readout Amplitude"),
+        "optimal_readout_amplitude": OutputParameterModel(
+            unit="a.u.", description="Optimal Readout Amplitude"
+        ),
     }
 
     def postprocess(

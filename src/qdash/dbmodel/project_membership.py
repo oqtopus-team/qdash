@@ -18,7 +18,9 @@ class ProjectMembershipDocument(Document):
     status: str = Field(default="pending", description="Invitation status")
     invited_by: str | None = Field(default=None, description="Inviter username")
     last_accessed_at: str | None = Field(default=None, description="Last access timestamp ISO8601")
-    system_info: SystemInfoModel = Field(default_factory=SystemInfoModel, description="System info timestamps")
+    system_info: SystemInfoModel = Field(
+        default_factory=SystemInfoModel, description="System info timestamps"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -32,6 +34,10 @@ class ProjectMembershipDocument(Document):
         ]
 
     @classmethod
-    def get_active_membership(cls, project_id: str, username: str) -> ProjectMembershipDocument | None:
+    def get_active_membership(
+        cls, project_id: str, username: str
+    ) -> ProjectMembershipDocument | None:
         """Fetch active membership for the user/project pair."""
-        return cls.find_one({"project_id": project_id, "username": username, "status": "active"}).run()
+        return cls.find_one(
+            {"project_id": project_id, "username": username, "status": "active"}
+        ).run()

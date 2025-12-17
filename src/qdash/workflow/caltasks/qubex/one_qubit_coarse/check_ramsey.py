@@ -43,7 +43,9 @@ class CheckRamsey(QubexTask):
         ),
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "ramsey_frequency": OutputParameterModel(unit="MHz", description="Ramsey oscillation frequency"),
+        "ramsey_frequency": OutputParameterModel(
+            unit="MHz", description="Ramsey oscillation frequency"
+        ),
         "qubit_frequency": OutputParameterModel(unit="GHz", description="Qubit bare frequency"),
         "t2_star": OutputParameterModel(unit="μs", description="T2* time"),
     }
@@ -116,8 +118,16 @@ class CheckRamsey(QubexTask):
         logger = get_run_logger()
 
         # Debug: Check what labels are actually in the data
-        x_labels = list(run_result.raw_result["x"].data.keys()) if hasattr(run_result.raw_result["x"], "data") else []
-        y_labels = list(run_result.raw_result["y"].data.keys()) if hasattr(run_result.raw_result["y"], "data") else []
+        x_labels = (
+            list(run_result.raw_result["x"].data.keys())
+            if hasattr(run_result.raw_result["x"], "data")
+            else []
+        )
+        y_labels = (
+            list(run_result.raw_result["y"].data.keys())
+            if hasattr(run_result.raw_result["y"], "data")
+            else []
+        )
 
         logger.info(f"Expected label: {label}")
         logger.info(f"X-axis data labels: {x_labels}")
@@ -169,8 +179,12 @@ class CheckRamsey(QubexTask):
         x_fit_success = x_r2 is not None and not self.r2_is_lower_than_threshold(x_r2)
         y_fit_success = y_r2 is not None and not self.r2_is_lower_than_threshold(y_r2)
 
-        x_fit_status = "✓ Success" if x_fit_success else ("✗ Failed" if result_x is not None else "✗ No data")
-        y_fit_status = "✓ Success" if y_fit_success else ("✗ Failed" if result_y is not None else "✗ No data")
+        x_fit_status = (
+            "✓ Success" if x_fit_success else ("✗ Failed" if result_x is not None else "✗ No data")
+        )
+        y_fit_status = (
+            "✓ Success" if y_fit_success else ("✗ Failed" if result_y is not None else "✗ No data")
+        )
         logger.info(f"  X-axis fit: {x_fit_status}")
         logger.info(f"  Y-axis fit: {y_fit_status}")
 
@@ -207,12 +221,18 @@ class CheckRamsey(QubexTask):
             selected_fit = y_fit
             selected_axis = "Y"
 
-        selected_r2 = x_r2 if use_x and x_r2 is not None else (y_r2 if not use_x and y_r2 is not None else None)
+        selected_r2 = (
+            x_r2
+            if use_x and x_r2 is not None
+            else (y_r2 if not use_x and y_r2 is not None else None)
+        )
         selected_r2_str = f"{selected_r2:.4f}" if selected_r2 is not None else "N/A"
         logger.info(f"  Selected axis: {selected_axis} (R²={selected_r2_str})")
         logger.info(f"  Bare frequency: {selected_result.bare_freq:.6f} GHz")
 
-        self.output_parameters["ramsey_frequency"].value = selected_fit["f"] * 1000  # convert to MHz
+        self.output_parameters["ramsey_frequency"].value = (
+            selected_fit["f"] * 1000
+        )  # convert to MHz
         self.output_parameters["ramsey_frequency"].error = selected_fit["f_err"] * 1000
         self.output_parameters["qubit_frequency"].value = selected_result.bare_freq
         self.output_parameters["t2_star"].value = selected_result.t2 * 0.001  # convert to μs
@@ -231,7 +251,9 @@ class CheckRamsey(QubexTask):
             figures.append(self.make_figure(result_x, result_y, label))
 
         raw_data = [selected_result.data]
-        return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
+        return PostProcessResult(
+            output_parameters=output_parameters, figures=figures, raw_data=raw_data
+        )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""

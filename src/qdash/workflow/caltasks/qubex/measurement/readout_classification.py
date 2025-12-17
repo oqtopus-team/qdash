@@ -101,7 +101,9 @@ class ReadoutClassification(QubexTask):
         self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
-        self.output_parameters["average_readout_fidelity"].value = result["average_readout_fidelity"][label]
+        self.output_parameters["average_readout_fidelity"].value = result[
+            "average_readout_fidelity"
+        ][label]
         self.output_parameters["readout_fidelity_0"].value = result["readout_fidelities"][label][0]
         self.output_parameters["readout_fidelity_1"].value = result["readout_fidelities"][label][1]
         output_parameters = self.attach_execution_id(execution_id)

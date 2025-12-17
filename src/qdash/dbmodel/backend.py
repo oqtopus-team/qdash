@@ -24,7 +24,9 @@ class BackendDocument(Document):
     project_id: str = Field(..., description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the task")
     name: str = Field(..., description="The name of backend")
-    system_info: SystemInfoModel = Field(default_factory=SystemInfoModel, description="The system information")
+    system_info: SystemInfoModel = Field(
+        default_factory=SystemInfoModel, description="The system information"
+    )
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -35,7 +37,10 @@ class BackendDocument(Document):
 
         name = "backend"
         indexes: ClassVar = [
-            IndexModel([("project_id", ASCENDING), ("name", ASCENDING), ("username", ASCENDING)], unique=True),
+            IndexModel(
+                [("project_id", ASCENDING), ("name", ASCENDING), ("username", ASCENDING)],
+                unique=True,
+            ),
             IndexModel([("project_id", ASCENDING), ("username", ASCENDING)]),
         ]
 

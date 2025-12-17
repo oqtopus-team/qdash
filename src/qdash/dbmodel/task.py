@@ -39,7 +39,10 @@ class TaskDocument(Document):
 
         name = "task"
         indexes: ClassVar = [
-            IndexModel([("project_id", ASCENDING), ("name", ASCENDING), ("username", ASCENDING)], unique=True),
+            IndexModel(
+                [("project_id", ASCENDING), ("name", ASCENDING), ("username", ASCENDING)],
+                unique=True,
+            ),
             IndexModel([("project_id", ASCENDING), ("username", ASCENDING)]),
         ]
 
@@ -74,7 +77,9 @@ class TaskDocument(Document):
         inserted_documents = []
         for task in tasks:
             logger.debug(f"Inserting task: {task}")
-            doc = cls.find_one({"project_id": task.project_id, "name": task.name, "username": task.username}).run()
+            doc = cls.find_one(
+                {"project_id": task.project_id, "name": task.name, "username": task.username}
+            ).run()
             if doc is None:
                 logger.debug(f"Task {task.name} not found. Inserting new task.")
                 doc = cls.from_task_model(task)

@@ -108,18 +108,24 @@ class CheckBellStateTomography(QubexTask):
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         exp = self.get_experiment(backend)
-        label = "-".join([exp.get_qubit_label(int(q)) for q in qid.split("-")])  # e.g., "0-1" → "Q00-Q01"
+        label = "-".join(
+            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
+        )  # e.g., "0-1" → "Q00-Q01"
         result = run_result.raw_result
         self.output_parameters["bell_state_fidelity"].value = result["fidelity"]
         output_parameters = self.attach_execution_id(execution_id)
         result["figure"] = self.make_figure(result, label)
         figures: list = [result["figure"]]
         raw_data: list = []
-        return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
+        return PostProcessResult(
+            output_parameters=output_parameters, figures=figures, raw_data=raw_data
+        )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
-        control, target = (exp.get_qubit_label(int(q)) for q in qid.split("-"))  # e.g., "0-1" → "Q00","Q01"
+        control, target = (
+            exp.get_qubit_label(int(q)) for q in qid.split("-")
+        )  # e.g., "0-1" → "Q00","Q01"
         result = exp.bell_state_tomography(control, target)
         self.save_calibration(backend)
         return RunResult(raw_result=result)

@@ -11,7 +11,9 @@ class ExecutionLockDocument(Document):
 
     project_id: str = Field(..., description="Owning project identifier")
     locked: bool = Field(default=False, description="Whether the execution is locked")
-    system_info: SystemInfoModel = Field(default_factory=SystemInfoModel, description="The system information")
+    system_info: SystemInfoModel = Field(
+        default_factory=SystemInfoModel, description="The system information"
+    )
 
     class Settings:
         """Settings for the document."""
