@@ -2040,6 +2040,35 @@
         }
       }
     },
+    "/copilot/config": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Get Copilot configuration",
+        "description": "Get Copilot configuration for the metrics assistant.\n\nRetrieves the Copilot configuration from YAML, including:\n- enabled: Whether Copilot is enabled\n- evaluation_metrics: Which metrics to use for multi-metric evaluation\n- scoring: Thresholds for good/excellent ratings per metric\n- system_prompt: The AI assistant's system prompt\n- initial_message: The initial greeting message\n\nReturns\n-------\ndict[str, Any]\n    Copilot configuration dictionary",
+        "operationId": "getCopilotConfig",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Getcopilotconfig"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/settings": {
       "get": {
         "tags": [
@@ -4631,35 +4660,6 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Getmetricsconfig"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/metrics/copilot/config": {
-      "get": {
-        "tags": [
-          "metrics"
-        ],
-        "summary": "Get Copilot configuration",
-        "description": "Get Copilot configuration for the metrics assistant.\n\nRetrieves the Copilot configuration from YAML, including:\n- enabled: Whether Copilot is enabled\n- evaluation_metrics: Which metrics to use for multi-metric evaluation\n- scoring: Thresholds for good/excellent ratings per metric\n- system_prompt: The AI assistant's system prompt\n- initial_message: The initial greeting message\n\nReturns\n-------\ndict[str, Any]\n    Copilot configuration dictionary",
-        "operationId": "getCopilotConfig",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Getcopilotconfig"
                 }
               }
             }

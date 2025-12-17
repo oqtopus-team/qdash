@@ -28,6 +28,16 @@ interface ChatContext {
   metricsData?: Record<string, unknown>;
 }
 
+interface CopilotConfig {
+  system_prompt?: string;
+  model?: {
+    provider?: string;
+    name?: string;
+    temperature?: number;
+    max_tokens?: number;
+  };
+}
+
 // Tool handlers registry
 type ToolHandler = (args: Record<string, unknown>) => Promise<string>;
 const toolHandlers = new Map<string, ToolHandler>();
@@ -62,11 +72,13 @@ const convertMessage = (message: ThreadMessageLike): ThreadMessageLike => {
 interface AssistantRuntimeProviderProps {
   children: ReactNode;
   context?: ChatContext;
+  copilotConfig?: CopilotConfig;
 }
 
 export function AssistantRuntimeProvider({
   children,
   context,
+  copilotConfig,
 }: AssistantRuntimeProviderProps) {
   const [messages, setMessages] = useState<readonly ThreadMessageLike[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -106,6 +118,7 @@ export function AssistantRuntimeProvider({
           body: JSON.stringify({
             messages: apiMessages,
             context,
+            copilotConfig,
           }),
         });
 
@@ -148,6 +161,7 @@ export function AssistantRuntimeProvider({
             body: JSON.stringify({
               messages: messagesWithTools,
               context,
+              copilotConfig,
             }),
           });
 
@@ -207,7 +221,7 @@ export function AssistantRuntimeProvider({
         setMessages((currentMessages) => [...currentMessages, errorMessage]);
       }
     },
-    [messages, context],
+    [messages, context, copilotConfig],
   );
 
   const runtime = useExternalStoreRuntime({
