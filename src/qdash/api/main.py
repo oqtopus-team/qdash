@@ -86,12 +86,12 @@ app.include_router(project.router, tags=["projects"])
 app.include_router(execution.router, tags=["execution"])
 app.include_router(file.router, tags=["file"])
 
-# Copilot router without auth (for server-side API calls from Next.js)
-app.include_router(copilot.router, prefix="/copilot", tags=["copilot"])
-
 # All other routers with global auth dependency
 auth_dependency = [Depends(get_current_active_user)]
 app.include_router(calibration.router, tags=["calibration"], dependencies=auth_dependency)
+app.include_router(
+    copilot.router, prefix="/copilot", tags=["copilot"], dependencies=auth_dependency
+)
 app.include_router(settings.router, tags=["settings"], dependencies=auth_dependency)
 app.include_router(chip.router, tags=["chip"], dependencies=auth_dependency)
 app.include_router(task.router, tags=["task"], dependencies=auth_dependency)
