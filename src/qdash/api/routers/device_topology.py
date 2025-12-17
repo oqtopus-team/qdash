@@ -245,7 +245,7 @@ def get_device_topology(
                 physical_id=int(qid),
                 position=Position(
                     x=qubit_pos.col * POSITION_SCALE / POSITION_DIVISOR,
-                    y=qubit_pos.row * POSITION_SCALE / POSITION_DIVISOR,
+                    y=-1 * qubit_pos.row * POSITION_SCALE / POSITION_DIVISOR,
                 ),
                 fidelity=x90_gate_fidelity,
                 meas_error=MeasError(
