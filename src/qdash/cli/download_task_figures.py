@@ -41,7 +41,9 @@ def download_task_figures(
     }
 
     # Fetch ALL matching documents, sorted by most recent first
-    all_docs = list(TaskResultHistoryDocument.find(query).sort([("system_info.updated_at", -1)]).run())
+    all_docs = list(
+        TaskResultHistoryDocument.find(query).sort([("system_info.updated_at", -1)]).run()
+    )
 
     if not all_docs:
         query_str = ", ".join(f"{k}={v}" for k, v in query.items())
@@ -163,4 +165,6 @@ def download_task_figures(
     typer.echo(f"{'='*60}")
     typer.echo(f"📁 Files saved to: {output_path.absolute()}")
     typer.echo(f"📄 Metadata saved to: {meta_path.absolute()}")
-    typer.echo(f"📊 Total JSON figures downloaded: {sum(len(t['json_figures']) for t in metadata_list)}")
+    typer.echo(
+        f"📊 Total JSON figures downloaded: {sum(len(t['json_figures']) for t in metadata_list)}"
+    )

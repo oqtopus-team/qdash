@@ -88,7 +88,8 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
 
         if not hasattr(module, request.flow_function_name):
             raise HTTPException(
-                status_code=400, detail=f"Flow function '{request.flow_function_name}' not found in {file_path}"
+                status_code=400,
+                detail=f"Flow function '{request.flow_function_name}' not found in {file_path}",
             )
 
         flow_obj = getattr(module, request.flow_function_name)
@@ -101,7 +102,9 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
                     await client.delete_deployment(request.old_deployment_id)
                     logger.info(f"Deleted old deployment: {request.old_deployment_id}")
             except Exception as e:
-                logger.warning(f"Failed to delete old deployment {request.old_deployment_id}: {type(e).__name__}: {e}")
+                logger.warning(
+                    f"Failed to delete old deployment {request.old_deployment_id}: {type(e).__name__}: {e}"
+                )
 
         # Build deployment using the flow object with work pool
         logger.info(f"Building deployment with work pool: {WORK_POOL_NAME}")
@@ -129,7 +132,9 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
         raise HTTPException(status_code=404, detail=str(e))
     except AttributeError as e:
         logger.error(f"Flow function not found: {e}")
-        raise HTTPException(status_code=400, detail=f"Flow function '{request.flow_function_name}' not found")
+        raise HTTPException(
+            status_code=400, detail=f"Flow function '{request.flow_function_name}' not found"
+        )
     except Exception as e:
         logger.error(f"Failed to register deployment: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -209,7 +214,9 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
                 logger.info(f"Found deployment: {target_deployment.name}")
             except Exception as e:
                 logger.error(f"Failed to read deployment {request.deployment_id}: {e}")
-                raise HTTPException(status_code=404, detail=f"Deployment not found: {request.deployment_id}")
+                raise HTTPException(
+                    status_code=404, detail=f"Deployment not found: {request.deployment_id}"
+                )
 
             # Update schedule and parameters
             try:
@@ -231,7 +238,9 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
                     logger.info("Successfully updated deployment parameters")
             except Exception as e:
                 logger.error(f"Failed to update deployment: {e}")
-                raise HTTPException(status_code=500, detail=f"Failed to update deployment: {str(e)}")
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to update deployment: {str(e)}"
+                )
 
             logger.info(
                 f"Set schedule on deployment {request.deployment_id}: cron={request.cron}, active={request.active}"

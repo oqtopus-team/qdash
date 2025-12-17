@@ -55,9 +55,13 @@ class ExecutionHistoryDocument(Document):
         name = "execution_history"
         indexes: ClassVar = [
             IndexModel([("project_id", ASCENDING), ("execution_id", ASCENDING)], unique=True),
-            IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING), ("start_at", DESCENDING)]),
+            IndexModel(
+                [("project_id", ASCENDING), ("chip_id", ASCENDING), ("start_at", DESCENDING)]
+            ),
             IndexModel([("project_id", ASCENDING), ("chip_id", ASCENDING)]),
-            IndexModel([("project_id", ASCENDING), ("username", ASCENDING), ("start_at", DESCENDING)]),
+            IndexModel(
+                [("project_id", ASCENDING), ("username", ASCENDING), ("start_at", DESCENDING)]
+            ),
         ]
 
     @classmethod

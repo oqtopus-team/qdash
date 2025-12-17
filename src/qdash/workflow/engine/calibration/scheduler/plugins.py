@@ -349,7 +349,9 @@ class FidelityFilter(CRPairFilter):
         ]
 
         self._filtered_count = len(filtered)
-        logger.info(f"FidelityFilter (≥{self.min_fidelity}): {self._total_count} → {self._filtered_count} pairs")
+        logger.info(
+            f"FidelityFilter (≥{self.min_fidelity}): {self._total_count} → {self._filtered_count} pairs"
+        )
         return filtered
 
     def get_stats(self) -> dict[str, Any]:
@@ -469,7 +471,9 @@ class IntraThenInterMuxScheduler(CRSchedulingStrategy):
         intra_groups = self.inner_scheduler.schedule(intra_mux, context) if intra_mux else []
         inter_groups = self.inner_scheduler.schedule(inter_mux, context) if inter_mux else []
 
-        logger.info(f"IntraThenInterMuxScheduler: {self._fast_count} intra-MUX, {self._slow_count} inter-MUX pairs")
+        logger.info(
+            f"IntraThenInterMuxScheduler: {self._fast_count} intra-MUX, {self._slow_count} inter-MUX pairs"
+        )
         return intra_groups + inter_groups
 
     def get_metadata(self) -> dict[str, Any]:

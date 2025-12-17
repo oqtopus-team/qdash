@@ -14,7 +14,9 @@ class ExecutionCounterDocument(Document):
     username: str
     chip_id: str
     index: int
-    system_info: SystemInfoModel = Field(default_factory=SystemInfoModel, description="The system information")
+    system_info: SystemInfoModel = Field(
+        default_factory=SystemInfoModel, description="The system information"
+    )
 
     class Settings:
         """Settings for the document."""
@@ -22,7 +24,12 @@ class ExecutionCounterDocument(Document):
         name = "execution_counter"
         indexes: ClassVar = [
             IndexModel(
-                [("project_id", ASCENDING), ("date", ASCENDING), ("username", ASCENDING), ("chip_id", ASCENDING)],
+                [
+                    ("project_id", ASCENDING),
+                    ("date", ASCENDING),
+                    ("username", ASCENDING),
+                    ("chip_id", ASCENDING),
+                ],
                 unique=True,
             )
         ]
@@ -58,12 +65,20 @@ class ExecutionCounterDocument(Document):
         max_retries = 5
         for attempt in range(max_retries):
             # First, try to find existing document
-            doc = cls.find_one({"project_id": project_id, "date": date, "username": username, "chip_id": chip_id}).run()
+            doc = cls.find_one(
+                {"project_id": project_id, "date": date, "username": username, "chip_id": chip_id}
+            ).run()
 
             if doc is None:
                 # Try to create initial document with index 0
                 try:
-                    doc = cls(project_id=project_id, date=date, username=username, chip_id=chip_id, index=0)
+                    doc = cls(
+                        project_id=project_id,
+                        date=date,
+                        username=username,
+                        chip_id=chip_id,
+                        index=0,
+                    )
                     doc.insert()
                     return 0
                 except DuplicateKeyError:

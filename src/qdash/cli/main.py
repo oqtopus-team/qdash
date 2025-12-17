@@ -38,7 +38,9 @@ def add_new_chip(
         from qdash.db.init.chip import init_chip_document
 
         init_chip_document(username=username, chip_id=chip_id, size=size)
-        typer.echo(f"New chip added successfully (username: {username}, chip_id: {chip_id}, size: {size})")
+        typer.echo(
+            f"New chip added successfully (username: {username}, chip_id: {chip_id}, size: {size})"
+        )
     except Exception as e:
         typer.echo(f"Error adding new chip: {e}", err=True)
         raise typer.Exit(1)
@@ -69,7 +71,9 @@ def update_active_tasks(
 def init_all_data(
     username: str = typer.Option(..., "--username", "-u", help="Username for initialization"),
     chip_id: str = typer.Option(..., "--chip-id", "-c", help="Chip ID for initialization"),
-    chip_size: int = typer.Option(..., "--chip-size", "-s", help="Size of the chip (e.g., 64, 144)"),
+    chip_size: int = typer.Option(
+        ..., "--chip-size", "-s", help="Size of the chip (e.g., 64, 144)"
+    ),
     backend: str = typer.Option(..., "--backend", "-b", help="Backend (e.g., qubex)"),
 ) -> None:
     """Initialize all data with confirmation."""
@@ -100,7 +104,9 @@ def init_all_data(
 
 @app.command()
 def export_note(
-    execution_id: str = typer.Option(..., "--execution-id", "-e", help="Execution ID (e.g., 20250130-001)"),
+    execution_id: str = typer.Option(
+        ..., "--execution-id", "-e", help="Execution ID (e.g., 20250130-001)"
+    ),
     task_id: str = typer.Option("master", "--task-id", "-t", help="Task ID (default: master)"),
     output: str = typer.Option(None, "--output", "-o", help="Output file path"),
     username: str = typer.Option(None, "--username", "-u", help="Username filter (optional)"),
@@ -147,7 +153,9 @@ def download_figures(
     task_name: str = typer.Option(..., "--task-name", "-t", help="Task name to search for"),
     chip_id: str = typer.Option(..., "--chip-id", "-c", help="Chip ID to filter by"),
     username: str = typer.Option(..., "--username", "-u", help="Username to filter by"),
-    output_dir: str = typer.Option(None, "--output-dir", "-o", help="Output directory for downloaded files"),
+    output_dir: str = typer.Option(
+        None, "--output-dir", "-o", help="Output directory for downloaded files"
+    ),
 ) -> None:
     """Download JSON figures from completed calibration tasks.
 

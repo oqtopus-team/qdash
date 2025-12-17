@@ -32,7 +32,9 @@ class CheckSkew(QubexTask):
     ) -> PostProcessResult:
         result = run_result.raw_result
         figures: list = [result["fig"]]
-        return PostProcessResult(output_parameters=self.attach_execution_id(execution_id), figures=figures)
+        return PostProcessResult(
+            output_parameters=self.attach_execution_id(execution_id), figures=figures
+        )
 
     def load(self, filename: str) -> Any:
         with (Path.cwd() / Path(filename)).open() as file:
@@ -57,7 +59,9 @@ class CheckSkew(QubexTask):
             config_dir=f"/app/config/qubex/{chip_id}/config",
             params_dir=f"/app/config/qubex/{chip_id}/params",
         )
-        clock_master_address = exp.system_manager.experiment_system.control_system.clock_master_address
+        clock_master_address = (
+            exp.system_manager.experiment_system.control_system.clock_master_address
+        )
         box_ids = exp.box_ids
         all_box_ids = list(set(list(box_ids) + [ref_port]))
         skew = Skew.from_yaml(

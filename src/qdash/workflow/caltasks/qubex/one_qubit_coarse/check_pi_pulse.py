@@ -31,7 +31,9 @@ class CheckPIPulse(QubexTask):
         label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
         figures = [result.data[label].plot(normalize=True, return_figure=True)]
-        return PostProcessResult(output_parameters=self.attach_execution_id(execution_id), figures=figures)
+        return PostProcessResult(
+            output_parameters=self.attach_execution_id(execution_id), figures=figures
+        )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)

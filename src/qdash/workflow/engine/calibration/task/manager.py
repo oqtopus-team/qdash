@@ -63,7 +63,9 @@ class TaskManager(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     execution_id: str
     task_result: TaskResultModel = Field(default_factory=TaskResultModel)
-    calib_data: CalibDataModel = Field(default_factory=lambda: CalibDataModel(qubit={}, coupling={}))
+    calib_data: CalibDataModel = Field(
+        default_factory=lambda: CalibDataModel(qubit={}, coupling={})
+    )
     calib_dir: str = ""
     controller_info: dict[str, dict] = Field(default_factory=dict)
 
@@ -79,7 +81,9 @@ class TaskManager(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    def __init__(self, username: str, execution_id: str, qids: list[str] = [], calib_dir: str = ".") -> None:
+    def __init__(
+        self, username: str, execution_id: str, qids: list[str] = [], calib_dir: str = "."
+    ) -> None:
         """Initialize TaskManager.
 
         Parameters
@@ -249,7 +253,9 @@ class TaskManager(BaseModel):
         self._state_manager.start_task(task_name, task_type, qid)
         self._sync_from_state_manager()
 
-    def start_all_qid_tasks(self, task_name: str, task_type: str = "qubit", qids: list[str] = []) -> None:
+    def start_all_qid_tasks(
+        self, task_name: str, task_type: str = "qubit", qids: list[str] = []
+    ) -> None:
         """Start a task for all given qubit IDs."""
         for qid in qids:
             self.start_task(task_name, task_type, qid)
@@ -260,7 +266,9 @@ class TaskManager(BaseModel):
         self._state_manager.end_task(task_name, task_type, qid)
         self._sync_from_state_manager()
 
-    def end_all_qid_tasks(self, task_name: str, task_type: str = "qubit", qids: list[str] = []) -> None:
+    def end_all_qid_tasks(
+        self, task_name: str, task_type: str = "qubit", qids: list[str] = []
+    ) -> None:
         """End a task for all given qubit IDs."""
         for qid in qids:
             self.end_task(task_name, task_type, qid)
@@ -323,7 +331,9 @@ class TaskManager(BaseModel):
         for qid in qids:
             self.update_task_status_to_failed(task_name, message, task_type, qid)
 
-    def update_not_executed_tasks_to_skipped(self, task_type: str = "global", qid: str = "") -> None:
+    def update_not_executed_tasks_to_skipped(
+        self, task_type: str = "global", qid: str = ""
+    ) -> None:
         """Mark unexecuted tasks as skipped."""
         self._sync_to_state_manager()
         self._state_manager.update_not_executed_tasks_to_skipped(task_type, qid)
@@ -347,7 +357,9 @@ class TaskManager(BaseModel):
         self._state_manager.put_output_parameters(task_name, output_parameters, task_type, qid)
         self._sync_from_state_manager()
 
-    def put_note_to_task(self, task_name: str, note: dict, task_type: str = "global", qid: str = "") -> None:
+    def put_note_to_task(
+        self, task_name: str, note: dict, task_type: str = "global", qid: str = ""
+    ) -> None:
         """Add a note to a task."""
         self._sync_to_state_manager()
         self._state_manager.put_note_to_task(task_name, note, task_type, qid)
@@ -401,7 +413,9 @@ class TaskManager(BaseModel):
         task = self._state_manager.get_task(task_name, task_type, qid)
         return dict(task.output_parameters)
 
-    def this_task_is_completed(self, task_name: str, task_type: str = "global", qid: str = "") -> bool:
+    def this_task_is_completed(
+        self, task_name: str, task_type: str = "global", qid: str = ""
+    ) -> bool:
         """Check if a task is completed."""
         self._sync_to_state_manager()
         task = self._state_manager.get_task(task_name, task_type, qid)
@@ -442,7 +456,9 @@ class TaskManager(BaseModel):
         """Save a single figure."""
         self.save_figures([figure], task_name, task_type, savedir, qid)
 
-    def save_raw_data(self, raw_data: list, task_name: str, task_type: str = "global", qid: str = "") -> None:
+    def save_raw_data(
+        self, raw_data: list, task_name: str, task_type: str = "global", qid: str = ""
+    ) -> None:
         """Save raw data."""
         if self._data_saver:
             paths = self._data_saver.save_raw_data(
@@ -486,11 +502,17 @@ class TaskManager(BaseModel):
 
     def _is_qubit_task(self, task_name: str) -> bool:
         """Check if task is a qubit task."""
-        return any(task_name in [task.name for task in tasks] for tasks in self.task_result.qubit_tasks.values())
+        return any(
+            task_name in [task.name for task in tasks]
+            for tasks in self.task_result.qubit_tasks.values()
+        )
 
     def _is_coupling_task(self, task_name: str) -> bool:
         """Check if task is a coupling task."""
-        return any(task_name in [task.name for task in tasks] for tasks in self.task_result.coupling_tasks.values())
+        return any(
+            task_name in [task.name for task in tasks]
+            for tasks in self.task_result.coupling_tasks.values()
+        )
 
     def _is_system_task(self, task_name: str) -> bool:
         """Check if task is a system task."""

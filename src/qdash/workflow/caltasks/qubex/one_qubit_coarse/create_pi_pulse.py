@@ -17,7 +17,9 @@ class CreatePIPulse(QubexTask):
     name: str = "CreatePIPulse"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "duration": InputParameterModel(unit="ns", value_type="int", value=PI_DURATION, description="PI pulse length"),
+        "duration": InputParameterModel(
+            unit="ns", value_type="int", value=PI_DURATION, description="PI pulse length"
+        ),
         "shots": InputParameterModel(
             unit="",
             value_type="int",

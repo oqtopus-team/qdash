@@ -31,7 +31,9 @@ class CheckResonatorFrequencies(QubexTask):
         )
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "coarse_resonator_frequency": OutputParameterModel(unit="GHz", description="Coarse resonator frequency"),
+        "coarse_resonator_frequency": OutputParameterModel(
+            unit="GHz", description="Coarse resonator frequency"
+        ),
     }
 
     def postprocess(

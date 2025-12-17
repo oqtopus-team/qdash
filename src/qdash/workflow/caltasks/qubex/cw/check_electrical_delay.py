@@ -16,7 +16,9 @@ class CheckElectricalDelay(QubexTask):
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "electrical_delay": OutputParameterModel(unit="ns", description="Electrical delay", value_type="float")
+        "electrical_delay": OutputParameterModel(
+            unit="ns", description="Electrical delay", value_type="float"
+        )
     }
 
     def postprocess(

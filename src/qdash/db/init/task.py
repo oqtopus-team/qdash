@@ -32,8 +32,12 @@ def update_active_tasks(username: str, backend: str) -> list[TaskModel]:
             description=cls.__doc__,
             backend=cls.backend,
             task_type=cls.task_type,
-            input_parameters={name: param.model_dump() for name, param in cls.input_parameters.items()},
-            output_parameters={name: param.model_dump() for name, param in cls.output_parameters.items()},
+            input_parameters={
+                name: param.model_dump() for name, param in cls.input_parameters.items()
+            },
+            output_parameters={
+                name: param.model_dump() for name, param in cls.output_parameters.items()
+            },
         )
         for cls in task_cls.values()
     ]

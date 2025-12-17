@@ -45,4 +45,6 @@ def list_backends(
     """
     logger.info(f"User {ctx.user.username} is listing backends for project {ctx.project_id}.")
     backends = BackendDocument.find({"project_id": ctx.project_id}).to_list()
-    return ListBackendsResponse(backends=[BackendResponseModel(**backend.dict()) for backend in backends])
+    return ListBackendsResponse(
+        backends=[BackendResponseModel(**backend.dict()) for backend in backends]
+    )

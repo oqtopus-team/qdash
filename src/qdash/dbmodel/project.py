@@ -13,13 +13,19 @@ from qdash.datamodel.system_info import SystemInfoModel
 class ProjectDocument(Document):
     """Mongo document representing a collaborative project."""
 
-    project_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Project identifier")
+    project_id: str = Field(
+        default_factory=lambda: str(uuid.uuid4()), description="Project identifier"
+    )
     owner_username: str = Field(..., description="Project owner username")
     name: str = Field(..., description="Project display name")
     description: str | None = Field(default=None, description="Project description")
     tags: list[str] = Field(default_factory=list, description="Project tags")
-    default_role: ProjectRole = Field(default=ProjectRole.VIEWER, description="Default role for invite links")
-    system_info: SystemInfoModel = Field(default_factory=SystemInfoModel, description="System info timestamps")
+    default_role: ProjectRole = Field(
+        default=ProjectRole.VIEWER, description="Default role for invite links"
+    )
+    system_info: SystemInfoModel = Field(
+        default_factory=SystemInfoModel, description="System info timestamps"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 

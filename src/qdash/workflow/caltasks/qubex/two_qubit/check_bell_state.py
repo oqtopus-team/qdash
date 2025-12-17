@@ -25,11 +25,15 @@ class CheckBellState(QubexTask):
         output_parameters = self.attach_execution_id(execution_id)
         figures: list = [result["figure"]]
         raw_data: list = []
-        return PostProcessResult(output_parameters=output_parameters, figures=figures, raw_data=raw_data)
+        return PostProcessResult(
+            output_parameters=output_parameters, figures=figures, raw_data=raw_data
+        )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
-        control, target = (exp.get_qubit_label(int(q)) for q in qid.split("-"))  # e.g., "0-1" → "Q00","Q01"
+        control, target = (
+            exp.get_qubit_label(int(q)) for q in qid.split("-")
+        )  # e.g., "0-1" → "Q00","Q01"
         result = exp.measure_bell_state(control, target)
         self.save_calibration(backend)
         return RunResult(raw_result=result)

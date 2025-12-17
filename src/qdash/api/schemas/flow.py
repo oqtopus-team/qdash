@@ -15,7 +15,9 @@ class SaveFlowRequest(BaseModel):
         None, description="Entry point function name (defaults to same as name if not provided)"
     )
     chip_id: str = Field(..., description="Target chip ID")
-    default_parameters: dict[str, Any] = Field(default_factory=dict, description="Default execution parameters")
+    default_parameters: dict[str, Any] = Field(
+        default_factory=dict, description="Default execution parameters"
+    )
     tags: list[str] = Field(default_factory=list, description="Tags for categorization")
 
     model_config: ClassVar[dict] = {
@@ -84,7 +86,9 @@ class ExecuteFlowRequest(BaseModel):
     )
 
     model_config: ClassVar[dict] = {
-        "json_schema_extra": {"examples": [{"parameters": {"qids": ["32", "38"], "max_iterations": 5}}]}
+        "json_schema_extra": {
+            "examples": [{"parameters": {"qids": ["32", "38"], "max_iterations": 5}}]
+        }
     }
 
 
@@ -100,8 +104,12 @@ class ExecuteFlowResponse(BaseModel):
 class ScheduleFlowRequest(BaseModel):
     """Request to schedule a Flow execution."""
 
-    cron: str | None = Field(None, description="Cron expression (e.g., '0 2 * * *' for daily at 2am JST)")
-    scheduled_time: str | None = Field(None, description="One-time execution time (ISO format, JST)")
+    cron: str | None = Field(
+        None, description="Cron expression (e.g., '0 2 * * *' for daily at 2am JST)"
+    )
+    scheduled_time: str | None = Field(
+        None, description="One-time execution time (ISO format, JST)"
+    )
     parameters: dict[str, Any] = Field(
         default_factory=dict, description="Execution parameters (overrides default_parameters)"
     )
@@ -130,7 +138,9 @@ class ScheduleFlowRequest(BaseModel):
 class ScheduleFlowResponse(BaseModel):
     """Response after scheduling a flow."""
 
-    schedule_id: str = Field(..., description="Schedule ID (deployment ID for cron, flow_run_id for one-time)")
+    schedule_id: str = Field(
+        ..., description="Schedule ID (deployment ID for cron, flow_run_id for one-time)"
+    )
     flow_name: str = Field(..., description="Flow name")
     schedule_type: str = Field(..., description="Schedule type: 'cron' or 'one-time'")
     cron: str | None = Field(None, description="Cron expression (for cron schedules)")
@@ -228,7 +238,9 @@ class ImportableModule(BaseModel):
     name: str = Field(..., description="Module category name")
     description: str = Field(..., description="Module category description")
     import_path: str = Field(..., description="Python import path")
-    functions: list[ImportableFunction] = Field(default_factory=list, description="Available functions")
+    functions: list[ImportableFunction] = Field(
+        default_factory=list, description="Available functions"
+    )
     classes: list[ImportableClass] = Field(default_factory=list, description="Available classes")
 
 

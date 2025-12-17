@@ -36,7 +36,9 @@ def execute_dynamic_task_by_qid(
 
     try:
         # TaskManager's integrated execution and save processing
-        execution_manager, task_manager = task_manager.execute_task(task_instance, backend, execution_manager, qid)
+        execution_manager, task_manager = task_manager.execute_task(
+            task_instance, backend, execution_manager, qid
+        )
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
         raise RuntimeError(f"Task {task_name} failed: {e}")
@@ -61,7 +63,9 @@ def execute_dynamic_task_batch(
     try:
         # Execute task for each qid using TaskManager's integrated processing
         for qid in qids:
-            execution_manager, task_manager = task_manager.execute_task(task_instance, backend, execution_manager, qid)
+            execution_manager, task_manager = task_manager.execute_task(
+                task_instance, backend, execution_manager, qid
+            )
     except Exception as e:
         logger.error(f"Failed to execute {task_name}: {e}, id: {task_manager.id}")
         raise RuntimeError(f"Task {task_name} failed: {e}")

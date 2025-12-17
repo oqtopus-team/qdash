@@ -33,7 +33,9 @@ class CalibrationNoteDocument(Document):
         default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
         description="The time when the note was last updated",
     )
-    system_info: SystemInfoModel = Field(default_factory=SystemInfoModel, description="The system information")
+    system_info: SystemInfoModel = Field(
+        default_factory=SystemInfoModel, description="The system information"
+    )
 
     class Settings:
         """Settings for the document."""
