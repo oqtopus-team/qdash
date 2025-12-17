@@ -119,6 +119,14 @@ function Sidebar() {
         : "text-base-content hover:bg-base-300"
     }`;
 
+  // Section header component for sidebar groups
+  const SectionHeader = ({ label }: { label: string }) =>
+    (isOpen || isMobileOpen) && (
+      <li className="menu-title text-xs font-semibold text-base-content/50 uppercase tracking-wider px-3 pt-3 pb-1">
+        {label}
+      </li>
+    );
+
   const sidebarContent = (
     <>
       <ul className="menu p-2 py-0">
@@ -140,6 +148,9 @@ function Sidebar() {
             </Link>
           </div>
         )}
+
+        {/* Data & Monitoring Section */}
+        <SectionHeader label="Data" />
         <li>
           <Link
             href="/metrics"
@@ -170,6 +181,24 @@ function Sidebar() {
             {(isOpen || isMobileOpen) && <span className="ml-2">Chip</span>}
           </Link>
         </li>
+        <li>
+          <Link
+            href="/analysis"
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/analysis"))
+                : desktopLinkClass(isActive("/analysis"))
+            }
+            title="Analysis"
+            onClick={handleLinkClick}
+          >
+            <BarChart3 size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">Analysis</span>}
+          </Link>
+        </li>
+
+        {/* Operations Section */}
+        <SectionHeader label="Operations" />
         {canEdit && (
           <li>
             <Link
@@ -206,21 +235,6 @@ function Sidebar() {
             )}
           </Link>
         </li>
-        <li>
-          <Link
-            href="/analysis"
-            className={
-              isMobileOpen
-                ? linkClass(isActive("/analysis"))
-                : desktopLinkClass(isActive("/analysis"))
-            }
-            title="Analysis"
-            onClick={handleLinkClick}
-          >
-            <BarChart3 size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Analysis</span>}
-          </Link>
-        </li>
         {canEdit && (
           <li>
             <Link
@@ -238,6 +252,9 @@ function Sidebar() {
             </Link>
           </li>
         )}
+
+        {/* Management Section */}
+        <SectionHeader label="Manage" />
         {canEdit && (
           <li>
             <Link
@@ -255,7 +272,6 @@ function Sidebar() {
             </Link>
           </li>
         )}
-
         <li>
           <Link
             href="/setting"
@@ -288,7 +304,9 @@ function Sidebar() {
             </Link>
           </li>
         )}
-        <div className={`divider ${isMobileOpen ? "my-1" : ""}`}></div>
+
+        {/* External Links Section */}
+        <div className={`divider ${isMobileOpen ? "my-1" : "my-0"}`}></div>
         <li>
           <a
             href="https://oqtopus-team.github.io/qdash/"

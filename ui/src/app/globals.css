@@ -328,25 +328,45 @@ a.card:hover {
 
 .modal-box {
   border-radius: 1.5rem;
-  box-shadow:
-    0 25px 50px -12px rgb(0 0 0 / 0.3),
-    0 0 0 1px rgb(0 0 0 / 0.05);
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
   border: 1px solid
     color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  will-change: transform, opacity;
+  contain: layout style paint;
 }
 
-/* Modal backdrop with blur */
+/* Disable all default modal transitions for instant close */
+.modal {
+  transition: none !important;
+}
+
+.modal-box {
+  transition: none !important;
+}
+
+/* Modal backdrop - no transition */
 .modal-backdrop,
 .modal::backdrop {
-  background-color: rgb(0 0 0 / 0.5);
-  backdrop-filter: blur(4px);
+  background-color: rgb(0 0 0 / 0.4);
+  transition: none !important;
 }
 
-/* Modal animation - mobile only (slide up from bottom) */
+/* Modal animation - instant/snappy */
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @keyframes modal-slide-up {
   from {
     opacity: 0;
-    transform: translateY(100%);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -354,23 +374,27 @@ a.card:hover {
   }
 }
 
-@keyframes modal-backdrop-fade {
-  from {
-    opacity: 0;
+/* Desktop: instant pop animation */
+@media (min-width: 640px) {
+  .modal[open] .modal-box {
+    animation: modal-pop 50ms ease-out;
   }
-  to {
+
+  .modal[open]::backdrop {
+    animation: none;
     opacity: 1;
   }
 }
 
-/* Apply slide-up animation only on mobile for modal-bottom */
+/* Mobile: very fast slide-up animation */
 @media (max-width: 639px) {
   .modal-bottom[open] .modal-box {
-    animation: modal-slide-up 0.2s ease-out;
+    animation: modal-slide-up 60ms ease-out;
   }
 
   .modal-bottom[open]::backdrop {
-    animation: modal-backdrop-fade 0.2s ease-out;
+    animation: none;
+    opacity: 1;
   }
 }
 

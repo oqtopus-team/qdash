@@ -198,7 +198,10 @@ services:
       - .env
     environment:
       - PORT=${UI_PORT:-5714}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gpt-oss:20b}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${UI_PORT:-5714}:${UI_PORT:-5714}"
     depends_on:
@@ -218,7 +221,6 @@ services:
     network_mode: host
     profiles:
       - tunnel
-
 networks:
   custom_net:
     external: false

@@ -22,6 +22,7 @@ import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
+import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { ChipPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
@@ -400,34 +401,32 @@ export function ChipPageContent() {
           </div>
 
           {/* Selection Controls */}
-          <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
-            <div className="flex flex-col sm:flex-row gap-4 flex-shrink-0">
-              <div className="w-full sm:w-auto">
+          <PageFiltersBar>
+            <PageFiltersBar.Group>
+              <PageFiltersBar.Item>
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}
                 />
-              </div>
-
-              <div className="w-full sm:w-auto">
+              </PageFiltersBar.Item>
+              <PageFiltersBar.Item>
                 <DateSelector
                   chipId={selectedChip}
                   selectedDate={selectedDate}
                   onDateSelect={setSelectedDate}
                   disabled={!selectedChip}
                 />
-              </div>
-
-              <div className="w-full sm:w-auto">
+              </PageFiltersBar.Item>
+              <PageFiltersBar.Item>
                 <TaskSelector
                   tasks={filteredTasks}
                   selectedTask={selectedTask}
                   onTaskSelect={setSelectedTask}
                   disabled={viewMode === "mux"}
                 />
-              </div>
-            </div>
-          </div>
+              </PageFiltersBar.Item>
+            </PageFiltersBar.Group>
+          </PageFiltersBar>
         </div>
 
         {/* Content Section */}

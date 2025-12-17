@@ -2,11 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 
-import Select, {
-  type GroupBase,
-  type SingleValue,
-  type StylesConfig,
-} from "react-select";
+import Select, { type GroupBase, type SingleValue } from "react-select";
 
 import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
 import { MetricsCdfChart } from "./MetricsCdfChart";
@@ -17,19 +13,17 @@ import { LinearGauge } from "@/components/ui/LinearGauge";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
-import { useGetTopologyById } from "@/client/topology/topology";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
-import { useCopilotConfig } from "@/hooks/useCopilotConfig";
-import {
-  COPILOT_ENABLED,
-  MetricsCopilot,
-  useMetricsCopilot,
-} from "@/features/copilot";
+import { useChatMetrics } from "@/hooks/useChatMetrics";
+import { getDaisySelectStyles } from "@/lib/reactSelectTheme";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 
 type TimeRange = "1d" | "7d" | "30d";
 type SelectionMode = "latest" | "best";
@@ -59,9 +53,6 @@ export function MetricsPageContent() {
     isError: isConfigError,
   } = useMetricsConfig();
 
-  // Load Copilot configuration
-  const { config: aiConfig } = useCopilotConfig();
-
   // Select appropriate metrics config based on type
   const metricsConfig = metricType === "qubit" ? qubitMetrics : couplingMetrics;
 
@@ -75,32 +66,6 @@ export function MetricsPageContent() {
       `square-lattice-mux-${chipData?.data?.size ?? 64}`
     );
   }, [chipData?.data?.topology_id, chipData?.data?.size]);
-
-  // Fetch topology data for Copilot spatial analysis
-  const { data: topologyResponse } = useGetTopologyById(topologyId, {
-    query: {
-      enabled: !!topologyId,
-      staleTime: Infinity,
-    },
-  });
-
-  // Extract topology data for Copilot
-  const topologyData = useMemo(() => {
-    // The API returns { data: TopologyDefinition }
-    const responseData = topologyResponse?.data as
-      | { data?: Record<string, unknown> }
-      | undefined;
-    const data = responseData?.data;
-    if (!data) return null;
-    return {
-      id: data.id as string,
-      name: data.name as string,
-      grid_size: data.grid_size as number,
-      num_qubits: data.num_qubits as number,
-      qubits: data.qubits as Record<string, { row: number; col: number }>,
-      couplings: data.couplings as number[][],
-    };
-  }, [topologyResponse]);
 
   // Set default chip when data loads
   useEffect(() => {
@@ -199,26 +164,9 @@ export function MetricsPageContent() {
     [metricOptions],
   );
 
-  const metricSelectStyles = useMemo<StylesConfig<MetricOption, false>>(
-    () => ({
-      control: (provided) => ({
-        ...provided,
-        minHeight: 36,
-        height: 36,
-      }),
-      valueContainer: (provided) => ({
-        ...provided,
-        padding: "2px 8px",
-      }),
-      indicatorsContainer: (provided) => ({
-        ...provided,
-        height: 36,
-      }),
-      menu: (provided) => ({
-        ...provided,
-        zIndex: 20,
-      }),
-    }),
+  // Use shared DaisyUI-compatible styles for React-Select
+  const metricSelectStyles = useMemo(
+    () => getDaisySelectStyles<MetricOption, false, GroupBase<MetricOption>>(),
     [],
   );
 
@@ -320,18 +268,14 @@ export function MetricsPageContent() {
     );
   }, [metricType, cdfGroups, selectedMetric]);
 
-  // CopilotKit integration for AI-assisted analysis
-  useMetricsCopilot({
+  // Chat integration for AI-assisted analysis
+  useChatMetrics({
     chipId: selectedChip,
     metricType,
     selectedMetric,
     metricsConfig,
     metricData,
-    allMetricsData,
     timeRange,
-    selectionMode,
-    aiConfig,
-    topologyData,
     onMetricChange: setSelectedMetric,
     onTimeRangeChange: (range) => setTimeRange(range as TimeRange),
   });
@@ -383,111 +327,110 @@ export function MetricsPageContent() {
           </div>
 
           {/* Time Range and Selection Mode Row */}
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <div className="flex flex-col sm:flex-row gap-4 flex-shrink-0">
+          <PageFiltersBar>
+            <PageFiltersBar.Group>
               {/* Time Range Selector */}
-              <div className="join rounded-lg overflow-hidden">
-                <button
-                  className={`join-item btn btn-sm ${
-                    timeRange === "1d" ? "btn-active" : ""
-                  }`}
-                  onClick={() => setTimeRange("1d")}
-                >
-                  <span>Last 1 Day</span>
-                </button>
-                <button
-                  className={`join-item btn btn-sm ${
-                    timeRange === "7d" ? "btn-active" : ""
-                  }`}
-                  onClick={() => setTimeRange("7d")}
-                >
-                  <span>Last 7 Days</span>
-                </button>
-                <button
-                  className={`join-item btn btn-sm ${
-                    timeRange === "30d" ? "btn-active" : ""
-                  }`}
-                  onClick={() => setTimeRange("30d")}
-                >
-                  <span>Last 30 Days</span>
-                </button>
-              </div>
+              <PageFiltersBar.Item>
+                <div className="join rounded-lg overflow-hidden">
+                  <button
+                    className={`join-item btn btn-sm ${
+                      timeRange === "1d" ? "btn-active" : ""
+                    }`}
+                    onClick={() => setTimeRange("1d")}
+                  >
+                    <span className="hidden sm:inline">Last 1 Day</span>
+                    <span className="sm:hidden">1D</span>
+                  </button>
+                  <button
+                    className={`join-item btn btn-sm ${
+                      timeRange === "7d" ? "btn-active" : ""
+                    }`}
+                    onClick={() => setTimeRange("7d")}
+                  >
+                    <span className="hidden sm:inline">Last 7 Days</span>
+                    <span className="sm:hidden">7D</span>
+                  </button>
+                  <button
+                    className={`join-item btn btn-sm ${
+                      timeRange === "30d" ? "btn-active" : ""
+                    }`}
+                    onClick={() => setTimeRange("30d")}
+                  >
+                    <span className="hidden sm:inline">Last 30 Days</span>
+                    <span className="sm:hidden">30D</span>
+                  </button>
+                </div>
+              </PageFiltersBar.Item>
 
               {/* Latest/Best Toggle */}
-              <div className="join rounded-lg overflow-hidden">
-                <button
-                  className={`join-item btn btn-sm ${
-                    selectionMode === "latest" ? "btn-active" : ""
-                  }`}
-                  onClick={() => setSelectionMode("latest")}
-                >
-                  <span>Latest</span>
-                </button>
-                <button
-                  className={`join-item btn btn-sm ${
-                    selectionMode === "best" ? "btn-active" : ""
-                  } ${!isBestModeSupported ? "btn-disabled" : ""}`}
-                  onClick={() => setSelectionMode("best")}
-                  disabled={!isBestModeSupported}
-                  title={
-                    !isBestModeSupported
-                      ? "Best mode not available for this metric"
-                      : "Show best values within time range"
-                  }
-                >
-                  <span>Best</span>
-                </button>
-              </div>
-            </div>
+              <PageFiltersBar.Item>
+                <div className="join rounded-lg overflow-hidden">
+                  <button
+                    className={`join-item btn btn-sm ${
+                      selectionMode === "latest" ? "btn-active" : ""
+                    }`}
+                    onClick={() => setSelectionMode("latest")}
+                  >
+                    <span>Latest</span>
+                  </button>
+                  <button
+                    className={`join-item btn btn-sm ${
+                      selectionMode === "best" ? "btn-active" : ""
+                    } ${!isBestModeSupported ? "btn-disabled" : ""}`}
+                    onClick={() => setSelectionMode("best")}
+                    disabled={!isBestModeSupported}
+                    title={
+                      !isBestModeSupported
+                        ? "Best mode not available for this metric"
+                        : "Show best values within time range"
+                    }
+                  >
+                    <span>Best</span>
+                  </button>
+                </div>
+              </PageFiltersBar.Item>
+            </PageFiltersBar.Group>
 
-            <div className="w-full sm:w-auto">
-              <ChipSelector
-                selectedChip={selectedChip}
-                onChipSelect={setSelectedChip}
-              />
-            </div>
+            <PageFiltersBar.Group position="end">
+              <PageFiltersBar.Item>
+                <ChipSelector
+                  selectedChip={selectedChip}
+                  onChipSelect={setSelectedChip}
+                />
+              </PageFiltersBar.Item>
 
-            <div className="w-full sm:w-auto">
-              <Select<MetricOption, false, GroupBase<MetricOption>>
-                className="w-full sm:w-64 text-base-content"
-                classNamePrefix="react-select"
-                options={groupedMetricOptions}
-                value={
-                  metricOptions.find(
-                    (option) => option.value === selectedMetric,
-                  ) ?? null
-                }
-                onChange={(option: SingleValue<MetricOption>) => {
-                  if (option) {
-                    setSelectedMetric(option.value);
+              <PageFiltersBar.Item>
+                <Select<MetricOption, false, GroupBase<MetricOption>>
+                  className="w-full sm:w-64 text-base-content"
+                  classNamePrefix="react-select"
+                  options={groupedMetricOptions}
+                  value={
+                    metricOptions.find(
+                      (option) => option.value === selectedMetric,
+                    ) ?? null
                   }
-                }}
-                placeholder="Select a metric"
-                isSearchable={false}
-                styles={metricSelectStyles}
-              />
-            </div>
-          </div>
+                  onChange={(option: SingleValue<MetricOption>) => {
+                    if (option) {
+                      setSelectedMetric(option.value);
+                    }
+                  }}
+                  placeholder="Select a metric"
+                  isSearchable={false}
+                  styles={metricSelectStyles}
+                />
+              </PageFiltersBar.Item>
+            </PageFiltersBar.Group>
+          </PageFiltersBar>
         </div>
 
         {/* Metrics Grid */}
         {!selectedChip ? (
-          <div className="alert alert-info">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              className="stroke-current shrink-0 w-6 h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span>Select a chip to view metrics</span>
-          </div>
+          <EmptyState
+            title="No chip selected"
+            description="Select a chip from the dropdown above to view metrics"
+            emoji="microchip"
+            size="lg"
+          />
         ) : isLoading ? (
           <div className="flex items-center justify-center h-96">
             <QuantumLoader
@@ -505,13 +448,19 @@ export function MetricsPageContent() {
             />
           </div>
         ) : isConfigError ? (
-          <div className="alert alert-error">
-            <span>Failed to load metrics configuration</span>
-          </div>
+          <EmptyState
+            title="Configuration error"
+            description="Failed to load metrics configuration. Please try refreshing the page."
+            emoji="warning"
+            size="lg"
+          />
         ) : isError ? (
-          <div className="alert alert-error">
-            <span>Failed to load metrics data</span>
-          </div>
+          <EmptyState
+            title="Data loading failed"
+            description="Failed to load metrics data. Please try again later."
+            emoji="warning"
+            size="lg"
+          />
         ) : currentMetricConfig ? (
           <>
             {/* Metric Title */}
@@ -555,10 +504,7 @@ export function MetricsPageContent() {
                 colorScale={{ min: 0, max: 0, colors: hexColors }}
                 gridSize={gridSize}
                 chipId={selectedChip}
-                topologyId={
-                  chipData?.data?.topology_id ??
-                  `square-lattice-mux-${chipData?.data?.size ?? 64}`
-                }
+                topologyId={topologyId}
                 selectedDate="latest"
               />
             ) : (
@@ -570,27 +516,20 @@ export function MetricsPageContent() {
                 colorScale={{ min: 0, max: 0, colors: hexColors }}
                 gridSize={gridSize}
                 chipId={selectedChip}
-                topologyId={
-                  chipData?.data?.topology_id ??
-                  `square-lattice-mux-${chipData?.data?.size ?? 64}`
-                }
+                topologyId={topologyId}
                 selectedDate="latest"
               />
             )}
           </>
         ) : (
-          <div className="alert alert-info">
-            <span>Select a metric to display</span>
-          </div>
+          <EmptyState
+            title="No metric selected"
+            description="Select a metric from the dropdown to display data"
+            emoji="chart-bar"
+            size="lg"
+          />
         )}
       </div>
-
-      {/* AI Analysis Assistant */}
-      {COPILOT_ENABLED && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <MetricsCopilot aiConfig={aiConfig} />
-        </div>
-      )}
     </PageContainer>
   );
 }
@@ -625,14 +564,14 @@ function CdfWithCoverage({
   return (
     <div className="space-y-2">
       {/* Linear Gauge for Coverage */}
-      <div className="bg-base-100 rounded-lg shadow-sm border border-base-300 px-4 py-2">
+      <Card variant="compact" padding="sm">
         <LinearGauge
           value={stats.coverage}
           current={stats.withData}
           total={stats.total}
           duration={800}
         />
-      </div>
+      </Card>
 
       {/* CDF Chart */}
       <MetricsCdfChart

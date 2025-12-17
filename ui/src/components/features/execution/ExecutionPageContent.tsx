@@ -17,6 +17,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
+import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
@@ -218,18 +219,24 @@ export function ExecutionPageContent() {
         title="Execution History"
         description="Monitor workflow runs and task results"
       />
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
-        <ChipSelector
-          selectedChip={selectedChip || ""}
-          onChipSelect={handleChipChange}
-        />
-        <DateSelector
-          chipId={selectedChip || ""}
-          selectedDate={selectedDate}
-          onDateSelect={setSelectedDate}
-          disabled={!selectedChip}
-        />
-      </div>
+      <PageFiltersBar className="mb-4 sm:mb-6">
+        <PageFiltersBar.Group>
+          <PageFiltersBar.Item>
+            <ChipSelector
+              selectedChip={selectedChip || ""}
+              onChipSelect={handleChipChange}
+            />
+          </PageFiltersBar.Item>
+          <PageFiltersBar.Item>
+            <DateSelector
+              chipId={selectedChip || ""}
+              selectedDate={selectedDate}
+              onDateSelect={setSelectedDate}
+              disabled={!selectedChip}
+            />
+          </PageFiltersBar.Item>
+        </PageFiltersBar.Group>
+      </PageFiltersBar>
       {/* Statistics display */}
       <ExecutionStats
         executions={cardData}
