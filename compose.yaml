@@ -158,7 +158,7 @@ services:
       - ./src/qdash/config.py:/app/qdash/config.py
       - ./src/qdash/workflow/user_flows:/app/qdash/workflow/user_flows # Shared user flows
       - ./src/qdash/workflow/templates:/app/qdash/workflow/templates # Flow templates
-      - ./src/qdash/workflow/flow:/app/qdash/workflow/flow # Flow helper modules
+      - ./src/qdash/workflow/service:/app/qdash/workflow/service # Calibration service modules
       - ./config:/app/config # Metrics metadata and other config files
       - ${CALIB_DATA_PATH}:/app/calib_data
       - ${QPU_DATA_PATH}:/app/qpu_data
