@@ -27,13 +27,7 @@ packages = [
     "src/qdash/workflow",
     "src/qdash/dbmodel",
     "src/qdash/datamodel",
-    "src/qdash/cli"
 ]
-
-[project.scripts]
-qdash = "qdash.cli:app"
-
-
 
 [tool.ruff]
 line-length = 100
