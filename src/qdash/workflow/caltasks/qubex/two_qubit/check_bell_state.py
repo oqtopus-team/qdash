@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.caltasks.base import (
@@ -23,8 +23,8 @@ class CheckBellState(QubexTask):
     ) -> PostProcessResult:
         result = run_result.raw_result
         output_parameters = self.attach_execution_id(execution_id)
-        figures: list = [result["figure"]]
-        raw_data: list = []
+        figures: list[Any] = [result["figure"]]
+        raw_data: list[Any] = []
         return PostProcessResult(
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
         )

@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -26,7 +26,7 @@ class CheckBellStateTomography(QubexTask):
         ),
     }
 
-    def make_figure(self, result: dict, label: str) -> go.Figure:
+    def make_figure(self, result: dict[str, Any], label: str) -> go.Figure:
         """Create a figure from the result."""
         # Assuming result contains a 'figure' key with the figure data
         fig = make_subplots(
@@ -115,8 +115,8 @@ class CheckBellStateTomography(QubexTask):
         self.output_parameters["bell_state_fidelity"].value = result["fidelity"]
         output_parameters = self.attach_execution_id(execution_id)
         result["figure"] = self.make_figure(result, label)
-        figures: list = [result["figure"]]
-        raw_data: list = []
+        figures: list[Any] = [result["figure"]]
+        raw_data: list[Any] = []
         return PostProcessResult(
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
         )

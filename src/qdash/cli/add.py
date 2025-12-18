@@ -111,7 +111,9 @@ def update_qubit_positions(
         raise
 
 
-def qubit_lattice(n: int, d: int) -> tuple[range, list, dict]:
+def qubit_lattice(
+    n: int, d: int
+) -> tuple[range, list[tuple[int, int]], dict[int, tuple[int, int]]]:
     """Generate qubit lattice structure for RQC square lattice."""
 
     def node(i: int, j: int, k: int) -> int:
@@ -150,7 +152,7 @@ def qubit_lattice(n: int, d: int) -> tuple[range, list, dict]:
     return nodes, edges, pos
 
 
-def correct(original: tuple, s: float) -> tuple:
+def correct(original: tuple[float, ...], s: float) -> tuple[float, ...]:
     """Correct position coordinates.
 
     Args:

@@ -1,10 +1,12 @@
+from typing import Any
+
 # ruff: noqa
 from qdash.workflow.caltasks.base import BaseTask
 
 
 def generate_task_instances(
     task_names: list[str],
-    task_details: dict,
+    task_details: dict[str, Any],
     backend: str,
 ) -> dict[str, BaseTask]:
     task_instances = {}

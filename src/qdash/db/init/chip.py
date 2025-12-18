@@ -16,7 +16,9 @@ CHIP_SIZE_256 = 256
 CHIP_SIZE_1024 = 1024
 
 
-def generate_qubit_data(num_qubits: int, pos: dict, chip_id: str, username: str) -> dict:
+def generate_qubit_data(
+    num_qubits: int, pos: dict[int, tuple[int, int]], chip_id: str, username: str
+) -> dict[str, QubitModel]:
     """Generate qubit data for the given number of qubits and positions.
 
     Args:
@@ -44,7 +46,9 @@ def generate_qubit_data(num_qubits: int, pos: dict, chip_id: str, username: str)
     return qubits
 
 
-def generate_coupling_data(edges: list[tuple[int, int]], chip_id: str, username: str) -> dict:
+def generate_coupling_data(
+    edges: list[tuple[int, int]], chip_id: str, username: str
+) -> dict[str, CouplingModel]:
     """Generate coupling data for the given edges.
 
     Args:
@@ -147,8 +151,8 @@ def init_chip_document(
         _, edges, _ = qubit_lattice(size, d)
         edges = bi_direction(edges)
         couplings = generate_coupling(edges, username=username, chip_id=chip_id)
-        for c in couplings:
-            c.insert()
+        for coupling in couplings:
+            coupling.insert()  # type: ignore[attr-defined]
     except Exception:
         print("Error adding new chip:", chip_id)
         raise

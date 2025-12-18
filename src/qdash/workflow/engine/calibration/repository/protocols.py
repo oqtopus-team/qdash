@@ -4,7 +4,7 @@ This module defines abstract interfaces (protocols) for data access operations
 to decouple TaskManager from specific database implementations.
 """
 
-from typing import Callable, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.task import BaseTaskResultModel, CalibDataModel
@@ -32,7 +32,7 @@ class TaskResultHistoryRepository(Protocol):
 class ChipRepository(Protocol):
     """Protocol for chip data access operations."""
 
-    def get_current_chip(self, username: str) -> dict:
+    def get_current_chip(self, username: str) -> dict[str, Any]:
         """Get the current chip data.
 
         Parameters
@@ -91,7 +91,7 @@ class CalibDataSaver(Protocol):
 
     def save_figures(
         self,
-        figures: list,
+        figures: list[Any],
         task_name: str,
         task_type: str,
         qid: str,
@@ -120,7 +120,7 @@ class CalibDataSaver(Protocol):
 
     def save_raw_data(
         self,
-        raw_data: list,
+        raw_data: list[Any],
         task_name: str,
         task_type: str,
         qid: str,
@@ -147,7 +147,7 @@ class CalibDataSaver(Protocol):
         """
         ...
 
-    def save_task_json(self, task_id: str, task_data: dict) -> str:
+    def save_task_json(self, task_id: str, task_data: dict[str, Any]) -> str:
         """Save task data as JSON.
 
         Parameters

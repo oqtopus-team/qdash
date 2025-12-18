@@ -88,7 +88,7 @@ class ExecutionService:
         chip_id: str,
         name: str = "",
         tags: list[str] | None = None,
-        note: dict | None = None,
+        note: dict[str, Any] | None = None,
         repository: ExecutionRepository | None = None,
     ) -> "ExecutionService":
         """Create a new ExecutionService with initial state.
@@ -295,7 +295,7 @@ class ExecutionService:
 
     def merge_controller_info(
         self,
-        controller_info: dict[str, dict],
+        controller_info: dict[str, dict[str, Any]],
     ) -> "ExecutionService":
         """Merge controller info and persist with optimistic locking.
 
@@ -404,7 +404,7 @@ class ExecutionService:
         return dict(self.state_manager.note)
 
     @note.setter
-    def note(self, value: dict) -> None:
+    def note(self, value: dict[str, Any]) -> None:
         """Set note."""
         self.state_manager.note = value
 

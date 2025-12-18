@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Any
 
 from bunnet import init_bunnet
 from pymongo import MongoClient
@@ -10,10 +11,10 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 
 # Skip MongoDB connection in test mode - tests set up their own connection
-_client: MongoClient | None = None
+_client: MongoClient[Any] | None = None
 
 
-def _get_client() -> MongoClient:
+def _get_client() -> MongoClient[Any]:
     """Get or create MongoDB client (lazy initialization)."""
     global _client
     if _client is None:

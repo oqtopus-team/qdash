@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 @task
-def _calibrate_mux_qubits(qids: list[str], tasks: list[str]) -> dict:
+def _calibrate_mux_qubits(qids: list[str], tasks: list[str]) -> dict[str, Any]:
     """Execute tasks for qubits in a single MUX sequentially."""
     logger = get_run_logger()
     session = get_session()
@@ -47,7 +47,7 @@ def _calibrate_mux_qubits(qids: list[str], tasks: list[str]) -> dict:
 
 
 @task
-def _calibrate_single_qubit(qid: str, tasks: list[str]) -> tuple[str, dict]:
+def _calibrate_single_qubit(qid: str, tasks: list[str]) -> tuple[str, dict[str, Any]]:
     """Execute tasks for a single qubit."""
     logger = get_run_logger()
     session = get_session()
@@ -66,7 +66,7 @@ def _calibrate_single_qubit(qid: str, tasks: list[str]) -> tuple[str, dict]:
 
 
 @task
-def _calibrate_step_qubits_parallel(parallel_qids: list[str], tasks: list[str]) -> dict:
+def _calibrate_step_qubits_parallel(parallel_qids: list[str], tasks: list[str]) -> dict[str, Any]:
     """Execute tasks for all qubits in a synchronized step in parallel."""
     futures = [_calibrate_single_qubit.submit(qid, tasks) for qid in parallel_qids]
     pair_results = [f.result() for f in futures]

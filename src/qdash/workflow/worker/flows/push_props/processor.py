@@ -1,9 +1,11 @@
+from typing import Any
+
 import pendulum
 from pydantic import BaseModel
 
 
 def _process_data(
-    raw_data: dict,
+    raw_data: dict[str, Any],
     field_map: dict[str, str],
     model_cls: type[BaseModel],
     within_24hrs: bool = False,

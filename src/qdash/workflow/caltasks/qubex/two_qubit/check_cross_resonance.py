@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import numpy as np
 import plotly.graph_objects as go
@@ -42,7 +42,7 @@ class CheckCrossResonance(QubexTask):
         ),
     }
 
-    def _plot_coeffs_history(self, coeffs_history: dict, label: str) -> go.Figure:
+    def _plot_coeffs_history(self, coeffs_history: dict[str, Any], label: str) -> go.Figure:
         fig = go.Figure()
         for key, value in coeffs_history.items():
             fig.add_trace(
@@ -79,8 +79,8 @@ class CheckCrossResonance(QubexTask):
 
         output_parameters = self.attach_execution_id(execution_id)
         fig = self._plot_coeffs_history(result["coeffs_history"], label=label)
-        figures: list = [fig]
-        raw_data: list = []
+        figures: list[Any] = [fig]
+        raw_data: list[Any] = []
         return PostProcessResult(
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
         )

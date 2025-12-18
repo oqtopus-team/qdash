@@ -64,7 +64,7 @@ class MongoExecutionRepository:
         self._password = password or os.getenv("MONGO_INITDB_ROOT_PASSWORD")
         self._database = database
 
-    def _get_client(self) -> MongoClient:
+    def _get_client(self) -> MongoClient[Any]:
         """Get MongoDB client.
 
         Returns
@@ -328,7 +328,7 @@ class MongoExecutionRepository:
 
         return update_ops
 
-    def _doc_to_model(self, doc: dict) -> ExecutionModel:
+    def _doc_to_model(self, doc: dict[str, Any]) -> ExecutionModel:
         """Convert MongoDB document to ExecutionModel.
 
         Parameters

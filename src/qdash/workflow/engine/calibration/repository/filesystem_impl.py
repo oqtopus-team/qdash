@@ -7,8 +7,10 @@ using the local filesystem as the backend.
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 import plotly.graph_objs as go
 
 logger = logging.getLogger(__name__)
@@ -154,7 +156,7 @@ class FilesystemCalibDataSaver:
 
     def save_raw_data(
         self,
-        raw_data: list[np.ndarray],
+        raw_data: list[npt.NDArray[Any]],
         task_name: str,
         task_type: str,
         qid: str,
@@ -206,7 +208,7 @@ class FilesystemCalibDataSaver:
 
         return paths
 
-    def save_task_json(self, task_id: str, task_data: dict) -> str:
+    def save_task_json(self, task_id: str, task_data: dict[str, Any]) -> str:
         """Save task data as JSON.
 
         Parameters

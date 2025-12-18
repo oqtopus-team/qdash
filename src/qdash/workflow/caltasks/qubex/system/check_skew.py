@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, ClassVar
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.caltasks.base import (
     PostProcessResult,
@@ -31,7 +31,7 @@ class CheckSkew(QubexTask):
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         result = run_result.raw_result
-        figures: list = [result["fig"]]
+        figures: list[Any] = [result["fig"]]
         return PostProcessResult(
             output_parameters=self.attach_execution_id(execution_id), figures=figures
         )

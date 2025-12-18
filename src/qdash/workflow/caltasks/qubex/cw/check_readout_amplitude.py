@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -26,7 +26,9 @@ class CheckReadoutAmplitude(QubexTask):
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 
-    def make_figure(self, signal: dict, noise: dict, snr: dict, label: str) -> go.Figure:
+    def make_figure(
+        self, signal: dict[str, Any], noise: dict[str, Any], snr: dict[str, Any], label: str
+    ) -> go.Figure:
         fig = make_subplots(rows=3, cols=1, shared_xaxes=True)
         fig.add_trace(
             go.Scatter(

@@ -33,7 +33,7 @@ def download_task_figures(
     initialize()
 
     # Build query
-    query: dict = {
+    query: dict[str, str] = {
         "name": task_name,
         "chip_id": chip_id,
         "username": username,

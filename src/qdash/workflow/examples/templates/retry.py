@@ -35,7 +35,7 @@ def calibrate_group_with_retry(
     qids: list[str],
     tasks: list[str],
     offsets: list[float],
-) -> dict:
+) -> dict[str, Any]:
     """Calibrate a group of qubits sequentially with retry logic.
 
     Runs in PARALLEL with other groups via submit().

@@ -930,7 +930,7 @@ class CalService:
     # High-level API Methods
     # =========================================================================
 
-    def run(self, groups: list[list[str]], tasks: list[str]) -> dict:
+    def run(self, groups: list[list[str]], tasks: list[str]) -> dict[str, Any]:
         """Run calibration with group-based parallelism.
 
         Groups execute in PARALLEL, qubits within each group execute SEQUENTIALLY.
@@ -983,7 +983,7 @@ class CalService:
         tasks: list[str] | None = None,
         mode: str = "synchronized",
         flow_name: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Run 1-qubit calibration with configurable execution strategy.
 
         Args:
@@ -1046,7 +1046,7 @@ class CalService:
         mode: str = "synchronized",
         fidelity_threshold: float = 0.90,
         max_parallel_ops: int = 10,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Run full chip calibration (1Q Check -> 1Q Full -> 2Q).
 
         Performs complete chip calibration in 3 separate executions:
@@ -1147,7 +1147,7 @@ class CalService:
         qids: list[str],
         task: str,
         params: list[dict[str, Any]],
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Run parameter sweep over a task.
 
         Executes the same task multiple times with different parameter values.
@@ -1216,7 +1216,7 @@ class CalService:
         tasks: list[str] | None = None,
         max_parallel_ops: int = 10,
         flow_name: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Run 2-qubit coupling calibration.
 
         Calibrates coupling between qubit pairs. Supports two modes:
@@ -1356,7 +1356,7 @@ class CalService:
             # Restore original flow_name
             self.flow_name = original_flow_name
 
-    def check_skew(self, muxes: list[int] | None = None) -> dict:
+    def check_skew(self, muxes: list[int] | None = None) -> dict[str, Any]:
         """Run system-level skew check.
 
         Args:

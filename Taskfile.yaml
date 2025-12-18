@@ -98,32 +98,9 @@ tasks:
       - bunx eslint . --fix -c eslint.config.mjs --quiet
 
   lint-mypy:
-    desc: Run mypy type checking on clean modules only
+    desc: Run mypy strict type checking
     cmds:
-      - task lint-mypy-datamodel
-      - task lint-mypy-dbmodel
-      - task lint-mypy-api
-      - task lint-mypy-workflow
-
-  lint-mypy-datamodel:
-    desc: Run stricter mypy checks on datamodel
-    cmds:
-      - uv run mypy src/qdash/datamodel --disallow-untyped-defs --no-implicit-optional --warn-return-any
-
-  lint-mypy-dbmodel:
-    desc: Run strict mypy on dbmodel
-    cmds:
-      - uv run mypy src/qdash/dbmodel --disallow-untyped-defs --no-implicit-optional --warn-return-any
-
-  lint-mypy-api:
-    desc: Run strict mypy on API
-    cmds:
-      - uv run mypy src/qdash/api --disallow-untyped-defs --no-implicit-optional --warn-return-any
-
-  lint-mypy-workflow:
-    desc: Run strict mypy on workflow services
-    cmds:
-      - uv run mypy src/qdash/workflow --disallow-untyped-defs --no-implicit-optional --warn-return-any
+      - uv run mypy src/qdash/datamodel src/qdash/dbmodel src/qdash/api src/qdash/workflow
 
   tbls-docs:
     cmds:

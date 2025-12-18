@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 import numpy as np
+import numpy.typing as npt
 import scipy.stats as stats
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,9 @@ class OutlierDetector(ABC):
         pass
 
     @abstractmethod
-    def extract_parameter_values(self, data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+    def extract_parameter_values(
+        self, data: Dict[str, Any], parameter_name: str
+    ) -> Dict[str, float]:
         """
         Extract parameter values from task results.
 
@@ -124,7 +127,9 @@ class OutlierDetector(ABC):
 
         # Log detection results
         if outlier_qids:
-            logger.info(f"Detected {len(outlier_qids)} outliers in {parameter_name} data using {method}")
+            logger.info(
+                f"Detected {len(outlier_qids)} outliers in {parameter_name} data using {method}"
+            )
             logger.debug(f"Outlier QIDs: {outlier_qids}")
 
         return OutlierResult(
@@ -137,7 +142,9 @@ class OutlierDetector(ABC):
             physical_violations=violations,
         )
 
-    def _modified_z_score(self, values: np.ndarray, threshold: Optional[float] = None) -> Tuple[np.ndarray, List[str]]:
+    def _modified_z_score(
+        self, values: npt.NDArray[np.floating[Any]], threshold: Optional[float] = None
+    ) -> Tuple[npt.NDArray[np.bool_], List[str]]:
         """
         Modified Z-score using Median Absolute Deviation (MAD).
         More robust than standard Z-score for non-normal distributions.
@@ -157,7 +164,9 @@ class OutlierDetector(ABC):
         violations = [f"Modified Z-score > {threshold}"]
         return outlier_mask, violations
 
-    def _iqr_method(self, values: np.ndarray, multiplier: Optional[float] = None) -> Tuple[np.ndarray, List[str]]:
+    def _iqr_method(
+        self, values: npt.NDArray[np.floating[Any]], multiplier: Optional[float] = None
+    ) -> Tuple[npt.NDArray[np.bool_], List[str]]:
         """
         Interquartile Range (IQR) method for outlier detection.
         Robust to skewed distributions.
@@ -175,7 +184,9 @@ class OutlierDetector(ABC):
         violations = [f"IQR method with multiplier {multiplier}"]
         return outlier_mask, violations
 
-    def _physical_bounds(self, values: np.ndarray, parameter_name: str) -> Tuple[np.ndarray, List[str]]:
+    def _physical_bounds(
+        self, values: npt.NDArray[np.floating[Any]], parameter_name: str
+    ) -> Tuple[npt.NDArray[np.bool_], List[str]]:
         """Check physical bounds for the parameter."""
         min_bound, max_bound = self.get_physical_bounds(parameter_name)
 
@@ -189,7 +200,9 @@ class OutlierDetector(ABC):
 
         return outlier_mask, violations
 
-    def _combined_method(self, values: np.ndarray, parameter_name: str, **kwargs: Any) -> Tuple[np.ndarray, List[str]]:
+    def _combined_method(
+        self, values: npt.NDArray[np.floating[Any]], parameter_name: str, **kwargs: Any
+    ) -> Tuple[npt.NDArray[np.bool_], List[str]]:
         """Combine physical bounds and statistical methods."""
         # Always check physical bounds first
         physical_outliers, physical_violations = self._physical_bounds(values, parameter_name)
@@ -198,7 +211,9 @@ class OutlierDetector(ABC):
         non_physical_outliers = ~physical_outliers
         if np.sum(non_physical_outliers) > 3:  # Need minimum data points
             valid_values = values[non_physical_outliers]
-            statistical_outliers, statistical_violations = self._modified_z_score(valid_values, **kwargs)
+            statistical_outliers, statistical_violations = self._modified_z_score(
+                valid_values, **kwargs
+            )
 
             # Map back to original indices
             full_statistical_mask = np.zeros(len(values), dtype=bool)
@@ -212,7 +227,9 @@ class OutlierDetector(ABC):
 
         return combined_outliers, combined_violations
 
-    def _z_score_scipy(self, values: np.ndarray, threshold: Optional[float] = None) -> Tuple[np.ndarray, List[str]]:
+    def _z_score_scipy(
+        self, values: npt.NDArray[np.floating[Any]], threshold: Optional[float] = None
+    ) -> Tuple[npt.NDArray[np.bool_], List[str]]:
         """Simple Z-score using scipy."""
         threshold = threshold or self.default_thresholds["z_score"]
 
@@ -281,7 +298,9 @@ class T2StarOutlierDetector(OutlierDetector):
     def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
         return (0.0, 1000.0)  # 0 to 1ms
 
-    def extract_parameter_values(self, data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+    def extract_parameter_values(
+        self, data: Dict[str, Any], parameter_name: str
+    ) -> Dict[str, float]:
         return extract_coherence_time_values(data, parameter_name)
 
 
@@ -291,7 +310,9 @@ class T2EchoOutlierDetector(OutlierDetector):
     def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
         return (0.0, 2000.0)  # 0 to 2ms
 
-    def extract_parameter_values(self, data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+    def extract_parameter_values(
+        self, data: Dict[str, Any], parameter_name: str
+    ) -> Dict[str, float]:
         return extract_coherence_time_values(data, parameter_name)
 
 
@@ -301,7 +322,9 @@ class T1OutlierDetector(OutlierDetector):
     def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
         return (0.0, 10000.0)  # 0 to 10ms
 
-    def extract_parameter_values(self, data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+    def extract_parameter_values(
+        self, data: Dict[str, Any], parameter_name: str
+    ) -> Dict[str, float]:
         return extract_coherence_time_values(data, parameter_name)
 
 
@@ -311,7 +334,9 @@ class GateFidelityOutlierDetector(OutlierDetector):
     def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
         return (0.0, 1.0)  # 0 to 1 (100%)
 
-    def extract_parameter_values(self, data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+    def extract_parameter_values(
+        self, data: Dict[str, Any], parameter_name: str
+    ) -> Dict[str, float]:
         return extract_fidelity_values(data, parameter_name)
 
 
@@ -349,7 +374,10 @@ def get_outlier_detector(task_name: str) -> Optional[OutlierDetector]:
 
 
 def filter_task_results_for_outliers(
-    task_results: Dict[str, Any], task_name: str, enable_filtering: bool = True, method: str = "combined"
+    task_results: Dict[str, Any],
+    task_name: str,
+    enable_filtering: bool = True,
+    method: str = "combined",
 ) -> Tuple[Dict[str, Any], Optional[OutlierResult]]:
     """
     Filter task results to remove outliers based on task type.
@@ -394,9 +422,15 @@ def filter_task_results_for_outliers(
         return task_results, None
 
     # Detect outliers
-    outlier_result = detector.detect_outliers(task_results, parameter_name=parameter_name, method=method)
+    outlier_result = detector.detect_outliers(
+        task_results, parameter_name=parameter_name, method=method
+    )
 
     # Filter out outliers
-    filtered_results = {qid: result for qid, result in task_results.items() if qid not in outlier_result.outlier_qids}
+    filtered_results = {
+        qid: result
+        for qid, result in task_results.items()
+        if qid not in outlier_result.outlier_qids
+    }
 
     return filtered_results, outlier_result

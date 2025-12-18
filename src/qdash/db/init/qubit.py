@@ -3,7 +3,9 @@
 from qdash.dbmodel.qubit import QubitDocument
 
 
-def qubit_lattice(n: int, d: int) -> tuple[range, list, dict]:
+def qubit_lattice(
+    n: int, d: int
+) -> tuple[range, list[tuple[int, int]], dict[int, tuple[int, int]]]:
     """Generate qubit lattice structure for RQC square lattice."""
 
     def node(i: int, j: int, k: int) -> int:
@@ -42,7 +44,7 @@ def qubit_lattice(n: int, d: int) -> tuple[range, list, dict]:
     return nodes, edges, pos
 
 
-def correct(original: tuple, s: float) -> tuple:
+def correct(original: tuple[float, ...], s: float) -> tuple[float, ...]:
     """Correct position coordinates.
 
     Args:
@@ -60,7 +62,9 @@ def correct(original: tuple, s: float) -> tuple:
     return tuple(x * s for x in offset_applied)
 
 
-def generate_dummy_data(num_qubits: int, pos: dict, username: str, chip_id: str) -> list:
+def generate_dummy_data(
+    num_qubits: int, pos: dict[int, tuple[int, int]], username: str, chip_id: str
+) -> list[QubitDocument]:
     """Generate dummy qubit data.
 
     Args:

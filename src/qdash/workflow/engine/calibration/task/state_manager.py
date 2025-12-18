@@ -323,7 +323,7 @@ class TaskStateManager(BaseModel):
         task.message = message
 
     def put_input_parameters(
-        self, task_name: str, input_parameters: dict, task_type: str, qid: str
+        self, task_name: str, input_parameters: dict[str, Any], task_type: str, qid: str
     ) -> None:
         """Store input parameters for a task.
 

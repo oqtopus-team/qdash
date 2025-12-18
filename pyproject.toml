@@ -62,15 +62,12 @@ lint.ignore = []
 ]
 
 [tool.mypy]
-# Temporarily relaxed settings to reduce overwhelming errors
+strict = true
 ignore_missing_imports = true
-ignore_errors = false
 exclude = ["tools", "scripts"]
-# Disable strict checks temporarily
-disallow_untyped_defs = false
-warn_return_any = false
-check_untyped_defs = false
-no_implicit_optional = false
+# Disable misc errors (primarily FastAPI untyped decorator warnings)
+disable_error_code = ["misc"]
+
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"

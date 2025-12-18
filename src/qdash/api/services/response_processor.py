@@ -19,7 +19,9 @@ class ResponseProcessor:
         # Tasks are now determined by the detector factory
         pass
 
-    def process_task_response(self, response: Any, task_name: str, enable_outlier_filtering: bool = True) -> Any:
+    def process_task_response(
+        self, response: Any, task_name: str, enable_outlier_filtering: bool = True
+    ) -> Any:
         """
         Process task response with automatic outlier filtering if applicable.
 
@@ -79,7 +81,9 @@ class ResponseProcessor:
                         if parameter_name in task.output_parameters:
                             # Set the outlier parameter value to None
                             task.output_parameters[parameter_name] = None
-                            logger.info(f"Set outlier parameter {parameter_name} to None for QID: {outlier_qid}")
+                            logger.info(
+                                f"Set outlier parameter {parameter_name} to None for QID: {outlier_qid}"
+                            )
             return filtered_results
 
         return results

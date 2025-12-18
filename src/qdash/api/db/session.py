@@ -3,6 +3,7 @@
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from bunnet import init_bunnet
 from fastapi import FastAPI
@@ -11,11 +12,11 @@ from pymongo.database import Database
 from qdash.dbmodel.document_models import document_models
 
 # Global client and database references
-_client: MongoClient | None = None
-_database: Database | None = None
+_client: MongoClient[Any] | None = None
+_database: Database[Any] | None = None
 
 
-def get_mongo_client() -> MongoClient:
+def get_mongo_client() -> MongoClient[Any]:
     """Get or create MongoDB client.
 
     Returns
@@ -37,7 +38,7 @@ def get_mongo_client() -> MongoClient:
     return _client
 
 
-def get_database() -> Database:
+def get_database() -> Database[Any]:
     """Get MongoDB database instance.
 
     Returns
@@ -52,7 +53,7 @@ def get_database() -> Database:
     return _database
 
 
-def init_db(database: Database | None = None) -> None:
+def init_db(database: Database[Any] | None = None) -> None:
     """Initialize Bunnet with given or default database.
 
     Parameters
@@ -79,7 +80,7 @@ def init_db(database: Database | None = None) -> None:
     init_bunnet(database=db, document_models=document_models())
 
 
-def set_test_client(client: MongoClient, db_name: str = "test_db") -> None:
+def set_test_client(client: MongoClient[Any], db_name: str = "test_db") -> None:
     """Set test MongoDB client (for mongomock or testcontainers).
 
     Parameters

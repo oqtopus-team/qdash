@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.workflow._internal.merge_notes import merge_notes_by_timestamp
@@ -13,7 +14,7 @@ class QubexBackend(BaseBackend):
 
     from qubex import Experiment
 
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         from qubex import Experiment
 
         """Initialize the Qubex backend with a configuration dictionary."""
@@ -21,7 +22,7 @@ class QubexBackend(BaseBackend):
         self._exp: Experiment | None = None
 
     @property
-    def config(self) -> dict:
+    def config(self) -> dict[str, Any]:
         """Return the configuration dictionary for the Qubex backend."""
         return self._config
 

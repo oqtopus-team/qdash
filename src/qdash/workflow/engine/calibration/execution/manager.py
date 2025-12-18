@@ -52,12 +52,12 @@ class ExecutionManager(BaseModel):
     name: str = ""
     execution_id: str = ""
     calib_data_path: str = ""
-    note: dict = {}
+    note: dict[str, Any] = {}
     status: ExecutionStatusModel = ExecutionStatusModel.SCHEDULED
     task_results: dict[str, TaskResultModel] = {}
     tags: list[str] = []
-    controller_info: dict[str, dict] = {}
-    fridge_info: dict = {}
+    controller_info: dict[str, dict[str, Any]] = {}
+    fridge_info: dict[str, Any] = {}
     chip_id: str = ""
     project_id: str | None = None
     start_at: str = Field(
@@ -78,10 +78,10 @@ class ExecutionManager(BaseModel):
         execution_id: str,
         calib_data_path: str,
         tags: list[str] = [],
-        fridge_info: dict = {},
+        fridge_info: dict[str, Any] = {},
         chip_id: str = "",
         name: str = "default",
-        note: dict = {},
+        note: dict[str, Any] = {},
         project_id: str | None = None,
         **kwargs: Any,
     ) -> None:

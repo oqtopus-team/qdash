@@ -67,7 +67,7 @@ class TaskManager(BaseModel):
         default_factory=lambda: CalibDataModel(qubit={}, coupling={})
     )
     calib_dir: str = ""
-    controller_info: dict[str, dict] = Field(default_factory=dict)
+    controller_info: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     # Upstream task ID for dependency tracking (set by session.py)
     _upstream_task_id: str = ""
@@ -348,7 +348,11 @@ class TaskManager(BaseModel):
     # ========== Parameter Methods (delegated to state manager) ==========
 
     def put_input_parameters(
-        self, task_name: str, input_parameters: dict, task_type: str = "global", qid: str = ""
+        self,
+        task_name: str,
+        input_parameters: dict[str, Any],
+        task_type: str = "global",
+        qid: str = "",
     ) -> None:
         """Store input parameters."""
         self._sync_to_state_manager()
@@ -357,7 +361,11 @@ class TaskManager(BaseModel):
         self._sync_from_state_manager()
 
     def put_output_parameters(
-        self, task_name: str, output_parameters: dict, task_type: str = "global", qid: str = ""
+        self,
+        task_name: str,
+        output_parameters: dict[str, Any],
+        task_type: str = "global",
+        qid: str = "",
     ) -> None:
         """Store output parameters."""
         self._sync_to_state_manager()
@@ -366,7 +374,7 @@ class TaskManager(BaseModel):
         self._sync_from_state_manager()
 
     def put_note_to_task(
-        self, task_name: str, note: dict, task_type: str = "global", qid: str = ""
+        self, task_name: str, note: dict[str, Any], task_type: str = "global", qid: str = ""
     ) -> None:
         """Add a note to a task."""
         self._sync_to_state_manager()
@@ -440,7 +448,7 @@ class TaskManager(BaseModel):
 
     def save_figures(
         self,
-        figures: list,
+        figures: list[Any],
         task_name: str,
         task_type: str = "global",
         savedir: str = "",
@@ -473,7 +481,7 @@ class TaskManager(BaseModel):
         self.save_figures([figure], task_name, task_type, savedir, qid)
 
     def save_raw_data(
-        self, raw_data: list, task_name: str, task_type: str = "global", qid: str = ""
+        self, raw_data: list[Any], task_name: str, task_type: str = "global", qid: str = ""
     ) -> None:
         """Save raw data."""
         if self._data_saver:
@@ -504,7 +512,7 @@ class TaskManager(BaseModel):
         """Diagnose the task manager."""
         pass
 
-    def put_controller_info(self, box_info: dict) -> None:
+    def put_controller_info(self, box_info: dict[str, Any]) -> None:
         """Store controller information."""
         self.controller_info = box_info
         # Also update executor's controller_info for ExecutionManager updates

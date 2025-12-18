@@ -1,5 +1,7 @@
 """Schema definitions for task router."""
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -8,7 +10,7 @@ class InputParameterModel(BaseModel):
 
     unit: str = ""
     value_type: str = "float"
-    value: tuple | int | float | None = None
+    value: tuple[int | float, ...] | int | float | None = None
     description: str = ""
 
 
@@ -56,8 +58,8 @@ class TaskResultResponse(BaseModel):
     execution_id: str
     figure_path: list[str]
     json_figure_path: list[str]
-    input_parameters: dict
-    output_parameters: dict
+    input_parameters: dict[str, Any]
+    output_parameters: dict[str, Any]
     start_at: str
     end_at: str
     elapsed_time: str

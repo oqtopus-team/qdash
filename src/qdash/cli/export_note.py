@@ -30,7 +30,7 @@ def export_calibration_note(
     initialize()
 
     # Build query
-    query: dict = {
+    query: dict[str, str] = {
         "execution_id": execution_id,
         "task_id": task_id,
     }

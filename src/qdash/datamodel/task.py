@@ -22,7 +22,7 @@ class InputParameterModel(BaseModel):
 
     unit: str = ""
     value_type: str = "float"
-    value: tuple | int | float | None = None
+    value: tuple[int | float, ...] | int | float | None = None
     description: str = ""
 
     def get_value(self) -> Any:
@@ -157,7 +157,7 @@ class CalibDataModel(BaseModel):
             self.coupling[qid] = {}
         self.coupling[qid][parameter_name] = data
 
-    def __getitem__(self, key: str) -> dict:
+    def __getitem__(self, key: str) -> dict[str, dict[str, OutputParameterModel]]:
         """Get the item by key."""
         if key in ("qubit", "coupling"):
             return getattr(self, key)  # type: ignore #noqa: PGH003
@@ -192,10 +192,10 @@ class BaseTaskResultModel(BaseModel):
     upstream_id: str = ""
     status: TaskStatusModel = TaskStatusModel.SCHEDULED
     message: str = ""
-    input_parameters: dict = {}
-    output_parameters: dict = {}
+    input_parameters: dict[str, Any] = {}
+    output_parameters: dict[str, Any] = {}
     output_parameter_names: list[str] = []
-    note: dict = {}
+    note: dict[str, Any] = {}
     figure_path: list[str] = []
     json_figure_path: list[str] = []
     raw_data_path: list[str] = []
@@ -210,7 +210,7 @@ class BaseTaskResultModel(BaseModel):
         if self.status == TaskStatusModel.FAILED:
             raise RuntimeError(f"Task {self.name} failed with message: {self.message}")
 
-    def put_input_parameter(self, input_parameters: dict) -> None:
+    def put_input_parameter(self, input_parameters: dict[str, Any]) -> None:
         """Put a parameter to the task result."""
         copied_parameters = deepcopy(input_parameters)
         # Process the copied_parameters
@@ -223,7 +223,7 @@ class BaseTaskResultModel(BaseModel):
                 copied_parameters[key] = item
         self.input_parameters = copied_parameters
 
-    def put_output_parameter(self, output_parameters: dict) -> None:
+    def put_output_parameter(self, output_parameters: dict[str, Any]) -> None:
         import numpy as np
 
         """
@@ -241,7 +241,7 @@ class BaseTaskResultModel(BaseModel):
             self.output_parameter_names.append(key)
         self.output_parameters = copied_parameters
 
-    def put_note(self, note: dict) -> None:
+    def put_note(self, note: dict[str, Any]) -> None:
         """Put a note to the task result.
 
         Args:
@@ -355,5 +355,5 @@ class TaskModel(BaseModel):
     backend: str | None = Field(None, description="The backend of the task")
     description: str = Field(..., description="Detailed description of the task")
     task_type: str = Field(..., description="The type of the task")
-    input_parameters: dict = Field(..., description="The input parameters of the task")
-    output_parameters: dict = Field(..., description="The output parameters of the task")
+    input_parameters: dict[str, Any] = Field(..., description="The input parameters of the task")
+    output_parameters: dict[str, Any] = Field(..., description="The output parameters of the task")

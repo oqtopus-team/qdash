@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any
 from typing import Any, ClassVar, Literal
 
 import plotly.graph_objs as go
@@ -10,7 +11,7 @@ from qdash.workflow.engine.backend.base import BaseBackend
 class PreProcessResult(BaseModel):
     """Result class."""
 
-    input_parameters: dict
+    input_parameters: dict[str, Any]
 
 
 class PostProcessResult(BaseModel):

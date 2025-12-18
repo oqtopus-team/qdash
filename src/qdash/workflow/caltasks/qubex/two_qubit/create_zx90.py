@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.caltasks.base import (
@@ -52,8 +52,8 @@ class CreateZX90(QubexTask):
         self.output_parameters["rotary_amplitude"].value = result["rotary_amplitude"]
         self.output_parameters["zx_rotation_rate"].value = result["zx_rotation_rate"]
         output_parameters = self.attach_execution_id(execution_id)
-        figures: list = [result["n1"], result["n3"], result["fig"]]
-        raw_data: list = []
+        figures: list[Any] = [result["n1"], result["n3"], result["fig"]]
+        raw_data: list[Any] = []
         return PostProcessResult(
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
         )

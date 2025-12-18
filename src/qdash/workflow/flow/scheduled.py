@@ -53,7 +53,7 @@ from qdash.workflow.flow.tasks import (
 
 
 @task
-def _calibrate_mux_qubits(qids: list[str], tasks: list[str]) -> dict:
+def _calibrate_mux_qubits(qids: list[str], tasks: list[str]) -> dict[str, Any]:
     """Execute tasks for qubits in a single MUX sequentially."""
     logger = get_run_logger()
     session = get_session()
@@ -75,7 +75,7 @@ def _calibrate_mux_qubits(qids: list[str], tasks: list[str]) -> dict:
 
 
 @task
-def _calibrate_single_qubit(qid: str, tasks: list[str]) -> tuple[str, dict]:
+def _calibrate_single_qubit(qid: str, tasks: list[str]) -> tuple[str, dict[str, Any]]:
     """Execute tasks for a single qubit."""
     logger = get_run_logger()
     session = get_session()
@@ -94,7 +94,7 @@ def _calibrate_single_qubit(qid: str, tasks: list[str]) -> tuple[str, dict]:
 
 
 @task
-def _calibrate_step_qubits_parallel(parallel_qids: list[str], tasks: list[str]) -> dict:
+def _calibrate_step_qubits_parallel(parallel_qids: list[str], tasks: list[str]) -> dict[str, Any]:
     """Execute tasks for all qubits in a synchronized step in parallel.
 
     All qubits in parallel_qids are from different MUXes and can be
@@ -107,7 +107,7 @@ def _calibrate_step_qubits_parallel(parallel_qids: list[str], tasks: list[str]) 
 
 
 @task
-def _execute_coupling_pair(coupling_qid: str, tasks: list[str]) -> tuple[str, dict]:
+def _execute_coupling_pair(coupling_qid: str, tasks: list[str]) -> tuple[str, dict[str, Any]]:
     """Execute tasks for a single coupling pair."""
     logger = get_run_logger()
     session = get_session()
@@ -126,7 +126,7 @@ def _execute_coupling_pair(coupling_qid: str, tasks: list[str]) -> tuple[str, di
 
 
 @task
-def _calibrate_parallel_group(coupling_qids: list[str], tasks: list[str]) -> dict:
+def _calibrate_parallel_group(coupling_qids: list[str], tasks: list[str]) -> dict[str, Any]:
     """Execute coupling tasks for a parallel group."""
     futures = [_execute_coupling_pair.submit(cqid, tasks) for cqid in coupling_qids]
     pair_results = [f.result() for f in futures]

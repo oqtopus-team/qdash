@@ -3,12 +3,14 @@
 from qdash.dbmodel.coupling import CouplingDocument
 
 
-def bi_direction(edges: list) -> list:
+def bi_direction(edges: list[tuple[int, int]]) -> list[tuple[int, int]]:
     """Bi-directional edges."""
     return edges + [(j, i) for i, j in edges]
 
 
-def generate_coupling(edges: list, username: str, chip_id: str) -> list:
+def generate_coupling(
+    edges: list[tuple[int, int]], username: str, chip_id: str
+) -> list[CouplingDocument]:
     """Generate coupling documents from edges.
 
     Args:

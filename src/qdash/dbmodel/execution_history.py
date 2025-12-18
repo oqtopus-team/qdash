@@ -1,5 +1,5 @@
 # dbmodel/execution_history.py
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
@@ -35,17 +35,17 @@ class ExecutionHistoryDocument(Document):
     name: str = Field(..., description="The name of the execution")
     execution_id: str = Field(..., description="The execution ID")
     calib_data_path: str = Field(..., description="The path to the calibration data")
-    note: dict = Field(..., description="The note")
+    note: dict[str, Any] = Field(..., description="The note")
     status: str = Field(..., description="The status of the execution")
     task_results: dict[str, TaskResultModel] = Field(..., description="The results of the tasks")
     tags: list[str] = Field(..., description="The tags")
-    controller_info: dict = Field(..., description="The controller information")
-    fridge_info: dict = Field(..., description="The fridge information")
+    controller_info: dict[str, Any] = Field(..., description="The controller information")
+    fridge_info: dict[str, Any] = Field(..., description="The fridge information")
     chip_id: str = Field(..., description="The chip ID")
     start_at: str = Field(..., description="The time when the execution started")
     end_at: str = Field(..., description="The time when the execution ended")
     elapsed_time: str = Field(..., description="The elapsed time")
-    calib_data: dict = Field(..., description="The calibration data")
+    calib_data: dict[str, Any] = Field(..., description="The calibration data")
     message: str = Field(..., description="The message")
     system_info: SystemInfoModel = Field(..., description="The system information")
 

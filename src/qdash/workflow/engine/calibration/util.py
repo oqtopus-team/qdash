@@ -1,6 +1,7 @@
 """Utility functions and classes for calibration workflows."""
 
 import re
+from typing import Any
 
 import pendulum
 from prefect import task
@@ -17,7 +18,7 @@ def qid_to_label(qid: str) -> str:
     raise ValueError(error_message)
 
 
-def pydantic_serializer(obj: BaseModel) -> dict:
+def pydantic_serializer(obj: BaseModel) -> dict[str, Any]:
     """Serialize a Pydantic BaseModel instance to a dictionary.
 
     Args:

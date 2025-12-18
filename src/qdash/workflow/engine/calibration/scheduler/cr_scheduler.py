@@ -45,7 +45,7 @@ from pathlib import Path
 from typing import Any
 
 import networkx as nx
-import yaml  # type: ignore[import-untyped]
+import yaml
 from qdash.datamodel.qubit import QubitModel
 from qdash.dbmodel.chip import ChipDocument
 
