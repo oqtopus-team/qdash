@@ -3996,7 +3996,7 @@
           "flow"
         ],
         "summary": "List flow helper files",
-        "description": "List all Python files in the qdash.workflow.flow module.\n\nReturns list of filenames that users can view for reference.",
+        "description": "List all Python files in the qdash.workflow.service module.\n\nReturns list of filenames that users can view for reference.",
         "operationId": "listFlowHelperFiles",
         "responses": {
           "200": {
@@ -6279,7 +6279,16 @@
           "value": {
             "anyOf": [
               {
-                "items": {},
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                },
                 "type": "array"
               },
               {

@@ -33,7 +33,7 @@ Example:
 from typing import Any
 
 from prefect import flow
-from qdash.workflow.flow import CalService
+from qdash.workflow.service import CalService
 
 
 def _mux_ids_to_qids(mux_ids: list[int]) -> list[str]:

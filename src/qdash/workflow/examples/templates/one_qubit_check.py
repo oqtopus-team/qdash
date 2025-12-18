@@ -27,8 +27,8 @@ Example:
 from typing import Any
 
 from prefect import flow
-from qdash.workflow.flow import CalService
-from qdash.workflow.flow.tasks import CHECK_1Q_TASKS
+from qdash.workflow.service import CalService
+from qdash.workflow.service.tasks import CHECK_1Q_TASKS
 
 
 @flow

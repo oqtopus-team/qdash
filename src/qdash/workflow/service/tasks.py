@@ -10,7 +10,7 @@ Task Lists:
     FULL_2Q_TASKS: Complete 2Q task list
 
 Example:
-    from qdash.workflow.flow.tasks import CHECK_1Q_TASKS, FULL_2Q_TASKS
+    from qdash.workflow.service.tasks import CHECK_1Q_TASKS, FULL_2Q_TASKS
 
     # Use in calibration
     calibrate_one_qubit_synchronized(

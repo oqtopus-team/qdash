@@ -468,7 +468,7 @@ async def get_flow_template(template_id: str) -> FlowTemplateWithCode:
 # ============================================================================
 
 # Base directory for flow helper modules
-FLOW_HELPERS_DIR = Path("/app/qdash/workflow/flow")
+FLOW_HELPERS_DIR = Path("/app/qdash/workflow/service")
 
 
 @router.get(
@@ -478,7 +478,7 @@ FLOW_HELPERS_DIR = Path("/app/qdash/workflow/flow")
     operation_id="listFlowHelperFiles",
 )
 async def list_flow_helper_files() -> list[str]:
-    """List all Python files in the qdash.workflow.flow module.
+    """List all Python files in the qdash.workflow.service module.
 
     Returns list of filenames that users can view for reference.
     """

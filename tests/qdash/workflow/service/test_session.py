@@ -1,18 +1,18 @@
-"""Tests for FlowSession.
+"""Tests for CalService.
 
-These tests verify the FlowSession API and helper functions for custom calibration flows.
+These tests verify the CalService API and helper functions for custom calibration flows.
 """
 
 import pytest
 from unittest.mock import MagicMock, patch
 
-from qdash.workflow.flow.session import (
-    FlowSession,
+from qdash.workflow.service.session import (
+    CalService,
     finish_calibration,
     get_session,
     init_calibration,
 )
-from qdash.workflow.flow.context import clear_current_session
+from qdash.workflow.service.context import clear_current_session
 
 
 class MockExecutionManager:
@@ -82,7 +82,7 @@ class MockExecutionLockDocument:
 @pytest.fixture(autouse=True)
 def clear_session_state():
     """Clear session state before and after each test."""
-    import qdash.workflow.flow.session as session_module
+    import qdash.workflow.service.session as session_module
 
     # Clear before test
     session_module._current_session = None
@@ -97,32 +97,32 @@ def clear_session_state():
 
 @pytest.fixture
 def mock_flow_session_deps(monkeypatch):
-    """Fixture to mock FlowSession dependencies."""
+    """Fixture to mock CalService dependencies."""
     monkeypatch.setattr(
-        "qdash.workflow.flow.session.ExecutionManager",
+        "qdash.workflow.service.session.ExecutionManager",
         MockExecutionManager,
     )
     monkeypatch.setattr(
-        "qdash.workflow.flow.session.create_backend",
+        "qdash.workflow.service.session.create_backend",
         lambda **kwargs: MockSession(),
     )
     monkeypatch.setattr(
-        "qdash.workflow.flow.session.GitHubIntegration",
+        "qdash.workflow.service.session.GitHubIntegration",
         MockGitHubIntegration,
     )
     monkeypatch.setattr(
-        "qdash.workflow.flow.session.ExecutionLockDocument",
+        "qdash.workflow.service.session.ExecutionLockDocument",
         MockExecutionLockDocument,
     )
 
 
-class TestFlowSessionInitialization:
-    """Test FlowSession initialization and basic setup."""
+class TestCalServiceInitialization:
+    """Test CalService initialization and basic setup."""
 
     def test_flow_session_attributes(self, mock_flow_session_deps):
-        """Test that FlowSession initializes with correct attributes."""
+        """Test that CalService initializes with correct attributes."""
         # Create session with qids (required parameter)
-        session = FlowSession(
+        session = CalService(
             username="test_user",
             execution_id="20240101-001",
             chip_id="chip_1",
@@ -141,7 +141,7 @@ class TestFlowSessionInitialization:
 
     def test_flow_session_default_tags(self, mock_flow_session_deps):
         """Test that default tags are set correctly."""
-        session = FlowSession(
+        session = CalService(
             username="test_user",
             execution_id="20240101-001",
             chip_id="chip_1",
@@ -152,12 +152,12 @@ class TestFlowSessionInitialization:
         assert "python_flow" in session.execution_manager.tags
 
 
-class TestFlowSessionParameterManagement:
+class TestCalServiceParameterManagement:
     """Test parameter get/set operations."""
 
     def test_set_and_get_parameter(self, mock_flow_session_deps):
         """Test setting and getting parameters."""
-        session = FlowSession(
+        session = CalService(
             username="test_user",
             execution_id="20240101-001",
             chip_id="chip_1",
@@ -173,7 +173,7 @@ class TestFlowSessionParameterManagement:
 
     def test_get_nonexistent_parameter(self, mock_flow_session_deps):
         """Test getting a parameter that doesn't exist."""
-        session = FlowSession(
+        session = CalService(
             username="test_user",
             execution_id="20240101-001",
             chip_id="chip_1",
@@ -213,7 +213,7 @@ class TestGlobalSessionHelpers:
         # Mock Prefect logger to avoid context error
         mock_logger = MagicMock()
         monkeypatch.setattr(
-            "qdash.workflow.flow.session.get_run_logger",
+            "qdash.workflow.service.session.get_run_logger",
             lambda: mock_logger,
         )
 

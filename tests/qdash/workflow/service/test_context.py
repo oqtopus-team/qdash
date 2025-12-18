@@ -3,7 +3,7 @@
 import threading
 from unittest.mock import MagicMock
 
-from qdash.workflow.flow.context import (
+from qdash.workflow.service.context import (
     SessionContext,
     clear_current_session,
     get_current_session,

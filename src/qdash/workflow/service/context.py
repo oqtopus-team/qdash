@@ -8,7 +8,7 @@ import threading
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from qdash.workflow.flow.session import CalService
+    from qdash.workflow.service.session import CalService
 
 
 class SessionContext:

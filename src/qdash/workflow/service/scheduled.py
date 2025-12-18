@@ -4,8 +4,8 @@ High-level functions that combine scheduler + execution for simple user code.
 
 Example:
     from prefect import flow
-    from qdash.workflow.flow import init_calibration, finish_calibration
-    from qdash.workflow.flow.scheduled import (
+    from qdash.workflow.service import init_calibration, finish_calibration
+    from qdash.workflow.service.scheduled import (
         calibrate_one_qubit_scheduled,
         calibrate_two_qubit_scheduled,
     )
@@ -38,9 +38,9 @@ from typing import Any
 
 from prefect import get_run_logger, task
 from qdash.workflow.engine.calibration import CRScheduler, OneQubitScheduler
-from qdash.workflow.flow.github import ConfigFileType, GitHubPushConfig
-from qdash.workflow.flow.session import finish_calibration, get_session, init_calibration
-from qdash.workflow.flow.tasks import (
+from qdash.workflow.service.github import ConfigFileType, GitHubPushConfig
+from qdash.workflow.service.session import finish_calibration, get_session, init_calibration
+from qdash.workflow.service.tasks import (
     CHECK_1Q_TASKS,
     FULL_1Q_TASKS,
     FULL_1Q_TASKS_AFTER_CHECK,

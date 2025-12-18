@@ -24,7 +24,7 @@ Example:
     ```
 """
 
-from qdash.workflow.flow import (
+from qdash.workflow.service import (
     CalService,
     ConfigFileType,
     GitHubIntegration,

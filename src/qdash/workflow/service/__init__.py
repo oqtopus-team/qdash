@@ -1,29 +1,29 @@
 """Workflow helper functions and utilities for Python Flow Editor."""
 
-from qdash.workflow.flow.context import (
+from qdash.workflow.service.context import (
     SessionContext,
     clear_current_session,
     get_current_session,
     set_current_session,
 )
-from qdash.workflow.flow.github import (
+from qdash.workflow.service.github import (
     ConfigFileType,
     GitHubIntegration,
     GitHubPushConfig,
 )
-from qdash.workflow.flow.scheduled import (
+from qdash.workflow.service.scheduled import (
     calibrate_one_qubit_scheduled,
     calibrate_one_qubit_synchronized,
     calibrate_two_qubit_scheduled,
     extract_candidate_qubits,
 )
-from qdash.workflow.flow.tasks import (
+from qdash.workflow.service.tasks import (
     CHECK_1Q_TASKS,
     FULL_1Q_TASKS,
     FULL_1Q_TASKS_AFTER_CHECK,
     FULL_2Q_TASKS,
 )
-from qdash.workflow.flow.session import (
+from qdash.workflow.service.session import (
     CalService,
     generate_execution_id,
 )

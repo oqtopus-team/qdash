@@ -12,11 +12,11 @@ from typing import TYPE_CHECKING, Any
 from prefect import get_run_logger, task
 
 from qdash.workflow.engine.calibration import OneQubitScheduler
-from qdash.workflow.flow.github import ConfigFileType, GitHubPushConfig
-from qdash.workflow.flow.session import finish_calibration, get_session, init_calibration
+from qdash.workflow.service.github import ConfigFileType, GitHubPushConfig
+from qdash.workflow.service.session import finish_calibration, get_session, init_calibration
 
 if TYPE_CHECKING:
-    from qdash.workflow.flow.session import CalService
+    from qdash.workflow.service.session import CalService
 
 
 # =============================================================================

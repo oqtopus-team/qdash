@@ -26,7 +26,7 @@ Example:
 from typing import Any
 
 from prefect import flow, get_run_logger, task
-from qdash.workflow.flow import CalService
+from qdash.workflow.service import CalService
 
 
 @task

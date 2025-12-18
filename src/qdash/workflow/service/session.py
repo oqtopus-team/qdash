@@ -9,7 +9,7 @@ Example:
 
     ```python
     from prefect import flow
-    from qdash.workflow.flow import CalService
+    from qdash.workflow.service import CalService
 
     @flow
     def simple_calibration(username, chip_id, qids, flow_name=None, project_id=None):
@@ -39,7 +39,7 @@ from qdash.workflow.engine.calibration.params_updater import get_params_updater
 from qdash.workflow.engine.calibration.prefect_tasks import execute_dynamic_task_by_qid
 from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.engine.backend.base import BaseBackend
-from qdash.workflow.flow.github import GitHubIntegration, GitHubPushConfig
+from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
 
 def generate_execution_id(username: str, chip_id: str, project_id: str | None = None) -> str:
@@ -240,7 +240,7 @@ class CalService:
 
         # Setup github_push_config if not provided
         if self.github_push_config is None and self.enable_github:
-            from qdash.workflow.flow.github import ConfigFileType
+            from qdash.workflow.service.github import ConfigFileType
 
             self.github_push_config = GitHubPushConfig(
                 enabled=self.enable_github,
@@ -1012,8 +1012,8 @@ class CalService:
             )
             ```
         """
-        from qdash.workflow.flow.strategy import OneQubitConfig, get_one_qubit_strategy
-        from qdash.workflow.flow.tasks import FULL_1Q_TASKS
+        from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
+        from qdash.workflow.service.tasks import FULL_1Q_TASKS
 
         if mux_ids is None:
             mux_ids = list(range(16))
@@ -1073,8 +1073,8 @@ class CalService:
             results = cal.run_full_chip(mux_ids=[0, 1, 2, 3])
             ```
         """
-        from qdash.workflow.flow.scheduled import extract_candidate_qubits
-        from qdash.workflow.flow.tasks import (
+        from qdash.workflow.service.scheduled import extract_candidate_qubits
+        from qdash.workflow.service.tasks import (
             CHECK_1Q_TASKS,
             FULL_1Q_TASKS_AFTER_CHECK,
             FULL_2Q_TASKS,
@@ -1431,7 +1431,7 @@ def _execute_coupling(cal: "CalService", coupling_qid: str, tasks: list[str]) ->
 # Internal Session Management (for scheduled.py)
 # =============================================================================
 
-from qdash.workflow.flow.context import (
+from qdash.workflow.service.context import (
     clear_current_session,
     get_current_session,
     set_current_session,
