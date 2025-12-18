@@ -20,7 +20,7 @@ from pymongo.database import Database
 pytest_plugins = ("pytest_asyncio",)
 
 # Set async fixture loop scope
-pytest.mark.asyncio_default_fixture_loop_scope = "function"
+pytest.mark.asyncio_default_fixture_loop_scope = "function"  # type: ignore[attr-defined]
 
 
 # Force test environment - override any existing value

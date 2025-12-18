@@ -212,7 +212,7 @@ SAMPLE_ERROR_RESPONSES = {
 
 def get_sample_data(category: str, key: str) -> Dict[str, Any]:
     """Get sample data by category and key."""
-    data_maps = {
+    data_maps: Dict[str, Dict[str, Any]] = {
         "users": SAMPLE_USERS,
         "chips": SAMPLE_CHIPS,
         "calibrations": SAMPLE_CALIBRATIONS,
@@ -231,9 +231,9 @@ def get_sample_data(category: str, key: str) -> Dict[str, Any]:
     return data_maps[category][key].copy()
 
 
-def get_all_sample_data(category: str) -> Dict[str, Dict[str, Any]]:
+def get_all_sample_data(category: str) -> Dict[str, Any]:
     """Get all sample data for a category."""
-    data_maps = {
+    data_maps: Dict[str, Dict[str, Any]] = {
         "users": SAMPLE_USERS,
         "chips": SAMPLE_CHIPS,
         "calibrations": SAMPLE_CALIBRATIONS,

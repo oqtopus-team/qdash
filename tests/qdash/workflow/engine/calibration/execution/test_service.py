@@ -1,5 +1,7 @@
 """Tests for ExecutionService."""
 
+from collections.abc import Callable
+
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -33,7 +35,7 @@ class MockExecutionRepository:
     def update_with_optimistic_lock(
         self,
         execution_id: str,
-        update_func: callable,
+        update_func: Callable[[ExecutionModel], None],
         initial_model: ExecutionModel | None = None,
     ) -> ExecutionModel:
         if self.stored_model is None and initial_model:
