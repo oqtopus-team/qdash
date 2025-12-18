@@ -150,6 +150,32 @@ class Step(ABC):
         ...
 
 
+@dataclass
+class CalibrationStep(Step):
+    """Base class for steps that execute actual calibration on hardware.
+
+    CalibrationSteps create execution history entries because they involve
+    real hardware interaction and produce calibration data.
+
+    Examples: OneQubitCheck, OneQubitFineTune, TwoQubitCalibration
+    """
+
+    pass
+
+
+@dataclass
+class TransformStep(Step):
+    """Base class for steps that transform data without hardware execution.
+
+    TransformSteps do NOT create execution history entries because they
+    only filter, schedule, or transform existing data.
+
+    Examples: FilterByMetric, FilterByStatus, GenerateCRSchedule
+    """
+
+    pass
+
+
 # =============================================================================
 # Pipeline
 # =============================================================================
@@ -220,7 +246,7 @@ class Pipeline:
 
 
 @dataclass
-class CustomOneQubit(Step):
+class CustomOneQubit(CalibrationStep):
     """Custom 1-qubit calibration step with user-defined tasks.
 
     This is the most flexible 1-qubit step - you specify exactly which
@@ -289,9 +315,12 @@ class CustomOneQubit(Step):
 
         # Store in metadata with step name as key
         ctx.metadata[self.step_name] = result
-        ctx.candidate_qids = result.successful_qids()
+        # Note: CalibrationSteps don't filter - use FilterByStatus for explicit filtering
 
-        logger.info(f"[{self.name}] Completed. {len(ctx.candidate_qids)} successful qubits")
+        logger.info(
+            f"[{self.name}] Completed. "
+            f"{len(result.successful_qids())}/{len(result.qubits)} successful"
+        )
         return ctx
 
     def _execute_direct(
@@ -340,7 +369,7 @@ class CustomOneQubit(Step):
 
 
 @dataclass
-class OneQubitCheck(Step):
+class OneQubitCheck(CalibrationStep):
     """Basic 1-qubit characterization step.
 
     Executes CHECK_1Q_TASKS: CheckRabi, CreateHPIPulse, CheckHPIPulse,
@@ -392,9 +421,12 @@ class OneQubitCheck(Step):
         # Build typed result (Step is responsible for parsing backend-specific data)
         result = self._build_result(raw_results)
         ctx.one_qubit_check = result
-        ctx.candidate_qids = result.successful_qids()
+        # Note: CalibrationSteps don't filter - use FilterByStatus for explicit filtering
 
-        logger.info(f"[{self.name}] Completed. {len(ctx.candidate_qids)} successful qubits")
+        logger.info(
+            f"[{self.name}] Completed. "
+            f"{len(result.successful_qids())}/{len(result.qubits)} successful"
+        )
         return ctx
 
     def _execute_direct(
@@ -453,7 +485,7 @@ class OneQubitCheck(Step):
 
 
 @dataclass
-class OneQubitFineTune(Step):
+class OneQubitFineTune(CalibrationStep):
     """Advanced 1-qubit calibration step.
 
     Executes FULL_1Q_TASKS_AFTER_CHECK: DRAG pulses, ReadoutClassification,
@@ -484,31 +516,56 @@ class OneQubitFineTune(Step):
         logger = get_run_logger()
         tasks = self.tasks or FULL_1Q_TASKS_AFTER_CHECK
 
-        logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(tasks)} tasks")
+        # Use filtered candidates from context if available
+        qids = ctx.candidate_qids if ctx.candidate_qids else targets.to_qids(service.chip_id)
 
-        from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
-        from qdash.workflow.service.targets import MuxTargets
+        logger.info(
+            f"[{self.name}] Starting with mode={self.mode}, "
+            f"{len(tasks)} tasks, {len(qids)} qubits"
+        )
 
-        if isinstance(targets, MuxTargets):
-            config = OneQubitConfig(
-                mux_ids=targets.mux_ids,
-                exclude_qids=targets.exclude_qids,
-                tasks=tasks,
-                flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
-                project_id=service.project_id,
-            )
-            strategy = get_one_qubit_strategy(self.mode)
-            raw_results = strategy.execute(service, config)
-        else:
-            qids = targets.to_qids(service.chip_id)
-            raw_results = self._execute_direct(service, qids, tasks)
+        if not qids:
+            logger.warning(f"[{self.name}] No candidate qubits, skipping")
+            ctx.one_qubit_fine_tune = OneQubitResult()
+            return ctx
+
+        raw_results = self._execute_with_qids(service, qids, tasks)
 
         result = self._build_result(raw_results)
         ctx.one_qubit_fine_tune = result
-        ctx.candidate_qids = result.successful_qids()
+        # Note: CalibrationSteps don't filter - use FilterByStatus for explicit filtering
 
-        logger.info(f"[{self.name}] Completed. {len(ctx.candidate_qids)} successful qubits")
+        logger.info(
+            f"[{self.name}] Completed. "
+            f"{len(result.successful_qids())}/{len(result.qubits)} successful"
+        )
         return ctx
+
+    def _execute_with_qids(
+        self,
+        service: CalibService,
+        qids: list[str],
+        tasks: list[str],
+    ) -> dict[str, Any]:
+        """Execute calibration for specific qubit IDs."""
+        from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
+
+        # Convert qids to mux_ids for strategy
+        # Extract unique mux IDs from qubit IDs (e.g., "0" -> mux 0, "4" -> mux 0)
+        mux_ids = sorted(set(int(qid) // 4 for qid in qids))
+        exclude_qids: list[str] = []  # We're explicitly specifying qids, so no exclusions
+
+        config = OneQubitConfig(
+            mux_ids=mux_ids,
+            exclude_qids=exclude_qids,
+            qids=qids,  # Pass explicit qid list
+            tasks=tasks,
+            flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
+            project_id=service.project_id,
+        )
+        strategy = get_one_qubit_strategy(self.mode)
+        result: dict[str, Any] = strategy.execute(service, config)
+        return result
 
     def _execute_direct(
         self,
@@ -575,7 +632,7 @@ class OneQubitFineTune(Step):
 
 
 @dataclass
-class FilterByMetric(Step):
+class FilterByMetric(TransformStep):
     """Filter qubits by a named metric threshold.
 
     This step filters `ctx.candidate_qids` to only include qubits
@@ -637,7 +694,7 @@ class FilterByMetric(Step):
 
 
 @dataclass
-class FilterByStatus(Step):
+class FilterByStatus(TransformStep):
     """Filter qubits by calibration status.
 
     Keeps only qubits that have "success" status in the latest result.
@@ -697,7 +754,7 @@ class FilterByStatus(Step):
 
 
 @dataclass
-class CustomTwoQubit(Step):
+class CustomTwoQubit(CalibrationStep):
     """Custom 2-qubit calibration step with user-defined tasks.
 
     Similar to CustomOneQubit, this allows specifying exactly which
@@ -826,10 +883,11 @@ class CustomTwoQubit(Step):
         # Build typed result
         result = self._build_result(all_raw_results)
         ctx.metadata[self.step_name] = result
-        ctx.candidate_couplings = result.successful_couplings()
+        # Note: CalibrationSteps don't filter - use FilterByStatus for explicit filtering
 
         logger.info(
-            f"[{self.name}] Completed. {len(ctx.candidate_couplings)}/{total_pairs} successful"
+            f"[{self.name}] Completed. "
+            f"{len(result.successful_couplings())}/{total_pairs} successful"
         )
         return ctx
 
@@ -860,7 +918,7 @@ class CustomTwoQubit(Step):
 
 
 @dataclass
-class GenerateCRSchedule(Step):
+class GenerateCRSchedule(TransformStep):
     """Generate CR (Cross-Resonance) schedule for 2-qubit calibration.
 
     Uses CRScheduler to generate parallel execution groups based on:
@@ -934,7 +992,7 @@ class GenerateCRSchedule(Step):
 
 
 @dataclass
-class TwoQubitCalibration(Step):
+class TwoQubitCalibration(CalibrationStep):
     """2-qubit coupling calibration step.
 
     Executes FULL_2Q_TASKS on scheduled coupling pairs.
@@ -1046,10 +1104,11 @@ class TwoQubitCalibration(Step):
         # Build typed result
         result = self._build_result(all_raw_results)
         ctx.two_qubit = result
-        ctx.candidate_couplings = result.successful_couplings()
+        # Note: CalibrationSteps don't filter - use FilterByStatus for explicit filtering
 
         logger.info(
-            f"[{self.name}] Completed. {len(ctx.candidate_couplings)}/{total_pairs} successful"
+            f"[{self.name}] Completed. "
+            f"{len(result.successful_couplings())}/{total_pairs} successful"
         )
         return ctx
 
@@ -1098,7 +1157,7 @@ class TwoQubitCalibration(Step):
 
 
 @dataclass
-class CheckSkew(Step):
+class CheckSkew(CalibrationStep):
     """System-level skew check step.
 
     Checks timing skew across MUX channels.

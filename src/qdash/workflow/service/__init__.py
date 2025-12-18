@@ -66,11 +66,8 @@ from qdash.workflow.service.github import (
     GitHubIntegration,
     GitHubPushConfig,
 )
-from qdash.workflow.service.scheduled import (
-    extract_candidate_qubits,
-    get_wiring_config_path,
-)
 from qdash.workflow.service.steps import (
+    CalibrationStep,
     CheckSkew,
     CustomOneQubit,
     CustomTwoQubit,
@@ -82,6 +79,7 @@ from qdash.workflow.service.steps import (
     Pipeline,
     Step,
     StepContext,
+    TransformStep,
     TwoQubitCalibration,
 )
 from qdash.workflow.service.targets import (
@@ -110,6 +108,8 @@ __all__ = [
     "AllMuxTargets",
     # === Steps ===
     "Step",
+    "CalibrationStep",
+    "TransformStep",
     "StepContext",
     "Pipeline",
     "OneQubitCheck",
@@ -121,9 +121,6 @@ __all__ = [
     "GenerateCRSchedule",
     "TwoQubitCalibration",
     "CheckSkew",
-    # === Utility Functions ===
-    "extract_candidate_qubits",
-    "get_wiring_config_path",
     # === Task Lists ===
     "CHECK_1Q_TASKS",
     "FULL_1Q_TASKS",

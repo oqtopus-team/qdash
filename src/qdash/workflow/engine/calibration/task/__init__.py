@@ -9,7 +9,7 @@ from qdash.workflow.engine.calibration.task.result_processor import (
     TaskResultProcessor,
 )
 from qdash.workflow.engine.calibration.task.state_manager import TaskStateManager
-from qdash.workflow.engine.calibration.task.types import TaskType, TaskTypes
+from qdash.datamodel.task import TaskType, TaskTypes
 
 __all__ = [
     "TaskManager",

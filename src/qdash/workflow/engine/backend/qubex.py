@@ -5,7 +5,7 @@ from typing import Any
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.workflow._internal.merge_notes import merge_notes_by_timestamp
 from qdash.workflow.engine.backend.base import BaseBackend
-from qdash.workflow.engine.calibration.task.types import TaskTypes
+from qdash.datamodel.task import TaskTypes
 
 
 class QubexBackend(BaseBackend):

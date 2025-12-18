@@ -9,7 +9,7 @@ from typing import Any
 
 import pendulum
 
-from qdash.workflow.engine.calibration.task.types import TaskTypes
+from qdash.datamodel.task import TaskTypes
 from pydantic import BaseModel
 from qdash.datamodel.task import (
     BaseTaskResultModel,

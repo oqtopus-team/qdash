@@ -11,11 +11,14 @@ Task Lists:
 
 Example:
     from qdash.workflow.service import CalibService
+    from qdash.workflow.service.steps import CustomOneQubit
     from qdash.workflow.service.tasks import CHECK_1Q_TASKS
+    from qdash.workflow.service.targets import MuxTargets
 
     # Use in calibration
     cal = CalibService(username, chip_id)
-    results = cal.one_qubit(tasks=CHECK_1Q_TASKS)
+    targets = MuxTargets([0, 1, 2, 3])
+    results = cal.run(targets, steps=[CustomOneQubit(tasks=CHECK_1Q_TASKS)])
 """
 
 # =============================================================================

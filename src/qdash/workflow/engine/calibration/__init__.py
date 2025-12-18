@@ -13,13 +13,6 @@ from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.execution.service import ExecutionService
 from qdash.workflow.engine.calibration.execution.state_manager import ExecutionStateManager
 
-# Prefect tasks
-from qdash.workflow.engine.calibration.prefect_tasks import (
-    execute_dynamic_task_batch,
-    execute_dynamic_task_by_qid,
-    validate_task_name,
-)
-
 # Scheduler components
 from qdash.workflow.engine.calibration.scheduler.cr_scheduler import CRScheduler, CRScheduleResult
 from qdash.workflow.engine.calibration.scheduler.one_qubit_plugins import (
@@ -48,14 +41,6 @@ from qdash.workflow.engine.calibration.task.result_processor import (
     TaskResultProcessor,
 )
 from qdash.workflow.engine.calibration.task.state_manager import TaskStateManager
-
-# Utilities
-from qdash.workflow.engine.calibration.util import (
-    SystemInfo,
-    pydantic_serializer,
-    qid_to_label,
-    update_active_tasks,
-)
 
 # Backward compatibility aliases (deprecated - use new paths)
 task_manager = TaskManager
@@ -98,13 +83,4 @@ __all__ = [
     # Synchronized Scheduling
     "SynchronizedOneQubitScheduleResult",
     "SynchronizedStepInfo",
-    # Prefect tasks
-    "execute_dynamic_task_by_qid",
-    "execute_dynamic_task_batch",
-    "validate_task_name",
-    # Utilities
-    "qid_to_label",
-    "pydantic_serializer",
-    "update_active_tasks",
-    "SystemInfo",
 ]

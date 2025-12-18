@@ -1,38 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar
 
-import plotly.graph_objs as go
-from pydantic import BaseModel
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.backend.base import BaseBackend
-from qdash.workflow.engine.calibration.task.types import TaskType, TaskTypes
-
-
-class PreProcessResult(BaseModel):
-    """Result class."""
-
-    input_parameters: dict[str, Any]
-
-
-class PostProcessResult(BaseModel):
-    """Result class."""
-
-    model_config = {"arbitrary_types_allowed": True}
-
-    output_parameters: dict[str, OutputParameterModel]
-    figures: list[go.Figure | go.FigureWidget] = []
-    raw_data: list[Any] = []
-
-
-class RunResult(BaseModel):
-    """Result class."""
-
-    raw_result: Any
-    r2: dict[str, float] | None = None
-
-    def has_r2(self) -> bool:
-        """Check if the result has R2 value."""
-        return self.r2 is not None
+from qdash.datamodel.task import TaskType, TaskTypes
 
 
 class BaseTask(ABC):

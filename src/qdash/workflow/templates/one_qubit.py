@@ -3,7 +3,7 @@
 This template demonstrates the step-based API for 1-qubit calibration.
 
 Example:
-    one_qubit_v2(
+    one_qubit(
         username="alice",
         chip_id="64Qv3",
         mux_ids=[0, 1, 2, 3],
@@ -24,7 +24,7 @@ from qdash.workflow.service.targets import MuxTargets
 
 
 @flow
-def one_qubit_v2(
+def one_qubit(
     username: str,
     chip_id: str,
     mux_ids: list[int] | None = None,
