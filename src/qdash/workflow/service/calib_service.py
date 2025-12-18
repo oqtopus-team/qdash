@@ -37,10 +37,6 @@ if TYPE_CHECKING:
 import pendulum
 from prefect import get_run_logger
 
-from qdash.workflow.service._internal.prefect_tasks import (
-    execute_group as _execute_group,
-)
-
 logger = logging.getLogger(__name__)
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
@@ -660,28 +656,19 @@ class CalibService:
 
     def run(
         self,
-        targets: "Target | list[list[str]]",
-        steps: "list[Step] | None" = None,
-        tasks: list[str] | None = None,
+        targets: "Target",
+        steps: "list[Step]",
     ) -> dict[str, Any]:
         """Run calibration pipeline with targets and steps.
 
-        This is the primary API for running calibration workflows. Supports two modes:
-
-        1. **Step-based (recommended)**: Define calibration as a series of steps
-        2. **Legacy group-based**: Direct qubit groups with task list
-
         Args:
-            targets: Either a Target object (MuxTargets, QubitTargets, etc.)
-                     or a list of qubit groups for legacy mode
-            steps: List of Step objects defining the calibration pipeline.
-                   If provided, `tasks` is ignored.
-            tasks: Task list for legacy mode (only used if steps is None)
+            targets: Target specification (MuxTargets, QubitTargets, etc.)
+            steps: List of Step objects defining the calibration pipeline
 
         Returns:
             Results dictionary. Structure depends on the steps executed.
 
-        Example (Step-based - recommended):
+        Example:
             ```python
             from qdash.workflow.service import CalibService
             from qdash.workflow.service.targets import MuxTargets
@@ -702,28 +689,8 @@ class CalibService:
                 TwoQubitCalibration(),
             ])
             ```
-
-        Example (Legacy group-based):
-            ```python
-            cal = CalibService("alice", "64Qv3")
-            results = cal.run(
-                targets=[["0", "1"], ["2", "3"]],
-                tasks=["CheckRabi", "CreateHPIPulse"],
-            )
-            ```
         """
-        from qdash.workflow.service.targets import Target
-
-        # Dispatch based on argument types
-        if isinstance(targets, Target):
-            if steps is None:
-                raise ValueError("steps must be provided when using Target")
-            return self._run_pipeline(targets, steps)
-        else:
-            # Legacy mode: targets is list[list[str]]
-            if tasks is None:
-                raise ValueError("tasks must be provided for legacy group-based mode")
-            return self._run_groups(targets, tasks)
+        return self._run_pipeline(targets, steps)
 
     def _run_pipeline(
         self,
@@ -781,84 +748,6 @@ class CalibService:
             results["metadata"] = ctx.metadata
 
         return results
-
-    def _run_groups(
-        self,
-        groups: list[list[str]],
-        tasks: list[str],
-    ) -> dict[str, Any]:
-        """Run calibration with group-based parallelism (legacy mode).
-
-        Groups execute in PARALLEL, qubits within each group execute SEQUENTIALLY.
-
-        Args:
-            groups: List of qubit groups (e.g., [["0", "1"], ["2", "3"]])
-            tasks: List of task names to execute
-
-        Returns:
-            Results dictionary keyed by qubit ID
-        """
-        logger = get_run_logger()
-        all_qids = [qid for group in groups for qid in group]
-        logger.info(f"Running calibration: {len(groups)} groups, {len(all_qids)} qubits")
-
-        try:
-            self._initialize(all_qids)
-
-            futures = [_execute_group.submit(self, group, tasks) for group in groups]
-            results_list = [f.result() for f in futures]
-
-            results = {}
-            for r in results_list:
-                results.update(r)
-
-            self.finish_calibration()
-            return results
-
-        except Exception as e:
-            logger.error(f"Calibration failed: {e}")
-            self.fail_calibration(str(e))
-            raise
-
-    def check_skew(self, muxes: list[int] | None = None) -> dict[str, Any]:
-        """Run system-level skew check.
-
-        Args:
-            muxes: MUX IDs to check (default: all except 3)
-
-        Returns:
-            CheckSkew task result
-
-        Example:
-            ```python
-            cal = CalibService("alice", "64Qv3")
-            result = cal.check_skew(muxes=[0, 1, 2])
-            ```
-        """
-        logger = get_run_logger()
-
-        if muxes is None:
-            muxes = [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-
-        logger.info(f"Running CheckSkew: {len(muxes)} MUX channels")
-
-        try:
-            self.muxes = muxes
-            self._initialize([])
-
-            result = self.execute_task(
-                "CheckSkew",
-                qid="",
-                task_details={"CheckSkew": {"muxes": muxes}},
-            )
-
-            self.finish_calibration()
-            return result
-
-        except Exception as e:
-            logger.error(f"CheckSkew failed: {e}")
-            self.fail_calibration(str(e))
-            raise
 
 
 # =============================================================================
