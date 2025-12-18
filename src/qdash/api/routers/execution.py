@@ -114,7 +114,7 @@ def flatten_tasks(task_results: dict) -> list[dict]:
     summary="Get a calibration figure by its path",
     operation_id="getFigureByPath",
 )
-def get_figure_by_path(path: str):
+def get_figure_by_path(path: str) -> FileResponse:
     """Fetch a calibration figure by its file path.
 
     Retrieves a PNG image file from the server's filesystem and returns it

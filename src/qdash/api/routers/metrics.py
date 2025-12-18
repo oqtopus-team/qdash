@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal
 
 import pendulum
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.metrics import (
@@ -88,7 +89,7 @@ def _get_task_timestamp(task_doc: Any) -> str:
 
     system_info = getattr(task_doc, "system_info", None)
     if isinstance(system_info, dict):
-        return system_info.get("created_at", "")
+        return str(system_info.get("created_at", ""))
 
     return getattr(system_info, "created_at", "") if system_info is not None else ""
 
@@ -110,7 +111,7 @@ async def get_metrics_config() -> dict[str, Any]:
 
     """
     config = load_metrics_config()
-    return config.model_dump()
+    return dict(config.model_dump())
 
 
 def _extract_latest_metrics(
@@ -151,7 +152,7 @@ def _extract_latest_metrics(
                 if isinstance(param_data, dict) and "value" in param_data:
                     # Check time filter
                     include_param = True
-                    if within_hours and "calibrated_at" in param_data:
+                    if within_hours and cutoff_time is not None and "calibrated_at" in param_data:
                         try:
                             calibrated_at = pendulum.parse(
                                 param_data["calibrated_at"], tz="Asia/Tokyo"
@@ -677,7 +678,7 @@ async def download_metrics_pdf(
     selection_mode: Annotated[
         Literal["latest", "best"], Query(description="Selection mode: 'latest' or 'best'")
     ] = "latest",
-):
+) -> StreamingResponse:
     """Download chip metrics as a PDF report.
 
     Generates a comprehensive PDF report containing:
@@ -693,8 +694,6 @@ async def download_metrics_pdf(
         within_hours: Optional time filter in hours
         selection_mode: "latest" for most recent values, "best" for optimal values
     """
-    from fastapi.responses import StreamingResponse
-
     from qdash.api.lib.metrics_pdf import MetricsPDFGenerator
 
     # Get chip document

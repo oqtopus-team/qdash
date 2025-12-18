@@ -70,6 +70,8 @@ def is_within_24h(calibrated_at: str | None) -> bool:
         now = pendulum.now(tz="Asia/Tokyo")
         cutoff = now.subtract(hours=24)
         calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
+        if not isinstance(calibrated_at_dt, pendulum.DateTime):
+            return False
         return bool(calibrated_at_dt >= cutoff)
     except Exception:
         return False
@@ -97,9 +99,9 @@ def get_value_within_24h_fallback(
         return fallback
 
     if use_24h:
-        return value if is_within_24h(calibrated_at) else fallback
+        return float(value) if is_within_24h(calibrated_at) else fallback
 
-    return value
+    return float(value)
 
 
 def normalize_coupling_key(control: str, target: str) -> str:

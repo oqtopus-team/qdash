@@ -484,8 +484,11 @@ def git_pull_config(
 
         # Parse and reconstruct URL with authentication
         parsed = urlparse(repo_url)
-        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-        auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
+        scheme = parsed.scheme if isinstance(parsed.scheme, str) else parsed.scheme.decode()
+        netloc = parsed.netloc if isinstance(parsed.netloc, str) else parsed.netloc.decode()
+        path = parsed.path if isinstance(parsed.path, str) else parsed.path.decode()
+        auth_netloc = f"{github_user}:{github_token}@{netloc}"
+        auth_url = urlunparse((scheme, auth_netloc, path, "", "", ""))
 
         # Create temporary directory and clone repository
         temp_dir = tempfile.mkdtemp()
@@ -591,8 +594,11 @@ def git_push_config(
 
         # Parse and reconstruct URL with authentication
         parsed = urlparse(repo_url)
-        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-        auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
+        scheme = parsed.scheme if isinstance(parsed.scheme, str) else parsed.scheme.decode()
+        netloc = parsed.netloc if isinstance(parsed.netloc, str) else parsed.netloc.decode()
+        path = parsed.path if isinstance(parsed.path, str) else parsed.path.decode()
+        auth_netloc = f"{github_user}:{github_token}@{netloc}"
+        auth_url = urlunparse((scheme, auth_netloc, path, "", "", ""))
 
         # Create temporary directory and clone repository
         temp_dir = tempfile.mkdtemp()

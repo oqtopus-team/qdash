@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class ResponseProcessor:
     """Service for processing API responses with optional outlier filtering."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Tasks are now determined by the detector factory
         pass
 

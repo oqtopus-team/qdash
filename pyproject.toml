@@ -124,6 +124,9 @@ dev = [
     "testcontainers[mongodb]==4.8.2",
     "typer==0.14.0",
     "go-task-bin>=3.41.0",
+    "types-pyyaml>=6.0.12.20250809",
+    "types-python-dateutil>=2.9.0.20250809",
+    "types-croniter>=6.0.0.20250809",
 ]
 [tool.uv.sources]
 qubex = { git = "https://github.com/amachino/qubex.git", branch = "chore/chevron-fig" }

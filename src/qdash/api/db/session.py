@@ -1,6 +1,7 @@
 """Database session management with dependency injection support."""
 
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from bunnet import init_bunnet
@@ -166,7 +167,7 @@ def create_initial_admin() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize and close the database connection.
 
     Parameters

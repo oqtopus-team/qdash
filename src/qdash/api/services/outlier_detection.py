@@ -36,7 +36,7 @@ class OutlierDetector(ABC):
     Subclasses should override specific methods to customize behavior.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Default statistical thresholds
         self.default_thresholds = {
             "modified_z_score": 3.5,
@@ -79,7 +79,7 @@ class OutlierDetector(ABC):
         data: Dict[str, Any],
         parameter_name: str,
         method: str = "combined",
-        **kwargs,
+        **kwargs: Any,
     ) -> OutlierResult:
         """
         Detect outliers in the data.
@@ -189,7 +189,7 @@ class OutlierDetector(ABC):
 
         return outlier_mask, violations
 
-    def _combined_method(self, values: np.ndarray, parameter_name: str, **kwargs) -> Tuple[np.ndarray, List[str]]:
+    def _combined_method(self, values: np.ndarray, parameter_name: str, **kwargs: Any) -> Tuple[np.ndarray, List[str]]:
         """Combine physical bounds and statistical methods."""
         # Always check physical bounds first
         physical_outliers, physical_violations = self._physical_bounds(values, parameter_name)

@@ -184,8 +184,9 @@ async def register_flow_deployment(
             )
             response.raise_for_status()
             data = response.json()
-            logger.info(f"Successfully registered deployment: {data['deployment_id']}")
-            return data["deployment_id"]
+            deployment_id = str(data["deployment_id"])
+            logger.info(f"Successfully registered deployment: {deployment_id}")
+            return deployment_id
     except httpx.HTTPStatusError as e:
         logger.error(
             f"HTTP error during deployment registration: {e.response.status_code} - {e.response.text}"

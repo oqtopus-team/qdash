@@ -393,7 +393,7 @@ def extract_task_info_from_file(file_path: Path, relative_path: str) -> list[Tas
         List of TaskInfo objects found in the file
 
     """
-    tasks = []
+    tasks: list[TaskInfo] = []
 
     # Validate file before parsing
     if not _is_valid_python_file(file_path):
