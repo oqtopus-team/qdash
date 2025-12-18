@@ -7,6 +7,7 @@ from qdash.workflow.caltasks.base import (
 )
 from qdash.workflow.caltasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 
 PEAKS_COUNT = 4
 peak_positions = {
@@ -21,7 +22,7 @@ class CheckResonatorFrequencies(QubexTask):
     """Task to check the resonator frequencies."""
 
     name: str = "CheckResonatorFrequencies"
-    task_type: str = "qubit"
+    task_type = TaskTypes.QUBIT
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "frequency_range": InputParameterModel(
             unit="GHz",

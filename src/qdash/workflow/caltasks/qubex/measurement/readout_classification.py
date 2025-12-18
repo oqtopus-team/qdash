@@ -10,13 +10,14 @@ from qdash.workflow.caltasks.base import (
 )
 from qdash.workflow.caltasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 
 
 class ReadoutClassification(QubexTask):
     """Task to classify the readout."""
 
     name: str = "ReadoutClassification"
-    task_type: str = "qubit"
+    task_type = TaskTypes.QUBIT
 
     # High resolution for accurate threshold detection
     GRID_RESOLUTION: int = 2001

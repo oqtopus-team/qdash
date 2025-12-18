@@ -15,6 +15,7 @@ from qdash.workflow.caltasks.fake.base import FakeTask
 from qdash.workflow.engine.backend.fake import FakeBackend
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 from qubex.simulator import Control, QuantumSimulator, QuantumSystem, SimulationResult, Transmon
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 
 
 def downsample(
@@ -86,7 +87,7 @@ class FakeRabi(FakeTask):
     """Task to check the Fake Rabi oscillation."""
 
     name: str = "FakeRabi"
-    task_type: str = "qubit"
+    task_type = TaskTypes.QUBIT
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "time_range": InputParameterModel(
             unit="ns",

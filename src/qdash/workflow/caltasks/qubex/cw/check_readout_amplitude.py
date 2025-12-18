@@ -9,13 +9,14 @@ from qdash.workflow.caltasks.base import (
 )
 from qdash.workflow.caltasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 
 
 class CheckReadoutAmplitude(QubexTask):
     """Task to check the readout amplitude."""
 
     name: str = "CheckReadoutAmplitude"
-    task_type: str = "qubit"
+    task_type = TaskTypes.QUBIT
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "amplitude_range": InputParameterModel(
             unit="a.u.",

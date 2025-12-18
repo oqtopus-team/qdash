@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Any
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar
 
 import plotly.graph_objs as go
 from pydantic import BaseModel
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.engine.backend.base import BaseBackend
+from qdash.workflow.engine.calibration.task.types import TaskType, TaskTypes
 
 
 class PreProcessResult(BaseModel):
@@ -39,7 +39,7 @@ class BaseTask(ABC):
     """Base class for the task."""
 
     name: str = ""
-    task_type: Literal["global", "qubit", "coupling", "system"]
+    task_type: TaskType
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
     r2_threshold: float = 0.7
@@ -216,25 +216,25 @@ class BaseTask(ABC):
         """Return the name of the task."""
         return self.name
 
-    def get_task_type(self) -> Literal["global", "qubit", "coupling", "system"]:
+    def get_task_type(self) -> TaskType:
         """Return the type of the task."""
         return self.task_type
 
     def is_global_task(self) -> bool:
         """Return True if the task is a global task."""
-        return self.task_type == "global"
+        return bool(self.task_type == TaskTypes.GLOBAL)
 
     def is_qubit_task(self) -> bool:
         """Return True if the task is a qubit task."""
-        return self.task_type == "qubit"
+        return bool(self.task_type == TaskTypes.QUBIT)
 
     def is_coupling_task(self) -> bool:
         """Return True if the task is a coupling task."""
-        return self.task_type == "coupling"
+        return bool(self.task_type == TaskTypes.COUPLING)
 
     def is_system_task(self) -> bool:
         """Return True if the task is a system task."""
-        return self.task_type == "system"
+        return bool(self.task_type == TaskTypes.SYSTEM)
 
     def attach_execution_id(self, execution_id: str) -> dict[str, OutputParameterModel]:
         """Attach the execution id to the output parameters."""

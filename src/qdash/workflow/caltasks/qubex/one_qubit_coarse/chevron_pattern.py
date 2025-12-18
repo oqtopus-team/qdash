@@ -8,13 +8,14 @@ from qdash.workflow.caltasks.base import (
 )
 from qdash.workflow.caltasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 
 
 class ChevronPattern(QubexTask):
     """Task to check the chevron pattern."""
 
     name: str = "ChevronPattern"
-    task_type: str = "qubit"
+    task_type = TaskTypes.QUBIT
     timeout: int = 60 * 240
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {

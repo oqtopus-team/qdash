@@ -7,6 +7,7 @@ from qdash.workflow.caltasks.base import (
 )
 from qdash.workflow.caltasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 
@@ -14,7 +15,7 @@ class CheckQubit(QubexTask):
     """Task to check the Qubit Rabi oscillation breifly."""
 
     name: str = "CheckQubit"
-    task_type: str = "qubit"
+    task_type = TaskTypes.QUBIT
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "time_range": InputParameterModel(
             unit="ns",

@@ -11,13 +11,14 @@ from qdash.workflow.caltasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, DRAG_PI_DURATION
 from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 
 
 class CreateDRAGPIPulse(QubexTask):
     """Task to create the DRAG pi pulse."""
 
     name: str = "CreateDRAGPIPulse"
-    task_type: str = "qubit"
+    task_type = TaskTypes.QUBIT
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "duration": InputParameterModel(
             unit="ns",

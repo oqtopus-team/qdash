@@ -5,6 +5,7 @@ from typing import Any
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.workflow._internal.merge_notes import merge_notes_by_timestamp
 from qdash.workflow.engine.backend.base import BaseBackend
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 
 
 class QubexBackend(BaseBackend):
@@ -36,11 +37,11 @@ class QubexBackend(BaseBackend):
         if self._exp is None:
             from qubex import Experiment
 
-            if self._config.get("task_type") == "qubit":
+            if self._config.get("task_type") == TaskTypes.QUBIT:
                 qubits = [
                     int(qid) for qid in self._config.get("qids", [])
                 ]  # e.g. : ["0", "1", "2"] → [0, 1, 2]
-            elif self._config.get("task_type") == "coupling":
+            elif self._config.get("task_type") == TaskTypes.COUPLING:
                 qubits = sorted(
                     {int(q) for qid in self._config.get("qids", []) for q in qid.split("-")}
                 )  # e.g. : ["0-1", "1-2"] → [0, 1, 2]

@@ -7,13 +7,14 @@ from qdash.workflow.caltasks.base import (
 )
 from qdash.workflow.caltasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 
 
 class CheckBellState(QubexTask):
     """Task to check the bell state."""
 
     name: str = "CheckBellState"
-    task_type: str = "coupling"
+    task_type = TaskTypes.COUPLING
     timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}

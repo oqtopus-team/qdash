@@ -4,9 +4,12 @@ This module provides the TaskStateManager class that handles task state
 management, including task creation, status updates, and parameter handling.
 """
 
+from collections.abc import Iterator
 from typing import Any
 
 import pendulum
+
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 from pydantic import BaseModel
 from qdash.datamodel.task import (
     BaseTaskResultModel,
@@ -83,6 +86,76 @@ class TaskStateManager(BaseModel):
         """
         return self._upstream_task_id
 
+    def _find_task(self, task_name: str, task_type: str, qid: str) -> BaseTaskResultModel | None:
+        """Find a task by name in the appropriate container.
+
+        Parameters
+        ----------
+        task_name : str
+            Name of the task to find
+        task_type : TaskType
+            Type of task (qubit, coupling, global, system)
+        qid : str
+            Qubit ID (empty for global/system tasks)
+
+        Returns
+        -------
+        BaseTaskResultModel | None
+            The found task, or None if not found
+
+        """
+        for task in self._iter_tasks(task_type, qid):
+            if task.name == task_name:
+                return task
+        return None
+
+    def _add_task(self, task: BaseTaskResultModel, task_type: str, qid: str) -> None:
+        """Add a task to the appropriate container.
+
+        Parameters
+        ----------
+        task : BaseTaskResultModel
+            The task to add
+        task_type : TaskType
+            Type of task (qubit, coupling, global, system)
+        qid : str
+            Qubit ID (empty for global/system tasks)
+
+        """
+        if task_type == TaskTypes.QUBIT:
+            self.task_result.qubit_tasks[qid].append(task)
+        elif task_type == TaskTypes.COUPLING:
+            self.task_result.coupling_tasks[qid].append(task)
+        elif task_type == TaskTypes.GLOBAL:
+            self.task_result.global_tasks.append(task)
+        elif task_type == TaskTypes.SYSTEM:
+            self.task_result.system_tasks.append(task)
+
+    def _iter_tasks(self, task_type: str, qid: str) -> Iterator[BaseTaskResultModel]:
+        """Iterate over tasks in the appropriate container (read-only).
+
+        Parameters
+        ----------
+        task_type : TaskType
+            Type of task (qubit, coupling, global, system)
+        qid : str
+            Qubit ID (empty for global/system tasks)
+
+        Yields
+        ------
+        BaseTaskResultModel
+            Tasks in the container
+
+        """
+        if task_type == TaskTypes.QUBIT:
+            yield from self.task_result.qubit_tasks[qid]
+        elif task_type == TaskTypes.COUPLING:
+            yield from self.task_result.coupling_tasks[qid]
+        elif task_type == TaskTypes.GLOBAL:
+            yield from self.task_result.global_tasks
+        elif task_type == TaskTypes.SYSTEM:
+            yield from self.task_result.system_tasks
+
     def _ensure_task_exists(self, task_name: str, task_type: str, qid: str) -> BaseTaskResultModel:
         """Ensure a task exists in the appropriate container.
 
@@ -90,7 +163,7 @@ class TaskStateManager(BaseModel):
         ----------
         task_name : str
             Name of the task
-        task_type : str
+        task_type : TaskType
             Type of task (qubit, coupling, global, system)
         qid : str
             Qubit ID (empty for global/system tasks)
@@ -101,41 +174,13 @@ class TaskStateManager(BaseModel):
             The existing or newly created task
 
         """
-        tasks = self._get_task_container(task_type, qid)
-        existing = [t for t in tasks if t.name == task_name]
+        existing = self._find_task(task_name, task_type, qid)
         if existing:
-            return existing[0]
+            return existing
 
         task = self._create_task(task_name, task_type, qid)
-        tasks.append(task)
+        self._add_task(task, task_type, qid)
         return task
-
-    def _get_task_container(self, task_type: str, qid: str) -> list[Any]:
-        """Get the appropriate task container.
-
-        Parameters
-        ----------
-        task_type : str
-            Type of task
-        qid : str
-            Qubit ID
-
-        Returns
-        -------
-        list
-            The task container list
-
-        """
-        if task_type == "qubit":
-            return list(self.task_result.qubit_tasks[qid])
-        elif task_type == "coupling":
-            return list(self.task_result.coupling_tasks[qid])
-        elif task_type == "global":
-            return list(self.task_result.global_tasks)
-        elif task_type == "system":
-            return list(self.task_result.system_tasks)
-        else:
-            raise ValueError(f"Unknown task type: {task_type}")
 
     def _create_task(self, task_name: str, task_type: str, qid: str) -> BaseTaskResultModel:
         """Create a new task of the appropriate type.
@@ -157,13 +202,13 @@ class TaskStateManager(BaseModel):
         """
         upstream_id = self._get_upstream_task_id()
 
-        if task_type == "qubit":
+        if task_type == TaskTypes.QUBIT:
             return QubitTaskModel(name=task_name, qid=qid, upstream_id=upstream_id)
-        elif task_type == "coupling":
+        elif task_type == TaskTypes.COUPLING:
             return CouplingTaskModel(name=task_name, qid=qid, upstream_id=upstream_id)
-        elif task_type == "global":
+        elif task_type == TaskTypes.GLOBAL:
             return GlobalTaskModel(name=task_name, upstream_id=upstream_id)
-        elif task_type == "system":
+        elif task_type == TaskTypes.SYSTEM:
             return SystemTaskModel(name=task_name, upstream_id=upstream_id)
         else:
             raise ValueError(f"Unknown task type: {task_type}")
@@ -191,11 +236,10 @@ class TaskStateManager(BaseModel):
             If task not found
 
         """
-        tasks = self._get_task_container(task_type, qid)
-        for task in tasks:
-            if task.name == task_name:
-                return task
-        raise ValueError(f"Task '{task_name}' not found for {task_type}/{qid}")
+        task = self._find_task(task_name, task_type, qid)
+        if task is None:
+            raise ValueError(f"Task '{task_name}' not found for {task_type}/{qid}")
+        return task
 
     def start_task(self, task_name: str, task_type: str, qid: str) -> None:
         """Start a task (set status to RUNNING and record start time).
@@ -367,10 +411,10 @@ class TaskStateManager(BaseModel):
         task.put_output_parameter(output_parameters)
 
         # Update calibration data
-        if task_type == "qubit":
+        if task_type == TaskTypes.QUBIT:
             for key, value in output_parameters.items():
                 self.calib_data.put_qubit_data(qid, key, value)
-        elif task_type == "coupling":
+        elif task_type == TaskTypes.COUPLING:
             for key, value in output_parameters.items():
                 self.calib_data.put_coupling_data(qid, key, value)
 
@@ -401,9 +445,9 @@ class TaskStateManager(BaseModel):
 
         # Rollback calib_data by removing the parameters
         if parameter_names:
-            if task_type == "qubit":
+            if task_type == TaskTypes.QUBIT:
                 self._clear_qubit_calib_data(qid, parameter_names)
-            elif task_type == "coupling":
+            elif task_type == TaskTypes.COUPLING:
                 self._clear_coupling_calib_data(qid, parameter_names)
 
     def get_output_parameter_by_task_name(
@@ -460,8 +504,7 @@ class TaskStateManager(BaseModel):
             Skip message
 
         """
-        tasks = self._get_task_container(task_type, qid)
-        for task in tasks:
+        for task in self._iter_tasks(task_type, qid):
             if task.status == TaskStatusModel.SCHEDULED:
                 task.status = TaskStatusModel.SKIPPED
                 task.message = message

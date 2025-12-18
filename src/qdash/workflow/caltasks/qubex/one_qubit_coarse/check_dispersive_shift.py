@@ -9,13 +9,14 @@ from qdash.workflow.caltasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 
 
 class CheckDispersiveShift(QubexTask):
     """Task to check the Dispersive Shift"""
 
     name: str = "CheckDispersiveShift"
-    task_type: str = "qubit"
+    task_type = TaskTypes.QUBIT
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "shots": InputParameterModel(
             unit="a.u.",

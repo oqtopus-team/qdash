@@ -9,13 +9,14 @@ from qdash.workflow.caltasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 
 
 class X90InterleavedRandomizedBenchmarking(QubexTask):
     """Task to perform X90 interleaved randomized benchmarking."""
 
     name: str = "X90InterleavedRandomizedBenchmarking"
-    task_type: str = "qubit"
+    task_type = TaskTypes.QUBIT
     timeout: int = 60 * 30
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "n_trials": InputParameterModel(

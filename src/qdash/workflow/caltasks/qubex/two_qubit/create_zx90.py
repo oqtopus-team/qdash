@@ -7,13 +7,14 @@ from qdash.workflow.caltasks.base import (
 )
 from qdash.workflow.caltasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 
 
 class CreateZX90(QubexTask):
     """Task to create ZX90 gate."""
 
     name: str = "CreateZX90"
-    task_type: str = "coupling"
+    task_type = TaskTypes.COUPLING
     timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
