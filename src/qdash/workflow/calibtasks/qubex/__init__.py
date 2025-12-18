@@ -19,9 +19,13 @@ from qdash.workflow.calibtasks.qubex.box_setup.readout_configure import ReadoutC
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_frequencies import CheckQubitFrequencies
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy import CheckQubitSpectroscopy
 from qdash.workflow.calibtasks.qubex.cw.check_readout_amplitude import CheckReadoutAmplitude
-from qdash.workflow.calibtasks.qubex.cw.check_reflection_coefficient import CheckReflectionCoefficient
+from qdash.workflow.calibtasks.qubex.cw.check_reflection_coefficient import (
+    CheckReflectionCoefficient,
+)
 from qdash.workflow.calibtasks.qubex.cw.check_resonator_frequencies import CheckResonatorFrequencies
-from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import CheckResonatorSpectroscopy
+from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
+    CheckResonatorSpectroscopy,
+)
 from qdash.workflow.calibtasks.qubex.measurement.readout_classification import ReadoutClassification
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_dispersive_shift import (
     CheckDispersiveShift,
