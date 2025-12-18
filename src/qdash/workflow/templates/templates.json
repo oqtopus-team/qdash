@@ -62,5 +62,21 @@
     "category": "system",
     "filename": "check_skew.py",
     "function_name": "check_skew"
+  },
+  {
+    "id": "one_qubit_v2",
+    "name": "1Q Calibration (v2)",
+    "description": "1-qubit calibration using step-based pipeline. Supports check-only or full calibration with fine-tune.",
+    "category": "production",
+    "filename": "one_qubit_v2.py",
+    "function_name": "one_qubit_v2"
+  },
+  {
+    "id": "full_calibration_v2",
+    "name": "Full Calibration (v2)",
+    "description": "Complete calibration using step-based pipeline: 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule -> 2Q.",
+    "category": "production",
+    "filename": "full_calibration_v2.py",
+    "function_name": "full_calibration_v2"
   }
 ]

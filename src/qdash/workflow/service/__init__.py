@@ -1,29 +1,54 @@
 """Workflow service module for Python Flow Editor.
 
-This module provides the main calibration API and utility functions.
+This module provides the main calibration API with a step-based pipeline approach.
 
 Main API:
     CalibService: High-level API for calibration workflows
     generate_execution_id: Generate unique execution IDs
 
-Utility Functions:
-    extract_candidate_qubits: Extract high-fidelity qubits from results
-    get_wiring_config_path: Get chip wiring configuration path
+Targets:
+    Target: Abstract base class for calibration targets
+    MuxTargets: Target qubits by MUX IDs
+    QubitTargets: Target specific qubit IDs
+    CouplingTargets: Target specific coupling pairs
+    AllMuxTargets: Target all MUXes (full chip)
 
-Task Lists:
-    CHECK_1Q_TASKS: Basic 1Q characterization tasks
-    FULL_1Q_TASKS: Complete 1Q task list
-    FULL_1Q_TASKS_AFTER_CHECK: Advanced 1Q tasks (after check)
-    FULL_2Q_TASKS: Complete 2Q task list
+Steps:
+    Step: Abstract base class for calibration steps
+    StepContext: Context shared between steps
+    OneQubitCheck: Basic 1Q characterization
+    OneQubitFineTune: Advanced 1Q calibration (DRAG, RB)
+    CustomOneQubit: Custom 1Q calibration with user-defined tasks
+    CustomTwoQubit: Custom 2Q calibration with user-defined tasks
+    FilterByMetric: Filter qubits by named metric threshold
+    FilterByStatus: Filter qubits by success status
+    GenerateCRSchedule: Generate CR schedule for 2Q calibration
+    TwoQubitCalibration: 2Q coupling calibration
+    CheckSkew: System-level skew check
 
 Example:
     from prefect import flow
     from qdash.workflow.service import CalibService
+    from qdash.workflow.service.targets import MuxTargets
+    from qdash.workflow.service.steps import (
+        OneQubitCheck,
+        OneQubitFineTune,
+        FilterByMetric,
+        TwoQubitCalibration,
+    )
 
     @flow
-    def simple_calibration(username, chip_id, qids):
+    def full_calibration(username: str, chip_id: str):
         cal = CalibService(username, chip_id)
-        return cal.run(groups=[qids], tasks=["CheckRabi", "CreateHPIPulse"])
+        targets = MuxTargets([0, 1, 2, 3])
+
+        results = cal.run(targets, steps=[
+            OneQubitCheck(),
+            OneQubitFineTune(),
+            FilterByMetric(metric="x90_fidelity", threshold=0.9),
+            TwoQubitCalibration(),
+        ])
+        return results
 """
 
 from qdash.workflow.service.calib_service import (
@@ -45,6 +70,27 @@ from qdash.workflow.service.scheduled import (
     extract_candidate_qubits,
     get_wiring_config_path,
 )
+from qdash.workflow.service.steps import (
+    CheckSkew,
+    CustomOneQubit,
+    CustomTwoQubit,
+    FilterByMetric,
+    FilterByStatus,
+    GenerateCRSchedule,
+    OneQubitCheck,
+    OneQubitFineTune,
+    Pipeline,
+    Step,
+    StepContext,
+    TwoQubitCalibration,
+)
+from qdash.workflow.service.targets import (
+    AllMuxTargets,
+    CouplingTargets,
+    MuxTargets,
+    QubitTargets,
+    Target,
+)
 from qdash.workflow.service.tasks import (
     CHECK_1Q_TASKS,
     FULL_1Q_TASKS,
@@ -56,6 +102,25 @@ __all__ = [
     # === High-level API ===
     "CalibService",
     "generate_execution_id",
+    # === Targets ===
+    "Target",
+    "MuxTargets",
+    "QubitTargets",
+    "CouplingTargets",
+    "AllMuxTargets",
+    # === Steps ===
+    "Step",
+    "StepContext",
+    "Pipeline",
+    "OneQubitCheck",
+    "OneQubitFineTune",
+    "CustomOneQubit",
+    "CustomTwoQubit",
+    "FilterByMetric",
+    "FilterByStatus",
+    "GenerateCRSchedule",
+    "TwoQubitCalibration",
+    "CheckSkew",
     # === Utility Functions ===
     "extract_candidate_qubits",
     "get_wiring_config_path",

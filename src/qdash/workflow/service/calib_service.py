@@ -21,7 +21,11 @@ Example:
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from qdash.workflow.service.steps import Step
+    from qdash.workflow.service.targets import Target
 
 import pendulum
 from prefect import get_run_logger
@@ -935,8 +939,136 @@ class CalibService:
     # High-level API Methods
     # =========================================================================
 
-    def run(self, groups: list[list[str]], tasks: list[str]) -> dict[str, Any]:
-        """Run calibration with group-based parallelism.
+    def run(
+        self,
+        targets: "Target | list[list[str]]",
+        steps: "list[Step] | None" = None,
+        tasks: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Run calibration pipeline with targets and steps.
+
+        This is the primary API for running calibration workflows. Supports two modes:
+
+        1. **Step-based (recommended)**: Define calibration as a series of steps
+        2. **Legacy group-based**: Direct qubit groups with task list
+
+        Args:
+            targets: Either a Target object (MuxTargets, QubitTargets, etc.)
+                     or a list of qubit groups for legacy mode
+            steps: List of Step objects defining the calibration pipeline.
+                   If provided, `tasks` is ignored.
+            tasks: Task list for legacy mode (only used if steps is None)
+
+        Returns:
+            Results dictionary. Structure depends on the steps executed.
+
+        Example (Step-based - recommended):
+            ```python
+            from qdash.workflow.service import CalibService
+            from qdash.workflow.service.targets import MuxTargets
+            from qdash.workflow.service.steps import (
+                OneQubitCheck,
+                OneQubitFineTune,
+                FilterByFidelity,
+                TwoQubitCalibration,
+            )
+
+            cal = CalibService("alice", "64Qv3")
+            targets = MuxTargets([0, 1, 2, 3])
+
+            results = cal.run(targets, steps=[
+                OneQubitCheck(),
+                OneQubitFineTune(),
+                FilterByFidelity(threshold=0.9),
+                TwoQubitCalibration(),
+            ])
+            ```
+
+        Example (Legacy group-based):
+            ```python
+            cal = CalibService("alice", "64Qv3")
+            results = cal.run(
+                targets=[["0", "1"], ["2", "3"]],
+                tasks=["CheckRabi", "CreateHPIPulse"],
+            )
+            ```
+        """
+        from qdash.workflow.service.targets import Target
+
+        # Dispatch based on argument types
+        if isinstance(targets, Target):
+            if steps is None:
+                raise ValueError("steps must be provided when using Target")
+            return self._run_pipeline(targets, steps)
+        else:
+            # Legacy mode: targets is list[list[str]]
+            if tasks is None:
+                raise ValueError("tasks must be provided for legacy group-based mode")
+            return self._run_groups(targets, tasks)
+
+    def _run_pipeline(
+        self,
+        targets: "Target",
+        steps: "list[Step]",
+    ) -> dict[str, Any]:
+        """Execute a calibration pipeline with steps.
+
+        Args:
+            targets: Target specification
+            steps: List of steps to execute
+
+        Returns:
+            Dictionary with typed results from each step
+        """
+        from qdash.workflow.service.steps import Pipeline, StepContext
+
+        logger = get_run_logger()
+
+        # Validate pipeline dependencies
+        pipeline = Pipeline(steps)
+        logger.info(f"Starting calibration pipeline with {len(pipeline)} steps")
+
+        # Initialize context
+        ctx = StepContext()
+        ctx.candidate_qids = targets.to_qids(self.chip_id)
+
+        # Execute steps sequentially
+        for i, step in enumerate(pipeline):
+            logger.info(f"Step {i + 1}/{len(pipeline)}: {step.name}")
+            try:
+                ctx = step.execute(self, targets, ctx)
+            except Exception as e:
+                logger.error(f"Step {step.name} failed: {e}")
+                raise
+
+        logger.info("Pipeline completed successfully")
+
+        # Build results from typed context fields
+        results: dict[str, Any] = {
+            "candidate_qids": ctx.candidate_qids,
+            "candidate_couplings": ctx.candidate_couplings,
+        }
+        if ctx.one_qubit_check is not None:
+            results["one_qubit_check"] = ctx.one_qubit_check
+        if ctx.one_qubit_fine_tune is not None:
+            results["one_qubit_fine_tune"] = ctx.one_qubit_fine_tune
+        if ctx.two_qubit is not None:
+            results["two_qubit"] = ctx.two_qubit
+        if ctx.skew_check is not None:
+            results["skew_check"] = ctx.skew_check
+        if ctx.filters:
+            results["filters"] = ctx.filters
+        if ctx.metadata:
+            results["metadata"] = ctx.metadata
+
+        return results
+
+    def _run_groups(
+        self,
+        groups: list[list[str]],
+        tasks: list[str],
+    ) -> dict[str, Any]:
+        """Run calibration with group-based parallelism (legacy mode).
 
         Groups execute in PARALLEL, qubits within each group execute SEQUENTIALLY.
 
@@ -946,18 +1078,6 @@ class CalibService:
 
         Returns:
             Results dictionary keyed by qubit ID
-
-        Example:
-            ```python
-            cal = CalibService("alice", "64Qv3")
-            results = cal.run(
-                groups=[["0", "1"], ["2", "3"]],
-                tasks=["CheckRabi", "CreateHPIPulse"]
-            )
-            # Group0: Q0 → Q1 (sequential)  ─┐
-            #                                 ├─ PARALLEL
-            # Group1: Q2 → Q3 (sequential)  ─┘
-            ```
         """
         logger = get_run_logger()
         all_qids = [qid for group in groups for qid in group]
