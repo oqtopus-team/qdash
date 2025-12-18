@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
@@ -37,10 +37,10 @@ class TaskResultHistoryDocument(Document):
     upstream_id: str = Field(..., description="The upstream task ID")
     status: str = Field(..., description="The status of the execution")
     message: str = Field(..., description="The message")
-    input_parameters: dict = Field(..., description="The input parameters")
-    output_parameters: dict = Field(..., description="The output parameters")
+    input_parameters: dict[str, Any] = Field(..., description="The input parameters")
+    output_parameters: dict[str, Any] = Field(..., description="The output parameters")
     output_parameter_names: list[str] = Field(..., description="The output parameter names")
-    note: dict = Field(..., description="The note")
+    note: dict[str, Any] = Field(..., description="The note")
     figure_path: list[str] = Field(..., description="The path to the figure")
     json_figure_path: list[str] = Field([], description="The path to the JSON figure")
     raw_data_path: list[str] = Field([], description="The path to the raw data")

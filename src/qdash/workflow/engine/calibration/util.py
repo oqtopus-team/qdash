@@ -1,12 +1,13 @@
 """Utility functions and classes for calibration workflows."""
 
 import re
+from typing import Any
 
 import pendulum
 from prefect import task
 from pydantic import BaseModel, Field
 from qdash.datamodel.task import TaskModel
-from qdash.workflow.caltasks.base import BaseTask
+from qdash.workflow.calibtasks.base import BaseTask
 
 
 def qid_to_label(qid: str) -> str:
@@ -17,7 +18,7 @@ def qid_to_label(qid: str) -> str:
     raise ValueError(error_message)
 
 
-def pydantic_serializer(obj: BaseModel) -> dict:
+def pydantic_serializer(obj: BaseModel) -> dict[str, Any]:
     """Serialize a Pydantic BaseModel instance to a dictionary.
 
     Args:

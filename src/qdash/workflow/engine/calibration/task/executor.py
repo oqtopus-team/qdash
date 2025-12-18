@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 from qdash.datamodel.task import CalibDataModel, OutputParameterModel
-from qdash.workflow.caltasks.base import PostProcessResult, PreProcessResult, RunResult
+from qdash.workflow.calibtasks.base import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.calibration.params_updater import get_params_updater
 from qdash.workflow.engine.calibration.repository import FilesystemCalibDataSaver
 from qdash.workflow.engine.calibration.task.history_recorder import TaskHistoryRecorder
@@ -88,6 +88,7 @@ class BackendProtocol(Protocol):
         calib_dir: str,
         execution_id: str,
         task_manager_id: str,
+        project_id: str | None = None,
     ) -> None:
         """Update calibration note."""
         ...
@@ -116,7 +117,7 @@ class TaskExecutionResult(BaseModel):
     calib_data_delta: CalibDataModel = Field(
         default_factory=lambda: CalibDataModel(qubit={}, coupling={})
     )
-    controller_info: dict[str, dict] = Field(default_factory=dict)
+    controller_info: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -192,9 +193,9 @@ class TaskExecutor:
         self.result_processor = result_processor or TaskResultProcessor()
         self.history_recorder = history_recorder or TaskHistoryRecorder()
         self.data_saver = data_saver or FilesystemCalibDataSaver(calib_dir)
-        self._controller_info: dict[str, dict] = {}
+        self._controller_info: dict[str, dict[str, Any]] = {}
 
-    def set_controller_info(self, controller_info: dict[str, dict]) -> None:
+    def set_controller_info(self, controller_info: dict[str, dict[str, Any]]) -> None:
         """Set controller information for hardware tracking.
 
         Parameters
@@ -480,7 +481,9 @@ class TaskExecutor:
         class TaskManagerProxy:
             """Proxy object that mimics TaskManager for ExecutionManager.update_with_task_manager."""
 
-            def __init__(self, task_manager_id: str, task_result, calib_data, controller_info):
+            def __init__(
+                self, task_manager_id: str, task_result: Any, calib_data: Any, controller_info: Any
+            ) -> None:
                 self.id = task_manager_id
                 self.task_result = task_result
                 self.calib_data = calib_data
@@ -911,7 +914,7 @@ class TaskExecutor:
         # Store in state manager
         self.state_manager.put_output_parameters(task_name, processed_params, task_type, qid)
 
-        return processed_params
+        return dict(processed_params)
 
     def _save_artifacts(
         self,

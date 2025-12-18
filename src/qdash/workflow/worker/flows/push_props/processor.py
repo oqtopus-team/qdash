@@ -1,9 +1,11 @@
+from typing import Any
+
 import pendulum
 from pydantic import BaseModel
 
 
 def _process_data(
-    raw_data: dict,
+    raw_data: dict[str, Any],
     field_map: dict[str, str],
     model_cls: type[BaseModel],
     within_24hrs: bool = False,
@@ -23,7 +25,10 @@ def _process_data(
             if calibrated_at:
                 try:
                     calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
-                    is_recent = calibrated_at_dt >= cutoff
+                    if isinstance(calibrated_at_dt, pendulum.DateTime):
+                        is_recent = calibrated_at_dt >= cutoff
+                    else:
+                        is_recent = False
                 except Exception:
                     is_recent = False
             else:

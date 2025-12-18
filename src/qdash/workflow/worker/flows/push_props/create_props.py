@@ -1,3 +1,5 @@
+from typing import Any
+
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.engine.backend.qubex import QubexBackend
@@ -76,7 +78,7 @@ def merge_properties(
 
 def get_chip_properties(
     chip: ChipDocument, backend: QubexBackend, within_24hrs: bool = False, cutoff_hours: int = 24
-) -> tuple[ChipProperties, dict]:
+) -> tuple[ChipProperties, dict[str, Any]]:
     """Extract chip properties from the ChipDocument.
 
     Returns:

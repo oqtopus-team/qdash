@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
@@ -29,8 +29,8 @@ class CouplingDocument(Document):
     qid: str = Field(..., description="The coupling ID")
     status: str = Field("pending", description="The status of the coupling")
     chip_id: str = Field(..., description="The chip ID")
-    data: dict = Field(..., description="The data of the coupling")
-    best_data: dict = Field(
+    data: dict[str, Any] = Field(..., description="The data of the coupling")
+    best_data: dict[str, Any] = Field(
         default_factory=dict,
         description="The best calibration results, focusing on fidelity metrics",
     )
@@ -62,7 +62,7 @@ class CouplingDocument(Document):
         ]
 
     @staticmethod
-    def merge_calib_data(existing: dict, new: dict) -> dict:
+    def merge_calib_data(existing: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
         """Merge calibration data recursively."""
         for key, value in new.items():
             if key in existing and isinstance(existing[key], dict) and isinstance(value, dict):
@@ -72,7 +72,7 @@ class CouplingDocument(Document):
         return existing
 
     @staticmethod
-    def update_best_data(current_best: dict, new_data: dict) -> dict:
+    def update_best_data(current_best: dict[str, Any], new_data: dict[str, Any]) -> dict[str, Any]:
         """Update best_data with new calibration results if they are better.
 
         Only updates fidelity-related metrics when the new values are higher
@@ -112,7 +112,7 @@ class CouplingDocument(Document):
         username: str,
         qid: str,
         chip_id: str,
-        output_parameters: dict,
+        output_parameters: dict[str, Any],
         project_id: str,
     ) -> "CouplingDocument":
         """Update the CouplingDocument's calibration data with new values."""

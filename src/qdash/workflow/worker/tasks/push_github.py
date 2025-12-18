@@ -74,7 +74,7 @@ def push_github(
 
         repo.remotes.origin.push()
 
-        return repo.head.commit.hexsha[:8]
+        return str(repo.head.commit.hexsha[:8])
 
     except GitCommandError as e:
         raise RuntimeError(f"Git push failed: {e.stderr}")
@@ -161,7 +161,7 @@ def push_github_batch(
         repo.remotes.origin.push()
 
         logger.info(f"Pushed {len(added_files)} files in single commit")
-        return repo.head.commit.hexsha[:8]
+        return str(repo.head.commit.hexsha[:8])
 
     except GitCommandError as e:
         raise RuntimeError(f"Git push failed: {e.stderr}")

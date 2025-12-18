@@ -867,7 +867,7 @@ class MetricsPDFGenerator:
         metric_scale: float,
     ) -> list[go.Scatter]:
         """Create traces for coupling edges with values."""
-        traces = []
+        traces: list[go.Scatter] = []
 
         # Collect coupling values and combine bidirectional
         coupling_values: dict[tuple[int, int], float] = {}
@@ -1131,7 +1131,7 @@ class MetricsPDFGenerator:
             extension = val_range * 0.05
 
             cdf_x = [min_val - extension]  # Start flat at 0%
-            cdf_y = [0]
+            cdf_y: list[float] = [0.0]
 
             for i, value in enumerate(values):
                 cdf_x.append(value)

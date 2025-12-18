@@ -13,7 +13,7 @@ from qdash.workflow.engine.calibration.task.result_processor import (
     FidelityValidationError,
     R2ValidationError,
 )
-from qdash.workflow.caltasks.base import PostProcessResult, PreProcessResult, RunResult
+from qdash.workflow.calibtasks.base import PostProcessResult, PreProcessResult, RunResult
 
 
 class MockTask:

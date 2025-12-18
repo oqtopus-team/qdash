@@ -24,7 +24,7 @@ from qdash.datamodel.task import (
     TaskStatusModel,
 )
 from qdash.workflow.engine.calibration.task.manager import TaskManager
-from qdash.workflow.caltasks.base import PostProcessResult, PreProcessResult, RunResult
+from qdash.workflow.calibtasks.base import PostProcessResult, PreProcessResult, RunResult
 
 
 class TestTaskStateManagement:

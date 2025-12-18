@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pendulum
 from bunnet import Document
@@ -28,7 +28,7 @@ class CalibrationNoteDocument(Document):
     chip_id: str = Field(..., description="The chip ID associated with this note")
     execution_id: str = Field(..., description="The execution ID associated with this note")
     task_id: str = Field(..., description="The task ID associated with this note")
-    note: dict = Field(..., description="The calibration note data")
+    note: dict[str, Any] = Field(..., description="The calibration note data")
     timestamp: str = Field(
         default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
         description="The time when the note was last updated",
@@ -65,7 +65,7 @@ class CalibrationNoteDocument(Document):
         chip_id: str,
         execution_id: str,
         task_id: str,
-        note: dict,
+        note: dict[str, Any],
         project_id: str,
     ) -> "CalibrationNoteDocument":
         """Upsert a calibration note.

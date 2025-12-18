@@ -226,7 +226,8 @@ def get_historical_qubit_task_results(
         calibrated_at_str = fidelity_data.get("calibrated_at")
 
         try:
-            calibrated_at = pendulum.parse(calibrated_at_str)
+            parsed = pendulum.parse(calibrated_at_str)
+            calibrated_at = parsed if isinstance(parsed, pendulum.DateTime) else None
         except Exception:
             calibrated_at = None
 
@@ -552,7 +553,8 @@ def get_historical_coupling_task_results(
         calibrated_at_str = fidelity_data.get("calibrated_at")
 
         try:
-            calibrated_at = pendulum.parse(calibrated_at_str)
+            parsed = pendulum.parse(calibrated_at_str)
+            calibrated_at = parsed if isinstance(parsed, pendulum.DateTime) else None
         except Exception:
             calibrated_at = None
 
@@ -838,7 +840,7 @@ def get_timeseries_task_results(
 def download_figures_as_zip(
     paths: Annotated[list[str], Body(description="List of file paths to include in the ZIP")],
     filename: Annotated[str, Body(description="Filename for the ZIP archive")] = "figures.zip",
-):
+) -> StreamingResponse:
     """Download multiple calibration figures as a ZIP file.
 
     Creates a ZIP archive containing all requested figure files and returns it

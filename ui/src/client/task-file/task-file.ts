@@ -193,7 +193,7 @@ export function useGetTaskFileSettings<
 }
 
 /**
- * List all available backend directories in caltasks.
+ * List all available backend directories in calibtasks.
 
 Returns
 -------
@@ -515,7 +515,7 @@ export function useGetTaskFileTree<
 
 Args:
 ----
-    path: Relative path from CALTASKS_BASE_PATH (e.g., "qubex/one_qubit_coarse/check_rabi.py")
+    path: Relative path from CALIBTASKS_BASE_PATH (e.g., "qubex/one_qubit_coarse/check_rabi.py")
 
 Returns:
 -------

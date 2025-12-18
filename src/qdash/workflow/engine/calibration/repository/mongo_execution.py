@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import Any
 
 from pymongo import MongoClient, ReturnDocument
+from pymongo.collection import Collection
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionModel,
@@ -63,7 +64,7 @@ class MongoExecutionRepository:
         self._password = password or os.getenv("MONGO_INITDB_ROOT_PASSWORD")
         self._database = database
 
-    def _get_client(self) -> MongoClient:
+    def _get_client(self) -> MongoClient[Any]:
         """Get MongoDB client.
 
         Returns
@@ -79,7 +80,7 @@ class MongoExecutionRepository:
             password=self._password,
         )
 
-    def _get_collection(self, client: MongoClient):
+    def _get_collection(self, client: MongoClient[Any]) -> Collection[Any]:
         """Get the execution history collection.
 
         Parameters
@@ -222,7 +223,7 @@ class MongoExecutionRepository:
             raise
 
     def _ensure_document_exists(
-        self, collection, execution_id: str, initial_model: ExecutionModel
+        self, collection: Collection[Any], execution_id: str, initial_model: ExecutionModel
     ) -> None:
         """Ensure document exists in collection.
 
@@ -327,7 +328,7 @@ class MongoExecutionRepository:
 
         return update_ops
 
-    def _doc_to_model(self, doc: dict) -> ExecutionModel:
+    def _doc_to_model(self, doc: dict[str, Any]) -> ExecutionModel:
         """Convert MongoDB document to ExecutionModel.
 
         Parameters

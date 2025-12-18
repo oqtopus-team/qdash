@@ -27,7 +27,7 @@ class MongoTaskResultHistoryRepository:
 class MongoChipRepository:
     """MongoDB implementation of ChipRepository."""
 
-    def get_current_chip(self, username: str) -> dict:
+    def get_current_chip(self, username: str) -> dict[str, Any]:
         """Get current chip data from MongoDB.
 
         Parameters

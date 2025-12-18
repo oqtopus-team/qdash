@@ -484,8 +484,11 @@ def git_pull_config(
 
         # Parse and reconstruct URL with authentication
         parsed = urlparse(repo_url)
-        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-        auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
+        scheme = parsed.scheme if isinstance(parsed.scheme, str) else parsed.scheme.decode()
+        netloc = parsed.netloc if isinstance(parsed.netloc, str) else parsed.netloc.decode()
+        path = parsed.path if isinstance(parsed.path, str) else parsed.path.decode()
+        auth_netloc = f"{github_user}:{github_token}@{netloc}"
+        auth_url = urlunparse((scheme, auth_netloc, path, "", "", ""))
 
         # Create temporary directory and clone repository
         temp_dir = tempfile.mkdtemp()
@@ -527,7 +530,7 @@ def git_pull_config(
             # Log success with commit information
             current = repo.head.commit
             commit_sha = current.hexsha[:8]
-            commit_msg = current.message.strip()
+            commit_msg = str(current.message).strip()
 
             logger.info(f"Updated to commit: {commit_sha} - {commit_msg}")
             logger.info(f"Config files updated successfully in: {CONFIG_BASE_PATH}")
@@ -591,8 +594,11 @@ def git_push_config(
 
         # Parse and reconstruct URL with authentication
         parsed = urlparse(repo_url)
-        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-        auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
+        scheme = parsed.scheme if isinstance(parsed.scheme, str) else parsed.scheme.decode()
+        netloc = parsed.netloc if isinstance(parsed.netloc, str) else parsed.netloc.decode()
+        path = parsed.path if isinstance(parsed.path, str) else parsed.path.decode()
+        auth_netloc = f"{github_user}:{github_token}@{netloc}"
+        auth_url = urlunparse((scheme, auth_netloc, path, "", "", ""))
 
         # Create temporary directory and clone repository
         temp_dir = tempfile.mkdtemp()

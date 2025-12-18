@@ -2649,7 +2649,7 @@
           "task-file"
         ],
         "summary": "List available task file backends",
-        "description": "List all available backend directories in caltasks.\n\nReturns\n-------\n    List of backend names and paths",
+        "description": "List all available backend directories in calibtasks.\n\nReturns\n-------\n    List of backend names and paths",
         "operationId": "listTaskFileBackends",
         "responses": {
           "200": {
@@ -2728,7 +2728,7 @@
           "task-file"
         ],
         "summary": "Get task file content for viewing/editing",
-        "description": "Get task file content for viewing/editing.\n\nArgs:\n----\n    path: Relative path from CALTASKS_BASE_PATH (e.g., \"qubex/one_qubit_coarse/check_rabi.py\")\n\nReturns:\n-------\n    File content and metadata",
+        "description": "Get task file content for viewing/editing.\n\nArgs:\n----\n    path: Relative path from CALIBTASKS_BASE_PATH (e.g., \"qubex/one_qubit_coarse/check_rabi.py\")\n\nReturns:\n-------\n    File content and metadata",
         "operationId": "getTaskFileContent",
         "security": [
           {
@@ -3996,7 +3996,7 @@
           "flow"
         ],
         "summary": "List flow helper files",
-        "description": "List all Python files in the qdash.workflow.flow module.\n\nReturns list of filenames that users can view for reference.",
+        "description": "List all Python files in the qdash.workflow.service module.\n\nReturns list of filenames that users can view for reference.",
         "operationId": "listFlowHelperFiles",
         "responses": {
           "200": {
@@ -6279,7 +6279,16 @@
           "value": {
             "anyOf": [
               {
-                "items": {},
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                },
                 "type": "array"
               },
               {

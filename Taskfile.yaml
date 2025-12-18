@@ -98,9 +98,9 @@ tasks:
       - bunx eslint . --fix -c eslint.config.mjs --quiet
 
   lint-mypy:
-    desc: Run mypy type checking on clean modules only
+    desc: Run mypy strict type checking
     cmds:
-      - uv run mypy src/qdash/dbmodel --ignore-missing-imports
+      - uv run mypy src/qdash/datamodel src/qdash/dbmodel src/qdash/api src/qdash/workflow
 
   tbls-docs:
     cmds:

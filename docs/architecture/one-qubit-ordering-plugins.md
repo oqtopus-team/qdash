@@ -215,7 +215,7 @@ from qdash.workflow.engine.calibration import (
     OneQubitScheduler,
     CheckerboardOrderingStrategy,
 )
-from qdash.workflow.flow import init_calibration, get_session, finish_calibration
+from qdash.workflow.service import init_calibration, get_session, finish_calibration
 
 @task
 def calibrate_mux_qubits(qids: list[str], tasks: list[str]) -> dict:
@@ -448,7 +448,7 @@ schedule_dict = schedule.to_dict()
 ```python
 from prefect import flow, task
 from qdash.workflow.engine.calibration import OneQubitScheduler
-from qdash.workflow.flow import init_calibration, get_session, finish_calibration
+from qdash.workflow.service import init_calibration, get_session, finish_calibration
 
 @task
 def calibrate_qubits_parallel(qids: list[str], tasks: list[str]) -> dict:

@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import pendulum
 from prefect import flow, get_run_logger
@@ -19,7 +20,7 @@ from qdash.workflow.worker.tasks.filesystem import (
 from qdash.workflow.worker.tasks.pull_github import pull_github
 
 
-def generate_data_availability_message(stats: dict) -> str:
+def generate_data_availability_message(stats: dict[str, Any]) -> str:
     """Generate a message about data availability."""
     cutoff_hours = stats["cutoff_hours"]
     total_qubits = stats["total_qubits"]
@@ -189,4 +190,4 @@ def chip_report(
         token=settings.slack_bot_token,
     )
     slack.send_slack()
-    return merged
+    return None

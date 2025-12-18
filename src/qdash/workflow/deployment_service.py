@@ -7,6 +7,7 @@ to register user flows as Prefect deployments.
 import os
 from logging import getLogger
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from prefect.client.orchestration import get_client
@@ -141,7 +142,7 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
 
 
 @app.get("/health")
-async def health() -> dict:
+async def health() -> dict[str, Any]:
     """Health check endpoint."""
     return {"status": "healthy"}
 
@@ -158,7 +159,7 @@ class SetScheduleRequest(BaseModel):
     cron: str
     timezone: str = "Asia/Tokyo"
     active: bool = True
-    parameters: dict | None = None
+    parameters: dict[str, Any] | None = None
 
 
 class SetScheduleResponse(BaseModel):
@@ -175,7 +176,7 @@ class CreateScheduledRunRequest(BaseModel):
 
     deployment_id: str
     scheduled_time: str  # ISO format
-    parameters: dict | None = None
+    parameters: dict[str, Any] | None = None
 
 
 class CreateScheduledRunResponse(BaseModel):

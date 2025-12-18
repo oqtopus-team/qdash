@@ -37,4 +37,4 @@ async def get_copilot_config() -> dict[str, Any]:
 
     """
     config = load_copilot_config()
-    return config.model_dump()
+    return dict(config.model_dump())

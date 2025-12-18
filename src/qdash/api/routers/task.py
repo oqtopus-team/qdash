@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from qdash.api.lib.project import ProjectContext, get_project_context
@@ -46,7 +46,7 @@ def list_tasks(
 
     """
     # Build query with project_id filter
-    query: dict = {"project_id": ctx.project_id}
+    query: dict[str, Any] = {"project_id": ctx.project_id}
 
     # Add backend filter if specified
     if backend:

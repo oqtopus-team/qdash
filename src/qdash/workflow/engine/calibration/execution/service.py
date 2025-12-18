@@ -5,7 +5,7 @@ state management and persistence through the repository layer.
 """
 
 import logging
-from typing import Callable
+from typing import Any, Callable
 
 from qdash.datamodel.execution import (
     CalibDataModel,
@@ -88,7 +88,7 @@ class ExecutionService:
         chip_id: str,
         name: str = "",
         tags: list[str] | None = None,
-        note: dict | None = None,
+        note: dict[str, Any] | None = None,
         repository: ExecutionRepository | None = None,
     ) -> "ExecutionService":
         """Create a new ExecutionService with initial state.
@@ -295,7 +295,7 @@ class ExecutionService:
 
     def merge_controller_info(
         self,
-        controller_info: dict[str, dict],
+        controller_info: dict[str, dict[str, Any]],
     ) -> "ExecutionService":
         """Merge controller info and persist with optimistic locking.
 
@@ -318,14 +318,14 @@ class ExecutionService:
         self.state_manager.merge_controller_info(controller_info)
         return self
 
-    def update_note(self, key: str, value: any) -> "ExecutionService":
+    def update_note(self, key: str, value: Any) -> "ExecutionService":
         """Update a note entry and persist.
 
         Parameters
         ----------
         key : str
             Note key
-        value : any
+        value : Any
             Note value
 
         Returns
@@ -361,22 +361,22 @@ class ExecutionService:
     @property
     def execution_id(self) -> str:
         """Get execution ID."""
-        return self.state_manager.execution_id
+        return str(self.state_manager.execution_id)
 
     @property
     def username(self) -> str:
         """Get username."""
-        return self.state_manager.username
+        return str(self.state_manager.username)
 
     @property
     def chip_id(self) -> str:
         """Get chip ID."""
-        return self.state_manager.chip_id
+        return str(self.state_manager.chip_id)
 
     @property
     def calib_data_path(self) -> str:
         """Get calibration data path."""
-        return self.state_manager.calib_data_path
+        return str(self.state_manager.calib_data_path)
 
     @property
     def status(self) -> ExecutionStatusModel:
@@ -389,22 +389,22 @@ class ExecutionService:
         return self.state_manager.calib_data
 
     @property
-    def task_results(self) -> dict[str, TaskResultModel]:
+    def task_results(self) -> dict[str, Any]:
         """Get task results."""
-        return self.state_manager.task_results
+        return dict(self.state_manager.task_results)
 
     @property
-    def controller_info(self) -> dict[str, dict]:
+    def controller_info(self) -> dict[str, dict[Any, Any]]:
         """Get controller info."""
-        return self.state_manager.controller_info
+        return dict(self.state_manager.controller_info)
 
     @property
-    def note(self) -> dict:
+    def note(self) -> dict[Any, Any]:
         """Get note."""
-        return self.state_manager.note
+        return dict(self.state_manager.note)
 
     @note.setter
-    def note(self, value: dict) -> None:
+    def note(self, value: dict[str, Any]) -> None:
         """Set note."""
         self.state_manager.note = value
 

@@ -2,8 +2,9 @@
 
 import io
 import re
-from typing import Annotated
+from typing import Annotated, Any
 
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import networkx as nx
 import pendulum
@@ -33,7 +34,9 @@ POSITION_SCALE = 50  # Grid spacing used in topology
 POSITION_DIVISOR = 30  # Divisor for final position
 
 
-def search_coupling_data_by_control_qid(cr_params: dict, search_term: str) -> dict:
+def search_coupling_data_by_control_qid(
+    cr_params: dict[str, Any], search_term: str
+) -> dict[str, Any]:
     """Search for coupling data by control qubit id."""
     filtered = {}
     for key, value in cr_params.items():
@@ -70,13 +73,15 @@ def is_within_24h(calibrated_at: str | None) -> bool:
         now = pendulum.now(tz="Asia/Tokyo")
         cutoff = now.subtract(hours=24)
         calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
+        if not isinstance(calibrated_at_dt, pendulum.DateTime):
+            return False
         return bool(calibrated_at_dt >= cutoff)
     except Exception:
         return False
 
 
 def get_value_within_24h_fallback(
-    data: dict,
+    data: dict[str, Any],
     use_24h: bool,
     fallback: float,
 ) -> float:
@@ -97,9 +102,9 @@ def get_value_within_24h_fallback(
         return fallback
 
     if use_24h:
-        return value if is_within_24h(calibrated_at) else fallback
+        return float(value) if is_within_24h(calibrated_at) else fallback
 
-    return value
+    return float(value)
 
 
 def normalize_coupling_key(control: str, target: str) -> str:
@@ -387,11 +392,11 @@ def get_device_topology(
         device_id=request.device_id,
         qubits=filtered_qubits,
         couplings=filtered_couplings,
-        calibrated_at=latest.timestamp,  # type: ignore # noqa: PGH003
+        calibrated_at=latest.timestamp,
     )
 
 
-def generate_device_plot(data: dict) -> bytes:
+def generate_device_plot(data: dict[str, Any]) -> bytes:
     """Generate a plot of the quantum device and return it as bytes."""
     # Create a new graph
     g = nx.Graph()
@@ -457,7 +462,7 @@ def generate_device_plot(data: dict) -> bytes:
     # )
     sm = plt.cm.ScalarMappable(
         cmap="viridis",
-        norm=plt.Normalize(
+        norm=mcolors.Normalize(
             vmin=min(nx.get_node_attributes(g, "fidelity").values()),
             vmax=max(nx.get_node_attributes(g, "fidelity").values()),
         ),

@@ -58,7 +58,7 @@ class ExecutionResponseSummary(BaseModel):
     end_at: str
     elapsed_time: str
     tags: list[str]
-    note: dict
+    note: dict[str, Any]
 
 
 class ExecutionResponseDetail(BaseModel):
@@ -82,7 +82,7 @@ class ExecutionResponseDetail(BaseModel):
     end_at: str
     elapsed_time: str
     task: list[Task]
-    note: dict
+    note: dict[str, Any]
 
 
 class ListExecutionsResponse(BaseModel):

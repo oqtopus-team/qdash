@@ -18,7 +18,7 @@ def merge_notes_by_timestamp(
         Merged note with most recent values
 
     """
-    merged: dict = {}
+    merged: dict[str, Any] = {}
 
     # Get all parameter types (hpi_params, pi_params, rabi_params)
     all_param_types = set(master_note.keys()) | set(task_note.keys())

@@ -53,7 +53,7 @@ USER_FLOWS_BASE_DIR = Path("/app/qdash/workflow/user_flows")
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
 
 # Path to templates directory
-TEMPLATES_DIR = Path("/app/qdash/workflow/examples/templates")
+TEMPLATES_DIR = Path("/app/qdash/workflow/templates")
 TEMPLATES_METADATA_FILE = TEMPLATES_DIR / "templates.json"
 
 
@@ -184,8 +184,9 @@ async def register_flow_deployment(
             )
             response.raise_for_status()
             data = response.json()
-            logger.info(f"Successfully registered deployment: {data['deployment_id']}")
-            return data["deployment_id"]
+            deployment_id = str(data["deployment_id"])
+            logger.info(f"Successfully registered deployment: {deployment_id}")
+            return deployment_id
     except httpx.HTTPStatusError as e:
         logger.error(
             f"HTTP error during deployment registration: {e.response.status_code} - {e.response.text}"
@@ -467,7 +468,7 @@ async def get_flow_template(template_id: str) -> FlowTemplateWithCode:
 # ============================================================================
 
 # Base directory for flow helper modules
-FLOW_HELPERS_DIR = Path("/app/qdash/workflow/flow")
+FLOW_HELPERS_DIR = Path("/app/qdash/workflow/service")
 
 
 @router.get(
@@ -477,7 +478,7 @@ FLOW_HELPERS_DIR = Path("/app/qdash/workflow/flow")
     operation_id="listFlowHelperFiles",
 )
 async def list_flow_helper_files() -> list[str]:
-    """List all Python files in the qdash.workflow.flow module.
+    """List all Python files in the qdash.workflow.service module.
 
     Returns list of filenames that users can view for reference.
     """

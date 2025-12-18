@@ -27,17 +27,11 @@ packages = [
     "src/qdash/workflow",
     "src/qdash/dbmodel",
     "src/qdash/datamodel",
-    "src/qdash/cli"
 ]
-
-[project.scripts]
-qdash = "qdash.cli:app"
-
-
 
 [tool.ruff]
 line-length = 100
-exclude = ["tools", "scripts", "qdash_client"]
+exclude = ["tools", "scripts"]
 lint.unfixable = ["F401"]
 # Temporarily use minimal rule set to get CI passing
 lint.select = [
@@ -62,15 +56,12 @@ lint.ignore = []
 ]
 
 [tool.mypy]
-# Temporarily relaxed settings to reduce overwhelming errors
+strict = true
 ignore_missing_imports = true
-ignore_errors = false
 exclude = ["tools", "scripts"]
-# Disable strict checks temporarily
-disallow_untyped_defs = false
-warn_return_any = false
-check_untyped_defs = false
-no_implicit_optional = false
+# Disable misc errors (primarily FastAPI untyped decorator warnings)
+disable_error_code = ["misc"]
+
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
@@ -124,6 +115,9 @@ dev = [
     "testcontainers[mongodb]==4.8.2",
     "typer==0.14.0",
     "go-task-bin>=3.41.0",
+    "types-pyyaml>=6.0.12.20250809",
+    "types-python-dateutil>=2.9.0.20250809",
+    "types-croniter>=6.0.0.20250809",
 ]
 [tool.uv.sources]
 qubex = { git = "https://github.com/amachino/qubex.git", branch = "chore/chevron-fig" }

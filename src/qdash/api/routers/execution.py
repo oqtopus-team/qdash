@@ -6,7 +6,7 @@ import io
 import logging
 import zipfile
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import FileResponse, StreamingResponse
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-def flatten_tasks(task_results: dict) -> list[dict]:
+def flatten_tasks(task_results: dict[str, Any]) -> list[dict[str, Any]]:
     """Flatten the task results into a list of tasks.
 
     Parameters
@@ -45,7 +45,7 @@ def flatten_tasks(task_results: dict) -> list[dict]:
 
     """
     # グループごとのタスクを保持する辞書
-    grouped_tasks: dict[str, list[dict]] = {}
+    grouped_tasks: dict[str, list[dict[str, Any]]] = {}
     logger.debug("Flattening task_results: %s", task_results)
 
     for key, result in task_results.items():
@@ -90,7 +90,7 @@ def flatten_tasks(task_results: dict) -> list[dict]:
         group_tasks.sort(key=lambda x: x.get("start_at", "") or "9999-12-31T23:59:59")
 
     # グループ自体をstart_atの早い順にソート
-    def get_group_completion_time(group: list[dict]) -> str:
+    def get_group_completion_time(group: list[dict[str, Any]]) -> str:
         completed_tasks = [t for t in group if t.get("start_at")]
         if not completed_tasks:
             return "9999-12-31T23:59:59"
@@ -114,7 +114,7 @@ def flatten_tasks(task_results: dict) -> list[dict]:
     summary="Get a calibration figure by its path",
     operation_id="getFigureByPath",
 )
-def get_figure_by_path(path: str):
+def get_figure_by_path(path: str) -> FileResponse:
     """Fetch a calibration figure by its file path.
 
     Retrieves a PNG image file from the server's filesystem and returns it

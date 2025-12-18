@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pendulum
 from bunnet import Document
@@ -29,8 +29,8 @@ class CouplingHistoryDocument(Document):
     qid: str = Field(..., description="The coupling ID")
     status: str = Field(..., description="The status of the coupling")
     chip_id: str = Field(..., description="The chip ID")
-    data: dict = Field(..., description="The data of the coupling")
-    best_data: dict = Field(
+    data: dict[str, Any] = Field(..., description="The data of the coupling")
+    best_data: dict[str, Any] = Field(
         default_factory=dict,
         description="The best calibration results, focusing on fidelity metrics",
     )

@@ -11,7 +11,7 @@ logger = getLogger(__name__)
 WORK_POOL_NAME = "user-flows-pool"
 
 
-async def setup_work_pool():
+async def setup_work_pool() -> None:
     """Create user-flows work pool if it doesn't exist."""
     from prefect.exceptions import ObjectAlreadyExists, ObjectNotFound
 

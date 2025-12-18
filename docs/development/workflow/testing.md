@@ -72,12 +72,12 @@ tests/qdash/workflow/
 │       └── repository/                    # Repository tests
 │           ├── __init__.py
 │           └── test_filesystem_impl.py    # Filesystem implementation tests
-└── flow/                              # Flow session and context tests
+└── service/                           # Calibration service tests
     ├── __init__.py
-    ├── test_config.py                 # FlowSessionConfig tests
+    ├── test_config.py                 # CalibServiceConfig tests
     ├── test_factory.py                # Factory tests
     ├── test_context.py                # SessionContext tests
-    └── test_session.py                # FlowSession tests
+    └── test_session.py                # CalibService tests
 ```
 
 ### Mapping Rules
@@ -90,8 +90,8 @@ tests/qdash/workflow/
 | `src/qdash/workflow/engine/calibration/execution/manager.py`      | `tests/qdash/workflow/engine/calibration/execution/test_manager.py`      |
 | `src/qdash/workflow/engine/calibration/execution/service.py`      | `tests/qdash/workflow/engine/calibration/execution/test_service.py`      |
 | `src/qdash/workflow/engine/calibration/scheduler/cr_scheduler.py` | `tests/qdash/workflow/engine/calibration/scheduler/test_cr_scheduler.py` |
-| `src/qdash/workflow/flow/context.py`                              | `tests/qdash/workflow/flow/test_context.py`                              |
-| `src/qdash/workflow/flow/session.py`                              | `tests/qdash/workflow/flow/test_session.py`                              |
+| `src/qdash/workflow/service/context.py`                           | `tests/qdash/workflow/service/test_context.py`                           |
+| `src/qdash/workflow/service/session.py`                           | `tests/qdash/workflow/service/test_session.py`                           |
 
 ---
 

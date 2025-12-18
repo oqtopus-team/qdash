@@ -1,8 +1,8 @@
 """API schemas for user-defined flows."""
 
-from typing import Any, ClassVar
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SaveFlowRequest(BaseModel):
@@ -20,8 +20,8 @@ class SaveFlowRequest(BaseModel):
     )
     tags: list[str] = Field(default_factory=list, description="Tags for categorization")
 
-    model_config: ClassVar[dict] = {
-        "json_schema_extra": {
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [
                 {
                     "name": "my_adaptive_calibration",
@@ -34,7 +34,7 @@ class SaveFlowRequest(BaseModel):
                 }
             ]
         }
-    }
+    )
 
 
 class SaveFlowResponse(BaseModel):
@@ -85,11 +85,11 @@ class ExecuteFlowRequest(BaseModel):
         default_factory=dict, description="Execution parameters (overrides default_parameters)"
     )
 
-    model_config: ClassVar[dict] = {
-        "json_schema_extra": {
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [{"parameters": {"qids": ["32", "38"], "max_iterations": 5}}]
         }
-    }
+    )
 
 
 class ExecuteFlowResponse(BaseModel):
@@ -116,8 +116,8 @@ class ScheduleFlowRequest(BaseModel):
     active: bool = Field(True, description="Whether the schedule is active")
     timezone: str = Field("Asia/Tokyo", description="Timezone for schedule")
 
-    model_config: ClassVar[dict] = {
-        "json_schema_extra": {
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [
                 {
                     "cron": "0 2 * * *",
@@ -132,7 +132,7 @@ class ScheduleFlowRequest(BaseModel):
                 },
             ]
         }
-    }
+    )
 
 
 class ScheduleFlowResponse(BaseModel):

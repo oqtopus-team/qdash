@@ -5,5 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { InputParameterModelValueAnyOfItem } from "./inputParameterModelValueAnyOfItem";
 
-export type InputParameterModelValue = unknown[] | number | number | null;
+export type InputParameterModelValue =
+  | InputParameterModelValueAnyOfItem[]
+  | number
+  | number
+  | null;

@@ -1,9 +1,11 @@
 import json
 from pathlib import Path
+from typing import Any
 
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.workflow._internal.merge_notes import merge_notes_by_timestamp
 from qdash.workflow.engine.backend.base import BaseBackend
+from qdash.workflow.engine.calibration.task.types import TaskTypes
 
 
 class QubexBackend(BaseBackend):
@@ -13,7 +15,7 @@ class QubexBackend(BaseBackend):
 
     from qubex import Experiment
 
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         from qubex import Experiment
 
         """Initialize the Qubex backend with a configuration dictionary."""
@@ -21,7 +23,7 @@ class QubexBackend(BaseBackend):
         self._exp: Experiment | None = None
 
     @property
-    def config(self) -> dict:
+    def config(self) -> dict[str, Any]:
         """Return the configuration dictionary for the Qubex backend."""
         return self._config
 
@@ -29,17 +31,17 @@ class QubexBackend(BaseBackend):
         """Return the version of the Qubex backend."""
         from qubex.version import get_package_version
 
-        return get_package_version("qubex")
+        return str(get_package_version("qubex"))
 
     def connect(self) -> None:
         if self._exp is None:
             from qubex import Experiment
 
-            if self._config.get("task_type") == "qubit":
+            if self._config.get("task_type") == TaskTypes.QUBIT:
                 qubits = [
                     int(qid) for qid in self._config.get("qids", [])
                 ]  # e.g. : ["0", "1", "2"] → [0, 1, 2]
-            elif self._config.get("task_type") == "coupling":
+            elif self._config.get("task_type") == TaskTypes.COUPLING:
                 qubits = sorted(
                     {int(q) for qid in self._config.get("qids", []) for q in qid.split("-")}
                 )  # e.g. : ["0-1", "1-2"] → [0, 1, 2]

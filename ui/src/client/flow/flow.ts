@@ -594,7 +594,7 @@ export function useGetFlowTemplate<
 }
 
 /**
- * List all Python files in the qdash.workflow.flow module.
+ * List all Python files in the qdash.workflow.service module.
 
 Returns list of filenames that users can view for reference.
  * @summary List flow helper files
