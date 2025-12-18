@@ -53,7 +53,7 @@ USER_FLOWS_BASE_DIR = Path("/app/qdash/workflow/user_flows")
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
 
 # Path to templates directory
-TEMPLATES_DIR = Path("/app/qdash/workflow/examples/templates")
+TEMPLATES_DIR = Path("/app/qdash/workflow/templates")
 TEMPLATES_METADATA_FILE = TEMPLATES_DIR / "templates.json"
 
 
