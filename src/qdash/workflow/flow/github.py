@@ -148,7 +148,7 @@ class GitHubIntegration:
 
             commit_id = pull_github(target_dir=target_dir)
             self.logger.info(f"Pulled config from GitHub: {commit_id}")
-            return commit_id
+            return str(commit_id) if commit_id else None
         except Exception as e:
             self.logger.warning(f"Failed to pull from GitHub: {e}")
             return None
@@ -182,6 +182,7 @@ class GitHubIntegration:
 
         for file_type in push_config.file_types:
             try:
+                result: str | dict[str, str]
                 if file_type == ConfigFileType.CALIB_NOTE:
                     result = self._push_calib_note(push_config)
                 elif file_type == ConfigFileType.PROPS:
@@ -190,6 +191,8 @@ class GitHubIntegration:
                     result = self._push_params_file(push_config)
                 elif file_type == ConfigFileType.ALL_PARAMS:
                     result = self._push_all_params(push_config)
+                else:
+                    continue
 
                 results[file_type.value] = result
             except Exception as e:
@@ -340,7 +343,7 @@ class GitHubIntegration:
         self.logger.info(f"Pushed params.yaml: {commit_sha}")
         return str(commit_sha)
 
-    def _push_all_params(self, config: GitHubPushConfig) -> dict[str, str]:
+    def _push_all_params(self, config: GitHubPushConfig) -> dict[str, Any]:
         """Push all yaml files in params directory in a single commit.
 
         Args:

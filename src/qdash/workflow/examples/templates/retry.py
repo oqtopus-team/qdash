@@ -23,6 +23,8 @@ Example:
     )
 """
 
+from typing import Any
+
 from prefect import flow, get_run_logger, task
 from qdash.workflow.flow import CalService
 
@@ -92,7 +94,7 @@ def parallel_retry_calibration(
     qids: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
-):
+) -> Any:
     """Parallel calibration with retry on failure.
 
     Args:

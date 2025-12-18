@@ -27,6 +27,8 @@ class SessionContext:
 
     _instance: "SessionContext | None" = None
     _lock = threading.Lock()
+    _local: threading.local
+    _global_session: "CalService | None"
 
     def __new__(cls) -> "SessionContext":
         """Singleton pattern for global access."""

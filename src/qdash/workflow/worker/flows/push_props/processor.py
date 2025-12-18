@@ -23,7 +23,10 @@ def _process_data(
             if calibrated_at:
                 try:
                     calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
-                    is_recent = calibrated_at_dt >= cutoff
+                    if isinstance(calibrated_at_dt, pendulum.DateTime):
+                        is_recent = calibrated_at_dt >= cutoff
+                    else:
+                        is_recent = False
                 except Exception:
                     is_recent = False
             else:

@@ -189,4 +189,4 @@ def chip_report(
         token=settings.slack_bot_token,
     )
     slack.send_slack()
-    return merged
+    return None

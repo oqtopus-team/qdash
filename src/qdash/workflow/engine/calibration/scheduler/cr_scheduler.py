@@ -45,7 +45,7 @@ from pathlib import Path
 from typing import Any
 
 import networkx as nx
-import yaml
+import yaml  # type: ignore[import-untyped]
 from qdash.datamodel.qubit import QubitModel
 from qdash.dbmodel.chip import ChipDocument
 
@@ -69,7 +69,7 @@ class CRScheduleResult:
         self,
         parallel_groups: list[list[tuple[str, str]]],
         metadata: dict[str, Any],
-        filtering_stats: dict[str, int],
+        filtering_stats: dict[str, Any],
         cr_pairs_string: list[str],
         qid_to_mux: dict[str, int],
         mux_conflict_map: dict[int, set[int]],
@@ -157,7 +157,7 @@ class CRScheduler:
         self.chip_id = chip_id
         self.wiring_config_path = wiring_config_path
         self._chip_doc: ChipDocument | None = None
-        self._wiring_config: dict[str, Any] | None = None
+        self._wiring_config: list[dict[str, Any]] | None = None
 
     def _load_chip_data(self) -> ChipDocument:
         """Load chip document from database."""
@@ -165,7 +165,7 @@ class CRScheduler:
             self._chip_doc = ChipDocument.get_current_chip(self.username)
         return self._chip_doc
 
-    def _load_wiring_config(self) -> dict[str, Any]:
+    def _load_wiring_config(self) -> list[dict[str, Any]]:
         """Load wiring configuration from YAML file."""
         if self._wiring_config is None:
             # Use provided path or default path
@@ -435,7 +435,7 @@ class CRScheduler:
     @staticmethod
     def _convert_to_parallel_groups(grouped: list[list[str]]) -> list[list[tuple[str, str]]]:
         """Convert grouped CR pairs to parallel_groups format."""
-        return [[tuple(pair.split("-")) for pair in group] for group in grouped]
+        return [[(pair.split("-")[0], pair.split("-")[1]) for pair in group] for group in grouped]
 
     def generate_with_plugins(
         self,

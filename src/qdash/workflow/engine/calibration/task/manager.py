@@ -141,7 +141,7 @@ class TaskManager(BaseModel):
         # Sync with state manager
         self._sync_to_state_manager()
 
-    def __setattr__(self, name, value) -> None:  # type: ignore[override]
+    def __setattr__(self, name: str, value: Any) -> None:
         """Intercept attribute assignments to keep internal components in sync."""
         super().__setattr__(name, value)
 
@@ -207,6 +207,7 @@ class TaskManager(BaseModel):
 
         """
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         result = self._state_manager._ensure_task_exists(task_name, task_type, qid)
         self._sync_from_state_manager()
         return result
@@ -226,7 +227,7 @@ class TaskManager(BaseModel):
 
         """
         if self._data_saver:
-            return self._data_saver._resolve_conflict(filepath)
+            return Path(self._data_saver._resolve_conflict(filepath))
         # Fallback implementation if data saver not available
         if not filepath.exists():
             return filepath
@@ -245,11 +246,13 @@ class TaskManager(BaseModel):
     def get_task(self, task_name: str, task_type: str = "global", qid: str = "") -> Any:
         """Get a task by name and type."""
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         return self._state_manager.get_task(task_name, task_type, qid)
 
     def start_task(self, task_name: str, task_type: str = "global", qid: str = "") -> None:
         """Start a task."""
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         self._state_manager.start_task(task_name, task_type, qid)
         self._sync_from_state_manager()
 
@@ -263,6 +266,7 @@ class TaskManager(BaseModel):
     def end_task(self, task_name: str, task_type: str = "global", qid: str = "") -> None:
         """End a task."""
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         self._state_manager.end_task(task_name, task_type, qid)
         self._sync_from_state_manager()
 
@@ -283,6 +287,7 @@ class TaskManager(BaseModel):
     ) -> None:
         """Update task status."""
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         self._state_manager.update_task_status(task_name, new_status, message, task_type, qid)
         self._sync_from_state_manager()
 
@@ -336,6 +341,7 @@ class TaskManager(BaseModel):
     ) -> None:
         """Mark unexecuted tasks as skipped."""
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         self._state_manager.update_not_executed_tasks_to_skipped(task_type, qid)
         self._sync_from_state_manager()
 
@@ -346,6 +352,7 @@ class TaskManager(BaseModel):
     ) -> None:
         """Store input parameters."""
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         self._state_manager.put_input_parameters(task_name, input_parameters, task_type, qid)
         self._sync_from_state_manager()
 
@@ -354,6 +361,7 @@ class TaskManager(BaseModel):
     ) -> None:
         """Store output parameters."""
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         self._state_manager.put_output_parameters(task_name, output_parameters, task_type, qid)
         self._sync_from_state_manager()
 
@@ -362,18 +370,21 @@ class TaskManager(BaseModel):
     ) -> None:
         """Add a note to a task."""
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         self._state_manager.put_note_to_task(task_name, note, task_type, qid)
         self._sync_from_state_manager()
 
-    def get_qubit_calib_data(self, qid: str) -> dict:
+    def get_qubit_calib_data(self, qid: str) -> dict[Any, Any]:
         """Get calibration data for a qubit."""
         self._sync_to_state_manager()
-        return self._state_manager.get_qubit_calib_data(qid)
+        assert self._state_manager is not None
+        return dict(self._state_manager.get_qubit_calib_data(qid))
 
-    def get_coupling_calib_data(self, qid: str) -> dict:
+    def get_coupling_calib_data(self, qid: str) -> dict[Any, Any]:
         """Get calibration data for a coupling."""
         self._sync_to_state_manager()
-        return self._state_manager.get_coupling_calib_data(qid)
+        assert self._state_manager is not None
+        return dict(self._state_manager.get_coupling_calib_data(qid))
 
     def _clear_qubit_calib_data(self, qid: str, keys: list[str]) -> None:
         """Clear specific keys from qubit calibration data.
@@ -387,6 +398,7 @@ class TaskManager(BaseModel):
 
         """
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         self._state_manager._clear_qubit_calib_data(qid, keys)
         self._sync_from_state_manager()
 
@@ -402,6 +414,7 @@ class TaskManager(BaseModel):
 
         """
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         self._state_manager._clear_coupling_calib_data(qid, keys)
         self._sync_from_state_manager()
 
@@ -410,6 +423,7 @@ class TaskManager(BaseModel):
     ) -> dict[str, Any]:
         """Get output parameters for a task."""
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         task = self._state_manager.get_task(task_name, task_type, qid)
         return dict(task.output_parameters)
 
@@ -418,8 +432,9 @@ class TaskManager(BaseModel):
     ) -> bool:
         """Check if a task is completed."""
         self._sync_to_state_manager()
+        assert self._state_manager is not None
         task = self._state_manager.get_task(task_name, task_type, qid)
-        return task.status == TaskStatusModel.COMPLETED
+        return bool(task.status == TaskStatusModel.COMPLETED)
 
     # ========== Figure/Data Saving (delegated to data saver) ==========
 
@@ -442,6 +457,7 @@ class TaskManager(BaseModel):
                 output_dir=override_dir,
             )
             self._sync_to_state_manager()
+            assert self._state_manager is not None
             self._state_manager.set_figure_paths(task_name, task_type, qid, png_paths, json_paths)
             self._sync_from_state_manager()
 
@@ -469,6 +485,7 @@ class TaskManager(BaseModel):
                 output_dir=None,
             )
             self._sync_to_state_manager()
+            assert self._state_manager is not None
             self._state_manager.set_raw_data_paths(task_name, task_type, qid, paths)
             self._sync_from_state_manager()
 
@@ -563,6 +580,7 @@ class TaskManager(BaseModel):
         """
         # Sync state before execution
         self._sync_to_state_manager()
+        assert self._executor is not None
 
         # Delegate to TaskExecutor
         execution_manager, result = self._executor.execute(

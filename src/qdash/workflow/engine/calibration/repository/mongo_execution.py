@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import Any
 
 from pymongo import MongoClient, ReturnDocument
+from pymongo.collection import Collection
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionModel,
@@ -79,7 +80,7 @@ class MongoExecutionRepository:
             password=self._password,
         )
 
-    def _get_collection(self, client: MongoClient):
+    def _get_collection(self, client: MongoClient[Any]) -> Collection[Any]:
         """Get the execution history collection.
 
         Parameters
@@ -222,7 +223,7 @@ class MongoExecutionRepository:
             raise
 
     def _ensure_document_exists(
-        self, collection, execution_id: str, initial_model: ExecutionModel
+        self, collection: Collection[Any], execution_id: str, initial_model: ExecutionModel
     ) -> None:
         """Ensure document exists in collection.
 

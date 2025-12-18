@@ -10,6 +10,8 @@ Example:
     )
 """
 
+from typing import Any
+
 from prefect import flow
 from qdash.workflow.flow import CalService
 
@@ -21,7 +23,7 @@ def check_skew(
     muxes: list[int] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
-):
+) -> Any:
     """System-level CheckSkew calibration.
 
     Args:

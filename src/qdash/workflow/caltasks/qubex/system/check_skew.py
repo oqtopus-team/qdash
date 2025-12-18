@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, ClassVar
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.caltasks.base import (
     PostProcessResult,

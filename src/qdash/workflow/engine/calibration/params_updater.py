@@ -167,7 +167,9 @@ class _QubexParamsUpdater:
                 return None
             return numeric
 
-        return value
+        if isinstance(value, str):
+            return value
+        return None
 
     def _update_yaml(self, file_path: Path, qubit_label: str, value: float | int | str) -> None:
         """Update YAML file with file locking and atomic write to prevent race conditions."""
@@ -221,7 +223,7 @@ class _QubexParamsUpdater:
             return True
         if isinstance(current, (int, float)) and isinstance(new, (int, float)):
             return abs(float(current) - float(new)) <= 1e-9
-        return current == new
+        return bool(current == new)
 
     @staticmethod
     def _label_index(label: str) -> int | None:

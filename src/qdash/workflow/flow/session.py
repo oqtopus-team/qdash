@@ -38,6 +38,7 @@ from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.params_updater import get_params_updater
 from qdash.workflow.engine.calibration.prefect_tasks import execute_dynamic_task_by_qid
 from qdash.workflow.engine.calibration.task.manager import TaskManager
+from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.flow.github import GitHubIntegration, GitHubPushConfig
 
 
@@ -194,12 +195,12 @@ class CalService:
 
         # Session state
         self._initialized = False
-        self.execution_id = execution_id
-        self.execution_manager = None
-        self.task_manager = None
-        self.backend = None
-        self.github_integration = None
-        self.github_push_config = github_push_config
+        self.execution_id: str | None = execution_id
+        self.execution_manager: ExecutionManager | None = None
+        self.task_manager: TaskManager | None = None
+        self.backend: BaseBackend | None = None
+        self.github_integration: GitHubIntegration | None = None
+        self.github_push_config: GitHubPushConfig | None = github_push_config
 
         # If qids provided, initialize immediately (low-level API mode)
         if qids is not None:
@@ -336,7 +337,7 @@ class CalService:
         # Pull config from GitHub if requested
         if enable_github_pull:
             logger = get_run_logger()
-            if GitHubIntegration.check_credentials():
+            if GitHubIntegration.check_credentials() and self.github_integration is not None:
                 commit_id = self.github_integration.pull_config()
                 if commit_id:
                     note["config_commit_id"] = commit_id
@@ -373,7 +374,7 @@ class CalService:
         # Note: For qubex backend, qids must be provided for proper box selection
         # Use task_manager.id for note_path (same as setup_calibration)
         note_path = f"{calib_data_path}/calib_note/{self.task_manager.id}.json"
-        session_config = {
+        session_config: dict[str, Any] = {
             "task_type": "qubit",
             "username": username,
             "qids": qids,
@@ -423,6 +424,8 @@ class CalService:
             QubitTaskModel,
             SystemTaskModel,
         )
+
+        assert self.task_manager is not None, "TaskManager not initialized"
 
         # Check if task already exists
         if task_type == "qubit":
@@ -515,6 +518,9 @@ class CalService:
             ```
 
         """
+        assert self.execution_manager is not None, "ExecutionManager not initialized"
+        assert self.task_manager is not None, "TaskManager not initialized"
+
         if task_details is None:
             task_details = {}
 
@@ -623,7 +629,7 @@ class CalService:
         # Add task_id to result for upstream tracking in group execution
         result["task_id"] = executed_task.task_id
 
-        return result
+        return dict(result)
 
     def get_parameter(self, qid: str, param_name: str) -> Any:
         """Get a calibration parameter value for a qubit.
@@ -641,6 +647,7 @@ class CalService:
             ```
 
         """
+        assert self.execution_manager is not None, "ExecutionManager not initialized"
         return self.execution_manager.calib_data.qubit.get(qid, {}).get(param_name)
 
     def set_parameter(self, qid: str, param_name: str, value: Any) -> None:
@@ -657,6 +664,7 @@ class CalService:
             ```
 
         """
+        assert self.execution_manager is not None, "ExecutionManager not initialized"
         if qid not in self.execution_manager.calib_data.qubit:
             self.execution_manager.calib_data.qubit[qid] = {}
         self.execution_manager.calib_data.qubit[qid][param_name] = value
@@ -701,6 +709,7 @@ class CalService:
             ```
 
         """
+        assert self.execution_manager is not None, "ExecutionManager not initialized"
         logger = get_run_logger()
 
         # Initialize stage_results dict in note if it doesn't exist
@@ -736,15 +745,17 @@ class CalService:
             ```
 
         """
+        assert self.execution_manager is not None, "ExecutionManager not initialized"
         stage_results = self.execution_manager.note.get("stage_results", {})
         stage_data = stage_results.get(stage_name)
 
         if stage_data:
-            return stage_data["result"]
+            return dict(stage_data["result"])
         return None
 
-    def _sync_backend_params_before_push(self, logger) -> None:
+    def _sync_backend_params_before_push(self, logger: Any) -> None:
         """Sync recent calibration results into backend YAML params prior to GitHub push."""
+        assert self.execution_manager is not None, "ExecutionManager not initialized"
         updater_instance = get_params_updater(self.backend, self.chip_id)
         if updater_instance is None:
             return
@@ -796,6 +807,9 @@ class CalService:
             ```
 
         """
+        assert self.execution_manager is not None, "ExecutionManager not initialized"
+        assert self.task_manager is not None, "TaskManager not initialized"
+        assert self.github_push_config is not None, "GitHubPushConfig not initialized"
         logger = get_run_logger()
         push_results = None
 
@@ -859,7 +873,7 @@ class CalService:
 
             if should_push:
                 self._sync_backend_params_before_push(logger)
-                if GitHubIntegration.check_credentials():
+                if GitHubIntegration.check_credentials() and self.github_integration is not None:
                     try:
                         push_results = self.github_integration.push_files(self.github_push_config)
 
@@ -1020,7 +1034,7 @@ class CalService:
         )
 
         strategy = get_one_qubit_strategy(mode)
-        return strategy.execute(self, config)
+        return dict(strategy.execute(self, config))
 
     def run_full_chip(
         self,
@@ -1385,12 +1399,12 @@ class CalService:
 
 # Internal task functions for parallel execution
 @task
-def _execute_group(cal: "CalService", qids: list[str], tasks: list[str]) -> dict:
+def _execute_group(cal: "CalService", qids: list[str], tasks: list[str]) -> dict[str, Any]:
     """Execute tasks for a group of qubits (internal task)."""
-    results = {}
+    results: dict[str, Any] = {}
     for qid in qids:
         try:
-            result = {}
+            result: dict[str, Any] = {}
             for task_name in tasks:
                 result[task_name] = cal.execute_task(task_name, qid)
             result["status"] = "success"
@@ -1401,10 +1415,10 @@ def _execute_group(cal: "CalService", qids: list[str], tasks: list[str]) -> dict
 
 
 @task
-def _execute_coupling(cal: "CalService", coupling_qid: str, tasks: list[str]) -> dict:
+def _execute_coupling(cal: "CalService", coupling_qid: str, tasks: list[str]) -> dict[str, Any]:
     """Execute tasks for a coupling pair (internal task)."""
     try:
-        result = {}
+        result: dict[str, Any] = {}
         for task_name in tasks:
             result[task_name] = cal.execute_task(task_name, coupling_qid)
         result["status"] = "success"
@@ -1465,6 +1479,7 @@ def get_session() -> CalService:
     if session is None:
         msg = "No active calibration session."
         raise RuntimeError(msg)
+    assert isinstance(session, CalService), "Session must be a CalService instance"
     return session
 
 

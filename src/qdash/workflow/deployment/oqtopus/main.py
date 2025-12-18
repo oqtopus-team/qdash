@@ -53,8 +53,8 @@ if __name__ == "__main__":
     )
 
     _ = serve(
-        chip_report_deploy,  # type: ignore
-        gateway_integration_deploy,  # type: ignore
+        chip_report_deploy,
+        gateway_integration_deploy,
         webserver=True,
         limit=50,
     )

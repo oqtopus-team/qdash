@@ -26,6 +26,8 @@ Example:
     )
 """
 
+from typing import Any
+
 from prefect import flow
 from qdash.workflow.flow import CalService
 from qdash.workflow.flow.tasks import FULL_1Q_TASKS_AFTER_CHECK
@@ -41,7 +43,7 @@ def one_qubit_full(
     mode: str = "synchronized",
     flow_name: str | None = None,
     project_id: str | None = None,
-):
+) -> Any:
     """One-qubit full calibration (after check).
 
     Advanced calibration tasks including DRAG pulses and RB.

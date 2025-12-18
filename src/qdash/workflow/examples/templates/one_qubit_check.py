@@ -24,6 +24,8 @@ Example:
     )
 """
 
+from typing import Any
+
 from prefect import flow
 from qdash.workflow.flow import CalService
 from qdash.workflow.flow.tasks import CHECK_1Q_TASKS
@@ -39,7 +41,7 @@ def one_qubit_check(
     mode: str = "synchronized",
     flow_name: str | None = None,
     project_id: str | None = None,
-):
+) -> Any:
     """One-qubit check calibration.
 
     Basic characterization tasks to verify qubit quality.

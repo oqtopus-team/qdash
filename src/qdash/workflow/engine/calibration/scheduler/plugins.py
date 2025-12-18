@@ -418,7 +418,7 @@ class MuxConflictScheduler(CRSchedulingStrategy):
             f"MuxConflictScheduler: {len(pairs)} pairs → {self._num_groups} groups "
             f"(strategy={self.coloring_strategy})"
         )
-        return groups
+        return list(groups)
 
     def get_metadata(self) -> dict[str, Any]:
         """Return scheduler metadata."""

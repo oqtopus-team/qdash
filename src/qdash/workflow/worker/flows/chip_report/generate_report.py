@@ -122,7 +122,7 @@ class CustomLatticeGraph(LatticeGraph):
         edge_overlay_color: str | None = None,
         edge_overlay_textcolor: str | None = None,
         colorscale: str = "Viridis",
-    ):
+    ) -> go.Figure:
         width = 3 * NODE_SIZE * self.n_qubit_cols
         height = 3 * NODE_SIZE * self.n_qubit_rows
 
@@ -217,7 +217,9 @@ class CustomLatticeGraph(LatticeGraph):
         return fig
 
 
-def replace_none_with_nan(obj: dict | list | ScalarFloat | None | float | int | str):
+def replace_none_with_nan(
+    obj: dict | list | ScalarFloat | None | float | int | str,
+) -> dict | list | float | int | str:
     if isinstance(obj, dict):
         return {k: replace_none_with_nan(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -238,7 +240,7 @@ def read_base_properties(filename: str = "") -> CommentedMap:
         return cast(CommentedMap, data)
 
 
-def generate_pdf_report(image_paths: list[str], pdf_path: str = "report.pdf"):
+def generate_pdf_report(image_paths: list[str], pdf_path: str = "report.pdf") -> None:
     """画像をPDFに貼り付けてレポートを作成。"""
     c = canvas.Canvas(pdf_path, pagesize=A4)
     width, height = A4
@@ -263,7 +265,7 @@ def generate_pdf_report(image_paths: list[str], pdf_path: str = "report.pdf"):
     print(f"Saved PDF report: {pdf_path}")
 
 
-def generate_rich_pdf_report(image_paths: list[str], pdf_path: str = "rich_report.pdf"):
+def generate_rich_pdf_report(image_paths: list[str], pdf_path: str = "rich_report.pdf") -> None:
     c = canvas.Canvas(pdf_path, pagesize=A4)
     width, height = A4
 

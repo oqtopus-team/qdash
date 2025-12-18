@@ -88,6 +88,7 @@ class BackendProtocol(Protocol):
         calib_dir: str,
         execution_id: str,
         task_manager_id: str,
+        project_id: str | None = None,
     ) -> None:
         """Update calibration note."""
         ...
@@ -480,7 +481,9 @@ class TaskExecutor:
         class TaskManagerProxy:
             """Proxy object that mimics TaskManager for ExecutionManager.update_with_task_manager."""
 
-            def __init__(self, task_manager_id: str, task_result, calib_data, controller_info):
+            def __init__(
+                self, task_manager_id: str, task_result: Any, calib_data: Any, controller_info: Any
+            ) -> None:
                 self.id = task_manager_id
                 self.task_result = task_result
                 self.calib_data = calib_data
@@ -911,7 +914,7 @@ class TaskExecutor:
         # Store in state manager
         self.state_manager.put_output_parameters(task_name, processed_params, task_type, qid)
 
-        return processed_params
+        return dict(processed_params)
 
     def _save_artifacts(
         self,

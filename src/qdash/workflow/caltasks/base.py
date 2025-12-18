@@ -46,7 +46,7 @@ class BaseTask(ABC):
     backend = "qubex"
     registry: ClassVar[dict[str, dict[str, type["BaseTask"]]]] = {}
 
-    def __init_subclass__(cls, **kwargs) -> None:
+    def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         backend = getattr(cls, "backend", None)
         if backend is None:
@@ -70,8 +70,13 @@ class BaseTask(ABC):
         # to avoid sharing state between task instances
         from copy import deepcopy
 
-        self.input_parameters = deepcopy(self.__class__.input_parameters)
-        self.output_parameters = deepcopy(self.__class__.output_parameters)
+        # These are instance copies that shadow the class variables
+        self.input_parameters: dict[str, InputParameterModel] = deepcopy(  # type: ignore[misc]
+            self.__class__.input_parameters
+        )
+        self.output_parameters: dict[str, OutputParameterModel] = deepcopy(  # type: ignore[misc]
+            self.__class__.output_parameters
+        )
 
         if params is not None:
             self._convert_and_set_parameters(params)

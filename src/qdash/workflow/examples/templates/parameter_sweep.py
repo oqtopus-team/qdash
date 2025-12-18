@@ -25,6 +25,8 @@ Example:
     )
 """
 
+from typing import Any
+
 from prefect import flow
 from qdash.workflow.flow import CalService
 
@@ -36,7 +38,7 @@ def parameter_sweep(
     qids: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
-):
+) -> Any:
     """Parameter sweep calibration flow.
 
     Args:

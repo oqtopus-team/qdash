@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import numpy as np
 import numpy.typing as npt
@@ -18,26 +18,28 @@ from qubex.simulator import Control, QuantumSimulator, QuantumSystem, Simulation
 
 
 def downsample(
-    data: npt.NDArray,
+    data: npt.NDArray[Any],
     n_samples: int | None,
-) -> npt.NDArray:
+) -> npt.NDArray[Any]:
     """Downsample the data to a specified number of samples."""
     if n_samples is None:
         return data
     if len(data) <= n_samples:
         return data
     indices = np.linspace(0, len(data) - 1, n_samples).astype(int)
-    return data[indices]
+    return np.asarray(data[indices])
 
 
 class CustomSimulationResult(SimulationResult):
     """Custom simulation result to handle Rabi parameters."""
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         """Initialize the custom simulation result."""
         super().__init__(**kwargs)
 
-    def plot_population_dynamics(self, label=None, *, n_samples=None) -> go.Figure:
+    def plot_population_dynamics(
+        self, label: str | None = None, *, n_samples: int | None = None
+    ) -> go.Figure:
         """Plot the population dynamics of the states.
 
         Parameters

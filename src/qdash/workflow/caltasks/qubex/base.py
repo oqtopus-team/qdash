@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Generator
 
 from qdash.datamodel.task import InputParameterModel
 from qdash.workflow.caltasks.base import (
@@ -160,7 +160,7 @@ class QubexTask(BaseTask):
             f"Batch run is not implemented for {self.name} task. Use run method instead."
         )
 
-    def get_experiment(self, backend: "QubexBackend"):
+    def get_experiment(self, backend: "QubexBackend") -> Any:
         """Get the experiment session from QubexBackend.
 
         Args:
@@ -188,7 +188,7 @@ class QubexTask(BaseTask):
 
         """
         exp = self.get_experiment(backend)
-        return exp.get_qubit_label(int(qid))
+        return str(exp.get_qubit_label(int(qid)))
 
     def get_resonator_label(self, backend: "QubexBackend", qid: str) -> str:
         """Get the resonator label for a given qubit ID.
@@ -204,7 +204,7 @@ class QubexTask(BaseTask):
 
         """
         exp = self.get_experiment(backend)
-        return exp.get_resonator_label(int(qid))
+        return str(exp.get_resonator_label(int(qid)))
 
     def save_calibration(self, backend: "QubexBackend") -> None:
         """Save calibration notes after task execution.
@@ -244,10 +244,12 @@ class QubexTask(BaseTask):
         default_freq = exp.experiment_system.quantum_system.get_qubit(label).frequency
 
         # Check if they differ (with small tolerance for floating point comparison)
-        return abs(current_freq - default_freq) > 1e-9
+        return bool(abs(float(current_freq) - float(default_freq)) > 1e-9)
 
     @contextmanager
-    def _apply_parameter_overrides(self, backend: "QubexBackend", qid: str):
+    def _apply_parameter_overrides(
+        self, backend: "QubexBackend", qid: str
+    ) -> Generator[None, None, None]:
         """Context manager to apply multiple parameter overrides.
 
         This unified method handles all parameter types that can be overridden:
@@ -356,7 +358,9 @@ class QubexTask(BaseTask):
                 resonator.frequency = original_values["readout_frequency"]
 
     @contextmanager
-    def _apply_frequency_override(self, backend: "QubexBackend", qid: str):
+    def _apply_frequency_override(
+        self, backend: "QubexBackend", qid: str
+    ) -> Generator[None, None, None]:
         """Context manager to apply frequency override if needed.
 
         DEPRECATED: Use _apply_parameter_overrides() instead for better flexibility.

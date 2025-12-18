@@ -4,7 +4,7 @@ from prefect import task
 
 
 @task(name="create directory")
-def create_directory_task(calib_dir: str):
+def create_directory_task(calib_dir: str) -> None:
     if not os.path.exists(calib_dir):
         os.makedirs(calib_dir)
     path_list = [

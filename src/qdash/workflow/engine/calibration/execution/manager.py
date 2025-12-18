@@ -6,6 +6,7 @@ to ExecutionService and ExecutionStateManager internally.
 """
 
 import logging
+from typing import Any
 
 import pendulum
 from pydantic import BaseModel, Field
@@ -82,7 +83,7 @@ class ExecutionManager(BaseModel):
         name: str = "default",
         note: dict = {},
         project_id: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self.username = username
@@ -244,16 +245,17 @@ class ExecutionManager(BaseModel):
     def start_execution(self) -> "ExecutionManager":
         """Start the execution and set the start time."""
         if self._state_manager and self._repository:
-            self._state_manager.start()
+            state_manager = self._state_manager
+            state_manager.start()
 
             def updater(model: ExecutionModel) -> None:
-                model.start_at = self._state_manager.start_at
+                model.start_at = state_manager.start_at
                 model.status = ExecutionStatusModel.RUNNING
 
             self._repository.update_with_optimistic_lock(
                 execution_id=self.execution_id,
                 update_func=updater,
-                initial_model=self._state_manager.to_datamodel(),
+                initial_model=state_manager.to_datamodel(),
             )
 
             self._sync_from_state_manager()
@@ -262,17 +264,18 @@ class ExecutionManager(BaseModel):
     def complete_execution(self) -> "ExecutionManager":
         """Complete the execution with success status."""
         if self._state_manager and self._repository:
-            self._state_manager.complete()
+            state_manager = self._state_manager
+            state_manager.complete()
 
             def updater(model: ExecutionModel) -> None:
-                model.end_at = self._state_manager.end_at
-                model.elapsed_time = self._state_manager.elapsed_time
+                model.end_at = state_manager.end_at
+                model.elapsed_time = state_manager.elapsed_time
                 model.status = ExecutionStatusModel.COMPLETED
 
             self._repository.update_with_optimistic_lock(
                 execution_id=self.execution_id,
                 update_func=updater,
-                initial_model=self._state_manager.to_datamodel(),
+                initial_model=state_manager.to_datamodel(),
             )
 
             self._sync_from_state_manager()
@@ -281,17 +284,18 @@ class ExecutionManager(BaseModel):
     def fail_execution(self) -> "ExecutionManager":
         """Complete the execution with failure status."""
         if self._state_manager and self._repository:
-            self._state_manager.fail()
+            state_manager = self._state_manager
+            state_manager.fail()
 
             def updater(model: ExecutionModel) -> None:
-                model.end_at = self._state_manager.end_at
-                model.elapsed_time = self._state_manager.elapsed_time
+                model.end_at = state_manager.end_at
+                model.elapsed_time = state_manager.elapsed_time
                 model.status = ExecutionStatusModel.FAILED
 
             self._repository.update_with_optimistic_lock(
                 execution_id=self.execution_id,
                 update_func=updater,
-                initial_model=self._state_manager.to_datamodel(),
+                initial_model=state_manager.to_datamodel(),
             )
 
             self._sync_from_state_manager()

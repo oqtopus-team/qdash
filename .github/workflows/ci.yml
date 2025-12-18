@@ -47,6 +47,8 @@ jobs:
         run: |
           task lint-python
           task lint-mypy
+          task lint-mypy-datamodel
+          task lint-mypy-workflow
 
   # test:
   #   runs-on: ubuntu-latest

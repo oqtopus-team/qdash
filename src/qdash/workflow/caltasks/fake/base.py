@@ -51,4 +51,4 @@ class FakeTask(BaseTask):
             The qubit label string (e.g., "Q00", "Q01", etc.)
 
         """
-        return qid_to_label(qid)
+        return str(qid_to_label(qid))

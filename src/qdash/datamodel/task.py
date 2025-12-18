@@ -61,12 +61,22 @@ class InputParameterModel(BaseModel):
                 for p in parts:
                     result *= p
                 return result
+            if self.value is None:
+                raise ValueError("Cannot convert None to int")
+            if isinstance(self.value, tuple):
+                raise ValueError("Cannot convert tuple to int")
             return int(self.value)
         elif self.value_type == "float":
+            if self.value is None:
+                raise ValueError("Cannot convert None to float")
+            if isinstance(self.value, tuple):
+                raise ValueError("Cannot convert tuple to float")
             return float(self.value)
         elif self.value_type == "str":
             return str(self.value)
         elif self.value_type == "list":
+            if not isinstance(self.value, (list, tuple)):
+                raise ValueError("Cannot convert non-iterable to list")
             return list(self.value)
         return self.value
 

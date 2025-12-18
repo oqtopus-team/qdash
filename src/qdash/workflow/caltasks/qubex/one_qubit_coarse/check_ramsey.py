@@ -228,6 +228,18 @@ class CheckRamsey(QubexTask):
         )
         selected_r2_str = f"{selected_r2:.4f}" if selected_r2 is not None else "N/A"
         logger.info(f"  Selected axis: {selected_axis} (R²={selected_r2_str})")
+
+        # Ensure we have valid results before proceeding
+        if selected_result is None:
+            raise ValueError(
+                f"No valid Ramsey result available for Q{qid}. "
+                "Both X and Y axis experiments returned no data."
+            )
+        if selected_fit is None:
+            raise ValueError(
+                f"No valid Ramsey fit available for Q{qid}. " "Fit failed for the selected axis."
+            )
+
         logger.info(f"  Bare frequency: {selected_result.bare_freq:.6f} GHz")
 
         self.output_parameters["ramsey_frequency"].value = (

@@ -32,7 +32,7 @@ class ReadoutConfigure(QubexTask):
     def run(self, backend: QubexBackend, qid: str) -> RunResult:  # noqa: ARG002
         exp = self.get_experiment(backend)
 
-        def readout_configure():
+        def readout_configure() -> RunResult | None:
             import numpy as np
 
             sys = exp.config_loader.get_experiment_system(chip_id=exp.chip_id)
@@ -48,6 +48,7 @@ class ReadoutConfigure(QubexTask):
             exp.system_manager.push(
                 exp.box_ids, confirm=False
             )  # controlはconfigの値でreadoutは指定した量子ビットのreadoutが紐づいているboxを更新
+            return None
 
         readout_configure()
 

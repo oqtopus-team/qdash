@@ -4,7 +4,7 @@ This module defines abstract interfaces (protocols) for data access operations
 to decouple TaskManager from specific database implementations.
 """
 
-from typing import Protocol, runtime_checkable
+from typing import Callable, Protocol, runtime_checkable
 
 from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.task import BaseTaskResultModel, CalibDataModel
@@ -200,7 +200,7 @@ class ExecutionRepository(Protocol):
     def update_with_optimistic_lock(
         self,
         execution_id: str,
-        update_func: callable,
+        update_func: Callable[[ExecutionModel], None],
     ) -> ExecutionModel:
         """Update execution with optimistic locking.
 

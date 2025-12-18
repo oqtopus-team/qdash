@@ -22,6 +22,8 @@ Example:
     )
 """
 
+from typing import Any
+
 from prefect import flow
 from qdash.workflow.flow import CalService
 
@@ -33,7 +35,7 @@ def simple_calibration(
     qids: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
-):
+) -> Any:
     """Simple calibration flow.
 
     Args:

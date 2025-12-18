@@ -31,9 +31,9 @@ def pull_github(target_dir: str | Path = "/app/config/qubex") -> str:
 
     try:
         # Get authentication details from environment
-        github_user = os.getenv("GITHUB_USER")
-        github_token = os.getenv("GITHUB_TOKEN")
-        repo_url = os.getenv("CONFIG_REPO_URL")
+        github_user = os.getenv("GITHUB_USER", "")
+        github_token = os.getenv("GITHUB_TOKEN", "")
+        repo_url = os.getenv("CONFIG_REPO_URL", "")
 
         if not all([github_user, github_token]):
             raise RuntimeError("Missing required environment variables: GITHUB_USER, GITHUB_TOKEN")
@@ -79,15 +79,18 @@ def pull_github(target_dir: str | Path = "/app/config/qubex") -> str:
 
         # Log success with commit information
         current = repo.head.commit
-        logger.info(f"Updated to commit: {current.hexsha[:8]} - {current.message.strip()}")
+        message = (
+            current.message if isinstance(current.message, str) else current.message.decode("utf-8")
+        )
+        logger.info(f"Updated to commit: {current.hexsha[:8]} - {message.strip()}")
         logger.info(f"Config files updated successfully in: {target_dir}")
 
     except GitCommandError as e:
         # Mask credentials in error message
         error_msg = str(e.stderr)
-        parsed = urlparse(repo_url)
+        parsed_err = urlparse(repo_url)
         masked_url = urlunparse(
-            (parsed.scheme, parsed.netloc.split("@")[-1], parsed.path, "", "", "")
+            (parsed_err.scheme, str(parsed_err.netloc).split("@")[-1], parsed_err.path, "", "", "")
         )
         raise RuntimeError(f"Git operation failed for {masked_url}: {error_msg}")
 
@@ -98,4 +101,4 @@ def pull_github(target_dir: str | Path = "/app/config/qubex") -> str:
         if temp_dir and Path(temp_dir).exists():
             shutil.rmtree(temp_dir)
 
-        return current.hexsha[:8] if current else None
+        return str(current.hexsha[:8]) if current else ""

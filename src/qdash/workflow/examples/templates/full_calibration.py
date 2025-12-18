@@ -23,6 +23,8 @@ Example:
     )
 """
 
+from typing import Any
+
 from prefect import flow
 from qdash.workflow.flow import CalService
 
@@ -36,7 +38,7 @@ def full_calibration(
     qids: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
-):
+) -> Any:
     """Full calibration: 1Q Check -> 1Q Full -> 2Q.
 
     Runs 3 separate executions for complete chip calibration.

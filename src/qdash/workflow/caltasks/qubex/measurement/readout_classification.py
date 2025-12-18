@@ -1,6 +1,7 @@
 from typing import Any, ClassVar
 
 import numpy as np
+import numpy.typing as npt
 import plotly.graph_objs as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.caltasks.base import (
@@ -55,7 +56,7 @@ class ReadoutClassification(QubexTask):
         m = 0.5 * (c0 + c1)
 
         # Projection function (cross-section)
-        def proj(z):
+        def proj(z: npt.NDArray[Any]) -> npt.NDArray[np.floating[Any]]:
             """Project complex data onto discrimination axis."""
             return np.real((z - m) * np.conj(u))
 

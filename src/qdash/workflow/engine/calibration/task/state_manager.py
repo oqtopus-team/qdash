@@ -4,6 +4,8 @@ This module provides the TaskStateManager class that handles task state
 management, including task creation, status updates, and parameter handling.
 """
 
+from typing import Any
+
 import pendulum
 from pydantic import BaseModel
 from qdash.datamodel.task import (
@@ -43,7 +45,7 @@ class TaskStateManager(BaseModel):
     calib_data: CalibDataModel = CalibDataModel(qubit={}, coupling={})
     _upstream_task_id: str = ""
 
-    def __init__(self, qids: list[str] | None = None, **data) -> None:
+    def __init__(self, qids: list[str] | None = None, **data: Any) -> None:
         """Initialize TaskStateManager.
 
         Parameters
@@ -108,7 +110,7 @@ class TaskStateManager(BaseModel):
         tasks.append(task)
         return task
 
-    def _get_task_container(self, task_type: str, qid: str) -> list:
+    def _get_task_container(self, task_type: str, qid: str) -> list[Any]:
         """Get the appropriate task container.
 
         Parameters
@@ -125,13 +127,13 @@ class TaskStateManager(BaseModel):
 
         """
         if task_type == "qubit":
-            return self.task_result.qubit_tasks[qid]
+            return list(self.task_result.qubit_tasks[qid])
         elif task_type == "coupling":
-            return self.task_result.coupling_tasks[qid]
+            return list(self.task_result.coupling_tasks[qid])
         elif task_type == "global":
-            return self.task_result.global_tasks
+            return list(self.task_result.global_tasks)
         elif task_type == "system":
-            return self.task_result.system_tasks
+            return list(self.task_result.system_tasks)
         else:
             raise ValueError(f"Unknown task type: {task_type}")
 
@@ -404,7 +406,9 @@ class TaskStateManager(BaseModel):
             elif task_type == "coupling":
                 self._clear_coupling_calib_data(qid, parameter_names)
 
-    def get_output_parameter_by_task_name(self, task_name: str, task_type: str, qid: str) -> dict:
+    def get_output_parameter_by_task_name(
+        self, task_name: str, task_type: str, qid: str
+    ) -> dict[Any, Any]:
         """Get output parameters for a specific task.
 
         Parameters
@@ -423,7 +427,7 @@ class TaskStateManager(BaseModel):
 
         """
         task = self.get_task(task_name, task_type, qid)
-        return task.output_parameters
+        return dict(task.output_parameters)
 
     def start_all_qid_tasks(self, task_name: str, task_type: str, qids: list[str]) -> None:
         """Start a task for all given qubit IDs.
@@ -482,7 +486,7 @@ class TaskStateManager(BaseModel):
         """
         try:
             task = self.get_task(task_name, task_type, qid)
-            return task.status == TaskStatusModel.COMPLETED
+            return bool(task.status == TaskStatusModel.COMPLETED)
         except ValueError:
             return False
 
@@ -516,7 +520,7 @@ class TaskStateManager(BaseModel):
             for name in parameter_names:
                 self.calib_data.coupling[qid].pop(name, None)
 
-    def get_qubit_calib_data(self, qid: str) -> dict:
+    def get_qubit_calib_data(self, qid: str) -> dict[Any, Any]:
         """Get calibration data for a qubit.
 
         Parameters
@@ -530,9 +534,9 @@ class TaskStateManager(BaseModel):
             The qubit calibration data
 
         """
-        return self.calib_data.qubit.get(qid, {})
+        return dict(self.calib_data.qubit.get(qid, {}))
 
-    def get_coupling_calib_data(self, qid: str) -> dict:
+    def get_coupling_calib_data(self, qid: str) -> dict[Any, Any]:
         """Get calibration data for a coupling.
 
         Parameters
@@ -546,7 +550,7 @@ class TaskStateManager(BaseModel):
             The coupling calibration data
 
         """
-        return self.calib_data.coupling.get(qid, {})
+        return dict(self.calib_data.coupling.get(qid, {}))
 
     def set_figure_paths(
         self,
@@ -697,18 +701,18 @@ class TaskStateManager(BaseModel):
         """
         return self._ensure_task_exists(task_name, task_type, qid)
 
-    def clear_qubit_calib_data(self, qid: str, parameter_names) -> None:
+    def clear_qubit_calib_data(self, qid: str, parameter_names: list[str]) -> None:
         """Public method to clear qubit calibration data.
 
         Parameters
         ----------
         qid : str
             Qubit ID
-        parameter_names : Iterable[str]
+        parameter_names : list[str]
             Names of parameters to clear
 
         """
-        self._clear_qubit_calib_data(qid, list(parameter_names))
+        self._clear_qubit_calib_data(qid, parameter_names)
 
     def update_task_status_to_running(
         self, task_name: str, message: str, task_type: str, qid: str

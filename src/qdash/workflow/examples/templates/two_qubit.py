@@ -30,6 +30,8 @@ Example:
     )
 """
 
+from typing import Any
+
 from prefect import flow
 from qdash.workflow.flow import CalService
 
@@ -53,7 +55,7 @@ def two_qubit_calibration(
     flow_name: str | None = None,
     project_id: str | None = None,
     max_parallel_ops: int = 10,
-):
+) -> Any:
     """Two-qubit coupling calibration with automatic CR scheduling.
 
     Uses CRScheduler to generate parallel execution groups based on
