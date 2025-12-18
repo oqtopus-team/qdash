@@ -9,68 +9,18 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from prefect import get_run_logger, task
+from prefect import get_run_logger
 
 from qdash.workflow.engine.calibration import OneQubitScheduler
+from qdash.workflow.service._internal.prefect_tasks import (
+    calibrate_mux_qubits as _calibrate_mux_qubits,
+    calibrate_step_qubits_parallel as _calibrate_step_qubits_parallel,
+)
+from qdash.workflow.service.calib_service import finish_calibration, get_session, init_calibration
 from qdash.workflow.service.github import ConfigFileType, GitHubPushConfig
-from qdash.workflow.service.session import finish_calibration, get_session, init_calibration
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.session import CalibService
-
-
-# =============================================================================
-# Internal Prefect Tasks
-# =============================================================================
-
-
-@task
-def _calibrate_mux_qubits(qids: list[str], tasks: list[str]) -> dict[str, Any]:
-    """Execute tasks for qubits in a single MUX sequentially."""
-    logger = get_run_logger()
-    session = get_session()
-    results = {}
-
-    for qid in qids:
-        try:
-            result = {}
-            for task_name in tasks:
-                task_result = session.execute_task(task_name, qid)
-                result[task_name] = task_result
-            result["status"] = "success"
-        except Exception as e:
-            logger.error(f"Failed to calibrate qubit {qid}: {e}")
-            result = {"status": "failed", "error": str(e)}
-        results[qid] = result
-
-    return results
-
-
-@task
-def _calibrate_single_qubit(qid: str, tasks: list[str]) -> tuple[str, dict[str, Any]]:
-    """Execute tasks for a single qubit."""
-    logger = get_run_logger()
-    session = get_session()
-
-    try:
-        result = {}
-        for task_name in tasks:
-            task_result = session.execute_task(task_name, qid)
-            result[task_name] = task_result
-        result["status"] = "success"
-    except Exception as e:
-        logger.error(f"Failed to calibrate qubit {qid}: {e}")
-        result = {"status": "failed", "error": str(e)}
-
-    return qid, result
-
-
-@task
-def _calibrate_step_qubits_parallel(parallel_qids: list[str], tasks: list[str]) -> dict[str, Any]:
-    """Execute tasks for all qubits in a synchronized step in parallel."""
-    futures = [_calibrate_single_qubit.submit(qid, tasks) for qid in parallel_qids]
-    pair_results = [f.result() for f in futures]
-    return {qid: result for qid, result in pair_results}
+    from qdash.workflow.service.calib_service import CalibService
 
 
 # =============================================================================

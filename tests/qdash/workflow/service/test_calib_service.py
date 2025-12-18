@@ -6,7 +6,7 @@ These tests verify the CalibService API and helper functions for custom calibrat
 import pytest
 from unittest.mock import MagicMock, patch
 
-from qdash.workflow.service.session import (
+from qdash.workflow.service.calib_service import (
     CalibService,
     finish_calibration,
     get_session,
@@ -82,7 +82,7 @@ class MockExecutionLockDocument:
 @pytest.fixture(autouse=True)
 def clear_session_state():
     """Clear session state before and after each test."""
-    import qdash.workflow.service.session as session_module
+    import qdash.workflow.service.calib_service as session_module
 
     # Clear before test
     session_module._current_session = None
@@ -99,19 +99,19 @@ def clear_session_state():
 def mock_flow_session_deps(monkeypatch):
     """Fixture to mock CalibService dependencies."""
     monkeypatch.setattr(
-        "qdash.workflow.service.session.ExecutionManager",
+        "qdash.workflow.service.calib_service.ExecutionManager",
         MockExecutionManager,
     )
     monkeypatch.setattr(
-        "qdash.workflow.service.session.create_backend",
+        "qdash.workflow.service.calib_service.create_backend",
         lambda **kwargs: MockSession(),
     )
     monkeypatch.setattr(
-        "qdash.workflow.service.session.GitHubIntegration",
+        "qdash.workflow.service.calib_service.GitHubIntegration",
         MockGitHubIntegration,
     )
     monkeypatch.setattr(
-        "qdash.workflow.service.session.ExecutionLockDocument",
+        "qdash.workflow.service.calib_service.ExecutionLockDocument",
         MockExecutionLockDocument,
     )
 
@@ -213,7 +213,7 @@ class TestGlobalSessionHelpers:
         # Mock Prefect logger to avoid context error
         mock_logger = MagicMock()
         monkeypatch.setattr(
-            "qdash.workflow.service.session.get_run_logger",
+            "qdash.workflow.service.calib_service.get_run_logger",
             lambda: mock_logger,
         )
 

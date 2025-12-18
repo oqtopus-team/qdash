@@ -24,7 +24,12 @@ from pathlib import Path
 from typing import Any
 
 import pendulum
-from prefect import get_run_logger, task
+from prefect import get_run_logger
+
+from qdash.workflow.service._internal.prefect_tasks import (
+    execute_coupling as _execute_coupling,
+    execute_group as _execute_group,
+)
 
 logger = logging.getLogger(__name__)
 from qdash.dbmodel.chip import ChipDocument
@@ -1397,38 +1402,8 @@ class CalibService:
             raise
 
 
-# Internal task functions for parallel execution
-@task
-def _execute_group(cal: "CalibService", qids: list[str], tasks: list[str]) -> dict[str, Any]:
-    """Execute tasks for a group of qubits (internal task)."""
-    results: dict[str, Any] = {}
-    for qid in qids:
-        try:
-            result: dict[str, Any] = {}
-            for task_name in tasks:
-                result[task_name] = cal.execute_task(task_name, qid)
-            result["status"] = "success"
-        except Exception as e:
-            result = {"status": "failed", "error": str(e)}
-        results[qid] = result
-    return results
-
-
-@task
-def _execute_coupling(cal: "CalibService", coupling_qid: str, tasks: list[str]) -> dict[str, Any]:
-    """Execute tasks for a coupling pair (internal task)."""
-    try:
-        result: dict[str, Any] = {}
-        for task_name in tasks:
-            result[task_name] = cal.execute_task(task_name, coupling_qid)
-        result["status"] = "success"
-    except Exception as e:
-        result = {"status": "failed", "error": str(e)}
-    return result
-
-
 # =============================================================================
-# Internal Session Management (for scheduled.py)
+# Internal Session Management (for scheduled.py and strategy.py)
 # =============================================================================
 
 from qdash.workflow.service.context import (
