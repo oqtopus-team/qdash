@@ -3,15 +3,18 @@
 This module provides calibration workflow management components organized into:
 - task/: Task management (TaskManager, TaskExecutor, TaskStateManager, etc.)
 - execution/: Execution management (ExecutionManager, ExecutionStateManager, ExecutionService)
+- session/: Session management (SessionManager, SessionConfig)
 - scheduler/: CR scheduling (CRScheduler)
 - repository/: Data persistence (MongoDB, filesystem implementations)
 """
 
-# Task components
 # Execution components
 from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.execution.service import ExecutionService
 from qdash.workflow.engine.calibration.execution.state_manager import ExecutionStateManager
+
+# Session components
+from qdash.workflow.engine.calibration.session import SessionConfig, SessionManager
 
 # Scheduler components
 from qdash.workflow.engine.calibration.scheduler.cr_scheduler import CRScheduler, CRScheduleResult
@@ -52,6 +55,9 @@ execution_service = ExecutionService
 cr_scheduler = CRScheduler
 
 __all__ = [
+    # Session
+    "SessionManager",
+    "SessionConfig",
     # Task
     "TaskManager",
     "TaskExecutor",

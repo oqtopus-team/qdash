@@ -19,7 +19,9 @@
       "Bash(task lint-python)",
       "Bash(task lint-mypy:*)",
       "mcp__serena__find_symbol",
-      "Bash(task lint-mypy:workflow:*)"
+      "Bash(task lint-mypy:workflow:*)",
+      "Bash(grep:*)",
+      "Bash(cut:*)"
     ],
     "deny": []
   },

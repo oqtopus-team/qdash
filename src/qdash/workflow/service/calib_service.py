@@ -47,13 +47,11 @@ from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.user import UserDocument
-from qdash.workflow.calibtasks.active_protocols import generate_task_instances
-from qdash.workflow.engine.backend.factory import create_backend
+from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.params_updater import get_params_updater
-from qdash.workflow.engine.calibration.prefect_tasks import execute_dynamic_task_by_qid
+from qdash.workflow.engine.calibration.session import SessionConfig, SessionManager
 from qdash.workflow.engine.calibration.task.manager import TaskManager
-from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
 
@@ -180,7 +178,6 @@ class CalibService:
         self.backend_name = backend_name
         self.use_lock = use_lock
         self._lock_acquired = False
-        self._last_executed_task_id_by_qid: dict[str, str] = {}  # Track last task_id per qid
 
         # Store flow_name (priority: flow_name > name)
         self.flow_name = flow_name or name
@@ -211,9 +208,7 @@ class CalibService:
         # Session state
         self._initialized = False
         self.execution_id: str | None = execution_id
-        self.execution_manager: ExecutionManager | None = None
-        self.task_manager: TaskManager | None = None
-        self.backend: BaseBackend | None = None
+        self._session_manager: SessionManager | None = None
         self.github_integration: GitHubIntegration | None = None
         self.github_push_config: GitHubPushConfig | None = github_push_config
 
@@ -274,19 +269,27 @@ class CalibService:
 
         # Wrap all initialization in try/except to ensure lock is released on failure
         try:
-            self._initialize_session(
+            # Create SessionConfig
+            config = SessionConfig(
                 username=self.username,
                 chip_id=self.chip_id,
                 qids=qids,
                 execution_id=self.execution_id,
                 backend_name=self.backend_name,
-                name=self.flow_name or "Python Flow Execution",
+                flow_name=self.flow_name,
                 tags=tags,
                 note=note,
-                enable_github_pull=self._enable_github_pull,
                 muxes=self.muxes,
                 project_id=self.project_id,
+                enable_github_pull=self._enable_github_pull,
             )
+
+            # Create and initialize SessionManager
+            self._session_manager = SessionManager(
+                config=config,
+                github_integration=self.github_integration,
+            )
+            self._session_manager.initialize()
             self._initialized = True
         except Exception:
             # Release lock if initialization fails
@@ -295,205 +298,32 @@ class CalibService:
                 self._lock_acquired = False
             raise
 
-    def _initialize_session(
-        self,
-        username: str,
-        chip_id: str,
-        qids: list[str],
-        execution_id: str,
-        backend_name: str,
-        name: str,
-        tags: list[str] | None,
-        note: dict[str, Any] | None,
-        enable_github_pull: bool,
-        muxes: list[int] | None,
-        project_id: str | None = None,
-    ) -> None:
-        """Initialize session components after lock acquisition.
+    @property
+    def execution_manager(self) -> ExecutionManager | None:
+        """Get the ExecutionManager from SessionManager."""
+        if self._session_manager is None:
+            return None
+        return self._session_manager.execution_manager
 
-        This method is separated from __init__ to enable proper exception handling
-        with lock release on failure.
+    @execution_manager.setter
+    def execution_manager(self, value: ExecutionManager | None) -> None:
+        """Set execution_manager (for backward compatibility with reload)."""
+        if self._session_manager is not None:
+            self._session_manager._execution_manager = value
 
-        Args:
-            username: Username for the session
-            chip_id: Target chip ID
-            qids: List of qubit IDs
-            execution_id: Execution identifier
-            backend_name: Backend type
-            name: Human-readable name
-            tags: Tags for categorization
-            note: Additional notes
-            enable_github_pull: Whether to pull from GitHub
-            muxes: MUX IDs for system-level tasks
-            project_id: Project ID for multi-tenancy support
+    @property
+    def task_manager(self) -> TaskManager | None:
+        """Get the TaskManager from SessionManager."""
+        if self._session_manager is None:
+            return None
+        return self._session_manager.task_manager
 
-        """
-        # Set default tags and note
-        # Use name (which is flow_name or display_name) as default tag
-        if tags is None:
-            tags = [name]
-        if note is None:
-            note = {}
-
-        # Setup calibration directory
-        date_str, index = execution_id.split("-")
-        user_path = f"/app/calib_data/{username}"
-        classifier_dir = f"{user_path}/.classifier"
-        calib_data_path = f"{user_path}/{date_str}/{index}"
-
-        # Create directory structure (matching create_directory_task behavior)
-        Path(calib_data_path).mkdir(parents=True, exist_ok=True)
-        Path(classifier_dir).mkdir(exist_ok=True)
-        Path(f"{calib_data_path}/task").mkdir(exist_ok=True)
-        Path(f"{calib_data_path}/fig").mkdir(exist_ok=True)
-        Path(f"{calib_data_path}/calib").mkdir(exist_ok=True)
-        Path(f"{calib_data_path}/calib_note").mkdir(exist_ok=True)
-
-        # Pull config from GitHub if requested
-        if enable_github_pull:
-            logger = get_run_logger()
-            if GitHubIntegration.check_credentials() and self.github_integration is not None:
-                commit_id = self.github_integration.pull_config()
-                if commit_id:
-                    note["config_commit_id"] = commit_id
-            else:
-                logger.warning("GitHub credentials not configured, skipping pull")
-
-        # Initialize ExecutionManager with integrated save processing
-        self.execution_manager = (
-            ExecutionManager(
-                username=username,
-                execution_id=execution_id,
-                calib_data_path=calib_data_path,
-                chip_id=chip_id,
-                name=name,
-                tags=tags,
-                note=note,
-                project_id=project_id,
-            )
-            .save()
-            .start_execution()
-            .update_execution_status_to_running()
-        )
-
-        # Initialize TaskManager for tracking all tasks
-        # This will be reused across all execute_task calls
-        self.task_manager = TaskManager(
-            username=username,
-            execution_id=execution_id,
-            qids=qids,
-            calib_dir=calib_data_path,
-        )
-
-        # Initialize backend session
-        # Note: For qubex backend, qids must be provided for proper box selection
-        # Use task_manager.id for note_path (same as setup_calibration)
-        note_path = f"{calib_data_path}/calib_note/{self.task_manager.id}.json"
-        session_config: dict[str, Any] = {
-            "task_type": "qubit",
-            "username": username,
-            "qids": qids,
-            "note_path": note_path,
-            "chip_id": chip_id,
-            "classifier_dir": classifier_dir,
-        }
-
-        # Add muxes if provided
-        if muxes is not None:
-            session_config["muxes"] = muxes
-
-        self.backend = create_backend(
-            backend=backend_name,
-            config=session_config,
-        )
-
-        # Save calibration_note before connecting (loads parameter overrides)
-        if self.backend.name == "qubex":
-            self.backend.save_note(
-                username=username,
-                chip_id=chip_id,
-                calib_dir=calib_data_path,
-                execution_id=execution_id,
-                task_manager_id=self.task_manager.id,
-                project_id=self.project_id,
-            )
-
-        self.backend.connect()
-
-    def _ensure_task_in_workflow(self, task_name: str, task_type: str, qid: str) -> None:
-        """Ensure task exists in TaskManager's workflow structure.
-
-        Dynamically adds task to the workflow if it doesn't exist yet.
-        This allows FlowSession to execute tasks on-demand without pre-building
-        the entire workflow.
-
-        Args:
-            task_name: Name of the task
-            task_type: Type of task ('qubit', 'coupling', 'global', 'system')
-            qid: Qubit ID
-
-        """
-        from qdash.datamodel.task import (
-            CouplingTaskModel,
-            GlobalTaskModel,
-            QubitTaskModel,
-            SystemTaskModel,
-        )
-
-        assert self.task_manager is not None, "TaskManager not initialized"
-
-        # Check if task already exists
-        if task_type == "qubit":
-            if qid in self.task_manager.task_result.qubit_tasks:
-                existing_tasks = [t.name for t in self.task_manager.task_result.qubit_tasks[qid]]
-                if task_name in existing_tasks:
-                    return
-            # Add new qubit task
-            task = QubitTaskModel(name=task_name, upstream_id="", qid=qid)
-            self.task_manager.task_result.qubit_tasks.setdefault(qid, []).append(task)
-        elif task_type == "coupling":
-            if qid in self.task_manager.task_result.coupling_tasks:
-                existing_tasks = [t.name for t in self.task_manager.task_result.coupling_tasks[qid]]
-                if task_name in existing_tasks:
-                    return
-            # Add new coupling task
-            task = CouplingTaskModel(name=task_name, upstream_id="", qid=qid)
-            self.task_manager.task_result.coupling_tasks.setdefault(qid, []).append(task)
-        elif task_type == "global":
-            existing_tasks = [t.name for t in self.task_manager.task_result.global_tasks]
-            if task_name in existing_tasks:
-                return
-            # Add new global task
-            task = GlobalTaskModel(name=task_name, upstream_id="")
-            self.task_manager.task_result.global_tasks.append(task)
-        elif task_type == "system":
-            existing_tasks = [t.name for t in self.task_manager.task_result.system_tasks]
-            if task_name in existing_tasks:
-                return
-            # Add new system task
-            task = SystemTaskModel(name=task_name, upstream_id="")
-            self.task_manager.task_result.system_tasks.append(task)
-
-        # Save updated workflow
-        self.task_manager.save()
-
-    def _get_relevant_qubit_ids(self, qid: str) -> list[str]:
-        """Get the list of qubit IDs relevant to a task execution.
-
-        For qubit tasks, this returns just the target qid.
-        For coupling tasks (e.g., "0-1"), this returns both individual qubits.
-
-        Args:
-            qid: The qubit or coupling ID
-
-        Returns:
-            List of relevant qubit IDs
-
-        """
-        if "-" in qid:
-            # Coupling ID like "0-1" - extract individual qubit IDs
-            return qid.split("-")
-        return [qid]
+    @property
+    def backend(self) -> BaseBackend | None:
+        """Get the Backend from SessionManager."""
+        if self._session_manager is None:
+            return None
+        return self._session_manager.backend
 
     def execute_task(
         self,
@@ -504,20 +334,11 @@ class CalibService:
     ) -> dict[str, Any]:
         """Execute a calibration task with integrated save processing.
 
-        This method leverages the refactored TaskManager.execute_task() which
-        automatically handles all save operations including:
-        - Output parameters
-        - Figures and raw data
-        - Task result history
-        - Execution history
-        - Calibration data updates
-
         Args:
             task_name: Name of the task to execute (e.g., 'CheckFreq')
             qid: Qubit ID to calibrate
             task_details: Optional task-specific configuration parameters
-            upstream_id: Optional explicit upstream task_id for dependency tracking.
-                If None, uses the last executed task_id for this qid.
+            upstream_id: Optional explicit upstream task_id for dependency tracking
 
         Returns:
             Dictionary containing the task's output parameters and task_id
@@ -531,120 +352,12 @@ class CalibService:
             result1 = session.execute_task("CheckRabi", "33")
             result2 = session.execute_task("CheckRabi", "32", upstream_id=result1["task_id"])
             ```
-
         """
-        assert self.execution_manager is not None, "ExecutionManager not initialized"
-        assert self.task_manager is not None, "TaskManager not initialized"
-
-        if task_details is None:
-            task_details = {}
-
-        # Ensure task_details has an entry for this task (can be empty dict)
-        if task_name not in task_details:
-            task_details[task_name] = {}
-
-        # Generate task instance
-        task_instances = generate_task_instances(
-            task_names=[task_name],
-            task_details=task_details,
-            backend=self.backend_name,
+        assert self._session_manager is not None, "Session not initialized"
+        result: dict[str, Any] = self._session_manager.execute_task(
+            task_name, qid, task_details, upstream_id
         )
-
-        task_instance = task_instances[task_name]
-        task_type = task_instance.get_task_type()
-
-        # Add task to workflow if not already present
-        self._ensure_task_in_workflow(task_name, task_type, qid)
-
-        # Reload execution manager to get latest state
-        execution_manager = ExecutionManager(
-            username=self.username,
-            execution_id=self.execution_id,
-            calib_data_path=self.execution_manager.calib_data_path,
-            project_id=self.project_id,
-        ).reload()
-
-        # Create a new TaskManager for this specific execution
-        # This ensures each execution has a separate task_result entry
-        import uuid
-        from copy import deepcopy
-
-        from qdash.datamodel.task import CalibDataModel
-
-        execution_task_manager = TaskManager(
-            username=self.username,
-            execution_id=self.execution_id,
-            qids=[qid],
-            calib_dir=self.task_manager.calib_dir,
-        )
-        execution_task_manager.id = str(uuid.uuid4())
-
-        # Copy only the relevant calibration data for this qid to reduce overhead
-        # For qubit tasks: copy data for the target qid
-        # For coupling tasks: qid is like "0-1", copy both individual qubit data and coupling data
-        relevant_qubit_ids = self._get_relevant_qubit_ids(qid)
-        execution_task_manager.calib_data = CalibDataModel(
-            qubit={
-                q: deepcopy(self.task_manager.calib_data.qubit[q])
-                for q in relevant_qubit_ids
-                if q in self.task_manager.calib_data.qubit
-            },
-            coupling={
-                c: deepcopy(self.task_manager.calib_data.coupling[c])
-                for c in [qid]
-                if qid in self.task_manager.calib_data.coupling
-            },
-        )
-        # controller_info is typically small, deepcopy is acceptable
-        execution_task_manager.controller_info = deepcopy(self.task_manager.controller_info)
-
-        # Set upstream_id for sequential task dependency tracking
-        # Priority: explicit upstream_id > last executed task for this qid > empty
-        if upstream_id is not None:
-            execution_task_manager._upstream_task_id = upstream_id
-        else:
-            execution_task_manager._upstream_task_id = self._last_executed_task_id_by_qid.get(
-                qid, ""
-            )
-
-        # Execute task with the dedicated task manager
-        execution_manager, executed_task_manager = execute_dynamic_task_by_qid.with_options(
-            timeout_seconds=task_instance.timeout,
-            task_run_name=task_instance.name,
-            log_prints=True,
-        )(
-            backend=self.backend,
-            execution_manager=execution_manager,
-            task_manager=execution_task_manager,
-            task_instance=task_instance,
-            qid=qid,
-        )
-
-        # Merge results back to main task_manager (for parameter access in future tasks)
-        self.task_manager.calib_data.qubit.update(executed_task_manager.calib_data.qubit)
-        self.task_manager.calib_data.coupling.update(executed_task_manager.calib_data.coupling)
-        self.task_manager.controller_info.update(executed_task_manager.controller_info)
-
-        # Update local execution manager
-        self.execution_manager = execution_manager
-
-        # Store the executed task's task_id for upstream tracking in next execution (per qid)
-        executed_task = executed_task_manager.get_task(
-            task_name=task_name, task_type=task_instance.get_task_type(), qid=qid
-        )
-        self._last_executed_task_id_by_qid[qid] = executed_task.task_id
-
-        # Return output parameters from the executed task manager
-        result = executed_task_manager.get_output_parameter_by_task_name(
-            task_name,
-            task_type=task_instance.get_task_type(),
-            qid=qid,
-        )
-
-        # Add task_id to result for upstream tracking in group execution
-        result["task_id"] = executed_task.task_id
-
-        return dict(result)
+        return result
 
     def get_parameter(self, qid: str, param_name: str) -> Any:
         """Get a calibration parameter value for a qubit.
