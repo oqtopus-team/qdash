@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from qdash.workflow.caltasks.base import BaseTask, RunResult
+from qdash.workflow.calibtasks.base import BaseTask, RunResult
 from qdash.workflow.engine.calibration.util import qid_to_label
 
 if TYPE_CHECKING:

@@ -1,7 +1,7 @@
 from typing import Any
 
 # ruff: noqa
-from qdash.workflow.caltasks.base import BaseTask
+from qdash.workflow.calibtasks.base import BaseTask
 
 
 def generate_task_instances(

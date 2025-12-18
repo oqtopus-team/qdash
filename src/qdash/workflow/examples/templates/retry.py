@@ -26,12 +26,12 @@ Example:
 from typing import Any
 
 from prefect import flow, get_run_logger, task
-from qdash.workflow.service import CalService
+from qdash.workflow.service import CalibService
 
 
 @task
 def calibrate_group_with_retry(
-    cal: CalService,
+    cal: CalibService,
     qids: list[str],
     tasks: list[str],
     offsets: list[float],
@@ -42,7 +42,7 @@ def calibrate_group_with_retry(
     Qubits within the group run SEQUENTIALLY.
 
     Args:
-        cal: CalService instance (shared)
+        cal: CalibService instance (shared)
         qids: Qubit IDs in this group (run sequentially)
         tasks: Task names (run sequentially per qubit)
         offsets: Frequency offsets to try on failure
@@ -139,7 +139,7 @@ def parallel_retry_calibration(
     logger.info(f"Starting parallel calibration: {len(groups)} groups, {len(all_qids)} qubits")
 
     # Initialize with all qids
-    cal = CalService(
+    cal = CalibService(
         username,
         chip_id,
         qids=all_qids,

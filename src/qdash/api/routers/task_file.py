@@ -33,14 +33,14 @@ if __name__ != "main":
 else:
     logger.setLevel(logging.DEBUG)
 
-# Get caltasks path from environment variable or use default
-# In Docker, this path is typically /app/src/qdash/workflow/caltasks
-# In local dev, it's ./src/qdash/workflow/caltasks
-CALTASKS_BASE_PATH = Path(os.getenv("CALTASKS_PATH", "./src/qdash/workflow/caltasks"))
+# Get calibtasks path from environment variable or use default
+# In Docker, this path is typically /app/src/qdash/workflow/calibtasks
+# In local dev, it's ./src/qdash/workflow/calibtasks
+CALIBTASKS_BASE_PATH = Path(os.getenv("CALIBTASKS_PATH", "./src/qdash/workflow/calibtasks"))
 
 # If running in Docker (check if /app exists), use absolute path
-if Path("/app").exists() and not CALTASKS_BASE_PATH.is_absolute():
-    CALTASKS_BASE_PATH = Path("/app") / "src" / "qdash" / "workflow" / "caltasks"
+if Path("/app").exists() and not CALIBTASKS_BASE_PATH.is_absolute():
+    CALIBTASKS_BASE_PATH = Path("/app") / "src" / "qdash" / "workflow" / "calibtasks"
 
 # Settings file path
 SETTINGS_PATH = Path(os.getenv("SETTINGS_PATH", "./config/settings.yaml"))
@@ -57,7 +57,7 @@ def validate_task_file_path(relative_path: str) -> Path:
 
     Args:
     ----
-        relative_path: Relative path from CALTASKS_BASE_PATH (e.g., "qubex/one_qubit_coarse/check_rabi.py")
+        relative_path: Relative path from CALIBTASKS_BASE_PATH (e.g., "qubex/one_qubit_coarse/check_rabi.py")
 
     Returns:
     -------
@@ -72,12 +72,12 @@ def validate_task_file_path(relative_path: str) -> Path:
     if ".." in relative_path:
         raise HTTPException(status_code=400, detail="Path traversal detected")
 
-    target_path = CALTASKS_BASE_PATH / relative_path
+    target_path = CALIBTASKS_BASE_PATH / relative_path
     resolved_path = target_path.resolve()
 
-    # Ensure resolved path is within CALTASKS_BASE_PATH
-    if not str(resolved_path).startswith(str(CALTASKS_BASE_PATH.resolve())):
-        raise HTTPException(status_code=400, detail="Path outside caltasks directory")
+    # Ensure resolved path is within CALIBTASKS_BASE_PATH
+    if not str(resolved_path).startswith(str(CALIBTASKS_BASE_PATH.resolve())):
+        raise HTTPException(status_code=400, detail="Path outside calibtasks directory")
 
     return resolved_path
 
@@ -172,27 +172,27 @@ def get_task_file_settings() -> TaskFileSettings:
     operation_id="listTaskFileBackends",
 )
 def list_task_file_backends() -> ListTaskFileBackendsResponse:
-    """List all available backend directories in caltasks.
+    """List all available backend directories in calibtasks.
 
     Returns
     -------
         List of backend names and paths
 
     """
-    if not CALTASKS_BASE_PATH.exists():
+    if not CALIBTASKS_BASE_PATH.exists():
         raise HTTPException(
-            status_code=404, detail=f"Caltasks directory not found: {CALTASKS_BASE_PATH}"
+            status_code=404, detail=f"Caltasks directory not found: {CALIBTASKS_BASE_PATH}"
         )
 
     backends = []
     try:
-        for item in sorted(CALTASKS_BASE_PATH.iterdir()):
+        for item in sorted(CALIBTASKS_BASE_PATH.iterdir()):
             # Skip hidden files, __pycache__, and non-directories
             if item.name.startswith(".") or item.name == "__pycache__" or not item.is_dir():
                 continue
             backends.append(TaskFileBackend(name=item.name, path=item.name))
     except PermissionError:
-        logger.warning(f"Permission denied accessing directory: {CALTASKS_BASE_PATH}")
+        logger.warning(f"Permission denied accessing directory: {CALIBTASKS_BASE_PATH}")
 
     return ListTaskFileBackendsResponse(backends=backends)
 
@@ -215,7 +215,7 @@ def get_task_file_tree(backend: str) -> list[TaskFileTreeNode]:
         File tree structure for the backend
 
     """
-    backend_path = CALTASKS_BASE_PATH / backend
+    backend_path = CALIBTASKS_BASE_PATH / backend
 
     if not backend_path.exists():
         raise HTTPException(status_code=404, detail=f"Backend directory not found: {backend}")
@@ -236,7 +236,7 @@ def get_task_file_content(path: str) -> dict[str, Any]:
 
     Args:
     ----
-        path: Relative path from CALTASKS_BASE_PATH (e.g., "qubex/one_qubit_coarse/check_rabi.py")
+        path: Relative path from CALIBTASKS_BASE_PATH (e.g., "qubex/one_qubit_coarse/check_rabi.py")
 
     Returns:
     -------
@@ -538,7 +538,7 @@ def list_task_info(
         List of task information
 
     """
-    backend_path = CALTASKS_BASE_PATH / backend
+    backend_path = CALIBTASKS_BASE_PATH / backend
 
     if not backend_path.exists():
         raise HTTPException(status_code=404, detail=f"Backend directory not found: {backend}")

@@ -33,7 +33,7 @@ Example:
 from typing import Any
 
 from prefect import flow
-from qdash.workflow.service import CalService
+from qdash.workflow.service import CalibService
 
 
 def _mux_ids_to_qids(mux_ids: list[int]) -> list[str]:
@@ -89,7 +89,7 @@ def two_qubit_calibration(
     # Execution
     # =========================================================================
 
-    cal = CalService(username, chip_id, flow_name=flow_name, project_id=project_id)
+    cal = CalibService(username, chip_id, flow_name=flow_name, project_id=project_id)
     return cal.two_qubit(
         candidate_qubits=candidate_qubits,
         max_parallel_ops=max_parallel_ops,

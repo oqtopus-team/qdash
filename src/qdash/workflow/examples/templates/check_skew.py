@@ -13,7 +13,7 @@ Example:
 from typing import Any
 
 from prefect import flow
-from qdash.workflow.service import CalService
+from qdash.workflow.service import CalibService
 
 
 @flow
@@ -44,5 +44,5 @@ def check_skew(
     # Execution
     # =========================================================================
 
-    cal = CalService(username, chip_id, flow_name=flow_name, project_id=project_id)
+    cal = CalibService(username, chip_id, flow_name=flow_name, project_id=project_id)
     return cal.check_skew(muxes=muxes)

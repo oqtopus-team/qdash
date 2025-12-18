@@ -1,13 +1,13 @@
-"""Tests for CalService.
+"""Tests for CalibService.
 
-These tests verify the CalService API and helper functions for custom calibration flows.
+These tests verify the CalibService API and helper functions for custom calibration flows.
 """
 
 import pytest
 from unittest.mock import MagicMock, patch
 
 from qdash.workflow.service.session import (
-    CalService,
+    CalibService,
     finish_calibration,
     get_session,
     init_calibration,
@@ -97,7 +97,7 @@ def clear_session_state():
 
 @pytest.fixture
 def mock_flow_session_deps(monkeypatch):
-    """Fixture to mock CalService dependencies."""
+    """Fixture to mock CalibService dependencies."""
     monkeypatch.setattr(
         "qdash.workflow.service.session.ExecutionManager",
         MockExecutionManager,
@@ -116,13 +116,13 @@ def mock_flow_session_deps(monkeypatch):
     )
 
 
-class TestCalServiceInitialization:
-    """Test CalService initialization and basic setup."""
+class TestCalibServiceInitialization:
+    """Test CalibService initialization and basic setup."""
 
     def test_flow_session_attributes(self, mock_flow_session_deps):
-        """Test that CalService initializes with correct attributes."""
+        """Test that CalibService initializes with correct attributes."""
         # Create session with qids (required parameter)
-        session = CalService(
+        session = CalibService(
             username="test_user",
             execution_id="20240101-001",
             chip_id="chip_1",
@@ -141,7 +141,7 @@ class TestCalServiceInitialization:
 
     def test_flow_session_default_tags(self, mock_flow_session_deps):
         """Test that default tags are set correctly."""
-        session = CalService(
+        session = CalibService(
             username="test_user",
             execution_id="20240101-001",
             chip_id="chip_1",
@@ -152,12 +152,12 @@ class TestCalServiceInitialization:
         assert "python_flow" in session.execution_manager.tags
 
 
-class TestCalServiceParameterManagement:
+class TestCalibServiceParameterManagement:
     """Test parameter get/set operations."""
 
     def test_set_and_get_parameter(self, mock_flow_session_deps):
         """Test setting and getting parameters."""
-        session = CalService(
+        session = CalibService(
             username="test_user",
             execution_id="20240101-001",
             chip_id="chip_1",
@@ -173,7 +173,7 @@ class TestCalServiceParameterManagement:
 
     def test_get_nonexistent_parameter(self, mock_flow_session_deps):
         """Test getting a parameter that doesn't exist."""
-        session = CalService(
+        session = CalibService(
             username="test_user",
             execution_id="20240101-001",
             chip_id="chip_1",

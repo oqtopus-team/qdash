@@ -1,4 +1,4 @@
-"""Calibration strategy classes for CalService.
+"""Calibration strategy classes for CalibService.
 
 Strategy pattern implementation for different calibration execution modes.
 """
@@ -16,7 +16,7 @@ from qdash.workflow.service.github import ConfigFileType, GitHubPushConfig
 from qdash.workflow.service.session import finish_calibration, get_session, init_calibration
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.session import CalService
+    from qdash.workflow.service.session import CalibService
 
 
 # =============================================================================
@@ -100,13 +100,13 @@ class OneQubitStrategy(ABC):
     @abstractmethod
     def execute(
         self,
-        cal_service: CalService,
+        cal_service: CalibService,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute the 1-qubit calibration strategy.
 
         Args:
-            cal_service: CalService instance with username, chip_id, etc.
+            cal_service: CalibService instance with username, chip_id, etc.
             config: Configuration for the calibration
 
         Returns:
@@ -139,7 +139,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalService,
+        cal_service: CalibService,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute Box-based scheduled calibration."""
@@ -216,7 +216,7 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalService,
+        cal_service: CalibService,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute synchronized step-based calibration."""

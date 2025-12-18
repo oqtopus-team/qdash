@@ -24,7 +24,7 @@ class TaskFileTreeNode(BaseModel):
 class SaveTaskFileRequest(BaseModel):
     """Request model for saving task file content."""
 
-    path: str  # Relative path from CALTASKS_PATH (e.g., "qubex/one_qubit_coarse/check_rabi.py")
+    path: str  # Relative path from CALIBTASKS_PATH (e.g., "qubex/one_qubit_coarse/check_rabi.py")
     content: str
 
 

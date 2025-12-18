@@ -3,11 +3,11 @@ from typing import ClassVar
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
-from qdash.workflow.caltasks.base import (
+from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
-from qdash.workflow.caltasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.engine.calibration.task.types import TaskTypes
 

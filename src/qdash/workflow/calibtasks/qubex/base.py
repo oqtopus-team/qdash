@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Generator
 
 from qdash.datamodel.task import InputParameterModel
-from qdash.workflow.caltasks.base import (
+from qdash.workflow.calibtasks.base import (
     BaseTask,
     PreProcessResult,
     RunResult,

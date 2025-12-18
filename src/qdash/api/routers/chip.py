@@ -14,7 +14,7 @@ from qdash.api.lib.project import (
     get_project_context_owner,
 )
 from qdash.api.routers.task_file import (
-    CALTASKS_BASE_PATH,
+    CALIBTASKS_BASE_PATH,
     SETTINGS_PATH,
     collect_tasks_from_directory,
 )
@@ -242,7 +242,7 @@ def _get_task_names_from_files() -> list[str]:
         logger.warning(f"Failed to load settings: {e}")
 
     # Get tasks from task files
-    backend_path = CALTASKS_BASE_PATH / default_backend
+    backend_path = CALIBTASKS_BASE_PATH / default_backend
     if not backend_path.exists() or not backend_path.is_dir():
         logger.warning(f"Backend directory not found: {backend_path}")
         return []

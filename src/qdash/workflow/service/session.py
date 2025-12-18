@@ -1,4 +1,4 @@
-"""CalService - High-level API for calibration workflows.
+"""CalibService - High-level API for calibration workflows.
 
 This module provides a clean, service-oriented API for calibration tasks.
 It wraps low-level session management and provides simple methods for
@@ -9,11 +9,11 @@ Example:
 
     ```python
     from prefect import flow
-    from qdash.workflow.service import CalService
+    from qdash.workflow.service import CalibService
 
     @flow
     def simple_calibration(username, chip_id, qids, flow_name=None, project_id=None):
-        cal = CalService(username, chip_id, flow_name=flow_name, project_id=project_id)
+        cal = CalibService(username, chip_id, flow_name=flow_name, project_id=project_id)
         return cal.run(qids=qids, tasks=["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"])
     ```
 """
@@ -32,7 +32,7 @@ from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.user import UserDocument
-from qdash.workflow.caltasks.active_protocols import generate_task_instances
+from qdash.workflow.calibtasks.active_protocols import generate_task_instances
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.params_updater import get_params_updater
@@ -71,7 +71,7 @@ def generate_execution_id(username: str, chip_id: str, project_id: str | None = 
     return f"{date_str}-{execution_index:03d}"
 
 
-class CalService:
+class CalibService:
     """High-level API for calibration workflows.
 
     Provides a clean, intuitive interface for common calibration patterns
@@ -87,14 +87,14 @@ class CalService:
         Simple API usage:
 
         ```python
-        cal = CalService("alice", "64Qv3")
+        cal = CalibService("alice", "64Qv3")
         results = cal.run(qids=["0", "1"], tasks=["CheckRabi", "CreateHPIPulse"])
         ```
 
         Advanced low-level access:
 
         ```python
-        cal = CalService("alice", "64Qv3", qids=["0", "1"])
+        cal = CalibService("alice", "64Qv3", qids=["0", "1"])
         result = cal.execute_task("CheckFreq", "0")
         cal.finish_calibration()
         ```
@@ -124,13 +124,13 @@ class CalService:
 
         1. High-level API (lazy initialization):
            ```python
-           cal = CalService("alice", "64Qv3")
+           cal = CalibService("alice", "64Qv3")
            cal.run(qids=["0", "1"], tasks=["CheckRabi"])
            ```
 
         2. Low-level API (immediate initialization):
            ```python
-           cal = CalService("alice", "64Qv3", qids=["0", "1"])
+           cal = CalibService("alice", "64Qv3", qids=["0", "1"])
            cal.execute_task("CheckRabi", "0")
            cal.finish_calibration()
            ```
@@ -944,7 +944,7 @@ class CalService:
 
         Example:
             ```python
-            cal = CalService("alice", "64Qv3")
+            cal = CalibService("alice", "64Qv3")
             results = cal.run(
                 groups=[["0", "1"], ["2", "3"]],
                 tasks=["CheckRabi", "CreateHPIPulse"]
@@ -1000,7 +1000,7 @@ class CalService:
 
         Example:
             ```python
-            cal = CalService("alice", "64Qv3")
+            cal = CalibService("alice", "64Qv3")
 
             # Synchronized mode (default)
             results = cal.one_qubit(mux_ids=[0, 1, 2, 3])
@@ -1069,7 +1069,7 @@ class CalService:
 
         Example:
             ```python
-            cal = CalService("alice", "64Qv3")
+            cal = CalibService("alice", "64Qv3")
             results = cal.run_full_chip(mux_ids=[0, 1, 2, 3])
             ```
         """
@@ -1162,7 +1162,7 @@ class CalService:
 
         Example:
             ```python
-            cal = CalService("alice", "64Qv3")
+            cal = CalibService("alice", "64Qv3")
             results = cal.sweep(
                 qids=["0", "1"],
                 task="CheckQubitSpectroscopy",
@@ -1238,7 +1238,7 @@ class CalService:
 
         Example:
             ```python
-            cal = CalService("alice", "64Qv3")
+            cal = CalibService("alice", "64Qv3")
 
             # Mode 1: Explicit pairs (all run in parallel)
             results = cal.two_qubit(
@@ -1367,7 +1367,7 @@ class CalService:
 
         Example:
             ```python
-            cal = CalService("alice", "64Qv3")
+            cal = CalibService("alice", "64Qv3")
             result = cal.check_skew(muxes=[0, 1, 2])
             ```
         """
@@ -1399,7 +1399,7 @@ class CalService:
 
 # Internal task functions for parallel execution
 @task
-def _execute_group(cal: "CalService", qids: list[str], tasks: list[str]) -> dict[str, Any]:
+def _execute_group(cal: "CalibService", qids: list[str], tasks: list[str]) -> dict[str, Any]:
     """Execute tasks for a group of qubits (internal task)."""
     results: dict[str, Any] = {}
     for qid in qids:
@@ -1415,7 +1415,7 @@ def _execute_group(cal: "CalService", qids: list[str], tasks: list[str]) -> dict
 
 
 @task
-def _execute_coupling(cal: "CalService", coupling_qid: str, tasks: list[str]) -> dict[str, Any]:
+def _execute_coupling(cal: "CalibService", coupling_qid: str, tasks: list[str]) -> dict[str, Any]:
     """Execute tasks for a coupling pair (internal task)."""
     try:
         result: dict[str, Any] = {}
@@ -1452,9 +1452,9 @@ def init_calibration(
     github_push_config: GitHubPushConfig | None = None,
     muxes: list[int] | None = None,
     project_id: str | None = None,
-) -> CalService:
+) -> CalibService:
     """Initialize a session and set it in global context (internal use)."""
-    session = CalService(
+    session = CalibService(
         username=username,
         chip_id=chip_id,
         qids=qids,
@@ -1473,13 +1473,13 @@ def init_calibration(
     return session
 
 
-def get_session() -> CalService:
+def get_session() -> CalibService:
     """Get the current session from global context (internal use)."""
     session = get_current_session()
     if session is None:
         msg = "No active calibration session."
         raise RuntimeError(msg)
-    assert isinstance(session, CalService), "Session must be a CalService instance"
+    assert isinstance(session, CalibService), "Session must be a CalibService instance"
     return session
 
 

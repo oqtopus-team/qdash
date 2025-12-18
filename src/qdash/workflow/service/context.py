@@ -8,27 +8,27 @@ import threading
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.session import CalService
+    from qdash.workflow.service.session import CalibService
 
 
 class SessionContext:
     """Thread-safe session context manager.
 
-    This class provides a structured way to manage CalService instances
+    This class provides a structured way to manage CalibService instances
     in a thread-safe manner.
 
     Attributes
     ----------
     _local : threading.local
         Thread-local storage for session instances
-    _global_session : CalService | None
+    _global_session : CalibService | None
         Fallback global session
     """
 
     _instance: "SessionContext | None" = None
     _lock = threading.Lock()
     _local: threading.local
-    _global_session: "CalService | None"
+    _global_session: "CalibService | None"
 
     def __new__(cls) -> "SessionContext":
         """Singleton pattern for global access."""
@@ -40,23 +40,23 @@ class SessionContext:
                     cls._instance._global_session = None
         return cls._instance
 
-    def set_session(self, session: "CalService | None") -> None:
+    def set_session(self, session: "CalibService | None") -> None:
         """Set the current session.
 
         Parameters
         ----------
-        session : CalService | None
+        session : CalibService | None
             Session to set as current, or None to clear
         """
         self._local.session = session
         self._global_session = session
 
-    def get_session(self) -> "CalService | None":
+    def get_session(self) -> "CalibService | None":
         """Get the current session.
 
         Returns
         -------
-        CalService | None
+        CalibService | None
             Current session or None if not set
         """
         # Try thread-local first, fallback to global
@@ -72,23 +72,23 @@ class SessionContext:
 _session_context = SessionContext()
 
 
-def set_current_session(session: "CalService | None") -> None:
+def set_current_session(session: "CalibService | None") -> None:
     """Set the current session (convenience function).
 
     Parameters
     ----------
-    session : CalService | None
+    session : CalibService | None
         Session to set as current
     """
     _session_context.set_session(session)
 
 
-def get_current_session() -> "CalService | None":
+def get_current_session() -> "CalibService | None":
     """Get the current session (convenience function).
 
     Returns
     -------
-    CalService | None
+    CalibService | None
         Current session or None
     """
     return _session_context.get_session()

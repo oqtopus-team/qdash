@@ -27,7 +27,7 @@ Example:
 from typing import Any
 
 from prefect import flow
-from qdash.workflow.service import CalService
+from qdash.workflow.service import CalibService
 from qdash.workflow.service.tasks import CHECK_1Q_TASKS
 
 
@@ -72,7 +72,7 @@ def one_qubit_check(
     # Execution
     # =========================================================================
 
-    cal = CalService(username, chip_id, flow_name=flow_name, project_id=project_id)
+    cal = CalibService(username, chip_id, flow_name=flow_name, project_id=project_id)
     return cal.one_qubit(
         mux_ids=mux_ids,
         exclude_qids=exclude_qids,

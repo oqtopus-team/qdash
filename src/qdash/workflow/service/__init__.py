@@ -24,13 +24,13 @@ from qdash.workflow.service.tasks import (
     FULL_2Q_TASKS,
 )
 from qdash.workflow.service.session import (
-    CalService,
+    CalibService,
     generate_execution_id,
 )
 
 __all__ = [
     # === High-level API ===
-    "CalService",
+    "CalibService",
     "generate_execution_id",
     # === Scheduled Calibration ===
     "calibrate_one_qubit_scheduled",

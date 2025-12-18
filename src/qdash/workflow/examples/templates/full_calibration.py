@@ -26,7 +26,7 @@ Example:
 from typing import Any
 
 from prefect import flow
-from qdash.workflow.service import CalService
+from qdash.workflow.service import CalibService
 
 
 @flow
@@ -69,7 +69,7 @@ def full_calibration(
     # Execution (3 separate executions)
     # =========================================================================
 
-    cal = CalService(username, chip_id, flow_name=flow_name, project_id=project_id)
+    cal = CalibService(username, chip_id, flow_name=flow_name, project_id=project_id)
     return cal.run_full_chip(
         mux_ids=mux_ids,
         exclude_qids=exclude_qids,

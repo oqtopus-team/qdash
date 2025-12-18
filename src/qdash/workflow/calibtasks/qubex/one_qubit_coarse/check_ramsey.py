@@ -2,11 +2,11 @@ from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.workflow.caltasks.base import (
+from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
-from qdash.workflow.caltasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 from qdash.workflow.engine.calibration.task.types import TaskTypes
