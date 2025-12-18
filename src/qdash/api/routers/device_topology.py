@@ -4,6 +4,7 @@ import io
 import re
 from typing import Annotated, Any
 
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import networkx as nx
 import pendulum
@@ -461,7 +462,7 @@ def generate_device_plot(data: dict[str, Any]) -> bytes:
     # )
     sm = plt.cm.ScalarMappable(
         cmap="viridis",
-        norm=plt.Normalize(
+        norm=mcolors.Normalize(
             vmin=min(nx.get_node_attributes(g, "fidelity").values()),
             vmax=max(nx.get_node_attributes(g, "fidelity").values()),
         ),

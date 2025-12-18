@@ -530,7 +530,7 @@ def git_pull_config(
             # Log success with commit information
             current = repo.head.commit
             commit_sha = current.hexsha[:8]
-            commit_msg = current.message.strip()
+            commit_msg = str(current.message).strip()
 
             logger.info(f"Updated to commit: {commit_sha} - {commit_msg}")
             logger.info(f"Config files updated successfully in: {CONFIG_BASE_PATH}")
