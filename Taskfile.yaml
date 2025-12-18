@@ -101,6 +101,7 @@ tasks:
     desc: Run mypy type checking on clean modules only
     cmds:
       - task lint-mypy-datamodel
+      - task lint-mypy-dbmodel
       - task lint-mypy-api
       - task lint-mypy-workflow
 
@@ -108,6 +109,11 @@ tasks:
     desc: Run stricter mypy checks on datamodel
     cmds:
       - uv run mypy src/qdash/datamodel --disallow-untyped-defs --no-implicit-optional --warn-return-any
+
+  lint-mypy-dbmodel:
+    desc: Run strict mypy on dbmodel
+    cmds:
+      - uv run mypy src/qdash/dbmodel --disallow-untyped-defs --no-implicit-optional --warn-return-any
 
   lint-mypy-api:
     desc: Run strict mypy on API

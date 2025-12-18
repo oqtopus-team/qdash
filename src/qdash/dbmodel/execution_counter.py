@@ -95,7 +95,7 @@ class ExecutionCounterDocument(Document):
             )
 
             if result is not None:
-                return result["index"]
+                return int(result["index"])
 
             # Result was None, retry
             time.sleep(0.01 * (attempt + 1))

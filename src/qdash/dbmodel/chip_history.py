@@ -131,7 +131,8 @@ class ChipHistoryDocument(Document):
                 system_info=chip_doc.system_info,
                 recorded_date=today,
             )
-            return history_doc.insert()
+            inserted: ChipHistoryDocument = history_doc.insert()
+            return inserted
 
         except DuplicateKeyError:
             # If duplicate key error occurs, find and update the existing document
@@ -155,7 +156,8 @@ class ChipHistoryDocument(Document):
                 existing_doc.couplings = chip_doc.couplings
                 existing_doc.installed_at = chip_doc.installed_at
                 existing_doc.system_info = chip_doc.system_info
-                return existing_doc.save()
+                saved: ChipHistoryDocument = existing_doc.save()
+                return saved
             else:
                 # This shouldn't happen, but handle it gracefully
                 raise RuntimeError("Document not found after DuplicateKeyError")
