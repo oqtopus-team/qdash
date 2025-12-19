@@ -49,21 +49,12 @@ from qdash.workflow.engine.task.result_processor import (
 )
 from qdash.workflow.engine.task.state_manager import TaskStateManager
 
-# Backwards compatibility aliases
-SessionManager = CalibOrchestrator
-SessionConfig = CalibConfig
-TaskSession = TaskContext
-
 __all__ = [
     # Orchestration
     "CalibOrchestrator",
     "CalibConfig",
-    # Backwards compatibility
-    "SessionManager",
-    "SessionConfig",
     # Task
     "TaskContext",
-    "TaskSession",  # Backwards compatibility
     "TaskExecutor",
     "TaskExecutionError",
     "TaskStateManager",

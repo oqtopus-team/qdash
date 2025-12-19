@@ -11,9 +11,6 @@ from qdash.workflow.engine.task.result_processor import (
 )
 from qdash.workflow.engine.task.state_manager import TaskStateManager
 
-# Backwards compatibility alias
-TaskSession = TaskContext
-
 __all__ = [
     "TaskContext",
     "TaskExecutor",
@@ -25,6 +22,4 @@ __all__ = [
     "TaskHistoryRecorder",
     "TaskType",
     "TaskTypes",
-    # Backwards compatibility
-    "TaskSession",
 ]
