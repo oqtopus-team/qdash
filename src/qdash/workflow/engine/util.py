@@ -10,6 +10,12 @@ from qdash.datamodel.task import TaskModel
 from qdash.workflow.calibtasks.base import BaseTask
 
 
+def get_current_timestamp() -> str:
+    """Get current timestamp in ISO8601 format (Asia/Tokyo timezone)."""
+    result: str = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()  # type: ignore[no-untyped-call]
+    return result
+
+
 def qid_to_label(qid: str) -> str:
     """Convert a numeric qid string to a label with at least two digits. e.g. '0' -> 'Q00'."""
     if re.fullmatch(r"\d+", qid):
@@ -65,14 +71,14 @@ class SystemInfo(BaseModel):
     """Data model for system information."""
 
     created_at: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+        default_factory=get_current_timestamp,
         description="The time when the system information was created",
     )
     updated_at: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+        default_factory=get_current_timestamp,
         description="The time when the system information was updated",
     )
 
     def update_time(self) -> None:
         """Update the time when the system information was updated."""
-        self.updated_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        self.updated_at = get_current_timestamp()

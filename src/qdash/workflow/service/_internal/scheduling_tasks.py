@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 def _get_session() -> "CalibService":
     """Get the current session from global context (internal use)."""
-    from qdash.workflow.service.context import get_current_session
+    from qdash.workflow.service.session_context import get_current_session
 
     session = get_current_session()
     if session is None:

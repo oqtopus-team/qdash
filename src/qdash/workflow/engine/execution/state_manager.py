@@ -61,7 +61,7 @@ class ExecutionStateManager(BaseModel):
             Self for method chaining
 
         """
-        self.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        self.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()  # type: ignore[no-untyped-call]
         self.status = ExecutionStatusModel.RUNNING
         self.system_info.update_time()
         return self
@@ -75,7 +75,7 @@ class ExecutionStateManager(BaseModel):
             Self for method chaining
 
         """
-        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()  # type: ignore[no-untyped-call]
         self.end_at = end_at
         self.elapsed_time = self._calculate_elapsed_time(self.start_at, end_at)
         self.status = ExecutionStatusModel.COMPLETED
@@ -91,7 +91,7 @@ class ExecutionStateManager(BaseModel):
             Self for method chaining
 
         """
-        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()  # type: ignore[no-untyped-call]
         self.end_at = end_at
         self.elapsed_time = self._calculate_elapsed_time(self.start_at, end_at)
         self.status = ExecutionStatusModel.FAILED
@@ -234,8 +234,8 @@ class ExecutionStateManager(BaseModel):
 
         """
         try:
-            start_time = pendulum.parse(start_at)
-            end_time = pendulum.parse(end_at)
+            start_time = pendulum.parse(start_at)  # type: ignore[attr-defined]
+            end_time = pendulum.parse(end_at)  # type: ignore[attr-defined]
         except Exception as e:
             raise ValueError(f"Failed to parse the time. {e}")
         return end_time.diff_for_humans(start_time, absolute=True)  # type: ignore

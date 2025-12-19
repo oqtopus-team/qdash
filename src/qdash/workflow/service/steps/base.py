@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService
-    from qdash.workflow.service.steps.context import StepContext
+    from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
 

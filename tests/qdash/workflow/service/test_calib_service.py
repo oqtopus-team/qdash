@@ -12,7 +12,7 @@ from qdash.workflow.service.calib_service import (
     get_session,
     init_calibration,
 )
-from qdash.workflow.service.context import clear_current_session
+from qdash.workflow.service.session_context import clear_current_session
 
 
 class MockExecutionService:

@@ -67,7 +67,7 @@ def push_github(
         if not diff:
             logger.info("No changes to commit")
             return "No changes to commit"
-        now_jst = pendulum.now("Asia/Tokyo").to_iso8601_string()
+        now_jst = pendulum.now("Asia/Tokyo").to_iso8601_string()  # type: ignore[no-untyped-call]
         repo.git.config("user.name", "github-actions[bot]")
         repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
         repo.index.commit(f"{commit_message} at {now_jst}")
@@ -153,7 +153,7 @@ def push_github_batch(
             logger.info("No changes to commit")
             return "No changes to commit"
 
-        now_jst = pendulum.now("Asia/Tokyo").to_iso8601_string()
+        now_jst = pendulum.now("Asia/Tokyo").to_iso8601_string()  # type: ignore[no-untyped-call]
         repo.git.config("user.name", "github-actions[bot]")
         repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
         repo.index.commit(f"{commit_message} at {now_jst}")

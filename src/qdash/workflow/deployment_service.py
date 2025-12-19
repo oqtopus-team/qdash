@@ -11,7 +11,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from prefect.client.orchestration import get_client
-from prefect.deployments import Deployment
+from prefect.deployments import Deployment  # type: ignore[attr-defined]
 from pydantic import BaseModel
 
 app = FastAPI(title="QDash Deployment Service")
@@ -99,7 +99,7 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
         if request.old_deployment_id:
             try:
                 logger.info(f"Attempting to delete old deployment: {request.old_deployment_id}")
-                async with get_client() as client:
+                async with get_client() as client:  # type: ignore[union-attr]
                     await client.delete_deployment(request.old_deployment_id)
                     logger.info(f"Deleted old deployment: {request.old_deployment_id}")
             except Exception as e:
@@ -208,7 +208,7 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
 
         cron_schedule = CronSchedule(cron=request.cron, timezone=request.timezone)
 
-        async with get_client() as client:
+        async with get_client() as client:  # type: ignore[union-attr]
             # Read existing deployment
             try:
                 target_deployment = await client.read_deployment(request.deployment_id)
@@ -289,7 +289,7 @@ async def create_scheduled_run(request: CreateScheduledRunRequest) -> CreateSche
             logger.error(f"Failed to parse scheduled time: {e}")
             raise HTTPException(status_code=400, detail=f"Invalid scheduled_time format: {str(e)}")
 
-        async with get_client() as client:
+        async with get_client() as client:  # type: ignore[union-attr]
             try:
                 flow_run = await client.create_flow_run_from_deployment(
                     deployment_id=request.deployment_id,

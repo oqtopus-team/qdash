@@ -38,7 +38,7 @@ from qdash.workflow.service.steps.base import (
 )
 
 # Context and Pipeline
-from qdash.workflow.service.steps.context import (
+from qdash.workflow.service.steps.pipeline import (
     Pipeline,
     StepContext,
 )

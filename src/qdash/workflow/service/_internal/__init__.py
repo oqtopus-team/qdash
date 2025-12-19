@@ -4,7 +4,7 @@ These modules contain implementation details and should not be imported directly
 by external code. Use the public API from `qdash.workflow.service` instead.
 """
 
-from qdash.workflow.service._internal.prefect_tasks import (
+from qdash.workflow.service._internal.scheduling_tasks import (
     calibrate_mux_qubits,
     calibrate_parallel_group,
     calibrate_single_qubit,

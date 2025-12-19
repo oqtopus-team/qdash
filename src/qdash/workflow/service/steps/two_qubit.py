@@ -20,7 +20,7 @@ from qdash.workflow.service.tasks import FULL_2Q_TASKS
 
 if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService
-    from qdash.workflow.service.steps.context import StepContext
+    from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
 
@@ -114,7 +114,7 @@ class CustomTwoQubit(CalibrationStep):
         )
 
         # Execute
-        from qdash.workflow.service._internal.prefect_tasks import calibrate_parallel_group
+        from qdash.workflow.service._internal.scheduling_tasks import calibrate_parallel_group
         from qdash.workflow.service.calib_service import (
             finish_calibration,
             get_session,
@@ -332,7 +332,7 @@ class TwoQubitCalibration(CalibrationStep):
         )
 
         # Execute
-        from qdash.workflow.service._internal.prefect_tasks import calibrate_parallel_group
+        from qdash.workflow.service._internal.scheduling_tasks import calibrate_parallel_group
         from qdash.workflow.service.calib_service import (
             finish_calibration,
             get_session,

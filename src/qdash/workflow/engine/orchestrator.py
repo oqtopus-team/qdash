@@ -403,7 +403,7 @@ class CalibOrchestrator:
         qid: str,
     ) -> TaskContext:
         """Execute task via Prefect and return executed context."""
-        from qdash.workflow.engine.prefect_tasks import execute_dynamic_task_by_qid_service
+        from qdash.workflow.engine.task_runner import execute_dynamic_task_by_qid_service
 
         # Get latest execution service state
         execution_service = ExecutionService.from_existing(self.config.execution_id)

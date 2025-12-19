@@ -73,7 +73,7 @@ def generate_execution_id(username: str, chip_id: str, project_id: str | None = 
         ```
 
     """
-    date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
+    date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")  # type: ignore[no-untyped-call]
     execution_index = ExecutionCounterDocument.get_next_index(
         date_str, username, chip_id, project_id=project_id
     )
@@ -443,7 +443,7 @@ class CalibService:
         # Store stage result with timestamp
         self.execution_service.note["stage_results"][stage_name] = {
             "result": result,
-            "timestamp": pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+            "timestamp": pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),  # type: ignore[no-untyped-call]
         }
 
         # Persist to database immediately
@@ -754,7 +754,7 @@ class CalibService:
 # Internal Session Management (for scheduled.py and strategy.py)
 # =============================================================================
 
-from qdash.workflow.service.context import (
+from qdash.workflow.service.session_context import (
     clear_current_session,
     get_current_session,
     set_current_session,

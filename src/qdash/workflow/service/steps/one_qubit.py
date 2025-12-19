@@ -19,7 +19,7 @@ from qdash.workflow.service.tasks import CHECK_1Q_TASKS, FULL_1Q_TASKS_AFTER_CHE
 
 if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService
-    from qdash.workflow.service.steps.context import StepContext
+    from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
 
@@ -106,7 +106,7 @@ class CustomOneQubit(CalibrationStep):
         qids: list[str],
     ) -> dict[str, Any]:
         """Direct execution for QubitTargets."""
-        from qdash.workflow.service._internal.prefect_tasks import calibrate_single_qubit
+        from qdash.workflow.service._internal.scheduling_tasks import calibrate_single_qubit
 
         results = {}
         futures = [calibrate_single_qubit.submit(qid, self.tasks) for qid in qids]
@@ -212,7 +212,7 @@ class OneQubitCheck(CalibrationStep):
         tasks: list[str],
     ) -> dict[str, Any]:
         """Direct execution for QubitTargets."""
-        from qdash.workflow.service._internal.prefect_tasks import calibrate_single_qubit
+        from qdash.workflow.service._internal.scheduling_tasks import calibrate_single_qubit
 
         results = {}
         futures = [calibrate_single_qubit.submit(qid, tasks) for qid in qids]
@@ -348,7 +348,7 @@ class OneQubitFineTune(CalibrationStep):
         tasks: list[str],
     ) -> dict[str, Any]:
         """Direct execution for QubitTargets."""
-        from qdash.workflow.service._internal.prefect_tasks import calibrate_single_qubit
+        from qdash.workflow.service._internal.scheduling_tasks import calibrate_single_qubit
 
         results = {}
         futures = [calibrate_single_qubit.submit(qid, tasks) for qid in qids]
