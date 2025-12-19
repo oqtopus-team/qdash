@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
-from qdash.workflow.engine.calibration import OneQubitScheduler
+from qdash.workflow.engine import OneQubitScheduler
 from qdash.workflow.service._internal.prefect_tasks import (
     calibrate_mux_qubits as _calibrate_mux_qubits,
     calibrate_step_qubits_parallel as _calibrate_step_qubits_parallel,

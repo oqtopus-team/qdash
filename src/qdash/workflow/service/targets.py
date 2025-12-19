@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from qdash.workflow.engine.calibration import OneQubitScheduler
+    from qdash.workflow.engine import OneQubitScheduler
 
 
 @dataclass
@@ -83,7 +83,7 @@ class MuxTargets(Target):
 
     def to_qids(self, chip_id: str) -> list[str]:
         """Resolve MUX IDs to qubit IDs using wiring configuration."""
-        from qdash.workflow.engine.calibration import OneQubitScheduler
+        from qdash.workflow.engine import OneQubitScheduler
 
         wiring_config_path = f"/app/config/qubex/{chip_id}/config/wiring.yaml"
         scheduler = OneQubitScheduler(chip_id=chip_id, wiring_config_path=wiring_config_path)
@@ -100,7 +100,7 @@ class MuxTargets(Target):
 
     def to_coupling_ids(self, chip_id: str) -> list[str]:
         """Get coupling IDs for qubits in targeted MUXes."""
-        from qdash.workflow.engine.calibration import CRScheduler
+        from qdash.workflow.engine import CRScheduler
 
         qids = self.to_qids(chip_id)
         wiring_config_path = f"/app/config/qubex/{chip_id}/config/wiring.yaml"
@@ -143,7 +143,7 @@ class QubitTargets(Target):
 
     def to_coupling_ids(self, chip_id: str) -> list[str]:
         """Get coupling IDs for the specified qubits."""
-        from qdash.workflow.engine.calibration import CRScheduler
+        from qdash.workflow.engine import CRScheduler
 
         wiring_config_path = f"/app/config/qubex/{chip_id}/config/wiring.yaml"
         scheduler = CRScheduler(

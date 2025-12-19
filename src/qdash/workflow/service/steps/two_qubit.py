@@ -87,7 +87,7 @@ class CustomTwoQubit(CalibrationStep):
             parallel_groups = ctx.metadata["cr_schedule"]
             logger.info(f"[{self.name}] Using pre-generated CR schedule")
         else:
-            from qdash.workflow.engine.calibration import CRScheduler
+            from qdash.workflow.engine import CRScheduler
 
             wiring_config_path = f"/app/config/qubex/{service.chip_id}/config/wiring.yaml"
             scheduler = CRScheduler(
@@ -225,7 +225,7 @@ class GenerateCRSchedule(TransformStep):
             ctx.candidate_couplings = []
             return ctx
 
-        from qdash.workflow.engine.calibration import CRScheduler
+        from qdash.workflow.engine import CRScheduler
 
         wiring_config_path = f"/app/config/qubex/{service.chip_id}/config/wiring.yaml"
         scheduler = CRScheduler(
@@ -305,7 +305,7 @@ class TwoQubitCalibration(CalibrationStep):
             parallel_groups = ctx.metadata["cr_schedule"]
             logger.info(f"[{self.name}] Using pre-generated CR schedule")
         else:
-            from qdash.workflow.engine.calibration import CRScheduler
+            from qdash.workflow.engine import CRScheduler
 
             wiring_config_path = f"/app/config/qubex/{service.chip_id}/config/wiring.yaml"
             scheduler = CRScheduler(
