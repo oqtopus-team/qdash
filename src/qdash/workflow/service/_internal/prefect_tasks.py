@@ -9,8 +9,6 @@ Tasks:
     calibrate_step_qubits_parallel: Execute tasks for synchronized step in parallel
     execute_coupling_pair: Execute tasks for a single coupling pair
     calibrate_parallel_group: Execute coupling tasks for a parallel group
-    execute_group: Execute tasks for a group of qubits (used by CalibService.run)
-    execute_coupling: Execute tasks for a coupling pair (used by CalibService.two_qubit)
 """
 
 from __future__ import annotations
@@ -162,59 +160,3 @@ def calibrate_parallel_group(coupling_qids: list[str], tasks: list[str]) -> dict
     futures = [execute_coupling_pair.submit(cqid, tasks) for cqid in coupling_qids]
     pair_results = [f.result() for f in futures]
     return {qid: result for qid, result in pair_results}
-
-
-# =============================================================================
-# CalibService Tasks (for high-level API)
-# =============================================================================
-
-
-@task
-def execute_group(cal: "CalibService", qids: list[str], tasks: list[str]) -> dict[str, Any]:
-    """Execute tasks for a group of qubits (internal task).
-
-    Used by CalibService.run() for group-based parallel execution.
-
-    Args:
-        cal: CalibService instance
-        qids: List of qubit IDs in the group
-        tasks: List of task names to execute
-
-    Returns:
-        Dictionary mapping qid to results
-    """
-    results: dict[str, Any] = {}
-    for qid in qids:
-        try:
-            result: dict[str, Any] = {}
-            for task_name in tasks:
-                result[task_name] = cal.execute_task(task_name, qid)
-            result["status"] = "success"
-        except Exception as e:
-            result = {"status": "failed", "error": str(e)}
-        results[qid] = result
-    return results
-
-
-@task
-def execute_coupling(cal: "CalibService", coupling_qid: str, tasks: list[str]) -> dict[str, Any]:
-    """Execute tasks for a coupling pair (internal task).
-
-    Used by CalibService.two_qubit() for coupling calibration.
-
-    Args:
-        cal: CalibService instance
-        coupling_qid: Coupling ID (e.g., "0-1")
-        tasks: List of task names to execute
-
-    Returns:
-        Dictionary with task results and status
-    """
-    try:
-        result: dict[str, Any] = {}
-        for task_name in tasks:
-            result[task_name] = cal.execute_task(task_name, coupling_qid)
-        result["status"] = "success"
-    except Exception as e:
-        result = {"status": "failed", "error": str(e)}
-    return result

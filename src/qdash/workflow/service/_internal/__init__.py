@@ -9,9 +9,7 @@ from qdash.workflow.service._internal.prefect_tasks import (
     calibrate_parallel_group,
     calibrate_single_qubit,
     calibrate_step_qubits_parallel,
-    execute_coupling,
     execute_coupling_pair,
-    execute_group,
 )
 
 __all__ = [
@@ -20,6 +18,4 @@ __all__ = [
     "calibrate_step_qubits_parallel",
     "execute_coupling_pair",
     "calibrate_parallel_group",
-    "execute_group",
-    "execute_coupling",
 ]
