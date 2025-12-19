@@ -1,4 +1,4 @@
-"""Session configuration for calibration workflows."""
+"""Calibration configuration for workflows."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Any
 
 
 @dataclass
-class SessionConfig:
+class CalibConfig:
     """Configuration for a calibration session.
 
     Attributes:

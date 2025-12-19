@@ -1,5 +1,7 @@
 """Task management components for calibration workflows."""
 
+from qdash.datamodel.task import TaskType, TaskTypes
+from qdash.workflow.engine.task.context import TaskContext
 from qdash.workflow.engine.task.executor import TaskExecutionError, TaskExecutor
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.result_processor import (
@@ -7,12 +9,13 @@ from qdash.workflow.engine.task.result_processor import (
     R2ValidationError,
     TaskResultProcessor,
 )
-from qdash.workflow.engine.task.session import TaskSession
 from qdash.workflow.engine.task.state_manager import TaskStateManager
-from qdash.datamodel.task import TaskType, TaskTypes
+
+# Backwards compatibility alias
+TaskSession = TaskContext
 
 __all__ = [
-    "TaskSession",
+    "TaskContext",
     "TaskExecutor",
     "TaskExecutionError",
     "TaskStateManager",
@@ -22,4 +25,6 @@ __all__ = [
     "TaskHistoryRecorder",
     "TaskType",
     "TaskTypes",
+    # Backwards compatibility
+    "TaskSession",
 ]

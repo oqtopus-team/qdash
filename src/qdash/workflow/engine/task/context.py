@@ -1,6 +1,6 @@
-"""TaskSession - Lightweight task management without facade bloat.
+"""TaskContext - Lightweight task context without facade bloat.
 
-This module provides the TaskSession class that directly holds TaskStateManager
+This module provides the TaskContext class that directly holds TaskStateManager
 and TaskExecutor without the sync overhead of the old TaskManager facade.
 
 The key difference from TaskManager:
@@ -35,8 +35,8 @@ if TYPE_CHECKING:
     from qdash.workflow.engine.execution.service import ExecutionService
 
 
-class TaskSession:
-    """Lightweight task session without facade bloat.
+class TaskContext:
+    """Lightweight task context without facade bloat.
 
     This class directly holds TaskStateManager and TaskExecutor,
     eliminating the sync overhead of the old TaskManager.
@@ -61,7 +61,7 @@ class TaskSession:
     Example
     -------
     ```python
-    session = TaskSession(
+    session = TaskContext(
         username="alice",
         execution_id="20240101-001",
         qids=["0", "1"],
@@ -83,7 +83,7 @@ class TaskSession:
         qids: list[str],
         calib_dir: str,
     ) -> None:
-        """Initialize TaskSession.
+        """Initialize TaskContext.
 
         Parameters
         ----------
@@ -413,7 +413,7 @@ class TaskSession:
         backend: "BaseBackend",
         execution_service: "ExecutionService",
         qid: str,
-    ) -> tuple["ExecutionService", "TaskSession"]:
+    ) -> tuple["ExecutionService", "TaskContext"]:
         """Execute task with integrated save processing.
 
         Parameters
@@ -429,7 +429,7 @@ class TaskSession:
 
         Returns
         -------
-        tuple[ExecutionService, TaskSession]
+        tuple[ExecutionService, TaskContext]
             Updated execution service and this task session
         """
         # Execute via TaskExecutor

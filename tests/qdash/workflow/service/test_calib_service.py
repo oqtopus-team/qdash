@@ -53,7 +53,7 @@ class MockExecutionService:
         return cls(**kwargs)
 
 
-class MockTaskSession:
+class MockTaskContext:
     """Mock TaskSession for testing."""
 
     def __init__(self, *args, **kwargs):
@@ -76,14 +76,14 @@ class MockBackend:
         pass
 
 
-class MockSessionManager:
-    """Mock SessionManager for testing."""
+class MockCalibOrchestrator:
+    """Mock CalibOrchestrator for testing."""
 
     def __init__(self, config, github_integration=None):
         self.config = config
         self._initialized = False
         self._execution_service = MockExecutionService(tags=config.tags or [])
-        self._task_session = MockTaskSession()
+        self._task_context = MockTaskContext()
         self._backend = MockBackend()
 
     @property
@@ -91,8 +91,8 @@ class MockSessionManager:
         return self._execution_service
 
     @property
-    def task_session(self):
-        return self._task_session
+    def task_context(self):
+        return self._task_context
 
     @property
     def backend(self):
@@ -159,8 +159,8 @@ def clear_session_state():
 def mock_flow_session_deps(monkeypatch):
     """Fixture to mock CalibService dependencies."""
     monkeypatch.setattr(
-        "qdash.workflow.service.calib_service.SessionManager",
-        MockSessionManager,
+        "qdash.workflow.service.calib_service.CalibOrchestrator",
+        MockCalibOrchestrator,
     )
     monkeypatch.setattr(
         "qdash.workflow.service.calib_service.GitHubIntegration",

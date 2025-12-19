@@ -1,20 +1,22 @@
 """Workflow engine components.
 
 This module provides calibration workflow management components organized into:
-- task/: Task management (TaskSession, TaskExecutor, TaskStateManager, etc.)
+- orchestrator.py: CalibOrchestrator - session lifecycle management
+- config.py: CalibConfig - session configuration
+- task/: Task management (TaskContext, TaskExecutor, TaskStateManager, etc.)
 - execution/: Execution management (ExecutionService, ExecutionStateManager)
-- session/: Session management (SessionManager, SessionConfig)
 - scheduler/: CR scheduling (CRScheduler)
 - repository/: Data persistence (MongoDB, filesystem implementations)
 - backend/: Backend implementations (qubex, fake)
 """
 
+# Orchestration components
+from qdash.workflow.engine.config import CalibConfig
+from qdash.workflow.engine.orchestrator import CalibOrchestrator
+
 # Execution components
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.execution.state_manager import ExecutionStateManager
-
-# Session components
-from qdash.workflow.engine.session import SessionConfig, SessionManager
 
 # Scheduler components
 from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler, CRScheduleResult
@@ -37,6 +39,7 @@ from qdash.workflow.engine.scheduler.one_qubit_scheduler import (
 )
 
 # Task components
+from qdash.workflow.engine.task.context import TaskContext
 from qdash.workflow.engine.task.executor import TaskExecutionError, TaskExecutor
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.result_processor import (
@@ -44,15 +47,23 @@ from qdash.workflow.engine.task.result_processor import (
     R2ValidationError,
     TaskResultProcessor,
 )
-from qdash.workflow.engine.task.session import TaskSession
 from qdash.workflow.engine.task.state_manager import TaskStateManager
 
+# Backwards compatibility aliases
+SessionManager = CalibOrchestrator
+SessionConfig = CalibConfig
+TaskSession = TaskContext
+
 __all__ = [
-    # Session
+    # Orchestration
+    "CalibOrchestrator",
+    "CalibConfig",
+    # Backwards compatibility
     "SessionManager",
     "SessionConfig",
     # Task
-    "TaskSession",
+    "TaskContext",
+    "TaskSession",  # Backwards compatibility
     "TaskExecutor",
     "TaskExecutionError",
     "TaskStateManager",

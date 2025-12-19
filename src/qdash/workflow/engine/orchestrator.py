@@ -1,8 +1,8 @@
-"""Session manager for calibration workflows.
+"""Calibration orchestrator for workflow execution.
 
 This module handles the lifecycle of a calibration session:
 - Directory structure creation
-- ExecutionService, TaskSession, Backend initialization
+- ExecutionService, TaskContext, Backend initialization
 - Session cleanup and finalization
 """
 
@@ -17,42 +17,42 @@ from prefect import get_run_logger
 from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.execution.service import ExecutionService
-from qdash.workflow.engine.session.config import SessionConfig
-from qdash.workflow.engine.task.session import TaskSession
+from qdash.workflow.engine.config import CalibConfig
+from qdash.workflow.engine.task.context import TaskContext
 
 if TYPE_CHECKING:
     from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
 
-class SessionManager:
-    """Manages the lifecycle of a calibration session.
+class CalibOrchestrator:
+    """Orchestrates the lifecycle of a calibration session.
 
     This class handles:
     - Directory structure creation
-    - ExecutionService, TaskSession, Backend initialization
+    - ExecutionService, TaskContext, Backend initialization
     - Session cleanup and finalization
 
     Example:
         ```python
-        config = SessionConfig(
+        config = CalibConfig(
             username="alice",
             chip_id="64Qv3",
             qids=["0", "1"],
             execution_id="20240101-001",
         )
-        session = SessionManager(config)
-        session.initialize()
+        orchestrator = CalibOrchestrator(config)
+        orchestrator.initialize()
 
-        # Use session components
-        session.execution_service.save()
-        session.task_session.get_task(...)
-        session.backend.connect()
+        # Use orchestrator components
+        orchestrator.execution_service.save()
+        orchestrator.task_context.get_task(...)
+        orchestrator.backend.connect()
         ```
     """
 
     def __init__(
         self,
-        config: SessionConfig,
+        config: CalibConfig,
         github_integration: "GitHubIntegration | None" = None,
     ) -> None:
         """Initialize the session manager.
@@ -66,7 +66,7 @@ class SessionManager:
 
         # Session components (initialized in initialize())
         self._execution_service: ExecutionService | None = None
-        self._task_session: TaskSession | None = None
+        self._task_context: TaskContext | None = None
         self._backend: BaseBackend | None = None
         self._initialized = False
 
@@ -81,11 +81,11 @@ class SessionManager:
         return self._execution_service
 
     @property
-    def task_session(self) -> TaskSession:
-        """Get the TaskSession instance."""
-        if self._task_session is None:
+    def task_context(self) -> TaskContext:
+        """Get the TaskContext instance."""
+        if self._task_context is None:
             raise RuntimeError("Session not initialized. Call initialize() first.")
-        return self._task_session
+        return self._task_context
 
     @property
     def backend(self) -> BaseBackend:
@@ -106,7 +106,7 @@ class SessionManager:
         1. Creates directory structure
         2. Pulls config from GitHub (if configured)
         3. Initializes ExecutionService
-        4. Initializes TaskSession
+        4. Initializes TaskContext
         5. Initializes and connects Backend
         """
         if self._initialized:
@@ -136,8 +136,8 @@ class SessionManager:
         self._execution_service.save_with_tags()
         self._execution_service.start_execution()
 
-        # Initialize TaskSession
-        self._task_session = TaskSession(
+        # Initialize TaskContext
+        self._task_context = TaskContext(
             username=config.username,
             execution_id=config.execution_id,
             qids=config.qids,
@@ -176,11 +176,11 @@ class SessionManager:
         """Create and configure the backend."""
         config = self.config
 
-        # task_session must be initialized before calling this method
-        assert self._task_session is not None, "TaskSession must be initialized first"
+        # task_context must be initialized before calling this method
+        assert self._task_context is not None, "TaskContext must be initialized first"
 
-        # Build note_path using task_session.id
-        note_path = f"{config.calib_data_path}/calib_note/{self._task_session.id}.json"
+        # Build note_path using task_context.id
+        note_path = f"{config.calib_data_path}/calib_note/{self._task_context.id}.json"
 
         session_config: dict[str, Any] = {
             "task_type": "qubit",
@@ -206,7 +206,7 @@ class SessionManager:
                 chip_id=config.chip_id,
                 calib_dir=config.calib_data_path,
                 execution_id=config.execution_id,
-                task_manager_id=self._task_session.id,
+                task_manager_id=self._task_context.id,
                 project_id=config.project_id,
             )
 
@@ -270,7 +270,7 @@ class SessionManager:
             latest_doc = CalibrationNoteDocument.find_one(
                 {
                     "username": config.username,
-                    "task_id": self.task_session.id,
+                    "task_id": self.task_context.id,
                     "execution_id": config.execution_id,
                     "chip_id": config.chip_id,
                 }
@@ -278,13 +278,13 @@ class SessionManager:
 
             if latest_doc:
                 note_path = Path(
-                    f"{config.calib_data_path}/calib_note/{self.task_session.id}.json"
+                    f"{config.calib_data_path}/calib_note/{self.task_context.id}.json"
                 )
                 note_path.parent.mkdir(parents=True, exist_ok=True)
                 note_path.write_text(json.dumps(latest_doc.note, indent=2, ensure_ascii=False))
                 logger.info(f"Exported calibration note to {note_path}")
             else:
-                logger.warning(f"No calibration note found for task_id={self.task_session.id}")
+                logger.warning(f"No calibration note found for task_id={self.task_context.id}")
         except Exception as e:
             logger.error(f"Failed to export calibration note: {e}")
 
@@ -345,70 +345,70 @@ class SessionManager:
         if execution_service is None:
             execution_service = self.execution_service
 
-        # Create a new TaskSession for this specific execution
-        execution_task_session = TaskSession(
+        # Create a new TaskContext for this specific execution
+        execution_task_context = TaskContext(
             username=config.username,
             execution_id=config.execution_id,
             qids=[qid],
-            calib_dir=self.task_session.calib_dir,
+            calib_dir=self.task_context.calib_dir,
         )
 
         # Copy only the relevant calibration data for this qid
         relevant_qubit_ids = self._get_relevant_qubit_ids(qid)
-        execution_task_session.state.calib_data = CalibDataModel(
+        execution_task_context.state.calib_data = CalibDataModel(
             qubit={
-                q: deepcopy(self.task_session.calib_data.qubit[q])
+                q: deepcopy(self.task_context.calib_data.qubit[q])
                 for q in relevant_qubit_ids
-                if q in self.task_session.calib_data.qubit
+                if q in self.task_context.calib_data.qubit
             },
             coupling={
-                c: deepcopy(self.task_session.calib_data.coupling[c])
+                c: deepcopy(self.task_context.calib_data.coupling[c])
                 for c in [qid]
-                if qid in self.task_session.calib_data.coupling
+                if qid in self.task_context.calib_data.coupling
             },
         )
-        execution_task_session.controller_info = deepcopy(self.task_session.controller_info)
+        execution_task_context.controller_info = deepcopy(self.task_context.controller_info)
 
         # Set upstream_id for sequential task dependency tracking
         if upstream_id is not None:
-            execution_task_session.set_upstream_task_id(upstream_id)
+            execution_task_context.set_upstream_task_id(upstream_id)
         else:
             last_id = self._last_executed_task_id_by_qid.get(qid, "")
-            execution_task_session.set_upstream_task_id(last_id)
+            execution_task_context.set_upstream_task_id(last_id)
 
         # Execute task
-        execution_service, executed_task_session = execute_dynamic_task_by_qid_service.with_options(
+        execution_service, executed_task_context = execute_dynamic_task_by_qid_service.with_options(
             timeout_seconds=task_instance.timeout,
             task_run_name=task_instance.name,
             log_prints=True,
         )(
             backend=self.backend,
             execution_service=execution_service,
-            task_session=execution_task_session,
+            task_context=execution_task_context,
             task_instance=task_instance,
             qid=qid,
         )
 
-        # Merge results back to main task_session
-        self.task_session.state.calib_data.qubit.update(
-            executed_task_session.calib_data.qubit
+        # Merge results back to main task_context
+        self.task_context.state.calib_data.qubit.update(
+            executed_task_context.calib_data.qubit
         )
-        self.task_session.state.calib_data.coupling.update(
-            executed_task_session.calib_data.coupling
+        self.task_context.state.calib_data.coupling.update(
+            executed_task_context.calib_data.coupling
         )
-        self.task_session.controller_info.update(executed_task_session.controller_info)
+        self.task_context.controller_info.update(executed_task_context.controller_info)
 
         # Update execution service
         self._execution_service = execution_service
 
         # Store the executed task's task_id for upstream tracking
-        executed_task = executed_task_session.get_task(
+        executed_task = executed_task_context.get_task(
             task_name=task_name, task_type=task_instance.get_task_type(), qid=qid
         )
         self._last_executed_task_id_by_qid[qid] = executed_task.task_id
 
         # Return output parameters
-        result = executed_task_session.get_output_parameter_by_task_name(
+        result = executed_task_context.get_output_parameter_by_task_name(
             task_name,
             task_type=task_instance.get_task_type(),
             qid=qid,
@@ -418,7 +418,7 @@ class SessionManager:
         return dict(result)
 
     def _ensure_task_in_workflow(self, task_name: str, task_type: str, qid: str) -> None:
-        """Ensure task exists in TaskSession's workflow structure."""
+        """Ensure task exists in TaskContext's workflow structure."""
         from qdash.datamodel.task import (
             CouplingTaskModel,
             GlobalTaskModel,
@@ -428,38 +428,38 @@ class SessionManager:
 
         # Check if task already exists
         if task_type == "qubit":
-            if qid in self.task_session.task_result.qubit_tasks:
+            if qid in self.task_context.task_result.qubit_tasks:
                 existing_tasks = [
-                    t.name for t in self.task_session.task_result.qubit_tasks[qid]
+                    t.name for t in self.task_context.task_result.qubit_tasks[qid]
                 ]
                 if task_name in existing_tasks:
                     return
             task = QubitTaskModel(name=task_name, upstream_id="", qid=qid)
-            self.task_session.task_result.qubit_tasks.setdefault(qid, []).append(task)
+            self.task_context.task_result.qubit_tasks.setdefault(qid, []).append(task)
         elif task_type == "coupling":
-            if qid in self.task_session.task_result.coupling_tasks:
+            if qid in self.task_context.task_result.coupling_tasks:
                 existing_tasks = [
-                    t.name for t in self.task_session.task_result.coupling_tasks[qid]
+                    t.name for t in self.task_context.task_result.coupling_tasks[qid]
                 ]
                 if task_name in existing_tasks:
                     return
             task = CouplingTaskModel(name=task_name, upstream_id="", qid=qid)
-            self.task_session.task_result.coupling_tasks.setdefault(qid, []).append(task)
+            self.task_context.task_result.coupling_tasks.setdefault(qid, []).append(task)
         elif task_type == "global":
-            existing_tasks = [t.name for t in self.task_session.task_result.global_tasks]
+            existing_tasks = [t.name for t in self.task_context.task_result.global_tasks]
             if task_name in existing_tasks:
                 return
             task = GlobalTaskModel(name=task_name, upstream_id="")
-            self.task_session.task_result.global_tasks.append(task)
+            self.task_context.task_result.global_tasks.append(task)
         elif task_type == "system":
-            existing_tasks = [t.name for t in self.task_session.task_result.system_tasks]
+            existing_tasks = [t.name for t in self.task_context.task_result.system_tasks]
             if task_name in existing_tasks:
                 return
             task = SystemTaskModel(name=task_name, upstream_id="")
-            self.task_session.task_result.system_tasks.append(task)
+            self.task_context.task_result.system_tasks.append(task)
 
         # Save updated workflow
-        self.task_session.save()
+        self.task_context.save()
 
     def _get_relevant_qubit_ids(self, qid: str) -> list[str]:
         """Get the list of qubit IDs relevant to a task execution."""

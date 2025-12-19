@@ -46,8 +46,8 @@ from qdash.dbmodel.user import UserDocument
 from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.params_updater import get_params_updater
-from qdash.workflow.engine.session import SessionConfig, SessionManager
-from qdash.workflow.engine.task.session import TaskSession
+from qdash.workflow.engine import CalibConfig, CalibOrchestrator
+from qdash.workflow.engine.task.context import TaskContext
 from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
 
@@ -204,7 +204,7 @@ class CalibService:
         # Session state
         self._initialized = False
         self.execution_id: str | None = execution_id
-        self._session_manager: SessionManager | None = None
+        self._orchestrator: CalibOrchestrator | None = None
         self.github_integration: GitHubIntegration | None = None
         self.github_push_config: GitHubPushConfig | None = github_push_config
 
@@ -265,8 +265,8 @@ class CalibService:
 
         # Wrap all initialization in try/except to ensure lock is released on failure
         try:
-            # Create SessionConfig
-            config = SessionConfig(
+            # Create CalibConfig
+            config = CalibConfig(
                 username=self.username,
                 chip_id=self.chip_id,
                 qids=qids,
@@ -280,12 +280,12 @@ class CalibService:
                 enable_github_pull=self._enable_github_pull,
             )
 
-            # Create and initialize SessionManager
-            self._session_manager = SessionManager(
+            # Create and initialize CalibOrchestrator
+            self._orchestrator = CalibOrchestrator(
                 config=config,
                 github_integration=self.github_integration,
             )
-            self._session_manager.initialize()
+            self._orchestrator.initialize()
             self._initialized = True
         except Exception:
             # Release lock if initialization fails
@@ -296,30 +296,30 @@ class CalibService:
 
     @property
     def execution_service(self) -> ExecutionService | None:
-        """Get the ExecutionService from SessionManager."""
-        if self._session_manager is None:
+        """Get the ExecutionService from CalibOrchestrator."""
+        if self._orchestrator is None:
             return None
-        return self._session_manager.execution_service
+        return self._orchestrator.execution_service
 
     @execution_service.setter
     def execution_service(self, value: ExecutionService | None) -> None:
         """Set execution_service (for backward compatibility with reload)."""
-        if self._session_manager is not None:
-            self._session_manager._execution_service = value
+        if self._orchestrator is not None:
+            self._orchestrator._execution_service = value
 
     @property
-    def task_session(self) -> TaskSession | None:
-        """Get the TaskSession from SessionManager."""
-        if self._session_manager is None:
+    def task_context(self) -> TaskContext | None:
+        """Get the TaskContext from CalibOrchestrator."""
+        if self._orchestrator is None:
             return None
-        return self._session_manager.task_session
+        return self._orchestrator.task_context
 
     @property
     def backend(self) -> BaseBackend | None:
-        """Get the Backend from SessionManager."""
-        if self._session_manager is None:
+        """Get the Backend from CalibOrchestrator."""
+        if self._orchestrator is None:
             return None
-        return self._session_manager.backend
+        return self._orchestrator.backend
 
     def execute_task(
         self,
@@ -349,8 +349,8 @@ class CalibService:
             result2 = session.execute_task("CheckRabi", "32", upstream_id=result1["task_id"])
             ```
         """
-        assert self._session_manager is not None, "Session not initialized"
-        result: dict[str, Any] = self._session_manager.execute_task(
+        assert self._orchestrator is not None, "Session not initialized"
+        result: dict[str, Any] = self._orchestrator.execute_task(
             task_name, qid, task_details, upstream_id
         )
         return result
@@ -532,7 +532,7 @@ class CalibService:
 
         """
         assert self.execution_service is not None, "ExecutionService not initialized"
-        assert self.task_session is not None, "TaskSession not initialized"
+        assert self.task_context is not None, "TaskContext not initialized"
         assert self.github_push_config is not None, "GitHubPushConfig not initialized"
         logger = get_run_logger()
         push_results = None
@@ -568,7 +568,7 @@ class CalibService:
                     latest_doc = CalibrationNoteDocument.find_one(
                         {
                             "username": self.username,
-                            "task_id": self.task_session.id,
+                            "task_id": self.task_context.id,
                             "execution_id": self.execution_id,
                             "chip_id": self.chip_id,
                         }
@@ -576,7 +576,7 @@ class CalibService:
 
                     if latest_doc:
                         note_path = Path(
-                            f"{self.execution_service.calib_data_path}/calib_note/{self.task_session.id}.json"
+                            f"{self.execution_service.calib_data_path}/calib_note/{self.task_context.id}.json"
                         )
                         note_path.parent.mkdir(parents=True, exist_ok=True)
                         note_path.write_text(
@@ -585,7 +585,7 @@ class CalibService:
                         logger.info(f"Exported calibration note to {note_path}")
                     else:
                         logger.warning(
-                            f"No calibration note found for task_id={self.task_session.id}"
+                            f"No calibration note found for task_id={self.task_context.id}"
                         )
                 except Exception as e:
                     logger.error(f"Failed to export calibration note: {e}")
