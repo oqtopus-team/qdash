@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from prefect import flow
-from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+from qdash.workflow.engine.repository import MongoCalibrationNoteRepository
 from qdash.workflow.worker.tasks.push_github import push_github
 
 
@@ -26,18 +26,25 @@ def push_calib_note(
     -------
         str: Commit SHA
 
+    Raises:
+    ------
+        ValueError: If no master calibration note is found
+
     """
     source_path = f"/app/config/qubex/{chip_id}/calibration/calib_note.json"
     repo_subpath = f"{chip_id}/calibration/calib_note.json"
-    latest = (
-        CalibrationNoteDocument.find({"username": username, "task_id": "master"})
-        .sort([("timestamp", -1)])  # 更新時刻で降順ソート
-        .limit(1)
-        .run()
-    )[0]
+
+    repo = MongoCalibrationNoteRepository()
+    latest_note = repo.find_latest_master(chip_id=chip_id, username=username)
+
+    if latest_note is None:
+        msg = f"No master calibration note found for user {username}"
+        raise ValueError(msg)
+
     calib_note_dir = f"/app/config/qubex/{chip_id}/calibration"
-    calib_note = latest.note
+    calib_note = latest_note.note
     calib_note_path = f"{calib_note_dir}/calib_note.json"
+    Path(calib_note_dir).mkdir(parents=True, exist_ok=True)
     with Path(calib_note_path).open("w", encoding="utf-8") as f:
         json.dump(calib_note, f, indent=4, ensure_ascii=False, sort_keys=True)
 

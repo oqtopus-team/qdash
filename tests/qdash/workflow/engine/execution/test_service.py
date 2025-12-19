@@ -84,7 +84,8 @@ class TestExecutionServiceCreation:
 
         assert service.state_manager.name == "Test Execution"
         assert service.state_manager.tags == ["tag1", "tag2"]
-        assert service.state_manager.note == {"key": "value"}
+        # note is now an ExecutionNote model with extra data in .extra
+        assert service.state_manager.note.extra == {"key": "value"}
 
 
 class TestExecutionServiceLifecycle:
@@ -309,6 +310,8 @@ class TestExecutionServiceProperties:
 
     def test_property_accessors(self):
         """Test all property accessors work correctly."""
+        from qdash.workflow.engine.execution.models import ExecutionNote
+
         mock_repo = MockExecutionRepository()
         service = ExecutionService.create(
             username="test_user",
@@ -326,7 +329,8 @@ class TestExecutionServiceProperties:
         assert isinstance(service.calib_data, CalibDataModel)
         assert isinstance(service.task_results, dict)
         assert isinstance(service.controller_info, dict)
-        assert isinstance(service.note, dict)
+        # note is now an ExecutionNote model
+        assert isinstance(service.note, ExecutionNote)
 
     def test_note_setter(self):
         """Test note setter works."""
@@ -341,7 +345,8 @@ class TestExecutionServiceProperties:
 
         service.note = {"new_key": "new_value"}
 
-        assert service.note == {"new_key": "new_value"}
+        # Dict values are converted to ExecutionNote with data in .extra
+        assert service.note.extra == {"new_key": "new_value"}
 
     def test_to_datamodel(self):
         """Test to_datamodel returns ExecutionModel."""

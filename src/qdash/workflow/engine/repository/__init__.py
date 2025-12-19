@@ -41,6 +41,10 @@ ExecutionRepository
     Interface for execution record storage.
     Tracks workflow execution sessions.
 
+CalibrationNoteRepository
+    Interface for calibration note storage.
+    Stores and retrieves calibration notes for chips.
+
 MongoDB Implementations
 -----------------------
 MongoTaskResultHistoryRepository
@@ -54,6 +58,9 @@ MongoChipHistoryRepository
 
 MongoExecutionRepository
     Persists to ``executions`` collection.
+
+MongoCalibrationNoteRepository
+    Persists to ``calibration_note`` collection.
 
 Filesystem Implementations
 --------------------------
@@ -82,6 +89,15 @@ Testing with Mocks
 from qdash.workflow.engine.repository.filesystem_impl import (
     FilesystemCalibDataSaver,
 )
+from qdash.workflow.engine.repository.inmemory_calibration_note import (
+    InMemoryCalibrationNoteRepository,
+)
+from qdash.workflow.engine.repository.mongo_calibration_note import (
+    MongoCalibrationNoteRepository,
+)
+from qdash.workflow.engine.repository.mongo_coupling import (
+    MongoCouplingCalibrationRepository,
+)
 from qdash.workflow.engine.repository.mongo_execution import (
     MongoExecutionRepository,
 )
@@ -91,11 +107,17 @@ from qdash.workflow.engine.repository.mongo_impl import (
     MongoTaskResultHistoryRepository,
     create_default_repositories,
 )
+from qdash.workflow.engine.repository.mongo_qubit import (
+    MongoQubitCalibrationRepository,
+)
 from qdash.workflow.engine.repository.protocols import (
     CalibDataSaver,
+    CalibrationNoteRepository,
     ChipHistoryRepository,
     ChipRepository,
+    CouplingCalibrationRepository,
     ExecutionRepository,
+    QubitCalibrationRepository,
     TaskResultHistoryRepository,
 )
 
@@ -106,12 +128,20 @@ __all__ = [
     "ChipHistoryRepository",
     "CalibDataSaver",
     "ExecutionRepository",
+    "CalibrationNoteRepository",
+    "QubitCalibrationRepository",
+    "CouplingCalibrationRepository",
     # MongoDB implementations
     "MongoTaskResultHistoryRepository",
     "MongoChipRepository",
     "MongoChipHistoryRepository",
     "MongoExecutionRepository",
+    "MongoCalibrationNoteRepository",
+    "MongoQubitCalibrationRepository",
+    "MongoCouplingCalibrationRepository",
     "create_default_repositories",
     # Filesystem implementations
     "FilesystemCalibDataSaver",
+    # In-memory implementations (for testing)
+    "InMemoryCalibrationNoteRepository",
 ]

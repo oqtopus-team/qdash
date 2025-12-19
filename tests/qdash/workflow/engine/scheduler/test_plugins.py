@@ -54,7 +54,7 @@ def mock_chip_doc():
 def filter_context(mock_chip_doc):
     """Create FilterContext for testing."""
     return FilterContext(
-        chip_doc=mock_chip_doc,
+        chip=mock_chip_doc,
         grid_size=8,
         qubit_frequency={"0": 5.0, "1": 5.1, "2": 5.2, "3": 5.3, "4": 5.4, "5": 5.5},
         qid_to_mux={"0": 0, "1": 0, "2": 0, "3": 0, "4": 1, "5": 1},

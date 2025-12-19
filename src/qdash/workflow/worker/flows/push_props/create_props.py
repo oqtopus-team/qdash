@@ -1,6 +1,6 @@
 from typing import Any
 
-from qdash.dbmodel.chip import ChipDocument
+from qdash.datamodel.chip import ChipModel
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.worker.flows.push_props.formatter import format_number
@@ -77,9 +77,9 @@ def merge_properties(
 
 
 def get_chip_properties(
-    chip: ChipDocument, backend: QubexBackend, within_24hrs: bool = False, cutoff_hours: int = 24
+    chip: ChipModel, backend: QubexBackend, within_24hrs: bool = False, cutoff_hours: int = 24
 ) -> tuple[ChipProperties, dict[str, Any]]:
-    """Extract chip properties from the ChipDocument.
+    """Extract chip properties from chip data.
 
     Returns:
         Tuple of (ChipProperties, stats_dict) where stats_dict contains data availability info
@@ -139,7 +139,12 @@ def create_chip_properties(
 ) -> None:
     """Create and write chip properties to a YAML file."""
     initialize()
-    chip = ChipDocument.get_current_chip(username=username)
+    from qdash.workflow.engine.repository import MongoChipRepository
+
+    chip_repo = MongoChipRepository()
+    chip = chip_repo.get_current_chip(username=username)
+    if chip is None:
+        raise ValueError(f"Chip not found for user {username}")
     from qdash.workflow.engine.backend.factory import create_backend
 
     backend = create_backend(

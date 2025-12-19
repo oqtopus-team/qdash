@@ -6,7 +6,11 @@ in calibration workflows.
 
 from typing import Any, Callable, Protocol, runtime_checkable
 
+from qdash.datamodel.calibration_note import CalibrationNoteModel
+from qdash.datamodel.chip import ChipModel
+from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.execution import ExecutionModel
+from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.task import BaseTaskResultModel, CalibDataModel
 
 
@@ -30,10 +34,23 @@ class TaskResultHistoryRepository(Protocol):
 
 @runtime_checkable
 class ChipRepository(Protocol):
-    """Protocol for chip data access operations."""
+    """Protocol for chip data access operations.
 
-    def get_current_chip(self, username: str) -> dict[str, Any]:
-        """Get the current chip data.
+    This repository provides access to chip data, which contains qubit and coupling
+    calibration parameters. The current chip is the most recently installed chip
+    for a given user.
+
+    Example
+    -------
+        >>> repo = MongoChipRepository()
+        >>> chip = repo.get_current_chip(username="alice")
+        >>> if chip:
+        ...     print(f"Chip {chip.chip_id} has {len(chip.qubits)} qubits")
+
+    """
+
+    def get_current_chip(self, username: str) -> ChipModel | None:
+        """Get the most recently installed chip for a user.
 
         Parameters
         ----------
@@ -42,8 +59,26 @@ class ChipRepository(Protocol):
 
         Returns
         -------
-        dict
-            The chip data including qubit and coupling parameters
+        ChipModel | None
+            The current chip or None if not found
+
+        """
+        ...
+
+    def get_chip_by_id(self, username: str, chip_id: str) -> ChipModel | None:
+        """Get a specific chip by chip_id and username.
+
+        Parameters
+        ----------
+        username : str
+            The username of the chip owner
+        chip_id : str
+            The specific chip ID to retrieve
+
+        Returns
+        -------
+        ChipModel | None
+            The chip if found, None otherwise
 
         """
         ...
@@ -73,13 +108,16 @@ class ChipRepository(Protocol):
 class ChipHistoryRepository(Protocol):
     """Protocol for chip history recording operations."""
 
-    def create_history(self, username: str) -> None:
-        """Create a chip history snapshot from the current chip state.
+    def create_history(self, username: str, chip_id: str | None = None) -> None:
+        """Create a chip history snapshot.
 
         Parameters
         ----------
         username : str
             The username to look up the chip
+        chip_id : str, optional
+            The specific chip ID to create history for.
+            If None, uses the current (most recently installed) chip.
 
         """
         ...
@@ -218,6 +256,268 @@ class ExecutionRepository(Protocol):
         -------
         ExecutionModel
             The updated execution model
+
+        """
+        ...
+
+
+@runtime_checkable
+class CalibrationNoteRepository(Protocol):
+    """Protocol for calibration note persistence operations.
+
+    This protocol abstracts the storage mechanism for calibration notes,
+    allowing for different implementations (MongoDB, in-memory for testing, etc.).
+
+    Example
+    -------
+        >>> repo = MongoCalibrationNoteRepository()
+        >>> note = repo.find_latest_master(project_id="proj-1", chip_id="64Qv3")
+        >>> if note:
+        ...     print(note.note)
+
+    """
+
+    def find_one(
+        self,
+        *,
+        project_id: str | None = None,
+        username: str | None = None,
+        chip_id: str | None = None,
+        execution_id: str | None = None,
+        task_id: str | None = None,
+    ) -> CalibrationNoteModel | None:
+        """Find a single calibration note by query parameters.
+
+        All parameters are optional and used as filters. At least one
+        parameter should be provided for meaningful results.
+
+        Parameters
+        ----------
+        project_id : str, optional
+            The project identifier
+        username : str, optional
+            The username who created the note
+        chip_id : str, optional
+            The chip identifier
+        execution_id : str, optional
+            The execution identifier
+        task_id : str, optional
+            The task identifier (e.g., "master" for master notes)
+
+        Returns
+        -------
+        CalibrationNoteModel | None
+            The found note or None if not found
+
+        """
+        ...
+
+    def find_latest_master(
+        self,
+        *,
+        chip_id: str,
+        project_id: str | None = None,
+        username: str | None = None,
+    ) -> CalibrationNoteModel | None:
+        """Find the latest master calibration note for a chip.
+
+        Master notes (task_id="master") contain aggregated calibration data.
+        This method returns the most recently updated master note.
+
+        Parameters
+        ----------
+        chip_id : str
+            The chip identifier (required)
+        project_id : str, optional
+            The project identifier
+        username : str, optional
+            The username who created the note
+
+        Returns
+        -------
+        CalibrationNoteModel | None
+            The latest master note or None if not found
+
+        """
+        ...
+
+    def upsert(self, note: CalibrationNoteModel) -> CalibrationNoteModel:
+        """Create or update a calibration note.
+
+        If a note with matching identifiers (project_id, username, chip_id,
+        execution_id, task_id) exists, it will be updated. Otherwise, a new
+        note will be created.
+
+        Parameters
+        ----------
+        note : CalibrationNoteModel
+            The note to create or update
+
+        Returns
+        -------
+        CalibrationNoteModel
+            The saved note with updated timestamp
+
+        """
+        ...
+
+
+@runtime_checkable
+class QubitCalibrationRepository(Protocol):
+    """Protocol for qubit calibration data operations.
+
+    This repository handles updating qubit calibration data, which involves:
+    - Merging new calibration parameters into existing data
+    - Updating best_data when new results are better
+    - Synchronizing data with ChipDocument
+    - Recording history
+
+    Note
+    ----
+        The update operation affects multiple collections (qubit, chip, history).
+        In the future, this may be refactored to separate the business logic
+        into a domain service.
+
+    """
+
+    def update_calib_data(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+        output_parameters: dict[str, Any],
+        project_id: str,
+    ) -> QubitModel:
+        """Update qubit calibration data with new measurement results.
+
+        This method:
+        1. Merges new parameters into existing qubit data
+        2. Updates best_data if new results are better (fidelity comparison)
+        3. Updates the qubit data in the chip document
+        4. Records a history snapshot
+
+        Parameters
+        ----------
+        username : str
+            The username performing the update
+        qid : str
+            The qubit identifier (e.g., "0", "1")
+        chip_id : str
+            The chip identifier
+        output_parameters : dict[str, Any]
+            The new calibration parameters to merge
+        project_id : str
+            The project identifier
+
+        Returns
+        -------
+        QubitModel
+            The updated qubit model
+
+        Raises
+        ------
+        ValueError
+            If the qubit or chip is not found
+
+        """
+        ...
+
+    def find_one(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+    ) -> QubitModel | None:
+        """Find a qubit by identifiers.
+
+        Parameters
+        ----------
+        username : str
+            The username
+        qid : str
+            The qubit identifier
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        QubitModel | None
+            The qubit model if found, None otherwise
+
+        """
+        ...
+
+
+@runtime_checkable
+class CouplingCalibrationRepository(Protocol):
+    """Protocol for coupling calibration data operations.
+
+    This repository handles updating coupling calibration data between qubits.
+    Similar to QubitCalibrationRepository, updates affect multiple collections.
+
+    """
+
+    def update_calib_data(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+        output_parameters: dict[str, Any],
+        project_id: str,
+    ) -> CouplingModel:
+        """Update coupling calibration data with new measurement results.
+
+        Parameters
+        ----------
+        username : str
+            The username performing the update
+        qid : str
+            The coupling identifier (e.g., "0-1" for coupling between qubits 0 and 1)
+        chip_id : str
+            The chip identifier
+        output_parameters : dict[str, Any]
+            The new calibration parameters to merge
+        project_id : str
+            The project identifier
+
+        Returns
+        -------
+        CouplingModel
+            The updated coupling model
+
+        Raises
+        ------
+        ValueError
+            If the coupling or chip is not found
+
+        """
+        ...
+
+    def find_one(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+    ) -> CouplingModel | None:
+        """Find a coupling by identifiers.
+
+        Parameters
+        ----------
+        username : str
+            The username
+        qid : str
+            The coupling identifier
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        CouplingModel | None
+            The coupling model if found, None otherwise
 
         """
         ...

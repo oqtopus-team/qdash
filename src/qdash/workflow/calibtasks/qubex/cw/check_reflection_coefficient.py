@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
-from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -58,7 +57,6 @@ class CheckReflectionCoefficient(QubexTask):
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
         results = {}
         initialize()
-        ChipDocument.get_current_chip(username="admin")
         for label, qid in zip(labels, qids):
             result = exp.measure_reflection_coefficient(
                 target=label,  # center_frequency=chip.qubits[qid].data["coarse_resonator_frequency"]["value"]

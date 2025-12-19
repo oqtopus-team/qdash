@@ -226,8 +226,10 @@ class CalibOrchestrator:
         if not self._initialized:
             return
 
-        from qdash.dbmodel.chip import ChipDocument
-        from qdash.dbmodel.chip_history import ChipHistoryDocument
+        from qdash.workflow.engine.repository import (
+            MongoChipHistoryRepository,
+            MongoChipRepository,
+        )
 
         logger = get_run_logger()
         config = self.config
@@ -238,11 +240,11 @@ class CalibOrchestrator:
         # Update chip history
         if update_chip_history:
             try:
-                chip_doc = ChipDocument.get_chip_by_id(
-                    username=config.username, chip_id=config.chip_id
-                )
-                if chip_doc is not None:
-                    ChipHistoryDocument.create_history(chip_doc)
+                chip_repo = MongoChipRepository()
+                chip = chip_repo.get_chip_by_id(username=config.username, chip_id=config.chip_id)
+                if chip is not None:
+                    history_repo = MongoChipHistoryRepository()
+                    history_repo.create_history(username=config.username, chip_id=config.chip_id)
                 else:
                     logger.warning(
                         f"Chip '{config.chip_id}' not found for user '{config.username}', "
@@ -262,26 +264,23 @@ class CalibOrchestrator:
 
     def _export_note_to_file(self, logger: Any) -> None:
         """Export calibration note to a JSON file."""
-        from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+        from qdash.workflow.engine.repository import MongoCalibrationNoteRepository
 
         config = self.config
 
         try:
-            latest_doc = CalibrationNoteDocument.find_one(
-                {
-                    "username": config.username,
-                    "task_id": self.task_context.id,
-                    "execution_id": config.execution_id,
-                    "chip_id": config.chip_id,
-                }
-            ).run()
+            repo = MongoCalibrationNoteRepository()
+            latest_note = repo.find_one(
+                username=config.username,
+                task_id=self.task_context.id,
+                execution_id=config.execution_id,
+                chip_id=config.chip_id,
+            )
 
-            if latest_doc:
-                note_path = Path(
-                    f"{config.calib_data_path}/calib_note/{self.task_context.id}.json"
-                )
+            if latest_note:
+                note_path = Path(f"{config.calib_data_path}/calib_note/{self.task_context.id}.json")
                 note_path.parent.mkdir(parents=True, exist_ok=True)
-                note_path.write_text(json.dumps(latest_doc.note, indent=2, ensure_ascii=False))
+                note_path.write_text(json.dumps(latest_note.note, indent=2, ensure_ascii=False))
                 logger.info(f"Exported calibration note to {note_path}")
             else:
                 logger.warning(f"No calibration note found for task_id={self.task_context.id}")
@@ -437,18 +436,12 @@ class CalibOrchestrator:
     ) -> dict[str, Any]:
         """Merge execution results back to main context and extract output."""
         # Merge calibration data
-        self.task_context.state.calib_data.qubit.update(
-            executed_context.calib_data.qubit
-        )
-        self.task_context.state.calib_data.coupling.update(
-            executed_context.calib_data.coupling
-        )
+        self.task_context.state.calib_data.qubit.update(executed_context.calib_data.qubit)
+        self.task_context.state.calib_data.coupling.update(executed_context.calib_data.coupling)
         self.task_context.controller_info.update(executed_context.controller_info)
 
         # Track task_id for upstream dependency
-        executed_task = executed_context.get_task(
-            task_name=task_name, task_type=task_type, qid=qid
-        )
+        executed_task = executed_context.get_task(task_name=task_name, task_type=task_type, qid=qid)
         self._last_executed_task_id_by_qid[qid] = executed_task.task_id
 
         # Extract and return output parameters
@@ -471,18 +464,14 @@ class CalibOrchestrator:
         # Check if task already exists
         if task_type == "qubit":
             if qid in self.task_context.task_result.qubit_tasks:
-                existing_tasks = [
-                    t.name for t in self.task_context.task_result.qubit_tasks[qid]
-                ]
+                existing_tasks = [t.name for t in self.task_context.task_result.qubit_tasks[qid]]
                 if task_name in existing_tasks:
                     return
             task = QubitTaskModel(name=task_name, upstream_id="", qid=qid)
             self.task_context.task_result.qubit_tasks.setdefault(qid, []).append(task)
         elif task_type == "coupling":
             if qid in self.task_context.task_result.coupling_tasks:
-                existing_tasks = [
-                    t.name for t in self.task_context.task_result.coupling_tasks[qid]
-                ]
+                existing_tasks = [t.name for t in self.task_context.task_result.coupling_tasks[qid]]
                 if task_name in existing_tasks:
                     return
             task = CouplingTaskModel(name=task_name, upstream_id="", qid=qid)

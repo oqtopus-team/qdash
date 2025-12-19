@@ -43,7 +43,8 @@ class TestExecutionStateManagerInit:
         assert manager.name == "Test Execution"
         assert manager.execution_id == "exec-001"
         assert manager.calib_data_path == "/tmp/calib"
-        assert manager.note == {"key": "value"}
+        # note is converted to ExecutionNote, dict values go to .extra
+        assert manager.note.extra == {"key": "value"}
         assert manager.tags == ["tag1", "tag2"]
         assert manager.chip_id == "chip-001"
 

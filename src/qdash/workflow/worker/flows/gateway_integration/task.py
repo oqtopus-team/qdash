@@ -7,7 +7,6 @@ from typing import Any
 import requests
 from prefect import task
 from pydantic import BaseModel, Field
-from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
 
 # Get API URL from environment variable with default
@@ -64,7 +63,10 @@ def generate_device_topology_request(
     """Generate and return the device topology request data."""
     logging.info("Generating device topology request data...")
     initialize()
-    chip = ChipDocument.get_current_chip("admin")
+    from qdash.workflow.engine.repository import MongoChipRepository
+
+    chip_repo = MongoChipRepository()
+    chip = chip_repo.get_current_chip("admin")
     # Define request data using Pydantic model
     if chip is None:
         msg = "No current chip found in the database."

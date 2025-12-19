@@ -4,7 +4,6 @@ from typing import Any
 import pendulum
 from prefect import flow, get_run_logger
 from qdash.config import get_settings
-from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow._internal.slack import SlackContents, Status
 from qdash.workflow.engine.backend.factory import create_backend
@@ -95,7 +94,12 @@ def chip_report(
     chip_info_dir = f"/app/calib_data/{username}/{date_str}/chip_info"
     create_directory_task.submit(chip_info_dir).result()
 
-    chip = ChipDocument.get_current_chip(username=username)
+    from qdash.workflow.engine.repository import MongoChipRepository
+
+    chip_repo = MongoChipRepository()
+    chip = chip_repo.get_current_chip(username=username)
+    if chip is None:
+        raise ValueError(f"Chip not found for user {username}")
     logger = get_run_logger()
     logger.info(f"Current chip: {chip.chip_id}")
     source_path = f"/app/config/qubex/{chip.chip_id}/params/props.yaml"

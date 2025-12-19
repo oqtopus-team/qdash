@@ -38,8 +38,6 @@ import pendulum
 from prefect import get_run_logger
 
 logger = logging.getLogger(__name__)
-from qdash.dbmodel.chip import ChipDocument
-from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.user import UserDocument
@@ -537,13 +535,18 @@ class CalibService:
             # Update chip history for the specific chip being calibrated
             if update_chip_history:
                 try:
+                    from qdash.workflow.engine.repository import (
+                        MongoChipHistoryRepository,
+                        MongoChipRepository,
+                    )
+
                     # Use chip_id from session instead of "current" chip to avoid
                     # updating wrong chip's history when calibrating older chips
-                    chip_doc = ChipDocument.get_chip_by_id(
-                        username=self.username, chip_id=self.chip_id
-                    )
-                    if chip_doc is not None:
-                        ChipHistoryDocument.create_history(chip_doc)
+                    chip_repo = MongoChipRepository()
+                    chip = chip_repo.get_chip_by_id(username=self.username, chip_id=self.chip_id)
+                    if chip is not None:
+                        history_repo = MongoChipHistoryRepository()
+                        history_repo.create_history(username=self.username, chip_id=self.chip_id)
                     else:
                         logger.warning(
                             f"Chip '{self.chip_id}' not found for user '{self.username}', "
@@ -556,24 +559,23 @@ class CalibService:
             # Export calibration note to file if requested
             if export_note_to_file:
                 try:
-                    from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+                    from qdash.workflow.engine.repository import MongoCalibrationNoteRepository
 
-                    latest_doc = CalibrationNoteDocument.find_one(
-                        {
-                            "username": self.username,
-                            "task_id": self.task_context.id,
-                            "execution_id": self.execution_id,
-                            "chip_id": self.chip_id,
-                        }
-                    ).run()
+                    repo = MongoCalibrationNoteRepository()
+                    latest_note = repo.find_one(
+                        username=self.username,
+                        task_id=self.task_context.id,
+                        execution_id=self.execution_id,
+                        chip_id=self.chip_id,
+                    )
 
-                    if latest_doc:
+                    if latest_note:
                         note_path = Path(
                             f"{self.execution_service.calib_data_path}/calib_note/{self.task_context.id}.json"
                         )
                         note_path.parent.mkdir(parents=True, exist_ok=True)
                         note_path.write_text(
-                            json.dumps(latest_doc.note, indent=2, ensure_ascii=False)
+                            json.dumps(latest_note.note, indent=2, ensure_ascii=False)
                         )
                         logger.info(f"Exported calibration note to {note_path}")
                     else:

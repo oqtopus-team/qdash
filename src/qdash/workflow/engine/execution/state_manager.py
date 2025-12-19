@@ -7,7 +7,7 @@ transitions without any database or I/O operations.
 from typing import Any
 
 import pendulum
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionModel,
@@ -52,6 +52,14 @@ class ExecutionStateManager(BaseModel):
     calib_data: CalibDataModel = CalibDataModel(qubit={}, coupling={})
     message: str = ""
     system_info: SystemInfoModel = SystemInfoModel()
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def _convert_note(cls, v: Any) -> ExecutionNote:
+        """Convert dict to ExecutionNote for backward compatibility."""
+        if isinstance(v, dict):
+            return ExecutionNote.from_dict(v)
+        return v
 
     def start(self) -> "ExecutionStateManager":
         """Set execution to started state.

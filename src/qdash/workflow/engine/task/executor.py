@@ -687,9 +687,7 @@ class TaskExecutor:
 
         return execution_service, result
 
-    def _update_execution(
-        self, execution_service: "ExecutionService"
-    ) -> "ExecutionService":
+    def _update_execution(self, execution_service: "ExecutionService") -> "ExecutionService":
         """Update execution service with current state.
 
         Parameters
@@ -854,8 +852,10 @@ class TaskExecutor:
         success : bool
             Whether backend updates should be applied
         """
-        from qdash.dbmodel.coupling import CouplingDocument
-        from qdash.dbmodel.qubit import QubitDocument
+        from qdash.workflow.engine.repository import (
+            MongoCouplingCalibrationRepository,
+            MongoQubitCalibrationRepository,
+        )
 
         task_name = task.get_name()
         task_type = task.get_task_type()
@@ -863,6 +863,10 @@ class TaskExecutor:
         # Get output parameters
         task_model = self.state_manager.get_task(task_name, task_type, qid)
         output_parameters = dict(task_model.output_parameters)
+
+        # Get repositories
+        qubit_repo = MongoQubitCalibrationRepository()
+        coupling_repo = MongoCouplingCalibrationRepository()
 
         if not success:
             logger.info(
@@ -872,7 +876,7 @@ class TaskExecutor:
             # Still save to database even if R² failed
             if output_parameters:
                 if task.is_qubit_task():
-                    QubitDocument.update_calib_data(
+                    qubit_repo.update_calib_data(
                         username=self.username,
                         qid=qid,
                         chip_id=execution_service.chip_id,
@@ -880,7 +884,7 @@ class TaskExecutor:
                         project_id=execution_service.project_id,
                     )
                 elif task.is_coupling_task():
-                    CouplingDocument.update_calib_data(
+                    coupling_repo.update_calib_data(
                         username=self.username,
                         qid=qid,
                         chip_id=execution_service.chip_id,
@@ -903,18 +907,16 @@ class TaskExecutor:
         # Update database
         if output_parameters:
             if task.is_qubit_task():
-                QubitDocument.update_calib_data(
+                qubit_repo.update_calib_data(
                     username=self.username,
                     qid=qid,
                     chip_id=execution_service.chip_id,
                     output_parameters=output_parameters,
                     project_id=execution_service.project_id,
                 )
-                self._update_backend_params(
-                    backend, execution_service, qid, output_parameters
-                )
+                self._update_backend_params(backend, execution_service, qid, output_parameters)
             elif task.is_coupling_task():
-                CouplingDocument.update_calib_data(
+                coupling_repo.update_calib_data(
                     username=self.username,
                     qid=qid,
                     chip_id=execution_service.chip_id,

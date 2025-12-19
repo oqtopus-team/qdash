@@ -46,7 +46,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
-from qdash.dbmodel.chip import ChipDocument
+from qdash.datamodel.chip import ChipModel
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +56,13 @@ class FilterContext:
     """Context object passed to CR pair filters.
 
     Attributes:
-        chip_doc: Current chip document
+        chip: Current chip data
         grid_size: Grid dimension (8 for 64-qubit, 12 for 144-qubit)
         qubit_frequency: Mapping from qubit ID to frequency (if available)
         qid_to_mux: Mapping from qubit ID to MUX ID
     """
 
-    chip_doc: ChipDocument
+    chip: ChipModel
     grid_size: int
     qubit_frequency: dict[str, float] = field(default_factory=dict)
     qid_to_mux: dict[str, int] = field(default_factory=dict)
@@ -332,7 +332,7 @@ class FidelityFilter(CRPairFilter):
 
         # Extract fidelity data
         fidelity_map = {}
-        for qid, qubit in context.chip_doc.qubits.items():
+        for qid, qubit in context.chip.qubits.items():
             if qubit.data and self.fidelity_key in qubit.data:
                 fidelity_map[qid] = qubit.data[self.fidelity_key].get("value", 0.0)
 

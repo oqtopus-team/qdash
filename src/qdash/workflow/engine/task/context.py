@@ -314,18 +314,14 @@ class TaskContext:
         """
         return self.state.get_task(task_name, task_type, qid)
 
-    def start_task(
-        self, task_name: str, task_type: str = TaskTypes.GLOBAL, qid: str = ""
-    ) -> None:
+    def start_task(self, task_name: str, task_type: str = TaskTypes.GLOBAL, qid: str = "") -> None:
         """Start a task (set status to RUNNING and record start time).
 
         This is a core operation used frequently in calibration flows.
         """
         self.state.start_task(task_name, task_type, qid)
 
-    def end_task(
-        self, task_name: str, task_type: str = TaskTypes.GLOBAL, qid: str = ""
-    ) -> None:
+    def end_task(self, task_name: str, task_type: str = TaskTypes.GLOBAL, qid: str = "") -> None:
         """End a task (record end time and calculate elapsed time).
 
         This is a core operation used frequently in calibration flows.
