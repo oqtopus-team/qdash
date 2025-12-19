@@ -1,16 +1,16 @@
 from prefect import get_run_logger, task
 from qdash.dbmodel.initialize import initialize
-from qdash.dbmodel.task import TaskDocument
 from qdash.workflow.calibtasks.base import BaseTask
 from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.execution.service import ExecutionService
+from qdash.workflow.engine.repository import MongoTaskRepository
 from qdash.workflow.engine.task.context import TaskContext
 
 
 def validate_task_name(task_names: list[str], username: str) -> list[str]:
     """Validate task names."""
-    tasks = TaskDocument.find({"username": username}).run()
-    task_list = [task.name for task in tasks]
+    task_repo = MongoTaskRepository()
+    task_list = task_repo.get_task_names(username)
     for task_name in task_names:
         if task_name not in task_list:
             raise ValueError(f"Invalid task name: {task_name}")

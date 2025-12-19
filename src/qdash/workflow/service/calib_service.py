@@ -38,9 +38,6 @@ import pendulum
 from prefect import get_run_logger
 
 logger = logging.getLogger(__name__)
-from qdash.dbmodel.execution_counter import ExecutionCounterDocument
-from qdash.dbmodel.execution_lock import ExecutionLockDocument
-from qdash.dbmodel.user import UserDocument
 from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.params_updater import get_params_updater
@@ -71,9 +68,15 @@ def generate_execution_id(username: str, chip_id: str, project_id: str | None = 
         ```
 
     """
+    from qdash.workflow.engine.repository import MongoExecutionCounterRepository
+
     date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
-    execution_index = ExecutionCounterDocument.get_next_index(
-        date_str, username, chip_id, project_id=project_id
+    counter_repo = MongoExecutionCounterRepository()
+    execution_index = counter_repo.get_next_index(
+        date=date_str,
+        username=username,
+        chip_id=chip_id,
+        project_id=project_id,
     )
     return f"{date_str}-{execution_index:03d}"
 
@@ -186,15 +189,17 @@ class CalibService:
         # Auto-resolve project_id from username if not provided
         # This works because only owners can run calibrations (1 user = 1 project policy)
         if project_id is None:
-            user = UserDocument.find_one({"username": username}).run()
-            if user and user.default_project_id:
-                project_id = user.default_project_id
+            from qdash.workflow.engine.repository import MongoUserRepository
+
+            user_repo = MongoUserRepository()
+            default_project_id = user_repo.get_default_project_id(username)
+            if default_project_id:
+                project_id = default_project_id
                 logger.info(f"Auto-resolved project_id={project_id} from user={username}")
             else:
                 raise ValueError(
                     f"Could not resolve project_id for user={username}. "
-                    f"User found: {user is not None}, "
-                    f"default_project_id: {user.default_project_id if user else 'N/A'}. "
+                    f"default_project_id is not set. "
                     f"Either provide project_id explicitly or ensure user has default_project_id set."
                 )
         self.project_id = project_id
@@ -255,10 +260,13 @@ class CalibService:
 
         # Acquire lock if requested
         if self.use_lock:
-            if ExecutionLockDocument.get_lock_status(project_id=self.project_id):
+            from qdash.workflow.engine.repository import MongoExecutionLockRepository
+
+            lock_repo = MongoExecutionLockRepository()
+            if lock_repo.is_locked(project_id=self.project_id):
                 msg = "Calibration is already running. Cannot start a new session."
                 raise RuntimeError(msg)
-            ExecutionLockDocument.lock(project_id=self.project_id)
+            lock_repo.lock(project_id=self.project_id)
             self._lock_acquired = True
 
         # Wrap all initialization in try/except to ensure lock is released on failure
@@ -288,7 +296,10 @@ class CalibService:
         except Exception:
             # Release lock if initialization fails
             if self._lock_acquired:
-                ExecutionLockDocument.unlock(project_id=self.project_id)
+                from qdash.workflow.engine.repository import MongoExecutionLockRepository
+
+                lock_repo = MongoExecutionLockRepository()
+                lock_repo.unlock(project_id=self.project_id)
                 self._lock_acquired = False
             raise
 
@@ -610,7 +621,10 @@ class CalibService:
         finally:
             # Always release lock if we acquired it
             if self.use_lock and self._lock_acquired:
-                ExecutionLockDocument.unlock(project_id=self.project_id)
+                from qdash.workflow.engine.repository import MongoExecutionLockRepository
+
+                lock_repo = MongoExecutionLockRepository()
+                lock_repo.unlock(project_id=self.project_id)
                 self._lock_acquired = False
 
         return push_results
@@ -641,7 +655,10 @@ class CalibService:
         finally:
             # Always release lock if we acquired it
             if self.use_lock and self._lock_acquired:
-                ExecutionLockDocument.unlock(project_id=self.project_id)
+                from qdash.workflow.engine.repository import MongoExecutionLockRepository
+
+                lock_repo = MongoExecutionLockRepository()
+                lock_repo.unlock(project_id=self.project_id)
                 self._lock_acquired = False
             self._initialized = False
 

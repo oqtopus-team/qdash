@@ -123,20 +123,25 @@ class MockGitHubIntegration:
         return False
 
 
-class MockExecutionLockDocument:
-    """Mock ExecutionLockDocument for testing."""
+class MockExecutionLockRepository:
+    """Mock ExecutionLockRepository for testing."""
 
-    @classmethod
-    def get_lock_status(cls, project_id: str | None = None):
+    def is_locked(self, project_id: str) -> bool:
         return False
 
-    @classmethod
-    def lock(cls, project_id: str | None = None):
+    def lock(self, project_id: str) -> None:
         pass
 
-    @classmethod
-    def unlock(cls, project_id: str | None = None):
+    def unlock(self, project_id: str) -> None:
         pass
+
+
+class MockUserRepository:
+    """Mock UserRepository for testing."""
+
+    def get_default_project_id(self, username: str) -> str | None:
+        # Return None so tests must provide project_id explicitly
+        return None
 
 
 @pytest.fixture(autouse=True)
@@ -166,9 +171,14 @@ def mock_flow_session_deps(monkeypatch):
         "qdash.workflow.service.calib_service.GitHubIntegration",
         MockGitHubIntegration,
     )
+    # Mock repository classes - patch at their definition location
     monkeypatch.setattr(
-        "qdash.workflow.service.calib_service.ExecutionLockDocument",
-        MockExecutionLockDocument,
+        "qdash.workflow.engine.repository.MongoExecutionLockRepository",
+        MockExecutionLockRepository,
+    )
+    monkeypatch.setattr(
+        "qdash.workflow.engine.repository.MongoUserRepository",
+        MockUserRepository,
     )
 
 

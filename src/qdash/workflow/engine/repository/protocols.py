@@ -521,3 +521,169 @@ class CouplingCalibrationRepository(Protocol):
 
         """
         ...
+
+
+@runtime_checkable
+class ExecutionCounterRepository(Protocol):
+    """Protocol for execution counter operations.
+
+    This repository provides atomic counter generation for execution IDs.
+    The counter is scoped by date, username, chip_id, and project_id.
+
+    Example
+    -------
+        >>> repo = MongoExecutionCounterRepository()
+        >>> index = repo.get_next_index(
+        ...     date="20240115",
+        ...     username="alice",
+        ...     chip_id="64Qv3",
+        ...     project_id="proj-1"
+        ... )
+        >>> print(index)  # 0, 1, 2, ...
+
+    """
+
+    def get_next_index(
+        self,
+        date: str,
+        username: str,
+        chip_id: str,
+        project_id: str,
+    ) -> int:
+        """Get the next execution index atomically.
+
+        Parameters
+        ----------
+        date : str
+            The date string (e.g., "20240115")
+        username : str
+            The username
+        chip_id : str
+            The chip identifier
+        project_id : str
+            The project identifier
+
+        Returns
+        -------
+        int
+            The next index (0 on first call, then 1, 2, 3...)
+
+        """
+        ...
+
+
+@runtime_checkable
+class ExecutionLockRepository(Protocol):
+    """Protocol for execution lock operations.
+
+    This repository provides mutual exclusion for calibration sessions.
+    Only one calibration can run per project at a time.
+
+    Example
+    -------
+        >>> repo = MongoExecutionLockRepository()
+        >>> if not repo.is_locked(project_id="proj-1"):
+        ...     repo.lock(project_id="proj-1")
+        ...     try:
+        ...         # run calibration
+        ...     finally:
+        ...         repo.unlock(project_id="proj-1")
+
+    """
+
+    def is_locked(self, project_id: str) -> bool:
+        """Check if the project is currently locked.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+
+        Returns
+        -------
+        bool
+            True if locked, False otherwise
+
+        """
+        ...
+
+    def lock(self, project_id: str) -> None:
+        """Acquire the execution lock.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+
+        """
+        ...
+
+    def unlock(self, project_id: str) -> None:
+        """Release the execution lock.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+
+        """
+        ...
+
+
+@runtime_checkable
+class UserRepository(Protocol):
+    """Protocol for user data access.
+
+    This repository provides read access to user information.
+    Used primarily for resolving default project IDs.
+
+    """
+
+    def get_default_project_id(self, username: str) -> str | None:
+        """Get the user's default project ID.
+
+        Parameters
+        ----------
+        username : str
+            The username to look up
+
+        Returns
+        -------
+        str | None
+            The default project ID, or None if not set or user not found
+
+        """
+        ...
+
+
+@runtime_checkable
+class TaskRepository(Protocol):
+    """Protocol for task definition access.
+
+    This repository provides read access to task definitions used for
+    validating task names before execution.
+
+    Example
+    -------
+        >>> repo = MongoTaskRepository()
+        >>> names = repo.get_task_names(username="alice")
+        >>> if "CheckFreq" in names:
+        ...     print("Task is valid")
+
+    """
+
+    def get_task_names(self, username: str) -> list[str]:
+        """Get all task names available for a user.
+
+        Parameters
+        ----------
+        username : str
+            The username to look up tasks for
+
+        Returns
+        -------
+        list[str]
+            List of available task names
+
+        """
+        ...

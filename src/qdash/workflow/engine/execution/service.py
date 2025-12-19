@@ -14,9 +14,7 @@ from qdash.datamodel.execution import (
     TaskResultModel,
 )
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.initialize import initialize
-from qdash.dbmodel.tag import TagDocument
 from qdash.workflow.engine.execution.models import ExecutionNote
 from qdash.workflow.engine.execution.state_manager import (
     ExecutionStateManager,
@@ -581,21 +579,16 @@ class ExecutionService:
     def save_with_tags(self) -> "ExecutionService":
         """Save current state to repository and auto-register tags.
 
+        Note: Tags are automatically registered by the repository's save() method,
+        so this method is now equivalent to save(). Kept for backward compatibility.
+
         Returns
         -------
         ExecutionService
             Self for method chaining
         """
-        self.save()
-
-        # Auto-register tags to TagDocument for UI tag selector
-        if self.state_manager.tags and self.state_manager.project_id:
-            TagDocument.insert_tags(
-                self.state_manager.tags,
-                self.state_manager.username,
-                self.state_manager.project_id,
-            )
-        return self
+        # Tags are auto-registered in MongoExecutionRepository.save()
+        return self.save()
 
     def ensure_saved(self) -> "ExecutionService":
         """Ensure execution exists in database (upsert if not found).
@@ -607,5 +600,5 @@ class ExecutionService:
         """
         model = self.repository.find_by_id(self.state_manager.execution_id)
         if model is None:
-            ExecutionHistoryDocument.upsert_document(self.to_datamodel())
+            self.save()
         return self

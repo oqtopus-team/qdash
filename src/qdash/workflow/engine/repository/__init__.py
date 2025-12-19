@@ -92,11 +92,25 @@ from qdash.workflow.engine.repository.filesystem_impl import (
 from qdash.workflow.engine.repository.inmemory_calibration_note import (
     InMemoryCalibrationNoteRepository,
 )
+from qdash.workflow.engine.repository.inmemory_impl import (
+    InMemoryChipRepository,
+    InMemoryExecutionCounterRepository,
+    InMemoryExecutionLockRepository,
+    InMemoryExecutionRepository,
+    InMemoryTaskRepository,
+    InMemoryUserRepository,
+)
 from qdash.workflow.engine.repository.mongo_calibration_note import (
     MongoCalibrationNoteRepository,
 )
 from qdash.workflow.engine.repository.mongo_coupling import (
     MongoCouplingCalibrationRepository,
+)
+from qdash.workflow.engine.repository.mongo_calib_service import (
+    MongoExecutionCounterRepository,
+    MongoExecutionLockRepository,
+    MongoTaskRepository,
+    MongoUserRepository,
 )
 from qdash.workflow.engine.repository.mongo_execution import (
     MongoExecutionRepository,
@@ -116,9 +130,13 @@ from qdash.workflow.engine.repository.protocols import (
     ChipHistoryRepository,
     ChipRepository,
     CouplingCalibrationRepository,
+    ExecutionCounterRepository,
+    ExecutionLockRepository,
     ExecutionRepository,
     QubitCalibrationRepository,
+    TaskRepository,
     TaskResultHistoryRepository,
+    UserRepository,
 )
 
 __all__ = [
@@ -131,6 +149,10 @@ __all__ = [
     "CalibrationNoteRepository",
     "QubitCalibrationRepository",
     "CouplingCalibrationRepository",
+    "ExecutionCounterRepository",
+    "ExecutionLockRepository",
+    "UserRepository",
+    "TaskRepository",
     # MongoDB implementations
     "MongoTaskResultHistoryRepository",
     "MongoChipRepository",
@@ -139,9 +161,19 @@ __all__ = [
     "MongoCalibrationNoteRepository",
     "MongoQubitCalibrationRepository",
     "MongoCouplingCalibrationRepository",
+    "MongoExecutionCounterRepository",
+    "MongoExecutionLockRepository",
+    "MongoUserRepository",
+    "MongoTaskRepository",
     "create_default_repositories",
     # Filesystem implementations
     "FilesystemCalibDataSaver",
     # In-memory implementations (for testing)
     "InMemoryCalibrationNoteRepository",
+    "InMemoryExecutionRepository",
+    "InMemoryExecutionCounterRepository",
+    "InMemoryExecutionLockRepository",
+    "InMemoryUserRepository",
+    "InMemoryTaskRepository",
+    "InMemoryChipRepository",
 ]
