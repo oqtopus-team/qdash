@@ -243,19 +243,102 @@ SCHEDULED → RUNNING → COMPLETED
 
 **Location**: `engine/repository/`
 
-**Purpose**: Data persistence abstraction.
+**Purpose**: Data persistence abstraction using the Repository Pattern.
 
-**Protocols** (interfaces):
-- `TaskResultHistoryRepository`: Task result history
-- `ChipRepository`: Chip configuration
-- `ChipHistoryRepository`: Chip history snapshots
-- `CalibDataSaver`: Figure and raw data saving
-- `ExecutionRepository`: Execution records
+The Repository Pattern separates data access logic from business logic, enabling:
+- **Testability**: Swap MongoDB for InMemory implementations in tests
+- **Flexibility**: Easy to change persistence mechanisms
+- **Clean Architecture**: Business logic doesn't depend on database details
 
-**Implementations**:
-- `MongoTaskResultHistoryRepository`: MongoDB implementation
-- `MongoChipRepository`: MongoDB implementation
-- `FilesystemCalibDataSaver`: Local filesystem
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Service / Executor Layer                      │
+│            (TaskExecutor, ExecutionService, etc.)                │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │ depends on
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Repository Protocols                          │
+│    (ChipRepository, ExecutionRepository, etc.)                   │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │ implemented by
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│   MongoDB Implementations│     │  InMemory Implementations│
+│   (MongoChipRepository)  │     │  (InMemoryChipRepository)│
+│   - Production use       │     │  - Unit testing          │
+└─────────────────────────┘     └─────────────────────────┘
+```
+
+**Protocols** (interfaces in `protocols.py`):
+
+| Protocol | Purpose |
+|----------|---------|
+| `TaskResultHistoryRepository` | Task result history recording |
+| `ChipRepository` | Chip configuration access |
+| `ChipHistoryRepository` | Chip history snapshots |
+| `CalibDataSaver` | Figure and raw data saving |
+| `ExecutionRepository` | Execution session records |
+| `CalibrationNoteRepository` | Calibration note storage |
+| `QubitCalibrationRepository` | Qubit calibration data updates |
+| `CouplingCalibrationRepository` | Coupling calibration data updates |
+| `ExecutionCounterRepository` | Atomic execution ID counter |
+| `ExecutionLockRepository` | Project execution locking |
+| `UserRepository` | User preferences |
+| `TaskRepository` | Task name lookup |
+
+**MongoDB Implementations**:
+- `MongoTaskResultHistoryRepository`
+- `MongoChipRepository`
+- `MongoChipHistoryRepository`
+- `MongoExecutionRepository`
+- `MongoCalibrationNoteRepository`
+- `MongoQubitCalibrationRepository`
+- `MongoCouplingCalibrationRepository`
+- `MongoExecutionCounterRepository`
+- `MongoExecutionLockRepository`
+- `MongoUserRepository`
+- `MongoTaskRepository`
+
+**InMemory Implementations** (for testing):
+- `InMemoryExecutionRepository`
+- `InMemoryChipRepository`
+- `InMemoryChipHistoryRepository`
+- `InMemoryTaskResultHistoryRepository`
+- `InMemoryCalibrationNoteRepository`
+- `InMemoryQubitCalibrationRepository`
+- `InMemoryCouplingCalibrationRepository`
+- `InMemoryExecutionCounterRepository`
+- `InMemoryExecutionLockRepository`
+- `InMemoryUserRepository`
+- `InMemoryTaskRepository`
+
+**Filesystem Implementations**:
+- `FilesystemCalibDataSaver`: Local filesystem for figures/data
+
+**Usage with Dependency Injection**:
+
+```python
+# Production code (MongoDB)
+from qdash.workflow.engine.repository import MongoChipRepository
+
+chip_repo = MongoChipRepository()
+chip = chip_repo.get_current_chip(username="alice")
+
+# Test code (InMemory)
+from qdash.workflow.engine.repository import InMemoryChipRepository
+
+chip_repo = InMemoryChipRepository()
+chip_repo.add_chip("alice", mock_chip)  # Test helper
+
+# With DI in service
+scheduler = CRScheduler(
+    username="alice",
+    chip_id="64Qv3",
+    chip_repo=InMemoryChipRepository(),  # Inject for testing
+)
+```
 
 ### 8. Backend Layer
 
@@ -351,8 +434,54 @@ class YourBackend(BaseBackend):
 
 ### Adding a New Repository Implementation
 
-1. Implement the protocol from `engine/repository/protocols.py`
-2. Use dependency injection in the component that needs it
+1. Define or use existing protocol from `engine/repository/protocols.py`:
+```python
+@runtime_checkable
+class YourRepository(Protocol):
+    def find(self, id: str) -> YourModel | None: ...
+    def save(self, model: YourModel) -> None: ...
+```
+
+2. Create MongoDB implementation:
+```python
+# engine/repository/mongo_your.py
+class MongoYourRepository:
+    def find(self, id: str) -> YourModel | None:
+        doc = YourDocument.find_one({"id": id}).run()
+        return self._to_model(doc) if doc else None
+
+    def save(self, model: YourModel) -> None:
+        YourDocument.from_model(model).save()
+```
+
+3. Create InMemory implementation for testing:
+```python
+# engine/repository/inmemory_impl.py
+class InMemoryYourRepository:
+    def __init__(self):
+        self._store: dict[str, YourModel] = {}
+
+    def find(self, id: str) -> YourModel | None:
+        return self._store.get(id)
+
+    def save(self, model: YourModel) -> None:
+        self._store[model.id] = model
+
+    def clear(self) -> None:  # Test helper
+        self._store.clear()
+```
+
+4. Export from `engine/repository/__init__.py`
+
+5. Use with dependency injection in services:
+```python
+class YourService:
+    def __init__(self, *, repo: YourRepository | None = None):
+        if repo is None:
+            from ... import MongoYourRepository
+            repo = MongoYourRepository()
+        self._repo = repo
+```
 
 ## Best Practices
 

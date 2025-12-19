@@ -13,8 +13,6 @@ from typing import Any
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionModel,
-    ExecutionStatusModel,
-    TaskResultModel,
 )
 
 
@@ -464,3 +462,367 @@ class InMemoryChipRepository:
         """Clear all stored chips (useful for test setup/teardown)."""
         self._chips.clear()
         self._chips_by_id.clear()
+
+
+class InMemoryTaskResultHistoryRepository:
+    """In-memory implementation of TaskResultHistoryRepository for testing.
+
+    This implementation stores task results in a list, making it suitable
+    for unit tests that don't require a real database.
+
+    Example
+    -------
+        >>> from qdash.datamodel.task import BaseTaskResultModel
+        >>> repo = InMemoryTaskResultHistoryRepository()
+        >>> repo.save(task_result, execution_model)
+        >>> assert len(repo.get_all()) == 1
+
+    """
+
+    def __init__(self) -> None:
+        """Initialize with empty storage."""
+        from qdash.datamodel.task import BaseTaskResultModel
+
+        self._history: list[tuple[BaseTaskResultModel, ExecutionModel]] = []
+
+    def save(self, task: Any, execution_model: ExecutionModel) -> None:
+        """Save a task result to the history.
+
+        Parameters
+        ----------
+        task : BaseTaskResultModel
+            The task result to save
+        execution_model : ExecutionModel
+            The parent execution context
+
+        """
+        self._history.append((task, execution_model))
+
+    def get_all(self) -> list[tuple[Any, ExecutionModel]]:
+        """Get all stored task results (test helper).
+
+        Returns
+        -------
+        list[tuple[BaseTaskResultModel, ExecutionModel]]
+            All stored task results with their execution contexts
+
+        """
+        return list(self._history)
+
+    def clear(self) -> None:
+        """Clear all stored history (useful for test setup/teardown)."""
+        self._history.clear()
+
+
+class InMemoryChipHistoryRepository:
+    """In-memory implementation of ChipHistoryRepository for testing.
+
+    This implementation stores chip history snapshots in a list, making it
+    suitable for unit tests that don't require a real database.
+
+    Example
+    -------
+        >>> repo = InMemoryChipHistoryRepository()
+        >>> repo.create_history("alice", "chip_1")
+        >>> assert len(repo.get_all()) == 1
+
+    """
+
+    def __init__(self) -> None:
+        """Initialize with empty storage."""
+        self._history: list[dict[str, str | None]] = []
+
+    def create_history(self, username: str, chip_id: str | None = None) -> None:
+        """Create a chip history snapshot.
+
+        Parameters
+        ----------
+        username : str
+            The username to look up the chip
+        chip_id : str, optional
+            The specific chip ID to create history for.
+            If None, uses the current (most recently installed) chip.
+
+        """
+        self._history.append({"username": username, "chip_id": chip_id})
+
+    def get_all(self) -> list[dict[str, str | None]]:
+        """Get all stored history snapshots (test helper).
+
+        Returns
+        -------
+        list[dict[str, str | None]]
+            All stored history snapshots
+
+        """
+        return list(self._history)
+
+    def clear(self) -> None:
+        """Clear all stored history (useful for test setup/teardown)."""
+        self._history.clear()
+
+
+class InMemoryQubitCalibrationRepository:
+    """In-memory implementation of QubitCalibrationRepository for testing.
+
+    This implementation stores qubit calibration data in a dictionary,
+    making it suitable for unit tests that don't require a real database.
+
+    Example
+    -------
+        >>> from qdash.datamodel.qubit import QubitModel
+        >>> repo = InMemoryQubitCalibrationRepository()
+        >>> qubit = QubitModel(qid="0", chip_id="chip_1", ...)
+        >>> repo.add_qubit("alice", qubit)
+        >>> found = repo.find_one(username="alice", qid="0", chip_id="chip_1")
+        >>> assert found is not None
+
+    """
+
+    def __init__(self) -> None:
+        """Initialize with empty storage."""
+        from qdash.datamodel.qubit import QubitModel
+
+        self._qubits: dict[str, QubitModel] = {}  # key -> qubit
+
+    def _make_key(self, username: str, qid: str, chip_id: str) -> str:
+        """Create storage key from identifiers."""
+        return f"{username}:{chip_id}:{qid}"
+
+    def update_calib_data(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+        output_parameters: dict[str, Any],
+        project_id: str,
+    ) -> Any:
+        """Update qubit calibration data with new measurement results.
+
+        Parameters
+        ----------
+        username : str
+            The username performing the update
+        qid : str
+            The qubit identifier (e.g., "0", "1")
+        chip_id : str
+            The chip identifier
+        output_parameters : dict[str, Any]
+            The new calibration parameters to merge
+        project_id : str
+            The project identifier
+
+        Returns
+        -------
+        QubitModel
+            The updated qubit model
+
+        Raises
+        ------
+        ValueError
+            If the qubit is not found
+
+        """
+        from qdash.datamodel.qubit import QubitModel
+
+        key = self._make_key(username, qid, chip_id)
+        qubit = self._qubits.get(key)
+
+        if qubit is None:
+            # Create new qubit if not exists
+            qubit = QubitModel(
+                project_id=project_id,
+                username=username,
+                qid=qid,
+                status="",
+                chip_id=chip_id,
+                data={},
+                best_data={},
+                node_info=None,
+            )
+            self._qubits[key] = qubit
+
+        # Merge parameters into data
+        for param_name, param_value in output_parameters.items():
+            qubit.data[param_name] = param_value
+
+        return qubit
+
+    def find_one(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+    ) -> Any | None:
+        """Find a qubit by identifiers.
+
+        Parameters
+        ----------
+        username : str
+            The username
+        qid : str
+            The qubit identifier
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        QubitModel | None
+            The qubit model if found, None otherwise
+
+        """
+        key = self._make_key(username, qid, chip_id)
+        return self._qubits.get(key)
+
+    def add_qubit(self, username: str, qubit: Any) -> None:
+        """Add a qubit for testing (test helper).
+
+        Parameters
+        ----------
+        username : str
+            The username
+        qubit : QubitModel
+            The qubit to add
+
+        """
+        key = self._make_key(username, qubit.qid, qubit.chip_id)
+        self._qubits[key] = qubit
+
+    def clear(self) -> None:
+        """Clear all stored qubits (useful for test setup/teardown)."""
+        self._qubits.clear()
+
+
+class InMemoryCouplingCalibrationRepository:
+    """In-memory implementation of CouplingCalibrationRepository for testing.
+
+    This implementation stores coupling calibration data in a dictionary,
+    making it suitable for unit tests that don't require a real database.
+
+    Example
+    -------
+        >>> from qdash.datamodel.coupling import CouplingModel
+        >>> repo = InMemoryCouplingCalibrationRepository()
+        >>> coupling = CouplingModel(qid="0-1", chip_id="chip_1", ...)
+        >>> repo.add_coupling("alice", coupling)
+        >>> found = repo.find_one(username="alice", qid="0-1", chip_id="chip_1")
+        >>> assert found is not None
+
+    """
+
+    def __init__(self) -> None:
+        """Initialize with empty storage."""
+        from qdash.datamodel.coupling import CouplingModel
+
+        self._couplings: dict[str, CouplingModel] = {}  # key -> coupling
+
+    def _make_key(self, username: str, qid: str, chip_id: str) -> str:
+        """Create storage key from identifiers."""
+        return f"{username}:{chip_id}:{qid}"
+
+    def update_calib_data(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+        output_parameters: dict[str, Any],
+        project_id: str,
+    ) -> Any:
+        """Update coupling calibration data with new measurement results.
+
+        Parameters
+        ----------
+        username : str
+            The username performing the update
+        qid : str
+            The coupling identifier (e.g., "0-1")
+        chip_id : str
+            The chip identifier
+        output_parameters : dict[str, Any]
+            The new calibration parameters to merge
+        project_id : str
+            The project identifier
+
+        Returns
+        -------
+        CouplingModel
+            The updated coupling model
+
+        Raises
+        ------
+        ValueError
+            If the coupling is not found
+
+        """
+        from qdash.datamodel.coupling import CouplingModel
+
+        key = self._make_key(username, qid, chip_id)
+        coupling = self._couplings.get(key)
+
+        if coupling is None:
+            # Create new coupling if not exists
+            coupling = CouplingModel(
+                project_id=project_id,
+                username=username,
+                qid=qid,
+                status="",
+                chip_id=chip_id,
+                data={},
+                best_data={},
+                edge_info=None,
+            )
+            self._couplings[key] = coupling
+
+        # Merge parameters into data
+        for param_name, param_value in output_parameters.items():
+            coupling.data[param_name] = param_value
+
+        return coupling
+
+    def find_one(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+    ) -> Any | None:
+        """Find a coupling by identifiers.
+
+        Parameters
+        ----------
+        username : str
+            The username
+        qid : str
+            The coupling identifier
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        CouplingModel | None
+            The coupling model if found, None otherwise
+
+        """
+        key = self._make_key(username, qid, chip_id)
+        return self._couplings.get(key)
+
+    def add_coupling(self, username: str, coupling: Any) -> None:
+        """Add a coupling for testing (test helper).
+
+        Parameters
+        ----------
+        username : str
+            The username
+        coupling : CouplingModel
+            The coupling to add
+
+        """
+        key = self._make_key(username, coupling.qid, coupling.chip_id)
+        self._couplings[key] = coupling
+
+    def clear(self) -> None:
+        """Clear all stored couplings (useful for test setup/teardown)."""
+        self._couplings.clear()

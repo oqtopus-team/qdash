@@ -319,3 +319,285 @@ class TestInMemoryTaskRepository:
         repo.clear()
 
         assert repo.get_task_names("alice") == []
+
+
+class TestInMemoryTaskResultHistoryRepository:
+    """Test InMemoryTaskResultHistoryRepository."""
+
+    def test_save_and_get_all(self):
+        """Test saving and retrieving task results."""
+        from qdash.workflow.engine.repository import InMemoryTaskResultHistoryRepository
+
+        repo = InMemoryTaskResultHistoryRepository()
+        execution = ExecutionModel(
+            username="alice",
+            name="Test",
+            execution_id="exec-001",
+            calib_data_path="/tmp",
+            note={},
+            status=ExecutionStatusModel.RUNNING,
+            task_results={},
+            tags=[],
+            controller_info={},
+            fridge_info={},
+            chip_id="chip_1",
+            start_at="",
+            end_at="",
+            elapsed_time="",
+            calib_data={"qubit": {}, "coupling": {}},
+            message="",
+            system_info={},
+        )
+
+        # Create a mock task result
+        task_result = {"task_name": "CheckFreq", "qid": "0"}
+
+        repo.save(task_result, execution)
+
+        results = repo.get_all()
+        assert len(results) == 1
+        assert results[0][0] == task_result
+        assert results[0][1].execution_id == "exec-001"
+
+    def test_clear(self):
+        """Test clearing repository."""
+        from qdash.workflow.engine.repository import InMemoryTaskResultHistoryRepository
+
+        repo = InMemoryTaskResultHistoryRepository()
+        execution = ExecutionModel(
+            username="alice",
+            name="Test",
+            execution_id="exec-001",
+            calib_data_path="/tmp",
+            note={},
+            status=ExecutionStatusModel.RUNNING,
+            task_results={},
+            tags=[],
+            controller_info={},
+            fridge_info={},
+            chip_id="chip_1",
+            start_at="",
+            end_at="",
+            elapsed_time="",
+            calib_data={"qubit": {}, "coupling": {}},
+            message="",
+            system_info={},
+        )
+        repo.save({"task": "test"}, execution)
+
+        repo.clear()
+
+        assert repo.get_all() == []
+
+
+class TestInMemoryChipHistoryRepository:
+    """Test InMemoryChipHistoryRepository."""
+
+    def test_create_history(self):
+        """Test creating chip history snapshot."""
+        from qdash.workflow.engine.repository import InMemoryChipHistoryRepository
+
+        repo = InMemoryChipHistoryRepository()
+
+        repo.create_history("alice", "chip_1")
+
+        history = repo.get_all()
+        assert len(history) == 1
+        assert history[0]["username"] == "alice"
+        assert history[0]["chip_id"] == "chip_1"
+
+    def test_create_history_without_chip_id(self):
+        """Test creating history without chip_id."""
+        from qdash.workflow.engine.repository import InMemoryChipHistoryRepository
+
+        repo = InMemoryChipHistoryRepository()
+
+        repo.create_history("alice")
+
+        history = repo.get_all()
+        assert len(history) == 1
+        assert history[0]["username"] == "alice"
+        assert history[0]["chip_id"] is None
+
+    def test_clear(self):
+        """Test clearing repository."""
+        from qdash.workflow.engine.repository import InMemoryChipHistoryRepository
+
+        repo = InMemoryChipHistoryRepository()
+        repo.create_history("alice", "chip_1")
+
+        repo.clear()
+
+        assert repo.get_all() == []
+
+
+class TestInMemoryQubitCalibrationRepository:
+    """Test InMemoryQubitCalibrationRepository."""
+
+    def test_update_calib_data_creates_new(self):
+        """Test updating creates new qubit if not exists."""
+        from qdash.workflow.engine.repository import InMemoryQubitCalibrationRepository
+
+        repo = InMemoryQubitCalibrationRepository()
+
+        result = repo.update_calib_data(
+            username="alice",
+            qid="0",
+            chip_id="chip_1",
+            output_parameters={"qubit_frequency": {"value": 5.0}},
+            project_id="proj-1",
+        )
+
+        assert result is not None
+        assert result.qid == "0"
+        assert result.data["qubit_frequency"]["value"] == 5.0
+
+    def test_update_calib_data_merges_existing(self):
+        """Test updating merges into existing qubit."""
+        from qdash.workflow.engine.repository import InMemoryQubitCalibrationRepository
+
+        repo = InMemoryQubitCalibrationRepository()
+
+        # First update
+        repo.update_calib_data(
+            username="alice",
+            qid="0",
+            chip_id="chip_1",
+            output_parameters={"qubit_frequency": {"value": 5.0}},
+            project_id="proj-1",
+        )
+
+        # Second update
+        result = repo.update_calib_data(
+            username="alice",
+            qid="0",
+            chip_id="chip_1",
+            output_parameters={"t1": {"value": 100.0}},
+            project_id="proj-1",
+        )
+
+        assert result.data["qubit_frequency"]["value"] == 5.0
+        assert result.data["t1"]["value"] == 100.0
+
+    def test_find_one(self):
+        """Test finding qubit by identifiers."""
+        from qdash.workflow.engine.repository import InMemoryQubitCalibrationRepository
+
+        repo = InMemoryQubitCalibrationRepository()
+        repo.update_calib_data(
+            username="alice",
+            qid="0",
+            chip_id="chip_1",
+            output_parameters={"qubit_frequency": {"value": 5.0}},
+            project_id="proj-1",
+        )
+
+        found = repo.find_one(username="alice", qid="0", chip_id="chip_1")
+        not_found = repo.find_one(username="bob", qid="0", chip_id="chip_1")
+
+        assert found is not None
+        assert found.qid == "0"
+        assert not_found is None
+
+    def test_clear(self):
+        """Test clearing repository."""
+        from qdash.workflow.engine.repository import InMemoryQubitCalibrationRepository
+
+        repo = InMemoryQubitCalibrationRepository()
+        repo.update_calib_data(
+            username="alice",
+            qid="0",
+            chip_id="chip_1",
+            output_parameters={"qubit_frequency": {"value": 5.0}},
+            project_id="proj-1",
+        )
+
+        repo.clear()
+
+        assert repo.find_one(username="alice", qid="0", chip_id="chip_1") is None
+
+
+class TestInMemoryCouplingCalibrationRepository:
+    """Test InMemoryCouplingCalibrationRepository."""
+
+    def test_update_calib_data_creates_new(self):
+        """Test updating creates new coupling if not exists."""
+        from qdash.workflow.engine.repository import InMemoryCouplingCalibrationRepository
+
+        repo = InMemoryCouplingCalibrationRepository()
+
+        result = repo.update_calib_data(
+            username="alice",
+            qid="0-1",
+            chip_id="chip_1",
+            output_parameters={"zx90_gate_fidelity": {"value": 0.99}},
+            project_id="proj-1",
+        )
+
+        assert result is not None
+        assert result.qid == "0-1"
+        assert result.data["zx90_gate_fidelity"]["value"] == 0.99
+
+    def test_update_calib_data_merges_existing(self):
+        """Test updating merges into existing coupling."""
+        from qdash.workflow.engine.repository import InMemoryCouplingCalibrationRepository
+
+        repo = InMemoryCouplingCalibrationRepository()
+
+        # First update
+        repo.update_calib_data(
+            username="alice",
+            qid="0-1",
+            chip_id="chip_1",
+            output_parameters={"zx90_gate_fidelity": {"value": 0.99}},
+            project_id="proj-1",
+        )
+
+        # Second update
+        result = repo.update_calib_data(
+            username="alice",
+            qid="0-1",
+            chip_id="chip_1",
+            output_parameters={"cr_amplitude": {"value": 0.5}},
+            project_id="proj-1",
+        )
+
+        assert result.data["zx90_gate_fidelity"]["value"] == 0.99
+        assert result.data["cr_amplitude"]["value"] == 0.5
+
+    def test_find_one(self):
+        """Test finding coupling by identifiers."""
+        from qdash.workflow.engine.repository import InMemoryCouplingCalibrationRepository
+
+        repo = InMemoryCouplingCalibrationRepository()
+        repo.update_calib_data(
+            username="alice",
+            qid="0-1",
+            chip_id="chip_1",
+            output_parameters={"zx90_gate_fidelity": {"value": 0.99}},
+            project_id="proj-1",
+        )
+
+        found = repo.find_one(username="alice", qid="0-1", chip_id="chip_1")
+        not_found = repo.find_one(username="bob", qid="0-1", chip_id="chip_1")
+
+        assert found is not None
+        assert found.qid == "0-1"
+        assert not_found is None
+
+    def test_clear(self):
+        """Test clearing repository."""
+        from qdash.workflow.engine.repository import InMemoryCouplingCalibrationRepository
+
+        repo = InMemoryCouplingCalibrationRepository()
+        repo.update_calib_data(
+            username="alice",
+            qid="0-1",
+            chip_id="chip_1",
+            output_parameters={"zx90_gate_fidelity": {"value": 0.99}},
+            project_id="proj-1",
+        )
+
+        repo.clear()
+
+        assert repo.find_one(username="alice", qid="0-1", chip_id="chip_1") is None

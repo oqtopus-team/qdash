@@ -93,11 +93,15 @@ from qdash.workflow.engine.repository.inmemory_calibration_note import (
     InMemoryCalibrationNoteRepository,
 )
 from qdash.workflow.engine.repository.inmemory_impl import (
+    InMemoryChipHistoryRepository,
     InMemoryChipRepository,
+    InMemoryCouplingCalibrationRepository,
     InMemoryExecutionCounterRepository,
     InMemoryExecutionLockRepository,
     InMemoryExecutionRepository,
+    InMemoryQubitCalibrationRepository,
     InMemoryTaskRepository,
+    InMemoryTaskResultHistoryRepository,
     InMemoryUserRepository,
 )
 from qdash.workflow.engine.repository.mongo_calibration_note import (
@@ -176,4 +180,8 @@ __all__ = [
     "InMemoryUserRepository",
     "InMemoryTaskRepository",
     "InMemoryChipRepository",
+    "InMemoryChipHistoryRepository",
+    "InMemoryTaskResultHistoryRepository",
+    "InMemoryQubitCalibrationRepository",
+    "InMemoryCouplingCalibrationRepository",
 ]

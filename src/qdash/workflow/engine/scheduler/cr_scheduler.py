@@ -38,16 +38,21 @@ Example:
     ```
 """
 
+from __future__ import annotations
+
 import itertools
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 import yaml
 from qdash.datamodel.chip import ChipModel
 from qdash.datamodel.qubit import QubitModel
+
+if TYPE_CHECKING:
+    from qdash.workflow.engine.repository.protocols import ChipRepository
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +148,8 @@ class CRScheduler:
         username: str,
         chip_id: str,
         wiring_config_path: str | Path | None = None,
+        *,
+        chip_repo: ChipRepository | None = None,
     ) -> None:
         """Initialize CR scheduler.
 
@@ -151,21 +158,25 @@ class CRScheduler:
             chip_id: Chip ID
             wiring_config_path: Path to wiring.yaml configuration file.
                 If None, uses default path: /workspace/qdash/config/qubex/{chip_id}/config/wiring.yaml
+            chip_repo: Repository for chip data access.
+                If None, uses MongoChipRepository.
 
         """
         self.username = username
         self.chip_id = chip_id
         self.wiring_config_path = wiring_config_path
+        self._chip_repo = chip_repo
         self._chip: ChipModel | None = None
         self._wiring_config: list[dict[str, Any]] | None = None
 
     def _load_chip_data(self) -> ChipModel:
         """Load chip data from database."""
         if self._chip is None:
-            from qdash.workflow.engine.repository import MongoChipRepository
+            if self._chip_repo is None:
+                from qdash.workflow.engine.repository import MongoChipRepository
 
-            chip_repo = MongoChipRepository()
-            chip = chip_repo.get_current_chip(self.username)
+                self._chip_repo = MongoChipRepository()
+            chip = self._chip_repo.get_current_chip(self.username)
             if chip is None:
                 raise ValueError(f"Chip not found for user {self.username}")
             self._chip = chip

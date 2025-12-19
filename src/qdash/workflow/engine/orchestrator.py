@@ -21,7 +21,7 @@ from qdash.workflow.engine.config import CalibConfig
 from qdash.workflow.engine.task.context import TaskContext
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
+    from qdash.workflow.service.github import GitHubIntegration
 
 
 class CalibOrchestrator:
