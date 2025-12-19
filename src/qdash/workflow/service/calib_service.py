@@ -44,10 +44,10 @@ from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.user import UserDocument
 from qdash.workflow.engine.backend.base import BaseBackend
-from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
+from qdash.workflow.engine.calibration.execution.service import ExecutionService
 from qdash.workflow.engine.calibration.params_updater import get_params_updater
 from qdash.workflow.engine.calibration.session import SessionConfig, SessionManager
-from qdash.workflow.engine.calibration.task.manager import TaskManager
+from qdash.workflow.engine.calibration.task.session import TaskSession
 from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
 
@@ -295,24 +295,24 @@ class CalibService:
             raise
 
     @property
-    def execution_manager(self) -> ExecutionManager | None:
-        """Get the ExecutionManager from SessionManager."""
+    def execution_service(self) -> ExecutionService | None:
+        """Get the ExecutionService from SessionManager."""
         if self._session_manager is None:
             return None
-        return self._session_manager.execution_manager
+        return self._session_manager.execution_service
 
-    @execution_manager.setter
-    def execution_manager(self, value: ExecutionManager | None) -> None:
-        """Set execution_manager (for backward compatibility with reload)."""
+    @execution_service.setter
+    def execution_service(self, value: ExecutionService | None) -> None:
+        """Set execution_service (for backward compatibility with reload)."""
         if self._session_manager is not None:
-            self._session_manager._execution_manager = value
+            self._session_manager._execution_service = value
 
     @property
-    def task_manager(self) -> TaskManager | None:
-        """Get the TaskManager from SessionManager."""
+    def task_session(self) -> TaskSession | None:
+        """Get the TaskSession from SessionManager."""
         if self._session_manager is None:
             return None
-        return self._session_manager.task_manager
+        return self._session_manager.task_session
 
     @property
     def backend(self) -> BaseBackend | None:
@@ -371,8 +371,8 @@ class CalibService:
             ```
 
         """
-        assert self.execution_manager is not None, "ExecutionManager not initialized"
-        return self.execution_manager.calib_data.qubit.get(qid, {}).get(param_name)
+        assert self.execution_service is not None, "ExecutionService not initialized"
+        return self.execution_service.calib_data.qubit.get(qid, {}).get(param_name)
 
     def set_parameter(self, qid: str, param_name: str, value: Any) -> None:
         """Set a calibration parameter value for a qubit.
@@ -388,10 +388,10 @@ class CalibService:
             ```
 
         """
-        assert self.execution_manager is not None, "ExecutionManager not initialized"
-        if qid not in self.execution_manager.calib_data.qubit:
-            self.execution_manager.calib_data.qubit[qid] = {}
-        self.execution_manager.calib_data.qubit[qid][param_name] = value
+        assert self.execution_service is not None, "ExecutionService not initialized"
+        if qid not in self.execution_service.calib_data.qubit:
+            self.execution_service.calib_data.qubit[qid] = {}
+        self.execution_service.calib_data.qubit[qid][param_name] = value
 
     def record_stage_result(self, stage_name: str, result: dict[str, Any]) -> None:
         """Record the result of a calibration stage for tracking and history.
@@ -433,21 +433,21 @@ class CalibService:
             ```
 
         """
-        assert self.execution_manager is not None, "ExecutionManager not initialized"
+        assert self.execution_service is not None, "ExecutionService not initialized"
         logger = get_run_logger()
 
         # Initialize stage_results dict in note if it doesn't exist
-        if "stage_results" not in self.execution_manager.note:
-            self.execution_manager.note["stage_results"] = {}
+        if "stage_results" not in self.execution_service.note:
+            self.execution_service.note["stage_results"] = {}
 
         # Store stage result with timestamp
-        self.execution_manager.note["stage_results"][stage_name] = {
+        self.execution_service.note["stage_results"][stage_name] = {
             "result": result,
             "timestamp": pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
         }
 
         # Persist to database immediately
-        self.execution_manager.save()
+        self.execution_service.save()
         logger.info(f"Recorded stage result for '{stage_name}'")
 
     def get_stage_result(self, stage_name: str) -> dict[str, Any] | None:
@@ -469,8 +469,8 @@ class CalibService:
             ```
 
         """
-        assert self.execution_manager is not None, "ExecutionManager not initialized"
-        stage_results = self.execution_manager.note.get("stage_results", {})
+        assert self.execution_service is not None, "ExecutionService not initialized"
+        stage_results = self.execution_service.note.get("stage_results", {})
         stage_data = stage_results.get(stage_name)
 
         if stage_data:
@@ -479,12 +479,12 @@ class CalibService:
 
     def _sync_backend_params_before_push(self, logger: Any) -> None:
         """Sync recent calibration results into backend YAML params prior to GitHub push."""
-        assert self.execution_manager is not None, "ExecutionManager not initialized"
+        assert self.execution_service is not None, "ExecutionService not initialized"
         updater_instance = get_params_updater(self.backend, self.chip_id)
         if updater_instance is None:
             return
 
-        for qid, params in self.execution_manager.calib_data.qubit.items():
+        for qid, params in self.execution_service.calib_data.qubit.items():
             if "-" in qid or not params:
                 continue
             try:
@@ -531,15 +531,15 @@ class CalibService:
             ```
 
         """
-        assert self.execution_manager is not None, "ExecutionManager not initialized"
-        assert self.task_manager is not None, "TaskManager not initialized"
+        assert self.execution_service is not None, "ExecutionService not initialized"
+        assert self.task_session is not None, "TaskSession not initialized"
         assert self.github_push_config is not None, "GitHubPushConfig not initialized"
         logger = get_run_logger()
         push_results = None
 
         try:
             # Reload and complete execution
-            self.execution_manager = self.execution_manager.reload().complete_execution()
+            self.execution_service = self.execution_service.reload().complete_execution()
 
             # Update chip history for the specific chip being calibrated
             if update_chip_history:
@@ -568,7 +568,7 @@ class CalibService:
                     latest_doc = CalibrationNoteDocument.find_one(
                         {
                             "username": self.username,
-                            "task_id": self.task_manager.id,
+                            "task_id": self.task_session.id,
                             "execution_id": self.execution_id,
                             "chip_id": self.chip_id,
                         }
@@ -576,7 +576,7 @@ class CalibService:
 
                     if latest_doc:
                         note_path = Path(
-                            f"{self.execution_manager.calib_data_path}/calib_note/{self.task_manager.id}.json"
+                            f"{self.execution_service.calib_data_path}/calib_note/{self.task_session.id}.json"
                         )
                         note_path.parent.mkdir(parents=True, exist_ok=True)
                         note_path.write_text(
@@ -585,7 +585,7 @@ class CalibService:
                         logger.info(f"Exported calibration note to {note_path}")
                     else:
                         logger.warning(
-                            f"No calibration note found for task_id={self.task_manager.id}"
+                            f"No calibration note found for task_id={self.task_session.id}"
                         )
                 except Exception as e:
                     logger.error(f"Failed to export calibration note: {e}")
@@ -603,8 +603,8 @@ class CalibService:
 
                         # Store push results in execution note
                         if push_results:
-                            self.execution_manager.note["github_push_results"] = push_results
-                            self.execution_manager.save()
+                            self.execution_service.note["github_push_results"] = push_results
+                            self.execution_service.save()
                             logger.info(f"GitHub push completed: {push_results}")
                     except Exception as e:
                         logger.error(f"Failed to push to GitHub: {e}")
@@ -641,8 +641,8 @@ class CalibService:
         """
         try:
             # Reload and mark as failed
-            if self.execution_manager:
-                self.execution_manager = self.execution_manager.reload().fail_execution()
+            if self.execution_service:
+                self.execution_service = self.execution_service.reload().fail_execution()
         finally:
             # Always release lock if we acquired it
             if self.use_lock and self._lock_acquired:

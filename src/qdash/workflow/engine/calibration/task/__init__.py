@@ -2,17 +2,17 @@
 
 from qdash.workflow.engine.calibration.task.executor import TaskExecutionError, TaskExecutor
 from qdash.workflow.engine.calibration.task.history_recorder import TaskHistoryRecorder
-from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.engine.calibration.task.result_processor import (
     FidelityValidationError,
     R2ValidationError,
     TaskResultProcessor,
 )
+from qdash.workflow.engine.calibration.task.session import TaskSession
 from qdash.workflow.engine.calibration.task.state_manager import TaskStateManager
 from qdash.datamodel.task import TaskType, TaskTypes
 
 __all__ = [
-    "TaskManager",
+    "TaskSession",
     "TaskExecutor",
     "TaskExecutionError",
     "TaskStateManager",

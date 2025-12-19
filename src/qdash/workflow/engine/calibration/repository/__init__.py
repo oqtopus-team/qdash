@@ -1,7 +1,7 @@
-"""Repository layer for TaskManager.
+"""Repository layer for calibration workflows.
 
 This module provides repository abstractions and implementations for
-decoupling TaskManager from specific data access implementations.
+data access in calibration workflows.
 """
 
 from qdash.workflow.engine.calibration.repository.filesystem_impl import (

@@ -4,7 +4,7 @@ These tests verify the CalibService API and helper functions for custom calibrat
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 
 from qdash.workflow.service.calib_service import (
     CalibService,
@@ -15,8 +15,8 @@ from qdash.workflow.service.calib_service import (
 from qdash.workflow.service.context import clear_current_session
 
 
-class MockExecutionManager:
-    """Mock ExecutionManager for testing."""
+class MockExecutionService:
+    """Mock ExecutionService for testing."""
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -27,6 +27,9 @@ class MockExecutionManager:
         self.completed = False
 
     def save(self):
+        return self
+
+    def save_with_tags(self):
         return self
 
     def start_execution(self):
@@ -45,9 +48,26 @@ class MockExecutionManager:
     def reload(self):
         return self
 
+    @classmethod
+    def create(cls, **kwargs):
+        return cls(**kwargs)
 
-class MockSession:
-    """Mock quantum session for testing."""
+
+class MockTaskSession:
+    """Mock TaskSession for testing."""
+
+    def __init__(self, *args, **kwargs):
+        self.id = "mock-task-session-id"
+        self.calib_data = type("obj", (object,), {"qubit": {"0": {}}, "coupling": {}})()
+        self.state = MagicMock()
+        self.state.calib_data = self.calib_data
+
+    def save(self):
+        pass
+
+
+class MockBackend:
+    """Mock backend for testing."""
 
     def __init__(self, *args, **kwargs):
         self.name = "fake"
@@ -56,11 +76,51 @@ class MockSession:
         pass
 
 
+class MockSessionManager:
+    """Mock SessionManager for testing."""
+
+    def __init__(self, config, github_integration=None):
+        self.config = config
+        self._initialized = False
+        self._execution_service = MockExecutionService(tags=config.tags or [])
+        self._task_session = MockTaskSession()
+        self._backend = MockBackend()
+
+    @property
+    def execution_service(self):
+        return self._execution_service
+
+    @property
+    def task_session(self):
+        return self._task_session
+
+    @property
+    def backend(self):
+        return self._backend
+
+    @property
+    def is_initialized(self):
+        return self._initialized
+
+    def initialize(self):
+        self._initialized = True
+
+    def complete(self, update_chip_history=True, export_note_to_file=False):
+        self._execution_service.complete_execution()
+
+    def fail(self):
+        self._execution_service.fail_execution()
+
+
 class MockGitHubIntegration:
     """Mock GitHubIntegration for testing."""
 
     def __init__(self, *args, **kwargs):
         pass
+
+    @staticmethod
+    def check_credentials():
+        return False
 
 
 class MockExecutionLockDocument:
@@ -99,12 +159,8 @@ def clear_session_state():
 def mock_flow_session_deps(monkeypatch):
     """Fixture to mock CalibService dependencies."""
     monkeypatch.setattr(
-        "qdash.workflow.service.calib_service.ExecutionManager",
-        MockExecutionManager,
-    )
-    monkeypatch.setattr(
-        "qdash.workflow.service.calib_service.create_backend",
-        lambda **kwargs: MockSession(),
+        "qdash.workflow.service.calib_service.SessionManager",
+        MockSessionManager,
     )
     monkeypatch.setattr(
         "qdash.workflow.service.calib_service.GitHubIntegration",
@@ -128,6 +184,7 @@ class TestCalibServiceInitialization:
             chip_id="chip_1",
             qids=["0", "1"],
             backend_name="fake",
+            project_id="test_project",  # Required to avoid UserDocument lookup
         )
 
         # Verify attributes
@@ -136,7 +193,7 @@ class TestCalibServiceInitialization:
         assert session.chip_id == "chip_1"
         assert session.backend_name == "fake"
         assert session.qids == ["0", "1"]
-        assert session.execution_manager is not None
+        assert session.execution_service is not None
         assert session.backend is not None
 
     def test_flow_session_default_tags(self, mock_flow_session_deps):
@@ -147,9 +204,10 @@ class TestCalibServiceInitialization:
             chip_id="chip_1",
             qids=["0"],
             tags=["python_flow"],  # Explicitly pass tags
+            project_id="test_project",
         )
 
-        assert "python_flow" in session.execution_manager.tags
+        assert "python_flow" in session.execution_service.tags
 
 
 class TestCalibServiceParameterManagement:
@@ -162,6 +220,7 @@ class TestCalibServiceParameterManagement:
             execution_id="20240101-001",
             chip_id="chip_1",
             qids=["0"],
+            project_id="test_project",
         )
 
         # Set parameter
@@ -178,6 +237,7 @@ class TestCalibServiceParameterManagement:
             execution_id="20240101-001",
             chip_id="chip_1",
             qids=["0"],
+            project_id="test_project",
         )
 
         # Get nonexistent parameter
@@ -196,6 +256,7 @@ class TestGlobalSessionHelpers:
             execution_id="20240101-001",
             chip_id="chip_1",
             qids=["0", "1"],
+            project_id="test_project",
         )
 
         # Get session
@@ -223,8 +284,9 @@ class TestGlobalSessionHelpers:
             execution_id="20240101-001",
             chip_id="chip_1",
             qids=["0"],
+            project_id="test_project",
         )
 
         finish_calibration()
 
-        assert session.execution_manager.completed is True
+        assert session.execution_service.completed is True

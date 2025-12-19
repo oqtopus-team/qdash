@@ -29,7 +29,7 @@ from qdash.workflow.engine.calibration.task.state_manager import TaskStateManage
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
+    from qdash.workflow.engine.calibration.execution.service import ExecutionService
 
 
 @runtime_checkable
@@ -206,151 +206,6 @@ class TaskExecutor:
         """
         self._controller_info = controller_info
 
-    def execute(
-        self,
-        task: TaskProtocol,
-        backend: BackendProtocol,
-        execution_manager: "ExecutionManager",
-        qid: str,
-    ) -> tuple["ExecutionManager", TaskExecutionResult]:
-        """Execute a task with full lifecycle management.
-
-        This is the main entry point that mirrors the original
-        TaskManager.execute_task behavior.
-
-        Parameters
-        ----------
-        task : TaskProtocol
-            The task to execute
-        backend : BackendProtocol
-            The backend to use
-        execution_manager : ExecutionManager
-            The execution manager
-        qid : str
-            The qubit ID
-
-        Returns
-        -------
-        tuple[ExecutionManager, TaskExecutionResult]
-            Updated execution manager and task execution result
-
-        Raises
-        ------
-        TaskExecutionError
-            If task execution fails
-        ValueError
-            If R² or fidelity validation fails
-
-        """
-        task_name = task.get_name()
-        task_type = task.get_task_type()
-
-        result = TaskExecutionResult(
-            task_name=task_name,
-            task_type=task_type,
-            qid=qid,
-        )
-
-        try:
-            # 0. Ensure task exists
-            self.state_manager.ensure_task_exists(task_name, task_type, qid)
-
-            # 1. Start task
-            self.state_manager.start_task(task_name, task_type, qid)
-
-            # Record task start to history
-            executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_manager.to_datamodel()
-            )
-
-            # Update execution manager
-            execution_manager = self._update_execution_manager(execution_manager)
-
-            # 2. Preprocess
-            preprocess_result = self._run_preprocess(task, backend, qid)
-            if preprocess_result:
-                self.state_manager.put_input_parameters(
-                    task_name, preprocess_result.input_parameters, task_type, qid
-                )
-                execution_manager = self._update_execution_manager(execution_manager)
-
-            # 3. Run
-            run_result = self._run_task(task, backend, qid)
-            result.r2 = run_result.r2 if run_result else None
-
-            if run_result is None:
-                # Task didn't produce results, mark as completed
-                self._complete_task(task_name, task_type, qid, "No run result")
-                result.success = True
-                result.message = "Completed without run result"
-                return execution_manager, result
-
-            # 4. Postprocess
-            postprocess_result = self._run_postprocess(task, backend, run_result, qid)
-
-            if postprocess_result:
-                # 5. Process and validate results
-                self._process_results(
-                    task, execution_manager, postprocess_result, qid, run_result, backend
-                )
-
-                result.output_parameters = dict(
-                    self.state_manager.get_task(task_name, task_type, qid).output_parameters
-                )
-
-            # 6. Complete task
-            self._complete_task(task_name, task_type, qid, f"{task_name} is completed")
-
-            # Record completion to history
-            executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_manager.to_datamodel()
-            )
-
-            execution_manager = self._update_execution_manager(execution_manager)
-            result.success = True
-            result.message = "Completed"
-
-        except (R2ValidationError, FidelityValidationError, ValueError) as e:
-            self._fail_task(task_name, task_type, qid, str(e))
-            executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_manager.to_datamodel()
-            )
-            result.message = str(e)
-            raise
-
-        except Exception as e:
-            self._fail_task(task_name, task_type, qid, str(e))
-            executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_manager.to_datamodel()
-            )
-            result.message = str(e)
-            raise TaskExecutionError(f"Task {task_name} failed: {e}") from e
-
-        finally:
-            # End task (record end time)
-            self.state_manager.end_task(task_name, task_type, qid)
-
-            # Final history record
-            executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_manager.to_datamodel()
-            )
-
-            # Create chip history snapshot
-            self.history_recorder.create_chip_history_snapshot(self.username)
-
-            execution_manager = self._update_execution_manager(execution_manager)
-
-        # Build calib_data_delta from state manager
-        result.calib_data_delta = self.state_manager.calib_data
-        result.controller_info = self._controller_info
-
-        return execution_manager, result
-
     def execute_task(
         self,
         task: TaskProtocol,
@@ -458,314 +313,6 @@ class TaskExecutor:
             self.state_manager.end_task(task_name, task_type, qid)
 
         return result
-
-    def _update_execution_manager(
-        self, execution_manager: "ExecutionManager"
-    ) -> "ExecutionManager":
-        """Update execution manager with current state.
-
-        Parameters
-        ----------
-        execution_manager : ExecutionManager
-            The execution manager to update
-
-        Returns
-        -------
-        ExecutionManager
-            Updated execution manager
-
-        """
-
-        # Create a minimal object with task manager attributes for update
-        # This maintains backward compatibility with ExecutionManager.update_with_task_manager
-        class TaskManagerProxy:
-            """Proxy object that mimics TaskManager for ExecutionManager.update_with_task_manager."""
-
-            def __init__(
-                self, task_manager_id: str, task_result: Any, calib_data: Any, controller_info: Any
-            ) -> None:
-                self.id = task_manager_id
-                self.task_result = task_result
-                self.calib_data = calib_data
-                self.controller_info = controller_info
-
-        tm = TaskManagerProxy(
-            task_manager_id=self.task_manager_id,
-            task_result=self.state_manager.task_result,
-            calib_data=self.state_manager.calib_data,
-            controller_info=self._controller_info,
-        )
-
-        return execution_manager.update_with_task_manager(tm)
-
-    def _process_results(
-        self,
-        task: TaskProtocol,
-        execution_manager: "ExecutionManager",
-        postprocess_result: PostProcessResult,
-        qid: str,
-        run_result: RunResult,
-        backend: BackendProtocol,
-    ) -> bool:
-        """Process task results including validation and persistence.
-
-        Parameters
-        ----------
-        task : TaskProtocol
-            The task
-        execution_manager : ExecutionManager
-            The execution manager
-        postprocess_result : PostProcessResult
-            The postprocess result
-        qid : str
-            The qubit ID
-        run_result : RunResult
-            The run result
-        backend : BackendProtocol
-            The backend
-
-        Returns
-        -------
-        bool
-            True if backend updates should be applied
-
-        """
-        task_name = task.get_name()
-        task_type = task.get_task_type()
-
-        # 1. Validate fidelity
-        if postprocess_result.output_parameters:
-            try:
-                self.result_processor.validate_fidelity(
-                    postprocess_result.output_parameters, task_name
-                )
-            except FidelityValidationError as e:
-                raise ValueError(str(e)) from e
-
-        # 2. Process output parameters
-        if postprocess_result.output_parameters:
-            task_model = self.state_manager.get_task(task_name, task_type, qid)
-            task.attach_task_id(task_model.task_id)
-
-            processed_params = self.result_processor.process_output_parameters(
-                postprocess_result.output_parameters,
-                task_name,
-                self.execution_id,
-                task_model.task_id,
-            )
-            self.state_manager.put_output_parameters(task_name, processed_params, task_type, qid)
-
-        # 3. Save figures
-        if postprocess_result.figures:
-            png_paths, json_paths = self.data_saver.save_figures(
-                postprocess_result.figures, task_name, task_type, qid
-            )
-            self.state_manager.set_figure_paths(task_name, task_type, qid, png_paths, json_paths)
-
-        # 4. Save raw data
-        if postprocess_result.raw_data:
-            raw_paths = self.data_saver.save_raw_data(
-                postprocess_result.raw_data, task_name, task_type, qid
-            )
-            self.state_manager.set_raw_data_paths(task_name, task_type, qid, raw_paths)
-
-        # 5. Validate R²
-        backend_success = True
-        if run_result.has_r2():
-            r2_value = run_result.r2.get(qid)
-            if r2_value is None:
-                backend_success = False
-            else:
-                try:
-                    self.result_processor.validate_r2(run_result.r2, qid, task.r2_threshold)
-                except R2ValidationError:
-                    # Clear output parameters on R² failure
-                    if postprocess_result.output_parameters:
-                        self.state_manager.clear_output_parameters(task_name, task_type, qid)
-                    raise ValueError(f"{task_name} R² value too low: {r2_value:.4f}")
-
-            if not backend_success and postprocess_result.output_parameters:
-                self.state_manager.clear_output_parameters(task_name, task_type, qid)
-
-        # 6. Backend-specific save processing
-        self._save_backend_specific(task, execution_manager, qid, backend, backend_success)
-
-        return backend_success
-
-    def _save_backend_specific(
-        self,
-        task: TaskProtocol,
-        execution_manager: "ExecutionManager",
-        qid: str,
-        backend: BackendProtocol,
-        success: bool,
-    ) -> None:
-        """Backend-specific save processing.
-
-        Parameters
-        ----------
-        task : TaskProtocol
-            The task
-        execution_manager : ExecutionManager
-            The execution manager
-        qid : str
-            The qubit ID
-        backend : BackendProtocol
-            The backend
-        success : bool
-            Whether backend updates should be applied
-
-        """
-        if task.backend == "qubex":
-            self._save_qubex_specific(task, execution_manager, qid, backend, success)
-        elif task.backend == "fake":
-            self._save_fake_specific(task, execution_manager, qid, backend, success)
-
-    def _save_qubex_specific(
-        self,
-        task: TaskProtocol,
-        execution_manager: "ExecutionManager",
-        qid: str,
-        backend: BackendProtocol,
-        success: bool,
-    ) -> None:
-        """Qubex-specific save processing.
-
-        Parameters
-        ----------
-        task : TaskProtocol
-            The task
-        execution_manager : ExecutionManager
-            The execution manager
-        qid : str
-            The qubit ID
-        backend : BackendProtocol
-            The backend
-        success : bool
-            Whether backend updates should be applied
-
-        """
-        from qdash.dbmodel.coupling import CouplingDocument
-        from qdash.dbmodel.qubit import QubitDocument
-
-        task_name = task.get_name()
-        task_type = task.get_task_type()
-
-        # Get output parameters
-        task_model = self.state_manager.get_task(task_name, task_type, qid)
-        output_parameters = dict(task_model.output_parameters)
-
-        if not success:
-            logger.info(
-                "Skipping backend parameter updates for %s due to failed R² validation",
-                task_name,
-            )
-            # Still save to database even if R² failed
-            if output_parameters:
-                if task.is_qubit_task():
-                    QubitDocument.update_calib_data(
-                        username=self.username,
-                        qid=qid,
-                        chip_id=execution_manager.chip_id,
-                        output_parameters=output_parameters,
-                        project_id=execution_manager.project_id,
-                    )
-                elif task.is_coupling_task():
-                    CouplingDocument.update_calib_data(
-                        username=self.username,
-                        qid=qid,
-                        chip_id=execution_manager.chip_id,
-                        output_parameters=output_parameters,
-                        project_id=execution_manager.project_id,
-                    )
-            return
-
-        # Save calibration note
-        if backend.name == "qubex":
-            backend.update_note(
-                username=self.username,
-                chip_id=execution_manager.chip_id,
-                calib_dir=self.calib_dir,
-                execution_id=execution_manager.execution_id,
-                task_manager_id=self.task_manager_id,
-                project_id=execution_manager.project_id,
-            )
-
-        # Update database
-        if output_parameters:
-            if task.is_qubit_task():
-                QubitDocument.update_calib_data(
-                    username=self.username,
-                    qid=qid,
-                    chip_id=execution_manager.chip_id,
-                    output_parameters=output_parameters,
-                    project_id=execution_manager.project_id,
-                )
-                self._update_backend_params(backend, execution_manager, qid, output_parameters)
-            elif task.is_coupling_task():
-                CouplingDocument.update_calib_data(
-                    username=self.username,
-                    qid=qid,
-                    chip_id=execution_manager.chip_id,
-                    output_parameters=output_parameters,
-                    project_id=execution_manager.project_id,
-                )
-
-    def _update_backend_params(
-        self,
-        backend: BackendProtocol,
-        execution_manager: "ExecutionManager",
-        qid: str,
-        output_parameters: dict[str, Any],
-    ) -> None:
-        """Update backend parameters.
-
-        Parameters
-        ----------
-        backend : BackendProtocol
-            The backend
-        execution_manager : ExecutionManager
-            The execution manager
-        qid : str
-            The qubit ID
-        output_parameters : dict[str, Any]
-            Output parameters to update
-
-        """
-        updater = get_params_updater(backend, execution_manager.chip_id)
-        if updater is None:
-            return
-        try:
-            updater.update(qid, output_parameters)
-        except Exception as exc:
-            logger.warning("Failed to update backend params for qid=%s: %s", qid, exc)
-
-    def _save_fake_specific(
-        self,
-        task: TaskProtocol,
-        execution_manager: "ExecutionManager",
-        qid: str,
-        backend: BackendProtocol,
-        success: bool,
-    ) -> None:
-        """Fake-specific save processing.
-
-        Parameters
-        ----------
-        task : TaskProtocol
-            The task
-        execution_manager : ExecutionManager
-            The execution manager
-        qid : str
-            The qubit ID
-        backend : BackendProtocol
-            The backend
-        success : bool
-            Whether backend updates should be applied
-
-        """
-        # Simulation metadata save, etc. (implement as needed)
-        pass
 
     def _run_preprocess(
         self,
@@ -996,3 +543,409 @@ class TaskExecutor:
 
         """
         self.state_manager.update_task_status_to_failed(task_name, message, task_type, qid)
+
+    def execute(
+        self,
+        task: TaskProtocol,
+        backend: BackendProtocol,
+        execution_service: "ExecutionService",
+        qid: str,
+    ) -> tuple["ExecutionService", TaskExecutionResult]:
+        """Execute a task with full lifecycle management.
+
+        This is the main entry point for task execution.
+
+        Parameters
+        ----------
+        task : TaskProtocol
+            The task to execute
+        backend : BackendProtocol
+            The backend to use
+        execution_service : ExecutionService
+            The execution service
+        qid : str
+            The qubit ID
+
+        Returns
+        -------
+        tuple[ExecutionService, TaskExecutionResult]
+            Updated execution service and task execution result
+
+        Raises
+        ------
+        TaskExecutionError
+            If task execution fails
+        ValueError
+            If R² or fidelity validation fails
+        """
+        task_name = task.get_name()
+        task_type = task.get_task_type()
+
+        result = TaskExecutionResult(
+            task_name=task_name,
+            task_type=task_type,
+            qid=qid,
+        )
+
+        try:
+            # 0. Ensure task exists
+            self.state_manager.ensure_task_exists(task_name, task_type, qid)
+
+            # 1. Start task
+            self.state_manager.start_task(task_name, task_type, qid)
+
+            # Record task start to history
+            executed_task = self.state_manager.get_task(task_name, task_type, qid)
+            self.history_recorder.record_task_result(
+                executed_task, execution_service.to_datamodel()
+            )
+
+            # Update execution service
+            execution_service = self._update_execution(execution_service)
+
+            # 2. Preprocess
+            preprocess_result = self._run_preprocess(task, backend, qid)
+            if preprocess_result:
+                self.state_manager.put_input_parameters(
+                    task_name, preprocess_result.input_parameters, task_type, qid
+                )
+                execution_service = self._update_execution(execution_service)
+
+            # 3. Run
+            run_result = self._run_task(task, backend, qid)
+            result.r2 = run_result.r2 if run_result else None
+
+            if run_result is None:
+                # Task didn't produce results, mark as completed
+                self._complete_task(task_name, task_type, qid, "No run result")
+                result.success = True
+                result.message = "Completed without run result"
+                return execution_service, result
+
+            # 4. Postprocess
+            postprocess_result = self._run_postprocess(task, backend, run_result, qid)
+
+            if postprocess_result:
+                # 5. Process and validate results
+                self._process_results(
+                    task, execution_service, postprocess_result, qid, run_result, backend
+                )
+
+                result.output_parameters = dict(
+                    self.state_manager.get_task(task_name, task_type, qid).output_parameters
+                )
+
+            # 6. Complete task
+            self._complete_task(task_name, task_type, qid, f"{task_name} is completed")
+
+            # Record completion to history
+            executed_task = self.state_manager.get_task(task_name, task_type, qid)
+            self.history_recorder.record_task_result(
+                executed_task, execution_service.to_datamodel()
+            )
+
+            execution_service = self._update_execution(execution_service)
+            result.success = True
+            result.message = "Completed"
+
+        except (R2ValidationError, FidelityValidationError, ValueError) as e:
+            self._fail_task(task_name, task_type, qid, str(e))
+            executed_task = self.state_manager.get_task(task_name, task_type, qid)
+            self.history_recorder.record_task_result(
+                executed_task, execution_service.to_datamodel()
+            )
+            result.message = str(e)
+            raise
+
+        except Exception as e:
+            self._fail_task(task_name, task_type, qid, str(e))
+            executed_task = self.state_manager.get_task(task_name, task_type, qid)
+            self.history_recorder.record_task_result(
+                executed_task, execution_service.to_datamodel()
+            )
+            result.message = str(e)
+            raise TaskExecutionError(f"Task {task_name} failed: {e}") from e
+
+        finally:
+            # End task (record end time)
+            self.state_manager.end_task(task_name, task_type, qid)
+
+            # Final history record
+            executed_task = self.state_manager.get_task(task_name, task_type, qid)
+            self.history_recorder.record_task_result(
+                executed_task, execution_service.to_datamodel()
+            )
+
+            # Create chip history snapshot
+            self.history_recorder.create_chip_history_snapshot(self.username)
+
+            execution_service = self._update_execution(execution_service)
+
+        # Build calib_data_delta from state manager
+        result.calib_data_delta = self.state_manager.calib_data
+        result.controller_info = self._controller_info
+
+        return execution_service, result
+
+    def _update_execution(
+        self, execution_service: "ExecutionService"
+    ) -> "ExecutionService":
+        """Update execution service with current state.
+
+        Parameters
+        ----------
+        execution_service : ExecutionService
+            The execution service to update
+
+        Returns
+        -------
+        ExecutionService
+            Updated execution service
+        """
+        return execution_service.update_with_task_result(
+            task_manager_id=self.task_manager_id,
+            task_result=self.state_manager.task_result,
+            calib_data=self.state_manager.calib_data,
+            controller_info=self._controller_info,
+        )
+
+    def _process_results(
+        self,
+        task: TaskProtocol,
+        execution_service: "ExecutionService",
+        postprocess_result: PostProcessResult,
+        qid: str,
+        run_result: RunResult,
+        backend: BackendProtocol,
+    ) -> bool:
+        """Process task results using ExecutionService.
+
+        Parameters
+        ----------
+        task : TaskProtocol
+            The task
+        execution_service : ExecutionService
+            The execution service
+        postprocess_result : PostProcessResult
+            The postprocess result
+        qid : str
+            The qubit ID
+        run_result : RunResult
+            The run result
+        backend : BackendProtocol
+            The backend
+
+        Returns
+        -------
+        bool
+            True if backend updates should be applied
+        """
+        task_name = task.get_name()
+        task_type = task.get_task_type()
+
+        # 1. Validate fidelity
+        if postprocess_result.output_parameters:
+            try:
+                self.result_processor.validate_fidelity(
+                    postprocess_result.output_parameters, task_name
+                )
+            except FidelityValidationError as e:
+                raise ValueError(str(e)) from e
+
+        # 2. Process output parameters
+        if postprocess_result.output_parameters:
+            task_model = self.state_manager.get_task(task_name, task_type, qid)
+            task.attach_task_id(task_model.task_id)
+
+            processed_params = self.result_processor.process_output_parameters(
+                postprocess_result.output_parameters,
+                task_name,
+                self.execution_id,
+                task_model.task_id,
+            )
+            self.state_manager.put_output_parameters(task_name, processed_params, task_type, qid)
+
+        # 3. Save figures
+        if postprocess_result.figures:
+            png_paths, json_paths = self.data_saver.save_figures(
+                postprocess_result.figures, task_name, task_type, qid
+            )
+            self.state_manager.set_figure_paths(task_name, task_type, qid, png_paths, json_paths)
+
+        # 4. Save raw data
+        if postprocess_result.raw_data:
+            raw_paths = self.data_saver.save_raw_data(
+                postprocess_result.raw_data, task_name, task_type, qid
+            )
+            self.state_manager.set_raw_data_paths(task_name, task_type, qid, raw_paths)
+
+        # 5. Validate R²
+        backend_success = True
+        if run_result.has_r2():
+            r2_value = run_result.r2.get(qid)
+            if r2_value is None:
+                backend_success = False
+            else:
+                try:
+                    self.result_processor.validate_r2(run_result.r2, qid, task.r2_threshold)
+                except R2ValidationError:
+                    # Clear output parameters on R² failure
+                    if postprocess_result.output_parameters:
+                        self.state_manager.clear_output_parameters(task_name, task_type, qid)
+                    raise ValueError(f"{task_name} R² value too low: {r2_value:.4f}")
+
+            if not backend_success and postprocess_result.output_parameters:
+                self.state_manager.clear_output_parameters(task_name, task_type, qid)
+
+        # 6. Backend-specific save processing
+        self._save_backend_specific(task, execution_service, qid, backend, backend_success)
+
+        return backend_success
+
+    def _save_backend_specific(
+        self,
+        task: TaskProtocol,
+        execution_service: "ExecutionService",
+        qid: str,
+        backend: BackendProtocol,
+        success: bool,
+    ) -> None:
+        """Backend-specific save processing using ExecutionService.
+
+        Parameters
+        ----------
+        task : TaskProtocol
+            The task
+        execution_service : ExecutionService
+            The execution service
+        qid : str
+            The qubit ID
+        backend : BackendProtocol
+            The backend
+        success : bool
+            Whether backend updates should be applied
+        """
+        if task.backend == "qubex":
+            self._save_qubex_specific(task, execution_service, qid, backend, success)
+        elif task.backend == "fake":
+            # Simulation metadata save (implement as needed)
+            pass
+
+    def _save_qubex_specific(
+        self,
+        task: TaskProtocol,
+        execution_service: "ExecutionService",
+        qid: str,
+        backend: BackendProtocol,
+        success: bool,
+    ) -> None:
+        """Qubex-specific save processing using ExecutionService.
+
+        Parameters
+        ----------
+        task : TaskProtocol
+            The task
+        execution_service : ExecutionService
+            The execution service
+        qid : str
+            The qubit ID
+        backend : BackendProtocol
+            The backend
+        success : bool
+            Whether backend updates should be applied
+        """
+        from qdash.dbmodel.coupling import CouplingDocument
+        from qdash.dbmodel.qubit import QubitDocument
+
+        task_name = task.get_name()
+        task_type = task.get_task_type()
+
+        # Get output parameters
+        task_model = self.state_manager.get_task(task_name, task_type, qid)
+        output_parameters = dict(task_model.output_parameters)
+
+        if not success:
+            logger.info(
+                "Skipping backend parameter updates for %s due to failed R² validation",
+                task_name,
+            )
+            # Still save to database even if R² failed
+            if output_parameters:
+                if task.is_qubit_task():
+                    QubitDocument.update_calib_data(
+                        username=self.username,
+                        qid=qid,
+                        chip_id=execution_service.chip_id,
+                        output_parameters=output_parameters,
+                        project_id=execution_service.project_id,
+                    )
+                elif task.is_coupling_task():
+                    CouplingDocument.update_calib_data(
+                        username=self.username,
+                        qid=qid,
+                        chip_id=execution_service.chip_id,
+                        output_parameters=output_parameters,
+                        project_id=execution_service.project_id,
+                    )
+            return
+
+        # Save calibration note
+        if backend.name == "qubex":
+            backend.update_note(
+                username=self.username,
+                chip_id=execution_service.chip_id,
+                calib_dir=self.calib_dir,
+                execution_id=execution_service.execution_id,
+                task_manager_id=self.task_manager_id,
+                project_id=execution_service.project_id,
+            )
+
+        # Update database
+        if output_parameters:
+            if task.is_qubit_task():
+                QubitDocument.update_calib_data(
+                    username=self.username,
+                    qid=qid,
+                    chip_id=execution_service.chip_id,
+                    output_parameters=output_parameters,
+                    project_id=execution_service.project_id,
+                )
+                self._update_backend_params(
+                    backend, execution_service, qid, output_parameters
+                )
+            elif task.is_coupling_task():
+                CouplingDocument.update_calib_data(
+                    username=self.username,
+                    qid=qid,
+                    chip_id=execution_service.chip_id,
+                    output_parameters=output_parameters,
+                    project_id=execution_service.project_id,
+                )
+
+    def _update_backend_params(
+        self,
+        backend: BackendProtocol,
+        execution_service: "ExecutionService",
+        qid: str,
+        output_parameters: dict[str, Any],
+    ) -> None:
+        """Update backend parameters using ExecutionService.
+
+        Parameters
+        ----------
+        backend : BackendProtocol
+            The backend
+        execution_service : ExecutionService
+            The execution service
+        qid : str
+            The qubit ID
+        output_parameters : dict[str, Any]
+            Output parameters to update
+        """
+        updater = get_params_updater(backend, execution_service.chip_id)
+        if updater is None:
+            return
+        try:
+            updater.update(qid, output_parameters)
+        except Exception as exc:
+            logger.warning("Failed to update backend params for qid=%s: %s", qid, exc)

@@ -13,6 +13,10 @@ from qdash.datamodel.execution import (
     ExecutionStatusModel,
     TaskResultModel,
 )
+from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+from qdash.dbmodel.initialize import initialize
+from qdash.dbmodel.tag import TagDocument
 from qdash.workflow.engine.calibration.execution.state_manager import (
     ExecutionStateManager,
 )
@@ -20,6 +24,8 @@ from qdash.workflow.engine.calibration.repository.mongo_execution import (
     MongoExecutionRepository,
 )
 from qdash.workflow.engine.calibration.repository.protocols import ExecutionRepository
+
+initialize()
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +95,8 @@ class ExecutionService:
         name: str = "",
         tags: list[str] | None = None,
         note: dict[str, Any] | None = None,
+        fridge_info: dict[str, Any] | None = None,
+        project_id: str | None = None,
         repository: ExecutionRepository | None = None,
     ) -> "ExecutionService":
         """Create a new ExecutionService with initial state.
@@ -109,6 +117,10 @@ class ExecutionService:
             Tags for categorization
         note : dict | None
             Additional notes
+        fridge_info : dict | None
+            Fridge information
+        project_id : str | None
+            Project identifier
         repository : ExecutionRepository | None
             Custom repository (defaults to MongoDB)
 
@@ -125,6 +137,8 @@ class ExecutionService:
             name=name,
             tags=tags or [],
             note=note or {},
+            fridge_info=fridge_info or {},
+            project_id=project_id,
             status=ExecutionStatusModel.SCHEDULED,
         )
 
@@ -417,3 +431,169 @@ class ExecutionService:
             The execution model
         """
         return self.state_manager.to_datamodel()
+
+    # === Additional properties for ExecutionManager compatibility ===
+
+    @property
+    def name(self) -> str:
+        """Get execution name."""
+        return str(self.state_manager.name)
+
+    @property
+    def project_id(self) -> str | None:
+        """Get project ID."""
+        return self.state_manager.project_id
+
+    @property
+    def fridge_info(self) -> dict[str, Any]:
+        """Get fridge info."""
+        return dict(self.state_manager.fridge_info)
+
+    @property
+    def tags(self) -> list[str]:
+        """Get tags."""
+        return list(self.state_manager.tags)
+
+    @property
+    def start_at(self) -> str:
+        """Get start time."""
+        return str(self.state_manager.start_at)
+
+    @property
+    def end_at(self) -> str:
+        """Get end time."""
+        return str(self.state_manager.end_at)
+
+    @property
+    def elapsed_time(self) -> str:
+        """Get elapsed time."""
+        return str(self.state_manager.elapsed_time)
+
+    @property
+    def system_info(self) -> SystemInfoModel:
+        """Get system info."""
+        return self.state_manager.system_info
+
+    @property
+    def message(self) -> str:
+        """Get message."""
+        return str(self.state_manager.message)
+
+    # === Methods for ExecutionManager compatibility ===
+
+    def update_with_task_result(
+        self,
+        task_manager_id: str,
+        task_result: TaskResultModel,
+        calib_data: CalibDataModel,
+        controller_info: dict[str, dict[str, Any]],
+    ) -> "ExecutionService":
+        """Update execution with task results, calib data, and controller info.
+
+        This is a replacement for ExecutionManager.update_with_task_manager().
+
+        Parameters
+        ----------
+        task_manager_id : str
+            Task manager/session identifier
+        task_result : TaskResultModel
+            Task result to merge
+        calib_data : CalibDataModel
+            Calibration data to merge
+        controller_info : dict[str, dict]
+            Controller info to merge
+
+        Returns
+        -------
+        ExecutionService
+            Self for method chaining
+        """
+        # Merge all data via state manager
+        self.state_manager.merge_task_result(task_manager_id, task_result)
+        self.state_manager.merge_calib_data(calib_data)
+        self.state_manager.merge_controller_info(controller_info)
+
+        # Persist with optimistic locking
+        def updater(model: ExecutionModel) -> None:
+            # Update task results
+            model.task_results[task_manager_id] = task_result
+
+            # Merge calibration data
+            if isinstance(model.calib_data, dict):
+                for qid, data in calib_data.qubit.items():
+                    model.calib_data.setdefault("qubit", {}).setdefault(qid, {}).update(
+                        data if isinstance(data, dict) else {}
+                    )
+                for qid, data in calib_data.coupling.items():
+                    model.calib_data.setdefault("coupling", {}).setdefault(qid, {}).update(
+                        data if isinstance(data, dict) else {}
+                    )
+
+            # Update controller info
+            for _id, info in controller_info.items():
+                model.controller_info[_id] = info
+
+        self._update_with_lock(updater)
+        return self.reload()
+
+    def start_execution(self) -> "ExecutionService":
+        """Start the execution (alias for start()).
+
+        Returns
+        -------
+        ExecutionService
+            Self for method chaining
+        """
+        return self.start()
+
+    def complete_execution(self) -> "ExecutionService":
+        """Complete the execution (alias for complete()).
+
+        Returns
+        -------
+        ExecutionService
+            Self for method chaining
+        """
+        return self.complete()
+
+    def fail_execution(self) -> "ExecutionService":
+        """Fail the execution (alias for fail()).
+
+        Returns
+        -------
+        ExecutionService
+            Self for method chaining
+        """
+        return self.fail()
+
+    def save_with_tags(self) -> "ExecutionService":
+        """Save current state to repository and auto-register tags.
+
+        Returns
+        -------
+        ExecutionService
+            Self for method chaining
+        """
+        self.save()
+
+        # Auto-register tags to TagDocument for UI tag selector
+        if self.state_manager.tags and self.state_manager.project_id:
+            TagDocument.insert_tags(
+                self.state_manager.tags,
+                self.state_manager.username,
+                self.state_manager.project_id,
+            )
+        return self
+
+    def ensure_saved(self) -> "ExecutionService":
+        """Ensure execution exists in database (upsert if not found).
+
+        Returns
+        -------
+        ExecutionService
+            Self for method chaining
+        """
+        model = self.repository.find_by_id(self.state_manager.execution_id)
+        if model is None:
+            ExecutionHistoryDocument.upsert_document(self.to_datamodel())
+        return self

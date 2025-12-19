@@ -1,7 +1,7 @@
-"""Repository layer protocols for TaskManager refactoring.
+"""Repository layer protocols for calibration workflows.
 
 This module defines abstract interfaces (protocols) for data access operations
-to decouple TaskManager from specific database implementations.
+in calibration workflows.
 """
 
 from typing import Any, Callable, Protocol, runtime_checkable

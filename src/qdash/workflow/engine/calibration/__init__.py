@@ -1,15 +1,14 @@
 """Calibration engine components.
 
 This module provides calibration workflow management components organized into:
-- task/: Task management (TaskManager, TaskExecutor, TaskStateManager, etc.)
-- execution/: Execution management (ExecutionManager, ExecutionStateManager, ExecutionService)
+- task/: Task management (TaskSession, TaskExecutor, TaskStateManager, etc.)
+- execution/: Execution management (ExecutionService, ExecutionStateManager)
 - session/: Session management (SessionManager, SessionConfig)
 - scheduler/: CR scheduling (CRScheduler)
 - repository/: Data persistence (MongoDB, filesystem implementations)
 """
 
 # Execution components
-from qdash.workflow.engine.calibration.execution.manager import ExecutionManager
 from qdash.workflow.engine.calibration.execution.service import ExecutionService
 from qdash.workflow.engine.calibration.execution.state_manager import ExecutionStateManager
 
@@ -35,31 +34,24 @@ from qdash.workflow.engine.calibration.scheduler.one_qubit_scheduler import (
     SynchronizedOneQubitScheduleResult,
     SynchronizedStepInfo,
 )
+
+# Task components
 from qdash.workflow.engine.calibration.task.executor import TaskExecutionError, TaskExecutor
 from qdash.workflow.engine.calibration.task.history_recorder import TaskHistoryRecorder
-from qdash.workflow.engine.calibration.task.manager import TaskManager
 from qdash.workflow.engine.calibration.task.result_processor import (
     FidelityValidationError,
     R2ValidationError,
     TaskResultProcessor,
 )
+from qdash.workflow.engine.calibration.task.session import TaskSession
 from qdash.workflow.engine.calibration.task.state_manager import TaskStateManager
-
-# Backward compatibility aliases (deprecated - use new paths)
-task_manager = TaskManager
-task_executor = TaskExecutor
-task_state_manager = TaskStateManager
-execution_manager = ExecutionManager
-execution_state_manager = ExecutionStateManager
-execution_service = ExecutionService
-cr_scheduler = CRScheduler
 
 __all__ = [
     # Session
     "SessionManager",
     "SessionConfig",
     # Task
-    "TaskManager",
+    "TaskSession",
     "TaskExecutor",
     "TaskExecutionError",
     "TaskStateManager",
@@ -68,7 +60,6 @@ __all__ = [
     "FidelityValidationError",
     "TaskHistoryRecorder",
     # Execution
-    "ExecutionManager",
     "ExecutionStateManager",
     "ExecutionService",
     # Scheduler
