@@ -495,4 +495,4 @@ class YourService:
 ## Related Documentation
 
 - [Testing Guidelines](./testing.md): How to test workflow components
-- [CalibService API](../../../src/qdash/workflow/__init__.py): High-level API
+- [CalibService API](https://github.com/oqtopus-team/qdash/blob/develop/src/qdash/workflow/__init__.py): High-level API (source code)

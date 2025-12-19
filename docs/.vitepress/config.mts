@@ -102,6 +102,7 @@ export default withMermaid(
               text: "Workflow",
               collapsed: true,
               items: [
+                { text: "Engine Architecture", link: "/development/workflow/engine-architecture" },
                 { text: "Testing", link: "/development/workflow/testing" },
               ],
             },
