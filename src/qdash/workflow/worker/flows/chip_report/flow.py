@@ -91,7 +91,7 @@ def chip_report(
 
     _ = "local" if os.getenv("CONFIG_REPO_URL") == "" else pull_github()
     initialize()
-    date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")  # type: ignore[no-untyped-call]
+    date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
     chip_info_dir = f"/app/calib_data/{username}/{date_str}/chip_info"
     create_directory_task.submit(chip_info_dir).result()
 

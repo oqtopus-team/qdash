@@ -16,7 +16,7 @@ def _process_data(
         return result
 
     now = pendulum.now("Asia/Tokyo")
-    cutoff = now.subtract(hours=cutoff_hours)  # type: ignore[no-untyped-call]
+    cutoff = now.subtract(hours=cutoff_hours)
 
     for key, value in raw_data.items():
         calibrated_at = value.get("calibrated_at")
@@ -24,8 +24,8 @@ def _process_data(
         if within_24hrs:
             if calibrated_at:
                 try:
-                    calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")  # type: ignore[attr-defined]
-                    if isinstance(calibrated_at_dt, pendulum.DateTime):  # type: ignore[attr-defined]
+                    calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
+                    if isinstance(calibrated_at_dt, pendulum.DateTime):
                         is_recent = calibrated_at_dt >= cutoff
                     else:
                         is_recent = False

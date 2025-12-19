@@ -17,6 +17,7 @@ from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.tag import TagDocument
+from qdash.workflow.engine.execution.models import ExecutionNote
 from qdash.workflow.engine.execution.state_manager import (
     ExecutionStateManager,
 )
@@ -140,7 +141,7 @@ class ExecutionService:
             chip_id=chip_id,
             name=name,
             tags=tags or [],
-            note=note or {},
+            note=ExecutionNote.from_dict(note),
             fridge_info=fridge_info or {},
             project_id=project_id,
             status=ExecutionStatusModel.SCHEDULED,
@@ -339,6 +340,9 @@ class ExecutionService:
     def update_note(self, key: str, value: Any) -> "ExecutionService":
         """Update a note entry and persist.
 
+        For known fields (stage_results, github_push_results, config_commit_id),
+        use the appropriate setter. For other keys, they are stored in 'extra'.
+
         Parameters
         ----------
         key : str
@@ -356,7 +360,8 @@ class ExecutionService:
             model.note[key] = value
 
         self._update_with_lock(update_func)
-        self.state_manager.note[key] = value
+        # Store in extra field for unknown keys
+        self.state_manager.note.extra[key] = value
         return self
 
     def _update_with_lock(self, update_func: Callable[[ExecutionModel], None]) -> None:
@@ -417,14 +422,17 @@ class ExecutionService:
         return dict(self.state_manager.controller_info)
 
     @property
-    def note(self) -> dict[Any, Any]:
-        """Get note."""
-        return dict(self.state_manager.note)
+    def note(self) -> ExecutionNote:
+        """Get note (returns ExecutionNote model)."""
+        return self.state_manager.note
 
     @note.setter
-    def note(self, value: dict[str, Any]) -> None:
+    def note(self, value: ExecutionNote | dict[str, Any]) -> None:
         """Set note."""
-        self.state_manager.note = value
+        if isinstance(value, dict):
+            self.state_manager.note = ExecutionNote.from_dict(value)
+        else:
+            self.state_manager.note = value
 
     def to_datamodel(self) -> ExecutionModel:
         """Convert to ExecutionModel.

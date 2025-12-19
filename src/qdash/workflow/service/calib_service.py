@@ -73,7 +73,7 @@ def generate_execution_id(username: str, chip_id: str, project_id: str | None = 
         ```
 
     """
-    date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")  # type: ignore[no-untyped-call]
+    date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
     execution_index = ExecutionCounterDocument.get_next_index(
         date_str, username, chip_id, project_id=project_id
     )
@@ -436,15 +436,9 @@ class CalibService:
         assert self.execution_service is not None, "ExecutionService not initialized"
         logger = get_run_logger()
 
-        # Initialize stage_results dict in note if it doesn't exist
-        if "stage_results" not in self.execution_service.note:
-            self.execution_service.note["stage_results"] = {}
-
-        # Store stage result with timestamp
-        self.execution_service.note["stage_results"][stage_name] = {
-            "result": result,
-            "timestamp": pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),  # type: ignore[no-untyped-call]
-        }
+        # Record stage result using the structured ExecutionNote API
+        timestamp = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        self.execution_service.note.record_stage(stage_name, result, timestamp)
 
         # Persist to database immediately
         self.execution_service.save()
@@ -470,11 +464,10 @@ class CalibService:
 
         """
         assert self.execution_service is not None, "ExecutionService not initialized"
-        stage_results = self.execution_service.note.get("stage_results", {})
-        stage_data = stage_results.get(stage_name)
+        stage_result = self.execution_service.note.get_stage(stage_name)
 
-        if stage_data:
-            return dict(stage_data["result"])
+        if stage_result:
+            return dict(stage_result.result)
         return None
 
     def _sync_backend_params_before_push(self, logger: Any) -> None:
@@ -603,7 +596,7 @@ class CalibService:
 
                         # Store push results in execution note
                         if push_results:
-                            self.execution_service.note["github_push_results"] = push_results
+                            self.execution_service.note.github_push_results = push_results
                             self.execution_service.save()
                             logger.info(f"GitHub push completed: {push_results}")
                     except Exception as e:

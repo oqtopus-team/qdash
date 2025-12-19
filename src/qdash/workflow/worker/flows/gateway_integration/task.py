@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-import requests  # type: ignore[import-untyped]
+import requests
 from prefect import task
 from pydantic import BaseModel, Field
 from qdash.dbmodel.chip import ChipDocument

@@ -15,6 +15,7 @@ from qdash.datamodel.execution import (
     TaskResultModel,
 )
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.workflow.engine.execution.models import ExecutionNote
 
 
 class ExecutionStateManager(BaseModel):
@@ -37,7 +38,7 @@ class ExecutionStateManager(BaseModel):
     name: str = ""
     execution_id: str = ""
     calib_data_path: str = ""
-    note: dict[str, Any] = {}
+    note: ExecutionNote = ExecutionNote()
     status: ExecutionStatusModel = ExecutionStatusModel.SCHEDULED
     task_results: dict[str, TaskResultModel] = {}
     tags: list[str] = []
@@ -61,7 +62,7 @@ class ExecutionStateManager(BaseModel):
             Self for method chaining
 
         """
-        self.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()  # type: ignore[no-untyped-call]
+        self.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
         self.status = ExecutionStatusModel.RUNNING
         self.system_info.update_time()
         return self
@@ -75,7 +76,7 @@ class ExecutionStateManager(BaseModel):
             Self for method chaining
 
         """
-        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()  # type: ignore[no-untyped-call]
+        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
         self.end_at = end_at
         self.elapsed_time = self._calculate_elapsed_time(self.start_at, end_at)
         self.status = ExecutionStatusModel.COMPLETED
@@ -91,7 +92,7 @@ class ExecutionStateManager(BaseModel):
             Self for method chaining
 
         """
-        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()  # type: ignore[no-untyped-call]
+        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
         self.end_at = end_at
         self.elapsed_time = self._calculate_elapsed_time(self.start_at, end_at)
         self.status = ExecutionStatusModel.FAILED
@@ -234,8 +235,8 @@ class ExecutionStateManager(BaseModel):
 
         """
         try:
-            start_time = pendulum.parse(start_at)  # type: ignore[attr-defined]
-            end_time = pendulum.parse(end_at)  # type: ignore[attr-defined]
+            start_time = pendulum.parse(start_at)
+            end_time = pendulum.parse(end_at)
         except Exception as e:
             raise ValueError(f"Failed to parse the time. {e}")
         return end_time.diff_for_humans(start_time, absolute=True)  # type: ignore
@@ -254,7 +255,7 @@ class ExecutionStateManager(BaseModel):
             name=self.name,
             execution_id=self.execution_id,
             calib_data_path=self.calib_data_path,
-            note=self.note,
+            note=self.note.to_dict(),
             status=self.status,
             task_results=self.task_results,
             tags=self.tags,
@@ -290,7 +291,7 @@ class ExecutionStateManager(BaseModel):
             name=model.name,
             execution_id=model.execution_id,
             calib_data_path=model.calib_data_path,
-            note=model.note,
+            note=ExecutionNote.from_dict(model.note),
             status=model.status,
             task_results=model.task_results,
             tags=model.tags,

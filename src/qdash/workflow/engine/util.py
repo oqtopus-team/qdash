@@ -12,7 +12,7 @@ from qdash.workflow.calibtasks.base import BaseTask
 
 def get_current_timestamp() -> str:
     """Get current timestamp in ISO8601 format (Asia/Tokyo timezone)."""
-    result: str = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()  # type: ignore[no-untyped-call]
+    result: str = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
     return result
 
 

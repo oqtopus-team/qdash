@@ -15,7 +15,7 @@ async def setup_work_pool() -> None:
     """Create user-flows work pool if it doesn't exist."""
     from prefect.exceptions import ObjectAlreadyExists, ObjectNotFound
 
-    async with get_client() as client:  # type: ignore[union-attr]
+    async with get_client() as client:
         try:
             # Check if work pool already exists
             work_pool = await client.read_work_pool(WORK_POOL_NAME)

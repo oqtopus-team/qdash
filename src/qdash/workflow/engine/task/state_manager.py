@@ -256,7 +256,7 @@ class TaskStateManager(BaseModel):
         """
         task = self._ensure_task_exists(task_name, task_type, qid)
         task.status = TaskStatusModel.RUNNING
-        task.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()  # type: ignore[no-untyped-call]
+        task.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
 
     def end_task(self, task_name: str, task_type: str, qid: str) -> None:
         """End a task (record end time and calculate elapsed time).
@@ -272,7 +272,7 @@ class TaskStateManager(BaseModel):
 
         """
         task = self.get_task(task_name, task_type, qid)
-        task.end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()  # type: ignore[no-untyped-call]
+        task.end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
         task.elapsed_time = task.calculate_elapsed_time(task.start_at, task.end_at)
 
     def update_task_status_to_completed(
