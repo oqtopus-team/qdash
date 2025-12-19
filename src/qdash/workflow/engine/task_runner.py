@@ -1,15 +1,50 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from prefect import get_run_logger, task
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.calibtasks.base import BaseTask
 from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.execution.service import ExecutionService
-from qdash.workflow.engine.repository import MongoTaskRepository
 from qdash.workflow.engine.task.context import TaskContext
 
+if TYPE_CHECKING:
+    from qdash.workflow.engine.repository.protocols import TaskRepository
 
-def validate_task_name(task_names: list[str], username: str) -> list[str]:
-    """Validate task names."""
-    task_repo = MongoTaskRepository()
+
+def validate_task_name(
+    task_names: list[str],
+    username: str,
+    task_repo: TaskRepository | None = None,
+) -> list[str]:
+    """Validate task names.
+
+    Parameters
+    ----------
+    task_names : list[str]
+        List of task names to validate
+    username : str
+        Username to look up tasks for
+    task_repo : TaskRepository | None
+        Repository for task lookup. If None, uses MongoTaskRepository.
+
+    Returns
+    -------
+    list[str]
+        The validated task names
+
+    Raises
+    ------
+    ValueError
+        If any task name is invalid
+
+    """
+    if task_repo is None:
+        from qdash.workflow.engine.repository import MongoTaskRepository
+
+        task_repo = MongoTaskRepository()
+
     task_list = task_repo.get_task_names(username)
     for task_name in task_names:
         if task_name not in task_list:

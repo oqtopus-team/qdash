@@ -111,9 +111,7 @@ class TestInMemoryExecutionRepository:
         def update_status(m: ExecutionModel) -> None:
             m.status = ExecutionStatusModel.RUNNING
 
-        updated = repo.update_with_optimistic_lock(
-            "exec-001", update_status, initial_model=initial
-        )
+        updated = repo.update_with_optimistic_lock("exec-001", update_status, initial_model=initial)
 
         assert updated.status == ExecutionStatusModel.RUNNING
 
