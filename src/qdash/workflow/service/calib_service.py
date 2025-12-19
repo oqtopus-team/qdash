@@ -350,7 +350,7 @@ class CalibService:
             ```
         """
         assert self._orchestrator is not None, "Session not initialized"
-        result: dict[str, Any] = self._orchestrator.execute_task(
+        result: dict[str, Any] = self._orchestrator.run_task(
             task_name, qid, task_details, upstream_id
         )
         return result

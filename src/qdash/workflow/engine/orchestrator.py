@@ -292,73 +292,91 @@ class CalibOrchestrator:
     # Task Execution
     # =========================================================================
 
-    def execute_task(
+    def run_task(
         self,
         task_name: str,
         qid: str,
         task_details: dict[str, Any] | None = None,
         upstream_id: str | None = None,
     ) -> dict[str, Any]:
-        """Execute a calibration task with integrated save processing.
+        """Run a calibration task.
+
+        This is the main entry point for task execution. The flow is:
+        1. Create task instance
+        2. Prepare execution context
+        3. Execute via Prefect task
+        4. Merge results back
 
         Args:
-            task_name: Name of the task to execute (e.g., 'CheckFreq')
+            task_name: Name of the task (e.g., 'CheckRabi')
             qid: Qubit ID to calibrate
-            task_details: Optional task-specific configuration parameters
-            upstream_id: Optional explicit upstream task_id for dependency tracking
+            task_details: Optional task configuration
+            upstream_id: Optional upstream task_id for dependency tracking
 
         Returns:
-            Dictionary containing the task's output parameters and task_id
+            Task output parameters including task_id
         """
-        from copy import deepcopy
+        # Step 1: Create task instance
+        task_instance = self._create_task_instance(task_name, task_details)
+        task_type = task_instance.get_task_type()
 
-        from qdash.datamodel.task import CalibDataModel
+        # Step 2: Register task in workflow
+        self._ensure_task_in_workflow(task_name, task_type, qid)
+
+        # Step 3: Prepare execution context
+        exec_context = self._prepare_execution_context(qid, upstream_id)
+
+        # Step 4: Execute via Prefect
+        executed_context = self._run_prefect_task(task_instance, exec_context, qid)
+
+        # Step 5: Merge results and return
+        return self._merge_and_extract_results(executed_context, task_name, task_type, qid)
+
+    def _create_task_instance(
+        self,
+        task_name: str,
+        task_details: dict[str, Any] | None,
+    ) -> Any:
+        """Create a task instance from task name."""
         from qdash.workflow.calibtasks.active_protocols import generate_task_instances
-        from qdash.workflow.engine.prefect_tasks import (
-            execute_dynamic_task_by_qid_service,
-        )
-
-        config = self.config
 
         if task_details is None:
             task_details = {}
-
-        # Ensure task_details has an entry for this task
         if task_name not in task_details:
             task_details[task_name] = {}
 
-        # Generate task instance
         task_instances = generate_task_instances(
             task_names=[task_name],
             task_details=task_details,
-            backend=config.backend_name,
+            backend=self.config.backend_name,
         )
+        return task_instances[task_name]
 
-        task_instance = task_instances[task_name]
-        task_type = task_instance.get_task_type()
+    def _prepare_execution_context(
+        self,
+        qid: str,
+        upstream_id: str | None,
+    ) -> TaskContext:
+        """Prepare a TaskContext for task execution."""
+        from copy import deepcopy
+        from qdash.datamodel.task import CalibDataModel
 
-        # Add task to workflow if not already present
-        self._ensure_task_in_workflow(task_name, task_type, qid)
+        config = self.config
 
-        # Reload execution service to get latest state
-        execution_service = ExecutionService.from_existing(config.execution_id)
-        if execution_service is None:
-            execution_service = self.execution_service
-
-        # Create a new TaskContext for this specific execution
-        execution_task_context = TaskContext(
+        # Create new context for this execution
+        exec_context = TaskContext(
             username=config.username,
             execution_id=config.execution_id,
             qids=[qid],
             calib_dir=self.task_context.calib_dir,
         )
 
-        # Copy only the relevant calibration data for this qid
-        relevant_qubit_ids = self._get_relevant_qubit_ids(qid)
-        execution_task_context.state.calib_data = CalibDataModel(
+        # Copy relevant calibration data
+        relevant_qids = self._get_relevant_qubit_ids(qid)
+        exec_context.state.calib_data = CalibDataModel(
             qubit={
                 q: deepcopy(self.task_context.calib_data.qubit[q])
-                for q in relevant_qubit_ids
+                for q in relevant_qids
                 if q in self.task_context.calib_data.qubit
             },
             coupling={
@@ -367,51 +385,75 @@ class CalibOrchestrator:
                 if qid in self.task_context.calib_data.coupling
             },
         )
-        execution_task_context.controller_info = deepcopy(self.task_context.controller_info)
+        exec_context.controller_info = deepcopy(self.task_context.controller_info)
 
-        # Set upstream_id for sequential task dependency tracking
+        # Set upstream task dependency
         if upstream_id is not None:
-            execution_task_context.set_upstream_task_id(upstream_id)
+            exec_context.set_upstream_task_id(upstream_id)
         else:
             last_id = self._last_executed_task_id_by_qid.get(qid, "")
-            execution_task_context.set_upstream_task_id(last_id)
+            exec_context.set_upstream_task_id(last_id)
 
-        # Execute task
-        execution_service, executed_task_context = execute_dynamic_task_by_qid_service.with_options(
+        return exec_context
+
+    def _run_prefect_task(
+        self,
+        task_instance: Any,
+        exec_context: TaskContext,
+        qid: str,
+    ) -> TaskContext:
+        """Execute task via Prefect and return executed context."""
+        from qdash.workflow.engine.prefect_tasks import execute_dynamic_task_by_qid_service
+
+        # Get latest execution service state
+        execution_service = ExecutionService.from_existing(self.config.execution_id)
+        if execution_service is None:
+            execution_service = self.execution_service
+
+        # Run Prefect task
+        execution_service, executed_context = execute_dynamic_task_by_qid_service.with_options(
             timeout_seconds=task_instance.timeout,
             task_run_name=task_instance.name,
             log_prints=True,
         )(
             backend=self.backend,
             execution_service=execution_service,
-            task_context=execution_task_context,
+            task_context=exec_context,
             task_instance=task_instance,
             qid=qid,
         )
 
-        # Merge results back to main task_context
-        self.task_context.state.calib_data.qubit.update(
-            executed_task_context.calib_data.qubit
-        )
-        self.task_context.state.calib_data.coupling.update(
-            executed_task_context.calib_data.coupling
-        )
-        self.task_context.controller_info.update(executed_task_context.controller_info)
-
-        # Update execution service
+        # Update execution service reference
         self._execution_service = execution_service
 
-        # Store the executed task's task_id for upstream tracking
-        executed_task = executed_task_context.get_task(
-            task_name=task_name, task_type=task_instance.get_task_type(), qid=qid
+        return executed_context
+
+    def _merge_and_extract_results(
+        self,
+        executed_context: TaskContext,
+        task_name: str,
+        task_type: str,
+        qid: str,
+    ) -> dict[str, Any]:
+        """Merge execution results back to main context and extract output."""
+        # Merge calibration data
+        self.task_context.state.calib_data.qubit.update(
+            executed_context.calib_data.qubit
+        )
+        self.task_context.state.calib_data.coupling.update(
+            executed_context.calib_data.coupling
+        )
+        self.task_context.controller_info.update(executed_context.controller_info)
+
+        # Track task_id for upstream dependency
+        executed_task = executed_context.get_task(
+            task_name=task_name, task_type=task_type, qid=qid
         )
         self._last_executed_task_id_by_qid[qid] = executed_task.task_id
 
-        # Return output parameters
-        result = executed_task_context.get_output_parameter_by_task_name(
-            task_name,
-            task_type=task_instance.get_task_type(),
-            qid=qid,
+        # Extract and return output parameters
+        result = executed_context.get_output_parameter_by_task_name(
+            task_name, task_type=task_type, qid=qid
         )
         result["task_id"] = executed_task.task_id
 

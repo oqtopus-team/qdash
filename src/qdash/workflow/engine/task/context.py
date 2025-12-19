@@ -13,7 +13,7 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from qdash.datamodel.task import (
     CalibDataModel,
@@ -28,11 +28,6 @@ from qdash.workflow.engine.task.result_processor import TaskResultProcessor
 from qdash.workflow.engine.task.state_manager import TaskStateManager
 
 logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from qdash.workflow.calibtasks.base import BaseTask
-    from qdash.workflow.engine.backend.base import BaseBackend
-    from qdash.workflow.engine.execution.service import ExecutionService
 
 
 class TaskContext:
@@ -404,46 +399,6 @@ class TaskContext:
     def has_only_system_tasks(self, task_names: list[str]) -> bool:
         """Check if all tasks are system types."""
         return cast(bool, self.state.has_only_system_tasks(task_names))
-
-    # === Task Execution ===
-
-    def execute_task(
-        self,
-        task_instance: "BaseTask",
-        backend: "BaseBackend",
-        execution_service: "ExecutionService",
-        qid: str,
-    ) -> tuple["ExecutionService", "TaskContext"]:
-        """Execute task with integrated save processing.
-
-        Parameters
-        ----------
-        task_instance : BaseTask
-            Task instance to execute
-        backend : BaseBackend
-            Backend object for device communication
-        execution_service : ExecutionService
-            Execution service for state management
-        qid : str
-            Qubit ID
-
-        Returns
-        -------
-        tuple[ExecutionService, TaskContext]
-            Updated execution service and this task session
-        """
-        # Execute via TaskExecutor
-        execution_service, result = self.executor.execute(
-            task=task_instance,
-            backend=backend,
-            execution_service=execution_service,
-            qid=qid,
-        )
-
-        # Save session state
-        self.save()
-
-        return execution_service, self
 
     # === Batch Operations ===
 
