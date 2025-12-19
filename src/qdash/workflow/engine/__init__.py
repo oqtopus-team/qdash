@@ -1,13 +1,82 @@
-"""Workflow engine components.
+"""Workflow Engine - Core infrastructure for calibration workflow execution.
 
-This module provides calibration workflow management components organized into:
-- orchestrator.py: CalibOrchestrator - session lifecycle management
-- config.py: CalibConfig - session configuration
-- task/: Task management (TaskContext, TaskExecutor, TaskStateManager, etc.)
-- execution/: Execution management (ExecutionService, ExecutionStateManager)
-- scheduler/: CR scheduling (CRScheduler)
-- repository/: Data persistence (MongoDB, filesystem implementations)
-- backend/: Backend implementations (qubex, fake)
+This module provides the internal engine components for calibration workflows.
+Most users should use the high-level `CalibService` API instead of these components directly.
+
+Architecture Overview
+---------------------
+The engine is organized into layers:
+
+1. **Orchestration** (CalibOrchestrator, CalibConfig)
+   - Session lifecycle management
+   - Component initialization and coordination
+
+2. **Task Execution** (task/)
+   - TaskContext: Execution context and state container
+   - TaskExecutor: Task lifecycle (preprocess → run → postprocess)
+   - TaskStateManager: State transitions and parameter storage
+   - TaskResultProcessor: R² and fidelity validation
+   - TaskHistoryRecorder: History recording to MongoDB
+
+3. **Execution Management** (execution/)
+   - ExecutionService: Workflow session tracking
+   - ExecutionStateManager: Execution state transitions
+
+4. **Scheduling** (scheduler/)
+   - CRScheduler: 2-qubit (Cross-Resonance) scheduling with graph coloring
+   - OneQubitScheduler: 1-qubit scheduling with Box-aware grouping
+
+5. **Data Persistence** (repository/)
+   - Protocol-based repository abstractions
+   - MongoDB and filesystem implementations
+
+6. **Backend Abstraction** (backend/)
+   - BaseBackend: Abstract interface for hardware
+   - QubexBackend: Real hardware via qubex library
+   - FakeBackend: Simulation for testing
+
+Component Relationships
+-----------------------
+::
+
+    CalibService (high-level API)
+           │
+           ▼
+    CalibOrchestrator
+           │
+    ┌──────┼──────┐
+    ▼      ▼      ▼
+  Task   Exec   Backend
+  Context Service
+           │
+           ▼
+    TaskExecutor
+           │
+    ┌──────┼──────┬──────┐
+    ▼      ▼      ▼      ▼
+  State  Result History Data
+  Manager Processor Recorder Saver
+
+Usage Example
+-------------
+Most users should use CalibService. Direct engine usage:
+
+>>> from qdash.workflow.engine import CalibOrchestrator, CalibConfig
+>>> config = CalibConfig(
+...     username="alice",
+...     chip_id="64Qv3",
+...     qids=["0", "1"],
+...     execution_id="20240101-001",
+... )
+>>> orchestrator = CalibOrchestrator(config)
+>>> orchestrator.initialize()
+>>> result = orchestrator.run_task("CheckRabi", qid="0")
+>>> orchestrator.complete()
+
+See Also
+--------
+- docs/development/workflow/engine-architecture.md for detailed architecture
+- qdash.workflow.CalibService for high-level API
 """
 
 # Orchestration components

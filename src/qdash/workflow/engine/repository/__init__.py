@@ -1,7 +1,82 @@
-"""Repository layer for calibration workflows.
+"""Repository Layer - Data persistence abstraction.
 
-This module provides repository abstractions and implementations for
-data access in calibration workflows.
+This module provides protocol-based repository abstractions and implementations
+for data access in calibration workflows. Using protocols allows for easy
+testing with mock implementations.
+
+Design Pattern
+--------------
+The repository pattern separates data access logic from business logic:
+::
+
+    TaskExecutor
+         │
+         ▼
+    Repository Protocol  ◄── Interface
+         │
+    ┌────┴────┐
+    ▼         ▼
+  MongoDB   Filesystem
+   Impl       Impl
+
+Protocols (Interfaces)
+----------------------
+TaskResultHistoryRepository
+    Interface for task result history storage.
+    Records individual task executions for audit/debugging.
+
+ChipRepository
+    Interface for chip configuration access.
+    Reads chip topology, qubit configurations.
+
+ChipHistoryRepository
+    Interface for chip history snapshots.
+    Creates point-in-time snapshots after calibrations.
+
+CalibDataSaver
+    Interface for saving figures and raw data.
+    Saves PNG/JSON figures and numpy arrays.
+
+ExecutionRepository
+    Interface for execution record storage.
+    Tracks workflow execution sessions.
+
+MongoDB Implementations
+-----------------------
+MongoTaskResultHistoryRepository
+    Persists to ``task_result_history`` collection.
+
+MongoChipRepository
+    Reads from ``chips`` collection.
+
+MongoChipHistoryRepository
+    Persists to ``chip_history`` collection.
+
+MongoExecutionRepository
+    Persists to ``executions`` collection.
+
+Filesystem Implementations
+--------------------------
+FilesystemCalibDataSaver
+    Saves figures to ``fig/`` and raw data to ``raw_data/`` directories.
+    Generates unique filenames with timestamps.
+
+Usage Example
+-------------
+>>> from qdash.workflow.engine.repository import (
+...     create_default_repositories,
+...     FilesystemCalibDataSaver,
+... )
+>>> repos = create_default_repositories()
+>>> repos["task_result_history"].save(task_model)
+>>> saver = FilesystemCalibDataSaver("/path/to/calib")
+>>> png_paths, json_paths = saver.save_figures(figures, "CheckRabi", "qubit", "0")
+
+Testing with Mocks
+------------------
+>>> from unittest.mock import MagicMock
+>>> mock_repo = MagicMock(spec=TaskResultHistoryRepository)
+>>> executor = TaskExecutor(history_recorder=mock_repo, ...)
 """
 
 from qdash.workflow.engine.repository.filesystem_impl import (

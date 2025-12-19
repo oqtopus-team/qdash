@@ -55,20 +55,30 @@ class TaskContext:
 
     Example
     -------
-    ```python
-    session = TaskContext(
-        username="alice",
-        execution_id="20240101-001",
-        qids=["0", "1"],
-        calib_dir="/app/calib_data/alice/20240101/001",
-    )
+    Production usage::
 
-    # Direct access to state - no sync overhead
-    session.state.start_task("CheckFreq", TaskTypes.QUBIT, "0")
+        session = TaskContext(
+            username="alice",
+            execution_id="20240101-001",
+            qids=["0", "1"],
+            calib_dir="/app/calib_data/alice/20240101/001",
+        )
 
-    # Execute task
-    result = session.execute_task(task_instance, backend, execution_service, "0")
-    ```
+        # Direct access to state - preferred pattern
+        session.state.start_task("CheckFreq", TaskTypes.QUBIT, "0")
+
+    Testing with dependency injection::
+
+        mock_state = MagicMock(spec=TaskStateManager)
+        mock_executor = MagicMock(spec=TaskExecutor)
+        session = TaskContext(
+            username="test",
+            execution_id="test-001",
+            qids=["0"],
+            calib_dir="/tmp/test",
+            state_manager=mock_state,
+            executor=mock_executor,
+        )
     """
 
     def __init__(
@@ -77,6 +87,13 @@ class TaskContext:
         execution_id: str,
         qids: list[str],
         calib_dir: str,
+        *,
+        state_manager: TaskStateManager | None = None,
+        data_saver: FilesystemCalibDataSaver | None = None,
+        executor: TaskExecutor | None = None,
+        result_processor: TaskResultProcessor | None = None,
+        history_recorder: TaskHistoryRecorder | None = None,
+        context_id: str | None = None,
     ) -> None:
         """Initialize TaskContext.
 
@@ -90,35 +107,50 @@ class TaskContext:
             List of qubit IDs to initialize
         calib_dir : str
             Calibration data directory
+        state_manager : TaskStateManager | None
+            Optional injected state manager (for testing)
+        data_saver : FilesystemCalibDataSaver | None
+            Optional injected data saver (for testing)
+        executor : TaskExecutor | None
+            Optional injected executor (for testing)
+        result_processor : TaskResultProcessor | None
+            Optional injected result processor (for testing)
+        history_recorder : TaskHistoryRecorder | None
+            Optional injected history recorder (for testing)
+        context_id : str | None
+            Optional fixed ID (for testing reproducibility)
         """
-        self.id = str(uuid.uuid4())
+        self.id = context_id or str(uuid.uuid4())
         self.username = username
         self.execution_id = execution_id
         self.calib_dir = calib_dir
         self.controller_info: dict[str, dict[str, Any]] = {}
 
         # Initialize state manager (the source of truth)
-        self.state: TaskStateManager = TaskStateManager(qids=qids)
+        # Use injected or create default
+        self.state: TaskStateManager = state_manager or TaskStateManager(qids=qids)
 
         # Initialize data saver
-        self.data_saver = FilesystemCalibDataSaver(calib_dir)
+        self.data_saver = data_saver or FilesystemCalibDataSaver(calib_dir)
 
         # Initialize executor with state manager
-        self.executor = TaskExecutor(
+        # Use injected or create default
+        self.executor = executor or TaskExecutor(
             state_manager=self.state,
             calib_dir=calib_dir,
             execution_id=execution_id,
             task_manager_id=self.id,
             username=username,
-            result_processor=TaskResultProcessor(),
-            history_recorder=TaskHistoryRecorder(),
+            result_processor=result_processor or TaskResultProcessor(),
+            history_recorder=history_recorder or TaskHistoryRecorder(),
             data_saver=self.data_saver,
         )
 
-        # Initialize containers for coupling qids
-        for qid in qids:
-            if self._is_coupling_format(qid):
-                self.state.calib_data.coupling[qid] = {}
+        # Initialize containers for coupling qids (only if state_manager was not injected)
+        if state_manager is None:
+            for qid in qids:
+                if self._is_coupling_format(qid):
+                    self.state.calib_data.coupling[qid] = {}
 
     # === Direct Properties (no sync needed) ===
 
@@ -270,23 +302,48 @@ class TaskContext:
         with Path(f"{calib_dir}/{self.id}.json").open("w") as f:
             json.dump(data, f, indent=2)
 
-    # === Convenience Methods (delegate to state) ===
+    # =========================================================================
+    # Core Task Operations
+    # =========================================================================
+    # These methods are frequently used and provide convenient shortcuts.
 
     def get_task(self, task_name: str, task_type: str = TaskTypes.GLOBAL, qid: str = "") -> Any:
-        """Get a task by name."""
+        """Get a task by name.
+
+        This is a core operation used frequently in calibration flows.
+        """
         return self.state.get_task(task_name, task_type, qid)
 
     def start_task(
         self, task_name: str, task_type: str = TaskTypes.GLOBAL, qid: str = ""
     ) -> None:
-        """Start a task."""
+        """Start a task (set status to RUNNING and record start time).
+
+        This is a core operation used frequently in calibration flows.
+        """
         self.state.start_task(task_name, task_type, qid)
 
     def end_task(
         self, task_name: str, task_type: str = TaskTypes.GLOBAL, qid: str = ""
     ) -> None:
-        """End a task."""
+        """End a task (record end time and calculate elapsed time).
+
+        This is a core operation used frequently in calibration flows.
+        """
         self.state.end_task(task_name, task_type, qid)
+
+    # =========================================================================
+    # State Delegation (prefer `context.state.XXX()` for direct access)
+    # =========================================================================
+    # These methods delegate to TaskStateManager. For more control or
+    # when writing new code, consider using `context.state.XXX()` directly.
+    #
+    # Example:
+    #     # Direct access (preferred for new code)
+    #     context.state.update_task_status_to_completed(task_name, msg, task_type, qid)
+    #
+    #     # Shortcut (kept for backward compatibility)
+    #     context.update_task_status_to_completed(task_name, msg, task_type, qid)
 
     def update_task_status(
         self,
@@ -296,7 +353,7 @@ class TaskContext:
         task_type: str = TaskTypes.GLOBAL,
         qid: str = "",
     ) -> None:
-        """Update task status."""
+        """Update task status. See also: `context.state.update_task_status()`."""
         self.state.update_task_status(task_name, new_status, message, task_type, qid)
 
     def update_task_status_to_running(
@@ -306,7 +363,7 @@ class TaskContext:
         task_type: str = TaskTypes.GLOBAL,
         qid: str = "",
     ) -> None:
-        """Update task status to RUNNING."""
+        """Update task status to RUNNING. See also: `context.state.update_task_status_to_running()`."""
         self.state.update_task_status_to_running(task_name, message, task_type, qid)
 
     def update_task_status_to_completed(
@@ -316,7 +373,7 @@ class TaskContext:
         task_type: str = TaskTypes.GLOBAL,
         qid: str = "",
     ) -> None:
-        """Update task status to COMPLETED."""
+        """Update task status to COMPLETED. See also: `context.state.update_task_status_to_completed()`."""
         self.state.update_task_status_to_completed(task_name, message, task_type, qid)
 
     def update_task_status_to_failed(
@@ -326,7 +383,7 @@ class TaskContext:
         task_type: str = TaskTypes.GLOBAL,
         qid: str = "",
     ) -> None:
-        """Update task status to FAILED."""
+        """Update task status to FAILED. See also: `context.state.update_task_status_to_failed()`."""
         self.state.update_task_status_to_failed(task_name, message, task_type, qid)
 
     def update_task_status_to_skipped(
@@ -336,7 +393,7 @@ class TaskContext:
         task_type: str = TaskTypes.GLOBAL,
         qid: str = "",
     ) -> None:
-        """Update task status to SKIPPED."""
+        """Update task status to SKIPPED. See also: `context.state.update_task_status_to_skipped()`."""
         self.state.update_task_status_to_skipped(task_name, message, task_type, qid)
 
     def put_input_parameters(
@@ -346,7 +403,7 @@ class TaskContext:
         task_type: str = TaskTypes.GLOBAL,
         qid: str = "",
     ) -> None:
-        """Store input parameters."""
+        """Store input parameters. See also: `context.state.put_input_parameters()`."""
         self.state.put_input_parameters(task_name, input_parameters, task_type, qid)
 
     def put_output_parameters(
@@ -356,8 +413,12 @@ class TaskContext:
         task_type: str = TaskTypes.GLOBAL,
         qid: str = "",
     ) -> None:
-        """Store output parameters."""
+        """Store output parameters. See also: `context.state.put_output_parameters()`."""
         self.state.put_output_parameters(task_name, output_parameters, task_type, qid)
+
+    # =========================================================================
+    # Data Access (read-only shortcuts)
+    # =========================================================================
 
     def get_qubit_calib_data(self, qid: str) -> dict[Any, Any]:
         """Get calibration data for a qubit."""
