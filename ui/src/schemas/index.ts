@@ -8,6 +8,9 @@
 
 export * from "./addMemberRequest";
 export * from "./adminDeleteProject200";
+export * from "./allConfigResponse";
+export * from "./allConfigResponseCopilot";
+export * from "./allConfigResponseMetrics";
 export * from "./backendResponseModel";
 export * from "./bodyDownloadFiguresAsZip";
 export * from "./bodyLogin";
@@ -278,6 +281,11 @@ export * from "./timeSeriesData";
 export * from "./timeSeriesDataData";
 export * from "./tokenResponse";
 export * from "./tokenResponseDefaultProjectId";
+export * from "./uISettings";
+export * from "./uITaskFilesSettings";
+export * from "./uITaskFilesSettingsDefaultBackend";
+export * from "./uITaskFilesSettingsDefaultViewMode";
+export * from "./uITaskFilesSettingsSortOrder";
 export * from "./updateScheduleRequest";
 export * from "./updateScheduleRequestCron";
 export * from "./updateScheduleRequestParameters";

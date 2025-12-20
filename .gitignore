@@ -235,9 +235,9 @@ config/qubex/*
 !config/settings.yaml
 !config/copilot.yaml
 !config/topologies/
-# Local settings overrides (not committed, but template is)
-config/settings.local.yaml
-!config/settings.local.yaml.template
+# Local settings overrides (not committed)
+# These allow per-developer customization without modifying committed files
+config/*.local.yaml
 src/tools/schedule/*
 .serena/cache/*
 .mcp.json

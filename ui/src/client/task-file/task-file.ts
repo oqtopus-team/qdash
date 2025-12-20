@@ -42,6 +42,8 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 /**
  * Get task file settings from config/settings.yaml.
 
+Uses ConfigLoader for unified loading with local override support.
+
 Returns
 -------
     Task file settings including default backend
