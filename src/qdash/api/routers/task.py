@@ -6,7 +6,10 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from qdash.api.lib.project import ProjectContext, get_project_context
+from qdash.api.lib.project import (  # noqa: TCH002
+    ProjectContext,
+    get_project_context,
+)
 from qdash.api.schemas.task import (
     InputParameterModel,
     ListTaskResponse,

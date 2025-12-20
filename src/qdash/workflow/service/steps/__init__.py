@@ -37,12 +37,6 @@ from qdash.workflow.service.steps.base import (
     TransformStep,
 )
 
-# Context and Pipeline
-from qdash.workflow.service.steps.pipeline import (
-    Pipeline,
-    StepContext,
-)
-
 # Filter steps
 from qdash.workflow.service.steps.filters import (
     FilterByMetric,
@@ -54,6 +48,12 @@ from qdash.workflow.service.steps.one_qubit import (
     CustomOneQubit,
     OneQubitCheck,
     OneQubitFineTune,
+)
+
+# Context and Pipeline
+from qdash.workflow.service.steps.pipeline import (
+    Pipeline,
+    StepContext,
 )
 
 # 2-Qubit and system steps

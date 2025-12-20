@@ -52,10 +52,10 @@ class Step(ABC):
     @abstractmethod
     def execute(
         self,
-        service: "CalibService",
-        targets: "Target",
-        ctx: "StepContext",
-    ) -> "StepContext":
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
         """Execute the step.
 
         Args:
@@ -79,8 +79,6 @@ class CalibrationStep(Step):
     Examples: OneQubitCheck, OneQubitFineTune, TwoQubitCalibration
     """
 
-    pass
-
 
 @dataclass
 class TransformStep(Step):
@@ -91,5 +89,3 @@ class TransformStep(Step):
 
     Examples: FilterByMetric, FilterByStatus, GenerateCRSchedule
     """
-
-    pass

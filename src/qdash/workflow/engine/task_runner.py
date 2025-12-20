@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING
 
 from prefect import get_run_logger, task
 from qdash.dbmodel.initialize import initialize
-from qdash.workflow.calibtasks.base import BaseTask
-from qdash.workflow.engine.backend.base import BaseBackend
-from qdash.workflow.engine.execution.service import ExecutionService
-from qdash.workflow.engine.task.context import TaskContext
 
 if TYPE_CHECKING:
     from qdash.repository.protocols import TaskRepository
+    from qdash.workflow.calibtasks.base import BaseTask
+    from qdash.workflow.engine.backend.base import BaseBackend
+    from qdash.workflow.engine.execution.service import ExecutionService
+    from qdash.workflow.engine.task.context import TaskContext
 
 
 def validate_task_name(

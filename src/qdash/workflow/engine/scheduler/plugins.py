@@ -44,9 +44,10 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from qdash.datamodel.chip import ChipModel
+if TYPE_CHECKING:
+    from qdash.datamodel.chip import ChipModel
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +100,6 @@ class CRPairFilter(ABC):
         Returns:
             Filtered list of CR pair strings
         """
-        pass
 
     @abstractmethod
     def get_stats(self) -> dict[str, Any]:
@@ -108,7 +108,6 @@ class CRPairFilter(ABC):
         Returns:
             Dictionary containing filter-specific statistics
         """
-        pass
 
     def __repr__(self) -> str:
         """String representation of the filter."""
@@ -133,7 +132,6 @@ class CRSchedulingStrategy(ABC):
         Returns:
             List of groups where each group contains CR pairs that can run in parallel
         """
-        pass
 
     @abstractmethod
     def get_metadata(self) -> dict[str, Any]:
@@ -142,7 +140,6 @@ class CRSchedulingStrategy(ABC):
         Returns:
             Dictionary containing scheduler-specific metadata
         """
-        pass
 
     def __repr__(self) -> str:
         """String representation of the scheduler."""

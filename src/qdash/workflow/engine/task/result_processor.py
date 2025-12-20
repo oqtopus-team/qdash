@@ -16,19 +16,13 @@ logger = logging.getLogger(__name__)
 class TaskResultProcessingError(Exception):
     """Exception raised when task result processing fails."""
 
-    pass
-
 
 class R2ValidationError(TaskResultProcessingError):
     """Exception raised when R² validation fails."""
 
-    pass
-
 
 class FidelityValidationError(TaskResultProcessingError):
     """Exception raised when fidelity validation fails."""
-
-    pass
 
 
 class TaskResultProcessor:

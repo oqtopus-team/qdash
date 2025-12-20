@@ -9,7 +9,7 @@ For host-side path customization, use .env and docker-compose.yaml volume mounts
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 # Re-export path constants from common module for backward compatibility
 from qdash.common.paths import (
@@ -20,6 +20,9 @@ from qdash.common.paths import (
     USER_FLOWS_DIR,
     WORKFLOW_DIR,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class PathResolver:

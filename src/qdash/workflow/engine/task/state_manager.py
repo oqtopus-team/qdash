@@ -8,8 +8,6 @@ from collections.abc import Iterator
 from typing import Any, cast
 
 import pendulum
-
-from qdash.datamodel.task import TaskTypes
 from pydantic import BaseModel
 from qdash.datamodel.task import (
     BaseTaskResultModel,
@@ -21,6 +19,7 @@ from qdash.datamodel.task import (
     SystemTaskModel,
     TaskResultModel,
     TaskStatusModel,
+    TaskTypes,
 )
 
 

@@ -37,7 +37,7 @@ class ExecutionLockDocument(Document):
         return doc.locked
 
     @classmethod
-    def set_lock(cls, lock: bool, project_id: str) -> None:  # noqa: FBT001
+    def set_lock(cls, lock: bool, project_id: str) -> None:
         doc = cls.find_one({"project_id": project_id}).run()
         if doc is None:
             doc = cls(project_id=project_id, locked=lock)

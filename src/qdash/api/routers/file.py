@@ -15,8 +15,8 @@ from fastapi.logger import logger
 from fastapi.responses import FileResponse
 from git import Repo
 from git.exc import GitCommandError
-from qdash.api.lib.auth import get_current_active_user
-from qdash.api.schemas.auth import User
+from qdash.api.lib.auth import get_current_active_user  # noqa: TCH002
+from qdash.api.schemas.auth import User  # noqa: TCH002
 from qdash.api.schemas.file import (
     FileTreeNode,
     GitPushRequest,

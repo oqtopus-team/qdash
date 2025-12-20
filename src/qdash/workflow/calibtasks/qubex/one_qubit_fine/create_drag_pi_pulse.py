@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -11,7 +11,6 @@ from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, DRAG_PI_DURATION
 from qubex.measurement.measurement import DEFAULT_INTERVAL
-from qdash.datamodel.task import TaskTypes
 
 
 class CreateDRAGPIPulse(QubexTask):

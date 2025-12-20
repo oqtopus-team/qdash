@@ -76,7 +76,6 @@ class MuxOrderingStrategy(ABC):
         Returns:
             Ordered list of qubit IDs for sequential execution within this MUX
         """
-        pass
 
     @abstractmethod
     def get_metadata(self) -> dict[str, Any]:
@@ -85,14 +84,13 @@ class MuxOrderingStrategy(ABC):
         Returns:
             Dictionary containing strategy-specific metadata
         """
-        pass
 
     @abstractmethod
     def generate_synchronized_steps(
         self,
         mux_ids: list[int],
         qids: list[str],
-        context: "OrderingContext",
+        context: OrderingContext,
     ) -> list[list[str]]:
         """Generate synchronized parallel steps across all MUXes.
 
@@ -105,7 +103,6 @@ class MuxOrderingStrategy(ABC):
             List of steps, where each step is a list of qubit IDs
             that can be executed simultaneously
         """
-        pass
 
     def __repr__(self) -> str:
         """String representation of the strategy."""
@@ -228,10 +225,7 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
     ) -> list[str]:
         """Order qubits for checkerboard pattern."""
         # Determine which offset order to use
-        if mux_id % 2 == 0:
-            offset_order = self.EVEN_MUX_ORDER
-        else:
-            offset_order = self.ODD_MUX_ORDER
+        offset_order = self.EVEN_MUX_ORDER if mux_id % 2 == 0 else self.ODD_MUX_ORDER
 
         # Base qubit ID for this MUX
         base_qid = mux_id * 4
@@ -295,10 +289,7 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
             base_qid = mux_id * 4
 
             # Determine offset order for this MUX
-            if mux_id % 2 == 0:
-                offset_order = self.EVEN_MUX_ORDER
-            else:
-                offset_order = self.ODD_MUX_ORDER
+            offset_order = self.EVEN_MUX_ORDER if mux_id % 2 == 0 else self.ODD_MUX_ORDER
 
             # Add qubits to corresponding steps
             for step_idx, offset in enumerate(offset_order):

@@ -10,7 +10,6 @@ from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-
 from qdash.api.lib.config_loader import ConfigLoader
 
 router = APIRouter(tags=["config"])

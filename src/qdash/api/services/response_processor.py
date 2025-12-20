@@ -5,7 +5,7 @@ This service handles post-processing of API responses, including outlier filteri
 """
 
 import logging
-from typing import Any, Dict, TypeVar
+from typing import Any, TypeVar
 
 from qdash.api.services.outlier_detection import filter_task_results_for_outliers
 
@@ -48,7 +48,7 @@ class ResponseProcessor:
         response.result = filtered_results
         return response
 
-    def _apply_outlier_filtering(self, results: Dict[str, Any], task_name: str) -> Dict[str, Any]:
+    def _apply_outlier_filtering(self, results: dict[str, Any], task_name: str) -> dict[str, Any]:
         """Apply outlier filtering to task results."""
         # Convert Task objects to dict for outlier detection
         task_dict = {}

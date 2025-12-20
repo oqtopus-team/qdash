@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Iterable, cast
+from typing import TYPE_CHECKING, cast
 
 from fastapi.logger import logger
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
-from qdash.dbmodel.user import UserDocument
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from qdash.dbmodel.user import UserDocument
 
 
 class ProjectService:

@@ -10,10 +10,9 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-
-from qdash.api.dependencies import get_chip_service
+from qdash.api.dependencies import get_chip_service  # noqa: TCH002
 from qdash.api.lib.config_loader import ConfigLoader
-from qdash.api.lib.project import (
+from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
     get_project_context_owner,
@@ -31,7 +30,7 @@ from qdash.api.schemas.chip import (
     MuxDetailResponse,
 )
 from qdash.api.services.chip_initializer import ChipInitializer
-from qdash.api.services.chip_service import ChipService
+from qdash.api.services.chip_service import ChipService  # noqa: TCH002
 
 router = APIRouter()
 
@@ -124,7 +123,7 @@ def create_chip(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error creating chip {request.chip_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to create chip: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"Failed to create chip: {e!s}") from e
 
 
 @router.get(

@@ -52,7 +52,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
-
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 if TYPE_CHECKING:
@@ -547,10 +546,7 @@ class OneQubitScheduler:
         # Apply ordering strategy if provided
         if ordering_strategy is not None:
             # Determine grid size from chip_id
-            if "144" in self.chip_id:
-                grid_size = 12
-            else:
-                grid_size = 8
+            grid_size = 12 if "144" in self.chip_id else 8
             mux_grid_size = grid_size // 2
 
             context = OrderingContext(
@@ -810,7 +806,7 @@ class OneQubitScheduler:
             qids = [qid for qid in qids if qid not in exclude_set]
             excluded_count = original_count - len(qids)
             logger.info(
-                f"Excluded {excluded_count} qubits: {sorted(exclude_set & set(str(mux_id * 4 + o) for mux_id in mux_ids for o in range(4)))}"
+                f"Excluded {excluded_count} qubits: {sorted(exclude_set & {str(mux_id * 4 + o) for mux_id in mux_ids for o in range(4)})}"
             )
 
             if len(qids) == 0:
@@ -918,7 +914,6 @@ class OneQubitScheduler:
         from qdash.workflow.engine.scheduler.one_qubit_plugins import (
             CheckerboardOrderingStrategy,
             DefaultSynchronizedStrategy,
-            MuxOrderingStrategy,
             OrderingContext,
         )
 
@@ -936,10 +931,7 @@ class OneQubitScheduler:
         qid_to_mux = self._build_qubit_to_mux_map(wiring_config)
 
         # Determine grid size from chip_id
-        if "144" in self.chip_id:
-            grid_size = 12
-        else:
-            grid_size = 8
+        grid_size = 12 if "144" in self.chip_id else 8
         mux_grid_size = grid_size // 2
 
         # Create ordering context

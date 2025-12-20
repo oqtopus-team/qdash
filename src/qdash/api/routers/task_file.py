@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import ast
+import contextlib
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.logger import logger
-from qdash.api.lib.auth import get_current_active_user
+from qdash.api.lib.auth import get_current_active_user  # noqa: TCH002
 from qdash.api.lib.config_loader import ConfigLoader
-from qdash.api.schemas.auth import User
+from qdash.api.schemas.auth import User  # noqa: TCH002
 from qdash.api.schemas.task_file import (
     FileNodeType,
     ListTaskFileBackendsResponse,
@@ -24,6 +24,9 @@ from qdash.api.schemas.task_file import (
     TaskInfo,
 )
 from qdash.common.paths import CALIBTASKS_DIR
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 router = APIRouter()
 gunicorn_logger = logging.getLogger("gunicorn.error")
@@ -494,10 +497,8 @@ def _get_directory_mtime_sum(directory: Path) -> float:
         for item in directory.rglob("*.py"):
             if item.name.startswith(".") or "__pycache__" in str(item):
                 continue
-            try:
+            with contextlib.suppress(OSError):
                 mtime_sum += item.stat().st_mtime
-            except OSError:
-                pass
     except PermissionError:
         pass
     return mtime_sum

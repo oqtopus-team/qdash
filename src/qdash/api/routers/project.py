@@ -27,8 +27,8 @@ from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.repository import (
-    MongoProjectRepository,
     MongoProjectMembershipRepository,
+    MongoProjectRepository,
     MongoUserRepository,
 )
 

@@ -5,11 +5,9 @@ persistence operations. Used by both API and workflow components.
 """
 
 import logging
-from typing import Any
 
 import pendulum
 from bunnet import SortDirection
-
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 

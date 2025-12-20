@@ -13,7 +13,6 @@ from qdash.api.schemas.execution import (
     ExecutionResponseSummary,
     Task,
 )
-from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +159,7 @@ class ExecutionService:
         """
         grouped_tasks: dict[str, list[dict[str, Any]]] = {}
 
-        for key, result in task_results.items():
+        for result in task_results.values():
             if not isinstance(result, dict):
                 result = result.model_dump()  # noqa: PLW2901
 
@@ -187,7 +186,7 @@ class ExecutionService:
 
             # カップリングタスクの処理
             if "coupling_tasks" in result:
-                for sub_key, tasks in result["coupling_tasks"].items():
+                for tasks in result["coupling_tasks"].values():
                     if "coupling" not in grouped_tasks:
                         grouped_tasks["coupling"] = []
                     grouped_tasks["coupling"].extend(tasks)

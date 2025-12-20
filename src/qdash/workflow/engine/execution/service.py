@@ -5,7 +5,8 @@ state management and persistence through the repository layer.
 """
 
 import logging
-from typing import Any, Callable, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 from qdash.datamodel.execution import (
     CalibDataModel,
@@ -15,12 +16,12 @@ from qdash.datamodel.execution import (
 )
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.initialize import initialize
+from qdash.repository import MongoExecutionRepository
+from qdash.repository.protocols import ExecutionRepository
 from qdash.workflow.engine.execution.models import ExecutionNote
 from qdash.workflow.engine.execution.state_manager import (
     ExecutionStateManager,
 )
-from qdash.repository import MongoExecutionRepository
-from qdash.repository.protocols import ExecutionRepository
 
 initialize()
 

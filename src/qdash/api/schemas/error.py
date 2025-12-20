@@ -12,8 +12,6 @@ from pydantic import BaseModel
 class ErrorResponse(JSONResponse):
     """Base class for error responses."""
 
-    pass
-
 
 class InternalServerError(HTTPException):
     """Internal server error exception.

@@ -1,5 +1,6 @@
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Any
 
 from qdash.datamodel.task import InputParameterModel
 from qdash.workflow.calibtasks.base import (

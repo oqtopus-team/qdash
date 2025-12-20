@@ -48,12 +48,11 @@ from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 import yaml
-
-from qdash.datamodel.chip import ChipModel
-from qdash.datamodel.qubit import QubitModel
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 if TYPE_CHECKING:
+    from qdash.datamodel.chip import ChipModel
+    from qdash.datamodel.qubit import QubitModel
     from qdash.repository.protocols import ChipRepository
 
 logger = logging.getLogger(__name__)
@@ -216,7 +215,7 @@ class CRScheduler:
         """Extract all two-qubit coupling IDs from chip data."""
         return [
             coupling_id
-            for coupling_id in chip.couplings.keys()
+            for coupling_id in chip.couplings
             if "-" in coupling_id and len(coupling_id.split("-")) == 2
         ]
 
@@ -391,7 +390,7 @@ class CRScheduler:
             q1b, q2b = pair_b.split("-")
 
             # Conflict 1: Shared qubits
-            if set([q1a, q2a]) & set([q1b, q2b]):
+            if {q1a, q2a} & {q1b, q2b}:
                 conflict_graph.add_edge(pair_a, pair_b)
                 continue
 

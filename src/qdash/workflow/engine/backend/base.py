@@ -33,7 +33,6 @@ class BaseBackend(ABC):
         project_id: str | None = None,
     ) -> None:
         """Save calibration note. Override in subclasses that support notes."""
-        pass
 
     def update_note(
         self,
@@ -45,4 +44,3 @@ class BaseBackend(ABC):
         project_id: str | None = None,
     ) -> None:
         """Update calibration note. Override in subclasses that support notes."""
-        pass

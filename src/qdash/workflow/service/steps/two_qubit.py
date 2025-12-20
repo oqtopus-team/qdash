@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
-
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.service.results import SkewCheckResult, TwoQubitResult
 from qdash.workflow.service.steps.base import CalibrationStep, TransformStep
@@ -64,10 +63,10 @@ class CustomTwoQubit(CalibrationStep):
 
     def execute(
         self,
-        service: "CalibService",
-        targets: "Target",
-        ctx: "StepContext",
-    ) -> "StepContext":
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
         """Execute custom 2-qubit calibration."""
         logger = get_run_logger()
 
@@ -213,10 +212,10 @@ class GenerateCRSchedule(TransformStep):
 
     def execute(
         self,
-        service: "CalibService",
-        targets: "Target",
-        ctx: "StepContext",
-    ) -> "StepContext":
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
         """Generate CR schedule from candidate qubits."""
         logger = get_run_logger()
 
@@ -287,10 +286,10 @@ class TwoQubitCalibration(CalibrationStep):
 
     def execute(
         self,
-        service: "CalibService",
-        targets: "Target",
-        ctx: "StepContext",
-    ) -> "StepContext":
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
         """Execute 2-qubit calibration."""
         logger = get_run_logger()
         tasks = self.tasks or FULL_2Q_TASKS
@@ -439,10 +438,10 @@ class CheckSkew(CalibrationStep):
 
     def execute(
         self,
-        service: "CalibService",
-        targets: "Target",
-        ctx: "StepContext",
-    ) -> "StepContext":
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
         """Execute skew check."""
         logger = get_run_logger()
 

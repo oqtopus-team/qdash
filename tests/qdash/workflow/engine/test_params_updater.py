@@ -6,10 +6,9 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from qdash.workflow.engine.params_updater import _QubexParamsUpdater
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
-
-from qdash.workflow.engine.params_updater import _QubexParamsUpdater
 
 
 class TestParamsUpdaterNoneHandling:
@@ -165,7 +164,7 @@ data:
     def test_atomic_write_no_partial_content(self, updater, yaml_file):
         """Test that atomic write prevents partial content."""
         # Read original content
-        original_content = yaml_file.read_text()
+        yaml_file.read_text()
 
         # Update should be atomic
         updater._update_yaml(yaml_file, "Q00", 100.0)

@@ -5,7 +5,7 @@ import numpy as np
 import numpy.typing as npt
 import plotly.graph_objects as go
 import qubex as qx
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -15,7 +15,6 @@ from qdash.workflow.calibtasks.fake.base import FakeTask
 from qdash.workflow.engine.backend.fake import FakeBackend
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
 from qubex.simulator import Control, QuantumSimulator, QuantumSystem, SimulationResult, Transmon
-from qdash.datamodel.task import TaskTypes
 
 
 def downsample(
@@ -110,7 +109,7 @@ class FakeRabi(FakeTask):
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 
-    def preprocess(self, backend: FakeBackend, qid: str) -> PreProcessResult:  # noqa: ARG002
+    def preprocess(self, backend: FakeBackend, qid: str) -> PreProcessResult:
         """Preprocess the task."""
         return PreProcessResult(input_parameters=self.input_parameters)
 

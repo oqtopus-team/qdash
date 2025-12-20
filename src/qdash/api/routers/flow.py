@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
 import httpx
 from croniter import croniter
@@ -39,10 +40,9 @@ from qdash.api.schemas.flow import (
     UpdateScheduleRequest,
     UpdateScheduleResponse,
 )
+from qdash.common.paths import SERVICE_DIR, TEMPLATES_DIR, USER_FLOWS_DIR
 from qdash.config import get_settings
 from qdash.repository import MongoFlowRepository
-from qdash.common.paths import SERVICE_DIR, TEMPLATES_DIR, USER_FLOWS_DIR
-from zoneinfo import ZoneInfo
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
@@ -122,12 +122,14 @@ def validate_flow_code(code: str, expected_function_name: str) -> None:
         if isinstance(node, ast.FunctionDef):
             # Check if function has @flow decorator
             for decorator in node.decorator_list:
-                if isinstance(decorator, ast.Name) and decorator.id == "flow":
-                    flow_functions.append(node.name)
-                elif (
-                    isinstance(decorator, ast.Call)
-                    and isinstance(decorator.func, ast.Name)
-                    and decorator.func.id == "flow"
+                if (
+                    isinstance(decorator, ast.Name)
+                    and decorator.id == "flow"
+                    or (
+                        isinstance(decorator, ast.Call)
+                        and isinstance(decorator.func, ast.Name)
+                        and decorator.func.id == "flow"
+                    )
                 ):
                     flow_functions.append(node.name)
 
@@ -265,6 +267,7 @@ async def save_flow(
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
         if result.returncode == 0:
             logger.info(f"Auto-formatted flow code with ruff: {file_path}")
@@ -810,7 +813,7 @@ async def update_flow_schedule(
                 except ValueError as e:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Invalid cron expression '{request.cron}': {str(e)}",
+                        detail=f"Invalid cron expression '{request.cron}': {e!s}",
                     )
 
                 # Use timezone from request (defaults to Asia/Tokyo in schema)
@@ -1087,7 +1090,7 @@ async def schedule_flow(
         logger.error(f"Deployment {flow.deployment_id} not found in Prefect: {e}")
         raise HTTPException(
             status_code=400,
-            detail=f"Flow '{name}' deployment not found in Prefect. Please re-save the flow. Error: {str(e)}",
+            detail=f"Flow '{name}' deployment not found in Prefect. Please re-save the flow. Error: {e!s}",
         )
 
     # Merge parameters - include username, chip_id, and project_id from flow metadata
@@ -1110,7 +1113,7 @@ async def schedule_flow(
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid cron expression '{request.cron}': {str(e)}",
+                detail=f"Invalid cron expression '{request.cron}': {e!s}",
             )
 
         try:
@@ -1227,7 +1230,7 @@ async def schedule_flow(
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid scheduled_time format: {str(e)}",
+                detail=f"Invalid scheduled_time format: {e!s}",
             )
 
         try:

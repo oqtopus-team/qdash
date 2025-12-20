@@ -1,13 +1,12 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qdash.datamodel.task import TaskTypes
 
 
 class RabiOscillation(QubexTask):
@@ -23,7 +22,7 @@ class RabiOscillation(QubexTask):
     ) -> PostProcessResult:
         return PostProcessResult(output_parameters={})
 
-    def run(self, backend: QubexBackend, qid: str) -> RunResult:  # noqa: ARG002
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
         default_rabi_amplitudes = {label: 0.01 for label in exp.qubit_labels}
         exp.rabi_experiment(

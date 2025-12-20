@@ -8,7 +8,6 @@ import logging
 from typing import Any
 
 from bunnet import SortDirection
-
 from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.task import BaseTaskResultModel
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument

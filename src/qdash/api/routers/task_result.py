@@ -6,15 +6,16 @@ import io
 import logging
 import zipfile
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import pendulum
 from bunnet import SortDirection
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import StreamingResponse
-from starlette.exceptions import HTTPException
-
-from qdash.api.lib.project import ProjectContext, get_project_context
+from qdash.api.lib.project import (  # noqa: TCH002
+    ProjectContext,
+    get_project_context,
+)
 from qdash.api.schemas.task_result import (
     LatestTaskResultResponse,
     TaskHistoryResponse,
@@ -24,10 +25,13 @@ from qdash.api.schemas.task_result import (
 )
 from qdash.api.services.response_processor import response_processor
 from qdash.datamodel.task import OutputParameterModel
-from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.repository.chip import MongoChipRepository
 from qdash.repository.chip_history import MongoChipHistoryRepository
 from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
+from starlette.exceptions import HTTPException
+
+if TYPE_CHECKING:
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 router = APIRouter()
 

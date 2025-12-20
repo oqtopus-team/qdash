@@ -7,10 +7,9 @@ These tests verify the CRScheduler functionality including:
 - Parallel grouping
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
-from pathlib import Path
 
+import pytest
 from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler, CRScheduleResult
 
 

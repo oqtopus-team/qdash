@@ -9,7 +9,8 @@ The protocols follow the Repository pattern, providing:
 - Clear separation between domain logic and data access
 """
 
-from typing import Any, Callable, Protocol, runtime_checkable
+from collections.abc import Callable
+from typing import Any, Protocol, runtime_checkable
 
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.datamodel.chip import ChipModel

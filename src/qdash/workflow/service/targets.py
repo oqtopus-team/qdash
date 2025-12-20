@@ -45,7 +45,6 @@ class Target(ABC):
         Returns:
             List of qubit IDs
         """
-        pass
 
     @abstractmethod
     def to_coupling_ids(self, chip_id: str) -> list[str]:
@@ -57,7 +56,6 @@ class Target(ABC):
         Returns:
             List of coupling IDs (e.g., ["0-1", "2-3"])
         """
-        pass
 
 
 @dataclass

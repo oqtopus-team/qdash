@@ -1,6 +1,6 @@
 """Tests for TaskHistoryRecorder."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
