@@ -99,7 +99,6 @@ class TaskExecutionError(Exception):
     """Exception raised when task execution fails."""
 
 
-
 class TaskExecutionResult(BaseModel):
     """Result of task execution.
 

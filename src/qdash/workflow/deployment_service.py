@@ -240,9 +240,7 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
                     logger.info("Successfully updated deployment parameters")
             except Exception as e:
                 logger.error(f"Failed to update deployment: {e}")
-                raise HTTPException(
-                    status_code=500, detail=f"Failed to update deployment: {e!s}"
-                )
+                raise HTTPException(status_code=500, detail=f"Failed to update deployment: {e!s}")
 
             logger.info(
                 f"Set schedule on deployment {request.deployment_id}: cron={request.cron}, active={request.active}"

@@ -3,8 +3,6 @@
 from collections.abc import Callable
 
 import pytest
-from unittest.mock import MagicMock, patch
-
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionModel,
@@ -13,9 +11,6 @@ from qdash.datamodel.execution import (
 )
 from qdash.datamodel.task import OutputParameterModel
 from qdash.workflow.engine.execution.service import ExecutionService
-from qdash.workflow.engine.execution.state_manager import (
-    ExecutionStateManager,
-)
 
 
 class MockExecutionRepository:

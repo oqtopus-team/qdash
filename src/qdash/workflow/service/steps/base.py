@@ -80,7 +80,6 @@ class CalibrationStep(Step):
     """
 
 
-
 @dataclass
 class TransformStep(Step):
     """Base class for steps that transform data without hardware execution.
@@ -90,4 +89,3 @@ class TransformStep(Step):
 
     Examples: FilterByMetric, FilterByStatus, GenerateCRSchedule
     """
-

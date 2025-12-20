@@ -67,6 +67,7 @@ lint.ignore = [
     "SIM102", # collapsible-if (readability preference)
     "SIM108", # if-else-block-instead-of-if-exp (readability preference)
     "PERF401", # manual-list-comprehension (readability over micro-optimization)
+    "PERF402", # manual-list-copy (readability over micro-optimization)
     "PLW0603", # global-statement (used for singletons/caching)
     "RUF003",  # ambiguous-unicode-character-comment (Japanese comments)
     "RUF012",  # mutable-class-default (Pydantic models)
@@ -89,6 +90,9 @@ lint.ignore = [
     "PLR2004",
     "PLR6301",
     "S101",
+    "S106",  # Test data passwords
+    "S108",  # /tmp usage in tests is acceptable
+    "RUF002", # Japanese in docstrings
 ]
 
 [tool.mypy]

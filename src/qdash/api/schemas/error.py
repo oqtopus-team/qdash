@@ -13,7 +13,6 @@ class ErrorResponse(JSONResponse):
     """Base class for error responses."""
 
 
-
 class InternalServerError(HTTPException):
     """Internal server error exception.
 

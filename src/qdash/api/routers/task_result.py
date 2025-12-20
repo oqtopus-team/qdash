@@ -12,6 +12,10 @@ import pendulum
 from bunnet import SortDirection
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import StreamingResponse
+from qdash.api.lib.project import (  # noqa: TCH002
+    ProjectContext,
+    get_project_context,
+)
 from qdash.api.schemas.task_result import (
     LatestTaskResultResponse,
     TaskHistoryResponse,
@@ -27,7 +31,6 @@ from qdash.repository.task_result_history import MongoTaskResultHistoryRepositor
 from starlette.exceptions import HTTPException
 
 if TYPE_CHECKING:
-    from qdash.api.lib.project import ProjectContext, get_project_context
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 router = APIRouter()

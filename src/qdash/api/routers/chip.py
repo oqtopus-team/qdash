@@ -7,10 +7,16 @@ Business logic is delegated to ChipService for better testability.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from qdash.api.dependencies import get_chip_service  # noqa: TCH002
 from qdash.api.lib.config_loader import ConfigLoader
+from qdash.api.lib.project import (  # noqa: TCH002
+    ProjectContext,
+    get_project_context,
+    get_project_context_owner,
+)
 from qdash.api.routers.task_file import (
     CALIBTASKS_BASE_PATH,
     collect_tasks_from_directory,
@@ -24,15 +30,7 @@ from qdash.api.schemas.chip import (
     MuxDetailResponse,
 )
 from qdash.api.services.chip_initializer import ChipInitializer
-
-if TYPE_CHECKING:
-    from qdash.api.dependencies import get_chip_service
-    from qdash.api.lib.project import (
-        ProjectContext,
-        get_project_context,
-        get_project_context_owner,
-    )
-    from qdash.api.services.chip_service import ChipService
+from qdash.api.services.chip_service import ChipService  # noqa: TCH002
 
 router = APIRouter()
 

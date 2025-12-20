@@ -17,15 +17,12 @@ class TaskResultProcessingError(Exception):
     """Exception raised when task result processing fails."""
 
 
-
 class R2ValidationError(TaskResultProcessingError):
     """Exception raised when R² validation fails."""
 
 
-
 class FidelityValidationError(TaskResultProcessingError):
     """Exception raised when fidelity validation fails."""
-
 
 
 class TaskResultProcessor:

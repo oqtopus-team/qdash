@@ -10,6 +10,10 @@ from bunnet import SortDirection
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from qdash.api.lib.metrics_config import load_metrics_config
+from qdash.api.lib.project import (  # noqa: TCH002
+    ProjectContext,
+    get_project_context,
+)
 from qdash.api.schemas.metrics import (
     ChipMetricsResponse,
     CouplingMetrics,
@@ -22,7 +26,6 @@ from qdash.repository.chip import MongoChipRepository
 from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
 
 if TYPE_CHECKING:
-    from qdash.api.lib.project import ProjectContext, get_project_context
     from qdash.dbmodel.chip import ChipDocument
 
 router = APIRouter()

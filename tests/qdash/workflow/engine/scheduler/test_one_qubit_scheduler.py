@@ -9,16 +9,12 @@ These tests verify the OneQubitScheduler functionality including:
 
 import pytest
 import yaml
-
 from qdash.workflow.engine.scheduler.one_qubit_scheduler import (
     BOX_A,
     BOX_B,
     BOX_MIXED,
     OneQubitScheduler,
     OneQubitScheduleResult,
-    OneQubitStageInfo,
-    SynchronizedOneQubitScheduleResult,
-    SynchronizedStepInfo,
 )
 
 

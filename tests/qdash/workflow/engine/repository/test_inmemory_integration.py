@@ -5,7 +5,6 @@ enabling MongoDB-free testing of workflow logic.
 """
 
 import pytest
-
 from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
 from qdash.workflow.engine.repository import (
     InMemoryExecutionCounterRepository,

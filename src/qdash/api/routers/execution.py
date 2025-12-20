@@ -8,22 +8,23 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
+from qdash.api.dependencies import get_execution_service  # noqa: TCH002
+from qdash.api.lib.project import (  # noqa: TCH002
+    ProjectContext,
+    get_project_context,
+)
 from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
     ListExecutionsResponse,
 )
+from qdash.api.services.execution_service import ExecutionService  # noqa: TCH002
 from starlette.exceptions import HTTPException
-
-if TYPE_CHECKING:
-    from qdash.api.dependencies import get_execution_service
-    from qdash.api.lib.project import ProjectContext, get_project_context
-    from qdash.api.services.execution_service import ExecutionService
 
 router = APIRouter()
 

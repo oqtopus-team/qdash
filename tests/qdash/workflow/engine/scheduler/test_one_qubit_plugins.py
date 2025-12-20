@@ -1,7 +1,6 @@
 """Tests for 1-Qubit Scheduler Ordering Plugins."""
 
 import pytest
-
 from qdash.workflow.engine.scheduler.one_qubit_plugins import (
     CheckerboardOrderingStrategy,
     DefaultOrderingStrategy,
