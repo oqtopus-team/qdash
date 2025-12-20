@@ -19,7 +19,7 @@ from qdash.repository.execution_history import MongoExecutionHistoryRepository
 from qdash.repository.execution_lock import MongoExecutionLockRepository
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_chip_repository() -> MongoChipRepository:
     """Get the chip repository instance.
 
@@ -32,7 +32,7 @@ def get_chip_repository() -> MongoChipRepository:
     return MongoChipRepository()
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_execution_counter_repository() -> MongoExecutionCounterRepository:
     """Get the execution counter repository instance.
 
@@ -45,7 +45,7 @@ def get_execution_counter_repository() -> MongoExecutionCounterRepository:
     return MongoExecutionCounterRepository()
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_task_result_repository() -> MongoTaskResultHistoryRepository:
     """Get the task result history repository instance.
 
@@ -58,7 +58,7 @@ def get_task_result_repository() -> MongoTaskResultHistoryRepository:
     return MongoTaskResultHistoryRepository()
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_chip_service() -> ChipService:
     """Get the chip service instance.
 
@@ -75,7 +75,7 @@ def get_chip_service() -> ChipService:
     )
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_execution_history_repository() -> MongoExecutionHistoryRepository:
     """Get the execution history repository instance.
 
@@ -88,7 +88,7 @@ def get_execution_history_repository() -> MongoExecutionHistoryRepository:
     return MongoExecutionHistoryRepository()
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_execution_lock_repository() -> MongoExecutionLockRepository:
     """Get the execution lock repository instance.
 
@@ -101,7 +101,7 @@ def get_execution_lock_repository() -> MongoExecutionLockRepository:
     return MongoExecutionLockRepository()
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_execution_service() -> ExecutionService:
     """Get the execution service instance.
 
@@ -117,7 +117,7 @@ def get_execution_service() -> ExecutionService:
     )
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_calibration_note_repository() -> MongoCalibrationNoteRepository:
     """Get the calibration note repository instance.
 
@@ -130,7 +130,7 @@ def get_calibration_note_repository() -> MongoCalibrationNoteRepository:
     return MongoCalibrationNoteRepository()
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_calibration_service() -> CalibrationService:
     """Get the calibration service instance.
 
