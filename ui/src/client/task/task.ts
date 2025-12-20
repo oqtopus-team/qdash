@@ -32,14 +32,19 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 /**
  * List all tasks.
 
-Args:
-----
-    ctx (ProjectContext): The project context with user and project information.
-    backend (Optional[str]): Optional backend name to filter tasks by.
+Parameters
+----------
+ctx : ProjectContext
+    The project context with user and project information.
+task_repo : MongoTaskDefinitionRepository
+    Repository for task definition operations.
+backend : str | None
+    Optional backend name to filter tasks by.
 
-Returns:
+Returns
 -------
-    list[TaskResponse]: The list of tasks.
+ListTaskResponse
+    The list of tasks.
  * @summary List all tasks
  */
 export const listTasks = (
@@ -178,14 +183,17 @@ export function useListTasks<
 /**
  * Get task result by task_id.
 
-Args:
-----
-    task_id: The task ID to search for.
-    ctx: The project context with user and project information.
+Parameters
+----------
+task_id : str
+    The task ID to search for.
+ctx : ProjectContext
+    The project context with user and project information.
 
-Returns:
+Returns
 -------
-    TaskResultResponse: The task result information including figure paths.
+TaskResultResponse
+    The task result information including figure paths.
  * @summary Get task result by task ID
  */
 export const getTaskResult = (

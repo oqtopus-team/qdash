@@ -45,7 +45,7 @@ class MongoTaskResultHistoryRepository:
             The parent execution context
 
         """
-        TaskResultHistoryDocument.create_from_task_result(
+        TaskResultHistoryDocument.upsert_document(
             task=task,
             execution_model=execution_model,
         )

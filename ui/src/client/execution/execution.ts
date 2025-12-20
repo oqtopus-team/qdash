@@ -217,6 +217,8 @@ Parameters
 ----------
 ctx : ProjectContext
     Project context with user and project information
+execution_service : ExecutionService
+    Service for execution operations
 
 Returns
 -------
@@ -377,6 +379,8 @@ Parameters
 ----------
 ctx : ProjectContext
     Project context with user and project information
+execution_service : ExecutionService
+    Service for execution operations
 chip_id : str
     ID of the chip to fetch executions for
 skip : int
@@ -532,6 +536,8 @@ execution_id : str
     ID of the execution to fetch
 ctx : ProjectContext
     Project context with user and project information
+execution_service : ExecutionService
+    Service for execution operations
 
 Returns
 -------
