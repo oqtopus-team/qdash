@@ -63,35 +63,6 @@ services:
       - postgres
     networks:
       - custom_net
-  workflow:
-    build:
-      context: .
-      dockerfile: ./src/qdash/workflow/Dockerfile
-    restart: always
-    env_file:
-      - .env
-    depends_on:
-      - prefect-server
-      - mongo
-    volumes:
-      - ./src/qdash/workflow:/app/qdash/workflow
-      - ./src/qdash/dbmodel:/app/qdash/dbmodel
-      - ./src/qdash/datamodel:/app/qdash/datamodel
-      - ./src/qdash/common:/app/qdash/common
-      - ./src/qdash/config.py:/app/qdash/config.py
-      - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
-      - ${CONFIG_PATH:-./config/qubex}:/app/config/qubex
-    working_dir: /app/qdash/workflow
-    command: python deployment/oqtopus/main.py
-    environment:
-      - BACKEND_URL=http://api:${API_PORT:-5715}
-      - PREFECT_API_URL=http://prefect-server:4200/api
-      - PREFECT_EXPERIMENTAL_ENABLE_EXTRA_RUNNER_ENDPOINTS=True
-      - PREFECT_EXPERIMENTAL_ENABLE_ENHANCED_CANCELLATION=True
-      - PREFECT_RUNNER_SERVER_HOST=127.0.0.1
-      - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
-    networks:
-      - custom_net
   deployment-service:
     build:
       context: .
@@ -101,7 +72,6 @@ services:
       - .env
     depends_on:
       - prefect-server
-      - workflow
     volumes:
       - ./src/qdash/workflow:/app/qdash/workflow
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
