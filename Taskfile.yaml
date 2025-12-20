@@ -100,7 +100,7 @@ tasks:
   lint-mypy:
     desc: Run mypy strict type checking
     cmds:
-      - uv run mypy src/qdash/datamodel src/qdash/dbmodel src/qdash/api src/qdash/workflow
+      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/api src/qdash/workflow
 
   tbls-docs:
     cmds:

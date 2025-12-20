@@ -23,6 +23,7 @@ from qdash.api.schemas.file import (
     SaveFileRequest,
     ValidateFileRequest,
 )
+from qdash.common.paths import QUBEX_CONFIG_BASE
 
 router = APIRouter()
 gunicorn_logger = logging.getLogger("gunicorn.error")
@@ -32,14 +33,8 @@ if __name__ != "main":
 else:
     logger.setLevel(logging.DEBUG)
 
-# Get config path from environment variable
-# In Docker, CONFIG_PATH is mounted to /app/config/qubex
-# In local dev, it's ./config/qubex
-CONFIG_BASE_PATH = Path(os.getenv("CONFIG_PATH", "./config/qubex"))
-
-# If running in Docker (check if /app exists), use absolute path
-if Path("/app").exists() and not CONFIG_BASE_PATH.is_absolute():
-    CONFIG_BASE_PATH = Path("/app") / "config" / "qubex"
+# Use centralized path from common module
+CONFIG_BASE_PATH = QUBEX_CONFIG_BASE
 
 
 def validate_config_path(relative_path: str) -> Path:

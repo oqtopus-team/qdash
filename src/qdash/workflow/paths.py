@@ -1,35 +1,25 @@
 """Path resolution for workflow components.
 
-This module provides centralized path management for workflow-related
-directories and files.
+This module provides path management for workflow-related directories and files.
+Path constants are imported from qdash.common.paths for consistency across
+API and workflow modules.
 
-Container-side paths are defined as constants. Host-side paths should be
-configured via .env and docker-compose.yaml volume mounts.
-
+For host-side path customization, use .env and docker-compose.yaml volume mounts.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-# =============================================================================
-# Container-side path constants
-# =============================================================================
-# These paths are fixed inside the container. To customize where data is stored
-# on the host, configure volume mounts in docker-compose.yaml and .env.
-#
-# Example .env:
-#   CALIB_DATA_PATH=./my-custom-path/calib_data
-#
-# Example docker-compose.yaml:
-#   volumes:
-#     - ${CALIB_DATA_PATH}:/app/calib_data
-
-CALIB_DATA_BASE = Path("/app/calib_data")
-"""Base directory for calibration data storage."""
-
-WORKFLOW_DIR = Path("/app/qdash/workflow")
-"""Working directory for Prefect deployments."""
+# Re-export path constants from common module for backward compatibility
+from qdash.common.paths import (
+    CALIB_DATA_BASE,
+    CALIBTASKS_DIR,
+    SERVICE_DIR,
+    TEMPLATES_DIR,
+    USER_FLOWS_DIR,
+    WORKFLOW_DIR,
+)
 
 
 class PathResolver:

@@ -2,16 +2,19 @@
 
 This module loads topology definitions from YAML configuration files.
 Each topology file contains explicit qubit positions and coupling definitions.
+
+Uses ConfigLoader for unified configuration directory resolution.
 """
 
 from __future__ import annotations
 
-import os
 from functools import lru_cache
 from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, Field
+
+from qdash.api.lib.config_loader import ConfigLoader
 
 
 class QubitPosition(BaseModel):
@@ -55,24 +58,8 @@ TOPOLOGIES_DIR = "topologies"
 
 
 def _get_config_dir() -> Path:
-    """Get the configuration directory path."""
-    # Try multiple possible locations for the config directory
-    possible_paths = [
-        # Docker environment: mounted at /app/config
-        Path("/app/config"),
-        # Local development: relative to project root
-        Path(__file__).parent.parent.parent.parent.parent / "config",
-        # Environment variable override
-        Path(os.getenv("CONFIG_DIR", "")) if os.getenv("CONFIG_DIR") else None,
-    ]
-
-    for path in possible_paths:
-        if path and path.exists():
-            return path
-
-    raise FileNotFoundError(
-        f"Config directory not found. Tried: {[str(p) for p in possible_paths if p]}"
-    )
+    """Get the configuration directory path using ConfigLoader."""
+    return ConfigLoader.get_config_dir()
 
 
 @lru_cache(maxsize=32)

@@ -8,11 +8,15 @@ import pendulum
 from git import Repo
 from git.exc import GitCommandError
 from prefect import get_run_logger, task
+from qdash.common.paths import QUBEX_CONFIG_BASE
+
+# Default source path for calib_note.json (example chip: 64Qv1)
+DEFAULT_CALIB_NOTE_PATH = str(QUBEX_CONFIG_BASE / "64Qv1" / "calibration" / "calib_note.json")
 
 
 @task(task_run_name="Push GitHub")
 def push_github(
-    source_path: str = "/app/config/qubex/64Qv1/calibration/calib_note.json",
+    source_path: str = DEFAULT_CALIB_NOTE_PATH,
     repo_subpath: str = "64Qv1/calibration/calib_note.json",
     commit_message: str = "Update calib_note.json",
     branch: str = "main",

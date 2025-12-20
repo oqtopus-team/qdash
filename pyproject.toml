@@ -24,6 +24,7 @@ packages = [
     "src",
     "src/qdash",
     "src/qdash/api",
+    "src/qdash/common",
     "src/qdash/workflow",
     "src/qdash/dbmodel",
     "src/qdash/datamodel",
@@ -61,6 +62,9 @@ ignore_missing_imports = true
 exclude = ["tools", "scripts"]
 # Disable misc errors (primarily FastAPI untyped decorator warnings)
 disable_error_code = ["misc"]
+# Use explicit package bases to avoid src.qdash vs qdash conflicts
+explicit_package_bases = true
+mypy_path = "src"
 
 
 [tool.pytest.ini_options]

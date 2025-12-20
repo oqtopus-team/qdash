@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Any
@@ -24,6 +23,7 @@ from qdash.api.schemas.task_file import (
     TaskFileTreeNode,
     TaskInfo,
 )
+from qdash.common.paths import CALIBTASKS_DIR
 
 router = APIRouter()
 gunicorn_logger = logging.getLogger("gunicorn.error")
@@ -33,14 +33,8 @@ if __name__ != "main":
 else:
     logger.setLevel(logging.DEBUG)
 
-# Get calibtasks path from environment variable or use default
-# In Docker, this path is typically /app/src/qdash/workflow/calibtasks
-# In local dev, it's ./src/qdash/workflow/calibtasks
-CALIBTASKS_BASE_PATH = Path(os.getenv("CALIBTASKS_PATH", "./src/qdash/workflow/calibtasks"))
-
-# If running in Docker (check if /app exists), use absolute path
-if Path("/app").exists() and not CALIBTASKS_BASE_PATH.is_absolute():
-    CALIBTASKS_BASE_PATH = Path("/app") / "src" / "qdash" / "workflow" / "calibtasks"
+# Use centralized path from common module
+CALIBTASKS_BASE_PATH = CALIBTASKS_DIR
 
 # Cache for task metadata: {backend: (mtime_sum, tasks)}
 # Cache is invalidated when sum of file modification times changes

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from qdash.common.paths import CONFIG_DIR
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -63,10 +64,10 @@ class ConfigLoader:
 
     """
 
-    # Container path (Docker environment)
-    CONFIG_DIR = Path("/app/config")
+    # Container path (Docker environment) - imported from common.paths
+    _CONFIG_DIR: Path = CONFIG_DIR
     # Local development path (relative to project root)
-    LOCAL_CONFIG_DIR = Path(__file__).parent.parent.parent.parent.parent / "config"
+    LOCAL_CONFIG_DIR: Path = Path(__file__).parent.parent.parent.parent.parent / "config"
 
     @classmethod
     def get_config_dir(cls) -> Path:
@@ -79,8 +80,8 @@ class ConfigLoader:
             Uses /app/config in Docker, or config/ in local development.
 
         """
-        if cls.CONFIG_DIR.exists():
-            return cls.CONFIG_DIR
+        if cls._CONFIG_DIR.exists():
+            return cls._CONFIG_DIR
         return cls.LOCAL_CONFIG_DIR
 
     @classmethod
