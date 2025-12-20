@@ -98,6 +98,7 @@ api = [
     "plotly>=5.18.0",  # For chart generation
     "kaleido>=0.2.1",  # For Plotly image export
     "pillow>=10.0.0",  # For image processing
+    "croniter>=6.0.0",  # For cron schedule parsing
 ]
 workflow = [
     "pymongo==4.8.0",
@@ -111,6 +112,7 @@ workflow = [
     "filelock>=3.17.0",
     "gitpython>=3.1.44",
     "reportlab>=4.4.1",
+    "ruamel.yaml>=0.18.0",
 ]
 dev = [
     "ruff==0.5.5",
@@ -119,12 +121,14 @@ dev = [
     "pytest-env==1.1.3",
     "pytest-mypy==0.10.3",
     "pytest-asyncio==0.24.0",
-    "typer==0.14.0",
+    "pytest-mock==3.14.1",
+    "mongomock==4.1.2",
     "go-task-bin>=3.41.0",
     "types-pyyaml>=6.0.12.20250809",
     "types-python-dateutil>=2.9.0.20250809",
     "types-croniter>=6.0.0.20250809",
     "types-requests>=2.32.0.20250809",
+    "setuptools>=80.9.0",
 ]
 [tool.uv.sources]
 qubex = { git = "https://github.com/amachino/qubex.git", branch = "chore/chevron-fig" }

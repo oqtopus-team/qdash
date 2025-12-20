@@ -220,7 +220,9 @@ class TestCalibServiceInitialization:
         assert session.execution_service is not None
         assert session.backend is not None
 
-    def test_flow_session_default_tags(self, mock_flow_session_deps, mock_lock_repo, mock_user_repo):
+    def test_flow_session_default_tags(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
+    ):
         """Test that default tags are set correctly."""
         session = CalibService(
             username="test_user",
@@ -258,7 +260,9 @@ class TestCalibServiceParameterManagement:
         freq = session.get_parameter("0", "qubit_frequency")
         assert freq == 5.0
 
-    def test_get_nonexistent_parameter(self, mock_flow_session_deps, mock_lock_repo, mock_user_repo):
+    def test_get_nonexistent_parameter(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
+    ):
         """Test getting a parameter that doesn't exist."""
         session = CalibService(
             username="test_user",

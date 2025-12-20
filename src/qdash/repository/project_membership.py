@@ -22,7 +22,7 @@ class MongoProjectMembershipRepository:
         Returns:
             ProjectMembershipDocument if found, None otherwise
         """
-        return ProjectMembershipDocument.get_active_membership(project_id, username)
+        return ProjectMembershipDocument.get_active_membership(project_id, username)  # type: ignore[no-any-return]
 
     def find_one(self, query: dict[str, Any]) -> ProjectMembershipDocument | None:
         """Find a single membership document by query.

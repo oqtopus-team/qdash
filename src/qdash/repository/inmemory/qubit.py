@@ -30,9 +30,9 @@ class InMemoryQubitCalibrationRepository:
         """Initialize with empty storage."""
         self._qubits: dict[str, QubitModel] = {}
 
-    def _make_key(self, username: str, qid: str, chip_id: str) -> str:
+    def _make_key(self, username: str, qid: str, chip_id: str | None) -> str:
         """Create storage key from identifiers."""
-        return f"{username}:{chip_id}:{qid}"
+        return f"{username}:{chip_id or 'default'}:{qid}"
 
     def update_calib_data(
         self,

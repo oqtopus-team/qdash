@@ -1,13 +1,13 @@
 from pathlib import Path
 
 from qdash.workflow.worker.flows.push_props.formatter import represent_float, represent_none
-from ruamel import yaml
+from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
 
-def create_yaml_loader(style: str = "rt") -> yaml.YAML:
+def create_yaml_loader(style: str = "rt") -> YAML:
     """Create a YAML loader with specific configurations."""
-    y = yaml.YAML(typ=style)
+    y = YAML(typ=style)
     y.preserve_quotes = True
     y.width = None
     y.indent(mapping=2, sequence=4, offset=2)
@@ -17,7 +17,7 @@ def create_yaml_loader(style: str = "rt") -> yaml.YAML:
     return y
 
 
-def add_custom_yaml_representers(yaml_obj: yaml.YAML) -> None:
+def add_custom_yaml_representers(yaml_obj: YAML) -> None:
     """Add custom representers for YAML serialization."""
     yaml_obj.representer.add_representer(type(None), represent_none)
     yaml_obj.representer.add_representer(float, represent_float)

@@ -5,22 +5,25 @@ on:
     branches: [main, develop]
     paths:
       - "ui/**"
+      - "Taskfile.yaml"
       - ".github/workflows/frontend-ci.yml"
   pull_request:
     branches: [main, develop]
     paths:
       - "ui/**"
+      - "Taskfile.yaml"
       - ".github/workflows/frontend-ci.yml"
 
 jobs:
-  frontend-lint:
+  lint:
+    name: Lint & Format
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
@@ -33,5 +36,30 @@ jobs:
         working-directory: ./ui
         run: bun install
 
-      - name: Run UI linting
-        run: task lint-ui
+      - name: Run lint check
+        run: task ci-ui
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Go Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+
+      - name: Install dependencies
+        working-directory: ./ui
+        run: bun install
+
+      - name: Build
+        run: task ci-ui-build

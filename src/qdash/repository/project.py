@@ -19,7 +19,7 @@ class MongoProjectRepository:
         Returns:
             ProjectDocument if found, None otherwise
         """
-        return ProjectDocument.find_by_id(project_id)
+        return ProjectDocument.find_by_id(project_id)  # type: ignore[no-any-return]
 
     def find_one(self, query: dict[str, Any]) -> ProjectDocument | None:
         """Find a single project document by query.
