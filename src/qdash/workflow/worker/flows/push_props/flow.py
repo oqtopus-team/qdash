@@ -1,4 +1,6 @@
 from prefect import flow
+
+from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.worker.flows.push_props.create_props import create_chip_properties
 from qdash.workflow.worker.tasks.push_github import push_github
 
@@ -26,7 +28,7 @@ def push_props(
         str: Commit SHA
 
     """
-    source_path = f"/app/config/qubex/{chip_id}/params/props.yaml"
+    source_path = str(get_qubex_paths().props_yaml(chip_id))
     repo_subpath = f"{chip_id}/params/props.yaml"
     create_chip_properties(
         username=username, source_path=source_path, target_path=source_path, chip_id=chip_id

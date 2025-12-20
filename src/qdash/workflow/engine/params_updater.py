@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from filelock import FileLock
+
 from qdash.datamodel.task import OutputParameterModel
+from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.worker.flows.push_props.formatter import represent_none
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
@@ -118,7 +120,7 @@ class _QubexParamsUpdater:
             return None
 
         for candidate in (
-            Path(f"/app/config/qubex/{chip_id}/params"),
+            get_qubex_paths().params_dir(chip_id),
             Path("config") / "qubex" / chip_id / "params",
         ):
             if candidate.exists():

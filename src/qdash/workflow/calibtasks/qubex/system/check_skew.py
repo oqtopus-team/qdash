@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import yaml
+
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -9,6 +10,7 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qubecalib.instrument.quel.quel1.tool.skew import Skew
 
 
@@ -42,8 +44,9 @@ class CheckSkew(QubexTask):
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:  # noqa: ARG002
         chip_id = backend.config.get("chip_id", None)
-        skew_file_path = f"/app/config/qubex/{chip_id}/config/skew.yaml"
-        box_file_path = f"/app/config/qubex/{chip_id}/config/box.yaml"
+        qubex_paths = get_qubex_paths()
+        skew_file_path = str(qubex_paths.skew_yaml(chip_id))
+        box_file_path = str(qubex_paths.box_yaml(chip_id))
         skew_config = self.load(skew_file_path)
         for k, v in skew_config["box_setting"].items():
             print(f"Box {k} setting: {v}")
@@ -56,8 +59,8 @@ class CheckSkew(QubexTask):
         exp = Experiment(
             chip_id=chip_id,
             muxes=self.input_parameters["muxes"].get_value(),
-            config_dir=f"/app/config/qubex/{chip_id}/config",
-            params_dir=f"/app/config/qubex/{chip_id}/params",
+            config_dir=str(qubex_paths.config_dir(chip_id)),
+            params_dir=str(qubex_paths.params_dir(chip_id)),
         )
         clock_master_address = (
             exp.system_manager.experiment_system.control_system.clock_master_address

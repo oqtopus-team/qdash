@@ -6,6 +6,7 @@ from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.datamodel.task import TaskTypes
 from qdash.workflow._internal.merge_notes import merge_notes_by_timestamp
 from qdash.workflow.engine.backend.base import BaseBackend
+from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.repository.protocols import CalibrationNoteRepository
@@ -78,14 +79,19 @@ class QubexBackend(BaseBackend):
                 qubits = []
 
             chip_id = self._config.get("chip_id", "64Q")
+            qubex_paths = get_qubex_paths()
+            classifier_dir = self._config.get("classifier_dir")
+            if classifier_dir is None:
+                msg = "classifier_dir must be provided in config"
+                raise ValueError(msg)
             self._exp = Experiment(
                 chip_id=chip_id,
                 qubits=qubits,
                 muxes=self._config.get("muxes", None),
-                config_dir=self._config.get("config_dir", f"/app/config/qubex/{chip_id}/config"),
-                params_dir=self._config.get("params_dir", f"/app/config/qubex/{chip_id}/params"),
-                classifier_dir=self._config.get("classifier_dir", "/app/.classifier"),
-                calib_note_path=self._config.get("note_path", "/app/calib_note.json"),
+                config_dir=self._config.get("config_dir", str(qubex_paths.config_dir(chip_id))),
+                params_dir=self._config.get("params_dir", str(qubex_paths.params_dir(chip_id))),
+                classifier_dir=classifier_dir,
+                calib_note_path=self._config.get("note_path", str(qubex_paths.default_calib_note_path)),
             )
             self._exp.connect()
 

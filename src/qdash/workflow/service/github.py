@@ -16,6 +16,8 @@ from typing import Any
 from prefect import get_run_logger
 from pydantic import BaseModel, Field
 
+from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+
 
 class ConfigFileType(Enum):
     """Configuration file types that can be pushed to GitHub.
@@ -123,7 +125,7 @@ class GitHubIntegration:
         required = ["GITHUB_USER", "GITHUB_TOKEN", "CONFIG_REPO_URL"]
         return all(os.getenv(var) for var in required)
 
-    def pull_config(self, target_dir: str = "/app/config/qubex") -> str | None:
+    def pull_config(self, target_dir: str | None = None) -> str | None:
         """Pull latest configuration from GitHub repository.
 
         This method uses the existing pull_github task to fetch the latest
@@ -131,7 +133,8 @@ class GitHubIntegration:
         configuration is automatically created.
 
         Args:
-            target_dir: Directory where config files will be updated
+            target_dir: Directory where config files will be updated.
+                If None, uses the default Qubex config base path.
 
         Returns:
             Commit SHA of the pulled configuration, or None if pull failed
@@ -143,6 +146,9 @@ class GitHubIntegration:
                 print(f"Updated to commit: {commit_id}")
             ```
         """
+        if target_dir is None:
+            target_dir = str(get_qubex_paths().config_base)
+
         try:
             from qdash.workflow.worker.tasks.pull_github import pull_github
 
@@ -206,7 +212,7 @@ class GitHubIntegration:
 
         This method:
         1. Fetches the master calibration note from MongoDB (task_id="master")
-        2. Writes it to /app/config/qubex/{chip_id}/calibration/calib_note.json
+        2. Writes it to the chip's calibration directory (calib_note.json)
         3. Pushes to GitHub
 
         Args:
@@ -236,11 +242,12 @@ class GitHubIntegration:
 
         master_note = latest_note.note
 
-        # 2. Write to /app/config/qubex/{chip_id}/calibration/calib_note.json
-        calib_note_dir = f"/app/config/qubex/{self.chip_id}/calibration"
-        Path(calib_note_dir).mkdir(parents=True, exist_ok=True)
+        # 2. Write to calibration/calib_note.json
+        qubex_paths = get_qubex_paths()
+        calib_note_path = qubex_paths.calib_note_json(self.chip_id)
+        calib_note_path.parent.mkdir(parents=True, exist_ok=True)
 
-        source_path = f"{calib_note_dir}/calib_note.json"
+        source_path = str(calib_note_path)
         with Path(source_path).open("w", encoding="utf-8") as f:
             json.dump(master_note, f, indent=4, ensure_ascii=False, sort_keys=True)
 
@@ -280,7 +287,7 @@ class GitHubIntegration:
         from qdash.workflow.worker.flows.push_props.create_props import create_chip_properties
         from qdash.workflow.worker.tasks.push_github import push_github
 
-        source_path = f"/app/config/qubex/{self.chip_id}/params/props.yaml"
+        source_path = str(get_qubex_paths().props_yaml(self.chip_id))
         repo_subpath = f"{self.chip_id}/params/props.yaml"
 
         # Use existing implementation to generate/merge props.yaml from ChipDocument
@@ -319,7 +326,7 @@ class GitHubIntegration:
         """
         from qdash.workflow.worker.tasks.push_github import push_github
 
-        source_path = f"/app/config/qubex/{self.chip_id}/params/params.yaml"
+        source_path = str(get_qubex_paths().params_yaml(self.chip_id))
         repo_subpath = f"{self.chip_id}/params/params.yaml"
 
         if not Path(source_path).exists():
@@ -351,7 +358,7 @@ class GitHubIntegration:
         """
         from qdash.workflow.worker.tasks.push_github import push_github_batch
 
-        params_dir = Path(f"/app/config/qubex/{self.chip_id}/params")
+        params_dir = get_qubex_paths().params_dir(self.chip_id)
 
         if not params_dir.exists():
             self.logger.warning(f"Params directory not found: {params_dir}")

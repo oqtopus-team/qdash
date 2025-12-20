@@ -53,6 +53,8 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
+from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+
 if TYPE_CHECKING:
     from qdash.workflow.engine.scheduler.one_qubit_plugins import (
         MuxOrderingStrategy,
@@ -264,7 +266,7 @@ class OneQubitScheduler:
         Args:
             chip_id: Chip ID (e.g., "64Qv3", "144Qv2")
             wiring_config_path: Path to wiring.yaml configuration file.
-                If None, uses default path: /workspace/qdash/config/qubex/{chip_id}/config/wiring.yaml
+                If None, uses the default QubexPaths wiring path.
         """
         self.chip_id = chip_id
         self.wiring_config_path = wiring_config_path
@@ -279,9 +281,7 @@ class OneQubitScheduler:
             if self.wiring_config_path is not None:
                 wiring_path = Path(self.wiring_config_path)
             else:
-                wiring_path = Path(
-                    f"/workspace/qdash/config/qubex/{self.chip_id}/config/wiring.yaml"
-                )
+                wiring_path = get_qubex_paths().wiring_yaml(self.chip_id)
 
             if not wiring_path.exists():
                 msg = f"Wiring config not found: {wiring_path}"
