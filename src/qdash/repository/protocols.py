@@ -1,7 +1,12 @@
-"""Repository layer protocols for calibration workflows.
+"""Repository layer protocols for QDash.
 
 This module defines abstract interfaces (protocols) for data access operations
-in calibration workflows.
+used by both API and workflow components.
+
+The protocols follow the Repository pattern, providing:
+- Abstraction over data storage (MongoDB, in-memory, etc.)
+- Testability through dependency injection
+- Clear separation between domain logic and data access
 """
 
 from typing import Any, Callable, Protocol, runtime_checkable
@@ -31,23 +36,105 @@ class TaskResultHistoryRepository(Protocol):
         """
         ...
 
+    def find_latest_by_chip_and_qids(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        qids: list[str],
+        task_names: list[str],
+    ) -> list[Any]:
+        """Find the latest task results for specified qubits and tasks.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        qids : list[str]
+            List of qubit identifiers
+        task_names : list[str]
+            List of task names to filter
+
+        Returns
+        -------
+        list[Any]
+            List of task result documents, sorted by end_at descending
+
+        """
+        ...
+
 
 @runtime_checkable
 class ChipRepository(Protocol):
     """Protocol for chip data access operations.
 
     This repository provides access to chip data, which contains qubit and coupling
-    calibration parameters. The current chip is the most recently installed chip
-    for a given user.
+    calibration parameters.
 
     Example
     -------
         >>> repo = MongoChipRepository()
-        >>> chip = repo.get_current_chip(username="alice")
-        >>> if chip:
-        ...     print(f"Chip {chip.chip_id} has {len(chip.qubits)} qubits")
+        >>> chips = repo.list_by_project(project_id="proj-1")
+        >>> chip = repo.find_by_id(project_id="proj-1", chip_id="64Qv3")
 
     """
+
+    def list_by_project(self, project_id: str) -> list[ChipModel]:
+        """List all chips in a project.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+
+        Returns
+        -------
+        list[ChipModel]
+            List of chips in the project
+
+        """
+        ...
+
+    def find_by_id(self, project_id: str, chip_id: str) -> ChipModel | None:
+        """Find a chip by project_id and chip_id.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        ChipModel | None
+            The chip if found, None otherwise
+
+        """
+        ...
+
+    def create(self, chip: ChipModel) -> ChipModel:
+        """Create a new chip.
+
+        Parameters
+        ----------
+        chip : ChipModel
+            The chip to create
+
+        Returns
+        -------
+        ChipModel
+            The created chip
+
+        Raises
+        ------
+        ValueError
+            If a chip with the same chip_id already exists in the project
+
+        """
+        ...
 
     def get_current_chip(self, username: str) -> ChipModel | None:
         """Get the most recently installed chip for a user.
@@ -318,7 +405,7 @@ class CalibrationNoteRepository(Protocol):
     def find_latest_master(
         self,
         *,
-        chip_id: str,
+        chip_id: str | None = None,
         project_id: str | None = None,
         username: str | None = None,
     ) -> CalibrationNoteModel | None:
@@ -329,12 +416,33 @@ class CalibrationNoteRepository(Protocol):
 
         Parameters
         ----------
-        chip_id : str
-            The chip identifier (required)
+        chip_id : str, optional
+            The chip identifier
         project_id : str, optional
             The project identifier
         username : str, optional
             The username who created the note
+
+        Returns
+        -------
+        CalibrationNoteModel | None
+            The latest master note or None if not found
+
+        """
+        ...
+
+    def find_latest_master_by_project(
+        self,
+        project_id: str,
+    ) -> CalibrationNoteModel | None:
+        """Find the latest master calibration note for a project.
+
+        Convenience method that finds the latest master note by project_id only.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
 
         Returns
         -------
@@ -570,6 +678,28 @@ class ExecutionCounterRepository(Protocol):
         -------
         int
             The next index (0 on first call, then 1, 2, 3...)
+
+        """
+        ...
+
+    def get_dates_for_chip(
+        self,
+        project_id: str,
+        chip_id: str,
+    ) -> list[str]:
+        """Get all dates with execution records for a chip.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        list[str]
+            List of date strings (e.g., ["20240115", "20240116"])
 
         """
         ...

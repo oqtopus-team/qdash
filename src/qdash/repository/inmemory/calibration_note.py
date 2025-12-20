@@ -95,7 +95,7 @@ class InMemoryCalibrationNoteRepository:
     def find_latest_master(
         self,
         *,
-        chip_id: str,
+        chip_id: str | None = None,
         project_id: str | None = None,
         username: str | None = None,
     ) -> CalibrationNoteModel | None:
@@ -103,8 +103,8 @@ class InMemoryCalibrationNoteRepository:
 
         Parameters
         ----------
-        chip_id : str
-            The chip identifier (required)
+        chip_id : str, optional
+            The chip identifier
         project_id : str, optional
             The project identifier
         username : str, optional
@@ -118,7 +118,7 @@ class InMemoryCalibrationNoteRepository:
         """
         candidates = []
         for note in self._notes.values():
-            if note.chip_id != chip_id:
+            if chip_id is not None and note.chip_id != chip_id:
                 continue
             if note.task_id != "master":
                 continue
@@ -134,6 +134,25 @@ class InMemoryCalibrationNoteRepository:
         # Sort by timestamp descending and return the first
         candidates.sort(key=lambda n: n.timestamp or "", reverse=True)
         return candidates[0]
+
+    def find_latest_master_by_project(
+        self,
+        project_id: str,
+    ) -> CalibrationNoteModel | None:
+        """Find the latest master calibration note for a project.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+
+        Returns
+        -------
+        CalibrationNoteModel | None
+            The latest master note or None if not found
+
+        """
+        return self.find_latest_master(project_id=project_id)
 
     def upsert(self, note: CalibrationNoteModel) -> CalibrationNoteModel:
         """Create or update a calibration note.

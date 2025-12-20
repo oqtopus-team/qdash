@@ -19,10 +19,8 @@ from qdash.workflow.engine.execution.models import ExecutionNote
 from qdash.workflow.engine.execution.state_manager import (
     ExecutionStateManager,
 )
-from qdash.workflow.engine.repository.mongo_execution import (
-    MongoExecutionRepository,
-)
-from qdash.workflow.engine.repository.protocols import ExecutionRepository
+from qdash.repository import MongoExecutionRepository
+from qdash.repository.protocols import ExecutionRepository
 
 initialize()
 

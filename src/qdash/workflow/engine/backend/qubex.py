@@ -9,7 +9,7 @@ from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 if TYPE_CHECKING:
-    from qdash.workflow.engine.repository.protocols import CalibrationNoteRepository
+    from qdash.repository.protocols import CalibrationNoteRepository
 
 
 class QubexBackend(BaseBackend):
@@ -46,7 +46,7 @@ class QubexBackend(BaseBackend):
     def calibration_note_repo(self) -> "CalibrationNoteRepository":
         """Get the calibration note repository, creating default if needed."""
         if self._calibration_note_repo is None:
-            from qdash.workflow.engine.repository import MongoCalibrationNoteRepository
+            from qdash.repository import MongoCalibrationNoteRepository
 
             self._calibration_note_repo = MongoCalibrationNoteRepository()
         return self._calibration_note_repo

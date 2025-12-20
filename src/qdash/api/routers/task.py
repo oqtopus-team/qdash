@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from qdash.api.lib.project import ProjectContext, get_project_context
@@ -13,14 +13,17 @@ from qdash.api.schemas.task import (
     TaskResponse,
     TaskResultResponse,
 )
-from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.repository.task_definition import MongoTaskDefinitionRepository
 
 router = APIRouter()
 
-# ロガーの設定
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+
+
+def get_task_definition_repository() -> MongoTaskDefinitionRepository:
+    """Get task definition repository instance."""
+    return MongoTaskDefinitionRepository()
 
 
 @router.get(
@@ -31,42 +34,41 @@ logger.setLevel(logging.DEBUG)
 )
 def list_tasks(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    task_repo: Annotated[MongoTaskDefinitionRepository, Depends(get_task_definition_repository)],
     backend: str | None = Query(None, description="Optional backend name to filter tasks by"),
 ) -> ListTaskResponse:
     """List all tasks.
 
-    Args:
-    ----
-        ctx (ProjectContext): The project context with user and project information.
-        backend (Optional[str]): Optional backend name to filter tasks by.
+    Parameters
+    ----------
+    ctx : ProjectContext
+        The project context with user and project information.
+    task_repo : MongoTaskDefinitionRepository
+        Repository for task definition operations.
+    backend : str | None
+        Optional backend name to filter tasks by.
 
-    Returns:
+    Returns
     -------
-        list[TaskResponse]: The list of tasks.
+    ListTaskResponse
+        The list of tasks.
 
     """
-    # Build query with project_id filter
-    query: dict[str, Any] = {"project_id": ctx.project_id}
-
-    # Add backend filter if specified
-    if backend:
-        query["backend"] = backend
-
-    tasks = TaskDocument.find(query).run()
+    tasks = task_repo.list_by_project(ctx.project_id, backend=backend)
     return ListTaskResponse(
         tasks=[
             TaskResponse(
-                name=task.name,
-                description=task.description,
-                task_type=task.task_type,
-                backend=task.backend,
+                name=task["name"],
+                description=task["description"],
+                task_type=task["task_type"],
+                backend=task["backend"],
                 input_parameters={
                     name: InputParameterModel(**param)
-                    for name, param in task.input_parameters.items()
+                    for name, param in task["input_parameters"].items()
                 },
                 output_parameters={
                     name: InputParameterModel(**param)
-                    for name, param in task.output_parameters.items()
+                    for name, param in task["output_parameters"].items()
                 },
             )
             for task in tasks
@@ -86,17 +88,22 @@ def get_task_result(
 ) -> TaskResultResponse:
     """Get task result by task_id.
 
-    Args:
-    ----
-        task_id: The task ID to search for.
-        ctx: The project context with user and project information.
+    Parameters
+    ----------
+    task_id : str
+        The task ID to search for.
+    ctx : ProjectContext
+        The project context with user and project information.
 
-    Returns:
+    Returns
     -------
-        TaskResultResponse: The task result information including figure paths.
+    TaskResultResponse
+        The task result information including figure paths.
 
     """
     # Find task result by task_id (scoped to project)
+    # Note: This still uses TaskResultHistoryDocument directly as
+    # the find_one operation is specific to this use case
     task_result = TaskResultHistoryDocument.find_one(
         {"project_id": ctx.project_id, "task_id": task_id}
     ).run()

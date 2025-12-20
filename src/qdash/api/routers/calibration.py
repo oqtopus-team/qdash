@@ -1,41 +1,16 @@
 """Calibration router for QDash API."""
 
-from datetime import datetime
 from logging import getLogger
 from typing import Annotated
 
-import dateutil.tz
-import pendulum
-from bunnet import SortDirection
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from qdash.api.dependencies import get_calibration_service
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.calibration import CalibrationNoteResponse
-from qdash.dbmodel.calibration_note import CalibrationNoteDocument
-from qdash.dbmodel.execution_counter import ExecutionCounterDocument
+from qdash.api.services.calibration_service import CalibrationService
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
-
-
-def generate_execution_id(username: str, chip_id: str, project_id: str | None = None) -> str:
-    """Generate a unique execution ID based on the current date and an execution index. e.g. 20220101-001.
-
-    Args:
-    ----
-        username: The username to generate the execution ID for
-        chip_id: The chip ID to generate the execution ID for
-        project_id: The project ID for multi-tenancy
-
-    Returns:
-    -------
-        str: The generated execution ID.
-
-    """
-    date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
-    execution_index = ExecutionCounterDocument.get_next_index(
-        date_str, username, chip_id, project_id
-    )
-    return f"{date_str}-{execution_index:03d}"
 
 
 @router.get(
@@ -46,6 +21,7 @@ def generate_execution_id(username: str, chip_id: str, project_id: str | None = 
 )
 def get_calibration_note(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    calibration_service: Annotated[CalibrationService, Depends(get_calibration_service)],
 ) -> CalibrationNoteResponse:
     """Get the latest calibration note for the master task.
 
@@ -57,6 +33,8 @@ def get_calibration_note(
     ----------
     ctx : ProjectContext
         Project context with user and project information
+    calibration_service : CalibrationService
+        Service for calibration operations
 
     Returns
     -------
@@ -64,22 +42,14 @@ def get_calibration_note(
         The latest calibration note containing username, execution_id, task_id,
         note content, and timestamp
 
+    Raises
+    ------
+    HTTPException
+        404 if no calibration note is found
+
     """
     logger.info(f"project: {ctx.project_id}, user: {ctx.user.username}")
-    latest = (
-        CalibrationNoteDocument.find({"project_id": ctx.project_id, "task_id": "master"})
-        .sort([("timestamp", SortDirection.DESCENDING)])  # 更新時刻で降順ソート
-        .limit(1)
-        .run()
-    )[0]
-    return CalibrationNoteResponse(
-        username=latest.username,
-        execution_id=latest.execution_id,
-        task_id=latest.task_id,
-        note=latest.note,
-        timestamp=latest.timestamp,
-    )
-
-
-ja = dateutil.tz.gettz("Asia/Tokyo")
-local_date = datetime.now(tz=ja)
+    note = calibration_service.get_latest_note(ctx.project_id)
+    if note is None:
+        raise HTTPException(status_code=404, detail="Calibration note not found")
+    return note

@@ -20,7 +20,8 @@ from qdash.api.schemas.metrics import (
     QubitMetrics,
 )
 from qdash.dbmodel.chip import ChipDocument
-from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.repository.chip import MongoChipRepository
+from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -233,11 +234,8 @@ def _extract_best_metrics(
 
     # Query task results that have at least one of the target metrics
     try:
-        task_results = (
-            TaskResultHistoryDocument.find(query)
-            .sort([("start_at", SortDirection.DESCENDING)])
-            .to_list()
-        )
+        task_result_repo = MongoTaskResultHistoryRepository()
+        task_results = task_result_repo.find(query, sort=[("start_at", SortDirection.DESCENDING)])
     except Exception as e:
         logger.error(f"Failed to query task result history: {e}")
         raise HTTPException(status_code=500, detail=f"Database query failed: {e}") from e
@@ -447,7 +445,8 @@ async def get_chip_metrics(
 
     """
     # Get chip document from database (scoped by project)
-    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
+    chip_repo = MongoChipRepository()
+    chip = chip_repo.find_one_document({"project_id": ctx.project_id, "chip_id": chip_id})
 
     if not chip:
         raise HTTPException(
@@ -524,13 +523,10 @@ async def get_qubit_metric_history(
     if cutoff_time:
         query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
 
-    results_query = TaskResultHistoryDocument.find(query).sort(
-        [("start_at", SortDirection.DESCENDING)]
+    task_result_repo = MongoTaskResultHistoryRepository()
+    task_results = task_result_repo.find(
+        query, sort=[("start_at", SortDirection.DESCENDING)], limit=limit
     )
-    if limit is not None:
-        results_query = results_query.limit(limit)
-
-    task_results = results_query.run()
 
     history_items: list[MetricHistoryItem] = []
 
@@ -624,13 +620,10 @@ async def get_coupling_metric_history(
     if cutoff_time:
         query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
 
-    results_query = TaskResultHistoryDocument.find(query).sort(
-        [("start_at", SortDirection.DESCENDING)]
+    task_result_repo = MongoTaskResultHistoryRepository()
+    task_results = task_result_repo.find(
+        query, sort=[("start_at", SortDirection.DESCENDING)], limit=limit
     )
-    if limit is not None:
-        results_query = results_query.limit(limit)
-
-    task_results = results_query.run()
 
     history_items: list[MetricHistoryItem] = []
 
@@ -706,11 +699,14 @@ async def download_metrics_pdf(
     from qdash.api.lib.metrics_pdf import MetricsPDFGenerator
 
     # Get chip document
-    chip = ChipDocument.find_one(
-        ChipDocument.project_id == ctx.project_id,
-        ChipDocument.chip_id == chip_id,
-        ChipDocument.username == ctx.user.username,
-    ).run()
+    chip_repo = MongoChipRepository()
+    chip = chip_repo.find_one_document(
+        {
+            "project_id": ctx.project_id,
+            "chip_id": chip_id,
+            "username": ctx.user.username,
+        }
+    )
 
     if not chip:
         raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")

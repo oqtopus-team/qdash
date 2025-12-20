@@ -1,4 +1,8 @@
-"""Chip router for QDash API."""
+"""Chip router for QDash API.
+
+This module provides HTTP endpoints for chip-related operations.
+Business logic is delegated to ChipService for better testability.
+"""
 
 from __future__ import annotations
 
@@ -6,13 +10,14 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from bunnet import SortDirection
+
+from qdash.api.dependencies import get_chip_service
+from qdash.api.lib.config_loader import ConfigLoader
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
     get_project_context_owner,
 )
-from qdash.api.lib.config_loader import ConfigLoader
 from qdash.api.routers.task_file import (
     CALIBTASKS_BASE_PATH,
     collect_tasks_from_directory,
@@ -24,12 +29,9 @@ from qdash.api.schemas.chip import (
     ListChipsResponse,
     ListMuxResponse,
     MuxDetailResponse,
-    MuxTask,
 )
 from qdash.api.services.chip_initializer import ChipInitializer
-from qdash.dbmodel.chip import ChipDocument
-from qdash.dbmodel.execution_counter import ExecutionCounterDocument
-from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.api.services.chip_service import ChipService
 
 router = APIRouter()
 
@@ -47,6 +49,7 @@ logger.setLevel(logging.DEBUG)
 )
 def list_chips(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
 ) -> ListChipsResponse:
     """List all chips in the current project.
 
@@ -54,6 +57,8 @@ def list_chips(
     ----------
     ctx : ProjectContext
         Project context with user and project information
+    chip_service : ChipService
+        Service for chip operations
 
     Returns
     -------
@@ -62,20 +67,8 @@ def list_chips(
 
     """
     logger.debug(f"Listing chips for project: {ctx.project_id}")
-    chips = ChipDocument.find({"project_id": ctx.project_id}).run()
-    return ListChipsResponse(
-        chips=[
-            ChipResponse(
-                chip_id=chip.chip_id,
-                size=chip.size,
-                topology_id=chip.topology_id,
-                qubits=chip.qubits,
-                couplings=chip.couplings,
-                installed_at=chip.installed_at,
-            )
-            for chip in chips
-        ]
-    )
+    chips = chip_service.list_chips(ctx.project_id)
+    return ListChipsResponse(chips=chips)
 
 
 @router.post(
@@ -143,6 +136,7 @@ def create_chip(
 def get_chip_dates(
     chip_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
 ) -> ChipDatesResponse:
     """Fetch available dates for a chip from execution counter.
 
@@ -152,6 +146,8 @@ def get_chip_dates(
         ID of the chip
     ctx : ProjectContext
         Project context with user and project information
+    chip_service : ChipService
+        Service for chip operations
 
     Returns
     -------
@@ -160,16 +156,7 @@ def get_chip_dates(
 
     """
     logger.debug(f"Fetching dates for chip {chip_id}, project: {ctx.project_id}")
-    counter_list = ExecutionCounterDocument.find(
-        {"project_id": ctx.project_id, "chip_id": chip_id}
-    ).run()
-    if not counter_list:
-        # Return empty list for newly created chips with no execution history
-        logger.debug(f"No execution counter found for chip {chip_id}, returning empty dates list")
-        return ChipDatesResponse(data=[])
-    # Extract unique dates from the counter
-    dates = [counter.date for counter in counter_list]
-    # Return dates in a format matching the API schema
+    dates = chip_service.get_chip_dates(ctx.project_id, chip_id)
     return ChipDatesResponse(data=dates)
 
 
@@ -179,6 +166,7 @@ def get_chip_dates(
 def get_chip(
     chip_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
 ) -> ChipResponse:
     """Get a chip by its ID.
 
@@ -188,6 +176,8 @@ def get_chip(
         ID of the chip to fetch
     ctx : ProjectContext
         Project context with user and project information
+    chip_service : ChipService
+        Service for chip operations
 
     Returns
     -------
@@ -202,18 +192,11 @@ def get_chip(
     """
     logger.debug(f"Fetching chip {chip_id} for project: {ctx.project_id}")
 
-    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
+    chip = chip_service.get_chip(ctx.project_id, chip_id)
     if chip is None:
         raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
 
-    return ChipResponse(
-        chip_id=chip.chip_id,
-        size=chip.size,
-        topology_id=chip.topology_id,
-        qubits=chip.qubits,
-        couplings=chip.couplings,
-        installed_at=chip.installed_at,
-    )
+    return chip
 
 
 # =============================================================================
@@ -249,46 +232,6 @@ def _get_task_names_from_files() -> list[str]:
     return [task.name for task in tasks]
 
 
-def _build_mux_detail(
-    mux_id: int,
-    task_names: list[str],
-    task_results: dict[str, dict[str, TaskResultHistoryDocument]],
-) -> MuxDetailResponse:
-    """Build MuxDetailResponse from task results."""
-    qids = [str(mux_id * 4 + i) for i in range(4)]
-    detail: dict[str, dict[str, MuxTask]] = {}
-
-    for qid in qids:
-        detail[qid] = {}
-        qid_results = task_results.get(qid, {})
-
-        for task_name in task_names:
-            result = qid_results.get(task_name)
-            if result is None:
-                task_result = MuxTask(name=task_name)
-            else:
-                task_result = MuxTask(
-                    task_id=result.task_id,
-                    name=result.name,
-                    status=result.status,
-                    message=result.message,
-                    input_parameters=result.input_parameters,
-                    output_parameters=result.output_parameters,
-                    output_parameter_names=result.output_parameter_names,
-                    note=result.note,
-                    figure_path=result.figure_path,
-                    json_figure_path=result.json_figure_path,
-                    raw_data_path=result.raw_data_path,
-                    start_at=result.start_at,
-                    end_at=result.end_at,
-                    elapsed_time=result.elapsed_time,
-                    task_type=result.task_type,
-                )
-            detail[qid][task_name] = task_result
-
-    return MuxDetailResponse(mux_id=mux_id, detail=detail)
-
-
 @router.get(
     "/chips/{chip_id}/muxes/{mux_id}",
     response_model=MuxDetailResponse,
@@ -299,6 +242,7 @@ def get_chip_mux(
     chip_id: str,
     mux_id: int,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
 ) -> MuxDetailResponse:
     """Get the multiplexer details.
 
@@ -310,6 +254,8 @@ def get_chip_mux(
         ID of the multiplexer
     ctx : ProjectContext
         Project context with user and project information
+    chip_service : ChipService
+        Service for chip operations
 
     Returns
     -------
@@ -323,32 +269,12 @@ def get_chip_mux(
     task_names = _get_task_names_from_files()
     logger.debug("Task names from files: %s", task_names)
 
-    # Calculate qids for this mux
-    qids = [str(mux_id * 4 + i) for i in range(4)]
-
-    # Fetch all task results in one query
-    all_results = (
-        TaskResultHistoryDocument.find(
-            {
-                "project_id": ctx.project_id,
-                "chip_id": chip_id,
-                "qid": {"$in": qids},
-                "name": {"$in": task_names},
-            }
-        )
-        .sort([("end_at", SortDirection.DESCENDING)])
-        .run()
+    return chip_service.get_mux_detail(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        mux_id=mux_id,
+        task_names=task_names,
     )
-
-    # Organize results by qid and task name
-    task_results: dict[str, dict[str, TaskResultHistoryDocument]] = {}
-    for result in all_results:
-        if result.qid not in task_results:
-            task_results[result.qid] = {}
-        if result.name not in task_results[result.qid]:
-            task_results[result.qid][result.name] = result
-
-    return _build_mux_detail(mux_id, task_names, task_results=task_results)
 
 
 @router.get(
@@ -361,6 +287,7 @@ def get_chip_mux(
 def list_chip_muxes(
     chip_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
 ) -> ListMuxResponse:
     """List all multiplexers for a chip.
 
@@ -370,6 +297,8 @@ def list_chip_muxes(
         ID of the chip
     ctx : ProjectContext
         Project context with user and project information
+    chip_service : ChipService
+        Service for chip operations
 
     Returns
     -------
@@ -380,42 +309,18 @@ def list_chip_muxes(
     # Get task names from task files instead of database
     task_names = _get_task_names_from_files()
 
-    # Get chip info
-    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
-    if chip is None:
+    # Get chip size
+    chip_size = chip_service.get_chip_size(ctx.project_id, chip_id)
+    if chip_size is None:
         raise HTTPException(
             status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}"
         )
 
-    # Calculate mux number
-    mux_num = int(chip.size // 4)
-    qids = [str(i) for i in range(chip.size)]
-
-    # Fetch all task results in one query
-    all_results = (
-        TaskResultHistoryDocument.find(
-            {
-                "project_id": ctx.project_id,
-                "chip_id": chip_id,
-                "qid": {"$in": qids},
-                "name": {"$in": task_names},
-            }
-        )
-        .sort([("end_at", SortDirection.DESCENDING)])
-        .run()
+    muxes = chip_service.get_all_mux_details(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        chip_size=chip_size,
+        task_names=task_names,
     )
-
-    # Organize results by qid and task name
-    task_results: dict[str, dict[str, TaskResultHistoryDocument]] = {}
-    for result in all_results:
-        if result.qid not in task_results:
-            task_results[result.qid] = {}
-        if result.name not in task_results[result.qid]:
-            task_results[result.qid][result.name] = result
-
-    # Build mux details
-    muxes: dict[int, MuxDetailResponse] = {}
-    for mux_id in range(mux_num):
-        muxes[mux_id] = _build_mux_detail(mux_id, task_names, task_results=task_results)
 
     return ListMuxResponse(muxes=muxes)

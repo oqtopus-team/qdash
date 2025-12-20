@@ -7,9 +7,7 @@ import numpy as np
 import plotly.graph_objs as go
 import pytest
 
-from qdash.workflow.engine.repository.filesystem_impl import (
-    FilesystemCalibDataSaver,
-)
+from qdash.repository.filesystem import FilesystemCalibDataSaver
 
 
 class TestFilesystemCalibDataSaver:

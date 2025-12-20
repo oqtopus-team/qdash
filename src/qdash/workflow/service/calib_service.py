@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Sequence
 
 if TYPE_CHECKING:
-    from qdash.workflow.engine.repository.protocols import (
+    from qdash.repository.protocols import (
         ExecutionCounterRepository,
         ExecutionLockRepository,
         UserRepository,
@@ -82,7 +82,7 @@ def generate_execution_id(
 
     """
     if counter_repo is None:
-        from qdash.workflow.engine.repository import MongoExecutionCounterRepository
+        from qdash.repository import MongoExecutionCounterRepository
 
         counter_repo = MongoExecutionCounterRepository()
 
@@ -217,7 +217,7 @@ class CalibService:
         # This works because only owners can run calibrations (1 user = 1 project policy)
         if project_id is None:
             if self._user_repo is None:
-                from qdash.workflow.engine.repository import MongoUserRepository
+                from qdash.repository import MongoUserRepository
 
                 self._user_repo = MongoUserRepository()
 
@@ -293,7 +293,7 @@ class CalibService:
         # Acquire lock if requested
         if self.use_lock:
             if self._lock_repo is None:
-                from qdash.workflow.engine.repository import MongoExecutionLockRepository
+                from qdash.repository import MongoExecutionLockRepository
 
                 self._lock_repo = MongoExecutionLockRepository()
 
@@ -577,7 +577,7 @@ class CalibService:
             # Update chip history for the specific chip being calibrated
             if update_chip_history:
                 try:
-                    from qdash.workflow.engine.repository import (
+                    from qdash.repository import (
                         MongoChipHistoryRepository,
                         MongoChipRepository,
                     )
@@ -601,7 +601,7 @@ class CalibService:
             # Export calibration note to file if requested
             if export_note_to_file:
                 try:
-                    from qdash.workflow.engine.repository import MongoCalibrationNoteRepository
+                    from qdash.repository import MongoCalibrationNoteRepository
 
                     repo = MongoCalibrationNoteRepository()
                     latest_note = repo.find_one(

@@ -21,7 +21,7 @@ from qdash.datamodel.task import (
     TaskStatusModel,
     TaskTypes,
 )
-from qdash.workflow.engine.repository import FilesystemCalibDataSaver
+from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.engine.task.executor import TaskExecutor
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.result_processor import TaskResultProcessor

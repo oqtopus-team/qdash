@@ -226,7 +226,7 @@ class CalibOrchestrator:
         if not self._initialized:
             return
 
-        from qdash.workflow.engine.repository import (
+        from qdash.repository import (
             MongoChipHistoryRepository,
             MongoChipRepository,
         )
@@ -264,7 +264,7 @@ class CalibOrchestrator:
 
     def _export_note_to_file(self, logger: Any) -> None:
         """Export calibration note to a JSON file."""
-        from qdash.workflow.engine.repository import MongoCalibrationNoteRepository
+        from qdash.repository import MongoCalibrationNoteRepository
 
         config = self.config
 

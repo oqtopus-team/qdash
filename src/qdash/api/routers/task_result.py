@@ -9,10 +9,11 @@ from pathlib import Path
 from typing import Annotated
 
 import pendulum
+from bunnet import SortDirection
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import StreamingResponse
 from starlette.exceptions import HTTPException
-from bunnet import SortDirection
+
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.task_result import (
     LatestTaskResultResponse,
@@ -23,9 +24,10 @@ from qdash.api.schemas.task_result import (
 )
 from qdash.api.services.response_processor import response_processor
 from qdash.datamodel.task import OutputParameterModel
-from qdash.dbmodel.chip import ChipDocument
-from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.repository.chip import MongoChipRepository
+from qdash.repository.chip_history import MongoChipHistoryRepository
+from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
 
 router = APIRouter()
 
@@ -83,7 +85,8 @@ def get_latest_qubit_task_results(
     )
 
     # Get chip info (scoped by project)
-    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
+    chip_repo = MongoChipRepository()
+    chip = chip_repo.find_one_document({"project_id": ctx.project_id, "chip_id": chip_id})
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
@@ -94,46 +97,44 @@ def get_latest_qubit_task_results(
         for k, v in chip.qubits.items()
     }
     # Fetch all task results in one query (scoped by project)
-    all_results = (
-        TaskResultHistoryDocument.find(
-            {
-                "project_id": ctx.project_id,
-                "chip_id": chip_id,
-                "name": task,
-                "qid": {"$in": qids},
-            }
-        )
-        .sort([("end_at", SortDirection.DESCENDING)])
-        .run()
+    task_result_repo = MongoTaskResultHistoryRepository()
+    all_results = task_result_repo.find(
+        {
+            "project_id": ctx.project_id,
+            "chip_id": chip_id,
+            "name": task,
+            "qid": {"$in": qids},
+        },
+        sort=[("end_at", SortDirection.DESCENDING)],
     )
 
     # Organize results by qid
     task_results: dict[str, TaskResultHistoryDocument] = {}
     for result in all_results:
-        if result.qid not in task_results:
+        if result.qid is not None and result.qid not in task_results:
             task_results[result.qid] = result
 
     # Build response
     results = {}
     for qid in qids:
-        result = task_results.get(qid)
-        if result is not None:
+        task_result_doc = task_results.get(qid)
+        if task_result_doc is not None:
             task_result = TaskResult(
-                task_id=result.task_id,
-                name=result.name,
-                status=result.status,
-                message=result.message,
-                input_parameters=result.input_parameters,
-                output_parameters=result.output_parameters,
-                output_parameter_names=result.output_parameter_names,
-                note=result.note,
-                figure_path=result.figure_path,
-                json_figure_path=result.json_figure_path,
-                raw_data_path=result.raw_data_path,
-                start_at=result.start_at,
-                end_at=result.end_at,
-                elapsed_time=result.elapsed_time,
-                task_type=result.task_type,
+                task_id=task_result_doc.task_id,
+                name=task_result_doc.name,
+                status=task_result_doc.status,
+                message=task_result_doc.message,
+                input_parameters=task_result_doc.input_parameters,
+                output_parameters=task_result_doc.output_parameters,
+                output_parameter_names=task_result_doc.output_parameter_names,
+                note=task_result_doc.note,
+                figure_path=task_result_doc.figure_path,
+                json_figure_path=task_result_doc.json_figure_path,
+                raw_data_path=task_result_doc.raw_data_path,
+                start_at=task_result_doc.start_at,
+                end_at=task_result_doc.end_at,
+                elapsed_time=task_result_doc.elapsed_time,
+                task_type=task_result_doc.task_type,
                 over_threshold=fidelity_map.get(qid, False),
             )
         else:
@@ -190,9 +191,10 @@ def get_historical_qubit_task_results(
     )
 
     # Get chip info (scoped by project)
-    chip = ChipHistoryDocument.find_one(
+    chip_history_repo = MongoChipHistoryRepository()
+    chip = chip_history_repo.find_one(
         {"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}
-    ).run()
+    )
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
@@ -202,22 +204,20 @@ def get_historical_qubit_task_results(
 
     start_time = parsed_date.start_of("day")
     end_time = parsed_date.end_of("day")
-    all_results = (
-        TaskResultHistoryDocument.find(
-            {
-                "project_id": ctx.project_id,
-                "chip_id": chip_id,
-                "name": task,
-                "qid": {"$in": qids},
-                # Filter tasks executed on the same date in JST
-                "start_at": {
-                    "$gte": start_time.to_iso8601_string(),
-                    "$lt": end_time.to_iso8601_string(),
-                },
-            }
-        )
-        .sort([("end_at", SortDirection.DESCENDING)])
-        .run()
+    task_result_repo = MongoTaskResultHistoryRepository()
+    all_results = task_result_repo.find(
+        {
+            "project_id": ctx.project_id,
+            "chip_id": chip_id,
+            "name": task,
+            "qid": {"$in": qids},
+            # Filter tasks executed on the same date in JST
+            "start_at": {
+                "$gte": start_time.to_iso8601_string(),
+                "$lt": end_time.to_iso8601_string(),
+            },
+        },
+        sort=[("end_at", SortDirection.DESCENDING)],
     )
     fidelity_map = {}
     for k, v in chip.qubits.items():
@@ -239,30 +239,30 @@ def get_historical_qubit_task_results(
     # Organize results by qid
     task_results: dict[str, TaskResultHistoryDocument] = {}
     for result in all_results:
-        if result.qid not in task_results:
+        if result.qid is not None and result.qid not in task_results:
             task_results[result.qid] = result
 
     # Build response
     results = {}
     for qid in qids:
-        result = task_results.get(qid)
-        if result is not None:
+        task_result_doc = task_results.get(qid)
+        if task_result_doc is not None:
             task_result = TaskResult(
-                task_id=result.task_id,
-                name=result.name,
-                status=result.status,
-                message=result.message,
-                input_parameters=result.input_parameters,
-                output_parameters=result.output_parameters,
-                output_parameter_names=result.output_parameter_names,
-                note=result.note,
-                figure_path=result.figure_path,
-                json_figure_path=result.json_figure_path,
-                raw_data_path=result.raw_data_path,
-                start_at=result.start_at,
-                end_at=result.end_at,
-                elapsed_time=result.elapsed_time,
-                task_type=result.task_type,
+                task_id=task_result_doc.task_id,
+                name=task_result_doc.name,
+                status=task_result_doc.status,
+                message=task_result_doc.message,
+                input_parameters=task_result_doc.input_parameters,
+                output_parameters=task_result_doc.output_parameters,
+                output_parameter_names=task_result_doc.output_parameter_names,
+                note=task_result_doc.note,
+                figure_path=task_result_doc.figure_path,
+                json_figure_path=task_result_doc.json_figure_path,
+                raw_data_path=task_result_doc.raw_data_path,
+                start_at=task_result_doc.start_at,
+                end_at=task_result_doc.end_at,
+                elapsed_time=task_result_doc.elapsed_time,
+                task_type=task_result_doc.task_type,
                 over_threshold=fidelity_map.get(qid, False),
             )
         else:
@@ -317,21 +317,20 @@ def get_qubit_task_history(
     logger.debug(f"Getting qubit task history for chip {chip_id}, qid {qid}, task {task}")
 
     # Get chip info (scoped by project)
-    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
+    chip_repo = MongoChipRepository()
+    chip = chip_repo.find_one_document({"project_id": ctx.project_id, "chip_id": chip_id})
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
     # Fetch all task results in one query (scoped by project)
-    all_results = (
-        TaskResultHistoryDocument.find(
-            {
-                "project_id": ctx.project_id,
-                "chip_id": chip_id,
-                "name": task,
-                "qid": qid,
-            }
-        )
-        .sort([("end_at", SortDirection.DESCENDING)])
-        .run()
+    task_result_repo = MongoTaskResultHistoryRepository()
+    all_results = task_result_repo.find(
+        {
+            "project_id": ctx.project_id,
+            "chip_id": chip_id,
+            "name": task,
+            "qid": qid,
+        },
+        sort=[("end_at", SortDirection.DESCENDING)],
     )
 
     # Organize results by task_id
@@ -407,7 +406,8 @@ def get_latest_coupling_task_results(
     )
 
     # Get chip info (scoped by project)
-    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
+    chip_repo = MongoChipRepository()
+    chip = chip_repo.find_one_document({"project_id": ctx.project_id, "chip_id": chip_id})
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
@@ -419,46 +419,44 @@ def get_latest_coupling_task_results(
     }
 
     # Fetch all task results in one query (scoped by project)
-    all_results = (
-        TaskResultHistoryDocument.find(
-            {
-                "project_id": ctx.project_id,
-                "chip_id": chip_id,
-                "name": task,
-                "qid": {"$in": qids},
-            }
-        )
-        .sort([("end_at", SortDirection.DESCENDING)])
-        .run()
+    task_result_repo = MongoTaskResultHistoryRepository()
+    all_results = task_result_repo.find(
+        {
+            "project_id": ctx.project_id,
+            "chip_id": chip_id,
+            "name": task,
+            "qid": {"$in": qids},
+        },
+        sort=[("end_at", SortDirection.DESCENDING)],
     )
 
     # Organize results by qid
     task_results: dict[str, TaskResultHistoryDocument] = {}
     for result in all_results:
-        if result.qid not in task_results:
+        if result.qid is not None and result.qid not in task_results:
             task_results[result.qid] = result
 
     # Build response
     results = {}
     for qid in qids:
-        result = task_results.get(qid)
-        if result is not None:
+        task_result_doc = task_results.get(qid)
+        if task_result_doc is not None:
             task_result = TaskResult(
-                task_id=result.task_id,
-                name=result.name,
-                status=result.status,
-                message=result.message,
-                input_parameters=result.input_parameters,
-                output_parameters=result.output_parameters,
-                output_parameter_names=result.output_parameter_names,
-                note=result.note,
-                figure_path=result.figure_path,
-                json_figure_path=result.json_figure_path,
-                raw_data_path=result.raw_data_path,
-                start_at=result.start_at,
-                end_at=result.end_at,
-                elapsed_time=result.elapsed_time,
-                task_type=result.task_type,
+                task_id=task_result_doc.task_id,
+                name=task_result_doc.name,
+                status=task_result_doc.status,
+                message=task_result_doc.message,
+                input_parameters=task_result_doc.input_parameters,
+                output_parameters=task_result_doc.output_parameters,
+                output_parameter_names=task_result_doc.output_parameter_names,
+                note=task_result_doc.note,
+                figure_path=task_result_doc.figure_path,
+                json_figure_path=task_result_doc.json_figure_path,
+                raw_data_path=task_result_doc.raw_data_path,
+                start_at=task_result_doc.start_at,
+                end_at=task_result_doc.end_at,
+                elapsed_time=task_result_doc.elapsed_time,
+                task_type=task_result_doc.task_type,
                 over_threshold=fidelity_map.get(qid, False),
             )
         else:
@@ -515,9 +513,10 @@ def get_historical_coupling_task_results(
     )
 
     # Get chip info (scoped by project)
-    chip = ChipHistoryDocument.find_one(
+    chip_history_repo = MongoChipHistoryRepository()
+    chip = chip_history_repo.find_one(
         {"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}
-    ).run()
+    )
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
@@ -529,21 +528,19 @@ def get_historical_coupling_task_results(
     start_time = parsed_date.start_of("day")
     end_time = parsed_date.end_of("day")
 
-    all_results = (
-        TaskResultHistoryDocument.find(
-            {
-                "project_id": ctx.project_id,
-                "chip_id": chip_id,
-                "name": task,
-                "qid": {"$in": qids},
-                "start_at": {
-                    "$gte": start_time.to_iso8601_string(),
-                    "$lt": end_time.to_iso8601_string(),
-                },
-            }
-        )
-        .sort([("end_at", SortDirection.DESCENDING)])
-        .run()
+    task_result_repo = MongoTaskResultHistoryRepository()
+    all_results = task_result_repo.find(
+        {
+            "project_id": ctx.project_id,
+            "chip_id": chip_id,
+            "name": task,
+            "qid": {"$in": qids},
+            "start_at": {
+                "$gte": start_time.to_iso8601_string(),
+                "$lt": end_time.to_iso8601_string(),
+            },
+        },
+        sort=[("end_at", SortDirection.DESCENDING)],
     )
 
     fidelity_map = {}
@@ -566,30 +563,30 @@ def get_historical_coupling_task_results(
     # Organize results by qid
     task_results: dict[str, TaskResultHistoryDocument] = {}
     for result in all_results:
-        if result.qid not in task_results:
+        if result.qid is not None and result.qid not in task_results:
             task_results[result.qid] = result
 
     # Build response
     results = {}
     for qid in qids:
-        result = task_results.get(qid)
-        if result is not None:
+        task_result_doc = task_results.get(qid)
+        if task_result_doc is not None:
             task_result = TaskResult(
-                task_id=result.task_id,
-                name=result.name,
-                status=result.status,
-                message=result.message,
-                input_parameters=result.input_parameters,
-                output_parameters=result.output_parameters,
-                output_parameter_names=result.output_parameter_names,
-                note=result.note,
-                figure_path=result.figure_path,
-                json_figure_path=result.json_figure_path,
-                raw_data_path=result.raw_data_path,
-                start_at=result.start_at,
-                end_at=result.end_at,
-                elapsed_time=result.elapsed_time,
-                task_type=result.task_type,
+                task_id=task_result_doc.task_id,
+                name=task_result_doc.name,
+                status=task_result_doc.status,
+                message=task_result_doc.message,
+                input_parameters=task_result_doc.input_parameters,
+                output_parameters=task_result_doc.output_parameters,
+                output_parameter_names=task_result_doc.output_parameter_names,
+                note=task_result_doc.note,
+                figure_path=task_result_doc.figure_path,
+                json_figure_path=task_result_doc.json_figure_path,
+                raw_data_path=task_result_doc.raw_data_path,
+                start_at=task_result_doc.start_at,
+                end_at=task_result_doc.end_at,
+                elapsed_time=task_result_doc.elapsed_time,
+                task_type=task_result_doc.task_type,
                 over_threshold=fidelity_map.get(qid, False),
             )
         else:
@@ -646,22 +643,21 @@ def get_coupling_task_history(
     )
 
     # Get chip info (scoped by project)
-    chip = ChipDocument.find_one({"project_id": ctx.project_id, "chip_id": chip_id}).run()
+    chip_repo = MongoChipRepository()
+    chip = chip_repo.find_one_document({"project_id": ctx.project_id, "chip_id": chip_id})
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
     # Fetch all task results in one query (scoped by project)
-    all_results = (
-        TaskResultHistoryDocument.find(
-            {
-                "project_id": ctx.project_id,
-                "chip_id": chip_id,
-                "name": task,
-                "qid": coupling_id,
-            }
-        )
-        .sort([("end_at", SortDirection.DESCENDING)])
-        .run()
+    task_result_repo = MongoTaskResultHistoryRepository()
+    all_results = task_result_repo.find(
+        {
+            "project_id": ctx.project_id,
+            "chip_id": chip_id,
+            "name": task,
+            "qid": coupling_id,
+        },
+        sort=[("end_at", SortDirection.DESCENDING)],
     )
 
     # Organize results by task_id
@@ -732,19 +728,17 @@ def _fetch_timeseries_data(
         end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
         start_at = pendulum.now(tz="Asia/Tokyo").subtract(days=7).to_iso8601_string()
     # Find all task results for the given tag and parameter (scoped by project)
-    task_results = (
-        TaskResultHistoryDocument.find(
-            {
-                "project_id": project_id,
-                "chip_id": chip_id,
-                "tags": tag,
-                "output_parameter_names": parameter,
-                "start_at": {"$gte": start_at, "$lte": end_at},
-            }
-        )
-        .sort([("start_at", SortDirection.ASCENDING)])
-        .project(TimeSeriesProjection)
-        .run()
+    task_result_repo = MongoTaskResultHistoryRepository()
+    task_results = task_result_repo.find_with_projection(
+        {
+            "project_id": project_id,
+            "chip_id": chip_id,
+            "tags": tag,
+            "output_parameter_names": parameter,
+            "start_at": {"$gte": start_at, "$lte": end_at},
+        },
+        projection_model=TimeSeriesProjection,
+        sort=[("start_at", SortDirection.ASCENDING)],
     )
 
     # Create a dictionary to store time series data for each qid

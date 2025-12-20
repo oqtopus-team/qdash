@@ -81,7 +81,7 @@ def init_db(database: Database[Any] | None = None) -> None:
 
 
 def set_test_client(client: MongoClient[Any], db_name: str = "test_db") -> None:
-    """Set test MongoDB client (for mongomock or testcontainers).
+    """Set test MongoDB client (for mongomock).
 
     Parameters
     ----------

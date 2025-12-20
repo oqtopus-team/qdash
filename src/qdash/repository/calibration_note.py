@@ -1,13 +1,15 @@
 """MongoDB implementation of CalibrationNoteRepository.
 
 This module provides the concrete MongoDB implementation for calibration note
-persistence operations.
+persistence operations. Used by both API and workflow components.
 """
 
 import logging
+from typing import Any
 
 import pendulum
 from bunnet import SortDirection
+
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 
@@ -85,7 +87,7 @@ class MongoCalibrationNoteRepository:
     def find_latest_master(
         self,
         *,
-        chip_id: str,
+        chip_id: str | None = None,
         project_id: str | None = None,
         username: str | None = None,
     ) -> CalibrationNoteModel | None:
@@ -93,8 +95,8 @@ class MongoCalibrationNoteRepository:
 
         Parameters
         ----------
-        chip_id : str
-            The chip identifier (required)
+        chip_id : str, optional
+            The chip identifier
         project_id : str, optional
             The project identifier
         username : str, optional
@@ -106,7 +108,9 @@ class MongoCalibrationNoteRepository:
             The latest master note or None if not found
 
         """
-        query: dict[str, str] = {"chip_id": chip_id, "task_id": "master"}
+        query: dict[str, str] = {"task_id": "master"}
+        if chip_id is not None:
+            query["chip_id"] = chip_id
         if project_id is not None:
             query["project_id"] = project_id
         if username is not None:
@@ -123,6 +127,25 @@ class MongoCalibrationNoteRepository:
             return None
 
         return self._to_model(docs[0])
+
+    def find_latest_master_by_project(
+        self,
+        project_id: str,
+    ) -> CalibrationNoteModel | None:
+        """Find the latest master calibration note for a project.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+
+        Returns
+        -------
+        CalibrationNoteModel | None
+            The latest master note or None if not found
+
+        """
+        return self.find_latest_master(project_id=project_id)
 
     def upsert(self, note: CalibrationNoteModel) -> CalibrationNoteModel:
         """Create or update a calibration note.
