@@ -6,7 +6,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from pymongo import DESCENDING
+from bunnet import SortDirection
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
@@ -336,7 +336,7 @@ def get_chip_mux(
                 "name": {"$in": task_names},
             }
         )
-        .sort([("end_at", DESCENDING)])
+        .sort([("end_at", SortDirection.DESCENDING)])
         .run()
     )
 
@@ -401,7 +401,7 @@ def list_chip_muxes(
                 "name": {"$in": task_names},
             }
         )
-        .sort([("end_at", DESCENDING)])
+        .sort([("end_at", SortDirection.DESCENDING)])
         .run()
     )
 

@@ -46,7 +46,7 @@ class QubitModel(BaseModel):
     project_id: str | None = Field(None, description="Owning project identifier")
     username: None | str = Field(None, description="The username of the user who created the qubit")
     qid: str = Field(..., description="The qubit ID")
-    status: str = Field("pending", description="The status of the qubit")
+    status: str = Field(default="pending", description="The status of the qubit")
     chip_id: str | None = Field(None, description="The chip ID")
     data: dict[str, Any] = Field(..., description="The data of the qubit")
     best_data: dict[str, Any] = Field(

@@ -5,7 +5,7 @@ management, including task creation, status updates, and parameter handling.
 """
 
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, cast
 
 import pendulum
 
@@ -123,13 +123,13 @@ class TaskStateManager(BaseModel):
 
         """
         if task_type == TaskTypes.QUBIT:
-            self.task_result.qubit_tasks[qid].append(task)
+            self.task_result.qubit_tasks[qid].append(cast(QubitTaskModel, task))
         elif task_type == TaskTypes.COUPLING:
-            self.task_result.coupling_tasks[qid].append(task)
+            self.task_result.coupling_tasks[qid].append(cast(CouplingTaskModel, task))
         elif task_type == TaskTypes.GLOBAL:
-            self.task_result.global_tasks.append(task)
+            self.task_result.global_tasks.append(cast(GlobalTaskModel, task))
         elif task_type == TaskTypes.SYSTEM:
-            self.task_result.system_tasks.append(task)
+            self.task_result.system_tasks.append(cast(SystemTaskModel, task))
 
     def _iter_tasks(self, task_type: str, qid: str) -> Iterator[BaseTaskResultModel]:
         """Iterate over tasks in the appropriate container (read-only).
@@ -663,14 +663,14 @@ class TaskStateManager(BaseModel):
                 continue
             # Check in any qubit tasks
             found = False
-            for qid_tasks in self.task_result.qubit_tasks.values():
-                if any(t.name == name for t in qid_tasks):
+            for qubit_tasks in self.task_result.qubit_tasks.values():
+                if any(t.name == name for t in qubit_tasks):
                     found = True
                     break
             if not found:
                 # Check if it's a coupling task
-                for qid_tasks in self.task_result.coupling_tasks.values():
-                    if any(t.name == name for t in qid_tasks):
+                for coupling_tasks in self.task_result.coupling_tasks.values():
+                    if any(t.name == name for t in coupling_tasks):
                         return False
         return True
 
@@ -694,14 +694,14 @@ class TaskStateManager(BaseModel):
                 continue
             # Check in any coupling tasks
             found = False
-            for qid_tasks in self.task_result.coupling_tasks.values():
-                if any(t.name == name for t in qid_tasks):
+            for coupling_tasks in self.task_result.coupling_tasks.values():
+                if any(t.name == name for t in coupling_tasks):
                     found = True
                     break
             if not found:
                 # Check if it's a qubit task
-                for qid_tasks in self.task_result.qubit_tasks.values():
-                    if any(t.name == name for t in qid_tasks):
+                for qubit_tasks in self.task_result.qubit_tasks.values():
+                    if any(t.name == name for t in qubit_tasks):
                         return False
         return True
 

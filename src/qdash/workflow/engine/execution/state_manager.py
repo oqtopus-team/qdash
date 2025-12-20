@@ -4,7 +4,7 @@ This module provides the ExecutionStateManager class that handles execution stat
 transitions without any database or I/O operations.
 """
 
-from typing import Any
+from typing import Any, cast
 
 import pendulum
 from pydantic import BaseModel, field_validator
@@ -59,7 +59,7 @@ class ExecutionStateManager(BaseModel):
         """Convert dict to ExecutionNote for backward compatibility."""
         if isinstance(v, dict):
             return ExecutionNote.from_dict(v)
-        return v
+        return cast(ExecutionNote, v)
 
     def start(self) -> "ExecutionStateManager":
         """Set execution to started state.
@@ -274,9 +274,9 @@ class ExecutionStateManager(BaseModel):
             start_at=self.start_at,
             end_at=self.end_at,
             elapsed_time=self.elapsed_time,
-            calib_data=self.calib_data.model_dump(),
+            calib_data=self.calib_data,
             message=self.message,
-            system_info=self.system_info.model_dump(),
+            system_info=self.system_info,
         )
 
     @classmethod
@@ -300,7 +300,7 @@ class ExecutionStateManager(BaseModel):
             execution_id=model.execution_id,
             calib_data_path=model.calib_data_path,
             note=ExecutionNote.from_dict(model.note),
-            status=model.status,
+            status=ExecutionStatusModel(model.status),
             task_results=model.task_results,
             tags=model.tags,
             controller_info=model.controller_info,

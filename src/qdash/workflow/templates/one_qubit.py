@@ -19,6 +19,7 @@ from qdash.workflow.service.steps import (
     FilterByStatus,
     OneQubitCheck,
     OneQubitFineTune,
+    Step,
 )
 from qdash.workflow.service.targets import MuxTargets
 
@@ -56,6 +57,7 @@ def one_qubit(
 
     targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
 
+    steps: list[Step]
     if check_only:
         # Basic check only
         steps = [

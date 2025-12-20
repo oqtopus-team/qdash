@@ -63,7 +63,7 @@ def calibrate_group_with_retry(
                     )
 
                 # Tasks run SEQUENTIALLY within qubit
-                result = {}
+                result: dict[str, Any] = {}
                 for task_name in tasks:
                     task_details = None
                     if offset != 0:

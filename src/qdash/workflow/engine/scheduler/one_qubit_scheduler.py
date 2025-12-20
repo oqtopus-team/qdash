@@ -918,6 +918,7 @@ class OneQubitScheduler:
         from qdash.workflow.engine.scheduler.one_qubit_plugins import (
             CheckerboardOrderingStrategy,
             DefaultSynchronizedStrategy,
+            MuxOrderingStrategy,
             OrderingContext,
         )
 
@@ -950,6 +951,7 @@ class OneQubitScheduler:
         )
 
         # Select strategy
+        strategy: MuxOrderingStrategy
         if use_checkerboard:
             strategy = CheckerboardOrderingStrategy()
         else:

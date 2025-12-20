@@ -278,7 +278,7 @@ class MongoExecutionRepository:
             MongoDB update operations
 
         """
-        update_data = model.model_dump() if hasattr(model, "model_dump") else model
+        update_data: dict[str, Any] = model.model_dump()
 
         update_ops: dict[str, Any] = {
             "$set": {
@@ -373,7 +373,7 @@ class MongoExecutionRepository:
             start_at=doc.get("start_at", ""),
             end_at=doc.get("end_at", ""),
             elapsed_time=doc.get("elapsed_time", ""),
-            calib_data=calib_data_model.model_dump(),
+            calib_data=calib_data_model,
             message=doc.get("message", ""),
             system_info=doc.get("system_info", {}),
         )

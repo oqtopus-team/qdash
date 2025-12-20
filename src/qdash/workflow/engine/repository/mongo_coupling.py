@@ -50,7 +50,7 @@ class MongoCouplingCalibrationRepository:
         qid: str,
         chip_id: str,
         output_parameters: dict[str, Any],
-        project_id: str,
+        project_id: str | None,
     ) -> CouplingModel:
         """Update coupling calibration data with new measurement results.
 
@@ -122,14 +122,14 @@ class MongoCouplingCalibrationRepository:
 
         return self._to_model(doc, doc.project_id)
 
-    def _to_model(self, doc: CouplingDocument, project_id: str) -> CouplingModel:
+    def _to_model(self, doc: CouplingDocument, project_id: str | None) -> CouplingModel:
         """Convert a document to a domain model.
 
         Parameters
         ----------
         doc : CouplingDocument
             The MongoDB document
-        project_id : str
+        project_id : str | None
             The project identifier
 
         Returns

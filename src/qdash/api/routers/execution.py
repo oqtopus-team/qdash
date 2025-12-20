@@ -10,7 +10,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import FileResponse, StreamingResponse
-from pymongo import DESCENDING
+from bunnet import SortDirection
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
@@ -212,7 +212,8 @@ def list_executions(
     )
     executions = (
         ExecutionHistoryDocument.find(
-            {"project_id": ctx.project_id, "chip_id": chip_id}, sort=[("start_at", DESCENDING)]
+            {"project_id": ctx.project_id, "chip_id": chip_id},
+            sort=[("start_at", SortDirection.DESCENDING)],
         )
         .skip(skip)
         .limit(limit)

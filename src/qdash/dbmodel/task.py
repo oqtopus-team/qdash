@@ -21,7 +21,7 @@ class TaskDocument(Document):
 
     """
 
-    project_id: str = Field(..., description="Owning project identifier")
+    project_id: str | None = Field(None, description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the task")
     name: str = Field(..., description="The name of the task")
     backend: str | None = Field(None, description="The backend of the task")

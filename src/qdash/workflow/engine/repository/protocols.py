@@ -239,6 +239,7 @@ class ExecutionRepository(Protocol):
         self,
         execution_id: str,
         update_func: Callable[[ExecutionModel], None],
+        initial_model: ExecutionModel | None = None,
     ) -> ExecutionModel:
         """Update execution with optimistic locking.
 
@@ -251,6 +252,8 @@ class ExecutionRepository(Protocol):
             The execution identifier
         update_func : callable
             Function that takes ExecutionModel and modifies it in place
+        initial_model : ExecutionModel | None
+            Optional initial model to use instead of fetching from database
 
         Returns
         -------
@@ -387,7 +390,7 @@ class QubitCalibrationRepository(Protocol):
         qid: str,
         chip_id: str,
         output_parameters: dict[str, Any],
-        project_id: str,
+        project_id: str | None,
     ) -> QubitModel:
         """Update qubit calibration data with new measurement results.
 
@@ -466,7 +469,7 @@ class CouplingCalibrationRepository(Protocol):
         qid: str,
         chip_id: str,
         output_parameters: dict[str, Any],
-        project_id: str,
+        project_id: str | None,
     ) -> CouplingModel:
         """Update coupling calibration data with new measurement results.
 
@@ -548,7 +551,7 @@ class ExecutionCounterRepository(Protocol):
         date: str,
         username: str,
         chip_id: str,
-        project_id: str,
+        project_id: str | None,
     ) -> int:
         """Get the next execution index atomically.
 
@@ -560,7 +563,7 @@ class ExecutionCounterRepository(Protocol):
             The username
         chip_id : str
             The chip identifier
-        project_id : str
+        project_id : str | None
             The project identifier
 
         Returns

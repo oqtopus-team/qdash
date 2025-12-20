@@ -23,15 +23,19 @@ class ParamsUpdater(Protocol):
     def update(self, qid: str, output_parameters: dict[str, Any]) -> None: ...
 
 
-def get_params_updater(backend: BaseBackend, chip_id: str | None = None) -> ParamsUpdater | None:
+def get_params_updater(
+    backend: "BaseBackend | None", chip_id: str | None = None
+) -> ParamsUpdater | None:
     """Resolve a backend-specific params updater for the given backend."""
+    if backend is None:
+        return None
     qubex_updater = _resolve_qubex_updater(backend, chip_id)
     if qubex_updater is not None:
         return qubex_updater
     return None
 
 
-def _resolve_qubex_updater(backend: BaseBackend, chip_id: str | None) -> ParamsUpdater | None:
+def _resolve_qubex_updater(backend: "BaseBackend", chip_id: str | None) -> ParamsUpdater | None:
     try:
         from qdash.workflow.engine.backend.qubex import QubexBackend
     except ImportError:

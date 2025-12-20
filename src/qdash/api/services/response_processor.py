@@ -5,9 +5,11 @@ This service handles post-processing of API responses, including outlier filteri
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, TypeVar
 
 from qdash.api.services.outlier_detection import filter_task_results_for_outliers
+
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +22,8 @@ class ResponseProcessor:
         pass
 
     def process_task_response(
-        self, response: Any, task_name: str, enable_outlier_filtering: bool = True
-    ) -> Any:
+        self, response: T, task_name: str, enable_outlier_filtering: bool = True
+    ) -> T:
         """
         Process task response with automatic outlier filtering if applicable.
 

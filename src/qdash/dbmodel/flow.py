@@ -5,6 +5,7 @@ from typing import Any
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
+from bunnet import SortDirection
 from pymongo import ASCENDING, DESCENDING
 
 
@@ -103,8 +104,8 @@ class FlowDocument(Document):
         return list(
             cls.find(
                 {"project_id": project_id, "username": username},
-                sort=[("updated_at", DESCENDING)],  # type: ignore[list-item]
-            ).run()  # type: ignore[no-untyped-call]
+                sort=[("updated_at", SortDirection.DESCENDING)],
+            ).run()
         )
 
     @classmethod

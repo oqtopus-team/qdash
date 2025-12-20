@@ -54,7 +54,7 @@ def calibrate_mux_qubits(qids: list[str], tasks: list[str]) -> dict[str, Any]:
 
     for qid in qids:
         try:
-            result = {}
+            result: dict[str, Any] = {}
             for task_name in tasks:
                 task_result = session.execute_task(task_name, qid)
                 result[task_name] = task_result
@@ -82,7 +82,7 @@ def calibrate_single_qubit(qid: str, tasks: list[str]) -> tuple[str, dict[str, A
     session = _get_session()
 
     try:
-        result = {}
+        result: dict[str, Any] = {}
         for task_name in tasks:
             task_result = session.execute_task(task_name, qid)
             result[task_name] = task_result
@@ -134,7 +134,7 @@ def execute_coupling_pair(coupling_qid: str, tasks: list[str]) -> tuple[str, dic
     session = _get_session()
 
     try:
-        result = {}
+        result: dict[str, Any] = {}
         for task_name in tasks:
             task_result = session.execute_task(task_name, coupling_qid)
             result[task_name] = task_result

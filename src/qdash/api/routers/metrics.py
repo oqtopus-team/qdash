@@ -6,6 +6,7 @@ import logging
 from typing import Annotated, Any, Literal
 
 import pendulum
+from bunnet import SortDirection
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from qdash.api.lib.metrics_config import load_metrics_config
@@ -232,7 +233,11 @@ def _extract_best_metrics(
 
     # Query task results that have at least one of the target metrics
     try:
-        task_results = TaskResultHistoryDocument.find(query).sort([("start_at", -1)]).to_list()
+        task_results = (
+            TaskResultHistoryDocument.find(query)
+            .sort([("start_at", SortDirection.DESCENDING)])
+            .to_list()
+        )
     except Exception as e:
         logger.error(f"Failed to query task result history: {e}")
         raise HTTPException(status_code=500, detail=f"Database query failed: {e}") from e
@@ -519,7 +524,9 @@ async def get_qubit_metric_history(
     if cutoff_time:
         query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
 
-    results_query = TaskResultHistoryDocument.find(query).sort([("start_at", -1)])
+    results_query = TaskResultHistoryDocument.find(query).sort(
+        [("start_at", SortDirection.DESCENDING)]
+    )
     if limit is not None:
         results_query = results_query.limit(limit)
 
@@ -617,7 +624,9 @@ async def get_coupling_metric_history(
     if cutoff_time:
         query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
 
-    results_query = TaskResultHistoryDocument.find(query).sort([("start_at", -1)])
+    results_query = TaskResultHistoryDocument.find(query).sort(
+        [("start_at", SortDirection.DESCENDING)]
+    )
     if limit is not None:
         results_query = results_query.limit(limit)
 

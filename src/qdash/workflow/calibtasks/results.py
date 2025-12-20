@@ -32,7 +32,7 @@ class RunResult(BaseModel):
     """Result class for task execution."""
 
     raw_result: Any
-    r2: dict[str, float] | None = None
+    r2: dict[str, float | None] | None = None
 
     def has_r2(self) -> bool:
         """Check if the result has R2 value."""

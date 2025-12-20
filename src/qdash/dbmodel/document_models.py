@@ -1,3 +1,5 @@
+from typing import Any
+
 from qdash.dbmodel.backend import BackendDocument
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
@@ -18,7 +20,7 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
 
 
-def document_models() -> list[str]:
+def document_models() -> list[Any]:
     """Initialize the repository and create initial data if needed."""
     return [
         ExecutionHistoryDocument,
