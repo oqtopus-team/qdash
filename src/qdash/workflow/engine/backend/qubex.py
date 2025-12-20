@@ -180,7 +180,7 @@ class QubexBackend(BaseBackend):
         )
 
         if master_note is None:
-            # マスターノートが存在しない場合は新規作成
+            # Create new master note if it doesn't exist
             repo.upsert(
                 CalibrationNoteModel(
                     project_id=project_id,
@@ -192,7 +192,7 @@ class QubexBackend(BaseBackend):
                 )
             )
         else:
-            # マスターノートが存在する場合はマージ
+            # Merge with existing master note
             merged_note = merge_notes_by_timestamp(master_note.note, calib_note)
             repo.upsert(
                 CalibrationNoteModel(

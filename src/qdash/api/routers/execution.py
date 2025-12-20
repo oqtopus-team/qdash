@@ -66,7 +66,7 @@ def get_figure_by_path(path: str) -> FileResponse:
             status_code=404,
             detail=f"File not found: {path}",
         )
-    # FileResponse を使うことで Content-Length が設定され、chunked encoding が不要になる
+    # FileResponse sets Content-Length, avoiding chunked encoding
     return FileResponse(path, media_type="image/png")
 
 

@@ -8,20 +8,20 @@ from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.user import UserDocument
 
-# ロガーの設定
+# Logger configuration
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# モジュールレベルで初期化
+# Initialize at module level
 initialize()
 
-# bcryptの設定を最適化
+# Optimize bcrypt settings
 pwd_context = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto",
-    bcrypt__rounds=10,  # 開発環境では少なめに設定
+    bcrypt__rounds=10,  # Lower rounds for development
     bcrypt__ident="2b",
-    truncate_error=False,  # パスワードの長さチェックを無効化
+    truncate_error=False,  # Disable password length check
 )
 
 # Bearer Token authentication scheme

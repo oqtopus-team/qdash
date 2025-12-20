@@ -42,12 +42,12 @@ class ReadoutConfigure(QubexTask):
             qubits = [exp.get_qubit_label(int(qid)) for qid in qubits]
             for r in sys.resonators:
                 if r.qubit not in qubits:
-                    r.frequency = np.nan  # readoutだけ更新
+                    r.frequency = np.nan  # Update readout only
             exp.system_manager.set_experiment_system(sys)
             exp.system_manager.experiment_system.configure()
             exp.system_manager.push(
                 exp.box_ids, confirm=False
-            )  # controlはconfigの値でreadoutは指定した量子ビットのreadoutが紐づいているboxを更新
+            )  # Use config values for control, update box linked to specified qubit's readout
             return None
 
         readout_configure()

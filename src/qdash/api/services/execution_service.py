@@ -163,7 +163,7 @@ class ExecutionService:
             if not isinstance(result, dict):
                 result = result.model_dump()  # noqa: PLW2901
 
-            # グローバルタスクの処理
+            # Process global tasks
             if "global_tasks" in result:
                 if "global" not in grouped_tasks:
                     grouped_tasks["global"] = []
@@ -174,7 +174,7 @@ class ExecutionService:
                     grouped_tasks["system"] = []
                 grouped_tasks["system"].extend(result["system_tasks"])
 
-            # キュービットタスクの処理
+            # Process qubit tasks
             if "qubit_tasks" in result:
                 for qid, tasks in result["qubit_tasks"].items():
                     if qid not in grouped_tasks:
@@ -184,18 +184,18 @@ class ExecutionService:
                             task["qid"] = qid
                         grouped_tasks[qid].append(task)
 
-            # カップリングタスクの処理
+            # Process coupling tasks
             if "coupling_tasks" in result:
                 for tasks in result["coupling_tasks"].values():
                     if "coupling" not in grouped_tasks:
                         grouped_tasks["coupling"] = []
                     grouped_tasks["coupling"].extend(tasks)
 
-        # 各グループ内でstart_atによるソート
+        # Sort tasks within each group by start_at
         for group_tasks in grouped_tasks.values():
             group_tasks.sort(key=lambda x: x.get("start_at", "") or "9999-12-31T23:59:59")
 
-        # グループ自体をstart_atの早い順にソート
+        # Sort groups by earliest start_at
         def get_group_completion_time(group: list[dict[str, Any]]) -> str:
             completed_tasks = [t for t in group if t.get("start_at")]
             if not completed_tasks:
@@ -204,7 +204,7 @@ class ExecutionService:
 
         sorted_groups = sorted(grouped_tasks.items(), key=lambda x: get_group_completion_time(x[1]))
 
-        # ソートされたグループを1つのリストに結合
+        # Merge sorted groups into a single list
         flat_tasks = []
         for _, tasks in sorted_groups:
             flat_tasks.extend(tasks)
