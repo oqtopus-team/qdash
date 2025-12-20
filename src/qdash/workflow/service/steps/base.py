@@ -52,10 +52,10 @@ class Step(ABC):
     @abstractmethod
     def execute(
         self,
-        service: "CalibService",
-        targets: "Target",
-        ctx: "StepContext",
-    ) -> "StepContext":
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
         """Execute the step.
 
         Args:

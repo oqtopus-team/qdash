@@ -21,7 +21,6 @@ Example:
 from typing import Any
 
 from prefect import flow
-
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.steps import (
     FilterByMetric,

@@ -3,9 +3,8 @@
 from datetime import datetime
 from typing import Any
 
-from bunnet import Document
+from bunnet import Document, SortDirection
 from pydantic import ConfigDict, Field
-from bunnet import SortDirection
 from pymongo import ASCENDING, DESCENDING
 
 

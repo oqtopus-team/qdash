@@ -10,7 +10,6 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-
 from qdash.api.dependencies import get_chip_service
 from qdash.api.lib.config_loader import ConfigLoader
 from qdash.api.lib.project import (

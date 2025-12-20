@@ -13,7 +13,6 @@ from fastapi import FastAPI, HTTPException
 from prefect.client.orchestration import get_client
 from prefect.deployments import Deployment
 from pydantic import BaseModel
-
 from qdash.workflow.paths import get_path_resolver
 
 app = FastAPI(title="QDash Deployment Service")

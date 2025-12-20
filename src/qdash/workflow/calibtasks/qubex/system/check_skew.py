@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import yaml
-
 from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,

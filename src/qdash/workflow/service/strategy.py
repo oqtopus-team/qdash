@@ -10,11 +10,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
-
 from qdash.workflow.engine import OneQubitScheduler
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.service._internal.scheduling_tasks import (
     calibrate_mux_qubits as _calibrate_mux_qubits,
+)
+from qdash.workflow.service._internal.scheduling_tasks import (
     calibrate_step_qubits_parallel as _calibrate_step_qubits_parallel,
 )
 from qdash.workflow.service.calib_service import finish_calibration, get_session, init_calibration

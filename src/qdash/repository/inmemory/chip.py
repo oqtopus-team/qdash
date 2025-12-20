@@ -4,8 +4,6 @@ This module provides a mock implementation that stores data in memory,
 useful for unit testing without requiring a MongoDB instance.
 """
 
-from typing import Any
-
 from qdash.datamodel.chip import ChipModel
 from qdash.datamodel.task import CalibDataModel
 

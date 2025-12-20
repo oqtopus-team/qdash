@@ -6,8 +6,9 @@ and Pipeline for validating step sequences.
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Iterator, Sequence
+from typing import TYPE_CHECKING, Any
 
 from qdash.workflow.service.results import (
     FilterResult,
@@ -73,7 +74,7 @@ class Pipeline:
         # Raises ValueError if dependencies are not satisfied
     """
 
-    steps: Sequence["Step"]
+    steps: Sequence[Step]
 
     def __post_init__(self) -> None:
         """Validate step dependencies."""
@@ -107,7 +108,7 @@ class Pipeline:
             # Add what this step provides
             available.update(step.provides)
 
-    def __iter__(self) -> Iterator["Step"]:
+    def __iter__(self) -> Iterator[Step]:
         """Iterate over steps."""
         return iter(self.steps)
 

@@ -8,12 +8,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
-from starlette.exceptions import HTTPException
-
 from qdash.api.dependencies import get_execution_service
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.error import Detail
@@ -23,6 +21,7 @@ from qdash.api.schemas.execution import (
     ListExecutionsResponse,
 )
 from qdash.api.services.execution_service import ExecutionService
+from starlette.exceptions import HTTPException
 
 router = APIRouter()
 

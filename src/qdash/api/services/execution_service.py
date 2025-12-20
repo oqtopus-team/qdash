@@ -13,7 +13,6 @@ from qdash.api.schemas.execution import (
     ExecutionResponseSummary,
     Task,
 )
-from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 
 logger = logging.getLogger(__name__)
 

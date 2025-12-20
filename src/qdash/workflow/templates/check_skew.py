@@ -13,7 +13,6 @@ Example:
 from typing import Any
 
 from prefect import flow, get_run_logger
-
 from qdash.workflow.service import CalibService
 
 

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from filelock import FileLock
-
 from qdash.datamodel.task import OutputParameterModel
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.worker.flows.push_props.formatter import represent_none
@@ -24,7 +23,7 @@ class ParamsUpdater(Protocol):
 
 
 def get_params_updater(
-    backend: "BaseBackend | None", chip_id: str | None = None
+    backend: BaseBackend | None, chip_id: str | None = None
 ) -> ParamsUpdater | None:
     """Resolve a backend-specific params updater for the given backend."""
     if backend is None:
@@ -35,7 +34,7 @@ def get_params_updater(
     return None
 
 
-def _resolve_qubex_updater(backend: "BaseBackend", chip_id: str | None) -> ParamsUpdater | None:
+def _resolve_qubex_updater(backend: BaseBackend, chip_id: str | None) -> ParamsUpdater | None:
     try:
         from qdash.workflow.engine.backend.qubex import QubexBackend
     except ImportError:

@@ -52,7 +52,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
-
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 if TYPE_CHECKING:
@@ -918,7 +917,6 @@ class OneQubitScheduler:
         from qdash.workflow.engine.scheduler.one_qubit_plugins import (
             CheckerboardOrderingStrategy,
             DefaultSynchronizedStrategy,
-            MuxOrderingStrategy,
             OrderingContext,
         )
 

@@ -9,20 +9,19 @@ from __future__ import annotations
 import io
 import logging
 import math
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
 import numpy as np
 import plotly.graph_objects as go
 from PIL import Image
+from qdash.api.lib.metrics_config import load_metrics_config
+from qdash.api.lib.topology_config import TopologyDefinition, load_topology
+from qdash.api.schemas.metrics import ChipMetricsResponse
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
-
-from qdash.api.lib.metrics_config import load_metrics_config
-from qdash.api.lib.topology_config import TopologyDefinition, load_topology
-from qdash.api.schemas.metrics import ChipMetricsResponse
 
 logger = logging.getLogger(__name__)
 

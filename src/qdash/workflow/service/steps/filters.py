@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from prefect import get_run_logger
-
 from qdash.workflow.service.results import FilterResult
 from qdash.workflow.service.steps.base import TransformStep
 
@@ -49,10 +48,10 @@ class FilterByMetric(TransformStep):
 
     def execute(
         self,
-        service: "CalibService",
-        targets: "Target",
-        ctx: "StepContext",
-    ) -> "StepContext":
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
         """Filter candidate qubits by metric threshold."""
         logger = get_run_logger()
 
@@ -107,10 +106,10 @@ class FilterByStatus(TransformStep):
 
     def execute(
         self,
-        service: "CalibService",
-        targets: "Target",
-        ctx: "StepContext",
-    ) -> "StepContext":
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
         """Filter candidate qubits by success status."""
         logger = get_run_logger()
 

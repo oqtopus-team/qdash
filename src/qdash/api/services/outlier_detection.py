@@ -7,7 +7,7 @@ This module provides base and specialized outlier detectors for quantum calibrat
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -23,10 +23,10 @@ class OutlierResult:
     original_count: int
     filtered_count: int
     outlier_count: int
-    outlier_qids: List[str]
+    outlier_qids: list[str]
     method_used: str
-    parameters: Dict[str, Any]
-    physical_violations: List[str]
+    parameters: dict[str, Any]
+    physical_violations: list[str]
 
 
 class OutlierDetector(ABC):
@@ -49,7 +49,7 @@ class OutlierDetector(ABC):
         }
 
     @abstractmethod
-    def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
+    def get_physical_bounds(self, parameter_name: str) -> tuple[float, float]:
         """
         Get physical bounds for the parameter.
 
@@ -63,8 +63,8 @@ class OutlierDetector(ABC):
 
     @abstractmethod
     def extract_parameter_values(
-        self, data: Dict[str, Any], parameter_name: str
-    ) -> Dict[str, float]:
+        self, data: dict[str, Any], parameter_name: str
+    ) -> dict[str, float]:
         """
         Extract parameter values from task results.
 
@@ -79,7 +79,7 @@ class OutlierDetector(ABC):
 
     def detect_outliers(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         parameter_name: str,
         method: str = "combined",
         **kwargs: Any,
@@ -143,8 +143,8 @@ class OutlierDetector(ABC):
         )
 
     def _modified_z_score(
-        self, values: npt.NDArray[np.floating[Any]], threshold: Optional[float] = None
-    ) -> Tuple[npt.NDArray[np.bool_], List[str]]:
+        self, values: npt.NDArray[np.floating[Any]], threshold: float | None = None
+    ) -> tuple[npt.NDArray[np.bool_], list[str]]:
         """
         Modified Z-score using Median Absolute Deviation (MAD).
         More robust than standard Z-score for non-normal distributions.
@@ -165,8 +165,8 @@ class OutlierDetector(ABC):
         return outlier_mask, violations
 
     def _iqr_method(
-        self, values: npt.NDArray[np.floating[Any]], multiplier: Optional[float] = None
-    ) -> Tuple[npt.NDArray[np.bool_], List[str]]:
+        self, values: npt.NDArray[np.floating[Any]], multiplier: float | None = None
+    ) -> tuple[npt.NDArray[np.bool_], list[str]]:
         """
         Interquartile Range (IQR) method for outlier detection.
         Robust to skewed distributions.
@@ -186,7 +186,7 @@ class OutlierDetector(ABC):
 
     def _physical_bounds(
         self, values: npt.NDArray[np.floating[Any]], parameter_name: str
-    ) -> Tuple[npt.NDArray[np.bool_], List[str]]:
+    ) -> tuple[npt.NDArray[np.bool_], list[str]]:
         """Check physical bounds for the parameter."""
         min_bound, max_bound = self.get_physical_bounds(parameter_name)
 
@@ -202,7 +202,7 @@ class OutlierDetector(ABC):
 
     def _combined_method(
         self, values: npt.NDArray[np.floating[Any]], parameter_name: str, **kwargs: Any
-    ) -> Tuple[npt.NDArray[np.bool_], List[str]]:
+    ) -> tuple[npt.NDArray[np.bool_], list[str]]:
         """Combine physical bounds and statistical methods."""
         # Always check physical bounds first
         physical_outliers, physical_violations = self._physical_bounds(values, parameter_name)
@@ -228,8 +228,8 @@ class OutlierDetector(ABC):
         return combined_outliers, combined_violations
 
     def _z_score_scipy(
-        self, values: npt.NDArray[np.floating[Any]], threshold: Optional[float] = None
-    ) -> Tuple[npt.NDArray[np.bool_], List[str]]:
+        self, values: npt.NDArray[np.floating[Any]], threshold: float | None = None
+    ) -> tuple[npt.NDArray[np.bool_], list[str]]:
         """Simple Z-score using scipy."""
         threshold = threshold or self.default_thresholds["z_score"]
 
@@ -241,7 +241,7 @@ class OutlierDetector(ABC):
         return outlier_mask, [f"Z-score > {threshold}"]
 
 
-def extract_coherence_time_values(data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+def extract_coherence_time_values(data: dict[str, Any], parameter_name: str) -> dict[str, float]:
     """Extract coherence time values from task results."""
     extracted = {}
 
@@ -268,7 +268,7 @@ def extract_coherence_time_values(data: Dict[str, Any], parameter_name: str) -> 
     return extracted
 
 
-def extract_fidelity_values(data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+def extract_fidelity_values(data: dict[str, Any], parameter_name: str) -> dict[str, float]:
     """Extract fidelity values from task results."""
     extracted = {}
 
@@ -295,53 +295,53 @@ def extract_fidelity_values(data: Dict[str, Any], parameter_name: str) -> Dict[s
 class T2StarOutlierDetector(OutlierDetector):
     """Detector for T2* (Ramsey) measurements."""
 
-    def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
+    def get_physical_bounds(self, parameter_name: str) -> tuple[float, float]:
         return (0.0, 1000.0)  # 0 to 1ms
 
     def extract_parameter_values(
-        self, data: Dict[str, Any], parameter_name: str
-    ) -> Dict[str, float]:
+        self, data: dict[str, Any], parameter_name: str
+    ) -> dict[str, float]:
         return extract_coherence_time_values(data, parameter_name)
 
 
 class T2EchoOutlierDetector(OutlierDetector):
     """Detector for T2 echo measurements."""
 
-    def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
+    def get_physical_bounds(self, parameter_name: str) -> tuple[float, float]:
         return (0.0, 2000.0)  # 0 to 2ms
 
     def extract_parameter_values(
-        self, data: Dict[str, Any], parameter_name: str
-    ) -> Dict[str, float]:
+        self, data: dict[str, Any], parameter_name: str
+    ) -> dict[str, float]:
         return extract_coherence_time_values(data, parameter_name)
 
 
 class T1OutlierDetector(OutlierDetector):
     """Detector for T1 relaxation time measurements."""
 
-    def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
+    def get_physical_bounds(self, parameter_name: str) -> tuple[float, float]:
         return (0.0, 10000.0)  # 0 to 10ms
 
     def extract_parameter_values(
-        self, data: Dict[str, Any], parameter_name: str
-    ) -> Dict[str, float]:
+        self, data: dict[str, Any], parameter_name: str
+    ) -> dict[str, float]:
         return extract_coherence_time_values(data, parameter_name)
 
 
 class GateFidelityOutlierDetector(OutlierDetector):
     """Detector for gate fidelity measurements."""
 
-    def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
+    def get_physical_bounds(self, parameter_name: str) -> tuple[float, float]:
         return (0.0, 1.0)  # 0 to 1 (100%)
 
     def extract_parameter_values(
-        self, data: Dict[str, Any], parameter_name: str
-    ) -> Dict[str, float]:
+        self, data: dict[str, Any], parameter_name: str
+    ) -> dict[str, float]:
         return extract_fidelity_values(data, parameter_name)
 
 
 # Factory function to get appropriate detector
-def get_outlier_detector(task_name: str) -> Optional[OutlierDetector]:
+def get_outlier_detector(task_name: str) -> OutlierDetector | None:
     """
     Factory function to get the appropriate outlier detector for a task.
 
@@ -351,7 +351,7 @@ def get_outlier_detector(task_name: str) -> Optional[OutlierDetector]:
     Returns:
         Appropriate OutlierDetector instance or None
     """
-    detector_mapping: Dict[str, Type[OutlierDetector]] = {
+    detector_mapping: dict[str, type[OutlierDetector]] = {
         "CheckRamsey": T2StarOutlierDetector,
         "Ramsey": T2StarOutlierDetector,
         "T2Star": T2StarOutlierDetector,
@@ -374,11 +374,11 @@ def get_outlier_detector(task_name: str) -> Optional[OutlierDetector]:
 
 
 def filter_task_results_for_outliers(
-    task_results: Dict[str, Any],
+    task_results: dict[str, Any],
     task_name: str,
     enable_filtering: bool = True,
     method: str = "combined",
-) -> Tuple[Dict[str, Any], Optional[OutlierResult]]:
+) -> tuple[dict[str, Any], OutlierResult | None]:
     """
     Filter task results to remove outliers based on task type.
 

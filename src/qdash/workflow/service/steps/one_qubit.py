@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
-
 from qdash.workflow.service.results import OneQubitResult
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import CHECK_1Q_TASKS, FULL_1Q_TASKS_AFTER_CHECK
@@ -58,10 +57,10 @@ class CustomOneQubit(CalibrationStep):
 
     def execute(
         self,
-        service: "CalibService",
-        targets: "Target",
-        ctx: "StepContext",
-    ) -> "StepContext":
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
         """Execute custom 1-qubit calibration."""
         logger = get_run_logger()
 
@@ -102,7 +101,7 @@ class CustomOneQubit(CalibrationStep):
 
     def _execute_direct(
         self,
-        service: "CalibService",
+        service: CalibService,
         qids: list[str],
     ) -> dict[str, Any]:
         """Direct execution for QubitTargets."""
@@ -168,10 +167,10 @@ class OneQubitCheck(CalibrationStep):
 
     def execute(
         self,
-        service: "CalibService",
-        targets: "Target",
-        ctx: "StepContext",
-    ) -> "StepContext":
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
         """Execute 1-qubit check calibration."""
         logger = get_run_logger()
         tasks = self.tasks or CHECK_1Q_TASKS
@@ -207,7 +206,7 @@ class OneQubitCheck(CalibrationStep):
 
     def _execute_direct(
         self,
-        service: "CalibService",
+        service: CalibService,
         qids: list[str],
         tasks: list[str],
     ) -> dict[str, Any]:
@@ -284,10 +283,10 @@ class OneQubitFineTune(CalibrationStep):
 
     def execute(
         self,
-        service: "CalibService",
-        targets: "Target",
-        ctx: "StepContext",
-    ) -> "StepContext":
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
         """Execute 1-qubit fine-tuning calibration."""
         logger = get_run_logger()
         tasks = self.tasks or FULL_1Q_TASKS_AFTER_CHECK
@@ -318,7 +317,7 @@ class OneQubitFineTune(CalibrationStep):
 
     def _execute_with_qids(
         self,
-        service: "CalibService",
+        service: CalibService,
         qids: list[str],
         tasks: list[str],
     ) -> dict[str, Any]:
@@ -343,7 +342,7 @@ class OneQubitFineTune(CalibrationStep):
 
     def _execute_direct(
         self,
-        service: "CalibService",
+        service: CalibService,
         qids: list[str],
         tasks: list[str],
     ) -> dict[str, Any]:

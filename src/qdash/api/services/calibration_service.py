@@ -5,7 +5,6 @@ using repository abstractions for data access.
 """
 
 from qdash.api.schemas.calibration import CalibrationNoteResponse
-from qdash.repository.calibration_note import MongoCalibrationNoteRepository
 from qdash.repository.protocols import CalibrationNoteRepository
 
 

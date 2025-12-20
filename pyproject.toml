@@ -33,17 +33,29 @@ packages = [
 [tool.ruff]
 line-length = 100
 exclude = ["tools", "scripts"]
+target-version = "py310"
 lint.unfixable = ["F401"]
-# Temporarily use minimal rule set to get CI passing
 lint.select = [
-    "E9",  # syntax errors only
-    "F63", # comparison issues
-    "F7",  # syntax errors
-    "F82", # undefined names
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
 ]
-lint.ignore = []
+lint.ignore = [
+    "E501",  # line-too-long (handled by formatter)
+    "B904",  # raise-without-from-inside-except (TODO: fix in exception handling task)
+    "B008",  # function-call-in-default-argument (FastAPI Depends pattern)
+    "UP038", # non-pep604-isinstance (requires manual fix)
+    "B007",  # unused-loop-control-variable (minor style issue)
+    "B012",  # return-in-finally (intentional in specific cases)
+    "B027",  # empty-method-without-abstract-decorator (intentional default impl)
+]
 
 [tool.ruff.lint.per-file-ignores]
+"src/qdash/workflow/service/calib_service.py" = ["E402"]  # Circular import avoidance
+"src/qdash/workflow/paths.py" = ["F401"]  # Re-exports for backward compatibility
 "tests/**" = [
     "ANN201",
     "ANN205",
@@ -68,6 +80,12 @@ disable_error_code = ["misc", "override", "no-untyped-call", "redundant-cast"]
 # Use explicit package bases to avoid src.qdash vs qdash conflicts
 explicit_package_bases = true
 mypy_path = "src"
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
 
 
 [tool.pytest.ini_options]

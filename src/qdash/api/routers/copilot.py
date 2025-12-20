@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter
-
 from qdash.api.lib.copilot_config import load_copilot_config
 
 router = APIRouter()

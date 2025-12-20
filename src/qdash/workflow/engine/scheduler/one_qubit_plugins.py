@@ -92,7 +92,7 @@ class MuxOrderingStrategy(ABC):
         self,
         mux_ids: list[int],
         qids: list[str],
-        context: "OrderingContext",
+        context: OrderingContext,
     ) -> list[list[str]]:
         """Generate synchronized parallel steps across all MUXes.
 

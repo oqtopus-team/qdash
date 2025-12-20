@@ -13,7 +13,6 @@ from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, Field
-
 from qdash.api.lib.config_loader import ConfigLoader
 
 

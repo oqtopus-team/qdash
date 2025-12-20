@@ -29,8 +29,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from qdash.repository.protocols import (
@@ -45,10 +46,10 @@ import pendulum
 from prefect import get_run_logger
 
 logger = logging.getLogger(__name__)
+from qdash.workflow.engine import CalibConfig, CalibOrchestrator
 from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.params_updater import get_params_updater
-from qdash.workflow.engine import CalibConfig, CalibOrchestrator
 from qdash.workflow.engine.task.context import TaskContext
 from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
@@ -693,8 +694,8 @@ class CalibService:
 
     def run(
         self,
-        targets: "Target",
-        steps: "Sequence[Step]",
+        targets: Target,
+        steps: Sequence[Step],
     ) -> dict[str, Any]:
         """Run calibration pipeline with targets and steps.
 
@@ -731,8 +732,8 @@ class CalibService:
 
     def _run_pipeline(
         self,
-        targets: "Target",
-        steps: "Sequence[Step]",
+        targets: Target,
+        steps: Sequence[Step],
     ) -> dict[str, Any]:
         """Execute a calibration pipeline with steps.
 

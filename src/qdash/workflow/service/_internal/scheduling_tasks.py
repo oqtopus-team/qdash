@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService
 
 
-def _get_session() -> "CalibService":
+def _get_session() -> CalibService:
     """Get the current session from global context (internal use)."""
     from qdash.workflow.service.session_context import get_current_session
 

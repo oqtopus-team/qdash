@@ -7,7 +7,6 @@ from typing import Any, Final, Literal
 import numpy as np
 import pendulum
 from pydantic import BaseModel, Field, field_validator
-
 from qdash.datamodel.system_info import SystemInfoModel
 
 SCHDULED = "scheduled"
