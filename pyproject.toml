@@ -42,6 +42,9 @@ lint.select = [
     "I",   # isort
     "B",   # flake8-bugbear
     "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "C4",  # flake8-comprehensions
+    "RET", # flake8-return
 ]
 lint.ignore = [
     "E501",  # line-too-long (handled by formatter)
@@ -51,6 +54,10 @@ lint.ignore = [
     "B007",  # unused-loop-control-variable (minor style issue)
     "B012",  # return-in-finally (intentional in specific cases)
     "B027",  # empty-method-without-abstract-decorator (intentional default impl)
+    "RET505", # superfluous-else-return (style preference)
+    "RET506", # superfluous-else-raise (style preference)
+    "SIM102", # collapsible-if (readability preference)
+    "SIM108", # if-else-block-instead-of-if-exp (readability preference)
 ]
 
 [tool.ruff.lint.per-file-ignores]

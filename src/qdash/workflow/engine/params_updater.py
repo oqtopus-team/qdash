@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 from pathlib import Path
@@ -161,10 +162,8 @@ class _QubexParamsUpdater:
             return None
 
         if hasattr(value, "item"):
-            try:
+            with contextlib.suppress(Exception):
                 value = value.item()
-            except Exception:
-                pass
 
         if isinstance(value, (int, float)):
             numeric = float(value)

@@ -111,7 +111,7 @@ def calibrate_step_qubits_parallel(parallel_qids: list[str], tasks: list[str]) -
     # Submit all qubits in parallel
     futures = [calibrate_single_qubit.submit(qid, tasks) for qid in parallel_qids]
     pair_results = [f.result() for f in futures]
-    return {qid: result for qid, result in pair_results}
+    return dict(pair_results)
 
 
 # =============================================================================
@@ -159,4 +159,4 @@ def calibrate_parallel_group(coupling_qids: list[str], tasks: list[str]) -> dict
     """
     futures = [execute_coupling_pair.submit(cqid, tasks) for cqid in coupling_qids]
     pair_results = [f.result() for f in futures]
-    return {qid: result for qid, result in pair_results}
+    return dict(pair_results)

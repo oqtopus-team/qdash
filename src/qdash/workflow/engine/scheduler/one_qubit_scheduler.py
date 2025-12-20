@@ -546,10 +546,7 @@ class OneQubitScheduler:
         # Apply ordering strategy if provided
         if ordering_strategy is not None:
             # Determine grid size from chip_id
-            if "144" in self.chip_id:
-                grid_size = 12
-            else:
-                grid_size = 8
+            grid_size = 12 if "144" in self.chip_id else 8
             mux_grid_size = grid_size // 2
 
             context = OrderingContext(
@@ -809,7 +806,7 @@ class OneQubitScheduler:
             qids = [qid for qid in qids if qid not in exclude_set]
             excluded_count = original_count - len(qids)
             logger.info(
-                f"Excluded {excluded_count} qubits: {sorted(exclude_set & set(str(mux_id * 4 + o) for mux_id in mux_ids for o in range(4)))}"
+                f"Excluded {excluded_count} qubits: {sorted(exclude_set & {str(mux_id * 4 + o) for mux_id in mux_ids for o in range(4)})}"
             )
 
             if len(qids) == 0:
@@ -934,10 +931,7 @@ class OneQubitScheduler:
         qid_to_mux = self._build_qubit_to_mux_map(wiring_config)
 
         # Determine grid size from chip_id
-        if "144" in self.chip_id:
-            grid_size = 12
-        else:
-            grid_size = 8
+        grid_size = 12 if "144" in self.chip_id else 8
         mux_grid_size = grid_size // 2
 
         # Create ordering context

@@ -249,14 +249,13 @@ def extract_coherence_time_values(data: dict[str, Any], parameter_name: str) -> 
         value = None
 
         # Handle different data structures
-        if isinstance(task_result, dict):
-            if "output_parameters" in task_result:
-                param_value = task_result["output_parameters"].get(parameter_name)
-                if param_value is not None:
-                    if isinstance(param_value, dict):
-                        value = float(param_value.get("value", param_value.get("mean", 0)))
-                    else:
-                        value = float(param_value)
+        if isinstance(task_result, dict) and "output_parameters" in task_result:
+            param_value = task_result["output_parameters"].get(parameter_name)
+            if param_value is not None:
+                if isinstance(param_value, dict):
+                    value = float(param_value.get("value", param_value.get("mean", 0)))
+                else:
+                    value = float(param_value)
 
         # Validate and convert to microseconds if needed
         if value is not None and not np.isnan(value) and value > 0:
@@ -276,14 +275,13 @@ def extract_fidelity_values(data: dict[str, Any], parameter_name: str) -> dict[s
         value = None
 
         # Handle different data structures
-        if isinstance(task_result, dict):
-            if "output_parameters" in task_result:
-                param_value = task_result["output_parameters"].get(parameter_name)
-                if param_value is not None:
-                    if isinstance(param_value, dict):
-                        value = float(param_value.get("value", param_value.get("mean", 0)))
-                    else:
-                        value = float(param_value)
+        if isinstance(task_result, dict) and "output_parameters" in task_result:
+            param_value = task_result["output_parameters"].get(parameter_name)
+            if param_value is not None:
+                if isinstance(param_value, dict):
+                    value = float(param_value.get("value", param_value.get("mean", 0)))
+                else:
+                    value = float(param_value)
 
         # Include all numeric values for outlier detection
         if value is not None and not np.isnan(value):

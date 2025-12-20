@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import contextlib
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -494,10 +495,8 @@ def _get_directory_mtime_sum(directory: Path) -> float:
         for item in directory.rglob("*.py"):
             if item.name.startswith(".") or "__pycache__" in str(item):
                 continue
-            try:
+            with contextlib.suppress(OSError):
                 mtime_sum += item.stat().st_mtime
-            except OSError:
-                pass
     except PermissionError:
         pass
     return mtime_sum

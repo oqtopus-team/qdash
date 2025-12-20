@@ -122,9 +122,7 @@ def validate_flow_code(code: str, expected_function_name: str) -> None:
         if isinstance(node, ast.FunctionDef):
             # Check if function has @flow decorator
             for decorator in node.decorator_list:
-                if isinstance(decorator, ast.Name) and decorator.id == "flow":
-                    flow_functions.append(node.name)
-                elif (
+                if isinstance(decorator, ast.Name) and decorator.id == "flow" or (
                     isinstance(decorator, ast.Call)
                     and isinstance(decorator.func, ast.Name)
                     and decorator.func.id == "flow"

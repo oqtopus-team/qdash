@@ -228,10 +228,7 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
     ) -> list[str]:
         """Order qubits for checkerboard pattern."""
         # Determine which offset order to use
-        if mux_id % 2 == 0:
-            offset_order = self.EVEN_MUX_ORDER
-        else:
-            offset_order = self.ODD_MUX_ORDER
+        offset_order = self.EVEN_MUX_ORDER if mux_id % 2 == 0 else self.ODD_MUX_ORDER
 
         # Base qubit ID for this MUX
         base_qid = mux_id * 4
@@ -295,10 +292,7 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
             base_qid = mux_id * 4
 
             # Determine offset order for this MUX
-            if mux_id % 2 == 0:
-                offset_order = self.EVEN_MUX_ORDER
-            else:
-                offset_order = self.ODD_MUX_ORDER
+            offset_order = self.EVEN_MUX_ORDER if mux_id % 2 == 0 else self.ODD_MUX_ORDER
 
             # Add qubits to corresponding steps
             for step_idx, offset in enumerate(offset_order):

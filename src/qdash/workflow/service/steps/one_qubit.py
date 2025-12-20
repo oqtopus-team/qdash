@@ -325,7 +325,7 @@ class OneQubitFineTune(CalibrationStep):
         from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
 
         # Convert qids to mux_ids for strategy
-        mux_ids = sorted(set(int(qid) // 4 for qid in qids))
+        mux_ids = sorted({int(qid) // 4 for qid in qids})
         exclude_qids: list[str] = []
 
         config = OneQubitConfig(
