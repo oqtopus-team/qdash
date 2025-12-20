@@ -56,7 +56,7 @@ class CheckRamsey(QubexTask):
         y_data = result_y.normalized.astype(float)
         sweep = result_x.sweep_range.astype(float)
 
-        # 色を sweep の逆順でカラーマップ化
+        # Map colors in reverse order of sweep
         fig = go.Figure()
 
         fig.add_trace(

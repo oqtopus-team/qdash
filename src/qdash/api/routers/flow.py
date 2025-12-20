@@ -56,6 +56,55 @@ DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-
 # Path to templates directory
 TEMPLATES_METADATA_FILE = TEMPLATES_DIR / "templates.json"
 
+# Default HTTP client configuration
+DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
+
+
+async def _http_post_with_retry(
+    url: str,
+    json_data: dict[str, Any],
+    *,
+    max_retries: int = 3,
+    timeout: httpx.Timeout | float = DEFAULT_TIMEOUT,
+) -> dict[str, Any]:
+    """Make HTTP POST request with retry logic.
+
+    Args:
+        url: Target URL
+        json_data: JSON payload
+        max_retries: Maximum retry attempts (default: 3)
+        timeout: Request timeout configuration
+
+    Returns:
+        Response JSON as dictionary
+
+    Raises:
+        HTTPException: If all retries fail or non-retryable error occurs
+
+    """
+    last_error: Exception | None = None
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for attempt in range(max_retries):
+            try:
+                response = await client.post(url, json=json_data)
+                response.raise_for_status()
+                result: dict[str, Any] = response.json()
+                return result
+            except (httpx.TimeoutException, httpx.ConnectError) as e:  # noqa: PERF203
+                last_error = e
+                if attempt < max_retries - 1:
+                    wait_time = 2**attempt  # Exponential backoff: 1s, 2s, 4s
+                    logger.warning(f"Attempt {attempt + 1} failed, retrying in {wait_time}s: {e}")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"All {max_retries} attempts failed: {e}")
+
+    # All retries exhausted
+    raise HTTPException(
+        status_code=500,
+        detail=f"Request failed after {max_retries} attempts: {last_error}",
+    )
+
 
 def get_user_flows_dir(username: str) -> Path:
     """Get user's flows directory, create if not exists.
@@ -1117,81 +1166,44 @@ async def schedule_flow(
             )
 
         try:
-            # Configure httpx client with timeout and retry
-            timeout_config = httpx.Timeout(
-                connect=5.0,  # Connection timeout
-                read=30.0,  # Read timeout
-                write=10.0,  # Write timeout
-                pool=5.0,  # Pool timeout
+            await _http_post_with_retry(
+                f"{DEPLOYMENT_SERVICE_URL}/set-schedule",
+                {
+                    "deployment_id": flow.deployment_id,
+                    "cron": request.cron,
+                    "timezone": request.timezone,
+                    "active": request.active,
+                    "parameters": parameters,
+                },
+            )
+            logger.info(f"Set cron schedule for flow '{name}': {request.cron}")
+
+            # Calculate next run time from cron expression
+            next_run = None
+            try:
+                now = datetime.now(timezone.utc)
+                cron_iter = croniter(request.cron, now)
+                next_run_dt = cron_iter.get_next(datetime)
+                next_run = next_run_dt.isoformat()
+            except Exception as e:
+                logger.warning(f"Failed to calculate next run time: {e}")
+
+            return ScheduleFlowResponse(
+                schedule_id=flow.deployment_id,
+                flow_name=name,
+                schedule_type="cron",
+                cron=request.cron,
+                next_run=next_run,
+                active=request.active,
+                message=f"Cron schedule set successfully for flow '{name}'",
             )
 
-            async with httpx.AsyncClient(timeout=timeout_config) as client:
-                # Retry logic: try up to 3 times with exponential backoff
-                max_retries = 3
-                for attempt in range(max_retries):
-                    try:
-                        response = await client.post(
-                            f"{DEPLOYMENT_SERVICE_URL}/set-schedule",
-                            json={
-                                "deployment_id": flow.deployment_id,
-                                "cron": request.cron,
-                                "timezone": request.timezone,
-                                "active": request.active,
-                                "parameters": parameters,
-                            },
-                        )
-                        response.raise_for_status()
-                        break  # Success, exit retry loop
-                    except (httpx.TimeoutException, httpx.ConnectError) as e:
-                        if attempt < max_retries - 1:
-                            wait_time = 2**attempt  # Exponential backoff: 1s, 2s, 4s
-                            logger.warning(
-                                f"Attempt {attempt + 1} failed, retrying in {wait_time}s: {e}"
-                            )
-                            await asyncio.sleep(wait_time)
-                        else:
-                            raise  # Final attempt failed
-                    except httpx.HTTPStatusError:
-                        raise  # Don't retry on 4xx/5xx errors
-                response.raise_for_status()
-                data = response.json()
-
-                logger.info(f"Set cron schedule for flow '{name}': {request.cron}")
-
-                # Calculate next run time from cron expression
-                next_run = None
-                try:
-                    now = datetime.now(timezone.utc)
-                    cron_iter = croniter(request.cron, now)
-                    next_run_dt = cron_iter.get_next(datetime)
-                    next_run = next_run_dt.isoformat()
-                except Exception as e:
-                    logger.warning(f"Failed to calculate next run time: {e}")
-                    next_run = None
-
-                return ScheduleFlowResponse(
-                    schedule_id=flow.deployment_id,
-                    flow_name=name,
-                    schedule_type="cron",
-                    cron=request.cron,
-                    next_run=next_run,
-                    active=request.active,
-                    message=f"Cron schedule set successfully for flow '{name}'",
-                )
-
         except httpx.HTTPStatusError as e:
-            # Get detailed error from deployment service
             error_detail = e.response.text if hasattr(e.response, "text") else str(e)
             logger.error(f"Failed to set cron schedule: {error_detail}")
             raise HTTPException(
                 status_code=e.response.status_code if hasattr(e, "response") else 500,
                 detail=f"Failed to set cron schedule: {error_detail}",
-            )
-        except httpx.HTTPError as e:
-            logger.error(f"Failed to set cron schedule (network error): {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to set cron schedule (network error): {e}",
             )
 
     # Handle one-time schedule
@@ -1234,65 +1246,33 @@ async def schedule_flow(
             )
 
         try:
-            # Configure httpx client with timeout
-            timeout_config = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
+            data = await _http_post_with_retry(
+                f"{DEPLOYMENT_SERVICE_URL}/create-scheduled-run",
+                {
+                    "deployment_id": flow.deployment_id,
+                    "scheduled_time": request.scheduled_time,
+                    "parameters": parameters,
+                },
+            )
+            flow_run_id = data["flow_run_id"]
+            logger.info(f"Created one-time schedule for flow '{name}': {request.scheduled_time}")
 
-            async with httpx.AsyncClient(timeout=timeout_config) as client:
-                # Retry logic for one-time schedule creation
-                max_retries = 3
-                for attempt in range(max_retries):
-                    try:
-                        response = await client.post(
-                            f"{DEPLOYMENT_SERVICE_URL}/create-scheduled-run",
-                            json={
-                                "deployment_id": flow.deployment_id,
-                                "scheduled_time": request.scheduled_time,
-                                "parameters": parameters,
-                            },
-                        )
-                        response.raise_for_status()
-                        data = response.json()
-                        break  # Success
-                    except (httpx.TimeoutException, httpx.ConnectError) as e:
-                        if attempt < max_retries - 1:
-                            wait_time = 2**attempt
-                            logger.warning(
-                                f"Attempt {attempt + 1} failed, retrying in {wait_time}s: {e}"
-                            )
-                            await asyncio.sleep(wait_time)
-                        else:
-                            raise
-                    except httpx.HTTPStatusError:
-                        raise
-
-                flow_run_id = data["flow_run_id"]
-                logger.info(
-                    f"Created one-time schedule for flow '{name}': {request.scheduled_time}"
-                )
-
-                return ScheduleFlowResponse(
-                    schedule_id=flow_run_id,
-                    flow_name=name,
-                    schedule_type="one-time",
-                    cron=None,
-                    next_run=request.scheduled_time,
-                    active=True,
-                    message=f"One-time schedule created successfully for flow '{name}'",
-                )
+            return ScheduleFlowResponse(
+                schedule_id=flow_run_id,
+                flow_name=name,
+                schedule_type="one-time",
+                cron=None,
+                next_run=request.scheduled_time,
+                active=True,
+                message=f"One-time schedule created successfully for flow '{name}'",
+            )
 
         except httpx.HTTPStatusError as e:
-            # Get detailed error from deployment service
             error_detail = e.response.text if hasattr(e.response, "text") else str(e)
             logger.error(f"Failed to create one-time schedule: {error_detail}")
             raise HTTPException(
                 status_code=e.response.status_code if hasattr(e, "response") else 500,
                 detail=f"Failed to create one-time schedule: {error_detail}",
-            )
-        except httpx.HTTPError as e:
-            logger.error(f"Failed to create one-time schedule (network error): {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to create one-time schedule (network error): {e}",
             )
 
     raise HTTPException(status_code=500, detail="Unexpected error in schedule creation")

@@ -66,7 +66,7 @@ def push_github(
 
         # Git operations
         repo.index.add([str(target_file_path.relative_to(temp_dir))])
-        # 差分がなければスキップ
+        # Skip if no changes
         diff = repo.index.diff("HEAD")
         if not diff:
             logger.info("No changes to commit")

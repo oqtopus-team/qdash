@@ -37,4 +37,4 @@ class MongoBackendRepository:
 
         """
         backends = BackendDocument.find({"project_id": project_id}).to_list()
-        return [backend.dict() for backend in backends]
+        return [backend.model_dump() for backend in backends]

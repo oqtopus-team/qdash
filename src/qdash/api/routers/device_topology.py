@@ -39,7 +39,7 @@ def search_coupling_data_by_control_qid(
     """Search for coupling data by control qubit id."""
     filtered = {}
     for key, value in cr_params.items():
-        # キーが '-' を含む場合は、左側を抽出
+        # If key contains '-', extract the left side
         left_side = key.split("-")[0] if "-" in key else key
         if left_side == search_term:
             filtered[key] = value
