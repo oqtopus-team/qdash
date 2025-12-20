@@ -98,7 +98,6 @@ class BackendProtocol(Protocol):
 class TaskExecutionError(Exception):
     """Exception raised when task execution fails."""
 
-    pass
 
 
 class TaskExecutionResult(BaseModel):

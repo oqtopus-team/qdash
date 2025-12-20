@@ -76,7 +76,6 @@ class MuxOrderingStrategy(ABC):
         Returns:
             Ordered list of qubit IDs for sequential execution within this MUX
         """
-        pass
 
     @abstractmethod
     def get_metadata(self) -> dict[str, Any]:
@@ -85,7 +84,6 @@ class MuxOrderingStrategy(ABC):
         Returns:
             Dictionary containing strategy-specific metadata
         """
-        pass
 
     @abstractmethod
     def generate_synchronized_steps(
@@ -105,7 +103,6 @@ class MuxOrderingStrategy(ABC):
             List of steps, where each step is a list of qubit IDs
             that can be executed simultaneously
         """
-        pass
 
     def __repr__(self) -> str:
         """String representation of the strategy."""

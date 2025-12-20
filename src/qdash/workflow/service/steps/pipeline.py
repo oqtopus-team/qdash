@@ -6,18 +6,18 @@ and Pipeline for validating step sequences.
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from qdash.workflow.service.results import (
-    FilterResult,
-    OneQubitResult,
-    SkewCheckResult,
-    TwoQubitResult,
-)
-
 if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
+
+    from qdash.workflow.service.results import (
+        FilterResult,
+        OneQubitResult,
+        SkewCheckResult,
+        TwoQubitResult,
+    )
     from qdash.workflow.service.steps.base import Step
 
 

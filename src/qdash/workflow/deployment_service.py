@@ -241,7 +241,7 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
             except Exception as e:
                 logger.error(f"Failed to update deployment: {e}")
                 raise HTTPException(
-                    status_code=500, detail=f"Failed to update deployment: {str(e)}"
+                    status_code=500, detail=f"Failed to update deployment: {e!s}"
                 )
 
             logger.info(
@@ -259,7 +259,7 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
         raise
     except Exception as e:
         logger.error(f"Failed to set schedule (unexpected error): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e!s}")
 
 
 @app.post("/create-scheduled-run", response_model=CreateScheduledRunResponse)
@@ -288,7 +288,7 @@ async def create_scheduled_run(request: CreateScheduledRunRequest) -> CreateSche
             logger.info(f"Parsed scheduled time: {scheduled_time}")
         except Exception as e:
             logger.error(f"Failed to parse scheduled time: {e}")
-            raise HTTPException(status_code=400, detail=f"Invalid scheduled_time format: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Invalid scheduled_time format: {e!s}")
 
         async with get_client() as client:
             try:
@@ -300,7 +300,7 @@ async def create_scheduled_run(request: CreateScheduledRunRequest) -> CreateSche
                 logger.info(f"Successfully created scheduled run {flow_run.id}")
             except Exception as e:
                 logger.error(f"Failed to create flow run: {e}")
-                raise HTTPException(status_code=500, detail=f"Failed to create flow run: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Failed to create flow run: {e!s}")
 
             logger.info(f"Created scheduled run {flow_run.id} for {scheduled_time}")
 
@@ -314,4 +314,4 @@ async def create_scheduled_run(request: CreateScheduledRunRequest) -> CreateSche
         raise
     except Exception as e:
         logger.error(f"Failed to create scheduled run (unexpected error): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e!s}")

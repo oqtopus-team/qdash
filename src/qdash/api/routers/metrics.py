@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import pendulum
 from bunnet import SortDirection
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from qdash.api.lib.metrics_config import load_metrics_config
-from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.metrics import (
     ChipMetricsResponse,
     CouplingMetrics,
@@ -19,9 +18,12 @@ from qdash.api.schemas.metrics import (
     QubitMetricHistoryResponse,
     QubitMetrics,
 )
-from qdash.dbmodel.chip import ChipDocument
 from qdash.repository.chip import MongoChipRepository
 from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
+
+if TYPE_CHECKING:
+    from qdash.api.lib.project import ProjectContext, get_project_context
+    from qdash.dbmodel.chip import ChipDocument
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

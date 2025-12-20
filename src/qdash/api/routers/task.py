@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.task import (
     InputParameterModel,
     ListTaskResponse,
@@ -15,6 +14,9 @@ from qdash.api.schemas.task import (
 )
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.repository.task_definition import MongoTaskDefinitionRepository
+
+if TYPE_CHECKING:
+    from qdash.api.lib.project import ProjectContext, get_project_context
 
 router = APIRouter()
 

@@ -109,7 +109,7 @@ class FakeRabi(FakeTask):
     }
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 
-    def preprocess(self, backend: FakeBackend, qid: str) -> PreProcessResult:  # noqa: ARG002
+    def preprocess(self, backend: FakeBackend, qid: str) -> PreProcessResult:
         """Preprocess the task."""
         return PreProcessResult(input_parameters=self.input_parameters)
 

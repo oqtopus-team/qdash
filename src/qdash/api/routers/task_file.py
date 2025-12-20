@@ -6,14 +6,11 @@ import ast
 import contextlib
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.logger import logger
-from qdash.api.lib.auth import get_current_active_user
 from qdash.api.lib.config_loader import ConfigLoader
-from qdash.api.schemas.auth import User
 from qdash.api.schemas.task_file import (
     FileNodeType,
     ListTaskFileBackendsResponse,
@@ -25,6 +22,12 @@ from qdash.api.schemas.task_file import (
     TaskInfo,
 )
 from qdash.common.paths import CALIBTASKS_DIR
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from qdash.api.lib.auth import get_current_active_user
+    from qdash.api.schemas.auth import User
 
 router = APIRouter()
 gunicorn_logger = logging.getLogger("gunicorn.error")

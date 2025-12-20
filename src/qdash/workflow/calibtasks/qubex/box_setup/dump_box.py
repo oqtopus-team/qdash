@@ -22,7 +22,7 @@ class DumpBox(QubexTask):
     ) -> PostProcessResult:
         return PostProcessResult(output_parameters={})
 
-    def run(self, backend: QubexBackend, qid: str) -> RunResult:  # noqa: ARG002
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
         for _id in exp.box_ids:
             box_info = {}

@@ -7,16 +7,10 @@ Business logic is delegated to ChipService for better testability.
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from qdash.api.dependencies import get_chip_service
 from qdash.api.lib.config_loader import ConfigLoader
-from qdash.api.lib.project import (
-    ProjectContext,
-    get_project_context,
-    get_project_context_owner,
-)
 from qdash.api.routers.task_file import (
     CALIBTASKS_BASE_PATH,
     collect_tasks_from_directory,
@@ -30,7 +24,15 @@ from qdash.api.schemas.chip import (
     MuxDetailResponse,
 )
 from qdash.api.services.chip_initializer import ChipInitializer
-from qdash.api.services.chip_service import ChipService
+
+if TYPE_CHECKING:
+    from qdash.api.dependencies import get_chip_service
+    from qdash.api.lib.project import (
+        ProjectContext,
+        get_project_context,
+        get_project_context_owner,
+    )
+    from qdash.api.services.chip_service import ChipService
 
 router = APIRouter()
 
@@ -123,7 +125,7 @@ def create_chip(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error creating chip {request.chip_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to create chip: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"Failed to create chip: {e!s}") from e
 
 
 @router.get(

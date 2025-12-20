@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends
-from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.tag import ListTagResponse, Tag
 from qdash.repository.tag import MongoTagRepository
+
+if TYPE_CHECKING:
+    from qdash.api.lib.project import ProjectContext, get_project_context
 
 router = APIRouter()
 

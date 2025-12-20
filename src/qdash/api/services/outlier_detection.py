@@ -59,7 +59,6 @@ class OutlierDetector(ABC):
         Returns:
             Tuple of (min_bound, max_bound)
         """
-        pass
 
     @abstractmethod
     def extract_parameter_values(
@@ -75,7 +74,6 @@ class OutlierDetector(ABC):
         Returns:
             Dictionary mapping qid to parameter value
         """
-        pass
 
     def detect_outliers(
         self,

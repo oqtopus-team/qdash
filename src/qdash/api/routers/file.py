@@ -7,7 +7,7 @@ import os
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 import yaml
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -15,8 +15,6 @@ from fastapi.logger import logger
 from fastapi.responses import FileResponse
 from git import Repo
 from git.exc import GitCommandError
-from qdash.api.lib.auth import get_current_active_user
-from qdash.api.schemas.auth import User
 from qdash.api.schemas.file import (
     FileTreeNode,
     GitPushRequest,
@@ -24,6 +22,10 @@ from qdash.api.schemas.file import (
     ValidateFileRequest,
 )
 from qdash.common.paths import QUBEX_CONFIG_BASE
+
+if TYPE_CHECKING:
+    from qdash.api.lib.auth import get_current_active_user
+    from qdash.api.schemas.auth import User
 
 router = APIRouter()
 gunicorn_logger = logging.getLogger("gunicorn.error")

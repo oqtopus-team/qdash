@@ -9,11 +9,14 @@ Uses ConfigLoader for unified configuration directory resolution.
 from __future__ import annotations
 
 from functools import lru_cache
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 from pydantic import BaseModel, Field
 from qdash.api.lib.config_loader import ConfigLoader
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class QubitPosition(BaseModel):

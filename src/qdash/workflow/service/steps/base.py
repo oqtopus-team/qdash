@@ -79,7 +79,6 @@ class CalibrationStep(Step):
     Examples: OneQubitCheck, OneQubitFineTune, TwoQubitCalibration
     """
 
-    pass
 
 
 @dataclass
@@ -92,4 +91,3 @@ class TransformStep(Step):
     Examples: FilterByMetric, FilterByStatus, GenerateCRSchedule
     """
 
-    pass

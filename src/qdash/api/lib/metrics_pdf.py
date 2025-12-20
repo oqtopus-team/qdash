@@ -10,18 +10,20 @@ import io
 import logging
 import math
 from datetime import datetime, timedelta, timezone
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import plotly.graph_objects as go
 from PIL import Image
 from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.lib.topology_config import TopologyDefinition, load_topology
-from qdash.api.schemas.metrics import ChipMetricsResponse
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
+
+if TYPE_CHECKING:
+    from qdash.api.schemas.metrics import ChipMetricsResponse
 
 logger = logging.getLogger(__name__)
 
@@ -517,7 +519,7 @@ class MetricsPDFGenerator:
     ) -> dict[str, Any]:
         """Calculate statistics for the metric values."""
         values = []
-        for key, metric_value in metric_data.items():
+        for metric_value in metric_data.values():
             if metric_value and metric_value.value is not None:
                 scaled_value = metric_value.value * metric_scale
                 values.append(scaled_value)
@@ -977,7 +979,7 @@ class MetricsPDFGenerator:
             schema_key = self._map_config_to_schema_key(metric_key, metric_type)
             metric_data = getattr(metrics_source, schema_key, None)
             if metric_data:
-                for key, metric_value in metric_data.items():
+                for metric_value in metric_data.values():
                     if metric_value and metric_value.value is not None:
                         return True
         return False
@@ -1110,7 +1112,7 @@ class MetricsPDFGenerator:
 
             # Extract and scale values
             values = []
-            for key, metric_value in metric_data.items():
+            for metric_value in metric_data.values():
                 if metric_value and metric_value.value is not None:
                     scaled_value = metric_value.value * metric_meta.scale
                     values.append(scaled_value)

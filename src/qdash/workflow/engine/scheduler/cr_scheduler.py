@@ -48,11 +48,11 @@ from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 import yaml
-from qdash.datamodel.chip import ChipModel
-from qdash.datamodel.qubit import QubitModel
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 if TYPE_CHECKING:
+    from qdash.datamodel.chip import ChipModel
+    from qdash.datamodel.qubit import QubitModel
     from qdash.repository.protocols import ChipRepository
 
 logger = logging.getLogger(__name__)

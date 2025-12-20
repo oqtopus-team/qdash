@@ -13,13 +13,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from prefect import get_run_logger
-from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.backend.factory import create_backend
-from qdash.workflow.engine.config import CalibConfig
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.task.context import TaskContext
 
 if TYPE_CHECKING:
+    from qdash.workflow.engine.backend.base import BaseBackend
+    from qdash.workflow.engine.config import CalibConfig
     from qdash.workflow.service.github import GitHubIntegration
 
 

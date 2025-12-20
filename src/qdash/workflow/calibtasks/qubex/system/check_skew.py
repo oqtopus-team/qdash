@@ -41,7 +41,7 @@ class CheckSkew(QubexTask):
         with (Path.cwd() / Path(filename)).open() as file:
             return yaml.safe_load(file)
 
-    def run(self, backend: QubexBackend, qid: str) -> RunResult:  # noqa: ARG002
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:
         chip_id = backend.config.get("chip_id", None)
         qubex_paths = get_qubex_paths()
         skew_file_path = str(qubex_paths.skew_yaml(chip_id))
@@ -65,7 +65,7 @@ class CheckSkew(QubexTask):
             exp.system_manager.experiment_system.control_system.clock_master_address
         )
         box_ids = exp.box_ids
-        all_box_ids = list(set(list(box_ids) + [ref_port]))
+        all_box_ids = list({*list(box_ids), ref_port})
         skew = Skew.from_yaml(
             str(skew_file_path),
             box_yaml=str(box_file_path),

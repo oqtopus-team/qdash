@@ -22,7 +22,7 @@ class LinkUp(QubexTask):
     ) -> PostProcessResult:
         return PostProcessResult(output_parameters={})
 
-    def run(self, backend: QubexBackend, qid: str) -> RunResult:  # noqa: ARG002
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
         exp.linkup()
         self.save_calibration(backend)

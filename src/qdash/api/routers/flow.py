@@ -262,7 +262,7 @@ async def save_flow(
             ["ruff", "format", str(file_path)],
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=10, check=False,
         )
         if result.returncode == 0:
             logger.info(f"Auto-formatted flow code with ruff: {file_path}")
@@ -808,7 +808,7 @@ async def update_flow_schedule(
                 except ValueError as e:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Invalid cron expression '{request.cron}': {str(e)}",
+                        detail=f"Invalid cron expression '{request.cron}': {e!s}",
                     )
 
                 # Use timezone from request (defaults to Asia/Tokyo in schema)
@@ -1085,7 +1085,7 @@ async def schedule_flow(
         logger.error(f"Deployment {flow.deployment_id} not found in Prefect: {e}")
         raise HTTPException(
             status_code=400,
-            detail=f"Flow '{name}' deployment not found in Prefect. Please re-save the flow. Error: {str(e)}",
+            detail=f"Flow '{name}' deployment not found in Prefect. Please re-save the flow. Error: {e!s}",
         )
 
     # Merge parameters - include username, chip_id, and project_id from flow metadata
@@ -1108,7 +1108,7 @@ async def schedule_flow(
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid cron expression '{request.cron}': {str(e)}",
+                detail=f"Invalid cron expression '{request.cron}': {e!s}",
             )
 
         try:
@@ -1225,7 +1225,7 @@ async def schedule_flow(
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid scheduled_time format: {str(e)}",
+                detail=f"Invalid scheduled_time format: {e!s}",
             )
 
         try:
