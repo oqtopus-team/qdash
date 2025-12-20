@@ -12,7 +12,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
       MONGO_INIT_DATABASE: qubex
     volumes:
-      - ${MONGO_DATA_PATH}:/data/db
+      - ${MONGO_DATA_PATH:-./mongo_data/data/db}:/data/db
     networks:
       - custom_net
   mongo-express:
@@ -43,7 +43,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - ${POSTGRES_DATA_PATH}:/var/lib/postgresql/data
+      - ${POSTGRES_DATA_PATH:-./postgres_data}:/var/lib/postgresql/data
     networks:
       - custom_net
   prefect-server:
@@ -78,8 +78,8 @@ services:
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/config.py:/app/qdash/config.py
-      - ${CALIB_DATA_PATH}:/app/calib_data
-      - ${CONFIG_PATH}:/app/config/qubex
+      - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
+      - ${CONFIG_PATH:-./config/qubex}:/app/config/qubex
     working_dir: /app/qdash/workflow
     command: python deployment/oqtopus/main.py
     environment:
@@ -130,8 +130,8 @@ services:
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/config.py:/app/qdash/config.py
-      - ${CALIB_DATA_PATH}:/app/calib_data
-      - ${CONFIG_PATH}:/app/config/qubex
+      - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
+      - ${CONFIG_PATH:-./config/qubex}:/app/config/qubex
     working_dir: /app/qdash/workflow
     command: >
       sh -c "python setup_work_pool.py &&
@@ -160,9 +160,8 @@ services:
       - ./src/qdash/workflow/templates:/app/qdash/workflow/templates # Flow templates
       - ./src/qdash/workflow/service:/app/qdash/workflow/service # Calibration service modules
       - ./config:/app/config # Metrics metadata and other config files
-      - ${CALIB_DATA_PATH}:/app/calib_data
-      - ${QPU_DATA_PATH}:/app/qpu_data
-      - ${CONFIG_PATH}:/app/config/qubex
+      - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
+      - ${CONFIG_PATH:-./config/qubex}:/app/config/qubex
       - ${CALIBTASKS_PATH:-./src/qdash/workflow/calibtasks}:/app/src/qdash/workflow/calibtasks
     working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
@@ -178,7 +177,6 @@ services:
     environment:
       - PYTHONPATH=/app:/app/qdash:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
       - CALIB_DATA_PATH=/app/calib_data
-      - QPU_DATA_PATH=/app/qpu_data
       - PREFECT_API_URL=http://prefect-server:4200/api
       - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
     networks:

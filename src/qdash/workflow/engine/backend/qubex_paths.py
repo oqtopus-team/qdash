@@ -3,31 +3,30 @@
 This module provides centralized path management for Qubex-specific
 directories and configuration files.
 
-Environment Variables
----------------------
-QDASH_QUBEX_CONFIG_BASE : str
-    Base directory for Qubex chip configurations.
-    Default: /app/config/qubex
+Container-side paths are defined as constants. Host-side paths should be
+configured via .env and docker-compose.yaml volume mounts.
 
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
+
+# =============================================================================
+# Container-side path constants
+# =============================================================================
+# These paths are fixed inside the container. To customize where data is stored
+# on the host, configure volume mounts in docker-compose.yaml and .env.
+
+QUBEX_CONFIG_BASE = Path("/app/config/qubex")
+"""Base directory for Qubex chip configurations."""
+
+DEFAULT_CALIB_NOTE_PATH = Path("/app/calib_note.json")
+"""Default calibration note path (fallback)."""
 
 
 class QubexPaths:
     """Resolves paths for Qubex backend configuration files.
-
-    This class provides methods to generate paths for chip-specific
-    configuration files, parameters, and calibration notes.
-
-    Parameters
-    ----------
-    config_base : str | None
-        Base directory for Qubex configurations. If None, uses
-        QDASH_QUBEX_CONFIG_BASE environment variable or default.
 
     Examples
     --------
@@ -40,18 +39,8 @@ class QubexPaths:
 
     """
 
-    DEFAULT_CONFIG_BASE = "/app/config/qubex"
-    DEFAULT_CALIB_NOTE_PATH = "/app/calib_note.json"
-
-    def __init__(
-        self,
-        config_base: str | None = None,
-    ) -> None:
-        self._config_base = Path(
-            config_base
-            if config_base is not None
-            else os.getenv("QDASH_QUBEX_CONFIG_BASE", self.DEFAULT_CONFIG_BASE)
-        )
+    def __init__(self, config_base: Path | None = None) -> None:
+        self._config_base = config_base or QUBEX_CONFIG_BASE
 
     @property
     def config_base(self) -> Path:
@@ -61,74 +50,26 @@ class QubexPaths:
     @property
     def default_calib_note_path(self) -> Path:
         """Default calibration note path (fallback)."""
-        return Path(self.DEFAULT_CALIB_NOTE_PATH)
+        return DEFAULT_CALIB_NOTE_PATH
 
     # -------------------------------------------------------------------------
     # Chip-specific directories
     # -------------------------------------------------------------------------
 
     def chip_dir(self, chip_id: str) -> Path:
-        """Get the base directory for a chip's configuration.
-
-        Parameters
-        ----------
-        chip_id : str
-            Chip identifier (e.g., "64Q", "64Qv1").
-
-        Returns
-        -------
-        Path
-            Path to the chip's base directory.
-
-        """
+        """Get the base directory for a chip's configuration."""
         return self._config_base / chip_id
 
     def config_dir(self, chip_id: str) -> Path:
-        """Get the config directory for a chip.
-
-        Parameters
-        ----------
-        chip_id : str
-            Chip identifier.
-
-        Returns
-        -------
-        Path
-            Path to the chip's config directory.
-
-        """
+        """Get the config directory for a chip."""
         return self.chip_dir(chip_id) / "config"
 
     def params_dir(self, chip_id: str) -> Path:
-        """Get the params directory for a chip.
-
-        Parameters
-        ----------
-        chip_id : str
-            Chip identifier.
-
-        Returns
-        -------
-        Path
-            Path to the chip's params directory.
-
-        """
+        """Get the params directory for a chip."""
         return self.chip_dir(chip_id) / "params"
 
     def calibration_dir(self, chip_id: str) -> Path:
-        """Get the calibration directory for a chip.
-
-        Parameters
-        ----------
-        chip_id : str
-            Chip identifier.
-
-        Returns
-        -------
-        Path
-            Path to the chip's calibration directory.
-
-        """
+        """Get the calibration directory for a chip."""
         return self.chip_dir(chip_id) / "calibration"
 
     # -------------------------------------------------------------------------
@@ -136,51 +77,15 @@ class QubexPaths:
     # -------------------------------------------------------------------------
 
     def wiring_yaml(self, chip_id: str) -> Path:
-        """Get the wiring configuration file path.
-
-        Parameters
-        ----------
-        chip_id : str
-            Chip identifier.
-
-        Returns
-        -------
-        Path
-            Path to the wiring.yaml file.
-
-        """
+        """Get the wiring configuration file path."""
         return self.config_dir(chip_id) / "wiring.yaml"
 
     def box_yaml(self, chip_id: str) -> Path:
-        """Get the box configuration file path.
-
-        Parameters
-        ----------
-        chip_id : str
-            Chip identifier.
-
-        Returns
-        -------
-        Path
-            Path to the box.yaml file.
-
-        """
+        """Get the box configuration file path."""
         return self.config_dir(chip_id) / "box.yaml"
 
     def skew_yaml(self, chip_id: str) -> Path:
-        """Get the skew configuration file path.
-
-        Parameters
-        ----------
-        chip_id : str
-            Chip identifier.
-
-        Returns
-        -------
-        Path
-            Path to the skew.yaml file.
-
-        """
+        """Get the skew configuration file path."""
         return self.config_dir(chip_id) / "skew.yaml"
 
     # -------------------------------------------------------------------------
@@ -188,35 +93,11 @@ class QubexPaths:
     # -------------------------------------------------------------------------
 
     def params_yaml(self, chip_id: str) -> Path:
-        """Get the params.yaml file path.
-
-        Parameters
-        ----------
-        chip_id : str
-            Chip identifier.
-
-        Returns
-        -------
-        Path
-            Path to the params.yaml file.
-
-        """
+        """Get the params.yaml file path."""
         return self.params_dir(chip_id) / "params.yaml"
 
     def props_yaml(self, chip_id: str) -> Path:
-        """Get the props.yaml file path.
-
-        Parameters
-        ----------
-        chip_id : str
-            Chip identifier.
-
-        Returns
-        -------
-        Path
-            Path to the props.yaml file.
-
-        """
+        """Get the props.yaml file path."""
         return self.params_dir(chip_id) / "props.yaml"
 
     # -------------------------------------------------------------------------
@@ -224,39 +105,23 @@ class QubexPaths:
     # -------------------------------------------------------------------------
 
     def calib_note_json(self, chip_id: str) -> Path:
-        """Get the calibration note JSON file path.
-
-        Parameters
-        ----------
-        chip_id : str
-            Chip identifier.
-
-        Returns
-        -------
-        Path
-            Path to the calib_note.json file.
-
-        """
+        """Get the calibration note JSON file path."""
         return self.calibration_dir(chip_id) / "calib_note.json"
 
 
-# Default instance for convenience
+# Default instance
 _default_qubex_paths: QubexPaths | None = None
 
 
 def get_qubex_paths() -> QubexPaths:
-    """Get the default QubexPaths instance.
-
-    Returns a singleton instance of QubexPaths using environment
-    variables or defaults.
-
-    Returns
-    -------
-    QubexPaths
-        The default QubexPaths instance.
-
-    """
+    """Get the default QubexPaths instance."""
     global _default_qubex_paths
     if _default_qubex_paths is None:
         _default_qubex_paths = QubexPaths()
     return _default_qubex_paths
+
+
+def reset_qubex_paths() -> None:
+    """Reset the cached QubexPaths instance."""
+    global _default_qubex_paths
+    _default_qubex_paths = None

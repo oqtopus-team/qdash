@@ -1,16 +1,23 @@
-# QDash UI Settings
-# This file contains default settings for the QDash UI
+# QDash Settings
+# This file contains default settings for the QDash application.
+#
+# Note: Container-side paths (like /app/calib_data) are defined as constants
+# in source code. To customize host-side paths, use .env and docker-compose.yaml.
 
-# Task Files Editor Settings
-task_files:
-  # Default backend to select when opening the Task Files page
-  # Available backends: qubex, fake
-  default_backend: qubex
+# =============================================================================
+# UI Settings
+# =============================================================================
+ui:
+  # Task Files Editor Settings
+  task_files:
+    # Default backend to select when opening the Task Files page
+    # Available backends: qubex, fake
+    default_backend: qubex
 
-  # Default view mode for the sidebar
-  # Options: tasks, files
-  default_view_mode: tasks
+    # Default view mode for the sidebar
+    # Options: tasks, files
+    default_view_mode: tasks
 
-  # Task list sort order
-  # Options: type_then_name, name_only, file_path
-  sort_order: type_then_name
+    # Task list sort order
+    # Options: type_then_name, name_only, file_path
+    sort_order: type_then_name

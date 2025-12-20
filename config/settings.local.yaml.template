@@ -1,0 +1,10 @@
+# Local Settings Override Template
+# Copy this file to settings.local.yaml and customize for your environment.
+# settings.local.yaml is gitignored and will not be committed.
+#
+# Only include the settings you want to override.
+
+# Example: Override UI settings
+# ui:
+#   task_files:
+#     default_backend: fake
