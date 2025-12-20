@@ -1,4 +1,14 @@
-"""API schema definitions."""
+"""API Schemas.
+
+Defines request/response types for FastAPI endpoints.
+TypeScript types for the frontend are auto-generated based on OpenAPI spec.
+
+Related modules:
+- datamodel: Domain models for business logic
+- dbmodel: MongoDB persistence models
+
+Note: Run `task generate` to regenerate frontend types after modifying this directory.
+"""
 
 from qdash.api.schemas.auth import User, UserCreate
 from qdash.api.schemas.backend import BackendResponseModel
