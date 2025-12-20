@@ -220,24 +220,21 @@ class GitHubIntegration:
         """
         import json
 
-        from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+        from qdash.workflow.engine.repository import MongoCalibrationNoteRepository
         from qdash.workflow.worker.tasks.push_github import push_github
 
         # 1. Fetch master note from MongoDB
-        latest = (
-            CalibrationNoteDocument.find(
-                {"username": self.username, "task_id": "master", "chip_id": self.chip_id}
-            )
-            .sort([("timestamp", -1)])  # Sort by timestamp descending
-            .limit(1)
-            .run()
+        repo = MongoCalibrationNoteRepository()
+        latest_note = repo.find_latest_master(
+            chip_id=self.chip_id,
+            username=self.username,
         )
 
-        if not latest:
+        if latest_note is None:
             msg = f"No master calibration note found in MongoDB for user {self.username}"
             raise FileNotFoundError(msg)
 
-        master_note = latest[0].note
+        master_note = latest_note.note
 
         # 2. Write to /app/config/qubex/{chip_id}/calibration/calib_note.json
         calib_note_dir = f"/app/config/qubex/{self.chip_id}/calibration"

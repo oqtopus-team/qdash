@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from qdash.workflow.calibtasks.base import BaseTask, RunResult
-from qdash.workflow.engine.calibration.util import qid_to_label
+from qdash.workflow.engine.util import qid_to_label
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.fake import FakeBackend

@@ -9,68 +9,18 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from prefect import get_run_logger, task
+from prefect import get_run_logger
 
-from qdash.workflow.engine.calibration import OneQubitScheduler
+from qdash.workflow.engine import OneQubitScheduler
+from qdash.workflow.service._internal.scheduling_tasks import (
+    calibrate_mux_qubits as _calibrate_mux_qubits,
+    calibrate_step_qubits_parallel as _calibrate_step_qubits_parallel,
+)
+from qdash.workflow.service.calib_service import finish_calibration, get_session, init_calibration
 from qdash.workflow.service.github import ConfigFileType, GitHubPushConfig
-from qdash.workflow.service.session import finish_calibration, get_session, init_calibration
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.session import CalibService
-
-
-# =============================================================================
-# Internal Prefect Tasks
-# =============================================================================
-
-
-@task
-def _calibrate_mux_qubits(qids: list[str], tasks: list[str]) -> dict[str, Any]:
-    """Execute tasks for qubits in a single MUX sequentially."""
-    logger = get_run_logger()
-    session = get_session()
-    results = {}
-
-    for qid in qids:
-        try:
-            result = {}
-            for task_name in tasks:
-                task_result = session.execute_task(task_name, qid)
-                result[task_name] = task_result
-            result["status"] = "success"
-        except Exception as e:
-            logger.error(f"Failed to calibrate qubit {qid}: {e}")
-            result = {"status": "failed", "error": str(e)}
-        results[qid] = result
-
-    return results
-
-
-@task
-def _calibrate_single_qubit(qid: str, tasks: list[str]) -> tuple[str, dict[str, Any]]:
-    """Execute tasks for a single qubit."""
-    logger = get_run_logger()
-    session = get_session()
-
-    try:
-        result = {}
-        for task_name in tasks:
-            task_result = session.execute_task(task_name, qid)
-            result[task_name] = task_result
-        result["status"] = "success"
-    except Exception as e:
-        logger.error(f"Failed to calibrate qubit {qid}: {e}")
-        result = {"status": "failed", "error": str(e)}
-
-    return qid, result
-
-
-@task
-def _calibrate_step_qubits_parallel(parallel_qids: list[str], tasks: list[str]) -> dict[str, Any]:
-    """Execute tasks for all qubits in a synchronized step in parallel."""
-    futures = [_calibrate_single_qubit.submit(qid, tasks) for qid in parallel_qids]
-    pair_results = [f.result() for f in futures]
-    return {qid: result for qid, result in pair_results}
+    from qdash.workflow.service.calib_service import CalibService
 
 
 # =============================================================================
@@ -87,6 +37,7 @@ class OneQubitConfig:
     tasks: list[str]
     flow_name: str | None
     project_id: str | None
+    qids: list[str] | None = None  # Explicit qubit IDs (overrides mux_ids if set)
 
 
 # =============================================================================
@@ -112,11 +63,26 @@ class OneQubitStrategy(ABC):
         Returns:
             Dictionary of results organized by stage
         """
-        pass
+        ...
 
     def _get_wiring_config_path(self, chip_id: str) -> str:
         """Get the wiring config path for a chip."""
         return f"/app/config/qubex/{chip_id}/config/wiring.yaml"
+
+    def _filter_qids(self, qids: list[str], allowed_qids: list[str] | None) -> list[str]:
+        """Filter qids to only include those in allowed_qids.
+
+        Args:
+            qids: List of qubit IDs to filter
+            allowed_qids: List of allowed qubit IDs (None means no filtering)
+
+        Returns:
+            Filtered list of qubit IDs
+        """
+        if allowed_qids is None:
+            return qids
+        allowed_set = set(allowed_qids)
+        return [qid for qid in qids if qid in allowed_set]
 
 
 # =============================================================================
@@ -155,7 +121,20 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
 
         for stage_info in schedule.stages:
             stage_name = f"Box_{stage_info.box_type}"
-            parallel_groups = stage_info.parallel_groups
+
+            # Filter parallel groups by allowed qids (if config.qids is set)
+            filtered_groups = [
+                self._filter_qids(group, config.qids) for group in stage_info.parallel_groups
+            ]
+            # Remove empty groups
+            parallel_groups = [g for g in filtered_groups if g]
+
+            # Skip stage if no qubits remain after filtering
+            if not parallel_groups:
+                continue
+
+            # Get filtered qids for this stage
+            stage_qids = [qid for group in parallel_groups for qid in group]
 
             # Determine flow name for this stage
             stage_flow_name = f"{config.flow_name}_{stage_name}" if config.flow_name else stage_name
@@ -163,7 +142,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
             init_calibration(
                 cal_service.username,
                 cal_service.chip_id,
-                stage_info.qids,
+                stage_qids,
                 flow_name=stage_flow_name,
                 tags=[config.flow_name] if config.flow_name else None,
                 project_id=config.project_id,
@@ -177,7 +156,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
                     "box": stage_info.box_type,
                     "schedule": parallel_groups,
                     "total_groups": len(parallel_groups),
-                    "total_qubits": len(stage_info.qids),
+                    "total_qubits": len(stage_qids),
                 },
             )
 
@@ -239,6 +218,13 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
         box_session_results = {}
 
         for step in schedule.steps:
+            # Filter parallel_qids by allowed qids (if config.qids is set)
+            filtered_qids = self._filter_qids(step.parallel_qids, config.qids)
+
+            # Skip step if no qubits remain after filtering
+            if not filtered_qids:
+                continue
+
             # Start new session when box type changes
             if step.box_type != current_box_type:
                 # Finish previous session
@@ -252,10 +238,19 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
                 # Start new session
                 current_box_type = step.box_type
                 box_steps = schedule.get_steps_by_box(current_box_type)
-                box_qids = [qid for s in box_steps for qid in s.parallel_qids]
 
-                # Build schedule info: list of parallel qid groups per step
-                schedule_steps = [s.parallel_qids for s in box_steps]
+                # Filter box_qids by allowed qids
+                box_qids = self._filter_qids(
+                    [qid for s in box_steps for qid in s.parallel_qids],
+                    config.qids,
+                )
+
+                # Build schedule info: list of filtered parallel qid groups per step
+                schedule_steps = [
+                    self._filter_qids(s.parallel_qids, config.qids) for s in box_steps
+                ]
+                # Remove empty steps from schedule info
+                schedule_steps = [s for s in schedule_steps if s]
 
                 stage_name = f"Box_{current_box_type}"
                 stage_flow_name = (
@@ -277,14 +272,14 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
                     note={
                         "type": "1-qubit-synchronized",
                         "box": current_box_type,
-                        "total_steps": len(box_steps),
+                        "total_steps": len(schedule_steps),
                         "schedule": schedule_steps,
                     },
                 )
 
             # Execute synchronized step (all qubits in parallel)
             step_results = _calibrate_step_qubits_parallel(
-                parallel_qids=step.parallel_qids,
+                parallel_qids=filtered_qids,
                 tasks=config.tasks,
             )
             box_session_results.update(step_results)

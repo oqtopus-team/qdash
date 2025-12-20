@@ -33,7 +33,7 @@ The scheduler solves the parallel CR gate scheduling problem:
 ### Class Structure
 
 ```python
-from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
+from qdash.workflow.engine.cr_scheduler import CRScheduler
 
 # Initialize scheduler
 scheduler = CRScheduler(
@@ -279,8 +279,8 @@ The scheduler now supports a pluggable architecture for filters and schedulers, 
 #### Basic Plugin Usage
 
 ```python
-from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
-from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+from qdash.workflow.engine.cr_scheduler import CRScheduler
+from qdash.workflow.engine.cr_scheduler_plugins import (
     CandidateQubitFilter,
     FrequencyDirectionalityFilter,
     FidelityFilter,
@@ -332,7 +332,7 @@ filters = None  # Default behavior
 ### Creating Custom Filters
 
 ```python
-from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+from qdash.workflow.engine.cr_scheduler_plugins import (
     CRPairFilter,
     FilterContext,
 )
@@ -378,7 +378,7 @@ class MyCustomFilter(CRPairFilter):
 ### Creating Custom Schedulers
 
 ```python
-from qdash.workflow.engine.calibration.cr_scheduler_plugins import (
+from qdash.workflow.engine.cr_scheduler_plugins import (
     CRSchedulingStrategy,
     ScheduleContext,
 )
@@ -424,7 +424,7 @@ class MyCustomScheduler(CRSchedulingStrategy):
 ### Basic Usage
 
 ```python
-from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
+from qdash.workflow.engine.cr_scheduler import CRScheduler
 
 scheduler = CRScheduler(username="alice", chip_id="64Qv3")
 result = scheduler.generate()
@@ -492,7 +492,7 @@ Assuming ~50% of edges pass frequency filter (56 CR pairs from 112 total edges):
 
 ```python
 from prefect import flow
-from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
+from qdash.workflow.engine.cr_scheduler import CRScheduler
 
 @flow
 def calibrate_cr_gates(username: str, chip_id: str):

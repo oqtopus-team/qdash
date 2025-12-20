@@ -64,7 +64,7 @@ Frequency distribution (approximate MHz):
 Uses natural qubit ID order within each MUX.
 
 ```python
-from qdash.workflow.engine.calibration import (
+from qdash.workflow.engine import (
     OneQubitScheduler,
     DefaultOrderingStrategy,
 )
@@ -90,7 +90,7 @@ schedule = scheduler.generate_from_mux(
 Creates a checkerboard pattern across the chip where simultaneously calibrated qubits are spatially and frequency-separated.
 
 ```python
-from qdash.workflow.engine.calibration import (
+from qdash.workflow.engine import (
     OneQubitScheduler,
     CheckerboardOrderingStrategy,
 )
@@ -187,7 +187,7 @@ X = Calibrating, . = Idle
 ### Basic Usage
 
 ```python
-from qdash.workflow.engine.calibration import (
+from qdash.workflow.engine import (
     OneQubitScheduler,
     CheckerboardOrderingStrategy,
 )
@@ -211,7 +211,7 @@ for stage in schedule.stages:
 
 ```python
 from prefect import flow, task
-from qdash.workflow.engine.calibration import (
+from qdash.workflow.engine import (
     OneQubitScheduler,
     CheckerboardOrderingStrategy,
 )
@@ -263,7 +263,7 @@ def frequency_aware_calibration(username: str, chip_id: str):
 You can create custom ordering strategies by extending `MuxOrderingStrategy`:
 
 ```python
-from qdash.workflow.engine.calibration.scheduler.one_qubit_plugins import (
+from qdash.workflow.engine.scheduler.one_qubit_plugins import (
     MuxOrderingStrategy,
     OrderingContext,
 )
@@ -400,7 +400,7 @@ Group 2: [4, 7, 14]  → Steps 4-7
 ### Usage
 
 ```python
-from qdash.workflow.engine.calibration import OneQubitScheduler
+from qdash.workflow.engine import OneQubitScheduler
 
 scheduler = OneQubitScheduler(chip_id="64Qv3")
 
@@ -447,7 +447,7 @@ schedule_dict = schedule.to_dict()
 
 ```python
 from prefect import flow, task
-from qdash.workflow.engine.calibration import OneQubitScheduler
+from qdash.workflow.engine import OneQubitScheduler
 from qdash.workflow.service import init_calibration, get_session, finish_calibration
 
 @task

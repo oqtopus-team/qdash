@@ -2,11 +2,12 @@ import math
 import uuid
 from copy import deepcopy
 from enum import Enum
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 import numpy as np
 import pendulum
 from pydantic import BaseModel, Field, field_validator
+
 from qdash.datamodel.system_info import SystemInfoModel
 
 SCHDULED = "scheduled"
@@ -15,6 +16,18 @@ COMPLETED = "completed"
 FAILED = "failed"
 PENDING = "pending"
 SKIPPED = "skipped"
+
+# Task type definitions
+TaskType = Literal["qubit", "coupling", "global", "system"]
+
+
+class TaskTypes:
+    """Constants for task types."""
+
+    QUBIT: Final[TaskType] = "qubit"
+    COUPLING: Final[TaskType] = "coupling"
+    GLOBAL: Final[TaskType] = "global"
+    SYSTEM: Final[TaskType] = "system"
 
 
 class InputParameterModel(BaseModel):

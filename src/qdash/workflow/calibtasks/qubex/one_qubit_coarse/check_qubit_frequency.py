@@ -10,7 +10,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
-from qdash.workflow.engine.calibration.task.types import TaskTypes
+from qdash.datamodel.task import TaskTypes
 
 
 class CheckQubitFrequency(QubexTask):

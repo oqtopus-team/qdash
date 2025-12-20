@@ -7,7 +7,7 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qdash.workflow.engine.calibration.task.types import TaskTypes
+from qdash.datamodel.task import TaskTypes
 
 
 class RabiOscillation(QubexTask):

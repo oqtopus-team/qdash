@@ -8,36 +8,20 @@
     "function_name": "simple_calibration"
   },
   {
-    "id": "one_qubit_check",
-    "name": "1Q Check",
-    "description": "Basic 1-qubit characterization (Rabi, HPI, T1, T2, Ramsey). Supports synchronized/scheduled modes.",
+    "id": "one_qubit",
+    "name": "1Q Calibration",
+    "description": "1-qubit calibration using step-based pipeline. Supports check-only or full calibration with fine-tune.",
     "category": "production",
-    "filename": "one_qubit_check.py",
-    "function_name": "one_qubit_check"
-  },
-  {
-    "id": "one_qubit_full",
-    "name": "1Q Full",
-    "description": "Advanced 1-qubit calibration (DRAG, RB, IRB). Supports synchronized/scheduled modes.",
-    "category": "production",
-    "filename": "one_qubit_full.py",
-    "function_name": "one_qubit_full"
+    "filename": "one_qubit.py",
+    "function_name": "one_qubit"
   },
   {
     "id": "full_calibration",
     "name": "Full Calibration",
-    "description": "Complete calibration sequence: 1Q Check -> 1Q Full -> 2Q (3 separate executions).",
+    "description": "Complete calibration using step-based pipeline: 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule -> 2Q.",
     "category": "production",
     "filename": "full_calibration.py",
     "function_name": "full_calibration"
-  },
-  {
-    "id": "parameter_sweep",
-    "name": "Parameter Sweep",
-    "description": "Execute a task repeatedly with different parameter values for exploring parameter space.",
-    "category": "advanced",
-    "filename": "parameter_sweep.py",
-    "function_name": "parameter_sweep"
   },
   {
     "id": "parallel_retry",
@@ -46,14 +30,6 @@
     "category": "advanced",
     "filename": "retry.py",
     "function_name": "parallel_retry_calibration"
-  },
-  {
-    "id": "two_qubit",
-    "name": "Two-Qubit Calibration",
-    "description": "2-qubit coupling calibration (CR, ZX90, Bell) with automatic CRScheduler for MUX conflict handling.",
-    "category": "coupling",
-    "filename": "two_qubit.py",
-    "function_name": "two_qubit_calibration"
   },
   {
     "id": "check_skew",

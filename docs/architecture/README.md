@@ -87,7 +87,7 @@ Each architecture document should include:
 Use Python syntax highlighting:
 
 ```python
-from qdash.workflow.engine.calibration.cr_scheduler import CRScheduler
+from qdash.workflow.engine.cr_scheduler import CRScheduler
 
 scheduler = CRScheduler(username="alice", chip_id="64Qv3")
 result = scheduler.generate()

@@ -1,31 +1,23 @@
 """Simple calibration flow template.
 
 The simplest template for learning and basic calibration tasks.
-
-Execution pattern:
-    groups = [["0", "1"], ["2", "3"]]
-
-    ┌─────────────────────────────────────────────────────────────┐
-    │  PARALLEL: Groups submitted simultaneously                  │
-    ├─────────────────────────────────────────────────────────────┤
-    │  Group0 ["0", "1"]: Q0 → Q1 (SEQUENTIAL)                   │
-    │                       ↓                      PARALLEL       │
-    │  Group1 ["2", "3"]: Q2 → Q3 (SEQUENTIAL)                   │
-    └─────────────────────────────────────────────────────────────┘
-
-    Groups run in PARALLEL, qubits within group run SEQUENTIALLY.
+Uses the step-based API with CustomOneQubit.
 
 Example:
     simple_calibration(
         username="alice",
         chip_id="64Qv3",
+        qids=["0", "1", "2", "3"],
     )
 """
 
 from typing import Any
 
 from prefect import flow
+
 from qdash.workflow.service import CalibService
+from qdash.workflow.service.steps import CustomOneQubit
+from qdash.workflow.service.targets import QubitTargets
 
 
 @flow
@@ -41,26 +33,33 @@ def simple_calibration(
     Args:
         username: User name (from UI)
         chip_id: Chip ID (from UI)
-        qids: Not used (groups defined below)
+        qids: Qubit IDs to calibrate (default: ["0", "1", "2", "3"])
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
+
+    Returns:
+        Pipeline results
     """
     # =========================================================================
     # Configuration
     # =========================================================================
 
-    # Qubit groups
-    # - Groups run in PARALLEL (submitted simultaneously)
-    # - Qubits within each group run SEQUENTIALLY (0→1, 2→3)
-    groups = [
-        ["0", "1"],  # Group 0: Q0 → Q1 sequential
-        ["2", "3"],  # Group 1: Q2 → Q3 sequential
-    ]
+    if qids is None:
+        qids = ["0", "1", "2", "3"]
 
+    # Define target qubits
+    targets = QubitTargets(qids=qids)
+
+    # Define tasks to run
     tasks = [
         "CheckRabi",
         "CreateHPIPulse",
         "CheckHPIPulse",
+    ]
+
+    # Define steps
+    steps = [
+        CustomOneQubit(step_name="simple_tasks", tasks=tasks),
     ]
 
     # =========================================================================
@@ -68,4 +67,4 @@ def simple_calibration(
     # =========================================================================
 
     cal = CalibService(username, chip_id, flow_name=flow_name, project_id=project_id)
-    return cal.run(groups=groups, tasks=tasks)
+    return cal.run(targets, steps=steps)
