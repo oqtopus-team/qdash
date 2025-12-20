@@ -9,7 +9,7 @@ from typing import Protocol, runtime_checkable
 
 from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.task import BaseTaskResultModel, CalibDataModel
-from qdash.workflow.engine.repository import (
+from qdash.repository import (
     MongoChipHistoryRepository,
     MongoChipRepository,
     MongoTaskResultHistoryRepository,

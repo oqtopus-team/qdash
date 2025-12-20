@@ -1441,7 +1441,7 @@
           "execution"
         ],
         "summary": "Get the execution lock status",
-        "description": "Fetch the current status of the execution lock.\n\nThe execution lock prevents concurrent calibration workflows from running\nsimultaneously. This endpoint checks whether a lock is currently held.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nExecutionLockStatusResponse\n    Response containing lock status (True if locked, False if available)",
+        "description": "Fetch the current status of the execution lock.\n\nThe execution lock prevents concurrent calibration workflows from running\nsimultaneously. This endpoint checks whether a lock is currently held.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\n\nReturns\n-------\nExecutionLockStatusResponse\n    Response containing lock status (True if locked, False if available)",
         "operationId": "getExecutionLockStatus",
         "security": [
           {
@@ -1496,7 +1496,7 @@
           "execution"
         ],
         "summary": "List executions",
-        "description": "List executions for a given chip with pagination.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
+        "description": "List executions for a given chip with pagination.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
         "operationId": "listExecutions",
         "security": [
           {
@@ -1589,7 +1589,7 @@
           "execution"
         ],
         "summary": "Get an execution by its ID",
-        "description": "Return the execution detail by its ID.\n\nParameters\n----------\nexecution_id : str\n    ID of the execution to fetch\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
+        "description": "Return the execution detail by its ID.\n\nParameters\n----------\nexecution_id : str\n    ID of the execution to fetch\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
         "operationId": "getExecution",
         "security": [
           {
@@ -1991,7 +1991,7 @@
           "calibration"
         ],
         "summary": "Get the calibration note",
-        "description": "Get the latest calibration note for the master task.\n\nRetrieves the most recent calibration note from the database, sorted by timestamp\nin descending order. The note contains metadata about calibration parameters\nand configuration.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nCalibrationNoteResponse\n    The latest calibration note containing username, execution_id, task_id,\n    note content, and timestamp",
+        "description": "Get the latest calibration note for the master task.\n\nRetrieves the most recent calibration note from the database, sorted by timestamp\nin descending order. The note contains metadata about calibration parameters\nand configuration.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\ncalibration_service : CalibrationService\n    Service for calibration operations\n\nReturns\n-------\nCalibrationNoteResponse\n    The latest calibration note containing username, execution_id, task_id,\n    note content, and timestamp\n\nRaises\n------\nHTTPException\n    404 if no calibration note is found",
         "operationId": "getCalibrationNote",
         "security": [
           {
@@ -2102,7 +2102,7 @@
           "chip"
         ],
         "summary": "List all chips",
-        "description": "List all chips in the current project.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nListChipsResponse\n    Wrapped list of available chips",
+        "description": "List all chips in the current project.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nListChipsResponse\n    Wrapped list of available chips",
         "operationId": "listChips",
         "security": [
           {
@@ -2220,7 +2220,7 @@
           "chip"
         ],
         "summary": "Get available dates for a chip",
-        "description": "Fetch available dates for a chip from execution counter.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nChipDatesResponse\n    List of available dates",
+        "description": "Fetch available dates for a chip from execution counter.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipDatesResponse\n    List of available dates",
         "operationId": "getChipDates",
         "security": [
           {
@@ -2284,7 +2284,7 @@
           "chip"
         ],
         "summary": "Get a chip",
-        "description": "Get a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nChipResponse\n    Chip information\n\nRaises\n------\nHTTPException\n    If chip is not found",
+        "description": "Get a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipResponse\n    Chip information\n\nRaises\n------\nHTTPException\n    If chip is not found",
         "operationId": "getChip",
         "security": [
           {
@@ -2348,7 +2348,7 @@
           "chip"
         ],
         "summary": "Get multiplexer details",
-        "description": "Get the multiplexer details.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmux_id : int\n    ID of the multiplexer\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nMuxDetailResponse\n    Multiplexer details",
+        "description": "Get the multiplexer details.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmux_id : int\n    ID of the multiplexer\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nMuxDetailResponse\n    Multiplexer details",
         "operationId": "getChipMux",
         "security": [
           {
@@ -2421,7 +2421,7 @@
           "chip"
         ],
         "summary": "List all multiplexers for a chip",
-        "description": "List all multiplexers for a chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nListMuxResponse\n    List of multiplexer details",
+        "description": "List all multiplexers for a chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nListMuxResponse\n    List of multiplexer details",
         "operationId": "listChipMuxes",
         "security": [
           {
@@ -2485,7 +2485,7 @@
           "task"
         ],
         "summary": "List all tasks",
-        "description": "List all tasks.\n\nArgs:\n----\n    ctx (ProjectContext): The project context with user and project information.\n    backend (Optional[str]): Optional backend name to filter tasks by.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
+        "description": "List all tasks.\n\nParameters\n----------\nctx : ProjectContext\n    The project context with user and project information.\ntask_repo : MongoTaskDefinitionRepository\n    Repository for task definition operations.\nbackend : str | None\n    Optional backend name to filter tasks by.\n\nReturns\n-------\nListTaskResponse\n    The list of tasks.",
         "operationId": "listTasks",
         "security": [
           {
@@ -2558,7 +2558,7 @@
           "task"
         ],
         "summary": "Get task result by task ID",
-        "description": "Get task result by task_id.\n\nArgs:\n----\n    task_id: The task ID to search for.\n    ctx: The project context with user and project information.\n\nReturns:\n-------\n    TaskResultResponse: The task result information including figure paths.",
+        "description": "Get task result by task_id.\n\nParameters\n----------\ntask_id : str\n    The task ID to search for.\nctx : ProjectContext\n    The project context with user and project information.\n\nReturns\n-------\nTaskResultResponse\n    The task result information including figure paths.",
         "operationId": "getTaskResult",
         "security": [
           {
@@ -3566,7 +3566,7 @@
           "tag"
         ],
         "summary": "List all tags",
-        "description": "List all tags for the current project.\n\nRetrieves all tags associated with the current project's calibration data.\nTags are used to categorize and filter task results.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nListTagResponse\n    Wrapped list of tag names",
+        "description": "List all tags for the current project.\n\nRetrieves all tags associated with the current project's calibration data.\nTags are used to categorize and filter task results.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\ntag_repo : MongoTagRepository\n    Repository for tag operations\n\nReturns\n-------\nListTagResponse\n    Wrapped list of tag names",
         "operationId": "listTags",
         "security": [
           {

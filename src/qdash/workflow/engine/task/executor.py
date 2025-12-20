@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from qdash.datamodel.task import CalibDataModel, OutputParameterModel
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.params_updater import get_params_updater
-from qdash.workflow.engine.repository import FilesystemCalibDataSaver
+from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.result_processor import (
     FidelityValidationError,
@@ -853,7 +853,7 @@ class TaskExecutor:
         success : bool
             Whether backend updates should be applied
         """
-        from qdash.workflow.engine.repository import (
+        from qdash.repository import (
             MongoCouplingCalibrationRepository,
             MongoQubitCalibrationRepository,
         )

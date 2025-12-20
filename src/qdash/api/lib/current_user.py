@@ -2,7 +2,7 @@ import logging
 from typing import cast
 
 from fastapi import Depends
-from qdash.api.lib.auth import get_current_user, username_header
+from qdash.api.lib.auth import get_user, username_header
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def get_current_user_id(username: str | None = Depends(username_header)) -> str:
     try:
         if username:
             logger.debug("Getting current user ID from username")
-            user = get_current_user(username)
+            user = get_user(username)
             if user and user.username:
                 logger.debug(f"Current user ID: {user.username}")
                 return cast(str, user.username)

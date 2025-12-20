@@ -141,7 +141,7 @@ def create_chip_properties(
 ) -> None:
     """Create and write chip properties to a YAML file."""
     initialize()
-    from qdash.workflow.engine.repository import MongoChipRepository
+    from qdash.repository import MongoChipRepository
 
     chip_repo = MongoChipRepository()
     chip = chip_repo.get_current_chip(username=username)

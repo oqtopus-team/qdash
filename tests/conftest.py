@@ -1,19 +1,45 @@
 """Root configuration for tests.
 
 This module provides pytest fixtures for testing the QDash API.
-It follows the Bunnet ODM testing patterns for MongoDB integration.
-
-MongoDB connection options (in order of preference):
-1. MONGO_TEST_DSN environment variable (for CI/CD or custom setup)
-2. Docker Compose MongoDB service (mongo:27017)
+It uses mongomock for in-memory MongoDB testing, eliminating the need
+for a real MongoDB instance.
 """
 
 import os
+import sys
 from collections.abc import Generator
-from dataclasses import dataclass
+from typing import Any
+from unittest.mock import MagicMock, patch
 
+# Mock prefect module before any imports
+# This is necessary because prefect has pydantic version conflicts with qubex
+if "prefect" not in sys.modules:
+
+    def _mock_decorator(*args: Any, **kwargs: Any) -> Any:
+        """Mock decorator that handles both @decorator and @decorator() syntax."""
+        if len(args) == 1 and callable(args[0]) and not kwargs:
+            # Called as @decorator without parentheses
+            return args[0]
+        # Called as @decorator() with parentheses
+        return lambda f: f
+
+    prefect_mock = MagicMock()
+    prefect_mock.flow = _mock_decorator
+    prefect_mock.task = _mock_decorator
+    prefect_mock.get_run_logger = MagicMock(return_value=MagicMock())
+    sys.modules["prefect"] = prefect_mock
+    sys.modules["prefect.client"] = MagicMock()
+    sys.modules["prefect.client.orchestration"] = MagicMock()
+    sys.modules["prefect.client.schemas"] = MagicMock()
+    sys.modules["prefect.client.schemas.actions"] = MagicMock()
+    sys.modules["prefect.client.schemas.filters"] = MagicMock()
+    sys.modules["prefect.client.schemas.schedules"] = MagicMock()
+    sys.modules["prefect.deployments"] = MagicMock()
+    sys.modules["prefect.exceptions"] = MagicMock()
+    sys.modules["prefect.states"] = MagicMock()
+
+import mongomock
 import pytest
-from pymongo import MongoClient
 from pymongo.database import Database
 
 # Configure pytest-asyncio
@@ -38,130 +64,78 @@ os.environ.setdefault("SLACK_APP_TOKEN", "test-app-token")
 os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
 
 
-@dataclass
-class TestSettings:
-    """Test configuration settings.
-
-    Attributes
-    ----------
-    mongo_test_dsn : str
-        MongoDB connection string for testing
-    mongo_test_db : str
-        Database name for testing
-
-    """
-
-    # Use 'mongo' hostname for devcontainer (Docker network)
-    # Override with MONGO_TEST_DSN env var for other environments
-    mongo_test_dsn: str = os.getenv("MONGO_TEST_DSN", "mongodb://root:example@mongo:27017")
-    mongo_test_db: str = os.getenv("MONGO_TEST_DB", "qdash_test")
-
-
-@pytest.fixture(scope="session")
-def test_settings() -> TestSettings:
-    """Get test settings.
-
-    Returns
-    -------
-    TestSettings
-        Test configuration instance
-
-    """
-    return TestSettings()
-
-
-@pytest.fixture(scope="session")
-def mongo_client(test_settings: TestSettings) -> Generator[MongoClient, None, None]:
-    """Create MongoDB client for testing (session-scoped).
-
-    This fixture connects to the MongoDB instance specified in test settings.
-    By default, it connects to the Docker Compose MongoDB service.
-
-    Parameters
-    ----------
-    test_settings : TestSettings
-        Test configuration
-
-    Yields
-    ------
-    MongoClient
-        MongoDB client instance
-
-    """
-    client: MongoClient = MongoClient(test_settings.mongo_test_dsn)
-    yield client
-    client.close()
-
-
-@pytest.fixture(scope="session")
-def mongo_db(mongo_client: MongoClient, test_settings: TestSettings) -> Database:
-    """Get MongoDB database for testing.
-
-    Parameters
-    ----------
-    mongo_client : MongoClient
-        MongoDB client
-    test_settings : TestSettings
-        Test configuration
-
-    Returns
-    -------
-    Database
-        MongoDB database instance
-
-    """
-    return mongo_client[test_settings.mongo_test_db]
+def _patched_command(self: Any, command: dict | str, **kwargs: Any) -> dict:
+    """Patch mongomock's command method to support Bunnet's buildInfo call."""
+    if isinstance(command, str):
+        command = {command: 1}
+    if "ping" in command:
+        return {"ok": 1.0}
+    if "buildInfo" in command:
+        # Return mock MongoDB version info for Bunnet initialization
+        return {
+            "version": "6.0.0",
+            "versionArray": [6, 0, 0, 0],
+            "ok": 1.0,
+        }
+    if "create" in command:
+        # Support collection creation
+        return {"ok": 1.0}
+    if "listIndexes" in command:
+        # Support index listing
+        return {"cursor": {"firstBatch": [], "id": 0, "ns": ""}, "ok": 1.0}
+    if "createIndexes" in command:
+        # Support index creation
+        return {"ok": 1.0}
+    # Default: return ok for other commands
+    return {"ok": 1.0}
 
 
 @pytest.fixture
-def init_db(
-    mongo_client: MongoClient, test_settings: TestSettings
-) -> Generator[Database, None, None]:
-    """Initialize Bunnet with test database.
+def init_db() -> Generator[Database, None, None]:
+    """Initialize Bunnet with in-memory mongomock database.
 
-    This fixture sets up the database connection for Bunnet ODM
-    and cleans up after each test.
-
-    Parameters
-    ----------
-    mongo_client : MongoClient
-        MongoDB client
-    test_settings : TestSettings
-        Test configuration
+    This fixture sets up an in-memory MongoDB using mongomock,
+    eliminating the need for a real MongoDB instance.
 
     Yields
     ------
     Database
-        MongoDB database instance
+        In-memory MongoDB database instance
 
     """
     import qdash.api.db.session as db_session
     from qdash.api.db.session import set_test_client
 
-    # Reset global database reference (not client) before setting up test database
+    # Reset global database reference before setting up test database
     db_session._database = None
 
-    set_test_client(mongo_client, db_name=test_settings.mongo_test_db)
-    db = mongo_client[test_settings.mongo_test_db]
-    yield db
+    # Create in-memory MongoDB client using mongomock
+    client = mongomock.MongoClient()
+    db_name = "qdash_test"
+
+    # Patch mongomock's command method to support Bunnet
+    with patch.object(mongomock.Database, "command", _patched_command):
+        set_test_client(client, db_name=db_name)
+        db = client[db_name]
+        yield db
 
     # Clean up: drop all collections after each test
-    # Don't close the client as it's session-scoped
     for collection_name in db.list_collection_names():
         db.drop_collection(collection_name)
+    client.close()
 
 
 @pytest.fixture
 def test_client(init_db):
-    """FastAPI test client with test MongoDB.
+    """FastAPI test client with in-memory MongoDB.
 
     This fixture provides a TestClient instance that can be used
-    to make requests to the API with a test database.
+    to make requests to the API with an in-memory database.
 
     Parameters
     ----------
     init_db : Database
-        Initialized test database (automatically used via fixture dependency)
+        Initialized in-memory database (automatically used via fixture dependency)
 
     Returns
     -------

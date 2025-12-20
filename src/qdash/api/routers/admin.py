@@ -182,15 +182,7 @@ def update_user_settings(
             detail=f"User '{username}' not found",
         )
 
-    # Prevent admin from changing their own role
-    if request.system_role is not None and username == admin.username:
-        if request.system_role != user.system_role:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot change your own system role",
-            )
-
-    # Prevent demoting the last admin
+    # Prevent demoting the last admin (check this first for clearer error message)
     if request.system_role is not None and request.system_role != user.system_role:
         if user.system_role == SystemRole.ADMIN:
             admin_count = UserDocument.find({"system_role": SystemRole.ADMIN}).count()
@@ -199,6 +191,14 @@ def update_user_settings(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Cannot demote the last admin user",
                 )
+
+    # Prevent admin from changing their own role
+    if request.system_role is not None and username == admin.username:
+        if request.system_role != user.system_role:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot change your own system role",
+            )
 
     # Update fields if provided
     if request.full_name is not None:

@@ -17,7 +17,17 @@ logger = logging.getLogger(__name__)
 
 
 class FilesystemCalibDataSaver:
-    """Filesystem implementation of CalibDataSaver."""
+    """Filesystem implementation of CalibDataSaver.
+
+    This class handles saving calibration artifacts (figures, raw data, JSON)
+    to the local filesystem.
+
+    Example
+    -------
+        >>> saver = FilesystemCalibDataSaver("/path/to/calib")
+        >>> png_paths, json_paths = saver.save_figures(figures, "CheckRabi", "qubit", "0")
+
+    """
 
     def __init__(self, calib_dir: str) -> None:
         """Initialize the saver with a calibration directory.
@@ -123,6 +133,8 @@ class FilesystemCalibDataSaver:
             The type of task (qubit, coupling, global, system)
         qid : str
             The qubit identifier (empty for global/system tasks)
+        output_dir : str | None
+            Optional output directory override
 
         Returns
         -------
@@ -174,6 +186,8 @@ class FilesystemCalibDataSaver:
             The type of task
         qid : str
             The qubit identifier
+        output_dir : str | None
+            Optional output directory override
 
         Returns
         -------

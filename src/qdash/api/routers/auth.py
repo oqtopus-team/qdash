@@ -25,6 +25,7 @@ from qdash.api.schemas.auth import (
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.user import UserDocument
+from qdash.repository import MongoUserRepository
 
 
 def _get_system_role_for_user(username: str) -> SystemRole:
@@ -150,9 +151,11 @@ def register_user(
         )
 
     logger.debug(f"Admin {current_user.username} creating user: {user_data.username}")
+
+    user_repo = MongoUserRepository()
+
     # Check if username already exists
-    query = UserDocument.find_one({"username": user_data.username}).run()
-    existing_user = query
+    existing_user = user_repo.find_by_username(user_data.username)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -171,7 +174,7 @@ def register_user(
         system_role=system_role,
         system_info=SystemInfoModel(),
     )
-    user.insert()
+    user_repo.insert(user)
     logger.info(f"Admin {current_user.username} created new user: {user_data.username}")
 
     # Create default project for every user
@@ -181,7 +184,7 @@ def register_user(
         name=f"{user.username}'s project",
     )
     user.default_project_id = project.project_id
-    user.save()
+    user_repo.save(user)
     logger.info(f"Created default project for user: {user.username}")
 
     return UserWithToken(
@@ -291,10 +294,11 @@ def change_password(
 
     # Update password in database
     new_hashed_password = get_password_hash(password_data.new_password)
-    user_doc = UserDocument.find_one({"username": current_user.username}).run()
+    user_repo = MongoUserRepository()
+    user_doc = user_repo.find_by_username(current_user.username)
     if user_doc:
         user_doc.hashed_password = new_hashed_password
-        user_doc.save()
+        user_repo.save(user_doc)
         logger.info(f"Password changed successfully for user: {current_user.username}")
         return {"message": "Password changed successfully"}
 
@@ -350,8 +354,10 @@ def reset_password(
         f"Admin {current_user.username} attempting to reset password for: {password_data.username}"
     )
 
+    user_repo = MongoUserRepository()
+
     # Find target user
-    user_doc = UserDocument.find_one({"username": password_data.username}).run()
+    user_doc = user_repo.find_by_username(password_data.username)
     if not user_doc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -368,6 +374,6 @@ def reset_password(
     # Update password in database
     new_hashed_password = get_password_hash(password_data.new_password)
     user_doc.hashed_password = new_hashed_password
-    user_doc.save()
+    user_repo.save(user_doc)
     logger.info(f"Admin {current_user.username} reset password for user: {password_data.username}")
     return {"message": f"Password reset successfully for user '{password_data.username}'"}

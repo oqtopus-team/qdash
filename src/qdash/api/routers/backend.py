@@ -9,11 +9,15 @@ from qdash.api.lib.project import (
     get_project_context,
 )
 from qdash.api.schemas.backend import BackendResponseModel, ListBackendsResponse
-from qdash.dbmodel.backend import BackendDocument
+from qdash.repository.backend import MongoBackendRepository
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+
+
+def get_backend_repository() -> MongoBackendRepository:
+    """Get backend repository instance."""
+    return MongoBackendRepository()
 
 
 @router.get(
@@ -25,6 +29,7 @@ logger.setLevel(logging.DEBUG)
 )
 def list_backends(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    backend_repo: Annotated[MongoBackendRepository, Depends(get_backend_repository)],
 ) -> ListBackendsResponse:
     """List all registered backends.
 
@@ -36,6 +41,8 @@ def list_backends(
     ----------
     ctx : ProjectContext
         Project context with user and project information
+    backend_repo : MongoBackendRepository
+        Repository for backend operations
 
     Returns
     -------
@@ -44,7 +51,5 @@ def list_backends(
 
     """
     logger.info(f"User {ctx.user.username} is listing backends for project {ctx.project_id}.")
-    backends = BackendDocument.find({"project_id": ctx.project_id}).to_list()
-    return ListBackendsResponse(
-        backends=[BackendResponseModel(**backend.dict()) for backend in backends]
-    )
+    backends = backend_repo.list_by_project(ctx.project_id)
+    return ListBackendsResponse(backends=[BackendResponseModel(**backend) for backend in backends])

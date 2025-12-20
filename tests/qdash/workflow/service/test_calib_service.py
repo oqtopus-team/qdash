@@ -161,6 +161,18 @@ def clear_session_state():
 
 
 @pytest.fixture
+def mock_lock_repo():
+    """Create a mock lock repository."""
+    return MockExecutionLockRepository()
+
+
+@pytest.fixture
+def mock_user_repo():
+    """Create a mock user repository."""
+    return MockUserRepository()
+
+
+@pytest.fixture
 def mock_flow_session_deps(monkeypatch):
     """Fixture to mock CalibService dependencies."""
     monkeypatch.setattr(
@@ -171,13 +183,13 @@ def mock_flow_session_deps(monkeypatch):
         "qdash.workflow.service.calib_service.GitHubIntegration",
         MockGitHubIntegration,
     )
-    # Mock repository classes - patch at their definition location
+    # Patch the repository imports where they are lazily imported in CalibService
     monkeypatch.setattr(
-        "qdash.workflow.engine.repository.MongoExecutionLockRepository",
+        "qdash.repository.MongoExecutionLockRepository",
         MockExecutionLockRepository,
     )
     monkeypatch.setattr(
-        "qdash.workflow.engine.repository.MongoUserRepository",
+        "qdash.repository.MongoUserRepository",
         MockUserRepository,
     )
 
@@ -185,7 +197,7 @@ def mock_flow_session_deps(monkeypatch):
 class TestCalibServiceInitialization:
     """Test CalibService initialization and basic setup."""
 
-    def test_flow_session_attributes(self, mock_flow_session_deps):
+    def test_flow_session_attributes(self, mock_flow_session_deps, mock_lock_repo, mock_user_repo):
         """Test that CalibService initializes with correct attributes."""
         # Create session with qids (required parameter)
         session = CalibService(
@@ -195,6 +207,8 @@ class TestCalibServiceInitialization:
             qids=["0", "1"],
             backend_name="fake",
             project_id="test_project",  # Required to avoid UserDocument lookup
+            lock_repo=mock_lock_repo,
+            user_repo=mock_user_repo,
         )
 
         # Verify attributes
@@ -206,7 +220,9 @@ class TestCalibServiceInitialization:
         assert session.execution_service is not None
         assert session.backend is not None
 
-    def test_flow_session_default_tags(self, mock_flow_session_deps):
+    def test_flow_session_default_tags(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
+    ):
         """Test that default tags are set correctly."""
         session = CalibService(
             username="test_user",
@@ -215,6 +231,8 @@ class TestCalibServiceInitialization:
             qids=["0"],
             tags=["python_flow"],  # Explicitly pass tags
             project_id="test_project",
+            lock_repo=mock_lock_repo,
+            user_repo=mock_user_repo,
         )
 
         assert "python_flow" in session.execution_service.tags
@@ -223,7 +241,7 @@ class TestCalibServiceInitialization:
 class TestCalibServiceParameterManagement:
     """Test parameter get/set operations."""
 
-    def test_set_and_get_parameter(self, mock_flow_session_deps):
+    def test_set_and_get_parameter(self, mock_flow_session_deps, mock_lock_repo, mock_user_repo):
         """Test setting and getting parameters."""
         session = CalibService(
             username="test_user",
@@ -231,6 +249,8 @@ class TestCalibServiceParameterManagement:
             chip_id="chip_1",
             qids=["0"],
             project_id="test_project",
+            lock_repo=mock_lock_repo,
+            user_repo=mock_user_repo,
         )
 
         # Set parameter
@@ -240,7 +260,9 @@ class TestCalibServiceParameterManagement:
         freq = session.get_parameter("0", "qubit_frequency")
         assert freq == 5.0
 
-    def test_get_nonexistent_parameter(self, mock_flow_session_deps):
+    def test_get_nonexistent_parameter(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
+    ):
         """Test getting a parameter that doesn't exist."""
         session = CalibService(
             username="test_user",
@@ -248,6 +270,8 @@ class TestCalibServiceParameterManagement:
             chip_id="chip_1",
             qids=["0"],
             project_id="test_project",
+            lock_repo=mock_lock_repo,
+            user_repo=mock_user_repo,
         )
 
         # Get nonexistent parameter

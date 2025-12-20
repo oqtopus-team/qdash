@@ -4,7 +4,7 @@ from pathlib import Path
 from prefect import flow
 
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
-from qdash.workflow.engine.repository import MongoCalibrationNoteRepository
+from qdash.repository import MongoCalibrationNoteRepository
 from qdash.workflow.worker.tasks.push_github import push_github
 
 

@@ -42,6 +42,8 @@ Parameters
 ----------
 ctx : ProjectContext
     Project context with user and project information
+chip_service : ChipService
+    Service for chip operations
 
 Returns
 -------
@@ -289,6 +291,8 @@ chip_id : str
     ID of the chip
 ctx : ProjectContext
     Project context with user and project information
+chip_service : ChipService
+    Service for chip operations
 
 Returns
 -------
@@ -443,6 +447,8 @@ chip_id : str
     ID of the chip to fetch
 ctx : ProjectContext
     Project context with user and project information
+chip_service : ChipService
+    Service for chip operations
 
 Returns
 -------
@@ -602,6 +608,8 @@ mux_id : int
     ID of the multiplexer
 ctx : ProjectContext
     Project context with user and project information
+chip_service : ChipService
+    Service for chip operations
 
 Returns
 -------
@@ -763,6 +771,8 @@ chip_id : str
     ID of the chip
 ctx : ProjectContext
     Project context with user and project information
+chip_service : ChipService
+    Service for chip operations
 
 Returns
 -------

@@ -326,7 +326,8 @@ class TestInMemoryTaskResultHistoryRepository:
 
     def test_save_and_get_all(self):
         """Test saving and retrieving task results."""
-        from qdash.workflow.engine.repository import InMemoryTaskResultHistoryRepository
+        from qdash.datamodel.task import QubitTaskModel
+        from qdash.repository.inmemory import InMemoryTaskResultHistoryRepository
 
         repo = InMemoryTaskResultHistoryRepository()
         execution = ExecutionModel(
@@ -347,21 +348,27 @@ class TestInMemoryTaskResultHistoryRepository:
             calib_data={"qubit": {}, "coupling": {}},
             message="",
             system_info={},
+            project_id="proj-1",
         )
 
-        # Create a mock task result
-        task_result = {"task_name": "CheckFreq", "qid": "0"}
+        # Create a proper task result model
+        task_result = QubitTaskModel(
+            name="CheckFreq",
+            qid="0",
+            project_id="proj-1",
+        )
 
         repo.save(task_result, execution)
 
         results = repo.get_all()
         assert len(results) == 1
-        assert results[0][0] == task_result
-        assert results[0][1].execution_id == "exec-001"
+        assert results[0].name == "CheckFreq"
+        assert results[0].qid == "0"
 
     def test_clear(self):
         """Test clearing repository."""
-        from qdash.workflow.engine.repository import InMemoryTaskResultHistoryRepository
+        from qdash.datamodel.task import QubitTaskModel
+        from qdash.repository.inmemory import InMemoryTaskResultHistoryRepository
 
         repo = InMemoryTaskResultHistoryRepository()
         execution = ExecutionModel(
@@ -382,8 +389,10 @@ class TestInMemoryTaskResultHistoryRepository:
             calib_data={"qubit": {}, "coupling": {}},
             message="",
             system_info={},
+            project_id="proj-1",
         )
-        repo.save({"task": "test"}, execution)
+        task_result = QubitTaskModel(name="Test", qid="0", project_id="proj-1")
+        repo.save(task_result, execution)
 
         repo.clear()
 

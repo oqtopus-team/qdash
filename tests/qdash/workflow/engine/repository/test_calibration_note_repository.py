@@ -6,10 +6,8 @@ and verifies the protocol interface.
 
 import pytest
 from qdash.datamodel.calibration_note import CalibrationNoteModel
-from qdash.workflow.engine.repository.inmemory_calibration_note import (
-    InMemoryCalibrationNoteRepository,
-)
-from qdash.workflow.engine.repository.protocols import CalibrationNoteRepository
+from qdash.repository.inmemory import InMemoryCalibrationNoteRepository
+from qdash.repository.protocols import CalibrationNoteRepository
 
 
 class TestInMemoryCalibrationNoteRepository:

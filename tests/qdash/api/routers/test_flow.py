@@ -145,13 +145,13 @@ class TestFlowRouter:
 class TestFlowExecution:
     """Tests for flow execution endpoint."""
 
-    def test_execute_flow_does_not_pass_project_id(
+    def test_execute_flow_passes_project_id_and_flow_name(
         self, test_client, test_project, auth_headers, sample_flow
     ):
-        """Test that execute_flow does not pass project_id to Prefect parameters.
+        """Test that execute_flow passes project_id and flow_name to Prefect parameters.
 
-        This is critical: project_id is auto-resolved from username in init_calibration,
-        not passed as a parameter to Prefect.
+        project_id is passed for multi-tenancy support, allowing workflows to
+        operate within the correct project context.
         """
         # Arrange: Mock Prefect client
         mock_flow_run = MagicMock()
@@ -176,14 +176,15 @@ class TestFlowExecution:
         # Assert
         assert response.status_code == 200
 
-        # Verify that project_id was NOT passed in parameters
+        # Verify parameters passed to Prefect
         call_args = mock_client.create_flow_run_from_deployment.call_args
         parameters = call_args.kwargs.get("parameters", {})
 
-        # project_id should NOT be in parameters (auto-resolved in init_calibration)
-        assert "project_id" not in parameters
+        # project_id should be passed for multi-tenancy
+        assert "project_id" in parameters
+        assert parameters["project_id"] == "test_project"
 
-        # flow_name should be passed
+        # flow_name should be passed for display purposes
         assert "flow_name" in parameters
         assert parameters["flow_name"] == "test_flow"
 

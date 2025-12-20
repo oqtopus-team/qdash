@@ -54,7 +54,7 @@ from qdash.datamodel.qubit import QubitModel
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 if TYPE_CHECKING:
-    from qdash.workflow.engine.repository.protocols import ChipRepository
+    from qdash.repository.protocols import ChipRepository
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +175,7 @@ class CRScheduler:
         """Load chip data from database."""
         if self._chip is None:
             if self._chip_repo is None:
-                from qdash.workflow.engine.repository import MongoChipRepository
+                from qdash.repository import MongoChipRepository
 
                 self._chip_repo = MongoChipRepository()
             chip = self._chip_repo.get_current_chip(self.username)

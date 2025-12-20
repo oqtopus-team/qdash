@@ -2,6 +2,8 @@
 
 This module provides the MongoExecutionRepository class that handles execution
 state persistence to MongoDB with optimistic locking support.
+
+Used by workflow components for managing calibration execution state.
 """
 
 import logging

@@ -40,7 +40,7 @@ from qdash.api.schemas.flow import (
     UpdateScheduleResponse,
 )
 from qdash.config import get_settings
-from qdash.dbmodel.flow import FlowDocument
+from qdash.repository import MongoFlowRepository
 from qdash.common.paths import SERVICE_DIR, TEMPLATES_DIR, USER_FLOWS_DIR
 from zoneinfo import ZoneInfo
 
@@ -244,7 +244,8 @@ async def save_flow(
     file_path = user_dir / f"{request.name}.py"
 
     # Check if flow already exists (to get old deployment_id)
-    existing_flow = FlowDocument.find_by_user_and_name(username, request.name, ctx.project_id)
+    flow_repo = MongoFlowRepository()
+    existing_flow = flow_repo.find_by_user_and_name(username, request.name, ctx.project_id)
     old_deployment_id = existing_flow.deployment_id if existing_flow else None
 
     # Write code to file
@@ -300,20 +301,21 @@ async def save_flow(
 
         if existing_flow:
             # Update existing flow
-            existing_flow.description = request.description
-            existing_flow.chip_id = request.chip_id
-            existing_flow.flow_function_name = request.flow_function_name
-            existing_flow.default_parameters = request.default_parameters
-            existing_flow.file_path = file_path_str
-            existing_flow.deployment_id = deployment_id
-            existing_flow.updated_at = datetime.now()
-            existing_flow.tags = request.tags
-            existing_flow.save()
+            flow_repo.update_flow(
+                flow=existing_flow,
+                description=request.description,
+                chip_id=request.chip_id,
+                flow_function_name=request.flow_function_name,
+                default_parameters=request.default_parameters,
+                file_path=file_path_str,
+                deployment_id=deployment_id,
+                tags=request.tags,
+            )
             logger.info(f"Updated flow '{request.name}' for user '{username}'")
             message = f"Flow '{request.name}' updated successfully"
         else:
             # Create new flow
-            flow_doc = FlowDocument(
+            flow_repo.create_flow(
                 project_id=ctx.project_id,
                 name=request.name,
                 username=username,
@@ -325,7 +327,6 @@ async def save_flow(
                 deployment_id=deployment_id,
                 tags=request.tags,
             )
-            flow_doc.insert()
             logger.info(f"Created new flow '{request.name}' for user '{username}'")
             message = f"Flow '{request.name}' created successfully"
 
@@ -360,7 +361,8 @@ async def list_flows(
     project_id = ctx.project_id
 
     try:
-        flows = FlowDocument.list_by_user(username, project_id)
+        flow_repo = MongoFlowRepository()
+        flows = flow_repo.list_by_user(username, project_id)
         logger.info(f"Listed {len(flows)} flows for user '{username}'")
 
         from qdash.api.schemas.flow import FlowSummary
@@ -576,7 +578,8 @@ async def list_all_flow_schedules(
     limit = min(limit, 100)
     username = ctx.user.username
     project_id = ctx.project_id
-    flows = FlowDocument.list_by_user(username, project_id)
+    flow_repo = MongoFlowRepository()
+    flows = flow_repo.list_by_user(username, project_id)
 
     all_schedules: list[FlowScheduleSummary] = []
 
@@ -677,6 +680,7 @@ async def delete_flow_schedule(
     """
     username = ctx.user.username
     project_id = ctx.project_id
+    flow_repo = MongoFlowRepository()
 
     async with get_client() as client:
         # Try as deployment ID (cron schedule)
@@ -684,9 +688,9 @@ async def delete_flow_schedule(
             _ = await client.read_deployment(schedule_id)
 
             # Verify ownership
-            flow = FlowDocument.find_one(
+            flow = flow_repo.find_one(
                 {"project_id": project_id, "deployment_id": schedule_id, "username": username}
-            ).run()
+            )
             if not flow:
                 raise HTTPException(
                     status_code=403,
@@ -722,13 +726,13 @@ async def delete_flow_schedule(
 
             # Verify ownership through deployment
             if flow_run.deployment_id:
-                flow = FlowDocument.find_one(
+                flow = flow_repo.find_one(
                     {
                         "project_id": project_id,
                         "deployment_id": str(flow_run.deployment_id),
                         "username": username,
                     }
-                ).run()
+                )
                 if not flow:
                     raise HTTPException(
                         status_code=403,
@@ -778,13 +782,14 @@ async def update_flow_schedule(
     """
     username = ctx.user.username
     project_id = ctx.project_id
+    flow_repo = MongoFlowRepository()
 
     async with get_client() as client:
         try:
             # Verify ownership
-            flow = FlowDocument.find_one(
+            flow = flow_repo.find_one(
                 {"project_id": project_id, "deployment_id": schedule_id, "username": username}
-            ).run()
+            )
             if not flow:
                 raise HTTPException(
                     status_code=403,
@@ -853,9 +858,10 @@ async def get_flow(
     """
     username = ctx.user.username
     project_id = ctx.project_id
+    flow_repo = MongoFlowRepository()
 
     # Find flow in database
-    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
+    flow = flow_repo.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -909,9 +915,10 @@ async def execute_flow(
     username = ctx.user.username
     project_id = ctx.project_id
     settings = get_settings()
+    flow_repo = MongoFlowRepository()
 
     # Find flow in database
-    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
+    flow = flow_repo.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -981,9 +988,10 @@ async def delete_flow(
     """
     username = ctx.user.username
     project_id = ctx.project_id
+    flow_repo = MongoFlowRepository()
 
     # Find flow in database
-    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
+    flow = flow_repo.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -1009,7 +1017,7 @@ async def delete_flow(
 
     # Delete from database
     try:
-        FlowDocument.delete_by_user_and_name(username, name, project_id)
+        flow_repo.delete_by_user_and_name(username, name, project_id)
         logger.info(f"Deleted flow '{name}' from database")
     except Exception as e:
         logger.error(f"Failed to delete flow from database: {e}")
@@ -1043,6 +1051,7 @@ async def schedule_flow(
 
     """
     username = ctx.user.username
+    flow_repo = MongoFlowRepository()
 
     # Validate request
     if not request.cron and not request.scheduled_time:
@@ -1059,7 +1068,7 @@ async def schedule_flow(
     project_id = ctx.project_id
 
     # Find flow
-    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
+    flow = flow_repo.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -1316,9 +1325,10 @@ async def list_flow_schedules(
     limit = min(limit, 100)
     username = ctx.user.username
     project_id = ctx.project_id
+    flow_repo = MongoFlowRepository()
 
     # Find flow
-    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
+    flow = flow_repo.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 

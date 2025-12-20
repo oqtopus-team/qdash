@@ -144,9 +144,9 @@ export function useAppConfig() {
       };
     }
 
-    const uiSettings = data.ui as unknown as UISettings;
-    const metricsConfig = data.metrics as unknown as MetricsConfig;
-    const copilotConfig = data.copilot as unknown as CopilotConfig;
+    const uiSettings = data.data.ui as unknown as UISettings;
+    const metricsConfig = data.data.metrics as unknown as MetricsConfig;
+    const copilotConfig = data.data.copilot as unknown as CopilotConfig;
 
     // Transform qubit metrics to array
     const qubitMetrics: MetricConfig[] = Object.entries(

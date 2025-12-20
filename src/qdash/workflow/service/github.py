@@ -226,7 +226,7 @@ class GitHubIntegration:
         """
         import json
 
-        from qdash.workflow.engine.repository import MongoCalibrationNoteRepository
+        from qdash.repository import MongoCalibrationNoteRepository
         from qdash.workflow.worker.tasks.push_github import push_github
 
         # 1. Fetch master note from MongoDB

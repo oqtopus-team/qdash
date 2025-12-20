@@ -10,7 +10,7 @@ from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.task.context import TaskContext
 
 if TYPE_CHECKING:
-    from qdash.workflow.engine.repository.protocols import TaskRepository
+    from qdash.repository.protocols import TaskRepository
 
 
 def validate_task_name(
@@ -41,7 +41,7 @@ def validate_task_name(
 
     """
     if task_repo is None:
-        from qdash.workflow.engine.repository import MongoTaskRepository
+        from qdash.repository import MongoTaskRepository
 
         task_repo = MongoTaskRepository()
 
