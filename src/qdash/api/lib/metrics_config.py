@@ -2,16 +2,18 @@
 
 This module loads metrics metadata from YAML configuration file.
 The configuration provides display metadata (titles, units, scales) for metrics.
+
+Uses ConfigLoader for unified configuration loading with local override support.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
-from pathlib import Path
 from typing import Any, Literal
 
-import yaml
 from pydantic import BaseModel
+
+from qdash.api.lib.config_loader import ConfigLoader
 
 
 class EvaluationConfig(BaseModel):
@@ -75,54 +77,19 @@ class MetricsConfig(BaseModel):
 def load_metrics_config() -> MetricsConfig:
     """Load metrics configuration from YAML file.
 
+    Uses ConfigLoader for unified loading with local override support.
+    Configuration is loaded from metrics.yaml with optional metrics.local.yaml overlay.
+
     Returns
     -------
         MetricsConfig with all metric metadata
 
     Raises
     ------
-        FileNotFoundError: If config file doesn't exist
         ValueError: If config file is invalid
 
-    Priority order for config file:
-        1. METRICS_CONFIG_PATH environment variable (highest priority)
-        2. /app/config/custom/metrics.yaml (Docker custom)
-        3. config/custom/metrics.yaml (local custom)
-        4. /app/config/metrics.yaml (Docker default)
-        5. config/metrics.yaml (local default)
-
     """
-    import os
-
-    project_root = Path(__file__).parent.parent.parent.parent.parent
-
-    # Try multiple possible locations for the config file (in priority order)
-    possible_paths = [
-        # 1. Environment variable override (highest priority)
-        Path(os.getenv("METRICS_CONFIG_PATH", "")) if os.getenv("METRICS_CONFIG_PATH") else None,
-        # 2. Custom configuration in config/custom/ (Docker environment)
-        Path("/app/config/custom/metrics.yaml"),
-        # 3. Custom configuration in config/custom/ (local development)
-        project_root / "config" / "custom" / "metrics.yaml",
-        # 4. Docker environment: mounted at /app/config
-        Path("/app/config/metrics.yaml"),
-        # 5. Local development: default config
-        project_root / "config" / "metrics.yaml",
-    ]
-
-    config_path = None
-    for path in possible_paths:
-        if path and path.exists():
-            config_path = path
-            break
-
-    if not config_path:
-        raise FileNotFoundError(
-            f"Metrics config file not found. Tried: {[str(p) for p in possible_paths if p]}"
-        )
-
-    with open(config_path) as f:
-        data = yaml.safe_load(f)
+    data = ConfigLoader.load_metrics()
 
     try:
         return MetricsConfig(**data)

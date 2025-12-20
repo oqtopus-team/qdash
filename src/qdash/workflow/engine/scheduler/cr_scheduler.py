@@ -48,8 +48,10 @@ from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 import yaml
+
 from qdash.datamodel.chip import ChipModel
 from qdash.datamodel.qubit import QubitModel
+from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.repository.protocols import ChipRepository
@@ -157,7 +159,7 @@ class CRScheduler:
             username: Username for chip data access
             chip_id: Chip ID
             wiring_config_path: Path to wiring.yaml configuration file.
-                If None, uses default path: /workspace/qdash/config/qubex/{chip_id}/config/wiring.yaml
+                If None, uses the default QubexPaths wiring path.
             chip_repo: Repository for chip data access.
                 If None, uses MongoChipRepository.
 
@@ -189,9 +191,7 @@ class CRScheduler:
             if self.wiring_config_path is not None:
                 wiring_path = Path(self.wiring_config_path)
             else:
-                wiring_path = Path(
-                    f"/workspace/qdash/config/qubex/{self.chip_id}/config/wiring.yaml"
-                )
+                wiring_path = get_qubex_paths().wiring_yaml(self.chip_id)
 
             if not wiring_path.exists():
                 msg = f"Wiring config not found: {wiring_path}"

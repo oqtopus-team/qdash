@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import Depends, Header, HTTPException, Path, status
 from qdash.api.lib.auth import get_current_active_user
@@ -73,7 +73,8 @@ def _resolve_project_id(
 
 def _get_membership(project_id: str, username: str) -> ProjectMembershipDocument | None:
     """Get active membership for user in project."""
-    return ProjectMembershipDocument.get_active_membership(project_id, username)
+    result = ProjectMembershipDocument.get_active_membership(project_id, username)
+    return cast("ProjectMembershipDocument | None", result)
 
 
 def _check_permission(

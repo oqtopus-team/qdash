@@ -7,6 +7,7 @@ persistence operations.
 import logging
 
 import pendulum
+from bunnet import SortDirection
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 
@@ -111,7 +112,12 @@ class MongoCalibrationNoteRepository:
         if username is not None:
             query["username"] = username
 
-        docs = CalibrationNoteDocument.find(query).sort([("timestamp", -1)]).limit(1).run()
+        docs = (
+            CalibrationNoteDocument.find(query)
+            .sort([("timestamp", SortDirection.DESCENDING)])
+            .limit(1)
+            .run()
+        )
 
         if not docs:
             return None

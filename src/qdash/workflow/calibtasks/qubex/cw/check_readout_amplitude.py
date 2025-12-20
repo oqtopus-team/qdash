@@ -86,8 +86,9 @@ class CheckReadoutAmplitude(QubexTask):
         output_parameters = self.attach_execution_id(execution_id)
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
-    def run(self, backend: QubexBackend, qid: str) -> RunResult:
+    def run(self, backend: QubexBackend, qid: str) -> RunResult:  # noqa: ARG002
         """Run the task."""
+        return RunResult(raw_result=None)
 
     def batch_run(self, backend: QubexBackend, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits."""

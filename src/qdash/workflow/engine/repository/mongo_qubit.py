@@ -50,7 +50,7 @@ class MongoQubitCalibrationRepository:
         qid: str,
         chip_id: str,
         output_parameters: dict[str, Any],
-        project_id: str,
+        project_id: str | None,
     ) -> QubitModel:
         """Update qubit calibration data with new measurement results.
 
@@ -120,14 +120,14 @@ class MongoQubitCalibrationRepository:
 
         return self._to_model(doc, doc.project_id)
 
-    def _to_model(self, doc: QubitDocument, project_id: str) -> QubitModel:
+    def _to_model(self, doc: QubitDocument, project_id: str | None) -> QubitModel:
         """Convert a document to a domain model.
 
         Parameters
         ----------
         doc : QubitDocument
             The MongoDB document
-        project_id : str
+        project_id : str | None
             The project identifier
 
         Returns

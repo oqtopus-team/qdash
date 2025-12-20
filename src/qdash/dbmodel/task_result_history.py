@@ -30,7 +30,7 @@ class TaskResultHistoryDocument(Document):
 
     """
 
-    project_id: str = Field(..., description="Owning project identifier")
+    project_id: str | None = Field(None, description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the task")
     task_id: str = Field(..., description="The task ID")
     name: str = Field(..., description="The task name")
@@ -129,7 +129,7 @@ class TaskResultHistoryDocument(Document):
         doc.end_at = task.end_at
         doc.elapsed_time = task.elapsed_time
         doc.task_type = task.task_type
-        doc.system_info = task.system_info.model_dump()
+        doc.system_info = task.system_info
         doc.qid = getattr(task, "qid", "")
         doc.execution_id = execution_model.execution_id
         doc.tags = execution_model.tags

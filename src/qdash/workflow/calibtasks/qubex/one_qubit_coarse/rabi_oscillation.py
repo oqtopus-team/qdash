@@ -21,7 +21,7 @@ class RabiOscillation(QubexTask):
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        pass
+        return PostProcessResult(output_parameters={})
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:  # noqa: ARG002
         exp = self.get_experiment(backend)

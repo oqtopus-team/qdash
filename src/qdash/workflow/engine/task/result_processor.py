@@ -5,6 +5,7 @@ validation of task outputs, R² checks, and fidelity validation.
 """
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 from qdash.datamodel.task import OutputParameterModel
@@ -61,7 +62,7 @@ class TaskResultProcessor:
 
     def validate_r2(
         self,
-        r2: dict[str, float] | None,
+        r2: Mapping[str, float | None] | None,
         qid: str,
         threshold: float | None = None,
     ) -> bool:
@@ -69,8 +70,8 @@ class TaskResultProcessor:
 
         Parameters
         ----------
-        r2 : dict[str, float] | None
-            Dictionary mapping qid to R² values
+        r2 : Mapping[str, float | None] | None
+            Mapping from qid to R² values
         qid : str
             The qubit ID to check
         threshold : float | None
@@ -94,6 +95,9 @@ class TaskResultProcessor:
             return True
 
         r2_value = r2[qid]
+        if r2_value is None:
+            return True
+
         check_threshold = threshold if threshold is not None else self.r2_threshold
 
         if r2_value <= check_threshold:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, cast
 
 from fastapi.logger import logger
 from qdash.datamodel.project import ProjectRole
@@ -51,7 +51,7 @@ class ProjectService:
                     role=ProjectRole.OWNER,
                     status="active",
                 )
-                return existing
+                return cast(ProjectDocument, existing)
             logger.warning(
                 "Default project %s missing for user %s, creating a new one",
                 user.default_project_id,

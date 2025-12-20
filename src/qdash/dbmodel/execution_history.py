@@ -30,7 +30,7 @@ class ExecutionHistoryDocument(Document):
 
     """
 
-    project_id: str = Field(..., description="Owning project identifier")
+    project_id: str | None = Field(None, description="Owning project identifier")
     username: str = Field(..., description="The username of the user who created the execution")
     name: str = Field(..., description="The name of the execution")
     execution_id: str = Field(..., description="The execution ID")
@@ -112,7 +112,7 @@ class ExecutionHistoryDocument(Document):
         doc.end_at = execution_model.end_at
         doc.elapsed_time = execution_model.elapsed_time
         doc.message = execution_model.message
-        doc.system_info = execution_model.system_info.model_dump()
+        doc.system_info = execution_model.system_info
 
         # Merge task_results
         for task_id, task_result in execution_model.task_results.items():

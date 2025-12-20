@@ -35,7 +35,7 @@ class InputParameterModel(BaseModel):
 
     unit: str = ""
     value_type: str = "float"
-    value: tuple[int | float, ...] | int | float | None = None
+    value: tuple[int | float, ...] | list[int | float] | int | float | None = None
     description: str = ""
 
     def get_value(self) -> Any:
@@ -76,14 +76,14 @@ class InputParameterModel(BaseModel):
                 return result
             if self.value is None:
                 raise ValueError("Cannot convert None to int")
-            if isinstance(self.value, tuple):
-                raise ValueError("Cannot convert tuple to int")
+            if isinstance(self.value, (tuple, list)):
+                raise ValueError("Cannot convert tuple/list to int")
             return int(self.value)
         elif self.value_type == "float":
             if self.value is None:
                 raise ValueError("Cannot convert None to float")
-            if isinstance(self.value, tuple):
-                raise ValueError("Cannot convert tuple to float")
+            if isinstance(self.value, (tuple, list)):
+                raise ValueError("Cannot convert tuple/list to float")
             return float(self.value)
         elif self.value_type == "str":
             return str(self.value)

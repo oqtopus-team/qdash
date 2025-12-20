@@ -39,7 +39,7 @@ class MongoExecutionCounterRepository:
         date: str,
         username: str,
         chip_id: str,
-        project_id: str,
+        project_id: str | None,
     ) -> int:
         """Get the next execution index atomically.
 
@@ -51,7 +51,7 @@ class MongoExecutionCounterRepository:
             The username
         chip_id : str
             The chip identifier
-        project_id : str
+        project_id : str | None
             The project identifier
 
         Returns

@@ -14,6 +14,8 @@ from prefect.client.orchestration import get_client
 from prefect.deployments import Deployment
 from pydantic import BaseModel
 
+from qdash.workflow.paths import get_path_resolver
+
 app = FastAPI(title="QDash Deployment Service")
 logger = getLogger("uvicorn.app")
 
@@ -65,8 +67,8 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
         logger.info(f"Creating deployment '{deployment_name}' from {file_path}")
 
         # Create entrypoint string: relative_path:function_name
-        # Working directory is /app/qdash/workflow, so make path relative to that
-        working_dir = Path("/app/qdash/workflow")
+        # Working directory is configured via QDASH_WORKFLOW_DIR
+        working_dir = get_path_resolver().workflow_dir
         try:
             relative_path = file_path.relative_to(working_dir)
         except ValueError:

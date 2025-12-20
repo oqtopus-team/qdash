@@ -87,6 +87,26 @@ class MuxOrderingStrategy(ABC):
         """
         pass
 
+    @abstractmethod
+    def generate_synchronized_steps(
+        self,
+        mux_ids: list[int],
+        qids: list[str],
+        context: "OrderingContext",
+    ) -> list[list[str]]:
+        """Generate synchronized parallel steps across all MUXes.
+
+        Args:
+            mux_ids: List of MUX IDs to include
+            qids: List of all qubit IDs
+            context: Context object containing chip configuration
+
+        Returns:
+            List of steps, where each step is a list of qubit IDs
+            that can be executed simultaneously
+        """
+        pass
+
     def __repr__(self) -> str:
         """String representation of the strategy."""
         return f"{self.__class__.__name__}()"
@@ -126,6 +146,35 @@ class DefaultOrderingStrategy(MuxOrderingStrategy):
             "strategy_name": "default",
             "description": "Natural qubit ID order",
         }
+
+    def generate_synchronized_steps(
+        self,
+        mux_ids: list[int],
+        qids: list[str],
+        context: OrderingContext,
+    ) -> list[list[str]]:
+        """Generate synchronized steps with natural ordering.
+
+        Args:
+            mux_ids: List of MUX IDs to include
+            qids: List of all qubit IDs
+            context: Context object
+
+        Returns:
+            List of 4 steps with natural ordering
+        """
+        qid_set = set(qids)
+        steps: list[list[str]] = [[] for _ in range(4)]
+
+        for mux_id in sorted(mux_ids):
+            base_qid = mux_id * 4
+
+            for offset in range(4):
+                target_qid = str(base_qid + offset)
+                if target_qid in qid_set:
+                    steps[offset].append(target_qid)
+
+        return [step for step in steps if step]
 
     def __repr__(self) -> str:
         """String representation."""

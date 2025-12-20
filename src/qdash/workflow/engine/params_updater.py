@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from filelock import FileLock
+
 from qdash.datamodel.task import OutputParameterModel
+from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.worker.flows.push_props.formatter import represent_none
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
@@ -21,15 +23,19 @@ class ParamsUpdater(Protocol):
     def update(self, qid: str, output_parameters: dict[str, Any]) -> None: ...
 
 
-def get_params_updater(backend: BaseBackend, chip_id: str | None = None) -> ParamsUpdater | None:
+def get_params_updater(
+    backend: "BaseBackend | None", chip_id: str | None = None
+) -> ParamsUpdater | None:
     """Resolve a backend-specific params updater for the given backend."""
+    if backend is None:
+        return None
     qubex_updater = _resolve_qubex_updater(backend, chip_id)
     if qubex_updater is not None:
         return qubex_updater
     return None
 
 
-def _resolve_qubex_updater(backend: BaseBackend, chip_id: str | None) -> ParamsUpdater | None:
+def _resolve_qubex_updater(backend: "BaseBackend", chip_id: str | None) -> ParamsUpdater | None:
     try:
         from qdash.workflow.engine.backend.qubex import QubexBackend
     except ImportError:
@@ -118,7 +124,7 @@ class _QubexParamsUpdater:
             return None
 
         for candidate in (
-            Path(f"/app/config/qubex/{chip_id}/params"),
+            get_qubex_paths().params_dir(chip_id),
             Path("config") / "qubex" / chip_id / "params",
         ):
             if candidate.exists():

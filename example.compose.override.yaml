@@ -1,7 +1,47 @@
-networks:
-  custom_net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: ${SUBNET}
-          gateway: ${GATEWAY}
+# =============================================================================
+# Docker Compose Override Example
+# =============================================================================
+# Copy this file to compose.override.yaml and customize as needed.
+# compose.override.yaml is automatically loaded by Docker Compose.
+# It is gitignored, so your customizations won't be committed.
+#
+# Common use cases:
+# - Custom volume mount paths (e.g., NAS, external drives)
+# - Custom network configuration
+# - Additional services
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example: Custom volume paths
+# -----------------------------------------------------------------------------
+# Uncomment and modify the services you need to customize.
+#
+# services:
+#   workflow:
+#     volumes:
+#       - /nas/shared/calib_data:/app/calib_data
+#       - /nas/shared/qubex_config:/app/config/qubex
+#
+#   api:
+#     volumes:
+#       - /nas/shared/calib_data:/app/calib_data
+#       - /nas/shared/qpu_data:/app/qpu_data
+#       - /nas/shared/qubex_config:/app/config/qubex
+#
+#   user-flow-worker:
+#     volumes:
+#       - /nas/shared/calib_data:/app/calib_data
+#       - /nas/shared/qubex_config:/app/config/qubex
+
+# -----------------------------------------------------------------------------
+# Example: Custom network with static IPs
+# -----------------------------------------------------------------------------
+# Useful when you need predictable IP addresses for firewall rules.
+#
+# networks:
+#   custom_net:
+#     driver: bridge
+#     ipam:
+#       config:
+#         - subnet: 172.20.0.0/16
+#           gateway: 172.20.0.1

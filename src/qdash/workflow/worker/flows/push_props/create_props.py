@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 from qdash.datamodel.chip import ChipModel
 from qdash.dbmodel.initialize import initialize
@@ -99,6 +99,8 @@ def get_chip_properties(
         raise ValueError(f"No digits found in chip_id: {backend.config['chip_id']}")
     n = int(match.group())
     exp = backend.get_instance()
+    if exp is None:
+        raise RuntimeError("Backend experiment instance is not initialized")
     for i in range(n):
         props.qubits[exp.get_qubit_label(i)] = QubitProperties()
 
@@ -157,7 +159,7 @@ def create_chip_properties(
             "chip_id": chip_id,
         },
     )
-    props, _ = get_chip_properties(chip, within_24hrs=False, backend=backend)
+    props, _ = get_chip_properties(chip, within_24hrs=False, backend=cast(QubexBackend, backend))
 
     handler = ChipPropertyYAMLHandler(source_path)
     base = handler.read()

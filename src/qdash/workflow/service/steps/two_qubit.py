@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
+from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.service.results import SkewCheckResult, TwoQubitResult
 from qdash.workflow.service.steps.base import CalibrationStep, TransformStep
 from qdash.workflow.service.tasks import FULL_2Q_TASKS
@@ -89,7 +90,7 @@ class CustomTwoQubit(CalibrationStep):
         else:
             from qdash.workflow.engine import CRScheduler
 
-            wiring_config_path = f"/app/config/qubex/{service.chip_id}/config/wiring.yaml"
+            wiring_config_path = str(get_qubex_paths().wiring_yaml(service.chip_id))
             scheduler = CRScheduler(
                 service.username,
                 service.chip_id,
@@ -227,7 +228,7 @@ class GenerateCRSchedule(TransformStep):
 
         from qdash.workflow.engine import CRScheduler
 
-        wiring_config_path = f"/app/config/qubex/{service.chip_id}/config/wiring.yaml"
+        wiring_config_path = str(get_qubex_paths().wiring_yaml(service.chip_id))
         scheduler = CRScheduler(
             service.username,
             service.chip_id,
@@ -307,7 +308,7 @@ class TwoQubitCalibration(CalibrationStep):
         else:
             from qdash.workflow.engine import CRScheduler
 
-            wiring_config_path = f"/app/config/qubex/{service.chip_id}/config/wiring.yaml"
+            wiring_config_path = str(get_qubex_paths().wiring_yaml(service.chip_id))
             scheduler = CRScheduler(
                 service.username,
                 service.chip_id,

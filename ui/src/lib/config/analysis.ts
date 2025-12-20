@@ -1,4 +1,15 @@
-// Shared configuration for analysis components
+/**
+ * Shared configuration for analysis components.
+ *
+ * NOTE: The threshold values in PARAMETER_CONFIG and ranges in THRESHOLD_RANGES/ERROR_RATE_RANGES
+ * are now also defined in config/metrics.yaml on the backend. For new code, prefer using
+ * the useAppConfig() hook to fetch these values from the /config/all API endpoint.
+ *
+ * Migration path:
+ * - Use useAppConfig() hook to get metrics config
+ * - Use getMetricThreshold() and getErrorRateRange() helpers from the hook
+ * - These utility functions remain for backwards compatibility and can accept config overrides
+ */
 
 // Task names and types mapping
 export const TASK_CONFIG: Record<

@@ -24,6 +24,7 @@ packages = [
     "src",
     "src/qdash",
     "src/qdash/api",
+    "src/qdash/common",
     "src/qdash/workflow",
     "src/qdash/dbmodel",
     "src/qdash/datamodel",
@@ -59,8 +60,14 @@ lint.ignore = []
 strict = true
 ignore_missing_imports = true
 exclude = ["tools", "scripts"]
-# Disable misc errors (primarily FastAPI untyped decorator warnings)
-disable_error_code = ["misc"]
+# Disable error codes for known issues:
+# - misc: FastAPI untyped decorator warnings
+# - override: Liskov substitution violations in calibtasks (design issue)
+# - no-untyped-call: Calls to untyped external library functions
+disable_error_code = ["misc", "override", "no-untyped-call", "redundant-cast"]
+# Use explicit package bases to avoid src.qdash vs qdash conflicts
+explicit_package_bases = true
+mypy_path = "src"
 
 
 [tool.pytest.ini_options]

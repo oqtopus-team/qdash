@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from qdash.api.schemas.auth import User, UserInDB
@@ -26,6 +26,23 @@ pwd_context = CryptContext(
 
 # Bearer Token authentication scheme
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def username_header(x_username: str | None = Header(None, alias="X-Username")) -> str | None:
+    """Extract username from X-Username header.
+
+    Parameters
+    ----------
+    x_username : str | None
+        Username from X-Username header (optional)
+
+    Returns
+    -------
+    str | None
+        Username or None if not provided
+
+    """
+    return x_username
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

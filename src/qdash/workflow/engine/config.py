@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from qdash.workflow.paths import get_path_resolver
+
 
 @dataclass
 class CalibConfig:
@@ -43,9 +45,9 @@ class CalibConfig:
     def __post_init__(self) -> None:
         """Compute derived paths from execution_id."""
         date_str, index = self.execution_id.split("-")
-        user_path = f"/app/calib_data/{self.username}"
-        self.classifier_dir = f"{user_path}/.classifier"
-        self.calib_data_path = f"{user_path}/{date_str}/{index}"
+        resolver = get_path_resolver()
+        self.classifier_dir = str(resolver.classifier_dir(self.username))
+        self.calib_data_path = str(resolver.execution_data_dir(self.username, date_str, index))
 
         # Set default tags if not provided
         if self.tags is None:

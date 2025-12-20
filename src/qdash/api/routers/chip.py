@@ -5,17 +5,16 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-import yaml
 from fastapi import APIRouter, Depends, HTTPException
-from pymongo import DESCENDING
+from bunnet import SortDirection
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
     get_project_context_owner,
 )
+from qdash.api.lib.config_loader import ConfigLoader
 from qdash.api.routers.task_file import (
     CALIBTASKS_BASE_PATH,
-    SETTINGS_PATH,
     collect_tasks_from_directory,
 )
 from qdash.api.schemas.chip import (
@@ -233,11 +232,10 @@ def _get_task_names_from_files() -> list[str]:
     # Get default backend from settings
     default_backend = "qubex"  # fallback default
     try:
-        if SETTINGS_PATH.exists():
-            with open(SETTINGS_PATH, encoding="utf-8") as f:
-                settings = yaml.safe_load(f)
-                task_files_settings = settings.get("task_files", {})
-                default_backend = task_files_settings.get("default_backend", "qubex")
+        settings = ConfigLoader.load_settings()
+        ui_settings = settings.get("ui", {})
+        task_files_settings = ui_settings.get("task_files", {})
+        default_backend = task_files_settings.get("default_backend", "qubex")
     except Exception as e:
         logger.warning(f"Failed to load settings: {e}")
 
@@ -338,7 +336,7 @@ def get_chip_mux(
                 "name": {"$in": task_names},
             }
         )
-        .sort([("end_at", DESCENDING)])
+        .sort([("end_at", SortDirection.DESCENDING)])
         .run()
     )
 
@@ -403,7 +401,7 @@ def list_chip_muxes(
                 "name": {"$in": task_names},
             }
         )
-        .sort([("end_at", DESCENDING)])
+        .sort([("end_at", SortDirection.DESCENDING)])
         .run()
     )
 

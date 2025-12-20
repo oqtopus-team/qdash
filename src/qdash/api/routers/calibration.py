@@ -6,6 +6,7 @@ from typing import Annotated
 
 import dateutil.tz
 import pendulum
+from bunnet import SortDirection
 from fastapi import APIRouter, Depends
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.calibration import CalibrationNoteResponse
@@ -67,7 +68,7 @@ def get_calibration_note(
     logger.info(f"project: {ctx.project_id}, user: {ctx.user.username}")
     latest = (
         CalibrationNoteDocument.find({"project_id": ctx.project_id, "task_id": "master"})
-        .sort([("timestamp", -1)])  # 更新時刻で降順ソート
+        .sort([("timestamp", SortDirection.DESCENDING)])  # 更新時刻で降順ソート
         .limit(1)
         .run()
     )[0]

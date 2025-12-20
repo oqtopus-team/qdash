@@ -2622,7 +2622,7 @@
           "task-file"
         ],
         "summary": "Get task file settings",
-        "description": "Get task file settings from config/settings.yaml.\n\nReturns\n-------\n    Task file settings including default backend",
+        "description": "Get task file settings from config/settings.yaml.\n\nUses ConfigLoader for unified loading with local override support.\n\nReturns\n-------\n    Task file settings including default backend",
         "operationId": "getTaskFileSettings",
         "responses": {
           "200": {
@@ -5219,6 +5219,34 @@
           }
         }
       }
+    },
+    "/config/all": {
+      "get": {
+        "tags": [
+          "config",
+          "config"
+        ],
+        "summary": "Get all configuration",
+        "description": "Fetch all application configuration in a single request",
+        "operationId": "getConfigAll",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllConfigResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -5236,6 +5264,26 @@
         ],
         "title": "AddMemberRequest",
         "description": "Request to add a member to a project (always as viewer)."
+      },
+      "AllConfigResponse": {
+        "properties": {
+          "ui": {
+            "$ref": "#/components/schemas/UISettings"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metrics"
+          },
+          "copilot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Copilot"
+          }
+        },
+        "type": "object",
+        "title": "AllConfigResponse",
+        "description": "Response containing all application configuration."
       },
       "BackendResponseModel": {
         "properties": {
@@ -7876,10 +7924,6 @@
             "type": "string",
             "title": "Calib Data Path"
           },
-          "qpu_data_path": {
-            "type": "string",
-            "title": "Qpu Data Path"
-          },
           "backend": {
             "type": "string",
             "title": "Backend",
@@ -7931,8 +7975,7 @@
           "slack_channel_id",
           "postgres_data_path",
           "mongo_data_path",
-          "calib_data_path",
-          "qpu_data_path"
+          "calib_data_path"
         ],
         "title": "Settings",
         "description": "Settings for the QDash application."
@@ -8718,6 +8761,56 @@
         ],
         "title": "TokenResponse",
         "description": "Token response model for login."
+      },
+      "UISettings": {
+        "properties": {
+          "task_files": {
+            "$ref": "#/components/schemas/UITaskFilesSettings"
+          }
+        },
+        "type": "object",
+        "title": "UISettings",
+        "description": "UI-specific settings."
+      },
+      "UITaskFilesSettings": {
+        "properties": {
+          "default_backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Backend"
+          },
+          "default_view_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default View Mode"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          }
+        },
+        "type": "object",
+        "title": "UITaskFilesSettings",
+        "description": "Task files editor settings."
       },
       "UpdateScheduleRequest": {
         "properties": {

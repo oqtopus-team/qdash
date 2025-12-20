@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
@@ -38,6 +38,7 @@ class ProjectMembershipDocument(Document):
         cls, project_id: str, username: str
     ) -> ProjectMembershipDocument | None:
         """Fetch active membership for the user/project pair."""
-        return cls.find_one(
+        result = cls.find_one(
             {"project_id": project_id, "username": username, "status": "active"}
         ).run()
+        return cast("ProjectMembershipDocument | None", result)

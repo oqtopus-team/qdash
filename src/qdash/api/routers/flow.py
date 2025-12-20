@@ -41,19 +41,19 @@ from qdash.api.schemas.flow import (
 )
 from qdash.config import get_settings
 from qdash.dbmodel.flow import FlowDocument
+from qdash.common.paths import SERVICE_DIR, TEMPLATES_DIR, USER_FLOWS_DIR
 from zoneinfo import ZoneInfo
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
 
 # Base directory for user flows (shared volume between API and Workflow containers)
-USER_FLOWS_BASE_DIR = Path("/app/qdash/workflow/user_flows")
+USER_FLOWS_BASE_DIR = USER_FLOWS_DIR
 
 # Deployment service URL (Deployment service container - internal Docker network)
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
 
 # Path to templates directory
-TEMPLATES_DIR = Path("/app/qdash/workflow/templates")
 TEMPLATES_METADATA_FILE = TEMPLATES_DIR / "templates.json"
 
 
@@ -468,7 +468,7 @@ async def get_flow_template(template_id: str) -> FlowTemplateWithCode:
 # ============================================================================
 
 # Base directory for flow helper modules
-FLOW_HELPERS_DIR = Path("/app/qdash/workflow/service")
+FLOW_HELPERS_DIR = SERVICE_DIR
 
 
 @router.get(

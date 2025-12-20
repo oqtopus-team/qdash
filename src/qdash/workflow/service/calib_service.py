@@ -30,7 +30,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Sequence
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.repository.protocols import (
@@ -694,7 +694,7 @@ class CalibService:
     def run(
         self,
         targets: "Target",
-        steps: "list[Step]",
+        steps: "Sequence[Step]",
     ) -> dict[str, Any]:
         """Run calibration pipeline with targets and steps.
 
@@ -732,7 +732,7 @@ class CalibService:
     def _run_pipeline(
         self,
         targets: "Target",
-        steps: "list[Step]",
+        steps: "Sequence[Step]",
     ) -> dict[str, Any]:
         """Execute a calibration pipeline with steps.
 

@@ -1,16 +1,18 @@
-from typing import Any
+from typing import Any, TypeVar
 
 import pendulum
 from pydantic import BaseModel
+
+T = TypeVar("T", bound=BaseModel)
 
 
 def _process_data(
     raw_data: dict[str, Any],
     field_map: dict[str, str],
-    model_cls: type[BaseModel],
+    model_cls: type[T],
     within_24hrs: bool = False,
     cutoff_hours: int = 24,
-) -> BaseModel:
+) -> T:
     result = model_cls()
     if not raw_data:
         return result

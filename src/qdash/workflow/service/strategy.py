@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from prefect import get_run_logger
 
 from qdash.workflow.engine import OneQubitScheduler
+from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.service._internal.scheduling_tasks import (
     calibrate_mux_qubits as _calibrate_mux_qubits,
     calibrate_step_qubits_parallel as _calibrate_step_qubits_parallel,
@@ -67,7 +68,7 @@ class OneQubitStrategy(ABC):
 
     def _get_wiring_config_path(self, chip_id: str) -> str:
         """Get the wiring config path for a chip."""
-        return f"/app/config/qubex/{chip_id}/config/wiring.yaml"
+        return str(get_qubex_paths().wiring_yaml(chip_id))
 
     def _filter_qids(self, qids: list[str], allowed_qids: list[str] | None) -> list[str]:
         """Filter qids to only include those in allowed_qids.

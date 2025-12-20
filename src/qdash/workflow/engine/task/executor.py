@@ -29,6 +29,7 @@ from qdash.workflow.engine.task.state_manager import TaskStateManager
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.execution.service import ExecutionService
 
 
@@ -113,7 +114,7 @@ class TaskExecutionResult(BaseModel):
     success: bool = False
     message: str = ""
     output_parameters: dict[str, Any] = Field(default_factory=dict)
-    r2: dict[str, float] | None = None
+    r2: dict[str, float | None] | None = None
     calib_data_delta: CalibDataModel = Field(
         default_factory=lambda: CalibDataModel(qubit={}, coupling={})
     )
@@ -209,7 +210,7 @@ class TaskExecutor:
     def execute_task(
         self,
         task: TaskProtocol,
-        backend: BackendProtocol,
+        backend: "BaseBackend",
         qid: str,
     ) -> dict[str, Any]:
         """Execute a task and return results (simplified version).
@@ -398,7 +399,7 @@ class TaskExecutor:
 
     def _validate_r2(
         self,
-        r2: dict[str, float],
+        r2: dict[str, float | None],
         qid: str,
         task: TaskProtocol,
     ) -> None:
@@ -406,7 +407,7 @@ class TaskExecutor:
 
         Parameters
         ----------
-        r2 : dict[str, float]
+        r2 : dict[str, float | None]
             R² values per qid
         qid : str
             The qubit ID
@@ -547,7 +548,7 @@ class TaskExecutor:
     def execute(
         self,
         task: TaskProtocol,
-        backend: BackendProtocol,
+        backend: "BaseBackend",
         execution_service: "ExecutionService",
         qid: str,
     ) -> tuple["ExecutionService", TaskExecutionResult]:
@@ -714,7 +715,7 @@ class TaskExecutor:
         postprocess_result: PostProcessResult,
         qid: str,
         run_result: RunResult,
-        backend: BackendProtocol,
+        backend: "BaseBackend",
     ) -> bool:
         """Process task results using ExecutionService.
 
@@ -779,7 +780,7 @@ class TaskExecutor:
 
         # 5. Validate R²
         backend_success = True
-        if run_result.has_r2():
+        if run_result.has_r2() and run_result.r2 is not None:
             r2_value = run_result.r2.get(qid)
             if r2_value is None:
                 backend_success = False
@@ -805,7 +806,7 @@ class TaskExecutor:
         task: TaskProtocol,
         execution_service: "ExecutionService",
         qid: str,
-        backend: BackendProtocol,
+        backend: "BaseBackend",
         success: bool,
     ) -> None:
         """Backend-specific save processing using ExecutionService.
@@ -818,7 +819,7 @@ class TaskExecutor:
             The execution service
         qid : str
             The qubit ID
-        backend : BackendProtocol
+        backend : BaseBackend
             The backend
         success : bool
             Whether backend updates should be applied
@@ -834,7 +835,7 @@ class TaskExecutor:
         task: TaskProtocol,
         execution_service: "ExecutionService",
         qid: str,
-        backend: BackendProtocol,
+        backend: "BaseBackend",
         success: bool,
     ) -> None:
         """Qubex-specific save processing using ExecutionService.
@@ -926,7 +927,7 @@ class TaskExecutor:
 
     def _update_backend_params(
         self,
-        backend: BackendProtocol,
+        backend: "BaseBackend",
         execution_service: "ExecutionService",
         qid: str,
         output_parameters: dict[str, Any],
@@ -935,7 +936,7 @@ class TaskExecutor:
 
         Parameters
         ----------
-        backend : BackendProtocol
+        backend : BaseBackend
             The backend
         execution_service : ExecutionService
             The execution service

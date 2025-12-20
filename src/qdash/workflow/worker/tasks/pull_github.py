@@ -8,10 +8,11 @@ from urllib.parse import urlparse, urlunparse
 from git import Repo
 from git.exc import GitCommandError
 from prefect import get_run_logger, task
+from qdash.common.paths import QUBEX_CONFIG_BASE
 
 
 @task(task_run_name="Pull GitHub")
-def pull_github(target_dir: str | Path = "/app/config/qubex") -> str:
+def pull_github(target_dir: str | Path = QUBEX_CONFIG_BASE) -> str:
     """Update configuration files from the remote repository.
 
     Args:

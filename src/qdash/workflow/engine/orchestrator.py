@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from prefect import get_run_logger
 
@@ -410,7 +410,7 @@ class CalibOrchestrator:
             execution_service = self.execution_service
 
         # Run Prefect task
-        execution_service, executed_context = execute_dynamic_task_by_qid_service.with_options(
+        result = execute_dynamic_task_by_qid_service.with_options(
             timeout_seconds=task_instance.timeout,
             task_run_name=task_instance.name,
             log_prints=True,
@@ -421,11 +421,12 @@ class CalibOrchestrator:
             task_instance=task_instance,
             qid=qid,
         )
+        execution_service, executed_context = result
 
         # Update execution service reference
         self._execution_service = execution_service
 
-        return executed_context
+        return cast(TaskContext, executed_context)
 
     def _merge_and_extract_results(
         self,
@@ -474,20 +475,20 @@ class CalibOrchestrator:
                 existing_tasks = [t.name for t in self.task_context.task_result.coupling_tasks[qid]]
                 if task_name in existing_tasks:
                     return
-            task = CouplingTaskModel(name=task_name, upstream_id="", qid=qid)
-            self.task_context.task_result.coupling_tasks.setdefault(qid, []).append(task)
+            coupling_task = CouplingTaskModel(name=task_name, upstream_id="", qid=qid)
+            self.task_context.task_result.coupling_tasks.setdefault(qid, []).append(coupling_task)
         elif task_type == "global":
             existing_tasks = [t.name for t in self.task_context.task_result.global_tasks]
             if task_name in existing_tasks:
                 return
-            task = GlobalTaskModel(name=task_name, upstream_id="")
-            self.task_context.task_result.global_tasks.append(task)
+            global_task = GlobalTaskModel(name=task_name, upstream_id="")
+            self.task_context.task_result.global_tasks.append(global_task)
         elif task_type == "system":
             existing_tasks = [t.name for t in self.task_context.task_result.system_tasks]
             if task_name in existing_tasks:
                 return
-            task = SystemTaskModel(name=task_name, upstream_id="")
-            self.task_context.task_result.system_tasks.append(task)
+            system_task = SystemTaskModel(name=task_name, upstream_id="")
+            self.task_context.task_result.system_tasks.append(system_task)
 
         # Save updated workflow
         self.task_context.save()

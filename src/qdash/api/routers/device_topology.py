@@ -8,6 +8,7 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import networkx as nx
 import pendulum
+from bunnet import SortDirection
 from fastapi import APIRouter, Depends
 from fastapi.logger import logger
 from fastapi.responses import Response
@@ -187,7 +188,7 @@ def get_device_topology(
     couplings = []
     latest = (
         CalibrationNoteDocument.find({"project_id": ctx.project_id, "task_id": "master"})
-        .sort([("timestamp", -1)])
+        .sort([("timestamp", SortDirection.DESCENDING)])
         .limit(1)
         .run()
     )[0]

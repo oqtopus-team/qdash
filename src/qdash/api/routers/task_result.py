@@ -12,7 +12,7 @@ import pendulum
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import StreamingResponse
 from starlette.exceptions import HTTPException
-from pymongo import ASCENDING, DESCENDING
+from bunnet import SortDirection
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.task_result import (
     LatestTaskResultResponse,
@@ -103,7 +103,7 @@ def get_latest_qubit_task_results(
                 "qid": {"$in": qids},
             }
         )
-        .sort([("end_at", DESCENDING)])
+        .sort([("end_at", SortDirection.DESCENDING)])
         .run()
     )
 
@@ -216,7 +216,7 @@ def get_historical_qubit_task_results(
                 },
             }
         )
-        .sort([("end_at", DESCENDING)])
+        .sort([("end_at", SortDirection.DESCENDING)])
         .run()
     )
     fidelity_map = {}
@@ -330,7 +330,7 @@ def get_qubit_task_history(
                 "qid": qid,
             }
         )
-        .sort([("end_at", DESCENDING)])
+        .sort([("end_at", SortDirection.DESCENDING)])
         .run()
     )
 
@@ -428,7 +428,7 @@ def get_latest_coupling_task_results(
                 "qid": {"$in": qids},
             }
         )
-        .sort([("end_at", DESCENDING)])
+        .sort([("end_at", SortDirection.DESCENDING)])
         .run()
     )
 
@@ -542,7 +542,7 @@ def get_historical_coupling_task_results(
                 },
             }
         )
-        .sort([("end_at", DESCENDING)])
+        .sort([("end_at", SortDirection.DESCENDING)])
         .run()
     )
 
@@ -660,7 +660,7 @@ def get_coupling_task_history(
                 "qid": coupling_id,
             }
         )
-        .sort([("end_at", DESCENDING)])
+        .sort([("end_at", SortDirection.DESCENDING)])
         .run()
     )
 
@@ -742,7 +742,7 @@ def _fetch_timeseries_data(
                 "start_at": {"$gte": start_at, "$lte": end_at},
             }
         )
-        .sort([("start_at", ASCENDING)])
+        .sort([("start_at", SortDirection.ASCENDING)])
         .project(TimeSeriesProjection)
         .run()
     )

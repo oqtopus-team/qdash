@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import ast
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Any
 
-import yaml
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.logger import logger
 from qdash.api.lib.auth import get_current_active_user
+from qdash.api.lib.config_loader import ConfigLoader
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.task_file import (
     FileNodeType,
@@ -24,6 +23,7 @@ from qdash.api.schemas.task_file import (
     TaskFileTreeNode,
     TaskInfo,
 )
+from qdash.common.paths import CALIBTASKS_DIR
 
 router = APIRouter()
 gunicorn_logger = logging.getLogger("gunicorn.error")
@@ -33,19 +33,8 @@ if __name__ != "main":
 else:
     logger.setLevel(logging.DEBUG)
 
-# Get calibtasks path from environment variable or use default
-# In Docker, this path is typically /app/src/qdash/workflow/calibtasks
-# In local dev, it's ./src/qdash/workflow/calibtasks
-CALIBTASKS_BASE_PATH = Path(os.getenv("CALIBTASKS_PATH", "./src/qdash/workflow/calibtasks"))
-
-# If running in Docker (check if /app exists), use absolute path
-if Path("/app").exists() and not CALIBTASKS_BASE_PATH.is_absolute():
-    CALIBTASKS_BASE_PATH = Path("/app") / "src" / "qdash" / "workflow" / "calibtasks"
-
-# Settings file path
-SETTINGS_PATH = Path(os.getenv("SETTINGS_PATH", "./config/settings.yaml"))
-if Path("/app").exists() and not SETTINGS_PATH.is_absolute():
-    SETTINGS_PATH = Path("/app") / "config" / "settings.yaml"
+# Use centralized path from common module
+CALIBTASKS_BASE_PATH = CALIBTASKS_DIR
 
 # Cache for task metadata: {backend: (mtime_sum, tasks)}
 # Cache is invalidated when sum of file modification times changes
@@ -144,23 +133,24 @@ def build_task_file_tree(directory: Path, base_path: Path) -> list[TaskFileTreeN
 def get_task_file_settings() -> TaskFileSettings:
     """Get task file settings from config/settings.yaml.
 
+    Uses ConfigLoader for unified loading with local override support.
+
     Returns
     -------
         Task file settings including default backend
 
     """
     try:
-        if SETTINGS_PATH.exists():
-            with open(SETTINGS_PATH, encoding="utf-8") as f:
-                settings = yaml.safe_load(f)
-                task_files_settings = settings.get("task_files", {})
-                return TaskFileSettings(
-                    default_backend=task_files_settings.get("default_backend"),
-                    default_view_mode=task_files_settings.get("default_view_mode"),
-                    sort_order=task_files_settings.get("sort_order"),
-                )
+        settings = ConfigLoader.load_settings()
+        ui_settings = settings.get("ui", {})
+        task_files_settings = ui_settings.get("task_files", {})
+        return TaskFileSettings(
+            default_backend=task_files_settings.get("default_backend"),
+            default_view_mode=task_files_settings.get("default_view_mode"),
+            sort_order=task_files_settings.get("sort_order"),
+        )
     except Exception as e:
-        logger.warning(f"Failed to load settings from {SETTINGS_PATH}: {e}")
+        logger.warning(f"Failed to load task file settings: {e}")
 
     return TaskFileSettings()
 

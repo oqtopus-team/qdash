@@ -49,12 +49,15 @@ def pydantic_serializer(obj: BaseModel) -> dict[str, Any]:
 def update_active_tasks(username: str, backend: str) -> list[TaskModel]:
     """Update the active tasks in the registry and return a list of TaskModel instances."""
     task_cls = BaseTask.registry.get(backend)
+    if task_cls is None:
+        return []
     return [
         TaskModel(
+            project_id=None,
             username=username,
             backend=backend,
             name=cls.name,
-            description=cls.__doc__,
+            description=cls.__doc__ or "",
             task_type=cls.task_type,
             input_parameters={
                 name: param.model_dump() for name, param in cls.input_parameters.items()

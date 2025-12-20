@@ -596,7 +596,7 @@ class InMemoryQubitCalibrationRepository:
         qid: str,
         chip_id: str,
         output_parameters: dict[str, Any],
-        project_id: str,
+        project_id: str | None,
     ) -> Any:
         """Update qubit calibration data with new measurement results.
 
@@ -610,7 +610,7 @@ class InMemoryQubitCalibrationRepository:
             The chip identifier
         output_parameters : dict[str, Any]
             The new calibration parameters to merge
-        project_id : str
+        project_id : str | None
             The project identifier
 
         Returns
@@ -729,7 +729,7 @@ class InMemoryCouplingCalibrationRepository:
         qid: str,
         chip_id: str,
         output_parameters: dict[str, Any],
-        project_id: str,
+        project_id: str | None,
     ) -> Any:
         """Update coupling calibration data with new measurement results.
 
@@ -743,7 +743,7 @@ class InMemoryCouplingCalibrationRepository:
             The chip identifier
         output_parameters : dict[str, Any]
             The new calibration parameters to merge
-        project_id : str
+        project_id : str | None
             The project identifier
 
         Returns

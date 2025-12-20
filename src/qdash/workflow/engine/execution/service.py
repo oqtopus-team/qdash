@@ -285,7 +285,7 @@ class ExecutionService:
             # Merge qubit data
             for qid, data in calib_data.qubit.items():
                 if "calib_data" not in model.__dict__:
-                    model.calib_data = {"qubit": {}, "coupling": {}}
+                    model.calib_data = CalibDataModel()
                 if isinstance(model.calib_data, dict):
                     model.calib_data.setdefault("qubit", {}).setdefault(qid, {}).update(
                         data
