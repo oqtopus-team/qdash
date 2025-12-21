@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 import numpy as np
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -15,7 +15,7 @@ class CheckT1(QubexTask):
     """Task to check the T1 time."""
 
     name: str = "CheckT1"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "time_range": InputParameterModel(
             unit="ns",

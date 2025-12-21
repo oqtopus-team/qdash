@@ -2,7 +2,7 @@ from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -15,7 +15,7 @@ class CheckReadoutAmplitude(QubexTask):
     """Task to check the readout amplitude."""
 
     name: str = "CheckReadoutAmplitude"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "amplitude_range": InputParameterModel(
             unit="a.u.",

@@ -83,15 +83,28 @@ class TestFidelityValidation:
         with pytest.raises(FidelityValidationError, match="exceeds 100%"):
             processor.validate_fidelity(output_params, "RandomizedBenchmarking")
 
-    def test_validate_fidelity_skips_non_rb_tasks(self):
-        """Test validate_fidelity skips validation for non-RB tasks."""
+    def test_validate_fidelity_validates_all_tasks(self):
+        """Test validate_fidelity validates fidelity for all tasks."""
         processor = TaskResultProcessor()
         output_params = {"fidelity": OutputParameterModel(value=1.5)}
 
-        # Should pass even with invalid fidelity for non-RB task
-        result = processor.validate_fidelity(output_params, "CheckRabi")
+        # Should raise FidelityValidationError for any task with invalid fidelity
+        with pytest.raises(FidelityValidationError):
+            processor.validate_fidelity(output_params, "CheckRabi")
 
-        assert result is True
+    def test_validate_fidelity_validates_named_fidelity_params(self):
+        """Test validate_fidelity validates parameters containing 'fidelity' in name."""
+        processor = TaskResultProcessor()
+        output_params = {
+            "average_readout_fidelity": OutputParameterModel(value=1.05),
+            "other_param": OutputParameterModel(value=5.0),
+        }
+
+        with pytest.raises(FidelityValidationError) as exc_info:
+            processor.validate_fidelity(output_params, "ReadoutClassification")
+
+        assert "average_readout_fidelity" in str(exc_info.value)
+        assert "105.00%" in str(exc_info.value)
 
     def test_validate_fidelity_passes_when_no_fidelity(self):
         """Test validate_fidelity passes when fidelity param missing."""

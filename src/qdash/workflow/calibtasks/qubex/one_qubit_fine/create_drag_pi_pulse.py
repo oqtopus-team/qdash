@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -17,7 +17,7 @@ class CreateDRAGPIPulse(QubexTask):
     """Task to create the DRAG pi pulse."""
 
     name: str = "CreateDRAGPIPulse"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "duration": InputParameterModel(
             unit="ns",

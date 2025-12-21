@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import yaml
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -17,7 +17,7 @@ class CheckSkew(QubexTask):
     """Task to check skew the boxies."""
 
     name: str = "CheckSkew"
-    task_type = TaskTypes.SYSTEM
+    task_type: str = "system"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "muxes": InputParameterModel(
             unit="a.u.",

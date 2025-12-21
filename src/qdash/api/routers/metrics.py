@@ -153,23 +153,25 @@ async def get_metrics_config() -> dict[str, Any]:
 
 
 def _extract_latest_metrics(
-    entity_models: dict[str, Any],
+    chip_id: str,
+    username: str,
+    entity_type: Literal["qubit", "coupling"],
     valid_metric_keys: set[str],
     cutoff_time: Any | None,
-    within_hours: int | None,
 ) -> dict[str, dict[str, MetricValue]]:
-    """Extract latest metrics from chip document entities (qubits or couplings).
+    """Extract latest metrics from task result history.
 
-    This function extracts the most recent calibration data directly from the
-    ChipDocument. If a time filter is specified, only metrics calibrated within
-    that window are included.
+    This function queries TaskResultHistoryDocument to find the most recent
+    successful metric values for each entity. Only completed tasks are included
+    to ensure grid displays successful results only.
 
     Args:
     ----
-        entity_models: Dictionary of qubit/coupling models from ChipDocument
+        chip_id: The chip identifier
+        username: The username for filtering
+        entity_type: Type of entity - either "qubit" or "coupling"
         valid_metric_keys: Set of metric keys to extract from config
-        cutoff_time: Optional datetime for filtering calibration times
-        within_hours: Number of hours for time window (used for logging)
+        cutoff_time: Optional datetime for filtering tasks
 
     Returns:
     -------
@@ -177,39 +179,79 @@ def _extract_latest_metrics(
 
     Notes:
     -----
-        - Reads from ChipDocument.qubits or ChipDocument.couplings
-        - Filters by calibrated_at timestamp if within_hours is specified
-        - Returns empty dict for metrics with no valid data
+        - Queries TaskResultHistoryDocument for output_parameters
+        - Only includes completed tasks (status="completed")
+        - Returns the most recent value for each metric/entity combination
 
     """
     metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
 
-    for entity_id, entity_model in entity_models.items():
-        if entity_model.data and isinstance(entity_model.data, dict):
-            for param_name, param_data in entity_model.data.items():
-                if isinstance(param_data, dict) and "value" in param_data:
-                    # Check time filter
-                    include_param = True
-                    if within_hours and cutoff_time is not None and "calibrated_at" in param_data:
-                        try:
-                            calibrated_at = to_datetime(param_data["calibrated_at"])
-                            include_param = (
-                                calibrated_at is not None and calibrated_at >= cutoff_time
-                            )
-                        except Exception:
-                            include_param = False
+    if not valid_metric_keys:
+        return metrics_data
 
-                    if include_param and param_name in valid_metric_keys:
-                        value = param_data.get("value")
-                        task_id = param_data.get("task_id", "")
-                        execution_id = param_data.get("execution_id", "")
+    # Build query for task result history with metric existence filter
+    # Only include completed tasks to ensure grid displays successful results only
+    query: dict[str, Any] = {
+        "chip_id": chip_id,
+        "username": username,
+        "task_type": entity_type,
+        "status": "completed",
+        "$or": [{f"output_parameters.{metric}": {"$exists": True}} for metric in valid_metric_keys],
+    }
+    if cutoff_time:
+        query["start_at"] = {"$gte": cutoff_time}
 
-                        # Store the value with metadata
-                        metrics_data[param_name][entity_id] = MetricValue(
-                            value=value,
-                            task_id=task_id if task_id else None,
-                            execution_id=execution_id if execution_id else None,
-                        )
+    # Query task results sorted by start_at descending (most recent first)
+    try:
+        task_result_repo = MongoTaskResultHistoryRepository()
+        task_results = task_result_repo.find(query, sort=[("start_at", SortDirection.DESCENDING)])
+    except Exception as e:
+        logger.error(f"Failed to query task result history: {e}")
+        raise HTTPException(status_code=500, detail=f"Database query failed: {e}") from e
+
+    if not task_results:
+        logger.warning(f"No task result history found for chip={chip_id}, username={username}")
+        return metrics_data
+
+    # Track which metric/entity combinations we've already found (first = latest)
+    found: dict[str, set[str]] = {key: set() for key in valid_metric_keys}
+
+    for task_doc in task_results:
+        entity_id = task_doc.qid
+        if not entity_id:
+            continue
+
+        output_params = task_doc.output_parameters
+        if not output_params:
+            continue
+
+        for metric_name in valid_metric_keys:
+            # Skip if we already have the latest value for this metric/entity
+            if entity_id in found[metric_name]:
+                continue
+
+            if metric_name not in output_params:
+                continue
+
+            metric_data = output_params[metric_name]
+
+            # Extract value from output_parameters
+            if isinstance(metric_data, dict):
+                value = metric_data.get("value")
+                task_id = metric_data.get("task_id", task_doc.task_id)
+                execution_id = metric_data.get("execution_id", task_doc.execution_id)
+            else:
+                value = metric_data
+                task_id = task_doc.task_id
+                execution_id = task_doc.execution_id
+
+            if value is not None and isinstance(value, (int, float)):
+                metrics_data[metric_name][entity_id] = MetricValue(
+                    value=float(value),
+                    task_id=task_id if task_id else None,
+                    execution_id=execution_id,
+                )
+                found[metric_name].add(entity_id)
 
     return metrics_data
 
@@ -261,10 +303,12 @@ def _extract_best_metrics(
 
     # Build query for task result history with metric existence filter
     # This significantly reduces the number of documents fetched from MongoDB
+    # Only include completed tasks to ensure grid displays successful results only
     query: dict[str, Any] = {
         "chip_id": chip_id,
         "username": username,
         "task_type": entity_type,
+        "status": "completed",
         "$or": [{f"output_parameters.{metric}": {"$exists": True}} for metric in best_mode_metrics],
     }
     if cutoff_time:
@@ -354,19 +398,17 @@ def _extract_best_metrics(
 
 
 def extract_qubit_metrics(
-    entity_models: dict[str, Any],
     chip_id: str,
     username: str,
     within_hours: int | None = None,
     selection_mode: Literal["latest", "best"] = "latest",
 ) -> QubitMetrics:
-    """Extract qubit metrics from qubit entity models.
+    """Extract qubit metrics from task result history.
 
     Args:
     ----
-        entity_models: Dictionary of qubit models from repository
-        chip_id: The chip identifier (for best mode queries)
-        username: The username (for best mode queries)
+        chip_id: The chip identifier
+        username: The username for filtering
         within_hours: Optional time filter in hours (e.g., 24 for last 24 hours)
         selection_mode: "latest" to get most recent value, "best" to get optimal value within time range
 
@@ -387,7 +429,7 @@ def extract_qubit_metrics(
     # Extract metrics based on selection mode
     if selection_mode == "latest":
         metrics_data = _extract_latest_metrics(
-            entity_models, valid_metric_keys, cutoff_time, within_hours
+            chip_id, username, "qubit", valid_metric_keys, cutoff_time
         )
     else:
         metrics_data = _extract_best_metrics(
@@ -408,19 +450,17 @@ def extract_qubit_metrics(
 
 
 def extract_coupling_metrics(
-    entity_models: dict[str, Any],
     chip_id: str,
     username: str,
     within_hours: int | None = None,
     selection_mode: Literal["latest", "best"] = "latest",
 ) -> CouplingMetrics:
-    """Extract coupling metrics from coupling entity models.
+    """Extract coupling metrics from task result history.
 
     Args:
     ----
-        entity_models: Dictionary of coupling models from repository
-        chip_id: The chip identifier (for best mode queries)
-        username: The username (for best mode queries)
+        chip_id: The chip identifier
+        username: The username for filtering
         within_hours: Optional time filter in hours
         selection_mode: "latest" to get most recent value, "best" to get optimal value within time range
 
@@ -441,7 +481,7 @@ def extract_coupling_metrics(
     # Extract metrics based on selection mode
     if selection_mode == "latest":
         metrics_data = _extract_latest_metrics(
-            entity_models, valid_metric_keys, cutoff_time, within_hours
+            chip_id, username, "coupling", valid_metric_keys, cutoff_time
         )
     else:
         metrics_data = _extract_best_metrics(
@@ -501,16 +541,10 @@ async def get_chip_metrics(
                 status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}"
             )
 
-    # Get entity models from individual document collections
-    qubit_models = chip_repo.get_all_qubit_models(ctx.project_id, chip_id)
-    coupling_models = chip_repo.get_all_coupling_models(ctx.project_id, chip_id)
-
-    # Extract metrics
-    qubit_metrics = extract_qubit_metrics(
-        qubit_models, chip_id, ctx.user.username, within_hours, selection_mode
-    )
+    # Extract metrics from task result history
+    qubit_metrics = extract_qubit_metrics(chip_id, ctx.user.username, within_hours, selection_mode)
     coupling_metrics = extract_coupling_metrics(
-        coupling_models, chip_id, ctx.user.username, within_hours, selection_mode
+        chip_id, ctx.user.username, within_hours, selection_mode
     )
 
     return ChipMetricsResponse(
@@ -767,10 +801,8 @@ async def download_metrics_pdf(
     if not chip:
         raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
 
-    # Get entity models from individual document collections (scalable approach)
-    qubit_models = chip_repo.get_all_qubit_models(ctx.project_id, chip_id)
-    coupling_models = chip_repo.get_all_coupling_models(ctx.project_id, chip_id)
-    qubit_count = len(qubit_models)
+    # Get qubit count for PDF report
+    qubit_count = chip_repo.get_qubit_count(ctx.project_id, chip_id)
 
     # Calculate cutoff time if time filter specified
     cutoff_time = None
@@ -783,16 +815,18 @@ async def download_metrics_pdf(
     # Extract metrics based on selection mode
     if selection_mode == "latest":
         qubit_metrics_data = _extract_latest_metrics(
-            entity_models=qubit_models,
+            chip_id=chip_id,
+            username=ctx.user.username,
+            entity_type="qubit",
             valid_metric_keys=set(config.qubit_metrics.keys()),
             cutoff_time=cutoff_time,
-            within_hours=within_hours,
         )
         coupling_metrics_data = _extract_latest_metrics(
-            entity_models=coupling_models,
+            chip_id=chip_id,
+            username=ctx.user.username,
+            entity_type="coupling",
             valid_metric_keys=set(config.coupling_metrics.keys()),
             cutoff_time=cutoff_time,
-            within_hours=within_hours,
         )
     else:
         qubit_metrics_data = _extract_best_metrics(

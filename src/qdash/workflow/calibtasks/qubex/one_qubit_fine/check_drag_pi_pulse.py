@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -13,7 +13,7 @@ class CheckDRAGPIPulse(QubexTask):
     """Task to check the DRAG PI pulse."""
 
     name: str = "CheckDRAGPIPulse"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "repetitions": InputParameterModel(
             unit="a.u.",
