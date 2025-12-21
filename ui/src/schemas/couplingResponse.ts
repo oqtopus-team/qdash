@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { CouplingResponseData } from "./couplingResponseData";
-import type { CouplingResponseBestData } from "./couplingResponseBestData";
 
 /**
  * Response model for a single coupling.
@@ -16,5 +15,4 @@ export interface CouplingResponse {
   chip_id: string;
   status?: string;
   data?: CouplingResponseData;
-  best_data?: CouplingResponseBestData;
 }

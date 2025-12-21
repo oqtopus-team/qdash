@@ -23,7 +23,6 @@ class MongoQubitCalibrationRepository:
     ----
         Currently delegates to QubitDocument.update_calib_data() which handles:
         - Data merging
-        - Best data updates
         - Chip document synchronization
         - History recording
 
@@ -143,6 +142,5 @@ class MongoQubitCalibrationRepository:
             status=doc.status,
             chip_id=doc.chip_id,
             data=doc.data,
-            best_data=doc.best_data,
             node_info=doc.node_info,
         )

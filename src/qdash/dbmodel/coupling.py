@@ -29,10 +29,6 @@ class CouplingDocument(Document):
     status: str = Field("pending", description="The status of the coupling")
     chip_id: str = Field(..., description="The chip ID")
     data: dict[str, Any] = Field(..., description="The data of the coupling")
-    best_data: dict[str, Any] = Field(
-        default_factory=dict,
-        description="The best calibration results, focusing on fidelity metrics",
-    )
     edge_info: EdgeInfoModel | None = Field(
         default=None, description="The edge information (deprecated)"
     )
@@ -70,41 +66,6 @@ class CouplingDocument(Document):
                 existing[key] = value
         return existing
 
-    @staticmethod
-    def update_best_data(current_best: dict[str, Any], new_data: dict[str, Any]) -> dict[str, Any]:
-        """Update best_data with new calibration results if they are better.
-
-        Only updates fidelity-related metrics when the new values are higher
-        (better fidelity = higher value).
-        """
-        fidelity_metrics = [
-            "zx90_gate_fidelity",
-            "bell_state_fidelity",
-        ]
-
-        for metric in fidelity_metrics:
-            if metric in new_data:
-                new_param = new_data[metric]
-                new_value = new_param.value if hasattr(new_param, "value") else 0.0
-                # Initialize if metric doesn't exist in best_data or new value is better
-                current_value = (
-                    current_best[metric].get("value", 0.0) if metric in current_best else 0.0
-                )
-                if metric not in current_best or new_value > current_value:
-                    # Convert OutputParameterModel to dict for storage
-                    current_best[metric] = {
-                        "value": new_param.value,
-                        "value_type": new_param.value_type,
-                        "error": new_param.error,
-                        "unit": new_param.unit,
-                        "description": new_param.description,
-                        "calibrated_at": new_param.calibrated_at,
-                        "execution_id": new_param.execution_id,
-                        "task_id": new_param.task_id,
-                    }
-
-        return current_best
-
     @classmethod
     def update_calib_data(
         cls,
@@ -119,10 +80,6 @@ class CouplingDocument(Document):
         if coupling_doc is None:
             raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
         coupling_doc.data = CouplingDocument.merge_calib_data(coupling_doc.data, output_parameters)
-        # Update best_data if new results are better
-        coupling_doc.best_data = CouplingDocument.update_best_data(
-            coupling_doc.best_data, output_parameters
-        )
         coupling_doc.system_info.update_time()
         coupling_doc.save()
         # Create history entry for the updated coupling
@@ -131,7 +88,6 @@ class CouplingDocument(Document):
             qid=qid,
             chip_id=chip_id,
             data=coupling_doc.data,
-            best_data=coupling_doc.best_data,
             edge_info=coupling_doc.edge_info,
             username=username,
         )

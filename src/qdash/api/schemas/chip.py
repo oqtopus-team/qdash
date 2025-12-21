@@ -115,7 +115,6 @@ class QubitResponse(BaseModel):
     chip_id: str
     status: str = "pending"
     data: dict[str, Any] = {}
-    best_data: dict[str, Any] = {}
 
 
 class ListQubitsResponse(BaseModel):
@@ -134,7 +133,6 @@ class CouplingResponse(BaseModel):
     chip_id: str
     status: str = "pending"
     data: dict[str, Any] = {}
-    best_data: dict[str, Any] = {}
 
 
 class ListCouplingsResponse(BaseModel):

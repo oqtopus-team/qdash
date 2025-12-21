@@ -28,10 +28,6 @@ class QubitDocument(Document):
     status: str = Field("pending", description="The status of the qubit")
     chip_id: str = Field(..., description="The chip ID")
     data: dict[str, Any] = Field(..., description="The data of the qubit")
-    best_data: dict[str, Any] = Field(
-        default_factory=dict,
-        description="The best calibration results, focusing on fidelity metrics",
-    )
     node_info: NodeInfoModel | None = Field(
         default=None, description="The node information (deprecated)"
     )
@@ -69,47 +65,6 @@ class QubitDocument(Document):
                 existing[key] = value
         return existing
 
-    @staticmethod
-    def update_best_data(current_best: dict[str, Any], new_data: dict[str, Any]) -> dict[str, Any]:
-        """Update best_data with new calibration results if they are better.
-
-        Only updates fidelity-related metrics when the new values are higher
-        (better fidelity = higher value).
-        """
-        fidelity_metrics = [
-            "average_readout_fidelity",
-            "readout_fidelity_0",
-            "readout_fidelity_1",
-            "x90_gate_fidelity",
-            "x180_gate_fidelity",
-            "t1",
-            "t2_echo",
-            "t2_star",
-        ]
-
-        for metric in fidelity_metrics:
-            if metric in new_data:
-                new_param = new_data[metric]
-                new_value = new_param.value if hasattr(new_param, "value") else 0.0
-                # Initialize if metric doesn't exist in best_data or new value is better
-                current_value = (
-                    current_best[metric].get("value", 0.0) if metric in current_best else 0.0
-                )
-                if metric not in current_best or new_value > current_value:
-                    # Convert OutputParameterModel to dict for storage
-                    current_best[metric] = {
-                        "value": new_param.value,
-                        "value_type": new_param.value_type,
-                        "error": new_param.error,
-                        "unit": new_param.unit,
-                        "description": new_param.description,
-                        "calibrated_at": new_param.calibrated_at,
-                        "execution_id": new_param.execution_id,
-                        "task_id": new_param.task_id,
-                    }
-
-        return current_best
-
     @classmethod
     def update_calib_data(
         cls,
@@ -125,8 +80,6 @@ class QubitDocument(Document):
             raise ValueError(f"Qubit {qid} not found in chip {chip_id}")
         # Merge new calibration data into the existing data
         qubit_doc.data = QubitDocument.merge_calib_data(qubit_doc.data, output_parameters)
-        # Update best_data if new results are better
-        qubit_doc.best_data = QubitDocument.update_best_data(qubit_doc.best_data, output_parameters)
         qubit_doc.system_info.update_time()
         qubit_doc.save()
         # Create history entry for the updated qubit
@@ -135,7 +88,6 @@ class QubitDocument(Document):
             qid=qid,
             chip_id=chip_id,
             data=qubit_doc.data,
-            best_data=qubit_doc.best_data,
             username=username,
         )
         QubitHistoryDocument.create_history(qubit_model)

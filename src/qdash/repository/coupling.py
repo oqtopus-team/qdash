@@ -23,7 +23,6 @@ class MongoCouplingCalibrationRepository:
     ----
         Currently delegates to CouplingDocument.update_calib_data() which handles:
         - Data merging
-        - Best data updates
         - Chip document synchronization
         - History recording
 
@@ -145,6 +144,5 @@ class MongoCouplingCalibrationRepository:
             status=doc.status,
             chip_id=doc.chip_id,
             data=doc.data,
-            best_data=doc.best_data,
             edge_info=doc.edge_info,
         )
