@@ -23,12 +23,19 @@ from qdash.workflow.engine.scheduler.plugins import (
 
 
 @pytest.fixture
-def mock_chip_doc():
-    """Mock ChipDocument with sample qubit and coupling data."""
-    chip_doc = MagicMock()
+def mock_chip():
+    """Mock ChipModel with metadata only (no embedded qubits/couplings)."""
+    chip = MagicMock()
+    chip.project_id = "test_project"
+    chip.chip_id = "test_chip"
+    chip.size = 64
+    return chip
 
-    # Mock qubits with frequency and fidelity data
-    chip_doc.qubits = {
+
+@pytest.fixture
+def mock_qubit_models():
+    """Mock qubit models from individual QubitDocument collection."""
+    return {
         "0": MagicMock(data={"qubit_frequency": {"value": 5.0}, "x90_fidelity": {"value": 0.98}}),
         "1": MagicMock(data={"qubit_frequency": {"value": 5.1}, "x90_fidelity": {"value": 0.97}}),
         "2": MagicMock(data={"qubit_frequency": {"value": 5.2}, "x90_fidelity": {"value": 0.96}}),
@@ -37,27 +44,22 @@ def mock_chip_doc():
         "5": MagicMock(data={"qubit_frequency": {"value": 5.5}, "x90_fidelity": {"value": 0.90}}),
     }
 
-    # Mock couplings
-    chip_doc.couplings = {
-        "0-1": MagicMock(),
-        "1-2": MagicMock(),
-        "2-3": MagicMock(),
-        "3-4": MagicMock(),
-        "4-5": MagicMock(),
-        "0-4": MagicMock(),  # Cross-MUX coupling
-    }
 
-    return chip_doc
+@pytest.fixture
+def mock_coupling_ids():
+    """Mock coupling IDs from individual CouplingDocument collection."""
+    return ["0-1", "1-2", "2-3", "3-4", "4-5", "0-4"]
 
 
 @pytest.fixture
-def filter_context(mock_chip_doc):
+def filter_context(mock_chip, mock_qubit_models):
     """Create FilterContext for testing."""
     return FilterContext(
-        chip=mock_chip_doc,
+        chip=mock_chip,
         grid_size=8,
         qubit_frequency={"0": 5.0, "1": 5.1, "2": 5.2, "3": 5.3, "4": 5.4, "5": 5.5},
         qid_to_mux={"0": 0, "1": 0, "2": 0, "3": 0, "4": 1, "5": 1},
+        qubit_models=mock_qubit_models,
     )
 
 
@@ -209,11 +211,24 @@ def test_intra_then_inter_mux_scheduler(schedule_context):
 # ============================================================================
 
 
+@patch.object(CRScheduler, "_load_coupling_ids")
+@patch.object(CRScheduler, "_load_qubit_models")
 @patch.object(CRScheduler, "_load_chip_data")
 @patch.object(CRScheduler, "_load_wiring_config")
-def test_generate_with_plugins_default(mock_wiring, mock_load, mock_chip_doc, tmp_path):
+def test_generate_with_plugins_default(
+    mock_wiring,
+    mock_load,
+    mock_qubits,
+    mock_couplings,
+    mock_chip,
+    mock_qubit_models,
+    mock_coupling_ids,
+    tmp_path,
+):
     """Test generate_with_plugins with default filters and scheduler."""
-    mock_load.return_value = mock_chip_doc
+    mock_load.return_value = mock_chip
+    mock_qubits.return_value = mock_qubit_models
+    mock_couplings.return_value = mock_coupling_ids
 
     # Mock wiring config
     wiring_config = [
@@ -235,11 +250,24 @@ def test_generate_with_plugins_default(mock_wiring, mock_load, mock_chip_doc, tm
     assert "filter_pipeline" in schedule.filtering_stats
 
 
+@patch.object(CRScheduler, "_load_coupling_ids")
+@patch.object(CRScheduler, "_load_qubit_models")
 @patch.object(CRScheduler, "_load_chip_data")
 @patch.object(CRScheduler, "_load_wiring_config")
-def test_generate_with_plugins_custom_filters(mock_wiring, mock_load, mock_chip_doc, tmp_path):
+def test_generate_with_plugins_custom_filters(
+    mock_wiring,
+    mock_load,
+    mock_qubits,
+    mock_couplings,
+    mock_chip,
+    mock_qubit_models,
+    mock_coupling_ids,
+    tmp_path,
+):
     """Test generate_with_plugins with custom filter pipeline."""
-    mock_load.return_value = mock_chip_doc
+    mock_load.return_value = mock_chip
+    mock_qubits.return_value = mock_qubit_models
+    mock_couplings.return_value = mock_coupling_ids
 
     wiring_config = [
         {"mux": 0, "read_out": "R0", "ctrl": ["C0", "C1"]},
@@ -270,11 +298,24 @@ def test_generate_with_plugins_custom_filters(mock_wiring, mock_load, mock_chip_
     assert "fidelity" in filter_names
 
 
+@patch.object(CRScheduler, "_load_coupling_ids")
+@patch.object(CRScheduler, "_load_qubit_models")
 @patch.object(CRScheduler, "_load_chip_data")
 @patch.object(CRScheduler, "_load_wiring_config")
-def test_generate_with_plugins_custom_scheduler(mock_wiring, mock_load, mock_chip_doc, tmp_path):
+def test_generate_with_plugins_custom_scheduler(
+    mock_wiring,
+    mock_load,
+    mock_qubits,
+    mock_couplings,
+    mock_chip,
+    mock_qubit_models,
+    mock_coupling_ids,
+    tmp_path,
+):
     """Test generate_with_plugins with custom scheduler."""
-    mock_load.return_value = mock_chip_doc
+    mock_load.return_value = mock_chip
+    mock_qubits.return_value = mock_qubit_models
+    mock_couplings.return_value = mock_coupling_ids
 
     wiring_config = [
         {"mux": 0, "read_out": "R0", "ctrl": ["C0", "C1"]},

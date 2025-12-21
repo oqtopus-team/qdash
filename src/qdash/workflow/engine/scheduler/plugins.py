@@ -57,16 +57,18 @@ class FilterContext:
     """Context object passed to CR pair filters.
 
     Attributes:
-        chip: Current chip data
+        chip: Current chip data (metadata only, for backwards compatibility)
         grid_size: Grid dimension (8 for 64-qubit, 12 for 144-qubit)
         qubit_frequency: Mapping from qubit ID to frequency (if available)
         qid_to_mux: Mapping from qubit ID to MUX ID
+        qubit_models: Qubit data from individual QubitDocument collection (scalable)
     """
 
     chip: ChipModel
     grid_size: int
     qubit_frequency: dict[str, float] = field(default_factory=dict)
     qid_to_mux: dict[str, int] = field(default_factory=dict)
+    qubit_models: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -327,9 +329,9 @@ class FidelityFilter(CRPairFilter):
         """Filter pairs by qubit fidelity."""
         self._total_count = len(pairs)
 
-        # Extract fidelity data
+        # Extract fidelity data from individual QubitDocument models (scalable)
         fidelity_map = {}
-        for qid, qubit in context.chip.qubits.items():
+        for qid, qubit in context.qubit_models.items():
             if qubit.data and self.fidelity_key in qubit.data:
                 fidelity_map[qid] = qubit.data[self.fidelity_key].get("value", 0.0)
 

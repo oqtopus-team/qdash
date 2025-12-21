@@ -27,7 +27,6 @@ from qdash.api.schemas.chip import (
     ChipSummaryResponse,
     CouplingResponse,
     CreateChipRequest,
-    ListChipsResponse,
     ListChipsSummaryResponse,
     ListCouplingsResponse,
     ListMuxResponse,
@@ -49,33 +48,6 @@ logger.setLevel(logging.DEBUG)
 # =============================================================================
 # Chip CRUD
 # =============================================================================
-
-
-@router.get(
-    "/chips", response_model=ListChipsResponse, summary="List all chips", operation_id="listChips"
-)
-def list_chips(
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
-    chip_service: Annotated[ChipService, Depends(get_chip_service)],
-) -> ListChipsResponse:
-    """List all chips in the current project.
-
-    Parameters
-    ----------
-    ctx : ProjectContext
-        Project context with user and project information
-    chip_service : ChipService
-        Service for chip operations
-
-    Returns
-    -------
-    ListChipsResponse
-        Wrapped list of available chips
-
-    """
-    logger.debug(f"Listing chips for project: {ctx.project_id}")
-    chips = chip_service.list_chips(ctx.project_id)
-    return ListChipsResponse(chips=chips)
 
 
 @router.get(
@@ -141,8 +113,6 @@ def create_chip(
             chip_id=chip.chip_id,
             size=chip.size,
             topology_id=chip.topology_id,
-            qubits=chip.qubits,
-            couplings=chip.couplings,
             installed_at=chip.installed_at,
         )
     except ValueError as e:
@@ -185,45 +155,6 @@ def get_chip_dates(
     logger.debug(f"Fetching dates for chip {chip_id}, project: {ctx.project_id}")
     dates = chip_service.get_chip_dates(ctx.project_id, chip_id)
     return ChipDatesResponse(data=dates)
-
-
-@router.get(
-    "/chips/{chip_id}", response_model=ChipResponse, summary="Get a chip", operation_id="getChip"
-)
-def get_chip(
-    chip_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
-    chip_service: Annotated[ChipService, Depends(get_chip_service)],
-) -> ChipResponse:
-    """Get a chip by its ID.
-
-    Parameters
-    ----------
-    chip_id : str
-        ID of the chip to fetch
-    ctx : ProjectContext
-        Project context with user and project information
-    chip_service : ChipService
-        Service for chip operations
-
-    Returns
-    -------
-    ChipResponse
-        Chip information
-
-    Raises
-    ------
-    HTTPException
-        If chip is not found
-
-    """
-    logger.debug(f"Fetching chip {chip_id} for project: {ctx.project_id}")
-
-    chip = chip_service.get_chip(ctx.project_id, chip_id)
-    if chip is None:
-        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
-
-    return chip
 
 
 # =============================================================================

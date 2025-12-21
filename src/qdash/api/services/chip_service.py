@@ -8,7 +8,6 @@ import logging
 from typing import Any
 
 from qdash.api.schemas.chip import (
-    ChipResponse,
     ChipSummaryResponse,
     CouplingResponse,
     MetricHeatmapResponse,
@@ -48,7 +47,7 @@ class ChipService:
         ...     execution_counter_repository=MongoExecutionCounterRepository(),
         ...     task_result_repository=MongoTaskResultHistoryRepository(),
         ... )
-        >>> chips = service.list_chips(project_id="proj-1")
+        >>> summaries = service.list_chips_summary(project_id="proj-1")
 
     """
 
@@ -62,61 +61,6 @@ class ChipService:
         self._chip_repo = chip_repository
         self._counter_repo = execution_counter_repository
         self._task_result_repo = task_result_repository
-
-    def list_chips(self, project_id: str) -> list[ChipResponse]:
-        """List all chips in a project.
-
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-
-        Returns
-        -------
-        list[ChipResponse]
-            List of chip responses
-
-        """
-        chips = self._chip_repo.list_by_project(project_id)
-        return [
-            ChipResponse(
-                chip_id=chip.chip_id,
-                size=chip.size,
-                topology_id=chip.topology_id,
-                qubits=chip.qubits,
-                couplings=chip.couplings,
-                installed_at=chip.installed_at,
-            )
-            for chip in chips
-        ]
-
-    def get_chip(self, project_id: str, chip_id: str) -> ChipResponse | None:
-        """Get a chip by ID.
-
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-        chip_id : str
-            The chip identifier
-
-        Returns
-        -------
-        ChipResponse | None
-            The chip response or None if not found
-
-        """
-        chip = self._chip_repo.find_by_id(project_id, chip_id)
-        if chip is None:
-            return None
-        return ChipResponse(
-            chip_id=chip.chip_id,
-            size=chip.size,
-            topology_id=chip.topology_id,
-            qubits=chip.qubits,
-            couplings=chip.couplings,
-            installed_at=chip.installed_at,
-        )
 
     def get_chip_dates(self, project_id: str, chip_id: str) -> list[str]:
         """Get available dates for a chip.

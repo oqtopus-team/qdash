@@ -5,23 +5,22 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import now
-from qdash.datamodel.coupling import CouplingModel
-from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 
 class ChipDocument(Document):
     """Data model for a chip.
 
+    Qubit and coupling data are stored in separate QubitDocument and CouplingDocument
+    collections for scalability (256+ qubits).
+
     Attributes
     ----------
         project_id (str): The owning project identifier (required).
         chip_id (str): The chip ID. e.g. "chip1".
         size (int): The size of the chip.
-        qubits (dict): The qubits of the chip.
-        couplings (dict): The couplings of the chip.
         installed_at (str): The time when the system information was created.
-        system_info (SystemInfo): The system information. e.g. {"created_at": "2021-01-01T00:00:00Z", "updated_at": "2021-01-01T00:00:00Z"}.
+        system_info (SystemInfo): The system information.
 
     """
 
@@ -32,8 +31,6 @@ class ChipDocument(Document):
     topology_id: str | None = Field(
         None, description="Topology template ID (e.g., 'square-lattice-mux-64')"
     )
-    qubits: dict[str, QubitModel] = Field({}, description="The qubits of the chip")
-    couplings: dict[str, CouplingModel] = Field({}, description="The couplings of the chip")
     installed_at: datetime = Field(
         default_factory=now,
         description="The time when the chip was installed",
@@ -58,22 +55,6 @@ class ChipDocument(Document):
                 [("project_id", ASCENDING), ("username", ASCENDING), ("installed_at", DESCENDING)]
             ),
         ]
-
-    def update_qubit(self, qid: str, qubit_data: QubitModel) -> "ChipDocument":
-        if qid not in self.qubits:
-            raise ValueError(f"Qubit {qid} not found in chip {self.chip_id}")
-        self.qubits[qid] = qubit_data
-        self.system_info.update_time()
-        self.save()
-        return self
-
-    def update_coupling(self, qid: str, coupling_data: CouplingModel) -> "ChipDocument":
-        if qid not in self.couplings:
-            raise ValueError(f"Coupling {qid} not found in chip {self.chip_id}")
-        self.couplings[qid] = coupling_data
-        self.system_info.update_time()
-        self.save()
-        return self
 
     @classmethod
     def get_current_chip(cls, username: str) -> "ChipDocument":

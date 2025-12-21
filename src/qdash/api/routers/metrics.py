@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import Annotated, Any, Literal
 
 from bunnet import SortDirection
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -25,9 +25,6 @@ from qdash.api.schemas.metrics import (
 from qdash.common.datetime_utils import now, to_datetime
 from qdash.repository.chip import MongoChipRepository
 from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
-
-if TYPE_CHECKING:
-    from qdash.dbmodel.chip import ChipDocument
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -218,7 +215,8 @@ def _extract_latest_metrics(
 
 
 def _extract_best_metrics(
-    chip: ChipDocument,
+    chip_id: str,
+    username: str,
     entity_type: Literal["qubit", "coupling"],
     valid_metric_keys: set[str],
     metrics_config: dict[str, Any],
@@ -233,7 +231,8 @@ def _extract_best_metrics(
 
     Args:
     ----
-        chip: Chip document containing chip_id and username
+        chip_id: The chip identifier
+        username: The username for filtering
         entity_type: Type of entity - either "qubit" or "coupling"
         valid_metric_keys: Set of metric keys to extract from config
         metrics_config: Metrics configuration mapping metric_key -> MetricMetadata
@@ -263,8 +262,8 @@ def _extract_best_metrics(
     # Build query for task result history with metric existence filter
     # This significantly reduces the number of documents fetched from MongoDB
     query: dict[str, Any] = {
-        "chip_id": chip.chip_id,
-        "username": chip.username,
+        "chip_id": chip_id,
+        "username": username,
         "task_type": entity_type,
         "$or": [{f"output_parameters.{metric}": {"$exists": True}} for metric in best_mode_metrics],
     }
@@ -280,9 +279,7 @@ def _extract_best_metrics(
         raise HTTPException(status_code=500, detail=f"Database query failed: {e}") from e
 
     if not task_results:
-        logger.warning(
-            f"No task result history found for chip={chip.chip_id}, username={chip.username}"
-        )
+        logger.warning(f"No task result history found for chip={chip_id}, username={username}")
         return metrics_data
 
     # Collect all values for each metric/entity_id combination
@@ -357,15 +354,19 @@ def _extract_best_metrics(
 
 
 def extract_qubit_metrics(
-    chip: ChipDocument,
+    entity_models: dict[str, Any],
+    chip_id: str,
+    username: str,
     within_hours: int | None = None,
     selection_mode: Literal["latest", "best"] = "latest",
 ) -> QubitMetrics:
-    """Extract qubit metrics from ChipDocument.
+    """Extract qubit metrics from qubit entity models.
 
     Args:
     ----
-        chip: The chip document
+        entity_models: Dictionary of qubit models from repository
+        chip_id: The chip identifier (for best mode queries)
+        username: The username (for best mode queries)
         within_hours: Optional time filter in hours (e.g., 24 for last 24 hours)
         selection_mode: "latest" to get most recent value, "best" to get optimal value within time range
 
@@ -386,11 +387,11 @@ def extract_qubit_metrics(
     # Extract metrics based on selection mode
     if selection_mode == "latest":
         metrics_data = _extract_latest_metrics(
-            chip.qubits, valid_metric_keys, cutoff_time, within_hours
+            entity_models, valid_metric_keys, cutoff_time, within_hours
         )
     else:
         metrics_data = _extract_best_metrics(
-            chip, "qubit", valid_metric_keys, config.qubit_metrics, cutoff_time
+            chip_id, username, "qubit", valid_metric_keys, config.qubit_metrics, cutoff_time
         )
 
     # Build QubitMetrics response
@@ -407,15 +408,19 @@ def extract_qubit_metrics(
 
 
 def extract_coupling_metrics(
-    chip: ChipDocument,
+    entity_models: dict[str, Any],
+    chip_id: str,
+    username: str,
     within_hours: int | None = None,
     selection_mode: Literal["latest", "best"] = "latest",
 ) -> CouplingMetrics:
-    """Extract coupling metrics from ChipDocument.
+    """Extract coupling metrics from coupling entity models.
 
     Args:
     ----
-        chip: The chip document
+        entity_models: Dictionary of coupling models from repository
+        chip_id: The chip identifier (for best mode queries)
+        username: The username (for best mode queries)
         within_hours: Optional time filter in hours
         selection_mode: "latest" to get most recent value, "best" to get optimal value within time range
 
@@ -436,11 +441,11 @@ def extract_coupling_metrics(
     # Extract metrics based on selection mode
     if selection_mode == "latest":
         metrics_data = _extract_latest_metrics(
-            chip.couplings, valid_metric_keys, cutoff_time, within_hours
+            entity_models, valid_metric_keys, cutoff_time, within_hours
         )
     else:
         metrics_data = _extract_best_metrics(
-            chip, "coupling", valid_metric_keys, config.coupling_metrics, cutoff_time
+            chip_id, username, "coupling", valid_metric_keys, config.coupling_metrics, cutoff_time
         )
 
     return CouplingMetrics(
@@ -483,23 +488,35 @@ async def get_chip_metrics(
         ChipMetricsResponse with all metrics data
 
     """
-    # Get chip document from database (scoped by project)
+    # Get chip existence and entity models from repository (scalable approach)
     chip_repo = MongoChipRepository()
-    chip = chip_repo.find_one_document({"project_id": ctx.project_id, "chip_id": chip_id})
 
-    if not chip:
-        raise HTTPException(
-            status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}"
-        )
+    # Check if chip exists and get qubit count
+    qubit_count = chip_repo.get_qubit_count(ctx.project_id, chip_id)
+    if qubit_count == 0:
+        # Check if chip exists at all
+        chip = chip_repo.find_one_document({"project_id": ctx.project_id, "chip_id": chip_id})
+        if not chip:
+            raise HTTPException(
+                status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}"
+            )
+
+    # Get entity models from individual document collections
+    qubit_models = chip_repo.get_all_qubit_models(ctx.project_id, chip_id)
+    coupling_models = chip_repo.get_all_coupling_models(ctx.project_id, chip_id)
 
     # Extract metrics
-    qubit_metrics = extract_qubit_metrics(chip, within_hours, selection_mode)
-    coupling_metrics = extract_coupling_metrics(chip, within_hours, selection_mode)
+    qubit_metrics = extract_qubit_metrics(
+        qubit_models, chip_id, ctx.user.username, within_hours, selection_mode
+    )
+    coupling_metrics = extract_coupling_metrics(
+        coupling_models, chip_id, ctx.user.username, within_hours, selection_mode
+    )
 
     return ChipMetricsResponse(
         chip_id=chip_id,
         username=ctx.user.username,
-        qubit_count=len(chip.qubits),
+        qubit_count=qubit_count,
         within_hours=within_hours,
         qubit_metrics=qubit_metrics,
         coupling_metrics=coupling_metrics,
@@ -737,7 +754,7 @@ async def download_metrics_pdf(
     """
     from qdash.api.lib.metrics_pdf import MetricsPDFGenerator
 
-    # Get chip document
+    # Get chip document (needed for topology_id)
     chip_repo = MongoChipRepository()
     chip = chip_repo.find_one_document(
         {
@@ -750,6 +767,11 @@ async def download_metrics_pdf(
     if not chip:
         raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
 
+    # Get entity models from individual document collections (scalable approach)
+    qubit_models = chip_repo.get_all_qubit_models(ctx.project_id, chip_id)
+    coupling_models = chip_repo.get_all_coupling_models(ctx.project_id, chip_id)
+    qubit_count = len(qubit_models)
+
     # Calculate cutoff time if time filter specified
     cutoff_time = None
     if within_hours:
@@ -761,27 +783,29 @@ async def download_metrics_pdf(
     # Extract metrics based on selection mode
     if selection_mode == "latest":
         qubit_metrics_data = _extract_latest_metrics(
-            entity_models=chip.qubits,
+            entity_models=qubit_models,
             valid_metric_keys=set(config.qubit_metrics.keys()),
             cutoff_time=cutoff_time,
             within_hours=within_hours,
         )
         coupling_metrics_data = _extract_latest_metrics(
-            entity_models=chip.couplings,
+            entity_models=coupling_models,
             valid_metric_keys=set(config.coupling_metrics.keys()),
             cutoff_time=cutoff_time,
             within_hours=within_hours,
         )
     else:
         qubit_metrics_data = _extract_best_metrics(
-            chip=chip,
+            chip_id=chip_id,
+            username=ctx.user.username,
             entity_type="qubit",
             valid_metric_keys=set(config.qubit_metrics.keys()),
             metrics_config=config.qubit_metrics,
             cutoff_time=cutoff_time,
         )
         coupling_metrics_data = _extract_best_metrics(
-            chip=chip,
+            chip_id=chip_id,
+            username=ctx.user.username,
             entity_type="coupling",
             valid_metric_keys=set(config.coupling_metrics.keys()),
             metrics_config=config.coupling_metrics,
@@ -798,7 +822,7 @@ async def download_metrics_pdf(
     metrics_response = ChipMetricsResponse(
         chip_id=chip_id,
         username=ctx.user.username,
-        qubit_count=len(chip.qubits),
+        qubit_count=qubit_count,
         within_hours=within_hours,
         qubit_metrics=QubitMetrics(**qubit_metrics_mapped),
         coupling_metrics=CouplingMetrics(**coupling_metrics_data),

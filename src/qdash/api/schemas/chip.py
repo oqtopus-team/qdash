@@ -8,15 +8,16 @@ from qdash.common.datetime_utils import format_elapsed_time, parse_elapsed_time
 
 
 class ChipResponse(BaseModel):
-    """Chip is a Pydantic model that represents a chip.
+    """Chip response model.
+
+    Qubit and coupling data are stored in separate collections for scalability
+    and should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).
 
     Attributes
     ----------
         chip_id (str): The ID of the chip.
         size (int): The size of the chip.
         topology_id (str | None): Topology template ID.
-        qubits (dict): Qubit information.
-        couplings (dict): Coupling information.
         installed_at (str): Installation timestamp.
 
     """
@@ -24,8 +25,6 @@ class ChipResponse(BaseModel):
     chip_id: str
     size: int = 64
     topology_id: str | None = None
-    qubits: dict[str, Any] = {}
-    couplings: dict[str, Any] = {}
     installed_at: datetime | None = None
 
 

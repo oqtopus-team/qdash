@@ -7,8 +7,6 @@ from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from pymongo.errors import DuplicateKeyError
 from qdash.common.datetime_utils import now
-from qdash.datamodel.coupling import CouplingModel
-from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
 
@@ -18,13 +16,14 @@ logger = logging.getLogger(__name__)
 class ChipHistoryDocument(Document):
     """Data model for chip history.
 
+    Qubit and coupling history data are stored in separate QubitHistoryDocument
+    and CouplingHistoryDocument collections for scalability (256+ qubits).
+
     Attributes
     ----------
         project_id (str): The owning project identifier.
         chip_id (str): The chip ID. e.g. "chip1".
         size (int): The size of the chip.
-        qubits (dict): The qubits of the chip.
-        couplings (dict): The couplings of the chip.
         installed_at (datetime): The time when the chip was installed.
         system_info (SystemInfo): The system information.
         recorded_date (str): The date when this history record was created (YYYYMMDD).
@@ -36,8 +35,6 @@ class ChipHistoryDocument(Document):
     username: str = Field(..., description="The username of the user who created the chip")
     size: int = Field(..., description="The size of the chip")
     topology_id: str | None = Field(None, description="Topology template ID")
-    qubits: dict[str, QubitModel] = Field({}, description="The qubits of the chip")
-    couplings: dict[str, CouplingModel] = Field({}, description="The couplings of the chip")
     installed_at: datetime = Field(..., description="The time when the chip was installed")
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
@@ -126,8 +123,6 @@ class ChipHistoryDocument(Document):
                 username=chip_doc.username,
                 size=chip_doc.size,
                 topology_id=chip_doc.topology_id,
-                qubits=chip_doc.qubits,
-                couplings=chip_doc.couplings,
                 installed_at=chip_doc.installed_at,
                 system_info=chip_doc.system_info,
                 recorded_date=today,
@@ -153,8 +148,6 @@ class ChipHistoryDocument(Document):
                 # Update the existing document
                 existing_doc.size = chip_doc.size
                 existing_doc.topology_id = chip_doc.topology_id
-                existing_doc.qubits = chip_doc.qubits
-                existing_doc.couplings = chip_doc.couplings
                 existing_doc.installed_at = chip_doc.installed_at
                 existing_doc.system_info = chip_doc.system_info
                 saved: ChipHistoryDocument = existing_doc.save()
