@@ -124,6 +124,16 @@ class TaskResultHistoryDocument(Document):
                     ("start_at", ASCENDING),
                 ]
             ),
+            # Index for metrics aggregation queries (metrics.py: aggregate_*_metrics)
+            IndexModel(
+                [
+                    ("chip_id", ASCENDING),
+                    ("username", ASCENDING),
+                    ("task_type", ASCENDING),
+                    ("status", ASCENDING),
+                    ("start_at", DESCENDING),
+                ]
+            ),
         ]
 
     @classmethod
