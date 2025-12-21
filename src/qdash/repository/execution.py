@@ -285,8 +285,6 @@ class MongoExecutionRepository:
                     "status": ExecutionStatusModel.SCHEDULED,
                     "task_results": {},
                     "tags": [],
-                    "controller_info": {},
-                    "fridge_info": {},
                     "chip_id": "",
                     "start_at": None,
                     "end_at": None,
@@ -343,16 +341,6 @@ class MongoExecutionRepository:
                 # Convert elapsed_time fields to seconds recursively
                 update_ops["$set"][f"task_results.{k}"] = _convert_elapsed_time_to_seconds(v)
 
-        # Merge controller_info
-        if update_data.get("controller_info"):
-            for k, v in update_data["controller_info"].items():
-                update_ops["$set"][f"controller_info.{k}"] = v
-
-        # Merge fridge_info
-        if update_data.get("fridge_info"):
-            for k, v in update_data["fridge_info"].items():
-                update_ops["$set"][f"fridge_info.{k}"] = v
-
         # Merge calibration data
         calib_data = update_data.get("calib_data", {})
         if calib_data.get("qubit"):
@@ -404,8 +392,6 @@ class MongoExecutionRepository:
             status=doc.get("status", ExecutionStatusModel.SCHEDULED),
             task_results=task_results,
             tags=doc.get("tags", []),
-            controller_info=doc.get("controller_info", {}),
-            fridge_info=doc.get("fridge_info", {}),
             chip_id=doc.get("chip_id", ""),
             start_at=doc.get("start_at") or None,
             end_at=doc.get("end_at") or None,

@@ -8,7 +8,7 @@ Components
 TaskContext
     Container for task execution state and results.
     Holds task_result (qubit/coupling/global tasks), calib_data,
-    and controller_info for an execution session.
+    for an execution session.
 
 TaskExecutor
     Executes tasks with full lifecycle management:

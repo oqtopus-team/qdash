@@ -193,8 +193,6 @@ class ExecutionModel(BaseModel):
     status: str            # Status
     task_results: dict[str, TaskResultModel]  # Task results
     tags: list[str]        # Tags
-    controller_info: dict  # Controller information
-    fridge_info: dict      # Fridge information
     chip_id: str           # Chip ID
     start_at: str          # Start time
     end_at: str            # End time
@@ -479,8 +477,6 @@ class ExecutionHistoryDocument(Document):
     status: str
     task_results: dict[str, TaskResultModel]
     tags: list[str]
-    controller_info: dict
-    fridge_info: dict
     chip_id: str
     start_at: str
     end_at: str
