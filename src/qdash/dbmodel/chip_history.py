@@ -1,11 +1,12 @@
 import logging
+from datetime import datetime, timedelta
 from typing import ClassVar
 
-import pendulum
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from pymongo.errors import DuplicateKeyError
+from qdash.common.datetime_utils import now
 from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
@@ -24,7 +25,7 @@ class ChipHistoryDocument(Document):
         size (int): The size of the chip.
         qubits (dict): The qubits of the chip.
         couplings (dict): The couplings of the chip.
-        installed_at (str): The time when the system information was created.
+        installed_at (datetime): The time when the chip was installed.
         system_info (SystemInfo): The system information.
         recorded_date (str): The date when this history record was created (YYYYMMDD).
 
@@ -37,10 +38,10 @@ class ChipHistoryDocument(Document):
     topology_id: str | None = Field(None, description="Topology template ID")
     qubits: dict[str, QubitModel] = Field({}, description="The qubits of the chip")
     couplings: dict[str, CouplingModel] = Field({}, description="The couplings of the chip")
-    installed_at: str = Field(..., description="The time when the system information was created")
+    installed_at: datetime = Field(..., description="The time when the chip was installed")
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD"),
+        default_factory=lambda: now().strftime("%Y%m%d"),
         description="The date when this history record was created",
     )
 
@@ -88,7 +89,7 @@ class ChipHistoryDocument(Document):
             Yesterday's history record if it exists, None otherwise
 
         """
-        yesterday = pendulum.now(tz="Asia/Tokyo").subtract(days=1).format("YYYYMMDD")
+        yesterday = (now() - timedelta(days=1)).strftime("%Y%m%d")
         return cls.find_one(
             {
                 "project_id": project_id,
@@ -115,7 +116,7 @@ class ChipHistoryDocument(Document):
         Raises:
             Exception: If database operation fails
         """
-        today = pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD")
+        today = now().strftime("%Y%m%d")
 
         try:
             # Try to insert a new document

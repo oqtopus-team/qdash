@@ -8,6 +8,7 @@
 import type { ChipResponseTopologyId } from "./chipResponseTopologyId";
 import type { ChipResponseQubits } from "./chipResponseQubits";
 import type { ChipResponseCouplings } from "./chipResponseCouplings";
+import type { ChipResponseInstalledAt } from "./chipResponseInstalledAt";
 
 /**
  * Chip is a Pydantic model that represents a chip.
@@ -27,5 +28,5 @@ export interface ChipResponse {
   topology_id?: ChipResponseTopologyId;
   qubits?: ChipResponseQubits;
   couplings?: ChipResponseCouplings;
-  installed_at?: string;
+  installed_at?: ChipResponseInstalledAt;
 }

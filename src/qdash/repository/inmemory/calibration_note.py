@@ -4,7 +4,7 @@ This module provides a mock implementation that stores data in memory,
 useful for unit testing without requiring a MongoDB instance.
 """
 
-import pendulum
+from qdash.common.datetime_utils import now
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 
 
@@ -176,7 +176,7 @@ class InMemoryCalibrationNoteRepository:
             note.task_id,
         )
 
-        timestamp = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        timestamp = now()
         updated_note = CalibrationNoteModel(
             project_id=note.project_id,
             username=note.username,

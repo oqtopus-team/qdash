@@ -1,6 +1,5 @@
 """Tests for ExecutionStateManager."""
 
-import pytest
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionStatusModel,
@@ -232,9 +231,9 @@ class TestDatamodelConversion:
             tags=[],
             controller_info={},
             fridge_info={},
-            start_at="",
-            end_at="",
-            elapsed_time="",
+            start_at=None,
+            end_at=None,
+            elapsed_time=None,
             calib_data={"qubit": {}, "coupling": {}},
             message="",
             system_info={},
@@ -302,23 +301,5 @@ class TestParameterRetrieval:
         assert result is None
 
 
-class TestElapsedTimeCalculation:
-    """Test elapsed time calculation."""
-
-    def test_calculate_elapsed_time_valid_timestamps(self):
-        """Test elapsed time calculation with valid timestamps."""
-        manager = ExecutionStateManager(execution_id="exec-001")
-
-        result = manager._calculate_elapsed_time(
-            "2024-01-01T10:00:00+09:00",
-            "2024-01-01T10:30:00+09:00",
-        )
-
-        assert "30" in result and "minute" in result
-
-    def test_calculate_elapsed_time_invalid_raises(self):
-        """Test elapsed time calculation raises on invalid input."""
-        manager = ExecutionStateManager(execution_id="exec-001")
-
-        with pytest.raises(ValueError, match="Failed to parse"):
-            manager._calculate_elapsed_time("invalid", "also-invalid")
+# Note: TestElapsedTimeCalculation tests were removed as elapsed time calculation
+# was moved to datetime_utils.calculate_elapsed_time()

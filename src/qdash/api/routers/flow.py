@@ -425,8 +425,8 @@ async def list_flows(
                 description=flow.description,
                 chip_id=flow.chip_id,
                 flow_function_name=flow.flow_function_name,
-                created_at=flow.created_at.isoformat(),
-                updated_at=flow.updated_at.isoformat(),
+                created_at=flow.created_at,
+                updated_at=flow.updated_at,
                 tags=flow.tags,
             )
             for flow in flows
@@ -653,7 +653,7 @@ async def list_all_flow_schedules(
                             cron=deployment.schedule.cron,
                             next_run=None,
                             active=deployment.is_schedule_active,
-                            created_at=deployment.created.isoformat() if deployment.created else "",
+                            created_at=deployment.created or datetime.now(timezone.utc),
                         )
                     )
             except Exception as e:
@@ -683,16 +683,18 @@ async def list_all_flow_schedules(
                                 flow_name=flow.name,
                                 schedule_type="one-time",
                                 cron=None,
-                                next_run=flow_run.next_scheduled_start_time.isoformat(),
+                                next_run=flow_run.next_scheduled_start_time,
                                 active=True,
-                                created_at=flow_run.created.isoformat() if flow_run.created else "",
+                                created_at=flow_run.created or datetime.now(timezone.utc),
                             )
                         )
             except Exception as e:
                 logger.warning(f"Failed to read scheduled flow runs for {flow.name}: {e}")
 
-    # Sort by next_run time
-    all_schedules.sort(key=lambda x: x.next_run or "")
+    # Sort by next_run time (None values at the end)
+    all_schedules.sort(
+        key=lambda x: (x.next_run is None, x.next_run or datetime.min.replace(tzinfo=timezone.utc))
+    )
 
     # Apply offset and limit to sorted results
     paginated_schedules = all_schedules[offset : offset + limit]
@@ -937,8 +939,8 @@ async def get_flow(
         chip_id=flow.chip_id,
         default_parameters=flow.default_parameters,
         file_path=flow.file_path,
-        created_at=flow.created_at.isoformat(),
-        updated_at=flow.updated_at.isoformat(),
+        created_at=flow.created_at,
+        updated_at=flow.updated_at,
         tags=flow.tags,
     )
 
@@ -1179,12 +1181,11 @@ async def schedule_flow(
             logger.info(f"Set cron schedule for flow '{name}': {request.cron}")
 
             # Calculate next run time from cron expression
-            next_run = None
+            next_run: datetime | None = None
             try:
-                now = datetime.now(timezone.utc)
-                cron_iter = croniter(request.cron, now)
-                next_run_dt = cron_iter.get_next(datetime)
-                next_run = next_run_dt.isoformat()
+                current_time = datetime.now(timezone.utc)
+                cron_iter = croniter(request.cron, current_time)
+                next_run = cron_iter.get_next(datetime)
             except Exception as e:
                 logger.warning(f"Failed to calculate next run time: {e}")
 
@@ -1262,7 +1263,7 @@ async def schedule_flow(
                 flow_name=name,
                 schedule_type="one-time",
                 cron=None,
-                next_run=request.scheduled_time,
+                next_run=scheduled_dt,
                 active=True,
                 message=f"One-time schedule created successfully for flow '{name}'",
             )
@@ -1334,7 +1335,7 @@ async def list_flow_schedules(
                         cron=deployment.schedule.cron,
                         next_run=None,  # Prefect calculates this internally
                         active=deployment.is_schedule_active,
-                        created_at=deployment.created.isoformat() if deployment.created else "",
+                        created_at=deployment.created or datetime.now(timezone.utc),
                     )
                 )
         except Exception as e:
@@ -1360,9 +1361,9 @@ async def list_flow_schedules(
                             flow_name=name,
                             schedule_type="one-time",
                             cron=None,
-                            next_run=flow_run.next_scheduled_start_time.isoformat(),
+                            next_run=flow_run.next_scheduled_start_time,
                             active=True,
-                            created_at=flow_run.created.isoformat() if flow_run.created else "",
+                            created_at=flow_run.created or datetime.now(timezone.utc),
                         )
                     )
         except Exception as e:

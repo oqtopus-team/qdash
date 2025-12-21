@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime  # noqa: TCH003
 from typing import ClassVar, cast
 
 from bunnet import Document
@@ -17,7 +18,7 @@ class ProjectMembershipDocument(Document):
     role: ProjectRole = Field(default=ProjectRole.VIEWER, description="Assigned project role")
     status: str = Field(default="pending", description="Invitation status")
     invited_by: str | None = Field(default=None, description="Inviter username")
-    last_accessed_at: str | None = Field(default=None, description="Last access timestamp ISO8601")
+    last_accessed_at: datetime | None = Field(default=None, description="Last access timestamp")
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="System info timestamps"
     )

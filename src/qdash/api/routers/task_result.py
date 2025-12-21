@@ -5,10 +5,10 @@ from __future__ import annotations
 import io
 import logging
 import zipfile
+from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
-import pendulum
 from bunnet import SortDirection
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -24,6 +24,14 @@ from qdash.api.schemas.task_result import (
     TimeSeriesProjection,
 )
 from qdash.api.services.response_processor import response_processor
+from qdash.common.datetime_utils import (
+    end_of_day,
+    now,
+    parse_date,
+    parse_elapsed_time,
+    start_of_day,
+    to_datetime,
+)
 from qdash.datamodel.task import OutputParameterModel
 from qdash.repository.chip import MongoChipRepository
 from qdash.repository.chip_history import MongoChipHistoryRepository
@@ -137,7 +145,7 @@ def get_latest_qubit_task_results(
                 raw_data_path=task_result_doc.raw_data_path,
                 start_at=task_result_doc.start_at,
                 end_at=task_result_doc.end_at,
-                elapsed_time=task_result_doc.elapsed_time,
+                elapsed_time=parse_elapsed_time(task_result_doc.elapsed_time),
                 task_type=task_result_doc.task_type,
                 over_threshold=fidelity_map.get(qid, False),
             )
@@ -204,10 +212,10 @@ def get_historical_qubit_task_results(
 
     # Get qids
     qids = list(chip.qubits.keys())
-    parsed_date = pendulum.from_format(date, "YYYYMMDD", tz="Asia/Tokyo")
+    parsed_date = parse_date(date, "YYYYMMDD")
 
-    start_time = parsed_date.start_of("day")
-    end_time = parsed_date.end_of("day")
+    start_time = start_of_day(parsed_date)
+    end_time = end_of_day(parsed_date)
     task_result_repo = MongoTaskResultHistoryRepository()
     all_results = task_result_repo.find(
         {
@@ -217,8 +225,8 @@ def get_historical_qubit_task_results(
             "qid": {"$in": qids},
             # Filter tasks executed on the same date in JST
             "start_at": {
-                "$gte": start_time.to_iso8601_string(),
-                "$lt": end_time.to_iso8601_string(),
+                "$gte": start_time,
+                "$lt": end_time,
             },
         },
         sort=[("end_at", SortDirection.DESCENDING)],
@@ -230,8 +238,7 @@ def get_historical_qubit_task_results(
         calibrated_at_str = fidelity_data.get("calibrated_at")
 
         try:
-            parsed = pendulum.parse(calibrated_at_str)
-            calibrated_at = parsed if isinstance(parsed, pendulum.DateTime) else None
+            calibrated_at = to_datetime(calibrated_at_str)
         except Exception:
             calibrated_at = None
 
@@ -265,7 +272,7 @@ def get_historical_qubit_task_results(
                 raw_data_path=task_result_doc.raw_data_path,
                 start_at=task_result_doc.start_at,
                 end_at=task_result_doc.end_at,
-                elapsed_time=task_result_doc.elapsed_time,
+                elapsed_time=parse_elapsed_time(task_result_doc.elapsed_time),
                 task_type=task_result_doc.task_type,
                 over_threshold=fidelity_map.get(qid, False),
             )
@@ -354,7 +361,7 @@ def get_qubit_task_history(
             raw_data_path=result.raw_data_path,
             start_at=result.start_at,
             end_at=result.end_at,
-            elapsed_time=result.elapsed_time,
+            elapsed_time=parse_elapsed_time(result.elapsed_time),
             task_type=result.task_type,
             over_threshold=False,
         )
@@ -459,7 +466,7 @@ def get_latest_coupling_task_results(
                 raw_data_path=task_result_doc.raw_data_path,
                 start_at=task_result_doc.start_at,
                 end_at=task_result_doc.end_at,
-                elapsed_time=task_result_doc.elapsed_time,
+                elapsed_time=parse_elapsed_time(task_result_doc.elapsed_time),
                 task_type=task_result_doc.task_type,
                 over_threshold=fidelity_map.get(qid, False),
             )
@@ -527,10 +534,10 @@ def get_historical_coupling_task_results(
     # Get coupling ids
     qids = list(chip.couplings.keys())
 
-    parsed_date = pendulum.from_format(date, "YYYYMMDD", tz="Asia/Tokyo")
+    parsed_date = parse_date(date, "YYYYMMDD")
 
-    start_time = parsed_date.start_of("day")
-    end_time = parsed_date.end_of("day")
+    start_time = start_of_day(parsed_date)
+    end_time = end_of_day(parsed_date)
 
     task_result_repo = MongoTaskResultHistoryRepository()
     all_results = task_result_repo.find(
@@ -540,8 +547,8 @@ def get_historical_coupling_task_results(
             "name": task,
             "qid": {"$in": qids},
             "start_at": {
-                "$gte": start_time.to_iso8601_string(),
-                "$lt": end_time.to_iso8601_string(),
+                "$gte": start_time,
+                "$lt": end_time,
             },
         },
         sort=[("end_at", SortDirection.DESCENDING)],
@@ -554,8 +561,7 @@ def get_historical_coupling_task_results(
         calibrated_at_str = fidelity_data.get("calibrated_at")
 
         try:
-            parsed = pendulum.parse(calibrated_at_str)
-            calibrated_at = parsed if isinstance(parsed, pendulum.DateTime) else None
+            calibrated_at = to_datetime(calibrated_at_str)
         except Exception:
             calibrated_at = None
 
@@ -589,7 +595,7 @@ def get_historical_coupling_task_results(
                 raw_data_path=task_result_doc.raw_data_path,
                 start_at=task_result_doc.start_at,
                 end_at=task_result_doc.end_at,
-                elapsed_time=task_result_doc.elapsed_time,
+                elapsed_time=parse_elapsed_time(task_result_doc.elapsed_time),
                 task_type=task_result_doc.task_type,
                 over_threshold=fidelity_map.get(qid, False),
             )
@@ -681,7 +687,7 @@ def get_coupling_task_history(
             raw_data_path=result.raw_data_path,
             start_at=result.start_at,
             end_at=result.end_at,
-            elapsed_time=result.elapsed_time,
+            elapsed_time=parse_elapsed_time(result.elapsed_time),
             task_type=result.task_type,
             over_threshold=False,
         )
@@ -729,8 +735,10 @@ def _fetch_timeseries_data(
 
     """
     if start_at is None or end_at is None:
-        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-        start_at = pendulum.now(tz="Asia/Tokyo").subtract(days=7).to_iso8601_string()
+        end_at_dt = now()
+        start_at_dt = now() - timedelta(days=7)
+        end_at = end_at_dt.isoformat()
+        start_at = start_at_dt.isoformat()
     # Find all task results for the given tag and parameter (scoped by project)
     task_result_repo = MongoTaskResultHistoryRepository()
     task_results = task_result_repo.find_with_projection(

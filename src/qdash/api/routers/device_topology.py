@@ -2,12 +2,12 @@
 
 import io
 import re
+from datetime import timedelta
 from typing import Annotated, Any
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import networkx as nx
-import pendulum
 from fastapi import APIRouter, Depends
 from fastapi.logger import logger
 from fastapi.responses import Response
@@ -24,6 +24,7 @@ from qdash.api.schemas.device_topology import (
     QubitGateDuration,
     QubitLifetime,
 )
+from qdash.common.datetime_utils import now, to_datetime
 from qdash.repository import MongoCalibrationNoteRepository, MongoChipRepository
 
 router = APIRouter()
@@ -59,7 +60,7 @@ def is_within_24h(calibrated_at: str | None) -> bool:
 
     Args:
     ----
-        calibrated_at: Timestamp string to check
+        calibrated_at: Timestamp string or datetime to check
 
     Returns:
     -------
@@ -69,10 +70,10 @@ def is_within_24h(calibrated_at: str | None) -> bool:
     if not calibrated_at:
         return False
     try:
-        now = pendulum.now(tz="Asia/Tokyo")
-        cutoff = now.subtract(hours=24)
-        calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
-        if not isinstance(calibrated_at_dt, pendulum.DateTime):
+        current_time = now()
+        cutoff = current_time - timedelta(hours=24)
+        calibrated_at_dt = to_datetime(calibrated_at)
+        if calibrated_at_dt is None:
             return False
         return bool(calibrated_at_dt >= cutoff)
     except Exception:

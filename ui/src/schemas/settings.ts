@@ -26,4 +26,5 @@ export interface Settings {
   api_port?: number;
   ui_port?: number;
   log_level?: string;
+  timezone?: string;
 }

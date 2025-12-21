@@ -1,9 +1,11 @@
 # dbmodel/execution_history.py
+from datetime import datetime, timedelta
 from typing import Any, ClassVar
 
 from bunnet import Document
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, field_validator
 from pymongo import ASCENDING, DESCENDING, IndexModel
+from qdash.common.datetime_utils import ensure_timezone, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionModel, TaskResultModel
 from qdash.datamodel.system_info import SystemInfoModel
 
@@ -23,10 +25,10 @@ class ExecutionHistoryDocument(Document):
         note (str): The note. e.g. "This is a note".
         tags (list[str]): The tags. e.g. ["tag1", "tag2"].
         message (str): The message. e.g. "This is a message".
-        start_at (str): The time when the
-        end_at (str): The time when the execution ended.
-        elapsed_time (str): The elapsed time.
-        system_info (SystemInfo): The system information. e.g. {"created_at": "2021-01-01T00:00:00Z", "updated_at": "2021-01-01T00:00:00Z"}.
+        start_at (datetime): The time when the execution started.
+        end_at (datetime): The time when the execution ended.
+        elapsed_time (timedelta): The elapsed time.
+        system_info (SystemInfoModel): The system information.
 
     """
 
@@ -42,12 +44,36 @@ class ExecutionHistoryDocument(Document):
     controller_info: dict[str, Any] = Field(..., description="The controller information")
     fridge_info: dict[str, Any] = Field(..., description="The fridge information")
     chip_id: str = Field(..., description="The chip ID")
-    start_at: str = Field(..., description="The time when the execution started")
-    end_at: str = Field(..., description="The time when the execution ended")
-    elapsed_time: str = Field(..., description="The elapsed time")
+    start_at: datetime | None = Field(None, description="The time when the execution started")
+    end_at: datetime | None = Field(None, description="The time when the execution ended")
+    elapsed_time: float | None = Field(None, description="The elapsed time in seconds")
     calib_data: dict[str, Any] = Field(..., description="The calibration data")
     message: str = Field(..., description="The message")
     system_info: SystemInfoModel = Field(..., description="The system information")
+
+    @field_validator("start_at", "end_at", mode="before")
+    @classmethod
+    def _ensure_timezone(cls, v: Any) -> datetime | Any:
+        """Ensure datetime fields are timezone-aware."""
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            return ensure_timezone(v)
+        # For other inputs (e.g., strings), let pydantic handle the conversion
+        return v
+
+    @field_validator("elapsed_time", mode="before")
+    @classmethod
+    def _parse_elapsed_time(cls, v: Any) -> float | None:
+        """Parse elapsed_time from various formats and return seconds."""
+        if v is None:
+            return None
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, timedelta):
+            return v.total_seconds()
+        td = parse_elapsed_time(v)
+        return td.total_seconds() if td else None
 
     class Settings:
         """Settings for the document."""
@@ -110,7 +136,9 @@ class ExecutionHistoryDocument(Document):
         doc.chip_id = execution_model.chip_id
         doc.start_at = execution_model.start_at
         doc.end_at = execution_model.end_at
-        doc.elapsed_time = execution_model.elapsed_time
+        doc.elapsed_time = (
+            execution_model.elapsed_time.total_seconds() if execution_model.elapsed_time else None
+        )
         doc.message = execution_model.message
         doc.system_info = execution_model.system_info
 

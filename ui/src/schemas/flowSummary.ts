@@ -18,9 +18,9 @@ export interface FlowSummary {
   chip_id: string;
   /** Entry point function name */
   flow_function_name: string;
-  /** Creation timestamp (ISO format) */
+  /** Creation timestamp */
   created_at: string;
-  /** Last update timestamp (ISO format) */
+  /** Last update timestamp */
   updated_at: string;
   /** Tags */
   tags: string[];

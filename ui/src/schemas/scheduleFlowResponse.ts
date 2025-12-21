@@ -20,7 +20,7 @@ export interface ScheduleFlowResponse {
   schedule_type: string;
   /** Cron expression (for cron schedules) */
   cron?: ScheduleFlowResponseCron;
-  /** Next scheduled run time (ISO format) */
+  /** Next scheduled run time */
   next_run?: ScheduleFlowResponseNextRun;
   /** Whether the schedule is active */
   active: boolean;

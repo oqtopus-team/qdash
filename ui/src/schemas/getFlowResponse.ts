@@ -25,9 +25,9 @@ export interface GetFlowResponse {
   default_parameters: GetFlowResponseDefaultParameters;
   /** Path to file */
   file_path: string;
-  /** Creation timestamp (ISO format) */
+  /** Creation timestamp */
   created_at: string;
-  /** Last update timestamp (ISO format) */
+  /** Last update timestamp */
   updated_at: string;
   /** Tags */
   tags: string[];

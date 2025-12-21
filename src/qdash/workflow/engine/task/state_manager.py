@@ -7,8 +7,8 @@ management, including task creation, status updates, and parameter handling.
 from collections.abc import Iterator
 from typing import Any, cast
 
-import pendulum
 from pydantic import BaseModel
+from qdash.common.datetime_utils import now
 from qdash.datamodel.task import (
     BaseTaskResultModel,
     CalibDataModel,
@@ -255,7 +255,7 @@ class TaskStateManager(BaseModel):
         """
         task = self._ensure_task_exists(task_name, task_type, qid)
         task.status = TaskStatusModel.RUNNING
-        task.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        task.start_at = now()
 
     def end_task(self, task_name: str, task_type: str, qid: str) -> None:
         """End a task (record end time and calculate elapsed time).
@@ -271,8 +271,10 @@ class TaskStateManager(BaseModel):
 
         """
         task = self.get_task(task_name, task_type, qid)
-        task.end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-        task.elapsed_time = task.calculate_elapsed_time(task.start_at, task.end_at)
+        end_time = now()
+        task.end_at = end_time
+        if task.start_at is not None:
+            task.elapsed_time = task.calculate_elapsed_time(task.start_at, end_time)
 
     def update_task_status_to_completed(
         self, task_name: str, message: str, task_type: str, qid: str

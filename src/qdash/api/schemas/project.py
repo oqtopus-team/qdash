@@ -1,5 +1,7 @@
 """Schemas for project management API."""
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 from qdash.datamodel.project import ProjectRole
 
@@ -30,8 +32,8 @@ class ProjectResponse(BaseModel):
     description: str | None
     tags: list[str]
     default_role: ProjectRole
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
 
 class ProjectListResponse(BaseModel):
@@ -62,7 +64,7 @@ class MemberResponse(BaseModel):
     role: ProjectRole
     status: str
     invited_by: str | None
-    last_accessed_at: str | None
+    last_accessed_at: datetime | None
 
 
 class MemberListResponse(BaseModel):

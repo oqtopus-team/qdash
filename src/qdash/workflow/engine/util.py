@@ -1,19 +1,19 @@
 """Utility functions and classes for calibration workflows."""
 
 import re
+from datetime import datetime
 from typing import Any
 
-import pendulum
 from prefect import task
 from pydantic import BaseModel, Field
+from qdash.common.datetime_utils import now
 from qdash.datamodel.task import TaskModel
 from qdash.workflow.calibtasks.base import BaseTask
 
 
-def get_current_timestamp() -> str:
-    """Get current timestamp in ISO8601 format (Asia/Tokyo timezone)."""
-    result: str = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
-    return result
+def get_current_timestamp() -> datetime:
+    """Get current timestamp in configured timezone."""
+    return now()
 
 
 def qid_to_label(qid: str) -> str:
@@ -73,11 +73,11 @@ def update_active_tasks(username: str, backend: str) -> list[TaskModel]:
 class SystemInfo(BaseModel):
     """Data model for system information."""
 
-    created_at: str = Field(
+    created_at: datetime = Field(
         default_factory=get_current_timestamp,
         description="The time when the system information was created",
     )
-    updated_at: str = Field(
+    updated_at: datetime = Field(
         default_factory=get_current_timestamp,
         description="The time when the system information was updated",
     )

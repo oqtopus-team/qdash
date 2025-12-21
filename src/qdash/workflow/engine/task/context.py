@@ -295,8 +295,8 @@ class TaskContext:
             "execution_id": self.execution_id,
             "calib_dir": self.calib_dir,
             "controller_info": self.controller_info,
-            "task_result": self.task_result.model_dump(),
-            "calib_data": self.calib_data.model_dump(),
+            "task_result": self.task_result.model_dump(mode="json"),
+            "calib_data": self.calib_data.model_dump(mode="json"),
         }
 
         with Path(f"{calib_dir}/{self.id}.json").open("w") as f:

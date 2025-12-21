@@ -38,6 +38,7 @@ import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteC
 import { FlowImportsPanel } from "@/components/features/flow/FlowImportsPanel";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { formatDateTime } from "@/utils/datetime";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -243,7 +244,7 @@ export default function EditFlowPage() {
             </div>
             {data?.data?.updated_at && (
               <span className="text-xs text-base-content/50 hidden lg:inline">
-                Updated: {new Date(data.data.updated_at).toLocaleString()}
+                Updated: {formatDateTime(data.data.updated_at)}
               </span>
             )}
           </div>

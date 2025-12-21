@@ -4,6 +4,7 @@ This module defines the domain model for calibration notes,
 separate from the database document representation.
 """
 
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -46,9 +47,9 @@ class CalibrationNoteModel(BaseModel):
     execution_id: str = Field(..., description="The execution ID associated with this note")
     task_id: str = Field(..., description="The task ID associated with this note")
     note: dict[str, Any] = Field(default_factory=dict, description="The calibration note data")
-    timestamp: str | None = Field(
+    timestamp: datetime | None = Field(
         default=None,
-        description="The time when the note was last updated (ISO 8601)",
+        description="The time when the note was last updated",
     )
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel,

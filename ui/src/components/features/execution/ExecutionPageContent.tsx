@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useMemo } from "react";
 
 import { ExternalLink } from "lucide-react";
 
+import { formatDateTime } from "@/utils/datetime";
+
 import { ExecutionStats } from "./ExecutionStats";
 
 import type { ExecutionResponseSummary } from "@/schemas";
@@ -123,6 +125,7 @@ export function ExecutionPageContent() {
       // Filter by date if not "latest"
       if (selectedDate !== "latest") {
         filteredData = executionData.data.executions.filter((exec) => {
+          if (!exec.start_at) return false;
           const execDate = new Date(exec.start_at);
           const execDateStr = `${execDate.getFullYear()}${String(
             execDate.getMonth() + 1,
@@ -288,7 +291,7 @@ export function ExecutionPageContent() {
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-0.5 sm:mt-1 text-xs sm:text-sm text-base-content/60">
-                  <span>{new Date(execution.start_at).toLocaleString()}</span>
+                  <span>{formatDateTime(execution.start_at)}</span>
                   {execution.elapsed_time && (
                     <span className="hidden sm:inline">
                       Duration: {execution.elapsed_time}
@@ -388,7 +391,7 @@ export function ExecutionPageContent() {
                       <div className="text-xs sm:text-sm text-base-content/60 mt-1">
                         <span>
                           {detailTask.start_at
-                            ? new Date(detailTask.start_at).toLocaleString()
+                            ? formatDateTime(detailTask.start_at)
                             : "N/A"}
                         </span>
                         {detailTask.elapsed_time && (

@@ -6,8 +6,8 @@ persistence operations. Used by both API and workflow components.
 
 import logging
 
-import pendulum
 from bunnet import SortDirection
+from qdash.common.datetime_utils import now
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 
@@ -168,7 +168,7 @@ class MongoCalibrationNoteRepository:
         }
 
         doc = CalibrationNoteDocument.find_one(query).run()
-        timestamp = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        timestamp = now()
 
         if doc is None:
             # Create new document

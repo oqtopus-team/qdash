@@ -59,5 +59,5 @@ class CalibrationService:
             execution_id=note.execution_id,
             task_id=note.task_id,
             note=note.note,
-            timestamp=note.timestamp or "",
+            timestamp=note.timestamp,
         )

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useToast } from "@/components/ui/Toast";
+import { formatDateTime } from "@/utils/datetime";
 
 import type { ScheduleFlowRequest, FlowScheduleSummary } from "@/schemas";
 
@@ -342,7 +343,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                   )}
                   {schedule.next_run && schedule.active && (
                     <p className="text-xs text-base-content/50 mt-1">
-                      Next: {new Date(schedule.next_run).toLocaleString()}
+                      Next: {formatDateTime(schedule.next_run)}
                     </p>
                   )}
                 </div>
