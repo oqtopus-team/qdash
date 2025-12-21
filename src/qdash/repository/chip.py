@@ -217,11 +217,52 @@ class MongoChipRepository:
     # Optimized methods for scalability (256+ qubits)
     # =========================================================================
 
+    def _get_counts_by_chip_ids(
+        self, project_id: str, chip_ids: list[str]
+    ) -> tuple[dict[str, int], dict[str, int]]:
+        """Get qubit and coupling counts for multiple chips in batch.
+
+        Uses MongoDB aggregation to fetch counts in 2 queries instead of N*2.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_ids : list[str]
+            List of chip IDs to get counts for
+
+        Returns
+        -------
+        tuple[dict[str, int], dict[str, int]]
+            Tuple of (qubit_counts, coupling_counts) dicts keyed by chip_id
+
+        """
+        if not chip_ids:
+            return {}, {}
+
+        # Aggregate qubit counts by chip_id in one query
+        qubit_pipeline = [
+            {"$match": {"project_id": project_id, "chip_id": {"$in": chip_ids}}},
+            {"$group": {"_id": "$chip_id", "count": {"$sum": 1}}},
+        ]
+        qubit_results = list(QubitDocument.aggregate(qubit_pipeline).run())
+        qubit_counts = {r["_id"]: r["count"] for r in qubit_results}
+
+        # Aggregate coupling counts by chip_id in one query
+        coupling_pipeline = [
+            {"$match": {"project_id": project_id, "chip_id": {"$in": chip_ids}}},
+            {"$group": {"_id": "$chip_id", "count": {"$sum": 1}}},
+        ]
+        coupling_results = list(CouplingDocument.aggregate(coupling_pipeline).run())
+        coupling_counts = {r["_id"]: r["count"] for r in coupling_results}
+
+        return qubit_counts, coupling_counts
+
     def list_summary_by_project(self, project_id: str) -> list[dict[str, Any]]:
         """List chips with summary info only (no qubit/coupling data).
 
-        Uses MongoDB projection for efficient data transfer.
-        Counts are fetched from individual QubitDocument/CouplingDocument collections.
+        Uses MongoDB aggregation for efficient batch count retrieval.
+        Optimized to use 3 queries instead of 1 + N*2 queries.
 
         Parameters
         ----------
@@ -235,14 +276,21 @@ class MongoChipRepository:
 
         """
         docs = list(ChipDocument.find({"project_id": project_id}).run())
+        if not docs:
+            return []
+
+        # Batch fetch counts for all chips (2 queries instead of N*2)
+        chip_ids = [doc.chip_id for doc in docs]
+        qubit_counts, coupling_counts = self._get_counts_by_chip_ids(project_id, chip_ids)
+
         return [
             {
                 "chip_id": doc.chip_id,
                 "size": doc.size,
                 "topology_id": doc.topology_id,
                 "installed_at": doc.installed_at,
-                "qubit_count": self.get_qubit_count(project_id, doc.chip_id),
-                "coupling_count": self.get_coupling_count(project_id, doc.chip_id),
+                "qubit_count": qubit_counts.get(doc.chip_id, 0),
+                "coupling_count": coupling_counts.get(doc.chip_id, 0),
             }
             for doc in docs
         ]
@@ -250,7 +298,7 @@ class MongoChipRepository:
     def find_summary_by_id(self, project_id: str, chip_id: str) -> dict[str, Any] | None:
         """Find chip summary by ID (no qubit/coupling data).
 
-        Counts are fetched from individual QubitDocument/CouplingDocument collections.
+        Uses batch count retrieval for consistency with list_summary_by_project.
 
         Parameters
         ----------
@@ -268,13 +316,17 @@ class MongoChipRepository:
         doc = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
         if doc is None:
             return None
+
+        # Use batch method for consistency (still 2 count queries, but reuses logic)
+        qubit_counts, coupling_counts = self._get_counts_by_chip_ids(project_id, [chip_id])
+
         return {
             "chip_id": doc.chip_id,
             "size": doc.size,
             "topology_id": doc.topology_id,
             "installed_at": doc.installed_at,
-            "qubit_count": self.get_qubit_count(project_id, chip_id),
-            "coupling_count": self.get_coupling_count(project_id, chip_id),
+            "qubit_count": qubit_counts.get(chip_id, 0),
+            "coupling_count": coupling_counts.get(chip_id, 0),
         }
 
     def list_qubits(
@@ -432,7 +484,12 @@ class MongoChipRepository:
             "data": doc.data,
         }
 
-    def aggregate_metrics_summary(self, project_id: str, chip_id: str) -> dict[str, Any] | None:
+    def aggregate_metrics_summary(
+        self,
+        project_id: str,
+        chip_id: str,
+        metric_keys: list[str] | None = None,
+    ) -> dict[str, Any] | None:
         """Aggregate metrics summary using MongoDB pipeline.
 
         Parameters
@@ -441,6 +498,9 @@ class MongoChipRepository:
             The project identifier
         chip_id : str
             The chip identifier
+        metric_keys : list[str] | None
+            List of metric keys to aggregate (from metrics.yaml).
+            If None, returns only counts.
 
         Returns
         -------
@@ -453,31 +513,40 @@ class MongoChipRepository:
         if chip is None:
             return None
 
+        # Build group stage dynamically from metric keys
+        group_stage: dict[str, Any] = {
+            "_id": None,
+            "qubit_count": {"$sum": 1},
+        }
+
+        # Add dynamic metric aggregations
+        if metric_keys:
+            for key in metric_keys:
+                group_stage[f"avg_{key}"] = {"$avg": f"$data.{key}.value"}
+
         pipeline = [
             {"$match": {"project_id": project_id, "chip_id": chip_id}},
-            {
-                "$group": {
-                    "_id": None,
-                    "qubit_count": {"$sum": 1},
-                    "calibrated_count": {
-                        "$sum": {"$cond": [{"$ifNull": ["$data.t1.value", False]}, 1, 0]}
-                    },
-                    "avg_t1": {"$avg": "$data.t1.value"},
-                    "avg_t2_echo": {"$avg": "$data.t2_echo.value"},
-                    "avg_t2_star": {"$avg": "$data.t2_star.value"},
-                    "avg_qubit_frequency": {"$avg": "$data.qubit_frequency.value"},
-                    "avg_readout_fidelity": {"$avg": "$data.average_readout_fidelity.value"},
-                }
-            },
+            {"$group": group_stage},
         ]
 
         results = list(QubitDocument.aggregate(pipeline).run())
         if not results:
             return {
                 "qubit_count": 0,
-                "calibrated_count": 0,
+                "averages": {},
             }
-        return dict(results[0])
+
+        result = dict(results[0])
+        # Extract averages into a separate dict
+        averages = {}
+        if metric_keys:
+            for key in metric_keys:
+                avg_key = f"avg_{key}"
+                if avg_key in result:
+                    averages[key] = result.pop(avg_key)
+
+        result["averages"] = averages
+        return result
 
     def aggregate_metric_heatmap(
         self,
@@ -560,38 +629,6 @@ class MongoChipRepository:
         results = list(QubitDocument.aggregate(pipeline).run())
         return [r["qid"] for r in results if r.get("qid")]
 
-    def get_qubit_fidelity_map(
-        self, project_id: str, chip_id: str, threshold: float = 0.99
-    ) -> dict[str, bool]:
-        """Get fidelity threshold map for qubits.
-
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-        chip_id : str
-            The chip identifier
-        threshold : float
-            Fidelity threshold (default 0.99)
-
-        Returns
-        -------
-        dict[str, bool]
-            Map of qubit ID to whether fidelity exceeds threshold
-
-        """
-        pipeline = [
-            {"$match": {"project_id": project_id, "chip_id": chip_id}},
-            {
-                "$project": {
-                    "qid": 1,
-                    "fidelity": "$data.x90_gate_fidelity.value",
-                }
-            },
-        ]
-        results = list(QubitDocument.aggregate(pipeline).run())
-        return {r["qid"]: (r.get("fidelity") or 0.0) > threshold for r in results if r.get("qid")}
-
     def get_coupling_ids(self, project_id: str, chip_id: str) -> list[str]:
         """Get all coupling IDs for a chip from CouplingDocument collection.
 
@@ -614,44 +651,6 @@ class MongoChipRepository:
         ]
         results = list(CouplingDocument.aggregate(pipeline).run())
         return [r["qid"] for r in results if r.get("qid")]
-
-    def get_coupling_fidelity_map(
-        self,
-        project_id: str,
-        chip_id: str,
-        threshold: float = 0.75,
-        metric: str = "bell_state_fidelity",
-    ) -> dict[str, bool]:
-        """Get fidelity threshold map for couplings.
-
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-        chip_id : str
-            The chip identifier
-        threshold : float
-            Fidelity threshold (default 0.75)
-        metric : str
-            The fidelity metric to check (default "bell_state_fidelity")
-
-        Returns
-        -------
-        dict[str, bool]
-            Map of coupling ID to whether fidelity exceeds threshold
-
-        """
-        pipeline = [
-            {"$match": {"project_id": project_id, "chip_id": chip_id}},
-            {
-                "$project": {
-                    "qid": 1,
-                    "fidelity": f"$data.{metric}.value",
-                }
-            },
-        ]
-        results = list(CouplingDocument.aggregate(pipeline).run())
-        return {r["qid"]: (r.get("fidelity") or 0.0) > threshold for r in results if r.get("qid")}
 
     def get_qubits_by_ids(
         self, project_id: str, chip_id: str, qids: list[str]
@@ -842,53 +841,6 @@ class MongoChipRepository:
         results = list(QubitHistoryDocument.aggregate(pipeline).run())
         return [r["qid"] for r in results if r.get("qid")]
 
-    def get_historical_qubit_fidelity_map(
-        self,
-        project_id: str,
-        chip_id: str,
-        recorded_date: str,
-        threshold: float = 0.99,
-    ) -> dict[str, dict[str, Any]]:
-        """Get fidelity data for qubits at a specific historical date.
-
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-        chip_id : str
-            The chip identifier
-        recorded_date : str
-            The date in YYYYMMDD format
-        threshold : float
-            Fidelity threshold (default 0.99)
-
-        Returns
-        -------
-        dict[str, dict[str, Any]]
-            Map of qubit ID to fidelity info (value, calibrated_at, over_threshold)
-
-        """
-        docs = list(
-            QubitHistoryDocument.find(
-                {
-                    "project_id": project_id,
-                    "chip_id": chip_id,
-                    "recorded_date": recorded_date,
-                }
-            ).run()
-        )
-        result = {}
-        for doc in docs:
-            fidelity_data = doc.data.get("x90_gate_fidelity", {})
-            value = fidelity_data.get("value", 0.0)
-            calibrated_at = fidelity_data.get("calibrated_at")
-            result[doc.qid] = {
-                "value": value,
-                "calibrated_at": calibrated_at,
-                "over_threshold": value > threshold,
-            }
-        return result
-
     def get_historical_coupling_ids(
         self, project_id: str, chip_id: str, recorded_date: str
     ) -> list[str]:
@@ -921,53 +873,3 @@ class MongoChipRepository:
         ]
         results = list(CouplingHistoryDocument.aggregate(pipeline).run())
         return [r["qid"] for r in results if r.get("qid")]
-
-    def get_historical_coupling_fidelity_map(
-        self,
-        project_id: str,
-        chip_id: str,
-        recorded_date: str,
-        threshold: float = 0.75,
-        metric: str = "bell_state_fidelity",
-    ) -> dict[str, dict[str, Any]]:
-        """Get fidelity data for couplings at a specific historical date.
-
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-        chip_id : str
-            The chip identifier
-        recorded_date : str
-            The date in YYYYMMDD format
-        threshold : float
-            Fidelity threshold (default 0.75)
-        metric : str
-            The fidelity metric to check (default "bell_state_fidelity")
-
-        Returns
-        -------
-        dict[str, dict[str, Any]]
-            Map of coupling ID to fidelity info (value, calibrated_at, over_threshold)
-
-        """
-        docs = list(
-            CouplingHistoryDocument.find(
-                {
-                    "project_id": project_id,
-                    "chip_id": chip_id,
-                    "recorded_date": recorded_date,
-                }
-            ).run()
-        )
-        result = {}
-        for doc in docs:
-            fidelity_data = doc.data.get(metric, {})
-            value = fidelity_data.get("value", 0.0)
-            calibrated_at = fidelity_data.get("calibrated_at")
-            result[doc.qid] = {
-                "value": value,
-                "calibrated_at": calibrated_at,
-                "over_threshold": value > threshold,
-            }
-        return result

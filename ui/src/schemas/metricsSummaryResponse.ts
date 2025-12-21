@@ -5,25 +5,17 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MetricsSummaryResponseAvgT1 } from "./metricsSummaryResponseAvgT1";
-import type { MetricsSummaryResponseAvgT2Echo } from "./metricsSummaryResponseAvgT2Echo";
-import type { MetricsSummaryResponseAvgT2Star } from "./metricsSummaryResponseAvgT2Star";
-import type { MetricsSummaryResponseAvgQubitFrequency } from "./metricsSummaryResponseAvgQubitFrequency";
-import type { MetricsSummaryResponseAvgReadoutFidelity } from "./metricsSummaryResponseAvgReadoutFidelity";
+import type { MetricsSummaryResponseAverages } from "./metricsSummaryResponseAverages";
 
 /**
  * Response model for aggregated metrics summary.
 
 Returns statistical summary computed by the database.
 Minimal data transfer (~0.1KB).
+Metrics are loaded dynamically from metrics.yaml config.
  */
 export interface MetricsSummaryResponse {
   chip_id: string;
   qubit_count: number;
-  calibrated_count: number;
-  avg_t1?: MetricsSummaryResponseAvgT1;
-  avg_t2_echo?: MetricsSummaryResponseAvgT2Echo;
-  avg_t2_star?: MetricsSummaryResponseAvgT2Star;
-  avg_qubit_frequency?: MetricsSummaryResponseAvgQubitFrequency;
-  avg_readout_fidelity?: MetricsSummaryResponseAvgReadoutFidelity;
+  averages?: MetricsSummaryResponseAverages;
 }

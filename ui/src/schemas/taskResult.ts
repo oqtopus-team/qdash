@@ -43,5 +43,4 @@ export interface TaskResult {
   elapsed_time?: TaskResultElapsedTime;
   task_type?: TaskResultTaskType;
   default_view?: boolean;
-  over_threshold?: boolean;
 }

@@ -89,10 +89,40 @@ class TaskResultHistoryDocument(Document):
 
         name = "task_result_history"
         indexes: ClassVar = [
+            # Primary indexes
             IndexModel([("project_id", ASCENDING), ("task_id", ASCENDING)], unique=True),
             IndexModel([("project_id", ASCENDING), ("execution_id", ASCENDING)]),
             IndexModel(
                 [("project_id", ASCENDING), ("chip_id", ASCENDING), ("start_at", DESCENDING)]
+            ),
+            # Index for latest task result queries (task_result.py: get_latest_*_task_results)
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("chip_id", ASCENDING),
+                    ("name", ASCENDING),
+                    ("qid", ASCENDING),
+                    ("end_at", DESCENDING),
+                ]
+            ),
+            # Index for metrics history queries (metrics.py: get_*_metric_history)
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("chip_id", ASCENDING),
+                    ("task_type", ASCENDING),
+                    ("qid", ASCENDING),
+                    ("start_at", DESCENDING),
+                ]
+            ),
+            # Index for timeseries queries (task_result.py: get_timeseries_task_results)
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("chip_id", ASCENDING),
+                    ("tags", ASCENDING),
+                    ("start_at", ASCENDING),
+                ]
             ),
         ]
 

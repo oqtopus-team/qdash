@@ -7,6 +7,7 @@ Business logic is delegated to ChipService for better testability.
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -165,12 +166,15 @@ def get_chip_dates(
 # =============================================================================
 
 
-def _get_task_names_from_files() -> list[str]:
-    """Get task names from task files instead of database.
+@lru_cache(maxsize=1)
+def _get_task_names_cached() -> tuple[str, ...]:
+    """Get task names from task files (cached).
+
+    Returns a tuple for cache compatibility. Internal function.
 
     Returns
     -------
-        List of task names from task files
+        Tuple of task names from task files
 
     """
     # Get default backend from settings
@@ -187,10 +191,23 @@ def _get_task_names_from_files() -> list[str]:
     backend_path = CALIBTASKS_BASE_PATH / default_backend
     if not backend_path.exists() or not backend_path.is_dir():
         logger.warning(f"Backend directory not found: {backend_path}")
-        return []
+        return ()
 
     tasks = collect_tasks_from_directory(backend_path, backend_path)
-    return [task.name for task in tasks]
+    return tuple(task.name for task in tasks)
+
+
+def _get_task_names_from_files() -> list[str]:
+    """Get task names from task files instead of database.
+
+    Uses cached results for performance optimization.
+
+    Returns
+    -------
+        List of task names from task files
+
+    """
+    return list(_get_task_names_cached())
 
 
 @router.get(

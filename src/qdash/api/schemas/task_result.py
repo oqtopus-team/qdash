@@ -29,7 +29,6 @@ class TaskResult(BaseModel):
     elapsed_time: timedelta | None = None
     task_type: str | None = None
     default_view: bool = True
-    over_threshold: bool = False
 
     @field_validator("elapsed_time", mode="before")
     @classmethod
