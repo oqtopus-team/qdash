@@ -162,13 +162,9 @@ class MetricsSummaryResponse(BaseModel):
 
     Returns statistical summary computed by the database.
     Minimal data transfer (~0.1KB).
+    Metrics are loaded dynamically from metrics.yaml config.
     """
 
     chip_id: str
     qubit_count: int
-    calibrated_count: int
-    avg_t1: float | None = None
-    avg_t2_echo: float | None = None
-    avg_t2_star: float | None = None
-    avg_qubit_frequency: float | None = None
-    avg_readout_fidelity: float | None = None
+    averages: dict[str, float | None] = {}  # Dynamic: {metric_key: avg_value}

@@ -23,14 +23,12 @@ from qdash.api.schemas.task_result import (
     TimeSeriesData,
     TimeSeriesProjection,
 )
-from qdash.api.services.response_processor import response_processor
 from qdash.common.datetime_utils import (
     end_of_day,
     now,
     parse_date,
     parse_elapsed_time,
     start_of_day,
-    to_datetime,
 )
 from qdash.datamodel.task import OutputParameterModel
 from qdash.repository.chip import MongoChipRepository
@@ -44,9 +42,6 @@ router = APIRouter()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
-QUBIT_FIDELITY_THRESHOLD = 0.99
-COUPLING_FIDELITY_THRESHOLD = 0.75
 
 
 # =============================================================================
@@ -98,14 +93,11 @@ def get_latest_qubit_task_results(
     # Use individual QubitDocument collection for scalability
     chip_repo = MongoChipRepository()
 
-    # Get qubit IDs and fidelity map from QubitDocument collection
+    # Get qubit IDs from QubitDocument collection
     qids = chip_repo.get_qubit_ids(ctx.project_id, chip_id)
     if not qids:
         raise ValueError(f"Chip {chip_id} not found or has no qubits in project {ctx.project_id}")
 
-    fidelity_map = chip_repo.get_qubit_fidelity_map(
-        ctx.project_id, chip_id, threshold=QUBIT_FIDELITY_THRESHOLD
-    )
     # Fetch all task results in one query (scoped by project)
     task_result_repo = MongoTaskResultHistoryRepository()
     all_results = task_result_repo.find(
@@ -145,14 +137,12 @@ def get_latest_qubit_task_results(
                 end_at=task_result_doc.end_at,
                 elapsed_time=parse_elapsed_time(task_result_doc.elapsed_time),
                 task_type=task_result_doc.task_type,
-                over_threshold=fidelity_map.get(qid, False),
             )
         else:
             task_result = TaskResult(name=task)
         results[qid] = task_result
 
-    response = LatestTaskResultResponse(task_name=task, result=results)
-    return response_processor.process_task_response(response, task)
+    return LatestTaskResultResponse(task_name=task, result=results)
 
 
 @router.get(
@@ -206,29 +196,10 @@ def get_historical_qubit_task_results(
     start_time = start_of_day(parsed_date)
     end_time = end_of_day(parsed_date)
 
-    # Get qubit IDs and fidelity data from QubitHistoryDocument
+    # Get qubit IDs from QubitHistoryDocument
     qids = chip_repo.get_historical_qubit_ids(ctx.project_id, chip_id, date)
     if not qids:
         raise ValueError(f"Chip {chip_id} not found or has no qubits for date {date}")
-
-    historical_fidelity = chip_repo.get_historical_qubit_fidelity_map(
-        ctx.project_id, chip_id, date, threshold=QUBIT_FIDELITY_THRESHOLD
-    )
-
-    # Build fidelity map with time filtering
-    fidelity_map = {}
-    for qid, fidelity_info in historical_fidelity.items():
-        calibrated_at_str = fidelity_info.get("calibrated_at")
-        try:
-            calibrated_at = to_datetime(calibrated_at_str) if calibrated_at_str else None
-        except Exception:
-            calibrated_at = None
-
-        fidelity_map[qid] = (
-            fidelity_info.get("over_threshold", False)
-            and calibrated_at is not None
-            and start_time <= calibrated_at <= end_time
-        )
 
     # Fetch task results
     task_result_repo = MongoTaskResultHistoryRepository()
@@ -269,14 +240,12 @@ def get_historical_qubit_task_results(
                 end_at=task_result_doc.end_at,
                 elapsed_time=parse_elapsed_time(task_result_doc.elapsed_time),
                 task_type=task_result_doc.task_type,
-                over_threshold=fidelity_map.get(qid, False),
             )
         else:
             task_result = TaskResult(name=task)
         results[qid] = task_result
 
-    response = LatestTaskResultResponse(task_name=task, result=results)
-    return response_processor.process_task_response(response, task)
+    return LatestTaskResultResponse(task_name=task, result=results)
 
 
 @router.get(
@@ -358,7 +327,6 @@ def get_qubit_task_history(
             end_at=result.end_at,
             elapsed_time=parse_elapsed_time(result.elapsed_time),
             task_type=result.task_type,
-            over_threshold=False,
         )
 
     return TaskHistoryResponse(name=task, data=data)
@@ -414,16 +382,12 @@ def get_latest_coupling_task_results(
     # Use individual CouplingDocument collection for scalability
     chip_repo = MongoChipRepository()
 
-    # Get coupling IDs and fidelity map from CouplingDocument collection
+    # Get coupling IDs from CouplingDocument collection
     qids = chip_repo.get_coupling_ids(ctx.project_id, chip_id)
     if not qids:
         raise ValueError(
             f"Chip {chip_id} not found or has no couplings in project {ctx.project_id}"
         )
-
-    fidelity_map = chip_repo.get_coupling_fidelity_map(
-        ctx.project_id, chip_id, threshold=COUPLING_FIDELITY_THRESHOLD
-    )
 
     # Fetch all task results in one query (scoped by project)
     task_result_repo = MongoTaskResultHistoryRepository()
@@ -464,14 +428,12 @@ def get_latest_coupling_task_results(
                 end_at=task_result_doc.end_at,
                 elapsed_time=parse_elapsed_time(task_result_doc.elapsed_time),
                 task_type=task_result_doc.task_type,
-                over_threshold=fidelity_map.get(qid, False),
             )
         else:
             task_result = TaskResult(name=task, default_view=False)
         results[qid] = task_result
 
-    response = LatestTaskResultResponse(task_name=task, result=results)
-    return response_processor.process_task_response(response, task)
+    return LatestTaskResultResponse(task_name=task, result=results)
 
 
 @router.get(
@@ -525,29 +487,10 @@ def get_historical_coupling_task_results(
     start_time = start_of_day(parsed_date)
     end_time = end_of_day(parsed_date)
 
-    # Get coupling IDs and fidelity data from CouplingHistoryDocument
+    # Get coupling IDs from CouplingHistoryDocument
     qids = chip_repo.get_historical_coupling_ids(ctx.project_id, chip_id, date)
     if not qids:
         raise ValueError(f"Chip {chip_id} not found or has no couplings for date {date}")
-
-    historical_fidelity = chip_repo.get_historical_coupling_fidelity_map(
-        ctx.project_id, chip_id, date, threshold=COUPLING_FIDELITY_THRESHOLD
-    )
-
-    # Build fidelity map with time filtering
-    fidelity_map = {}
-    for coupling_id, fidelity_info in historical_fidelity.items():
-        calibrated_at_str = fidelity_info.get("calibrated_at")
-        try:
-            calibrated_at = to_datetime(calibrated_at_str) if calibrated_at_str else None
-        except Exception:
-            calibrated_at = None
-
-        fidelity_map[coupling_id] = (
-            fidelity_info.get("over_threshold", False)
-            and calibrated_at is not None
-            and start_time <= calibrated_at <= end_time
-        )
 
     # Fetch task results
     task_result_repo = MongoTaskResultHistoryRepository()
@@ -588,14 +531,12 @@ def get_historical_coupling_task_results(
                 end_at=task_result_doc.end_at,
                 elapsed_time=parse_elapsed_time(task_result_doc.elapsed_time),
                 task_type=task_result_doc.task_type,
-                over_threshold=fidelity_map.get(qid, False),
             )
         else:
             task_result = TaskResult(name=task, default_view=False)
         results[qid] = task_result
 
-    response = LatestTaskResultResponse(task_name=task, result=results)
-    return response_processor.process_task_response(response, task)
+    return LatestTaskResultResponse(task_name=task, result=results)
 
 
 @router.get(
@@ -680,7 +621,6 @@ def get_coupling_task_history(
             end_at=result.end_at,
             elapsed_time=parse_elapsed_time(result.elapsed_time),
             task_type=result.task_type,
-            over_threshold=False,
         )
 
     return TaskHistoryResponse(name=task, data=data)

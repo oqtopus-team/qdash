@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type MetricsSummaryResponseAvgT2Star = number | null;
+export type MetricsSummaryResponseAverages = { [key: string]: number | null };

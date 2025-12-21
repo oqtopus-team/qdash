@@ -19,6 +19,7 @@ export interface Settings {
   mongo_data_path: string;
   calib_data_path: string;
   backend?: string;
+  mongo_db_name?: string;
   mongo_port?: number;
   mongo_express_port?: number;
   postgres_port?: number;

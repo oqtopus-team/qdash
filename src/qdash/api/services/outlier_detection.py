@@ -369,6 +369,28 @@ def get_outlier_detector(task_name: str) -> OutlierDetector | None:
     return None
 
 
+def get_primary_parameter_name(task_results: dict[str, Any]) -> str | None:
+    """
+    Extract the primary parameter name from task results.
+
+    Gets the first parameter name from output_parameters of any task result.
+    Task definitions already specify their output parameters, so no hardcoded mapping needed.
+
+    Args:
+        task_results: Dictionary of QID -> task result
+
+    Returns:
+        Parameter name or None if not found
+    """
+    for task_result in task_results.values():
+        if isinstance(task_result, dict) and "output_parameters" in task_result:
+            output_params = task_result["output_parameters"]
+            if output_params and isinstance(output_params, dict):
+                # Return the first parameter name
+                return next(iter(output_params.keys()), None)
+    return None
+
+
 def filter_task_results_for_outliers(
     task_results: dict[str, Any],
     task_name: str,
@@ -396,24 +418,8 @@ def filter_task_results_for_outliers(
         # No detector for this task type
         return task_results, None
 
-    # Determine parameter name based on task
-    parameter_mapping = {
-        "CheckRamsey": "t2_star",
-        "Ramsey": "t2_star",
-        "T2Star": "t2_star",
-        "CheckT2Echo": "t2_echo",
-        "T2Echo": "t2_echo",
-        "CheckT1": "t1",
-        "T1": "t1",
-        "X90InterleavedRandomizedBenchmarking": "x90_gate_fidelity",
-        "X180InterleavedRandomizedBenchmarking": "x180_gate_fidelity",
-        "ZX90InterleavedRandomizedBenchmarking": "zx90_gate_fidelity",
-        "RandomizedBenchmarking": "average_gate_fidelity",
-        "ReadoutClassification": "average_readout_fidelity",
-        "CheckBellStateTomography": "bell_state_fidelity",
-    }
-
-    parameter_name = parameter_mapping.get(task_name)
+    # Get parameter name directly from task results (no hardcoded mapping needed)
+    parameter_name = get_primary_parameter_name(task_results)
     if not parameter_name:
         return task_results, None
 
