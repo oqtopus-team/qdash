@@ -8,24 +8,27 @@ from qdash.common.datetime_utils import format_elapsed_time, parse_elapsed_time
 
 
 class ChipResponse(BaseModel):
-    """Chip is a Pydantic model that represents a chip.
+    """Chip response model.
+
+    Qubit and coupling data are stored in separate collections for scalability
+    and should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).
 
     Attributes
     ----------
         chip_id (str): The ID of the chip.
         size (int): The size of the chip.
         topology_id (str | None): Topology template ID.
-        qubits (dict): Qubit information.
-        couplings (dict): Coupling information.
-        installed_at (str): Installation timestamp.
+        qubit_count (int): Number of qubits in the chip.
+        coupling_count (int): Number of couplings in the chip.
+        installed_at (datetime | None): Installation timestamp.
 
     """
 
     chip_id: str
     size: int = 64
     topology_id: str | None = None
-    qubits: dict[str, Any] = {}
-    couplings: dict[str, Any] = {}
+    qubit_count: int = 0
+    coupling_count: int = 0
     installed_at: datetime | None = None
 
 
@@ -99,9 +102,75 @@ class ListMuxResponse(BaseModel):
 
 
 class ListChipsResponse(BaseModel):
-    """Response model for listing all chips.
-
-    Wraps list of chips for API consistency and future extensibility (e.g., pagination).
-    """
+    """Response model for listing chips."""
 
     chips: list[ChipResponse]
+    total: int
+
+
+class QubitResponse(BaseModel):
+    """Response model for a single qubit."""
+
+    qid: str
+    chip_id: str
+    status: str = "pending"
+    data: dict[str, Any] = {}
+    best_data: dict[str, Any] = {}
+
+
+class ListQubitsResponse(BaseModel):
+    """Response model for listing qubits with pagination."""
+
+    qubits: list[QubitResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class CouplingResponse(BaseModel):
+    """Response model for a single coupling."""
+
+    qid: str
+    chip_id: str
+    status: str = "pending"
+    data: dict[str, Any] = {}
+    best_data: dict[str, Any] = {}
+
+
+class ListCouplingsResponse(BaseModel):
+    """Response model for listing couplings with pagination."""
+
+    couplings: list[CouplingResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class MetricHeatmapResponse(BaseModel):
+    """Response model for metric heatmap data.
+
+    Returns only the metric values keyed by qubit/coupling ID.
+    Much smaller than full chip data (~5KB vs ~300KB for 64 qubits).
+    """
+
+    chip_id: str
+    metric: str
+    values: dict[str, float | None]
+    unit: str | None = None
+
+
+class MetricsSummaryResponse(BaseModel):
+    """Response model for aggregated metrics summary.
+
+    Returns statistical summary computed by the database.
+    Minimal data transfer (~0.1KB).
+    """
+
+    chip_id: str
+    qubit_count: int
+    calibrated_count: int
+    avg_t1: float | None = None
+    avg_t2_echo: float | None = None
+    avg_t2_star: float | None = None
+    avg_qubit_frequency: float | None = None
+    avg_readout_fidelity: float | None = None

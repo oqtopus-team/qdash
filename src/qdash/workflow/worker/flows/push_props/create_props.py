@@ -1,6 +1,5 @@
 from typing import Any, cast
 
-from qdash.datamodel.chip import ChipModel
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.worker.flows.push_props.formatter import format_number
@@ -77,9 +76,20 @@ def merge_properties(
 
 
 def get_chip_properties(
-    chip: ChipModel, backend: QubexBackend, within_24hrs: bool = False, cutoff_hours: int = 24
+    qubit_models: dict[str, Any],
+    coupling_models: dict[str, Any],
+    backend: QubexBackend,
+    within_24hrs: bool = False,
+    cutoff_hours: int = 24,
 ) -> tuple[ChipProperties, dict[str, Any]]:
-    """Extract chip properties from chip data.
+    """Extract chip properties from individual QubitDocument/CouplingDocument collections.
+
+    Args:
+        qubit_models: Dict of qubit ID to QubitDocument (from repository)
+        coupling_models: Dict of coupling ID to CouplingDocument (from repository)
+        backend: QubexBackend instance
+        within_24hrs: Filter to data within last 24 hours
+        cutoff_hours: Cutoff hours for time filtering
 
     Returns:
         Tuple of (ChipProperties, stats_dict) where stats_dict contains data availability info
@@ -104,7 +114,8 @@ def get_chip_properties(
     for i in range(n):
         props.qubits[exp.get_qubit_label(i)] = QubitProperties()
 
-    for qid, q in chip.qubits.items():
+    # Use individual QubitDocument models (scalable for 256+ qubits)
+    for qid, q in qubit_models.items():
         stats["total_qubits"] += 1
         qubit_props = _process_data(
             q.data, qubit_field_map, QubitProperties, within_24hrs, cutoff_hours
@@ -117,7 +128,8 @@ def get_chip_properties(
         ):
             stats["qubits_with_recent_data"] += 1
 
-    for cid, c in chip.couplings.items():
+    # Use individual CouplingDocument models (scalable for 256+ qubits)
+    for cid, c in coupling_models.items():
         source, target = cid.split("-")
         cid_str = f"{exp.get_qubit_label(int(source))}-{exp.get_qubit_label(int(target))}"
         stats["total_couplings"] += 1
@@ -147,6 +159,14 @@ def create_chip_properties(
     chip = chip_repo.get_current_chip(username=username)
     if chip is None:
         raise ValueError(f"Chip not found for user {username}")
+
+    # Fetch qubit and coupling models from individual documents (scalable)
+    project_id = chip.project_id
+    if project_id is None:
+        raise ValueError(f"Chip {chip_id} has no project_id")
+    qubit_models = chip_repo.get_all_qubit_models(project_id, chip_id)
+    coupling_models = chip_repo.get_all_coupling_models(project_id, chip_id)
+
     from qdash.workflow.engine.backend.factory import create_backend
 
     backend = create_backend(
@@ -159,7 +179,9 @@ def create_chip_properties(
             "chip_id": chip_id,
         },
     )
-    props, _ = get_chip_properties(chip, within_24hrs=False, backend=cast(QubexBackend, backend))
+    props, _ = get_chip_properties(
+        qubit_models, coupling_models, within_24hrs=False, backend=cast(QubexBackend, backend)
+    )
 
     handler = ChipPropertyYAMLHandler(source_path)
     base = handler.read()

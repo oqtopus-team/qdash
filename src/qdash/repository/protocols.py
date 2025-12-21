@@ -191,6 +191,109 @@ class ChipRepository(Protocol):
         """
         ...
 
+    # Optimized methods for scalability
+
+    def list_summary_by_project(self, project_id: str) -> list[dict[str, Any]]:
+        """List chips with summary info only."""
+        ...
+
+    def find_summary_by_id(self, project_id: str, chip_id: str) -> dict[str, Any] | None:
+        """Find chip summary by ID."""
+        ...
+
+    def list_qubits(
+        self,
+        project_id: str,
+        chip_id: str,
+        limit: int = 50,
+        offset: int = 0,
+        qids: list[str] | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List qubits with pagination."""
+        ...
+
+    def find_qubit(self, project_id: str, chip_id: str, qid: str) -> dict[str, Any] | None:
+        """Find a single qubit."""
+        ...
+
+    def list_couplings(
+        self,
+        project_id: str,
+        chip_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List couplings with pagination."""
+        ...
+
+    def find_coupling(
+        self, project_id: str, chip_id: str, coupling_id: str
+    ) -> dict[str, Any] | None:
+        """Find a single coupling."""
+        ...
+
+    def aggregate_metrics_summary(self, project_id: str, chip_id: str) -> dict[str, Any] | None:
+        """Aggregate metrics summary using MongoDB pipeline."""
+        ...
+
+    def aggregate_metric_heatmap(
+        self,
+        project_id: str,
+        chip_id: str,
+        metric: str,
+        is_coupling: bool = False,
+    ) -> dict[str, Any] | None:
+        """Aggregate heatmap data for a single metric."""
+        ...
+
+    def get_qubit_ids(self, project_id: str, chip_id: str) -> list[str]:
+        """Get all qubit IDs for a chip."""
+        ...
+
+    def get_qubit_fidelity_map(
+        self, project_id: str, chip_id: str, threshold: float = 0.99
+    ) -> dict[str, bool]:
+        """Get fidelity threshold map for qubits."""
+        ...
+
+    def get_coupling_ids(self, project_id: str, chip_id: str) -> list[str]:
+        """Get all coupling IDs for a chip."""
+        ...
+
+    def get_coupling_fidelity_map(
+        self,
+        project_id: str,
+        chip_id: str,
+        threshold: float = 0.75,
+        metric: str = "bell_state_fidelity",
+    ) -> dict[str, bool]:
+        """Get fidelity threshold map for couplings."""
+        ...
+
+    def get_qubits_by_ids(
+        self, project_id: str, chip_id: str, qids: list[str]
+    ) -> dict[str, dict[str, Any]]:
+        """Get multiple qubits by their IDs."""
+        ...
+
+    def get_couplings_by_ids(
+        self, project_id: str, chip_id: str, coupling_ids: list[str]
+    ) -> dict[str, dict[str, Any]]:
+        """Get multiple couplings by their IDs."""
+        ...
+
+    def get_all_qubit_models(self, project_id: str, chip_id: str) -> dict[str, Any]:
+        """Get all qubit documents as a dict keyed by qubit ID."""
+        ...
+
+    def get_all_coupling_models(self, project_id: str, chip_id: str) -> dict[str, Any]:
+        """Get all coupling documents as a dict keyed by coupling ID."""
+        ...
+
+    def get_qubit_count(self, project_id: str, chip_id: str) -> int:
+        """Get the number of qubits for a chip."""
+        ...
+
 
 @runtime_checkable
 class ChipHistoryRepository(Protocol):

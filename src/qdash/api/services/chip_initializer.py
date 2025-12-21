@@ -5,8 +5,6 @@ from collections.abc import Mapping
 from typing import Any
 
 from qdash.api.lib.topology_config import load_topology
-from qdash.datamodel.coupling import CouplingModel
-from qdash.datamodel.qubit import QubitModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -35,74 +33,6 @@ class ChipInitializer:
             result.append((edge[0], edge[1]))
             result.append((edge[1], edge[0]))
         return result
-
-    @staticmethod
-    def _generate_qubit_data(
-        topology_qubits: Mapping[int, Any],
-        chip_id: str,
-        username: str,
-        project_id: str | None = None,
-    ) -> dict[str, QubitModel]:
-        """Generate qubit data for ChipDocument from topology.
-
-        Args:
-        ----
-            topology_qubits: Qubit positions from topology definition
-            chip_id: Chip ID
-            username: Username
-            project_id: Project ID
-
-        Returns:
-        -------
-            Dictionary of qubit models
-
-        """
-        qubits = {}
-        for qid in topology_qubits:
-            qubits[f"{qid}"] = QubitModel(
-                project_id=project_id,
-                username=username,
-                chip_id=chip_id,
-                qid=f"{qid}",
-                status="pending",
-                data={},
-                best_data={},
-            )
-        return qubits
-
-    @staticmethod
-    def _generate_coupling_data(
-        edges: list[tuple[int, int]],
-        chip_id: str,
-        username: str,
-        project_id: str | None = None,
-    ) -> dict[str, CouplingModel]:
-        """Generate coupling data for ChipDocument.
-
-        Args:
-        ----
-            edges: List of bi-directional edge tuples
-            chip_id: Chip ID
-            username: Username
-            project_id: Project ID
-
-        Returns:
-        -------
-            Dictionary of coupling models
-
-        """
-        couplings = {}
-        for edge in edges:
-            couplings[f"{edge[0]}-{edge[1]}"] = CouplingModel(
-                project_id=project_id,
-                username=username,
-                qid=f"{edge[0]}-{edge[1]}",
-                status="pending",
-                chip_id=chip_id,
-                data={},
-                best_data={},
-            )
-        return couplings
 
     @staticmethod
     def _generate_qubit_documents(
@@ -240,19 +170,13 @@ class ChipInitializer:
             topology_qubits = topology.qubits
             bi_edges = cls._bi_direction(topology.couplings)
 
-            # Generate qubit and coupling data for ChipDocument
-            qubits = cls._generate_qubit_data(topology_qubits, chip_id, username, project_id)
-            couplings = cls._generate_coupling_data(bi_edges, chip_id, username, project_id)
-
-            # Create and save ChipDocument
+            # Create and save ChipDocument (without embedded qubits/couplings)
             chip = ChipDocument(
                 project_id=project_id,
                 username=username,
                 chip_id=chip_id,
                 size=size,
                 topology_id=topology_id,
-                qubits=qubits,
-                couplings=couplings,
                 system_info={},
             )
             chip.save()

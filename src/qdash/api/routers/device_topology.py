@@ -199,6 +199,11 @@ def get_device_topology(
     chip_model = chip_repo.get_current_chip(username=latest.username)
     if chip_model is None:
         raise ValueError(f"No chip found for user {latest.username}")
+
+    # Get entity models from individual document collections (scalable approach)
+    qubit_models = chip_repo.get_all_qubit_models(ctx.project_id, chip_model.chip_id)
+    coupling_models = chip_repo.get_all_coupling_models(ctx.project_id, chip_model.chip_id)
+
     # Load topology config for position calculation
     topology = load_topology(chip_model.topology_id)
     # Sort physical qubit indices and create id mapping
@@ -207,12 +212,15 @@ def get_device_topology(
     logger.info(f"id_mapping: {id_mapping}")
 
     for qid in request.qubits:
-        # Get qubit data with timestamp checks
-        x90_data = chip_model.qubits[qid].data.get("x90_gate_fidelity", {})
-        t1_data = chip_model.qubits[qid].data.get("t1", {})
-        t2_data = chip_model.qubits[qid].data.get("t2_echo", {})
-        readout_0_data = chip_model.qubits[qid].data.get("readout_fidelity_0", {})
-        readout_1_data = chip_model.qubits[qid].data.get("readout_fidelity_1", {})
+        # Get qubit data with timestamp checks (from individual QubitDocument)
+        qubit_doc = qubit_models.get(qid)
+        if qubit_doc is None:
+            continue
+        x90_data = qubit_doc.data.get("x90_gate_fidelity", {})
+        t1_data = qubit_doc.data.get("t1", {})
+        t2_data = qubit_doc.data.get("t2_echo", {})
+        readout_0_data = qubit_doc.data.get("readout_fidelity_0", {})
+        readout_1_data = qubit_doc.data.get("readout_fidelity_1", {})
 
         x90_gate_fidelity = get_value_within_24h_fallback(
             x90_data, request.condition.qubit_fidelity.is_within_24h, fallback=0.25
@@ -289,10 +297,10 @@ def get_device_topology(
             target = cr_value["target"]
             control, target = split_q_string(cr_key)
             cr_duration = cr_value.get("duration", 20)
-            # Get coupling fidelity data with timestamp check
-            coupling_data = chip_model.couplings[f"{control}-{target}"].data.get(
-                "zx90_gate_fidelity", {}
-            )
+            # Get coupling fidelity data with timestamp check (from individual CouplingDocument)
+            coupling_key = f"{control}-{target}"
+            coupling_doc = coupling_models.get(coupling_key)
+            coupling_data = coupling_doc.data.get("zx90_gate_fidelity", {}) if coupling_doc else {}
             # zx90_gate_fidelity = (
             #     coupling_data["value"]
             #     if is_within_24h(coupling_data.get("calibrated_at"))

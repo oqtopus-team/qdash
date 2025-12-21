@@ -5,7 +5,6 @@ from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
 
 
@@ -126,9 +125,7 @@ class CouplingDocument(Document):
         )
         coupling_doc.system_info.update_time()
         coupling_doc.save()
-        chip_doc = ChipDocument.find_one({"username": username, "chip_id": chip_id}).run()
-        if chip_doc is None:
-            raise ValueError(f"Chip {chip_id} not found")
+        # Create history entry for the updated coupling
         coupling_model = CouplingModel(
             project_id=project_id,
             qid=qid,
@@ -138,8 +135,6 @@ class CouplingDocument(Document):
             edge_info=coupling_doc.edge_info,
             username=username,
         )
-        chip_doc.update_coupling(qid, coupling_model)
-        # Update the coupling in the history document
         CouplingHistoryDocument.create_history(coupling_model)
         return coupling_doc
 

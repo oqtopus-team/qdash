@@ -7,7 +7,15 @@ abstracting away the repository layer from the routers.
 import logging
 from typing import Any
 
-from qdash.api.schemas.chip import ChipResponse, MuxDetailResponse, MuxTask
+from qdash.api.schemas.chip import (
+    ChipResponse,
+    CouplingResponse,
+    MetricHeatmapResponse,
+    MetricsSummaryResponse,
+    MuxDetailResponse,
+    MuxTask,
+    QubitResponse,
+)
 from qdash.repository.protocols import (
     ChipRepository,
     ExecutionCounterRepository,
@@ -39,7 +47,7 @@ class ChipService:
         ...     execution_counter_repository=MongoExecutionCounterRepository(),
         ...     task_result_repository=MongoTaskResultHistoryRepository(),
         ... )
-        >>> chips = service.list_chips(project_id="proj-1")
+        >>> summaries = service.list_chips_summary(project_id="proj-1")
 
     """
 
@@ -53,61 +61,6 @@ class ChipService:
         self._chip_repo = chip_repository
         self._counter_repo = execution_counter_repository
         self._task_result_repo = task_result_repository
-
-    def list_chips(self, project_id: str) -> list[ChipResponse]:
-        """List all chips in a project.
-
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-
-        Returns
-        -------
-        list[ChipResponse]
-            List of chip responses
-
-        """
-        chips = self._chip_repo.list_by_project(project_id)
-        return [
-            ChipResponse(
-                chip_id=chip.chip_id,
-                size=chip.size,
-                topology_id=chip.topology_id,
-                qubits=chip.qubits,
-                couplings=chip.couplings,
-                installed_at=chip.installed_at,
-            )
-            for chip in chips
-        ]
-
-    def get_chip(self, project_id: str, chip_id: str) -> ChipResponse | None:
-        """Get a chip by ID.
-
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-        chip_id : str
-            The chip identifier
-
-        Returns
-        -------
-        ChipResponse | None
-            The chip response or None if not found
-
-        """
-        chip = self._chip_repo.find_by_id(project_id, chip_id)
-        if chip is None:
-            return None
-        return ChipResponse(
-            chip_id=chip.chip_id,
-            size=chip.size,
-            topology_id=chip.topology_id,
-            qubits=chip.qubits,
-            couplings=chip.couplings,
-            installed_at=chip.installed_at,
-        )
 
     def get_chip_dates(self, project_id: str, chip_id: str) -> list[str]:
         """Get available dates for a chip.
@@ -299,3 +252,292 @@ class ChipService:
                 detail[qid][task_name] = task_result
 
         return MuxDetailResponse(mux_id=mux_id, detail=detail)
+
+    # =========================================================================
+    # Optimized methods for scalability (256+ qubits)
+    # =========================================================================
+
+    def list_chips_summary(self, project_id: str) -> list[ChipResponse]:
+        """List all chips with summary information.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+
+        Returns
+        -------
+        list[ChipResponse]
+            List of chips
+
+        """
+        summaries = self._chip_repo.list_summary_by_project(project_id)
+        return [
+            ChipResponse(
+                chip_id=s["chip_id"],
+                size=s.get("size", 64),
+                topology_id=s.get("topology_id"),
+                qubit_count=s.get("qubit_count", 0),
+                coupling_count=s.get("coupling_count", 0),
+                installed_at=s.get("installed_at"),
+            )
+            for s in summaries
+        ]
+
+    def get_chip_summary(self, project_id: str, chip_id: str) -> ChipResponse | None:
+        """Get chip details.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        ChipResponse | None
+            Chip details or None if not found
+
+        """
+        summary = self._chip_repo.find_summary_by_id(project_id, chip_id)
+        if summary is None:
+            return None
+        return ChipResponse(
+            chip_id=summary["chip_id"],
+            size=summary.get("size", 64),
+            topology_id=summary.get("topology_id"),
+            qubit_count=summary.get("qubit_count", 0),
+            coupling_count=summary.get("coupling_count", 0),
+            installed_at=summary.get("installed_at"),
+        )
+
+    def list_qubits(
+        self,
+        project_id: str,
+        chip_id: str,
+        limit: int = 50,
+        offset: int = 0,
+        qids: list[str] | None = None,
+    ) -> tuple[list[QubitResponse], int]:
+        """List qubits with pagination.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        limit : int
+            Maximum number of qubits to return
+        offset : int
+            Number of qubits to skip
+        qids : list[str] | None
+            Optional list of specific qubit IDs to fetch
+
+        Returns
+        -------
+        tuple[list[QubitResponse], int]
+            List of qubits and total count
+
+        """
+        qubits, total = self._chip_repo.list_qubits(
+            project_id=project_id,
+            chip_id=chip_id,
+            limit=limit,
+            offset=offset,
+            qids=qids,
+        )
+        return (
+            [
+                QubitResponse(
+                    qid=q["qid"],
+                    chip_id=q["chip_id"],
+                    status=q.get("status", "pending"),
+                    data=q.get("data", {}),
+                    best_data=q.get("best_data", {}),
+                )
+                for q in qubits
+            ],
+            total,
+        )
+
+    def get_qubit(self, project_id: str, chip_id: str, qid: str) -> QubitResponse | None:
+        """Get a single qubit by ID.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        qid : str
+            The qubit identifier
+
+        Returns
+        -------
+        QubitResponse | None
+            Qubit data or None if not found
+
+        """
+        qubit = self._chip_repo.find_qubit(project_id, chip_id, qid)
+        if qubit is None:
+            return None
+        return QubitResponse(
+            qid=qubit["qid"],
+            chip_id=qubit["chip_id"],
+            status=qubit.get("status", "pending"),
+            data=qubit.get("data", {}),
+            best_data=qubit.get("best_data", {}),
+        )
+
+    def list_couplings(
+        self,
+        project_id: str,
+        chip_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> tuple[list[CouplingResponse], int]:
+        """List couplings with pagination.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        limit : int
+            Maximum number of couplings to return
+        offset : int
+            Number of couplings to skip
+
+        Returns
+        -------
+        tuple[list[CouplingResponse], int]
+            List of couplings and total count
+
+        """
+        couplings, total = self._chip_repo.list_couplings(
+            project_id=project_id,
+            chip_id=chip_id,
+            limit=limit,
+            offset=offset,
+        )
+        return (
+            [
+                CouplingResponse(
+                    qid=c["qid"],
+                    chip_id=c["chip_id"],
+                    status=c.get("status", "pending"),
+                    data=c.get("data", {}),
+                    best_data=c.get("best_data", {}),
+                )
+                for c in couplings
+            ],
+            total,
+        )
+
+    def get_coupling(
+        self, project_id: str, chip_id: str, coupling_id: str
+    ) -> CouplingResponse | None:
+        """Get a single coupling by ID.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        coupling_id : str
+            The coupling identifier
+
+        Returns
+        -------
+        CouplingResponse | None
+            Coupling data or None if not found
+
+        """
+        coupling = self._chip_repo.find_coupling(project_id, chip_id, coupling_id)
+        if coupling is None:
+            return None
+        return CouplingResponse(
+            qid=coupling["qid"],
+            chip_id=coupling["chip_id"],
+            status=coupling.get("status", "pending"),
+            data=coupling.get("data", {}),
+            best_data=coupling.get("best_data", {}),
+        )
+
+    def get_metrics_summary(self, project_id: str, chip_id: str) -> MetricsSummaryResponse | None:
+        """Get aggregated metrics summary.
+
+        Uses MongoDB aggregation pipeline for efficient DB-side computation.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        MetricsSummaryResponse | None
+            Aggregated metrics or None if chip not found
+
+        """
+        summary = self._chip_repo.aggregate_metrics_summary(project_id, chip_id)
+        if summary is None:
+            return None
+        return MetricsSummaryResponse(
+            chip_id=chip_id,
+            qubit_count=summary.get("qubit_count", 0),
+            calibrated_count=summary.get("calibrated_count", 0),
+            avg_t1=summary.get("avg_t1"),
+            avg_t2_echo=summary.get("avg_t2_echo"),
+            avg_t2_star=summary.get("avg_t2_star"),
+            avg_qubit_frequency=summary.get("avg_qubit_frequency"),
+            avg_readout_fidelity=summary.get("avg_readout_fidelity"),
+        )
+
+    def get_metric_heatmap(
+        self, project_id: str, chip_id: str, metric: str
+    ) -> MetricHeatmapResponse | None:
+        """Get heatmap data for a single metric.
+
+        Uses MongoDB aggregation pipeline to extract only the needed metric values.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        metric : str
+            The metric name
+
+        Returns
+        -------
+        MetricHeatmapResponse | None
+            Metric values keyed by qubit/coupling ID
+
+        """
+        # Determine if this is a qubit or coupling metric
+        coupling_metrics = {"zx90_gate_fidelity", "bell_state_fidelity", "static_zz_interaction"}
+        is_coupling = metric in coupling_metrics
+
+        result = self._chip_repo.aggregate_metric_heatmap(
+            project_id=project_id,
+            chip_id=chip_id,
+            metric=metric,
+            is_coupling=is_coupling,
+        )
+        if result is None:
+            return None
+
+        return MetricHeatmapResponse(
+            chip_id=chip_id,
+            metric=metric,
+            values=result.get("values", {}),
+            unit=result.get("unit"),
+        )

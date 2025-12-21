@@ -202,7 +202,7 @@ export function CorrelationView() {
     setYParameter,
   ]);
 
-  // Fetch chips data
+  // Fetch chips data (lightweight summary)
   const { data: chipsResponse } = useListChips();
 
   // Set default chip on mount

@@ -34,7 +34,6 @@ from qdash.common.datetime_utils import (
 )
 from qdash.datamodel.task import OutputParameterModel
 from qdash.repository.chip import MongoChipRepository
-from qdash.repository.chip_history import MongoChipHistoryRepository
 from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
 from starlette.exceptions import HTTPException
 
@@ -96,18 +95,17 @@ def get_latest_qubit_task_results(
         f"Getting latest qubit task results for chip {chip_id}, task {task}, project: {ctx.project_id}"
     )
 
-    # Get chip info (scoped by project)
+    # Use individual QubitDocument collection for scalability
     chip_repo = MongoChipRepository()
-    chip = chip_repo.find_one_document({"project_id": ctx.project_id, "chip_id": chip_id})
-    if chip is None:
-        raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
-    # Get qids
-    qids = list(chip.qubits.keys())
-    fidelity_map = {
-        k: v.data.get("x90_gate_fidelity", {}).get("value", 0.0) > QUBIT_FIDELITY_THRESHOLD
-        for k, v in chip.qubits.items()
-    }
+    # Get qubit IDs and fidelity map from QubitDocument collection
+    qids = chip_repo.get_qubit_ids(ctx.project_id, chip_id)
+    if not qids:
+        raise ValueError(f"Chip {chip_id} not found or has no qubits in project {ctx.project_id}")
+
+    fidelity_map = chip_repo.get_qubit_fidelity_map(
+        ctx.project_id, chip_id, threshold=QUBIT_FIDELITY_THRESHOLD
+    )
     # Fetch all task results in one query (scoped by project)
     task_result_repo = MongoTaskResultHistoryRepository()
     all_results = task_result_repo.find(
@@ -202,20 +200,37 @@ def get_historical_qubit_task_results(
         f"Getting historical qubit task results for chip {chip_id}, task {task}, date {date}"
     )
 
-    # Get chip info (scoped by project)
-    chip_history_repo = MongoChipHistoryRepository()
-    chip = chip_history_repo.find_one(
-        {"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}
-    )
-    if chip is None:
-        raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
-
-    # Get qids
-    qids = list(chip.qubits.keys())
+    # Use QubitHistoryDocument for historical data (scalable approach)
+    chip_repo = MongoChipRepository()
     parsed_date = parse_date(date, "YYYYMMDD")
-
     start_time = start_of_day(parsed_date)
     end_time = end_of_day(parsed_date)
+
+    # Get qubit IDs and fidelity data from QubitHistoryDocument
+    qids = chip_repo.get_historical_qubit_ids(ctx.project_id, chip_id, date)
+    if not qids:
+        raise ValueError(f"Chip {chip_id} not found or has no qubits for date {date}")
+
+    historical_fidelity = chip_repo.get_historical_qubit_fidelity_map(
+        ctx.project_id, chip_id, date, threshold=QUBIT_FIDELITY_THRESHOLD
+    )
+
+    # Build fidelity map with time filtering
+    fidelity_map = {}
+    for qid, fidelity_info in historical_fidelity.items():
+        calibrated_at_str = fidelity_info.get("calibrated_at")
+        try:
+            calibrated_at = to_datetime(calibrated_at_str) if calibrated_at_str else None
+        except Exception:
+            calibrated_at = None
+
+        fidelity_map[qid] = (
+            fidelity_info.get("over_threshold", False)
+            and calibrated_at is not None
+            and start_time <= calibrated_at <= end_time
+        )
+
+    # Fetch task results
     task_result_repo = MongoTaskResultHistoryRepository()
     all_results = task_result_repo.find(
         {
@@ -223,30 +238,10 @@ def get_historical_qubit_task_results(
             "chip_id": chip_id,
             "name": task,
             "qid": {"$in": qids},
-            # Filter tasks executed on the same date in JST
-            "start_at": {
-                "$gte": start_time,
-                "$lt": end_time,
-            },
+            "start_at": {"$gte": start_time, "$lt": end_time},
         },
         sort=[("end_at", SortDirection.DESCENDING)],
     )
-    fidelity_map = {}
-    for k, v in chip.qubits.items():
-        fidelity_data = v.data.get("x90_gate_fidelity", {})
-        value = fidelity_data.get("value", 0.0)
-        calibrated_at_str = fidelity_data.get("calibrated_at")
-
-        try:
-            calibrated_at = to_datetime(calibrated_at_str)
-        except Exception:
-            calibrated_at = None
-
-        fidelity_map[k] = (
-            value > QUBIT_FIDELITY_THRESHOLD
-            and calibrated_at is not None
-            and start_time <= calibrated_at <= end_time
-        )
     # Organize results by qid
     task_results: dict[str, TaskResultHistoryDocument] = {}
     for result in all_results:
@@ -416,18 +411,19 @@ def get_latest_coupling_task_results(
         f"Getting latest coupling task results for chip {chip_id}, task {task}, project: {ctx.project_id}"
     )
 
-    # Get chip info (scoped by project)
+    # Use individual CouplingDocument collection for scalability
     chip_repo = MongoChipRepository()
-    chip = chip_repo.find_one_document({"project_id": ctx.project_id, "chip_id": chip_id})
-    if chip is None:
-        raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
 
-    # Get coupling ids
-    qids = list(chip.couplings.keys())
-    fidelity_map = {
-        k: v.data.get("bell_state_fidelity", {}).get("value", 0.0) > COUPLING_FIDELITY_THRESHOLD
-        for k, v in chip.couplings.items()
-    }
+    # Get coupling IDs and fidelity map from CouplingDocument collection
+    qids = chip_repo.get_coupling_ids(ctx.project_id, chip_id)
+    if not qids:
+        raise ValueError(
+            f"Chip {chip_id} not found or has no couplings in project {ctx.project_id}"
+        )
+
+    fidelity_map = chip_repo.get_coupling_fidelity_map(
+        ctx.project_id, chip_id, threshold=COUPLING_FIDELITY_THRESHOLD
+    )
 
     # Fetch all task results in one query (scoped by project)
     task_result_repo = MongoTaskResultHistoryRepository()
@@ -523,22 +519,37 @@ def get_historical_coupling_task_results(
         f"Getting historical coupling task results for chip {chip_id}, task {task}, date {date}"
     )
 
-    # Get chip info (scoped by project)
-    chip_history_repo = MongoChipHistoryRepository()
-    chip = chip_history_repo.find_one(
-        {"project_id": ctx.project_id, "chip_id": chip_id, "recorded_date": date}
-    )
-    if chip is None:
-        raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
-
-    # Get coupling ids
-    qids = list(chip.couplings.keys())
-
+    # Use CouplingHistoryDocument for historical data (scalable approach)
+    chip_repo = MongoChipRepository()
     parsed_date = parse_date(date, "YYYYMMDD")
-
     start_time = start_of_day(parsed_date)
     end_time = end_of_day(parsed_date)
 
+    # Get coupling IDs and fidelity data from CouplingHistoryDocument
+    qids = chip_repo.get_historical_coupling_ids(ctx.project_id, chip_id, date)
+    if not qids:
+        raise ValueError(f"Chip {chip_id} not found or has no couplings for date {date}")
+
+    historical_fidelity = chip_repo.get_historical_coupling_fidelity_map(
+        ctx.project_id, chip_id, date, threshold=COUPLING_FIDELITY_THRESHOLD
+    )
+
+    # Build fidelity map with time filtering
+    fidelity_map = {}
+    for coupling_id, fidelity_info in historical_fidelity.items():
+        calibrated_at_str = fidelity_info.get("calibrated_at")
+        try:
+            calibrated_at = to_datetime(calibrated_at_str) if calibrated_at_str else None
+        except Exception:
+            calibrated_at = None
+
+        fidelity_map[coupling_id] = (
+            fidelity_info.get("over_threshold", False)
+            and calibrated_at is not None
+            and start_time <= calibrated_at <= end_time
+        )
+
+    # Fetch task results
     task_result_repo = MongoTaskResultHistoryRepository()
     all_results = task_result_repo.find(
         {
@@ -546,30 +557,10 @@ def get_historical_coupling_task_results(
             "chip_id": chip_id,
             "name": task,
             "qid": {"$in": qids},
-            "start_at": {
-                "$gte": start_time,
-                "$lt": end_time,
-            },
+            "start_at": {"$gte": start_time, "$lt": end_time},
         },
         sort=[("end_at", SortDirection.DESCENDING)],
     )
-
-    fidelity_map = {}
-    for k, v in chip.couplings.items():
-        fidelity_data = v.data.get("bell_state_fidelity", {})
-        value = fidelity_data.get("value", 0.0)
-        calibrated_at_str = fidelity_data.get("calibrated_at")
-
-        try:
-            calibrated_at = to_datetime(calibrated_at_str)
-        except Exception:
-            calibrated_at = None
-
-        fidelity_map[k] = (
-            value > COUPLING_FIDELITY_THRESHOLD
-            and calibrated_at is not None
-            and start_time <= calibrated_at <= end_time
-        )
     # Organize results by qid
     task_results: dict[str, TaskResultHistoryDocument] = {}
     for result in all_results:

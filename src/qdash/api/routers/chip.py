@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from qdash.api.dependencies import get_chip_service  # noqa: TCH002
 from qdash.api.lib.config_loader import ConfigLoader
 from qdash.api.lib.project import (  # noqa: TCH002
@@ -24,10 +24,16 @@ from qdash.api.routers.task_file import (
 from qdash.api.schemas.chip import (
     ChipDatesResponse,
     ChipResponse,
+    CouplingResponse,
     CreateChipRequest,
     ListChipsResponse,
+    ListCouplingsResponse,
     ListMuxResponse,
+    ListQubitsResponse,
+    MetricHeatmapResponse,
+    MetricsSummaryResponse,
     MuxDetailResponse,
+    QubitResponse,
 )
 from qdash.api.services.chip_initializer import ChipInitializer
 from qdash.api.services.chip_service import ChipService  # noqa: TCH002
@@ -44,30 +50,23 @@ logger.setLevel(logging.DEBUG)
 
 
 @router.get(
-    "/chips", response_model=ListChipsResponse, summary="List all chips", operation_id="listChips"
+    "/chips",
+    response_model=ListChipsResponse,
+    summary="List all chips",
+    operation_id="listChips",
 )
 def list_chips(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     chip_service: Annotated[ChipService, Depends(get_chip_service)],
 ) -> ListChipsResponse:
-    """List all chips in the current project.
+    """List all chips with summary information.
 
-    Parameters
-    ----------
-    ctx : ProjectContext
-        Project context with user and project information
-    chip_service : ChipService
-        Service for chip operations
-
-    Returns
-    -------
-    ListChipsResponse
-        Wrapped list of available chips
-
+    Returns chip metadata (id, size, topology, qubit/coupling counts).
+    For detailed qubit/coupling data, use the dedicated endpoints.
     """
     logger.debug(f"Listing chips for project: {ctx.project_id}")
-    chips = chip_service.list_chips(ctx.project_id)
-    return ListChipsResponse(chips=chips)
+    chips = chip_service.list_chips_summary(ctx.project_id)
+    return ListChipsResponse(chips=chips, total=len(chips))
 
 
 @router.post(
@@ -109,12 +108,14 @@ def create_chip(
             topology_id=request.topology_id,
         )
 
+        # qubit_count and coupling_count are derived from topology
+        # For a new chip, this equals the topology's defined qubits/couplings
         return ChipResponse(
             chip_id=chip.chip_id,
             size=chip.size,
             topology_id=chip.topology_id,
-            qubits=chip.qubits,
-            couplings=chip.couplings,
+            qubit_count=chip.size,  # Qubits are created based on size
+            coupling_count=0,  # Will be populated by ChipInitializer
             installed_at=chip.installed_at,
         )
     except ValueError as e:
@@ -157,45 +158,6 @@ def get_chip_dates(
     logger.debug(f"Fetching dates for chip {chip_id}, project: {ctx.project_id}")
     dates = chip_service.get_chip_dates(ctx.project_id, chip_id)
     return ChipDatesResponse(data=dates)
-
-
-@router.get(
-    "/chips/{chip_id}", response_model=ChipResponse, summary="Get a chip", operation_id="getChip"
-)
-def get_chip(
-    chip_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
-    chip_service: Annotated[ChipService, Depends(get_chip_service)],
-) -> ChipResponse:
-    """Get a chip by its ID.
-
-    Parameters
-    ----------
-    chip_id : str
-        ID of the chip to fetch
-    ctx : ProjectContext
-        Project context with user and project information
-    chip_service : ChipService
-        Service for chip operations
-
-    Returns
-    -------
-    ChipResponse
-        Chip information
-
-    Raises
-    ------
-    HTTPException
-        If chip is not found
-
-    """
-    logger.debug(f"Fetching chip {chip_id} for project: {ctx.project_id}")
-
-    chip = chip_service.get_chip(ctx.project_id, chip_id)
-    if chip is None:
-        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
-
-    return chip
 
 
 # =============================================================================
@@ -323,3 +285,307 @@ def list_chip_muxes(
     )
 
     return ListMuxResponse(muxes=muxes)
+
+
+# =============================================================================
+# Optimized endpoints for scalability (256+ qubits)
+# =============================================================================
+
+
+@router.get(
+    "/chips/{chip_id}",
+    response_model=ChipResponse,
+    summary="Get chip details",
+    operation_id="getChip",
+)
+def get_chip(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+) -> ChipResponse:
+    """Get chip details including metadata and counts.
+
+    Returns chip metadata (size, topology, qubit/coupling counts).
+    For detailed qubit/coupling data, use the dedicated endpoints.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    ctx : ProjectContext
+        Project context with user and project information
+    chip_service : ChipService
+        Service for chip operations
+
+    Returns
+    -------
+    ChipResponse
+        Chip details
+
+    """
+    logger.debug(f"Fetching chip {chip_id}, project: {ctx.project_id}")
+    summary = chip_service.get_chip_summary(ctx.project_id, chip_id)
+    if summary is None:
+        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
+    return summary
+
+
+@router.get(
+    "/chips/{chip_id}/qubits",
+    response_model=ListQubitsResponse,
+    summary="List qubits for a chip",
+    operation_id="listChipQubits",
+)
+def list_chip_qubits(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+    limit: Annotated[int, Query(le=256, ge=1)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    qids: Annotated[list[str] | None, Query()] = None,
+) -> ListQubitsResponse:
+    """List qubits for a chip with pagination.
+
+    Retrieves qubit data from the separate QubitDocument collection.
+    Supports filtering by specific qubit IDs.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    ctx : ProjectContext
+        Project context with user and project information
+    chip_service : ChipService
+        Service for chip operations
+    limit : int
+        Maximum number of qubits to return (default 50, max 256)
+    offset : int
+        Number of qubits to skip for pagination
+    qids : list[str] | None
+        Optional list of specific qubit IDs to fetch
+
+    Returns
+    -------
+    ListQubitsResponse
+        List of qubits with pagination info
+
+    """
+    logger.debug(f"Listing qubits for chip {chip_id}, project: {ctx.project_id}")
+    qubits, total = chip_service.list_qubits(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        limit=limit,
+        offset=offset,
+        qids=qids,
+    )
+    return ListQubitsResponse(qubits=qubits, total=total, limit=limit, offset=offset)
+
+
+@router.get(
+    "/chips/{chip_id}/qubits/{qid}",
+    response_model=QubitResponse,
+    summary="Get a single qubit",
+    operation_id="getChipQubit",
+)
+def get_chip_qubit(
+    chip_id: str,
+    qid: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+) -> QubitResponse:
+    """Get a single qubit by ID.
+
+    This is 10-18x faster than fetching the full chip and extracting one qubit.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    qid : str
+        ID of the qubit
+    ctx : ProjectContext
+        Project context with user and project information
+    chip_service : ChipService
+        Service for chip operations
+
+    Returns
+    -------
+    QubitResponse
+        Qubit data
+
+    """
+    logger.debug(f"Fetching qubit {qid} for chip {chip_id}, project: {ctx.project_id}")
+    qubit = chip_service.get_qubit(ctx.project_id, chip_id, qid)
+    if qubit is None:
+        raise HTTPException(status_code=404, detail=f"Qubit {qid} not found in chip {chip_id}")
+    return qubit
+
+
+@router.get(
+    "/chips/{chip_id}/couplings",
+    response_model=ListCouplingsResponse,
+    summary="List couplings for a chip",
+    operation_id="listChipCouplings",
+)
+def list_chip_couplings(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+    limit: Annotated[int, Query(le=512, ge=1)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> ListCouplingsResponse:
+    """List couplings for a chip with pagination.
+
+    Retrieves coupling data from the separate CouplingDocument collection.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    ctx : ProjectContext
+        Project context with user and project information
+    chip_service : ChipService
+        Service for chip operations
+    limit : int
+        Maximum number of couplings to return (default 100, max 512)
+    offset : int
+        Number of couplings to skip for pagination
+
+    Returns
+    -------
+    ListCouplingsResponse
+        List of couplings with pagination info
+
+    """
+    logger.debug(f"Listing couplings for chip {chip_id}, project: {ctx.project_id}")
+    couplings, total = chip_service.list_couplings(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        limit=limit,
+        offset=offset,
+    )
+    return ListCouplingsResponse(couplings=couplings, total=total, limit=limit, offset=offset)
+
+
+@router.get(
+    "/chips/{chip_id}/couplings/{coupling_id}",
+    response_model=CouplingResponse,
+    summary="Get a single coupling",
+    operation_id="getChipCoupling",
+)
+def get_chip_coupling(
+    chip_id: str,
+    coupling_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+) -> CouplingResponse:
+    """Get a single coupling by ID.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    coupling_id : str
+        ID of the coupling (e.g., "0-1")
+    ctx : ProjectContext
+        Project context with user and project information
+    chip_service : ChipService
+        Service for chip operations
+
+    Returns
+    -------
+    CouplingResponse
+        Coupling data
+
+    """
+    logger.debug(f"Fetching coupling {coupling_id} for chip {chip_id}, project: {ctx.project_id}")
+    coupling = chip_service.get_coupling(ctx.project_id, chip_id, coupling_id)
+    if coupling is None:
+        raise HTTPException(
+            status_code=404, detail=f"Coupling {coupling_id} not found in chip {chip_id}"
+        )
+    return coupling
+
+
+@router.get(
+    "/chips/{chip_id}/metrics/summary",
+    response_model=MetricsSummaryResponse,
+    summary="Get aggregated metrics summary",
+    operation_id="getChipMetricsSummary",
+)
+def get_chip_metrics_summary(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+) -> MetricsSummaryResponse:
+    """Get aggregated metrics summary for a chip.
+
+    Computes statistics (averages, counts) on the database side.
+    Returns ~0.1KB of data, ideal for dashboard overview.
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    ctx : ProjectContext
+        Project context with user and project information
+    chip_service : ChipService
+        Service for chip operations
+
+    Returns
+    -------
+    MetricsSummaryResponse
+        Aggregated metrics summary
+
+    """
+    logger.debug(f"Fetching metrics summary for chip {chip_id}, project: {ctx.project_id}")
+    summary = chip_service.get_metrics_summary(ctx.project_id, chip_id)
+    if summary is None:
+        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
+    return summary
+
+
+@router.get(
+    "/chips/{chip_id}/metrics/heatmap/{metric}",
+    response_model=MetricHeatmapResponse,
+    summary="Get heatmap data for a single metric",
+    operation_id="getChipMetricHeatmap",
+)
+def get_chip_metric_heatmap(
+    chip_id: str,
+    metric: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+) -> MetricHeatmapResponse:
+    """Get heatmap data for a single metric.
+
+    Returns only the values needed for heatmap visualization (~5KB).
+    Much more efficient than fetching full chip data (~300KB+).
+
+    Supported metrics:
+    - Qubit: t1, t2_echo, t2_star, qubit_frequency, anharmonicity,
+             average_readout_fidelity, x90_gate_fidelity, x180_gate_fidelity
+    - Coupling: zx90_gate_fidelity, bell_state_fidelity, static_zz_interaction
+
+    Parameters
+    ----------
+    chip_id : str
+        ID of the chip
+    metric : str
+        Name of the metric to retrieve
+    ctx : ProjectContext
+        Project context with user and project information
+    chip_service : ChipService
+        Service for chip operations
+
+    Returns
+    -------
+    MetricHeatmapResponse
+        Metric values keyed by qubit/coupling ID
+
+    """
+    logger.debug(f"Fetching heatmap for {metric} on chip {chip_id}, project: {ctx.project_id}")
+    heatmap = chip_service.get_metric_heatmap(ctx.project_id, chip_id, metric)
+    if heatmap is None:
+        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
+    return heatmap
