@@ -238,6 +238,10 @@ def format_elapsed_time(elapsed: timedelta) -> str:
     return f"{hours}:{minutes:02d}:{seconds:02d}"
 
 
+MAX_ELAPSED_TIME_STRING_LENGTH = 100  # Prevent DoS from extremely long strings
+MAX_ELAPSED_TIME_SECONDS = 365 * 24 * 3600  # 1 year maximum
+
+
 def parse_elapsed_time(elapsed_str: str | timedelta | int | float | None) -> timedelta | None:
     """Parse elapsed time string to timedelta.
 
@@ -251,6 +255,11 @@ def parse_elapsed_time(elapsed_str: str | timedelta | int | float | None) -> tim
     - timedelta objects (pass through)
     - int/float (interpreted as seconds)
 
+    Input validation:
+    - String inputs are limited to MAX_ELAPSED_TIME_STRING_LENGTH characters
+    - Parsed values are capped at MAX_ELAPSED_TIME_SECONDS (1 year)
+    - Negative values raise ValueError
+
     Args:
     ----
         elapsed_str: Elapsed time string, timedelta, or number of seconds
@@ -259,19 +268,38 @@ def parse_elapsed_time(elapsed_str: str | timedelta | int | float | None) -> tim
     -------
         timedelta: Parsed elapsed time, or None if input is None
 
+    Raises:
+    ------
+        ValueError: If string is too long, value is negative, or exceeds maximum
+
     """
     import re
 
     if elapsed_str is None:
         return None
     if isinstance(elapsed_str, timedelta):
+        total_seconds = elapsed_str.total_seconds()
+        if total_seconds < 0:
+            raise ValueError("Elapsed time cannot be negative")
+        if total_seconds > MAX_ELAPSED_TIME_SECONDS:
+            raise ValueError(f"Elapsed time exceeds maximum ({MAX_ELAPSED_TIME_SECONDS} seconds)")
         return elapsed_str
     if isinstance(elapsed_str, (int, float)):
+        if elapsed_str < 0:
+            raise ValueError("Elapsed time cannot be negative")
+        if elapsed_str > MAX_ELAPSED_TIME_SECONDS:
+            raise ValueError(f"Elapsed time exceeds maximum ({MAX_ELAPSED_TIME_SECONDS} seconds)")
         return timedelta(seconds=elapsed_str)
 
     elapsed_str = str(elapsed_str).strip()
     if not elapsed_str:
         return None
+
+    # Validate string length
+    if len(elapsed_str) > MAX_ELAPSED_TIME_STRING_LENGTH:
+        raise ValueError(
+            f"Elapsed time string too long ({len(elapsed_str)} > {MAX_ELAPSED_TIME_STRING_LENGTH})"
+        )
 
     # Try HH:MM:SS or MM:SS format first
     parts = elapsed_str.split(":")

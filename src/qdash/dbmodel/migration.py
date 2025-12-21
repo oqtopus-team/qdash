@@ -5,13 +5,184 @@ Run migrations with:
     python -m qdash.dbmodel.migration topology-id --execute  # actual migration
     python -m qdash.dbmodel.migration datetime-fields          # dry-run
     python -m qdash.dbmodel.migration datetime-fields --execute  # actual migration
+    python -m qdash.dbmodel.migration validate-datetime      # validate before migration
 """
 
 import logging
+from typing import Any
 
 import pendulum
 
 logger = logging.getLogger(__name__)
+
+# Constants for migration safety
+BATCH_SIZE = 1000  # Process documents in batches for memory efficiency
+MAX_STRING_LENGTH = 100  # Maximum length for elapsed_time strings to prevent abuse
+
+
+class MigrationError(Exception):
+    """Raised when migration encounters an unrecoverable error."""
+
+
+class ValidationResult:
+    """Results of pre-migration validation."""
+
+    def __init__(self) -> None:
+        self.valid_count = 0
+        self.invalid_count = 0
+        self.errors: list[dict[str, Any]] = []
+
+    def add_error(self, collection: str, doc_id: Any, field: str, value: Any, reason: str) -> None:
+        """Record a validation error."""
+        self.invalid_count += 1
+        self.errors.append(
+            {
+                "collection": collection,
+                "doc_id": str(doc_id),
+                "field": field,
+                "value": str(value)[:100],  # Truncate for safety
+                "reason": reason,
+            }
+        )
+
+    def add_valid(self) -> None:
+        """Record a valid field."""
+        self.valid_count += 1
+
+    @property
+    def is_valid(self) -> bool:
+        """Check if all validations passed."""
+        return self.invalid_count == 0
+
+    def summary(self) -> dict[str, Any]:
+        """Return summary of validation results."""
+        return {
+            "valid_count": self.valid_count,
+            "invalid_count": self.invalid_count,
+            "errors": self.errors[:50],  # Limit errors in summary
+            "is_valid": self.is_valid,
+        }
+
+
+def validate_datetime_data() -> ValidationResult:
+    """Validate existing datetime data before migration.
+
+    Checks all datetime fields for potential issues that could cause
+    migration failures.
+
+    Returns:
+        ValidationResult with details of any validation errors.
+    """
+    from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+    from qdash.dbmodel.chip import ChipDocument
+    from qdash.dbmodel.chip_history import ChipHistoryDocument
+    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+    result = ValidationResult()
+
+    def validate_datetime_string(value: Any) -> tuple[bool, str]:
+        """Validate a datetime string can be parsed."""
+        if value is None or value == "":
+            return True, ""
+        if not isinstance(value, str):
+            return True, ""  # Already non-string, will be handled by migration
+        try:
+            pendulum.parse(value)
+            return True, ""
+        except Exception as e:
+            return False, str(e)
+
+    def validate_elapsed_time_string(value: Any) -> tuple[bool, str]:
+        """Validate an elapsed_time string can be parsed."""
+        if value is None or value == "":
+            return True, ""
+        if not isinstance(value, str):
+            return True, ""
+        if len(value) > MAX_STRING_LENGTH:
+            return False, f"String too long ({len(value)} chars)"
+        # Try to parse
+        seconds = parse_elapsed_time_to_seconds(value)
+        if seconds == 0.0 and value.strip() not in ("0", "0.0", ""):
+            return False, "Could not parse elapsed time"
+        return True, ""
+
+    # Validate ExecutionHistoryDocument
+    collection = ExecutionHistoryDocument.get_motor_collection()
+    for doc in collection.find({}, {"_id": 1, "start_at": 1, "end_at": 1, "elapsed_time": 1}):
+        for field in ["start_at", "end_at"]:
+            if field in doc and isinstance(doc[field], str):
+                valid, error = validate_datetime_string(doc[field])
+                if valid:
+                    result.add_valid()
+                else:
+                    result.add_error("execution_history", doc["_id"], field, doc[field], error)
+
+        if "elapsed_time" in doc and isinstance(doc["elapsed_time"], str):
+            valid, error = validate_elapsed_time_string(doc["elapsed_time"])
+            if valid:
+                result.add_valid()
+            else:
+                result.add_error(
+                    "execution_history", doc["_id"], "elapsed_time", doc["elapsed_time"], error
+                )
+
+    # Validate TaskResultHistoryDocument
+    collection = TaskResultHistoryDocument.get_motor_collection()
+    for doc in collection.find({}, {"_id": 1, "start_at": 1, "end_at": 1, "elapsed_time": 1}):
+        for field in ["start_at", "end_at"]:
+            if field in doc and isinstance(doc[field], str):
+                valid, error = validate_datetime_string(doc[field])
+                if valid:
+                    result.add_valid()
+                else:
+                    result.add_error("task_result_history", doc["_id"], field, doc[field], error)
+
+        if "elapsed_time" in doc and isinstance(doc["elapsed_time"], str):
+            valid, error = validate_elapsed_time_string(doc["elapsed_time"])
+            if valid:
+                result.add_valid()
+            else:
+                result.add_error(
+                    "task_result_history", doc["_id"], "elapsed_time", doc["elapsed_time"], error
+                )
+
+    # Validate ChipDocument
+    collection = ChipDocument.get_motor_collection()
+    for doc in collection.find({}, {"_id": 1, "installed_at": 1}):
+        if "installed_at" in doc and isinstance(doc["installed_at"], str):
+            valid, error = validate_datetime_string(doc["installed_at"])
+            if valid:
+                result.add_valid()
+            else:
+                result.add_error("chip", doc["_id"], "installed_at", doc["installed_at"], error)
+
+    # Validate ChipHistoryDocument
+    collection = ChipHistoryDocument.get_motor_collection()
+    for doc in collection.find({}, {"_id": 1, "installed_at": 1}):
+        if "installed_at" in doc and isinstance(doc["installed_at"], str):
+            valid, error = validate_datetime_string(doc["installed_at"])
+            if valid:
+                result.add_valid()
+            else:
+                result.add_error(
+                    "chip_history", doc["_id"], "installed_at", doc["installed_at"], error
+                )
+
+    # Validate CalibrationNoteDocument
+    collection = CalibrationNoteDocument.get_motor_collection()
+    for doc in collection.find({}, {"_id": 1, "timestamp": 1}):
+        if "timestamp" in doc and isinstance(doc["timestamp"], str):
+            valid, error = validate_datetime_string(doc["timestamp"])
+            if valid:
+                result.add_valid()
+            else:
+                result.add_error(
+                    "calibration_note", doc["_id"], "timestamp", doc["timestamp"], error
+                )
+
+    logger.info(f"Validation complete: {result.valid_count} valid, {result.invalid_count} invalid")
+    return result
 
 
 def migrate_add_topology_id(dry_run: bool = True) -> dict[str, int]:
@@ -437,6 +608,16 @@ if __name__ == "__main__":
         help="Actually execute the migration (default is dry-run)",
     )
 
+    # validate-datetime command
+    validate_parser = subparsers.add_parser(
+        "validate-datetime", help="Validate datetime data before migration"
+    )
+    validate_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output results as JSON",
+    )
+
     args = parser.parse_args()
 
     if args.command == "topology-id":
@@ -451,5 +632,23 @@ if __name__ == "__main__":
         initialize()
         stats = migrate_datetime_fields(dry_run=not args.execute)
         logger.info(f"Migration complete: {stats}")
+    elif args.command == "validate-datetime":
+        import json
+
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        result = validate_datetime_data()
+        if hasattr(args, "json") and args.json:
+            print(json.dumps(result.summary(), indent=2))
+        else:
+            print(f"Validation {'PASSED' if result.is_valid else 'FAILED'}")
+            print(f"  Valid fields: {result.valid_count}")
+            print(f"  Invalid fields: {result.invalid_count}")
+            if result.errors:
+                print("\nErrors (first 10):")
+                for error in result.errors[:10]:
+                    print(f"  - {error['collection']}.{error['field']}: {error['reason']}")
+                    print(f"    Value: {error['value']}")
     else:
         parser.print_help()

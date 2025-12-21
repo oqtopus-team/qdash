@@ -79,3 +79,52 @@ class TestParseElapsedTime:
             parse_elapsed_time("invalid")
         with pytest.raises(ValueError, match="Invalid elapsed time format"):
             parse_elapsed_time("abc:def:ghi")
+
+
+class TestParseElapsedTimeValidation:
+    """Test input validation in parse_elapsed_time."""
+
+    def test_negative_timedelta_raises(self) -> None:
+        """Test negative timedelta raises ValueError."""
+        with pytest.raises(ValueError, match="cannot be negative"):
+            parse_elapsed_time(timedelta(seconds=-10))
+
+    def test_negative_float_raises(self) -> None:
+        """Test negative float raises ValueError."""
+        with pytest.raises(ValueError, match="cannot be negative"):
+            parse_elapsed_time(-100.0)
+
+    def test_negative_int_raises(self) -> None:
+        """Test negative int raises ValueError."""
+        with pytest.raises(ValueError, match="cannot be negative"):
+            parse_elapsed_time(-50)
+
+    def test_string_too_long_raises(self) -> None:
+        """Test string exceeding max length raises ValueError."""
+        long_string = "a" * 200
+        with pytest.raises(ValueError, match="too long"):
+            parse_elapsed_time(long_string)
+
+    def test_excessive_duration_timedelta_raises(self) -> None:
+        """Test timedelta exceeding 1 year raises ValueError."""
+        two_years = timedelta(days=730)
+        with pytest.raises(ValueError, match="exceeds maximum"):
+            parse_elapsed_time(two_years)
+
+    def test_excessive_duration_float_raises(self) -> None:
+        """Test float exceeding 1 year raises ValueError."""
+        two_years_seconds = 2 * 365 * 24 * 3600.0
+        with pytest.raises(ValueError, match="exceeds maximum"):
+            parse_elapsed_time(two_years_seconds)
+
+    def test_valid_large_duration(self) -> None:
+        """Test valid large duration (under 1 year) works."""
+        result = parse_elapsed_time(timedelta(days=364))
+        assert result is not None
+        assert result.days == 364
+
+    def test_zero_values_work(self) -> None:
+        """Test zero values work correctly."""
+        assert parse_elapsed_time(0) == timedelta(seconds=0)
+        assert parse_elapsed_time(0.0) == timedelta(seconds=0)
+        assert parse_elapsed_time(timedelta(0)) == timedelta(seconds=0)
