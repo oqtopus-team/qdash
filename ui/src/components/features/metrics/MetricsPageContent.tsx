@@ -11,7 +11,7 @@ import { MetricsStatsCards, useMetricStats } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 import { LinearGauge } from "@/components/ui/LinearGauge";
 
-import { useListChipsSummary, useGetChipSummary } from "@/client/chip/chip";
+import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
@@ -56,8 +56,8 @@ export function MetricsPageContent() {
   // Select appropriate metrics config based on type
   const metricsConfig = metricType === "qubit" ? qubitMetrics : couplingMetrics;
 
-  const { data: chipsData, isLoading: isChipsLoading } = useListChipsSummary();
-  const { data: chipData } = useGetChipSummary(selectedChip);
+  const { data: chipsData, isLoading: isChipsLoading } = useListChips();
+  const { data: chipData } = useGetChip(selectedChip);
 
   // Get topology ID from chip data
   const topologyId = useMemo(() => {

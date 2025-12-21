@@ -2102,7 +2102,7 @@
           "chip"
         ],
         "summary": "List all chips",
-        "description": "List all chips in the current project.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nListChipsResponse\n    Wrapped list of available chips",
+        "description": "List all chips with summary information.\n\nReturns chip metadata (id, size, topology, qubit/coupling counts).\nFor detailed qubit/coupling data, use the dedicated endpoints.",
         "operationId": "listChips",
         "security": [
           {
@@ -2214,61 +2214,6 @@
         }
       }
     },
-    "/chips/summary": {
-      "get": {
-        "tags": [
-          "chip"
-        ],
-        "summary": "List all chips (lightweight)",
-        "description": "List all chips with summary information only (no qubit/coupling data).\n\nThis endpoint returns ~1KB vs ~300KB+ for full chip data.\nUse this for chip selectors and listings where qubit data is not needed.",
-        "operationId": "listChipsSummary",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "X-Project-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Project-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListChipsSummaryResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/chips/{chip_id}/dates": {
       "get": {
         "tags": [
@@ -2316,70 +2261,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ChipDatesResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/chips/{chip_id}": {
-      "get": {
-        "tags": [
-          "chip"
-        ],
-        "summary": "Get a chip",
-        "description": "Get a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipResponse\n    Chip information\n\nRaises\n------\nHTTPException\n    If chip is not found",
-        "operationId": "getChip",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "X-Project-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Project-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChipResponse"
                 }
               }
             }
@@ -2534,14 +2415,14 @@
         }
       }
     },
-    "/chips/{chip_id}/summary": {
+    "/chips/{chip_id}": {
       "get": {
         "tags": [
           "chip"
         ],
-        "summary": "Get chip summary (lightweight)",
-        "description": "Get chip summary without embedded qubit/coupling data.\n\nThis endpoint returns ~0.3KB vs ~300KB+ for full chip data.\nUse this when you only need chip metadata (size, topology, dates).\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipSummaryResponse\n    Chip summary information",
-        "operationId": "getChipSummary",
+        "summary": "Get chip details",
+        "description": "Get chip details including metadata and counts.\n\nReturns chip metadata (size, topology, qubit/coupling counts).\nFor detailed qubit/coupling data, use the dedicated endpoints.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipResponse\n    Chip details",
+        "operationId": "getChip",
         "security": [
           {
             "HTTPBearer": []
@@ -2580,7 +2461,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ChipSummaryResponse"
+                  "$ref": "#/components/schemas/ChipResponse"
                 }
               }
             }
@@ -6064,60 +5945,6 @@
             ],
             "title": "Topology Id"
           },
-          "qubits": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Qubits",
-            "default": {}
-          },
-          "couplings": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Couplings",
-            "default": {}
-          },
-          "installed_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Installed At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "chip_id"
-        ],
-        "title": "ChipResponse",
-        "description": "Chip is a Pydantic model that represents a chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubits (dict): Qubit information.\n    couplings (dict): Coupling information.\n    installed_at (str): Installation timestamp."
-      },
-      "ChipSummaryResponse": {
-        "properties": {
-          "chip_id": {
-            "type": "string",
-            "title": "Chip Id"
-          },
-          "size": {
-            "type": "integer",
-            "title": "Size",
-            "default": 64
-          },
-          "topology_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Topology Id"
-          },
           "qubit_count": {
             "type": "integer",
             "title": "Qubit Count",
@@ -6145,8 +5972,8 @@
         "required": [
           "chip_id"
         ],
-        "title": "ChipSummaryResponse",
-        "description": "Lightweight chip summary without embedded qubit/coupling data.\n\nUse this for chip listings and when full qubit data is not needed.\nThis is significantly smaller than ChipResponse (~0.3KB vs ~300KB+ for 64 qubits)."
+        "title": "ChipResponse",
+        "description": "Chip response model.\n\nQubit and coupling data are stored in separate collections for scalability\nand should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubit_count (int): Number of qubits in the chip.\n    coupling_count (int): Number of couplings in the chip.\n    installed_at (datetime | None): Installation timestamp."
       },
       "Condition": {
         "properties": {
@@ -7161,36 +6988,19 @@
             },
             "type": "array",
             "title": "Chips"
-          }
-        },
-        "type": "object",
-        "required": [
-          "chips"
-        ],
-        "title": "ListChipsResponse",
-        "description": "Response model for listing all chips.\n\nWraps list of chips for API consistency and future extensibility (e.g., pagination)."
-      },
-      "ListChipsSummaryResponse": {
-        "properties": {
-          "chips": {
-            "items": {
-              "$ref": "#/components/schemas/ChipSummaryResponse"
-            },
-            "type": "array",
-            "title": "Chips"
           },
           "total": {
             "type": "integer",
-            "title": "Total",
-            "default": 0
+            "title": "Total"
           }
         },
         "type": "object",
         "required": [
-          "chips"
+          "chips",
+          "total"
         ],
-        "title": "ListChipsSummaryResponse",
-        "description": "Response model for listing chips with summary info only.\n\nUse this instead of ListChipsResponse when you don't need qubit/coupling data."
+        "title": "ListChipsResponse",
+        "description": "Response model for listing chips."
       },
       "ListCouplingsResponse": {
         "properties": {

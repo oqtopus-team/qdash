@@ -11,7 +11,7 @@ import type { Task, TaskInfo } from "@/schemas";
 import { FluentEmoji } from "@/components/ui/FluentEmoji";
 import { QubitDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
-import { useGetChipSummary } from "@/client/chip/chip";
+import { useGetChip } from "@/client/chip/chip";
 import {
   useListTaskInfo,
   useGetTaskFileSettings,
@@ -52,8 +52,7 @@ function QubitDetailPageContent() {
     | "history";
   const setViewMode = setQubitViewMode;
 
-  const { data: chipData, isLoading: isChipLoading } =
-    useGetChipSummary(chipId);
+  const { data: chipData, isLoading: isChipLoading } = useGetChip(chipId);
 
   // Get task file settings to determine default backend
   const { data: taskFileSettings, isLoading: isSettingsLoading } =

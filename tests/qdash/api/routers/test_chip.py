@@ -55,15 +55,15 @@ def auth_headers():
 class TestChipRouter:
     """Tests for chip-related API endpoints."""
 
-    def test_list_chips_summary_empty(self, test_client, test_project, auth_headers):
+    def test_list_chips_empty(self, test_client, test_project, auth_headers):
         """Test listing chips when no chips exist."""
-        response = test_client.get("/chips/summary", headers=auth_headers)
+        response = test_client.get("/chips", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["chips"] == []
         assert data["total"] == 0
 
-    def test_list_chips_summary_with_data(self, test_client, test_project, auth_headers):
+    def test_list_chips_with_data(self, test_client, test_project, auth_headers):
         """Test listing chips when chips exist."""
         # Arrange: Create a chip in the database
         chip = ChipDocument(
@@ -90,7 +90,7 @@ class TestChipRouter:
             qubit.insert()
 
         # Act
-        response = test_client.get("/chips/summary", headers=auth_headers)
+        response = test_client.get("/chips", headers=auth_headers)
 
         # Assert
         assert response.status_code == 200
@@ -100,7 +100,7 @@ class TestChipRouter:
         assert data["chips"][0]["size"] == 64
         assert data["chips"][0]["qubit_count"] == 3
 
-    def test_list_chips_summary_filters_by_project(self, test_client, test_project, auth_headers):
+    def test_list_chips_filters_by_project(self, test_client, test_project, auth_headers):
         """Test that listing chips only returns chips for the current project."""
         # Arrange: Create chips for different projects
         chip1 = ChipDocument(
@@ -122,7 +122,7 @@ class TestChipRouter:
         chip2.insert()
 
         # Act
-        response = test_client.get("/chips/summary", headers=auth_headers)
+        response = test_client.get("/chips", headers=auth_headers)
 
         # Assert
         assert response.status_code == 200
@@ -130,8 +130,8 @@ class TestChipRouter:
         assert len(data["chips"]) == 1
         assert data["chips"][0]["chip_id"] == "chip_project1"
 
-    def test_get_chip_summary_success(self, test_client, test_project, auth_headers):
-        """Test fetching a specific chip summary by ID."""
+    def test_get_chip_success(self, test_client, test_project, auth_headers):
+        """Test fetching a specific chip by ID."""
         # Arrange
         chip = ChipDocument(
             chip_id="test_chip_fetch",
@@ -143,7 +143,7 @@ class TestChipRouter:
         chip.insert()
 
         # Act
-        response = test_client.get("/chips/test_chip_fetch/summary", headers=auth_headers)
+        response = test_client.get("/chips/test_chip_fetch", headers=auth_headers)
 
         # Assert
         assert response.status_code == 200
@@ -151,14 +151,14 @@ class TestChipRouter:
         assert data["chip_id"] == "test_chip_fetch"
         assert data["size"] == 144
 
-    def test_get_chip_summary_not_found(self, test_client, test_project, auth_headers):
+    def test_get_chip_not_found(self, test_client, test_project, auth_headers):
         """Test fetching a non-existent chip returns 404."""
-        response = test_client.get("/chips/nonexistent_chip/summary", headers=auth_headers)
+        response = test_client.get("/chips/nonexistent_chip", headers=auth_headers)
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
 
-    def test_get_chip_summary_wrong_project(self, test_client, test_project, auth_headers):
+    def test_get_chip_wrong_project(self, test_client, test_project, auth_headers):
         """Test that fetching another project's chip returns 404."""
         # Arrange: Create a chip for another project
         chip = ChipDocument(
@@ -171,7 +171,7 @@ class TestChipRouter:
         chip.insert()
 
         # Act: Try to fetch from test_project
-        response = test_client.get("/chips/other_project_chip/summary", headers=auth_headers)
+        response = test_client.get("/chips/other_project_chip", headers=auth_headers)
 
         # Assert: Should not find the chip (project isolation)
         assert response.status_code == 404
@@ -221,22 +221,22 @@ class TestChipRouter:
         # Assert
         assert response.status_code == 400
 
-    def test_list_chips_summary_requires_authentication(self, test_client, test_project):
+    def test_list_chips_requires_authentication(self, test_client, test_project):
         """Test that listing chips without auth returns 401."""
         # Act: Request without Authorization header
-        response = test_client.get("/chips/summary")
+        response = test_client.get("/chips")
 
         # Assert
         assert response.status_code == 401
 
-    def test_list_chips_summary_invalid_token(self, test_client, test_project):
+    def test_list_chips_invalid_token(self, test_client, test_project):
         """Test that listing chips with invalid token returns 401."""
         # Act: Request with invalid token
         headers = {
             "Authorization": "Bearer invalid_token",
             "X-Project-Id": "test_project",
         }
-        response = test_client.get("/chips/summary", headers=headers)
+        response = test_client.get("/chips", headers=headers)
 
         # Assert
         assert response.status_code == 401

@@ -8,7 +8,7 @@ import logging
 from typing import Any
 
 from qdash.api.schemas.chip import (
-    ChipSummaryResponse,
+    ChipResponse,
     CouplingResponse,
     MetricHeatmapResponse,
     MetricsSummaryResponse,
@@ -257,10 +257,8 @@ class ChipService:
     # Optimized methods for scalability (256+ qubits)
     # =========================================================================
 
-    def list_chips_summary(self, project_id: str) -> list[ChipSummaryResponse]:
-        """List all chips with summary information only.
-
-        Uses projection to exclude heavy qubit/coupling data.
+    def list_chips_summary(self, project_id: str) -> list[ChipResponse]:
+        """List all chips with summary information.
 
         Parameters
         ----------
@@ -269,13 +267,13 @@ class ChipService:
 
         Returns
         -------
-        list[ChipSummaryResponse]
-            List of chip summaries
+        list[ChipResponse]
+            List of chips
 
         """
         summaries = self._chip_repo.list_summary_by_project(project_id)
         return [
-            ChipSummaryResponse(
+            ChipResponse(
                 chip_id=s["chip_id"],
                 size=s.get("size", 64),
                 topology_id=s.get("topology_id"),
@@ -286,8 +284,8 @@ class ChipService:
             for s in summaries
         ]
 
-    def get_chip_summary(self, project_id: str, chip_id: str) -> ChipSummaryResponse | None:
-        """Get chip summary without embedded qubit/coupling data.
+    def get_chip_summary(self, project_id: str, chip_id: str) -> ChipResponse | None:
+        """Get chip details.
 
         Parameters
         ----------
@@ -298,14 +296,14 @@ class ChipService:
 
         Returns
         -------
-        ChipSummaryResponse | None
-            Chip summary or None if not found
+        ChipResponse | None
+            Chip details or None if not found
 
         """
         summary = self._chip_repo.find_summary_by_id(project_id, chip_id)
         if summary is None:
             return None
-        return ChipSummaryResponse(
+        return ChipResponse(
             chip_id=summary["chip_id"],
             size=summary.get("size", 64),
             topology_id=summary.get("topology_id"),

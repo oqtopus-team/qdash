@@ -4,7 +4,7 @@ import { useMemo, useEffect, useCallback } from "react";
 
 import Select from "react-select";
 
-import { useListChipsSummary } from "@/client/chip/chip";
+import { useListChips } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { PlotCard } from "@/components/charts/PlotCard";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
@@ -146,7 +146,7 @@ export function CDFView() {
   ]);
 
   // Fetch chips data
-  const { data: chipsResponse } = useListChipsSummary();
+  const { data: chipsResponse } = useListChips();
 
   // Set default chip on mount
   useEffect(() => {

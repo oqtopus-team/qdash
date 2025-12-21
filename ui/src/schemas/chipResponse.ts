@@ -6,27 +6,28 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ChipResponseTopologyId } from "./chipResponseTopologyId";
-import type { ChipResponseQubits } from "./chipResponseQubits";
-import type { ChipResponseCouplings } from "./chipResponseCouplings";
 import type { ChipResponseInstalledAt } from "./chipResponseInstalledAt";
 
 /**
- * Chip is a Pydantic model that represents a chip.
+ * Chip response model.
+
+Qubit and coupling data are stored in separate collections for scalability
+and should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).
 
 Attributes
 ----------
     chip_id (str): The ID of the chip.
     size (int): The size of the chip.
     topology_id (str | None): Topology template ID.
-    qubits (dict): Qubit information.
-    couplings (dict): Coupling information.
-    installed_at (str): Installation timestamp.
+    qubit_count (int): Number of qubits in the chip.
+    coupling_count (int): Number of couplings in the chip.
+    installed_at (datetime | None): Installation timestamp.
  */
 export interface ChipResponse {
   chip_id: string;
   size?: number;
   topology_id?: ChipResponseTopologyId;
-  qubits?: ChipResponseQubits;
-  couplings?: ChipResponseCouplings;
+  qubit_count?: number;
+  coupling_count?: number;
   installed_at?: ChipResponseInstalledAt;
 }

@@ -18,13 +18,17 @@ class ChipResponse(BaseModel):
         chip_id (str): The ID of the chip.
         size (int): The size of the chip.
         topology_id (str | None): Topology template ID.
-        installed_at (str): Installation timestamp.
+        qubit_count (int): Number of qubits in the chip.
+        coupling_count (int): Number of couplings in the chip.
+        installed_at (datetime | None): Installation timestamp.
 
     """
 
     chip_id: str
     size: int = 64
     topology_id: str | None = None
+    qubit_count: int = 0
+    coupling_count: int = 0
     installed_at: datetime | None = None
 
 
@@ -97,29 +101,11 @@ class ListMuxResponse(BaseModel):
     muxes: dict[int, MuxDetailResponse]
 
 
-class ChipSummaryResponse(BaseModel):
-    """Lightweight chip summary without embedded qubit/coupling data.
+class ListChipsResponse(BaseModel):
+    """Response model for listing chips."""
 
-    Use this for chip listings and when full qubit data is not needed.
-    This is significantly smaller than ChipResponse (~0.3KB vs ~300KB+ for 64 qubits).
-    """
-
-    chip_id: str
-    size: int = 64
-    topology_id: str | None = None
-    qubit_count: int = 0
-    coupling_count: int = 0
-    installed_at: datetime | None = None
-
-
-class ListChipsSummaryResponse(BaseModel):
-    """Response model for listing chips with summary info only.
-
-    Use this instead of ListChipsResponse when you don't need qubit/coupling data.
-    """
-
-    chips: list[ChipSummaryResponse]
-    total: int = 0
+    chips: list[ChipResponse]
+    total: int
 
 
 class QubitResponse(BaseModel):
@@ -188,12 +174,3 @@ class MetricsSummaryResponse(BaseModel):
     avg_t2_star: float | None = None
     avg_qubit_frequency: float | None = None
     avg_readout_fidelity: float | None = None
-
-
-class ListChipsResponse(BaseModel):
-    """Response model for listing all chips.
-
-    Wraps list of chips for API consistency and future extensibility (e.g., pagination).
-    """
-
-    chips: list[ChipResponse]

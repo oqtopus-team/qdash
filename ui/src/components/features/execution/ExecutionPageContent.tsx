@@ -10,7 +10,7 @@ import { ExecutionStats } from "./ExecutionStats";
 
 import type { ExecutionResponseSummary } from "@/schemas";
 
-import { useListChipsSummary } from "@/client/chip/chip";
+import { useListChips } from "@/client/chip/chip";
 import {
   useListExecutions,
   useGetExecution,
@@ -54,7 +54,7 @@ export function ExecutionPageContent() {
   useDateNavigation(selectedChip || "", selectedDate, setSelectedDate);
 
   // Get list of chips to set default
-  const { data: chipsData } = useListChipsSummary();
+  const { data: chipsData } = useListChips();
 
   // Memoize sorted chips to avoid recalculating on every render
   const sortedChips = useMemo(() => {

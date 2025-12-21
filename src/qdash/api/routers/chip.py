@@ -24,10 +24,9 @@ from qdash.api.routers.task_file import (
 from qdash.api.schemas.chip import (
     ChipDatesResponse,
     ChipResponse,
-    ChipSummaryResponse,
     CouplingResponse,
     CreateChipRequest,
-    ListChipsSummaryResponse,
+    ListChipsResponse,
     ListCouplingsResponse,
     ListMuxResponse,
     ListQubitsResponse,
@@ -51,23 +50,23 @@ logger.setLevel(logging.DEBUG)
 
 
 @router.get(
-    "/chips/summary",
-    response_model=ListChipsSummaryResponse,
-    summary="List all chips (lightweight)",
-    operation_id="listChipsSummary",
+    "/chips",
+    response_model=ListChipsResponse,
+    summary="List all chips",
+    operation_id="listChips",
 )
-def list_chips_summary(
+def list_chips(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     chip_service: Annotated[ChipService, Depends(get_chip_service)],
-) -> ListChipsSummaryResponse:
-    """List all chips with summary information only (no qubit/coupling data).
+) -> ListChipsResponse:
+    """List all chips with summary information.
 
-    This endpoint returns ~1KB vs ~300KB+ for full chip data.
-    Use this for chip selectors and listings where qubit data is not needed.
+    Returns chip metadata (id, size, topology, qubit/coupling counts).
+    For detailed qubit/coupling data, use the dedicated endpoints.
     """
-    logger.debug(f"Listing chip summaries for project: {ctx.project_id}")
-    summaries = chip_service.list_chips_summary(ctx.project_id)
-    return ListChipsSummaryResponse(chips=summaries, total=len(summaries))
+    logger.debug(f"Listing chips for project: {ctx.project_id}")
+    chips = chip_service.list_chips_summary(ctx.project_id)
+    return ListChipsResponse(chips=chips, total=len(chips))
 
 
 @router.post(
@@ -109,10 +108,14 @@ def create_chip(
             topology_id=request.topology_id,
         )
 
+        # qubit_count and coupling_count are derived from topology
+        # For a new chip, this equals the topology's defined qubits/couplings
         return ChipResponse(
             chip_id=chip.chip_id,
             size=chip.size,
             topology_id=chip.topology_id,
+            qubit_count=chip.size,  # Qubits are created based on size
+            coupling_count=0,  # Will be populated by ChipInitializer
             installed_at=chip.installed_at,
         )
     except ValueError as e:
@@ -290,20 +293,20 @@ def list_chip_muxes(
 
 
 @router.get(
-    "/chips/{chip_id}/summary",
-    response_model=ChipSummaryResponse,
-    summary="Get chip summary (lightweight)",
-    operation_id="getChipSummary",
+    "/chips/{chip_id}",
+    response_model=ChipResponse,
+    summary="Get chip details",
+    operation_id="getChip",
 )
-def get_chip_summary(
+def get_chip(
     chip_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     chip_service: Annotated[ChipService, Depends(get_chip_service)],
-) -> ChipSummaryResponse:
-    """Get chip summary without embedded qubit/coupling data.
+) -> ChipResponse:
+    """Get chip details including metadata and counts.
 
-    This endpoint returns ~0.3KB vs ~300KB+ for full chip data.
-    Use this when you only need chip metadata (size, topology, dates).
+    Returns chip metadata (size, topology, qubit/coupling counts).
+    For detailed qubit/coupling data, use the dedicated endpoints.
 
     Parameters
     ----------
@@ -316,11 +319,11 @@ def get_chip_summary(
 
     Returns
     -------
-    ChipSummaryResponse
-        Chip summary information
+    ChipResponse
+        Chip details
 
     """
-    logger.debug(f"Fetching chip summary for {chip_id}, project: {ctx.project_id}")
+    logger.debug(f"Fetching chip {chip_id}, project: {ctx.project_id}")
     summary = chip_service.get_chip_summary(ctx.project_id, chip_id)
     if summary is None:
         raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
