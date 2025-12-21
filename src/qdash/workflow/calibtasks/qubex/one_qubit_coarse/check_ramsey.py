@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 
 import plotly.graph_objects as go
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -15,7 +15,7 @@ class CheckRamsey(QubexTask):
     """Task to check the Rabi oscillation."""
 
     name: str = "CheckRamsey"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "detuning": InputParameterModel(
             unit="GHz",

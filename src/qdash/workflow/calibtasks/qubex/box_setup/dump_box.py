@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -13,7 +13,7 @@ class DumpBox(QubexTask):
     """DumpBox class to dump the box information."""
 
     name: str = "DumpBox"
-    task_type = TaskTypes.GLOBAL
+    task_type: str = "global"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
 

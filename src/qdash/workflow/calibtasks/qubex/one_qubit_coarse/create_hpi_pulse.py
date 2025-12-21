@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -15,7 +15,7 @@ class CreateHPIPulse(QubexTask):
     """Task to create the HPI pulse."""
 
     name: str = "CreateHPIPulse"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "duration": InputParameterModel(
             unit="ns", value_type="int", value=HPI_DURATION, description="HPI pulse length"

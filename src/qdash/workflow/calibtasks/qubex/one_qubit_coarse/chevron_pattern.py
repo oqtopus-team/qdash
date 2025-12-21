@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 import numpy as np
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -14,7 +14,7 @@ class ChevronPattern(QubexTask):
     """Task to check the chevron pattern."""
 
     name: str = "ChevronPattern"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
     timeout: int = 60 * 240
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {

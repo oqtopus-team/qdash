@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskType, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.backend.base import BaseBackend
 
@@ -17,7 +17,7 @@ class BaseTask(ABC):
     """Base class for the task."""
 
     name: str = ""
-    task_type: TaskType
+    task_type: str
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
     r2_threshold: float = 0.7
@@ -194,7 +194,7 @@ class BaseTask(ABC):
         """Return the name of the task."""
         return self.name
 
-    def get_task_type(self) -> TaskType:
+    def get_task_type(self) -> str:
         """Return the type of the task."""
         return self.task_type
 

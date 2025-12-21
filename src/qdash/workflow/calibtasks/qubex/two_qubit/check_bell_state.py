@@ -1,6 +1,6 @@
 from typing import Any, ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -13,7 +13,7 @@ class CheckBellState(QubexTask):
     """Task to check the bell state."""
 
     name: str = "CheckBellState"
-    task_type = TaskTypes.COUPLING
+    task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}

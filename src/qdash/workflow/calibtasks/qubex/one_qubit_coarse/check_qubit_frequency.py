@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -16,7 +16,7 @@ class CheckQubitFrequency(QubexTask):
     """Task to check the qubit frequency."""
 
     name: str = "CheckQubitFrequency"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "detuning_range": InputParameterModel(
             unit="GHz",
