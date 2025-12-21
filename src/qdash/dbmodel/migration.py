@@ -1,11 +1,8 @@
 """Database migration utilities.
 
 Run migrations with:
-    python -m qdash.dbmodel.migration remove-embedded-qubits-couplings          # dry-run
-    python -m qdash.dbmodel.migration remove-embedded-qubits-couplings --execute  # execute
-
-    python -m qdash.dbmodel.migration remove-controller-fridge-info          # dry-run
-    python -m qdash.dbmodel.migration remove-controller-fridge-info --execute  # execute
+    python -m qdash.dbmodel.migration remove-best-data          # dry-run
+    python -m qdash.dbmodel.migration remove-best-data --execute  # execute
 """
 
 import logging
@@ -21,61 +18,11 @@ class MigrationError(Exception):
     """Raised when migration encounters an unrecoverable error."""
 
 
-def migrate_remove_embedded_qubits_couplings(dry_run: bool = True) -> dict[str, int]:
-    """Remove embedded qubits and couplings fields from chip and chip_history collections.
+def migrate_remove_best_data(dry_run: bool = True) -> dict[str, int]:
+    """Remove best_data field from qubit and coupling collections.
 
-    These fields are no longer used as qubit/coupling data is now stored in separate
-    QubitDocument/CouplingDocument collections for scalability (256+ qubits).
-
-    Args:
-        dry_run: If True, only reports what would be changed.
-
-    Returns:
-        Migration statistics with counts of affected documents.
-    """
-    from qdash.dbmodel.chip import ChipDocument
-    from qdash.dbmodel.chip_history import ChipHistoryDocument
-
-    stats: dict[str, int] = {"chip": 0, "chip_history": 0}
-
-    # Fields to remove
-    fields_to_unset = {"qubits": "", "couplings": ""}
-
-    # Migrate ChipDocument
-    collection = ChipDocument.get_motor_collection()
-    filter_query: dict[str, Any] = {
-        "$or": [
-            {"qubits": {"$exists": True}},
-            {"couplings": {"$exists": True}},
-        ]
-    }
-    count = collection.count_documents(filter_query)
-    stats["chip"] = count
-    logger.info(f"Found {count} chip documents with qubits or couplings")
-
-    if not dry_run and count > 0:
-        result = collection.update_many(filter_query, {"$unset": fields_to_unset})
-        logger.info(f"Updated {result.modified_count} chip documents")
-
-    # Migrate ChipHistoryDocument
-    collection = ChipHistoryDocument.get_motor_collection()
-    count = collection.count_documents(filter_query)
-    stats["chip_history"] = count
-    logger.info(f"Found {count} chip_history documents with qubits or couplings")
-
-    if not dry_run and count > 0:
-        result = collection.update_many(filter_query, {"$unset": fields_to_unset})
-        logger.info(f"Updated {result.modified_count} chip_history documents")
-
-    prefix = "[DRY RUN] Would update" if dry_run else "Updated"
-    logger.info(f"{prefix} documents: {stats}")
-    return stats
-
-
-def migrate_remove_controller_fridge_info(dry_run: bool = True) -> dict[str, int]:
-    """Remove controller_info and fridge_info fields from execution_history and task_result_history.
-
-    These fields were never used in production and are being removed from the codebase.
+    The best_data field is no longer used as metrics are now calculated
+    on-demand at retrieval time instead of being stored.
 
     Args:
         dry_run: If True, only reports what would be changed.
@@ -83,40 +30,61 @@ def migrate_remove_controller_fridge_info(dry_run: bool = True) -> dict[str, int
     Returns:
         Migration statistics with counts of affected documents.
     """
-    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
-    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+    from qdash.dbmodel.coupling import CouplingDocument
+    from qdash.dbmodel.coupling_history import CouplingHistoryDocument
+    from qdash.dbmodel.qubit import QubitDocument
+    from qdash.dbmodel.qubit_history import QubitHistoryDocument
 
-    stats: dict[str, int] = {"execution_history": 0, "task_result_history": 0}
-
-    # Fields to remove
-    fields_to_unset = {"controller_info": "", "fridge_info": ""}
-
-    # Migrate ExecutionHistoryDocument
-    collection = ExecutionHistoryDocument.get_motor_collection()
-    # Find documents that have either field
-    filter_query: dict[str, Any] = {
-        "$or": [
-            {"controller_info": {"$exists": True}},
-            {"fridge_info": {"$exists": True}},
-        ]
+    stats: dict[str, int] = {
+        "qubit": 0,
+        "qubit_history": 0,
+        "coupling": 0,
+        "coupling_history": 0,
     }
+
+    # Field to remove
+    fields_to_unset = {"best_data": ""}
+    filter_query: dict[str, Any] = {"best_data": {"$exists": True}}
+
+    # Migrate QubitDocument
+    collection = QubitDocument.get_motor_collection()
     count = collection.count_documents(filter_query)
-    stats["execution_history"] = count
-    logger.info(f"Found {count} execution_history documents with controller_info or fridge_info")
+    stats["qubit"] = count
+    logger.info(f"Found {count} qubit documents with best_data")
 
     if not dry_run and count > 0:
         result = collection.update_many(filter_query, {"$unset": fields_to_unset})
-        logger.info(f"Updated {result.modified_count} execution_history documents")
+        logger.info(f"Updated {result.modified_count} qubit documents")
 
-    # Migrate TaskResultHistoryDocument
-    collection = TaskResultHistoryDocument.get_motor_collection()
+    # Migrate QubitHistoryDocument
+    collection = QubitHistoryDocument.get_motor_collection()
     count = collection.count_documents(filter_query)
-    stats["task_result_history"] = count
-    logger.info(f"Found {count} task_result_history documents with controller_info or fridge_info")
+    stats["qubit_history"] = count
+    logger.info(f"Found {count} qubit_history documents with best_data")
 
     if not dry_run and count > 0:
         result = collection.update_many(filter_query, {"$unset": fields_to_unset})
-        logger.info(f"Updated {result.modified_count} task_result_history documents")
+        logger.info(f"Updated {result.modified_count} qubit_history documents")
+
+    # Migrate CouplingDocument
+    collection = CouplingDocument.get_motor_collection()
+    count = collection.count_documents(filter_query)
+    stats["coupling"] = count
+    logger.info(f"Found {count} coupling documents with best_data")
+
+    if not dry_run and count > 0:
+        result = collection.update_many(filter_query, {"$unset": fields_to_unset})
+        logger.info(f"Updated {result.modified_count} coupling documents")
+
+    # Migrate CouplingHistoryDocument
+    collection = CouplingHistoryDocument.get_motor_collection()
+    count = collection.count_documents(filter_query)
+    stats["coupling_history"] = count
+    logger.info(f"Found {count} coupling_history documents with best_data")
+
+    if not dry_run and count > 0:
+        result = collection.update_many(filter_query, {"$unset": fields_to_unset})
+        logger.info(f"Updated {result.modified_count} coupling_history documents")
 
     prefix = "[DRY RUN] Would update" if dry_run else "Updated"
     logger.info(f"{prefix} documents: {stats}")
@@ -131,23 +99,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Database migrations")
     subparsers = parser.add_subparsers(dest="command", help="Migration commands")
 
-    # remove-embedded-qubits-couplings migration
-    remove_embedded_parser = subparsers.add_parser(
-        "remove-embedded-qubits-couplings",
-        help="Remove embedded qubits/couplings fields from chip collections",
+    # remove-best-data migration
+    remove_best_data_parser = subparsers.add_parser(
+        "remove-best-data",
+        help="Remove best_data field from qubit and coupling collections",
     )
-    remove_embedded_parser.add_argument(
-        "--execute",
-        action="store_true",
-        help="Actually execute the migration (default is dry-run)",
-    )
-
-    # remove-controller-fridge-info migration
-    remove_parser = subparsers.add_parser(
-        "remove-controller-fridge-info",
-        help="Remove controller_info and fridge_info fields from collections",
-    )
-    remove_parser.add_argument(
+    remove_best_data_parser.add_argument(
         "--execute",
         action="store_true",
         help="Actually execute the migration (default is dry-run)",
@@ -155,17 +112,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.command == "remove-embedded-qubits-couplings":
+    if args.command == "remove-best-data":
         from qdash.dbmodel.initialize import initialize
 
         initialize()
-        stats = migrate_remove_embedded_qubits_couplings(dry_run=not args.execute)
-        logger.info(f"Migration complete: {stats}")
-    elif args.command == "remove-controller-fridge-info":
-        from qdash.dbmodel.initialize import initialize
-
-        initialize()
-        stats = migrate_remove_controller_fridge_info(dry_run=not args.execute)
+        stats = migrate_remove_best_data(dry_run=not args.execute)
         logger.info(f"Migration complete: {stats}")
     else:
         parser.print_help()

@@ -30,10 +30,6 @@ class QubitHistoryDocument(Document):
     status: str = Field(..., description="The status of the qubit")
     chip_id: str = Field(..., description="The chip ID")
     data: dict[str, Any] = Field(..., description="The data of the qubit")
-    best_data: dict[str, Any] = Field(
-        default_factory=dict,
-        description="The best calibration results, focusing on fidelity metrics",
-    )
     node_info: NodeInfoModel | None = Field(
         default=None, description="The node information (deprecated)"
     )
@@ -83,7 +79,6 @@ class QubitHistoryDocument(Document):
         if existing_history:
             history = existing_history
             history.data = qubit.data
-            history.best_data = qubit.best_data
             history.status = qubit.status
             history.node_info = qubit.node_info
         else:
@@ -95,7 +90,6 @@ class QubitHistoryDocument(Document):
                 status=qubit.status,
                 chip_id=qubit.chip_id,
                 data=qubit.data,
-                best_data=qubit.best_data,
                 node_info=qubit.node_info,
                 system_info=SystemInfoModel(),
             )

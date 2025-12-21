@@ -64,7 +64,6 @@ class ChipInitializer:
                 qid=f"{qid}",
                 status="pending",
                 data={},
-                best_data={},
                 system_info={},
             )
             documents.append(qubit_doc)
@@ -100,7 +99,6 @@ class ChipInitializer:
                 status="pending",
                 chip_id=chip_id,
                 data={},
-                best_data={},
                 system_info={},
             )
             documents.append(coupling_doc)

@@ -583,7 +583,6 @@ class QubitCalibrationRepository(Protocol):
 
     This repository handles updating qubit calibration data, which involves:
     - Merging new calibration parameters into existing data
-    - Updating best_data when new results are better
     - Synchronizing data with ChipDocument
     - Recording history
 
@@ -608,9 +607,8 @@ class QubitCalibrationRepository(Protocol):
 
         This method:
         1. Merges new parameters into existing qubit data
-        2. Updates best_data if new results are better (fidelity comparison)
-        3. Updates the qubit data in the chip document
-        4. Records a history snapshot
+        2. Updates the qubit data in the chip document
+        3. Records a history snapshot
 
         Parameters
         ----------

@@ -76,7 +76,6 @@ class InMemoryQubitCalibrationRepository:
                 status="",
                 chip_id=chip_id,
                 data={},
-                best_data={},
                 node_info=None,
             )
             self._qubits[key] = qubit

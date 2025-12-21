@@ -91,7 +91,6 @@ def generate_dummy_data(num_qubits: int, pos: dict, username: str, chip_id: str)
                 ),
             ),
             data={},
-            best_data={},
             system_info={},
         )
         data.append(qubit_data)

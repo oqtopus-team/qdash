@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { QubitResponseData } from "./qubitResponseData";
-import type { QubitResponseBestData } from "./qubitResponseBestData";
 
 /**
  * Response model for a single qubit.
@@ -16,5 +15,4 @@ export interface QubitResponse {
   chip_id: string;
   status?: string;
   data?: QubitResponseData;
-  best_data?: QubitResponseBestData;
 }
