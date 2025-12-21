@@ -49,7 +49,8 @@ def get_database() -> Database[Any]:
     """
     global _database
     if _database is None:
-        _database = get_mongo_client().qubex
+        db_name = os.getenv("MONGO_DB_NAME", "qdash")
+        _database = get_mongo_client()[db_name]
     return _database
 
 

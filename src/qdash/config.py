@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     mongo_data_path: str
     calib_data_path: str
     backend: str = "qubex"  # Default backend is 'qubex'
+    # MongoDB
+    mongo_db_name: str = "qdash"  # MongoDB database name
     # Ports
     mongo_port: int = 27017
     mongo_express_port: int = 8081
