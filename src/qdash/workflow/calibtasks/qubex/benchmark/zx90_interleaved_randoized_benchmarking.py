@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -15,7 +15,7 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
     """Task to perform ZX90 interleaved randomized benchmarking."""
 
     name: str = "ZX90InterleavedRandomizedBenchmarking"
-    task_type = TaskTypes.COUPLING
+    task_type: str = "coupling"
     timeout: int = 60 * 30  # 25 minutes
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "n_trials": InputParameterModel(

@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -15,7 +15,7 @@ class CheckOptimalReadoutAmplitude(QubexTask):
     """Task to check the Optimal Readout Amplitude"""
 
     name: str = "CheckOptimalReadoutAmplitude"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "amplitude_range": InputParameterModel(
             unit="a.u.",

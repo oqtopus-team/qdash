@@ -7,6 +7,7 @@ abstracting away the repository layer from the routers.
 import logging
 from typing import Any
 
+from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.schemas.chip import (
     ChipResponse,
     CouplingResponse,
@@ -468,6 +469,7 @@ class ChipService:
         """Get aggregated metrics summary.
 
         Uses MongoDB aggregation pipeline for efficient DB-side computation.
+        Metric keys are loaded dynamically from metrics.yaml config.
 
         Parameters
         ----------
@@ -482,18 +484,17 @@ class ChipService:
             Aggregated metrics or None if chip not found
 
         """
-        summary = self._chip_repo.aggregate_metrics_summary(project_id, chip_id)
+        # Get metric keys from config (cached)
+        metrics_config = load_metrics_config()
+        metric_keys = list(metrics_config.qubit_metrics.keys())
+
+        summary = self._chip_repo.aggregate_metrics_summary(project_id, chip_id, metric_keys)
         if summary is None:
             return None
         return MetricsSummaryResponse(
             chip_id=chip_id,
             qubit_count=summary.get("qubit_count", 0),
-            calibrated_count=summary.get("calibrated_count", 0),
-            avg_t1=summary.get("avg_t1"),
-            avg_t2_echo=summary.get("avg_t2_echo"),
-            avg_t2_star=summary.get("avg_t2_star"),
-            avg_qubit_frequency=summary.get("avg_qubit_frequency"),
-            avg_readout_fidelity=summary.get("avg_readout_fidelity"),
+            averages=summary.get("averages", {}),
         )
 
     def get_metric_heatmap(

@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -14,7 +14,7 @@ class CheckReflectionCoefficient(QubexTask):
     """Task to check the reflection coefficient of a resonator."""
 
     name: str = "CheckReflectionCoefficient"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
     output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
         "resonator_frequency": OutputParameterModel(

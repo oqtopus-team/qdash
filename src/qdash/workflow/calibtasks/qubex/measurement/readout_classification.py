@@ -3,7 +3,7 @@ from typing import Any, ClassVar
 import numpy as np
 import numpy.typing as npt
 import plotly.graph_objs as go
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -16,7 +16,7 @@ class ReadoutClassification(QubexTask):
     """Task to classify the readout."""
 
     name: str = "ReadoutClassification"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
 
     # High resolution for accurate threshold detection
     GRID_RESOLUTION: int = 2001

@@ -7526,74 +7526,29 @@
             "type": "integer",
             "title": "Qubit Count"
           },
-          "calibrated_count": {
-            "type": "integer",
-            "title": "Calibrated Count"
-          },
-          "avg_t1": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Avg T1"
-          },
-          "avg_t2_echo": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Avg T2 Echo"
-          },
-          "avg_t2_star": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Avg T2 Star"
-          },
-          "avg_qubit_frequency": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Avg Qubit Frequency"
-          },
-          "avg_readout_fidelity": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Avg Readout Fidelity"
+          "averages": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Averages",
+            "default": {}
           }
         },
         "type": "object",
         "required": [
           "chip_id",
-          "qubit_count",
-          "calibrated_count"
+          "qubit_count"
         ],
         "title": "MetricsSummaryResponse",
-        "description": "Response model for aggregated metrics summary.\n\nReturns statistical summary computed by the database.\nMinimal data transfer (~0.1KB)."
+        "description": "Response model for aggregated metrics summary.\n\nReturns statistical summary computed by the database.\nMinimal data transfer (~0.1KB).\nMetrics are loaded dynamically from metrics.yaml config."
       },
       "MuxDetailResponse": {
         "properties": {
@@ -8737,6 +8692,11 @@
             "title": "Backend",
             "default": "qubex"
           },
+          "mongo_db_name": {
+            "type": "string",
+            "title": "Mongo Db Name",
+            "default": "qdash"
+          },
           "mongo_port": {
             "type": "integer",
             "title": "Mongo Port",
@@ -9015,11 +8975,6 @@
             "type": "boolean",
             "title": "Default View",
             "default": true
-          },
-          "over_threshold": {
-            "type": "boolean",
-            "title": "Over Threshold",
-            "default": false
           }
         },
         "type": "object",
@@ -9440,11 +9395,6 @@
             "type": "boolean",
             "title": "Default View",
             "default": true
-          },
-          "over_threshold": {
-            "type": "boolean",
-            "title": "Over Threshold",
-            "default": false
           }
         },
         "type": "object",

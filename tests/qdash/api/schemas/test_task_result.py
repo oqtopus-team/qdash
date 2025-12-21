@@ -110,4 +110,3 @@ class TestTaskResultDatetimeFields:
         assert result.name == ""
         assert result.status == "pending"
         assert result.default_view is True
-        assert result.over_threshold is False

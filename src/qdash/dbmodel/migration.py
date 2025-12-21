@@ -1,6 +1,9 @@
 """Database migration utilities.
 
 Run migrations with:
+    python -m qdash.dbmodel.migration fix-invalid-fidelity          # dry-run
+    python -m qdash.dbmodel.migration fix-invalid-fidelity --execute  # execute
+
     python -m qdash.dbmodel.migration remove-best-data          # dry-run
     python -m qdash.dbmodel.migration remove-best-data --execute  # execute
 
@@ -22,6 +25,120 @@ BATCH_SIZE = 1000  # Process documents in batches for memory efficiency
 
 class MigrationError(Exception):
     """Raised when migration encounters an unrecoverable error."""
+
+
+def migrate_fix_invalid_fidelity(dry_run: bool = True) -> dict[str, Any]:
+    """Mark task results with fidelity > 100% as failed.
+
+    Fidelity values exceeding 100% (1.0) indicate measurement or calculation
+    errors. This migration finds such records and updates their status to
+    'failed' with an appropriate message.
+
+    Args:
+        dry_run: If True, only reports what would be changed.
+
+    Returns:
+        Migration statistics with counts of affected documents.
+    """
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+    stats: dict[str, Any] = {
+        "total_checked": 0,
+        "invalid_found": 0,
+        "updated": 0,
+        "details": [],
+    }
+
+    collection = TaskResultHistoryDocument.get_motor_collection()
+
+    # Find all completed tasks that have fidelity-related output parameters
+    # We need to check each document's output_parameters for fidelity > 1.0
+    filter_query: dict[str, Any] = {"status": "completed"}
+
+    cursor = collection.find(filter_query)
+    invalid_docs: list[dict[str, Any]] = []
+
+    for doc in cursor:
+        stats["total_checked"] += 1
+        output_params = doc.get("output_parameters", {})
+
+        if not output_params:
+            continue
+
+        # Check all parameters containing 'fidelity' in their name
+        invalid_params: list[tuple[str, float]] = []
+        for param_name, param_data in output_params.items():
+            if "fidelity" not in param_name.lower():
+                continue
+
+            # Handle both dict format and direct value
+            if isinstance(param_data, dict):
+                value = param_data.get("value")
+            else:
+                value = param_data
+
+            if value is not None and isinstance(value, (int, float)) and value > 1.0:
+                invalid_params.append((param_name, float(value)))
+
+        if invalid_params:
+            invalid_docs.append(
+                {
+                    "_id": doc["_id"],
+                    "task_id": doc.get("task_id", ""),
+                    "name": doc.get("name", ""),
+                    "qid": doc.get("qid", ""),
+                    "invalid_params": invalid_params,
+                }
+            )
+
+    stats["invalid_found"] = len(invalid_docs)
+
+    if invalid_docs:
+        logger.info(f"Found {len(invalid_docs)} documents with invalid fidelity values:")
+        for doc_info in invalid_docs[:10]:  # Show first 10
+            params_str = ", ".join(
+                f"{name}={value*100:.2f}%" for name, value in doc_info["invalid_params"]
+            )
+            logger.info(f"  - {doc_info['name']} (qid={doc_info['qid']}): {params_str}")
+            stats["details"].append(
+                {
+                    "task_id": doc_info["task_id"],
+                    "name": doc_info["name"],
+                    "qid": doc_info["qid"],
+                    "invalid_params": {
+                        name: f"{value*100:.2f}%" for name, value in doc_info["invalid_params"]
+                    },
+                }
+            )
+
+        if len(invalid_docs) > 10:
+            logger.info(f"  ... and {len(invalid_docs) - 10} more")
+
+    if not dry_run and invalid_docs:
+        for doc_info in invalid_docs:
+            params_str = ", ".join(
+                f"{name}={value*100:.2f}%" for name, value in doc_info["invalid_params"]
+            )
+            message = f"Fidelity exceeds 100%: {params_str}"
+
+            result = collection.update_one(
+                {"_id": doc_info["_id"]},
+                {
+                    "$set": {
+                        "status": "failed",
+                        "message": message,
+                    }
+                },
+            )
+            if result.modified_count > 0:
+                stats["updated"] += 1
+
+        logger.info(f"Updated {stats['updated']} documents to status='failed'")
+
+    prefix = "[DRY RUN] Would update" if dry_run else "Updated"
+    logger.info(f"{prefix} {stats['invalid_found']} documents with invalid fidelity values")
+
+    return stats
 
 
 def migrate_remove_best_data(dry_run: bool = True) -> dict[str, int]:
@@ -238,6 +355,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Database migrations")
     subparsers = parser.add_subparsers(dest="command", help="Migration commands")
 
+    # fix-invalid-fidelity migration
+    fix_fidelity_parser = subparsers.add_parser(
+        "fix-invalid-fidelity",
+        help="Mark task results with fidelity > 100% as failed",
+    )
+    fix_fidelity_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
     # remove-best-data migration
     remove_best_data_parser = subparsers.add_parser(
         "remove-best-data",
@@ -274,7 +402,13 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.command == "remove-best-data":
+    if args.command == "fix-invalid-fidelity":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_fix_invalid_fidelity(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "remove-best-data":
         from qdash.dbmodel.initialize import initialize
 
         initialize()

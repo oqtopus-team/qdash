@@ -35,14 +35,6 @@ class TaskResultProcessor:
 
     """
 
-    # Task names that have fidelity output and need validation
-    FIDELITY_TASKS = frozenset(
-        [
-            "RandomizedBenchmarking",
-            "InterleavedRandomizedBenchmarking",
-        ]
-    )
-
     def __init__(self, r2_threshold: float = 0.7) -> None:
         """Initialize TaskResultProcessor.
 
@@ -106,7 +98,11 @@ class TaskResultProcessor:
         output_parameters: dict[str, OutputParameterModel],
         task_name: str,
     ) -> bool:
-        """Validate fidelity for RB tasks (must be <= 1.0).
+        """Validate fidelity parameters (must be <= 1.0).
+
+        Validates all output parameters whose name contains 'fidelity'.
+        Fidelity values exceeding 100% (1.0) indicate measurement or
+        calculation errors and should cause the task to fail.
 
         Parameters
         ----------
@@ -118,26 +114,26 @@ class TaskResultProcessor:
         Returns
         -------
         bool
-            True if fidelity is valid
+            True if all fidelity parameters are valid
 
         Raises
         ------
         FidelityValidationError
-            If fidelity exceeds 100%
+            If any fidelity parameter exceeds 100%
 
         """
-        if task_name not in self.FIDELITY_TASKS:
-            return True
+        for param_name, param in output_parameters.items():
+            if "fidelity" not in param_name.lower():
+                continue
 
-        fidelity_param = output_parameters.get("fidelity")
-        if fidelity_param is None:
-            return True
+            if param.value is None:
+                continue
 
-        fidelity_value = fidelity_param.value
-        if fidelity_value > 1.0:
-            raise FidelityValidationError(
-                f"Fidelity exceeds 100% for {task_name}: {fidelity_value * 100:.2f}%"
-            )
+            if param.value > 1.0:
+                raise FidelityValidationError(
+                    f"Fidelity exceeds 100% for {task_name}.{param_name}: "
+                    f"{param.value * 100:.2f}%"
+                )
 
         return True
 

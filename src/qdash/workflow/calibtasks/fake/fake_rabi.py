@@ -5,7 +5,7 @@ import numpy as np
 import numpy.typing as npt
 import plotly.graph_objects as go
 import qubex as qx
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -86,7 +86,7 @@ class FakeRabi(FakeTask):
     """Task to check the Fake Rabi oscillation."""
 
     name: str = "FakeRabi"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "time_range": InputParameterModel(
             unit="ns",

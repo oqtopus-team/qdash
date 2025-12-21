@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import InputParameterModel, OutputParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -15,7 +15,7 @@ class X180InterleavedRandomizedBenchmarking(QubexTask):
     """Task to perform X180 interleaved randomized benchmarking."""
 
     name: str = "X180InterleavedRandomizedBenchmarking"
-    task_type = TaskTypes.QUBIT
+    task_type: str = "qubit"
     timeout: int = 60 * 30
     input_parameters: ClassVar[dict[str, InputParameterModel]] = {
         "n_trials": InputParameterModel(

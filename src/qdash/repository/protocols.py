@@ -232,7 +232,12 @@ class ChipRepository(Protocol):
         """Find a single coupling."""
         ...
 
-    def aggregate_metrics_summary(self, project_id: str, chip_id: str) -> dict[str, Any] | None:
+    def aggregate_metrics_summary(
+        self,
+        project_id: str,
+        chip_id: str,
+        metric_keys: list[str] | None = None,
+    ) -> dict[str, Any] | None:
         """Aggregate metrics summary using MongoDB pipeline."""
         ...
 
@@ -250,24 +255,8 @@ class ChipRepository(Protocol):
         """Get all qubit IDs for a chip."""
         ...
 
-    def get_qubit_fidelity_map(
-        self, project_id: str, chip_id: str, threshold: float = 0.99
-    ) -> dict[str, bool]:
-        """Get fidelity threshold map for qubits."""
-        ...
-
     def get_coupling_ids(self, project_id: str, chip_id: str) -> list[str]:
         """Get all coupling IDs for a chip."""
-        ...
-
-    def get_coupling_fidelity_map(
-        self,
-        project_id: str,
-        chip_id: str,
-        threshold: float = 0.75,
-        metric: str = "bell_state_fidelity",
-    ) -> dict[str, bool]:
-        """Get fidelity threshold map for couplings."""
         ...
 
     def get_qubits_by_ids(

@@ -430,11 +430,7 @@ export function TaskResultGrid({
                     setSelectedTaskInfo({ qid, taskName: selectedTask });
                   }
                 }}
-                className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${
-                  task.over_threshold
-                    ? "ring-2 ring-primary ring-offset-1 animate-pulse-light"
-                    : ""
-                } ${muxBgClass} ${
+                className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${muxBgClass} ${
                   downloadSelectionEnabled && isSelectedForDownload
                     ? "ring-2 ring-primary ring-offset-2"
                     : ""
