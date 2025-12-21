@@ -50,8 +50,9 @@ def initialize() -> None:
     if os.getenv("ENV") == "test":
         return
 
+    db_name = os.getenv("MONGO_DB_NAME", "qdash")
     init_bunnet(
-        database=_get_client().qubex,
+        database=_get_client()[db_name],
         document_models=document_models(),
     )
 
