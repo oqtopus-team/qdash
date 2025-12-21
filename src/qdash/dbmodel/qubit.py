@@ -5,7 +5,6 @@ from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.qubit import NodeInfoModel, QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
 
 
@@ -130,10 +129,7 @@ class QubitDocument(Document):
         qubit_doc.best_data = QubitDocument.update_best_data(qubit_doc.best_data, output_parameters)
         qubit_doc.system_info.update_time()
         qubit_doc.save()
-        # Update the qubit in the chip document
-        chip_doc = ChipDocument.find_one({"username": username, "chip_id": chip_id}).run()
-        if chip_doc is None:
-            raise ValueError(f"Chip {chip_id} not found")
+        # Create history entry for the updated qubit
         qubit_model = QubitModel(
             project_id=project_id,
             qid=qid,
@@ -142,8 +138,6 @@ class QubitDocument(Document):
             best_data=qubit_doc.best_data,
             username=username,
         )
-        chip_doc.update_qubit(qid, qubit_model)
-        # Update History
         QubitHistoryDocument.create_history(qubit_model)
         return qubit_doc
 
