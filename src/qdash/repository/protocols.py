@@ -191,6 +191,61 @@ class ChipRepository(Protocol):
         """
         ...
 
+    # Optimized methods for scalability
+
+    def list_summary_by_project(self, project_id: str) -> list[dict[str, Any]]:
+        """List chips with summary info only."""
+        ...
+
+    def find_summary_by_id(self, project_id: str, chip_id: str) -> dict[str, Any] | None:
+        """Find chip summary by ID."""
+        ...
+
+    def list_qubits(
+        self,
+        project_id: str,
+        chip_id: str,
+        limit: int = 50,
+        offset: int = 0,
+        qids: list[str] | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List qubits with pagination."""
+        ...
+
+    def find_qubit(self, project_id: str, chip_id: str, qid: str) -> dict[str, Any] | None:
+        """Find a single qubit."""
+        ...
+
+    def list_couplings(
+        self,
+        project_id: str,
+        chip_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List couplings with pagination."""
+        ...
+
+    def find_coupling(
+        self, project_id: str, chip_id: str, coupling_id: str
+    ) -> dict[str, Any] | None:
+        """Find a single coupling."""
+        ...
+
+    def aggregate_metrics_summary(self, project_id: str, chip_id: str) -> dict[str, Any] | None:
+        """Aggregate metrics summary using MongoDB pipeline."""
+        ...
+
+    def aggregate_metric_heatmap(
+        self,
+        project_id: str,
+        chip_id: str,
+        metric: str,
+        is_coupling: bool = False,
+    ) -> dict[str, Any] | None:
+        """Aggregate heatmap data for a single metric."""
+        ...
+
 
 @runtime_checkable
 class ChipHistoryRepository(Protocol):

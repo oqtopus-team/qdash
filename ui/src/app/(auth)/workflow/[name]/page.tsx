@@ -12,7 +12,7 @@ import type { AxiosResponse } from "axios";
 import { useToast } from "@/components/ui/Toast";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
-import { useListChips } from "@/client/chip/chip";
+import { useListChipsSummary } from "@/client/chip/chip";
 import { useGetExecutionLockStatus } from "@/client/execution/execution";
 import {
   getFlow,
@@ -67,7 +67,7 @@ export default function EditFlowPage() {
   const { data: userData } = useGetCurrentUser();
 
   // Fetch chips
-  const { data: chipsData } = useListChips();
+  const { data: chipsData } = useListChipsSummary();
 
   // Fetch execution lock status (refresh every 5 seconds)
   const { data: lockStatus, isLoading: isLockStatusLoading } =

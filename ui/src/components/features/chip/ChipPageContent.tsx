@@ -13,7 +13,11 @@ import { CreateChipModal } from "./modals/CreateChipModal";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
 
-import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
+import {
+  useListChipMuxes,
+  useGetChipSummary,
+  useListChipsSummary,
+} from "@/client/chip/chip";
 import {
   useListTaskInfo,
   useGetTaskFileSettings,
@@ -56,8 +60,9 @@ export function ChipPageContent() {
 
   const [gridSize, setGridSize] = useState<number>(8);
 
-  const { data: chipData } = useGetChip(selectedChip);
-  const { data: chipsData, isLoading: isChipsLoading } = useListChips();
+  // Use lightweight summary endpoints (~0.3KB vs ~300KB)
+  const { data: chipData } = useGetChipSummary(selectedChip);
+  const { data: chipsData, isLoading: isChipsLoading } = useListChipsSummary();
 
   // Get topology config to check if MUX is enabled
   const topologyId =

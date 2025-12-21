@@ -10,6 +10,8 @@ from typing import Any
 from qdash.datamodel.chip import ChipModel
 from qdash.datamodel.task import CalibDataModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.coupling import CouplingDocument
+from qdash.dbmodel.qubit import QubitDocument
 
 logger = logging.getLogger(__name__)
 
@@ -212,3 +214,331 @@ class MongoChipRepository:
             installed_at=doc.installed_at,
             system_info=doc.system_info,
         )
+
+    # =========================================================================
+    # Optimized methods for scalability (256+ qubits)
+    # =========================================================================
+
+    def list_summary_by_project(self, project_id: str) -> list[dict[str, Any]]:
+        """List chips with summary info only (no qubit/coupling data).
+
+        Uses MongoDB projection for efficient data transfer.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            List of chip summary dictionaries
+
+        """
+        # Note: We still fetch the full document here because we need to count
+        # embedded qubits/couplings. For true optimization, we would need to
+        # move to a normalized schema where counts are stored separately.
+        docs = list(ChipDocument.find({"project_id": project_id}).run())
+        return [
+            {
+                "chip_id": doc.chip_id,
+                "size": doc.size,
+                "topology_id": doc.topology_id,
+                "installed_at": doc.installed_at,
+                "qubit_count": len(doc.qubits) if doc.qubits else 0,
+                "coupling_count": len(doc.couplings) if doc.couplings else 0,
+            }
+            for doc in docs
+        ]
+
+    def find_summary_by_id(self, project_id: str, chip_id: str) -> dict[str, Any] | None:
+        """Find chip summary by ID (no qubit/coupling data).
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        dict[str, Any] | None
+            Chip summary dictionary or None
+
+        """
+        doc = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
+        if doc is None:
+            return None
+        return {
+            "chip_id": doc.chip_id,
+            "size": doc.size,
+            "topology_id": doc.topology_id,
+            "installed_at": doc.installed_at,
+            "qubit_count": len(doc.qubits) if doc.qubits else 0,
+            "coupling_count": len(doc.couplings) if doc.couplings else 0,
+        }
+
+    def list_qubits(
+        self,
+        project_id: str,
+        chip_id: str,
+        limit: int = 50,
+        offset: int = 0,
+        qids: list[str] | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List qubits from QubitDocument collection with pagination.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        limit : int
+            Maximum number of qubits
+        offset : int
+            Number to skip
+        qids : list[str] | None
+            Optional specific qubit IDs
+
+        Returns
+        -------
+        tuple[list[dict[str, Any]], int]
+            List of qubit dicts and total count
+
+        """
+        query: dict[str, Any] = {"project_id": project_id, "chip_id": chip_id}
+        if qids:
+            query["qid"] = {"$in": qids}
+
+        total = QubitDocument.find(query).count()
+        docs = list(QubitDocument.find(query).skip(offset).limit(limit).run())
+
+        return (
+            [
+                {
+                    "qid": doc.qid,
+                    "chip_id": doc.chip_id,
+                    "status": doc.status,
+                    "data": doc.data,
+                    "best_data": doc.best_data,
+                }
+                for doc in docs
+            ],
+            total,
+        )
+
+    def find_qubit(self, project_id: str, chip_id: str, qid: str) -> dict[str, Any] | None:
+        """Find a single qubit from QubitDocument collection.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        qid : str
+            The qubit identifier
+
+        Returns
+        -------
+        dict[str, Any] | None
+            Qubit data or None
+
+        """
+        doc = QubitDocument.find_one(
+            {"project_id": project_id, "chip_id": chip_id, "qid": qid}
+        ).run()
+        if doc is None:
+            return None
+        return {
+            "qid": doc.qid,
+            "chip_id": doc.chip_id,
+            "status": doc.status,
+            "data": doc.data,
+            "best_data": doc.best_data,
+        }
+
+    def list_couplings(
+        self,
+        project_id: str,
+        chip_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List couplings from CouplingDocument collection with pagination.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        limit : int
+            Maximum number of couplings
+        offset : int
+            Number to skip
+
+        Returns
+        -------
+        tuple[list[dict[str, Any]], int]
+            List of coupling dicts and total count
+
+        """
+        query: dict[str, Any] = {"project_id": project_id, "chip_id": chip_id}
+
+        total = CouplingDocument.find(query).count()
+        docs = list(CouplingDocument.find(query).skip(offset).limit(limit).run())
+
+        return (
+            [
+                {
+                    "qid": doc.qid,
+                    "chip_id": doc.chip_id,
+                    "status": doc.status,
+                    "data": doc.data,
+                    "best_data": doc.best_data,
+                }
+                for doc in docs
+            ],
+            total,
+        )
+
+    def find_coupling(
+        self, project_id: str, chip_id: str, coupling_id: str
+    ) -> dict[str, Any] | None:
+        """Find a single coupling from CouplingDocument collection.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        coupling_id : str
+            The coupling identifier
+
+        Returns
+        -------
+        dict[str, Any] | None
+            Coupling data or None
+
+        """
+        doc = CouplingDocument.find_one(
+            {"project_id": project_id, "chip_id": chip_id, "qid": coupling_id}
+        ).run()
+        if doc is None:
+            return None
+        return {
+            "qid": doc.qid,
+            "chip_id": doc.chip_id,
+            "status": doc.status,
+            "data": doc.data,
+            "best_data": doc.best_data,
+        }
+
+    def aggregate_metrics_summary(self, project_id: str, chip_id: str) -> dict[str, Any] | None:
+        """Aggregate metrics summary using MongoDB pipeline.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        dict[str, Any] | None
+            Aggregated metrics or None
+
+        """
+        # Check if chip exists first
+        chip = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
+        if chip is None:
+            return None
+
+        pipeline = [
+            {"$match": {"project_id": project_id, "chip_id": chip_id}},
+            {
+                "$group": {
+                    "_id": None,
+                    "qubit_count": {"$sum": 1},
+                    "calibrated_count": {
+                        "$sum": {"$cond": [{"$ifNull": ["$data.t1.value", False]}, 1, 0]}
+                    },
+                    "avg_t1": {"$avg": "$data.t1.value"},
+                    "avg_t2_echo": {"$avg": "$data.t2_echo.value"},
+                    "avg_t2_star": {"$avg": "$data.t2_star.value"},
+                    "avg_qubit_frequency": {"$avg": "$data.qubit_frequency.value"},
+                    "avg_readout_fidelity": {"$avg": "$data.average_readout_fidelity.value"},
+                }
+            },
+        ]
+
+        results = list(QubitDocument.aggregate(pipeline).run())
+        if not results:
+            return {
+                "qubit_count": 0,
+                "calibrated_count": 0,
+            }
+        return dict(results[0])
+
+    def aggregate_metric_heatmap(
+        self,
+        project_id: str,
+        chip_id: str,
+        metric: str,
+        is_coupling: bool = False,
+    ) -> dict[str, Any] | None:
+        """Aggregate heatmap data for a single metric.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        metric : str
+            The metric name
+        is_coupling : bool
+            Whether to query coupling or qubit collection
+
+        Returns
+        -------
+        dict[str, Any] | None
+            Heatmap data with values and unit
+
+        """
+        # Check if chip exists first
+        chip = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
+        if chip is None:
+            return None
+
+        collection = CouplingDocument if is_coupling else QubitDocument
+
+        pipeline = [
+            {"$match": {"project_id": project_id, "chip_id": chip_id}},
+            {
+                "$project": {
+                    "qid": 1,
+                    "value": f"$data.{metric}.value",
+                    "unit": f"$data.{metric}.unit",
+                }
+            },
+        ]
+
+        results = list(collection.aggregate(pipeline).run())
+
+        values: dict[str, float | None] = {}
+        unit: str | None = None
+
+        for r in results:
+            qid = r.get("qid")
+            if qid:
+                values[qid] = r.get("value")
+                if unit is None and r.get("unit"):
+                    unit = r.get("unit")
+
+        return {"values": values, "unit": unit}

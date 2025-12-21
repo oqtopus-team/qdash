@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 
-import { useListChips } from "@/client/chip/chip";
+import { useListChipsSummary } from "@/client/chip/chip";
 import { CDFView } from "@/components/features/analysis/CDFView";
 import { CorrelationView } from "@/components/features/analysis/CorrelationView";
 import { HistogramView } from "@/components/features/analysis/HistogramView";
@@ -25,7 +25,7 @@ function AnalyzePageContent() {
   };
 
   // Check loading state for initial skeleton
-  const { isLoading: isChipsLoading } = useListChips();
+  const { isLoading: isChipsLoading } = useListChipsSummary();
   const { isLoading: isConfigLoading } = useMetricsConfig();
 
   // Show skeleton during initial loading

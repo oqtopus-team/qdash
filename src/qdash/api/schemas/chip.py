@@ -98,6 +98,99 @@ class ListMuxResponse(BaseModel):
     muxes: dict[int, MuxDetailResponse]
 
 
+class ChipSummaryResponse(BaseModel):
+    """Lightweight chip summary without embedded qubit/coupling data.
+
+    Use this for chip listings and when full qubit data is not needed.
+    This is significantly smaller than ChipResponse (~0.3KB vs ~300KB+ for 64 qubits).
+    """
+
+    chip_id: str
+    size: int = 64
+    topology_id: str | None = None
+    qubit_count: int = 0
+    coupling_count: int = 0
+    installed_at: datetime | None = None
+
+
+class ListChipsSummaryResponse(BaseModel):
+    """Response model for listing chips with summary info only.
+
+    Use this instead of ListChipsResponse when you don't need qubit/coupling data.
+    """
+
+    chips: list[ChipSummaryResponse]
+    total: int = 0
+
+
+class QubitResponse(BaseModel):
+    """Response model for a single qubit."""
+
+    qid: str
+    chip_id: str
+    status: str = "pending"
+    data: dict[str, Any] = {}
+    best_data: dict[str, Any] = {}
+
+
+class ListQubitsResponse(BaseModel):
+    """Response model for listing qubits with pagination."""
+
+    qubits: list[QubitResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class CouplingResponse(BaseModel):
+    """Response model for a single coupling."""
+
+    qid: str
+    chip_id: str
+    status: str = "pending"
+    data: dict[str, Any] = {}
+    best_data: dict[str, Any] = {}
+
+
+class ListCouplingsResponse(BaseModel):
+    """Response model for listing couplings with pagination."""
+
+    couplings: list[CouplingResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class MetricHeatmapResponse(BaseModel):
+    """Response model for metric heatmap data.
+
+    Returns only the metric values keyed by qubit/coupling ID.
+    Much smaller than full chip data (~5KB vs ~300KB for 64 qubits).
+    """
+
+    chip_id: str
+    metric: str
+    values: dict[str, float | None]
+    unit: str | None = None
+
+
+class MetricsSummaryResponse(BaseModel):
+    """Response model for aggregated metrics summary.
+
+    Returns statistical summary computed by the database.
+    Minimal data transfer (~0.1KB).
+    """
+
+    chip_id: str
+    qubit_count: int
+    calibrated_count: int
+    avg_t1: float | None = None
+    avg_t2_echo: float | None = None
+    avg_t2_star: float | None = None
+    avg_qubit_frequency: float | None = None
+    avg_readout_fidelity: float | None = None
+
+
 class ListChipsResponse(BaseModel):
     """Response model for listing all chips.
 

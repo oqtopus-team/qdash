@@ -7,7 +7,7 @@ import Select from "react-select";
 import type { ParameterKey, TagKey } from "@/types/analysis";
 import type { Layout } from "plotly.js";
 
-import { useListChips } from "@/client/chip/chip";
+import { useListChipsSummary } from "@/client/chip/chip";
 import { useListTags } from "@/client/tag/tag";
 import { useGetTimeseriesTaskResults } from "@/client/task-result/task-result";
 import { PlotCard } from "@/components/charts/PlotCard";
@@ -137,7 +137,7 @@ export function TimeSeriesView() {
   }, [qubitMetrics, couplingMetrics, selectedParameter]);
 
   // Fetch chips data for default selection
-  const { data: chipsResponse } = useListChips();
+  const { data: chipsResponse } = useListChipsSummary();
 
   // Fetch tags
   const { data: tagsResponse, isLoading: isLoadingTags } = useListTags();

@@ -16,7 +16,7 @@ import type {
 import type { AxiosResponse } from "axios";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
-import { useListChips } from "@/client/chip/chip";
+import { useListChipsSummary } from "@/client/chip/chip";
 import {
   getFlowTemplate,
   listFlowTemplates,
@@ -50,7 +50,7 @@ export default function NewFlowPage() {
   const { data: userData } = useGetCurrentUser();
 
   // Fetch chips
-  const { data: chipsData } = useListChips();
+  const { data: chipsData } = useListChipsSummary();
 
   // Fetch templates
   const { data: templatesData, isLoading: isTemplatesLoading } = useQuery({

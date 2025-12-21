@@ -4,7 +4,7 @@ import { useMemo, useEffect, useCallback } from "react";
 
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
-import { useListChips } from "@/client/chip/chip";
+import { useListChipsSummary } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { PlotCard } from "@/components/charts/PlotCard";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
@@ -202,8 +202,8 @@ export function CorrelationView() {
     setYParameter,
   ]);
 
-  // Fetch chips data
-  const { data: chipsResponse } = useListChips();
+  // Fetch chips data (lightweight summary)
+  const { data: chipsResponse } = useListChipsSummary();
 
   // Set default chip on mount
   useEffect(() => {

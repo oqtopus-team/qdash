@@ -6,7 +6,7 @@ import Select from "react-select";
 
 import type { SingleValue } from "react-select";
 
-import { useListChips } from "@/client/chip/chip";
+import { useListChipsSummary } from "@/client/chip/chip";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
 
 interface ChipOption {
@@ -26,7 +26,8 @@ export function ChipSelector({
   selectedChip,
   onChipSelect,
 }: ChipSelectorProps) {
-  const { data: chips, isLoading, isError } = useListChips();
+  // Use lightweight summary endpoint (~0.2KB vs ~300KB)
+  const { data: chips, isLoading, isError } = useListChipsSummary();
 
   const sortedOptions = useMemo(() => {
     if (!chips?.data?.chips) return [];
