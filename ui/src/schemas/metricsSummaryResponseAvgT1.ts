@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type ChipResponseQubits = { [key: string]: unknown };
+export type MetricsSummaryResponseAvgT1 = number | null;

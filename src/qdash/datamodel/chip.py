@@ -1,22 +1,21 @@
 from datetime import datetime
 
 from pydantic import BaseModel, Field
-from qdash.datamodel.coupling import CouplingModel
-from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 
 class ChipModel(BaseModel):
     """Data model for a chip.
 
+    Qubit and coupling data are stored in separate QubitDocument and CouplingDocument
+    collections for scalability (256+ qubits).
+
     Attributes
     ----------
         chip_id (str): The chip ID. e.g. "chip1".
         size (int): The size of the chip.
-        qubits (dict): The qubits of the chip.
-        couplings (dict): The couplings of the chip.
         installed_at (datetime): The time when the chip was installed.
-        system_info (SystemInfo): The system information. e.g. {"created_at": "2021-01-01T00:00:00Z", "updated_at": "2021-01-01T00:00:00Z"}.
+        system_info (SystemInfo): The system information.
 
     """
 
@@ -27,8 +26,6 @@ class ChipModel(BaseModel):
     topology_id: str | None = Field(
         None, description="Topology template ID (e.g., 'square-lattice-mux-64')"
     )
-    qubits: dict[str, QubitModel] = Field(..., description="The qubits of the chip")
-    couplings: dict[str, CouplingModel] = Field(..., description="The couplings of the chip")
     installed_at: datetime = Field(..., description="The time when the chip was installed")
 
     system_info: SystemInfoModel = Field(..., description="The system information")

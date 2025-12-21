@@ -2102,7 +2102,7 @@
           "chip"
         ],
         "summary": "List all chips",
-        "description": "List all chips in the current project.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nListChipsResponse\n    Wrapped list of available chips",
+        "description": "List all chips with summary information.\n\nReturns chip metadata (id, size, topology, qubit/coupling counts).\nFor detailed qubit/coupling data, use the dedicated endpoints.",
         "operationId": "listChips",
         "security": [
           {
@@ -2278,70 +2278,6 @@
         }
       }
     },
-    "/chips/{chip_id}": {
-      "get": {
-        "tags": [
-          "chip"
-        ],
-        "summary": "Get a chip",
-        "description": "Get a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipResponse\n    Chip information\n\nRaises\n------\nHTTPException\n    If chip is not found",
-        "operationId": "getChip",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "X-Project-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Project-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChipResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/chips/{chip_id}/muxes/{mux_id}": {
       "get": {
         "tags": [
@@ -2462,6 +2398,546 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ListMuxResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Get chip details",
+        "description": "Get chip details including metadata and counts.\n\nReturns chip metadata (size, topology, qubit/coupling counts).\nFor detailed qubit/coupling data, use the dedicated endpoints.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipResponse\n    Chip details",
+        "operationId": "getChip",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/qubits": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "List qubits for a chip",
+        "description": "List qubits for a chip with pagination.\n\nRetrieves qubit data from the separate QubitDocument collection.\nSupports filtering by specific qubit IDs.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\nlimit : int\n    Maximum number of qubits to return (default 50, max 256)\noffset : int\n    Number of qubits to skip for pagination\nqids : list[str] | None\n    Optional list of specific qubit IDs to fetch\n\nReturns\n-------\nListQubitsResponse\n    List of qubits with pagination info",
+        "operationId": "listChipQubits",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 256,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "qids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Qids"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListQubitsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/qubits/{qid}": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Get a single qubit",
+        "description": "Get a single qubit by ID.\n\nThis is 10-18x faster than fetching the full chip and extracting one qubit.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nqid : str\n    ID of the qubit\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nQubitResponse\n    Qubit data",
+        "operationId": "getChipQubit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QubitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/couplings": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "List couplings for a chip",
+        "description": "List couplings for a chip with pagination.\n\nRetrieves coupling data from the separate CouplingDocument collection.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\nlimit : int\n    Maximum number of couplings to return (default 100, max 512)\noffset : int\n    Number of couplings to skip for pagination\n\nReturns\n-------\nListCouplingsResponse\n    List of couplings with pagination info",
+        "operationId": "listChipCouplings",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 512,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCouplingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/couplings/{coupling_id}": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Get a single coupling",
+        "description": "Get a single coupling by ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\ncoupling_id : str\n    ID of the coupling (e.g., \"0-1\")\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nCouplingResponse\n    Coupling data",
+        "operationId": "getChipCoupling",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "coupling_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Coupling Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouplingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/metrics/summary": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Get aggregated metrics summary",
+        "description": "Get aggregated metrics summary for a chip.\n\nComputes statistics (averages, counts) on the database side.\nReturns ~0.1KB of data, ideal for dashboard overview.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nMetricsSummaryResponse\n    Aggregated metrics summary",
+        "operationId": "getChipMetricsSummary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricsSummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/metrics/heatmap/{metric}": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Get heatmap data for a single metric",
+        "description": "Get heatmap data for a single metric.\n\nReturns only the values needed for heatmap visualization (~5KB).\nMuch more efficient than fetching full chip data (~300KB+).\n\nSupported metrics:\n- Qubit: t1, t2_echo, t2_star, qubit_frequency, anharmonicity,\n         average_readout_fidelity, x90_gate_fidelity, x180_gate_fidelity\n- Coupling: zx90_gate_fidelity, bell_state_fidelity, static_zz_interaction\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmetric : str\n    Name of the metric to retrieve\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nMetricHeatmapResponse\n    Metric values keyed by qubit/coupling ID",
+        "operationId": "getChipMetricHeatmap",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "metric",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Metric"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricHeatmapResponse"
                 }
               }
             }
@@ -5469,17 +5945,15 @@
             ],
             "title": "Topology Id"
           },
-          "qubits": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Qubits",
-            "default": {}
+          "qubit_count": {
+            "type": "integer",
+            "title": "Qubit Count",
+            "default": 0
           },
-          "couplings": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Couplings",
-            "default": {}
+          "coupling_count": {
+            "type": "integer",
+            "title": "Coupling Count",
+            "default": 0
           },
           "installed_at": {
             "anyOf": [
@@ -5499,7 +5973,7 @@
           "chip_id"
         ],
         "title": "ChipResponse",
-        "description": "Chip is a Pydantic model that represents a chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubits (dict): Qubit information.\n    couplings (dict): Coupling information.\n    installed_at (str): Installation timestamp."
+        "description": "Chip response model.\n\nQubit and coupling data are stored in separate collections for scalability\nand should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubit_count (int): Number of qubits in the chip.\n    coupling_count (int): Number of couplings in the chip.\n    installed_at (datetime | None): Installation timestamp."
       },
       "Condition": {
         "properties": {
@@ -5617,6 +6091,42 @@
         "type": "object",
         "title": "CouplingMetrics",
         "description": "Two-qubit coupling metrics data."
+      },
+      "CouplingResponse": {
+        "properties": {
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "pending"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "default": {}
+          },
+          "best_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Best Data",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "qid",
+          "chip_id"
+        ],
+        "title": "CouplingResponse",
+        "description": "Response model for a single coupling."
       },
       "CreateChipRequest": {
         "properties": {
@@ -6478,14 +6988,51 @@
             },
             "type": "array",
             "title": "Chips"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
           }
         },
         "type": "object",
         "required": [
-          "chips"
+          "chips",
+          "total"
         ],
         "title": "ListChipsResponse",
-        "description": "Response model for listing all chips.\n\nWraps list of chips for API consistency and future extensibility (e.g., pagination)."
+        "description": "Response model for listing chips."
+      },
+      "ListCouplingsResponse": {
+        "properties": {
+          "couplings": {
+            "items": {
+              "$ref": "#/components/schemas/CouplingResponse"
+            },
+            "type": "array",
+            "title": "Couplings"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "couplings",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "ListCouplingsResponse",
+        "description": "Response model for listing couplings with pagination."
       },
       "ListExecutionsResponse": {
         "properties": {
@@ -6589,6 +7136,38 @@
         ],
         "title": "ListMuxResponse",
         "description": "ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers."
+      },
+      "ListQubitsResponse": {
+        "properties": {
+          "qubits": {
+            "items": {
+              "$ref": "#/components/schemas/QubitResponse"
+            },
+            "type": "array",
+            "title": "Qubits"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "qubits",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "ListQubitsResponse",
+        "description": "Response model for listing qubits with pagination."
       },
       "ListTagResponse": {
         "properties": {
@@ -6803,6 +7382,51 @@
         "title": "MemberUpdate",
         "description": "Request schema for updating a member's role."
       },
+      "MetricHeatmapResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Values"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "metric",
+          "values"
+        ],
+        "title": "MetricHeatmapResponse",
+        "description": "Response model for metric heatmap data.\n\nReturns only the metric values keyed by qubit/coupling ID.\nMuch smaller than full chip data (~5KB vs ~300KB for 64 qubits)."
+      },
       "MetricHistoryItem": {
         "properties": {
           "value": {
@@ -6897,6 +7521,85 @@
         "type": "object",
         "title": "MetricValue",
         "description": "Single metric value with metadata."
+      },
+      "MetricsSummaryResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qubit_count": {
+            "type": "integer",
+            "title": "Qubit Count"
+          },
+          "calibrated_count": {
+            "type": "integer",
+            "title": "Calibrated Count"
+          },
+          "avg_t1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg T1"
+          },
+          "avg_t2_echo": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg T2 Echo"
+          },
+          "avg_t2_star": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg T2 Star"
+          },
+          "avg_qubit_frequency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Qubit Frequency"
+          },
+          "avg_readout_fidelity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Readout Fidelity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "qubit_count",
+          "calibrated_count"
+        ],
+        "title": "MetricsSummaryResponse",
+        "description": "Response model for aggregated metrics summary.\n\nReturns statistical summary computed by the database.\nMinimal data transfer (~0.1KB)."
       },
       "MuxDetailResponse": {
         "properties": {
@@ -7692,6 +8395,42 @@
         "type": "object",
         "title": "QubitMetrics",
         "description": "Single qubit metrics data."
+      },
+      "QubitResponse": {
+        "properties": {
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "pending"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "default": {}
+          },
+          "best_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Best Data",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "qid",
+          "chip_id"
+        ],
+        "title": "QubitResponse",
+        "description": "Response model for a single qubit."
       },
       "SaveFileRequest": {
         "properties": {

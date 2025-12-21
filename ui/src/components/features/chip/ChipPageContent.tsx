@@ -56,6 +56,7 @@ export function ChipPageContent() {
 
   const [gridSize, setGridSize] = useState<number>(8);
 
+  // Use lightweight endpoints (~0.3KB vs ~300KB with embedded data)
   const { data: chipData } = useGetChip(selectedChip);
   const { data: chipsData, isLoading: isChipsLoading } = useListChips();
 

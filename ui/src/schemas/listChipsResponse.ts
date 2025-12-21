@@ -8,10 +8,9 @@
 import type { ChipResponse } from "./chipResponse";
 
 /**
- * Response model for listing all chips.
-
-Wraps list of chips for API consistency and future extensibility (e.g., pagination).
+ * Response model for listing chips.
  */
 export interface ListChipsResponse {
   chips: ChipResponse[];
+  total: number;
 }

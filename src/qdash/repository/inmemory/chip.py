@@ -139,31 +139,22 @@ class InMemoryChipRepository:
     ) -> None:
         """Update chip calibration data.
 
+        Note: This is a no-op for in-memory repository since calibration data
+        is now stored in separate QubitDocument/CouplingDocument collections.
+        Use dedicated qubit/coupling repository methods for data updates.
+
         Parameters
         ----------
         chip_id : str
             The chip identifier
         calib_data : CalibDataModel
-            The calibration data to merge
+            The calibration data to merge (unused)
         username : str
             The user performing the update
 
         """
-        chip = self.get_chip_by_id(username, chip_id)
-        if chip is None:
-            return
-
-        # Merge qubit data
-        for qid, data in calib_data.qubit.items():
-            if qid in chip.qubits:
-                for param_name, param_value in data.items():
-                    chip.qubits[qid].data[param_name] = param_value
-
-        # Merge coupling data
-        for cid, data in calib_data.coupling.items():
-            if cid in chip.couplings:
-                for param_name, param_value in data.items():
-                    chip.couplings[cid].data[param_name] = param_value
+        # Calibration data updates now happen in separate qubit/coupling repositories
+        _ = chip_id, calib_data, username
 
     def clear(self) -> None:
         """Clear all stored chips (useful for test setup/teardown)."""

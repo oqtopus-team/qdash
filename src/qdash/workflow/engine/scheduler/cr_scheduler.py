@@ -52,7 +52,6 @@ from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 if TYPE_CHECKING:
     from qdash.datamodel.chip import ChipModel
-    from qdash.datamodel.qubit import QubitModel
     from qdash.repository.protocols import ChipRepository
 
 logger = logging.getLogger(__name__)
@@ -169,19 +168,51 @@ class CRScheduler:
         self._chip_repo = chip_repo
         self._chip: ChipModel | None = None
         self._wiring_config: list[dict[str, Any]] | None = None
+        # Cached individual document data (scalable approach for 256+ qubits)
+        self._qubit_models: dict[str, Any] | None = None
+        self._coupling_ids: list[str] | None = None
+
+    def _ensure_chip_repo(self) -> ChipRepository:
+        """Ensure chip repository is initialized."""
+        if self._chip_repo is None:
+            from qdash.repository import MongoChipRepository
+
+            self._chip_repo = MongoChipRepository()
+        return self._chip_repo
 
     def _load_chip_data(self) -> ChipModel:
         """Load chip data from database."""
         if self._chip is None:
-            if self._chip_repo is None:
-                from qdash.repository import MongoChipRepository
-
-                self._chip_repo = MongoChipRepository()
-            chip = self._chip_repo.get_current_chip(self.username)
+            chip_repo = self._ensure_chip_repo()
+            chip = chip_repo.get_current_chip(self.username)
             if chip is None:
                 raise ValueError(f"Chip not found for user {self.username}")
             self._chip = chip
         return self._chip
+
+    def _load_qubit_models(self) -> dict[str, Any]:
+        """Load qubit models from individual QubitDocument collection (scalable)."""
+        if self._qubit_models is None:
+            chip_repo = self._ensure_chip_repo()
+            # Get project_id from chip metadata
+            chip = self._load_chip_data()
+            project_id = chip.project_id
+            if project_id is None:
+                raise ValueError(f"Chip {self.chip_id} has no project_id")
+            self._qubit_models = chip_repo.get_all_qubit_models(project_id, self.chip_id)
+        return self._qubit_models
+
+    def _load_coupling_ids(self) -> list[str]:
+        """Load coupling IDs from individual CouplingDocument collection (scalable)."""
+        if self._coupling_ids is None:
+            chip_repo = self._ensure_chip_repo()
+            # Get project_id from chip metadata
+            chip = self._load_chip_data()
+            project_id = chip.project_id
+            if project_id is None:
+                raise ValueError(f"Chip {self.chip_id} has no project_id")
+            self._coupling_ids = chip_repo.get_coupling_ids(project_id, self.chip_id)
+        return self._coupling_ids
 
     def _load_wiring_config(self) -> list[dict[str, Any]]:
         """Load wiring configuration from YAML file."""
@@ -202,20 +233,24 @@ class CRScheduler:
         return self._wiring_config
 
     @staticmethod
-    def _extract_qubit_frequency(qubits: dict[str, QubitModel]) -> dict[str, float]:
-        """Extract qubit frequencies from chip data."""
+    def _extract_qubit_frequency(qubits: dict[str, Any]) -> dict[str, float]:
+        """Extract qubit frequencies from qubit models.
+
+        Works with both QubitModel (embedded) and QubitDocument (individual collection).
+        Both have .data attribute with calibration data.
+        """
         return {
             qid: qubit.data["qubit_frequency"]["value"]
             for qid, qubit in qubits.items()
             if qubit.data and "qubit_frequency" in qubit.data
         }
 
-    @staticmethod
-    def _get_two_qubit_pair_list(chip: ChipModel) -> list[str]:
-        """Extract all two-qubit coupling IDs from chip data."""
+    def _get_two_qubit_pair_list(self) -> list[str]:
+        """Extract all two-qubit coupling IDs from CouplingDocument collection."""
+        coupling_ids = self._load_coupling_ids()
         return [
             coupling_id
-            for coupling_id in chip.couplings
+            for coupling_id in coupling_ids
             if "-" in coupling_id and len(coupling_id.split("-")) == 2
         ]
 
@@ -518,9 +553,10 @@ class CRScheduler:
             f"Generating CR schedule (plugin mode) for chip_id={self.chip_id}, username={self.username}"
         )
 
-        # Load chip data
+        # Load chip metadata and qubit data from individual documents (scalable)
         chip = self._load_chip_data()
-        qubit_frequency = self._extract_qubit_frequency(chip.qubits)
+        qubit_models = self._load_qubit_models()
+        qubit_frequency = self._extract_qubit_frequency(qubit_models)
 
         # Load MUX configuration
         wiring_config = self._load_wiring_config()
@@ -530,12 +566,13 @@ class CRScheduler:
         # Determine grid size
         grid_size = 12 if "144Q" in self.chip_id else 8
 
-        # Create filter context
+        # Create filter context with qubit models for scalable filtering
         filter_context = FilterContext(
             chip=chip,
             grid_size=grid_size,
             qubit_frequency=qubit_frequency,
             qid_to_mux=qid_to_mux,
+            qubit_models=qubit_models,
         )
 
         # Use default filters if not provided
@@ -546,8 +583,8 @@ class CRScheduler:
                 FrequencyDirectionalityFilter(use_design_based=use_design_based),
             ]
 
-        # Get all coupling pairs
-        all_pairs = self._get_two_qubit_pair_list(chip)
+        # Get all coupling pairs from individual documents
+        all_pairs = self._get_two_qubit_pair_list()
         logger.info(f"Starting with {len(all_pairs)} coupling pairs")
 
         # Apply filters sequentially
@@ -677,15 +714,15 @@ class CRScheduler:
                 f"  Using {len(candidate_qubits)} candidate qubits from stage1: {candidate_qubits}"
             )
 
-        # Load chip data
-        chip = self._load_chip_data()
-        qubit_frequency = self._extract_qubit_frequency(chip.qubits)
+        # Load qubit data from individual documents (scalable)
+        qubit_models = self._load_qubit_models()
+        qubit_frequency = self._extract_qubit_frequency(qubit_models)
 
-        logger.debug(f"  Total qubits in chip: {len(chip.qubits)}")
+        logger.debug(f"  Total qubits in chip: {len(qubit_models)}")
         logger.debug(f"  Qubits with frequency data: {len(qubit_frequency)}")
 
-        # Get all coupling pairs
-        all_pairs = self._get_two_qubit_pair_list(chip)
+        # Get all coupling pairs from individual documents
+        all_pairs = self._get_two_qubit_pair_list()
 
         # Determine grid size from chip_id
         grid_size = 12 if "144Q" in self.chip_id else 8
