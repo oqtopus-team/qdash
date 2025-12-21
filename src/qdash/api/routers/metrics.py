@@ -159,9 +159,9 @@ def _extract_latest_metrics(
     valid_metric_keys: set[str],
     cutoff_time: Any | None,
 ) -> dict[str, dict[str, MetricValue]]:
-    """Extract latest metrics from task result history.
+    """Extract latest metrics from task result history using aggregation.
 
-    This function queries TaskResultHistoryDocument to find the most recent
+    Uses MongoDB aggregation pipeline for efficient retrieval of the most recent
     successful metric values for each entity. Only completed tasks are included
     to ensure grid displays successful results only.
 
@@ -177,81 +177,33 @@ def _extract_latest_metrics(
     -------
         Dictionary mapping metric_name -> entity_id -> MetricValue with latest values
 
-    Notes:
-    -----
-        - Queries TaskResultHistoryDocument for output_parameters
-        - Only includes completed tasks (status="completed")
-        - Returns the most recent value for each metric/entity combination
-
     """
-    metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
-
     if not valid_metric_keys:
-        return metrics_data
+        return {key: {} for key in valid_metric_keys}
 
-    # Build query for task result history with metric existence filter
-    # Only include completed tasks to ensure grid displays successful results only
-    query: dict[str, Any] = {
-        "chip_id": chip_id,
-        "username": username,
-        "task_type": entity_type,
-        "status": "completed",
-        "$or": [{f"output_parameters.{metric}": {"$exists": True}} for metric in valid_metric_keys],
-    }
-    if cutoff_time:
-        query["start_at"] = {"$gte": cutoff_time}
-
-    # Query task results sorted by start_at descending (most recent first)
     try:
         task_result_repo = MongoTaskResultHistoryRepository()
-        task_results = task_result_repo.find(query, sort=[("start_at", SortDirection.DESCENDING)])
+        agg_results = task_result_repo.aggregate_latest_metrics(
+            chip_id=chip_id,
+            username=username,
+            entity_type=entity_type,
+            metric_keys=valid_metric_keys,
+            cutoff_time=cutoff_time,
+        )
     except Exception as e:
-        logger.error(f"Failed to query task result history: {e}")
+        logger.error(f"Failed to aggregate latest metrics: {e}")
         raise HTTPException(status_code=500, detail=f"Database query failed: {e}") from e
 
-    if not task_results:
-        logger.warning(f"No task result history found for chip={chip_id}, username={username}")
-        return metrics_data
+    # Convert aggregation results to MetricValue format
+    metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
 
-    # Track which metric/entity combinations we've already found (first = latest)
-    found: dict[str, set[str]] = {key: set() for key in valid_metric_keys}
-
-    for task_doc in task_results:
-        entity_id = task_doc.qid
-        if not entity_id:
-            continue
-
-        output_params = task_doc.output_parameters
-        if not output_params:
-            continue
-
-        for metric_name in valid_metric_keys:
-            # Skip if we already have the latest value for this metric/entity
-            if entity_id in found[metric_name]:
-                continue
-
-            if metric_name not in output_params:
-                continue
-
-            metric_data = output_params[metric_name]
-
-            # Extract value from output_parameters
-            if isinstance(metric_data, dict):
-                value = metric_data.get("value")
-                task_id = metric_data.get("task_id", task_doc.task_id)
-                execution_id = metric_data.get("execution_id", task_doc.execution_id)
-            else:
-                value = metric_data
-                task_id = task_doc.task_id
-                execution_id = task_doc.execution_id
-
-            if value is not None and isinstance(value, (int, float)):
-                metrics_data[metric_name][entity_id] = MetricValue(
-                    value=float(value),
-                    task_id=task_id if task_id else None,
-                    execution_id=execution_id,
-                )
-                found[metric_name].add(entity_id)
+    for metric_name, entity_values in agg_results.items():
+        for entity_id, result in entity_values.items():
+            metrics_data[metric_name][entity_id] = MetricValue(
+                value=result["value"],
+                task_id=result["task_id"],
+                execution_id=result["execution_id"],
+            )
 
     return metrics_data
 
@@ -264,12 +216,10 @@ def _extract_best_metrics(
     metrics_config: dict[str, Any],
     cutoff_time: Any | None,
 ) -> dict[str, dict[str, MetricValue]]:
-    """Extract best metrics from task result history.
+    """Extract best metrics from task result history using aggregation.
 
-    This function queries TaskResultHistoryDocument to find the optimal metric values
+    Uses MongoDB aggregation pipeline to efficiently find the optimal metric values
     based on the evaluation mode (maximize/minimize) defined in the configuration.
-    It processes all task results within the specified time window and selects the
-    best value for each metric.
 
     Args:
     ----
@@ -284,114 +234,39 @@ def _extract_best_metrics(
     -------
         Dictionary mapping metric_name -> entity_id -> MetricValue with best values
 
-    Notes:
-    -----
-        - Only processes metrics with evaluation.mode != "none"
-        - Queries TaskResultHistoryDocument for output_parameters
-        - Uses max() for "maximize" mode and min() for "minimize" mode
-
     """
     metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
 
-    # Filter to only metrics that support best mode (evaluation.mode != "none")
-    best_mode_metrics = [
-        key for key in valid_metric_keys if metrics_config[key].evaluation.mode != "none"
-    ]
+    # Build metric_modes dict for metrics that support best mode (evaluation.mode != "none")
+    metric_modes: dict[str, Literal["maximize", "minimize"]] = {}
+    for key in valid_metric_keys:
+        mode = metrics_config[key].evaluation.mode
+        if mode in ("maximize", "minimize"):
+            metric_modes[key] = mode
 
-    if not best_mode_metrics:
+    if not metric_modes:
         return metrics_data
 
-    # Build query for task result history with metric existence filter
-    # This significantly reduces the number of documents fetched from MongoDB
-    # Only include completed tasks to ensure grid displays successful results only
-    query: dict[str, Any] = {
-        "chip_id": chip_id,
-        "username": username,
-        "task_type": entity_type,
-        "status": "completed",
-        "$or": [{f"output_parameters.{metric}": {"$exists": True}} for metric in best_mode_metrics],
-    }
-    if cutoff_time:
-        query["start_at"] = {"$gte": cutoff_time}
-
-    # Query task results that have at least one of the target metrics
     try:
         task_result_repo = MongoTaskResultHistoryRepository()
-        task_results = task_result_repo.find(query, sort=[("start_at", SortDirection.DESCENDING)])
+        agg_results = task_result_repo.aggregate_best_metrics(
+            chip_id=chip_id,
+            username=username,
+            entity_type=entity_type,
+            metric_modes=metric_modes,
+            cutoff_time=cutoff_time,
+        )
     except Exception as e:
-        logger.error(f"Failed to query task result history: {e}")
+        logger.error(f"Failed to aggregate best metrics: {e}")
         raise HTTPException(status_code=500, detail=f"Database query failed: {e}") from e
 
-    if not task_results:
-        logger.warning(f"No task result history found for chip={chip_id}, username={username}")
-        return metrics_data
-
-    # Collect all values for each metric/entity_id combination
-    # Structure: metric_name -> entity_id -> list of (value, task_id, execution_id, calibrated_at)
-    metric_values: dict[str, dict[str, list[tuple[float, str, str, str]]]] = {
-        key: {} for key in valid_metric_keys
-    }
-
-    for task_doc in task_results:
-        entity_id = task_doc.qid
-        if not entity_id:
-            continue
-
-        output_params = task_doc.output_parameters
-        if not output_params:
-            continue
-
-        for metric_name in valid_metric_keys:
-            if metric_name not in output_params:
-                continue
-
-            metric_data = output_params[metric_name]
-
-            # Extract value from output_parameters
-            if isinstance(metric_data, dict):
-                value = metric_data.get("value")
-                task_id = metric_data.get("task_id", task_doc.task_id)
-                execution_id = metric_data.get("execution_id", task_doc.execution_id)
-                calibrated_at = metric_data.get("calibrated_at", task_doc.start_at)
-            else:
-                value = metric_data
-                task_id = task_doc.task_id
-                execution_id = task_doc.execution_id
-                calibrated_at = task_doc.start_at
-
-            if value is not None and isinstance(value, (int, float)):
-                if entity_id not in metric_values[metric_name]:
-                    metric_values[metric_name][entity_id] = []
-                metric_values[metric_name][entity_id].append(
-                    (float(value), task_id or "", execution_id, calibrated_at)
-                )
-
-    # Select best value for each metric/entity_id based on evaluation mode
-    for metric_name in valid_metric_keys:
-        metric_config = metrics_config[metric_name]
-        eval_mode = metric_config.evaluation.mode
-
-        if eval_mode == "none":
-            # For 'none' mode, skip in best mode
-            continue
-
-        for entity_id, values in metric_values[metric_name].items():
-            if not values:
-                continue
-
-            # Select best value according to evaluation mode
-            if eval_mode == "maximize":
-                best_entry = max(values, key=lambda x: x[0])
-            elif eval_mode == "minimize":
-                best_entry = min(values, key=lambda x: x[0])
-            else:
-                continue
-
-            best_value, best_task_id, best_execution_id, _ = best_entry
+    # Convert aggregation results to MetricValue format
+    for metric_name, entity_values in agg_results.items():
+        for entity_id, result in entity_values.items():
             metrics_data[metric_name][entity_id] = MetricValue(
-                value=best_value,
-                task_id=best_task_id if best_task_id else None,
-                execution_id=best_execution_id,
+                value=result["value"],
+                task_id=result["task_id"],
+                execution_id=result["execution_id"],
             )
 
     return metrics_data
