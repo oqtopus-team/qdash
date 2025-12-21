@@ -1,0 +1,42 @@
+[
+  {
+    "id": "simple",
+    "name": "Simple Calibration",
+    "description": "Basic calibration for learning and simple tasks. Supports sequential and parallel group execution.",
+    "category": "basic",
+    "filename": "simple.py",
+    "function_name": "simple_calibration"
+  },
+  {
+    "id": "one_qubit",
+    "name": "1Q Calibration",
+    "description": "1-qubit calibration using step-based pipeline. Supports check-only or full calibration with fine-tune.",
+    "category": "production",
+    "filename": "one_qubit.py",
+    "function_name": "one_qubit"
+  },
+  {
+    "id": "full_calibration",
+    "name": "Full Calibration",
+    "description": "Complete calibration using step-based pipeline: 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule -> 2Q.",
+    "category": "production",
+    "filename": "full_calibration.py",
+    "function_name": "full_calibration"
+  },
+  {
+    "id": "parallel_retry",
+    "name": "Parallel Retry Calibration",
+    "description": "Parallel execution with @task + submit(). Demonstrates retry logic with frequency offset.",
+    "category": "advanced",
+    "filename": "retry.py",
+    "function_name": "parallel_retry_calibration"
+  },
+  {
+    "id": "check_skew",
+    "name": "Check Skew",
+    "description": "System-level skew measurement and calibration across MUX channels.",
+    "category": "system",
+    "filename": "check_skew.py",
+    "function_name": "check_skew"
+  }
+]

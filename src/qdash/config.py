@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic_settings import BaseSettings  # , SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -14,7 +14,6 @@ class Settings(BaseSettings):
     postgres_data_path: str
     mongo_data_path: str
     calib_data_path: str
-    qpu_data_path: str
     backend: str = "qubex"  # Default backend is 'qubex'
     # Ports
     mongo_port: int = 27017
@@ -25,9 +24,11 @@ class Settings(BaseSettings):
     ui_port: int = 5714
     # Logging
     log_level: str = "INFO"
+    # Timezone
+    timezone: str = "Asia/Tokyo"
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Get the application settings."""
     return Settings()

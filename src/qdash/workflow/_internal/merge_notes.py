@@ -1,6 +1,6 @@
 from typing import Any
 
-import pendulum
+from qdash.common.datetime_utils import parse_date
 
 
 def merge_notes_by_timestamp(
@@ -18,7 +18,7 @@ def merge_notes_by_timestamp(
         Merged note with most recent values
 
     """
-    merged: dict = {}
+    merged: dict[str, Any] = {}
 
     # Get all parameter types (hpi_params, pi_params, rabi_params)
     all_param_types = set(master_note.keys()) | set(task_note.keys())
@@ -44,8 +44,8 @@ def merge_notes_by_timestamp(
                 continue
 
             # Compare timestamps to determine which data to use
-            master_time = pendulum.from_format(master_data["timestamp"], "YYYY-MM-DD HH:mm:ss")
-            task_time = pendulum.from_format(task_data["timestamp"], "YYYY-MM-DD HH:mm:ss")
+            master_time = parse_date(master_data["timestamp"], "YYYY-MM-DD HH:mm:ss")
+            task_time = parse_date(task_data["timestamp"], "YYYY-MM-DD HH:mm:ss")
 
             merged[param_type][qubit] = task_data if task_time > master_time else master_data
 

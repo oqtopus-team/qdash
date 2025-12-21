@@ -1,8 +1,9 @@
 """Database model for user-defined flows."""
 
 from datetime import datetime
+from typing import Any
 
-from bunnet import Document
+from bunnet import Document, SortDirection
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING
 
@@ -31,7 +32,7 @@ class FlowDocument(Document):
     chip_id: str = Field(..., description="Target chip ID")
     description: str = Field(default="", description="Flow description")
     flow_function_name: str = Field(..., description="Entry point function name")
-    default_parameters: dict = Field(
+    default_parameters: dict[str, Any] = Field(
         default_factory=dict, description="Default parameters for execution"
     )
     file_path: str = Field(..., description="Relative path to .py file")
@@ -99,11 +100,10 @@ class FlowDocument(Document):
             List of FlowDocument objects
 
         """
-        sort_order: list = [("updated_at", DESCENDING)]
         return list(
             cls.find(
                 {"project_id": project_id, "username": username},
-                sort=sort_order,
+                sort=[("updated_at", SortDirection.DESCENDING)],
             ).run()
         )
 

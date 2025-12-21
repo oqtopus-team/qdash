@@ -7,11 +7,13 @@ to register user flows as Prefect deployments.
 import os
 from logging import getLogger
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from prefect.client.orchestration import get_client
 from prefect.deployments import Deployment
 from pydantic import BaseModel
+from qdash.workflow.paths import get_path_resolver
 
 app = FastAPI(title="QDash Deployment Service")
 logger = getLogger("uvicorn.app")
@@ -64,8 +66,8 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
         logger.info(f"Creating deployment '{deployment_name}' from {file_path}")
 
         # Create entrypoint string: relative_path:function_name
-        # Working directory is /app/qdash/workflow, so make path relative to that
-        working_dir = Path("/app/qdash/workflow")
+        # Working directory is configured via QDASH_WORKFLOW_DIR
+        working_dir = get_path_resolver().workflow_dir
         try:
             relative_path = file_path.relative_to(working_dir)
         except ValueError:
@@ -141,7 +143,7 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
 
 
 @app.get("/health")
-async def health() -> dict:
+async def health() -> dict[str, Any]:
     """Health check endpoint."""
     return {"status": "healthy"}
 
@@ -158,7 +160,7 @@ class SetScheduleRequest(BaseModel):
     cron: str
     timezone: str = "Asia/Tokyo"
     active: bool = True
-    parameters: dict | None = None
+    parameters: dict[str, Any] | None = None
 
 
 class SetScheduleResponse(BaseModel):
@@ -175,7 +177,7 @@ class CreateScheduledRunRequest(BaseModel):
 
     deployment_id: str
     scheduled_time: str  # ISO format
-    parameters: dict | None = None
+    parameters: dict[str, Any] | None = None
 
 
 class CreateScheduledRunResponse(BaseModel):
@@ -238,9 +240,7 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
                     logger.info("Successfully updated deployment parameters")
             except Exception as e:
                 logger.error(f"Failed to update deployment: {e}")
-                raise HTTPException(
-                    status_code=500, detail=f"Failed to update deployment: {str(e)}"
-                )
+                raise HTTPException(status_code=500, detail=f"Failed to update deployment: {e!s}")
 
             logger.info(
                 f"Set schedule on deployment {request.deployment_id}: cron={request.cron}, active={request.active}"
@@ -257,7 +257,7 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
         raise
     except Exception as e:
         logger.error(f"Failed to set schedule (unexpected error): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e!s}")
 
 
 @app.post("/create-scheduled-run", response_model=CreateScheduledRunResponse)
@@ -286,7 +286,7 @@ async def create_scheduled_run(request: CreateScheduledRunRequest) -> CreateSche
             logger.info(f"Parsed scheduled time: {scheduled_time}")
         except Exception as e:
             logger.error(f"Failed to parse scheduled time: {e}")
-            raise HTTPException(status_code=400, detail=f"Invalid scheduled_time format: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Invalid scheduled_time format: {e!s}")
 
         async with get_client() as client:
             try:
@@ -298,7 +298,7 @@ async def create_scheduled_run(request: CreateScheduledRunRequest) -> CreateSche
                 logger.info(f"Successfully created scheduled run {flow_run.id}")
             except Exception as e:
                 logger.error(f"Failed to create flow run: {e}")
-                raise HTTPException(status_code=500, detail=f"Failed to create flow run: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Failed to create flow run: {e!s}")
 
             logger.info(f"Created scheduled run {flow_run.id} for {scheduled_time}")
 
@@ -312,4 +312,4 @@ async def create_scheduled_run(request: CreateScheduledRunRequest) -> CreateSche
         raise
     except Exception as e:
         logger.error(f"Failed to create scheduled run (unexpected error): {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e!s}")

@@ -9,20 +9,21 @@ from __future__ import annotations
 import io
 import logging
 import math
-from datetime import datetime, timezone, timedelta
-from typing import Any, Literal
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import plotly.graph_objects as go
 from PIL import Image
+from qdash.api.lib.metrics_config import load_metrics_config
+from qdash.api.lib.topology_config import TopologyDefinition, load_topology
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
-from qdash.api.lib.metrics_config import load_metrics_config
-from qdash.api.lib.topology_config import TopologyDefinition, load_topology
-from qdash.api.schemas.metrics import ChipMetricsResponse
+if TYPE_CHECKING:
+    from qdash.api.schemas.metrics import ChipMetricsResponse
 
 logger = logging.getLogger(__name__)
 
@@ -518,7 +519,7 @@ class MetricsPDFGenerator:
     ) -> dict[str, Any]:
         """Calculate statistics for the metric values."""
         values = []
-        for key, metric_value in metric_data.items():
+        for metric_value in metric_data.values():
             if metric_value and metric_value.value is not None:
                 scaled_value = metric_value.value * metric_scale
                 values.append(scaled_value)
@@ -710,11 +711,11 @@ class MetricsPDFGenerator:
                 hovertext=text_matrix,
                 texttemplate="%{text}",
                 showscale=False,
-                textfont=dict(
-                    family="monospace",
-                    size=TEXT_SIZE,
-                    weight="bold",
-                ),
+                textfont={
+                    "family": "monospace",
+                    "size": TEXT_SIZE,
+                    "weight": "bold",
+                },
             )
         )
 
@@ -725,22 +726,22 @@ class MetricsPDFGenerator:
         fig.update_layout(
             title=None,  # Title is in PDF header
             showlegend=False,
-            margin=dict(b=20, l=20, r=20, t=20),
-            xaxis=dict(
-                ticks="",
-                linewidth=1,
-                showgrid=False,
-                zeroline=False,
-                showticklabels=False,
-            ),
-            yaxis=dict(
-                ticks="",
-                autorange="reversed",
-                linewidth=1,
-                showgrid=False,
-                zeroline=False,
-                showticklabels=False,
-            ),
+            margin={"b": 20, "l": 20, "r": 20, "t": 20},
+            xaxis={
+                "ticks": "",
+                "linewidth": 1,
+                "showgrid": False,
+                "zeroline": False,
+                "showticklabels": False,
+            },
+            yaxis={
+                "ticks": "",
+                "autorange": "reversed",
+                "linewidth": 1,
+                "showgrid": False,
+                "zeroline": False,
+                "showticklabels": False,
+            },
             width=width,
             height=height,
         )
@@ -763,21 +764,21 @@ class MetricsPDFGenerator:
             title=None,  # Title is in PDF header
             width=width,
             height=height,
-            margin=dict(b=20, l=20, r=20, t=20),
-            xaxis=dict(
-                ticks="",
-                showgrid=False,
-                zeroline=False,
-                showticklabels=False,
-                constrain="domain",
-            ),
-            yaxis=dict(
-                ticks="",
-                autorange="reversed",
-                showgrid=False,
-                zeroline=False,
-                showticklabels=False,
-            ),
+            margin={"b": 20, "l": 20, "r": 20, "t": 20},
+            xaxis={
+                "ticks": "",
+                "showgrid": False,
+                "zeroline": False,
+                "showticklabels": False,
+                "constrain": "domain",
+            },
+            yaxis={
+                "ticks": "",
+                "autorange": "reversed",
+                "showgrid": False,
+                "zeroline": False,
+                "showticklabels": False,
+            },
             plot_bgcolor="white",
             showlegend=False,
             hovermode="closest",
@@ -800,8 +801,7 @@ class MetricsPDFGenerator:
         node_traces = self._create_qubit_node_traces()
         data.extend(node_traces)
 
-        fig = go.Figure(data=data, layout=layout)
-        return fig
+        return go.Figure(data=data, layout=layout)
 
     def _create_mux_node_trace(self) -> go.Scatter:
         """Create trace for MUX boundary rectangles."""
@@ -827,7 +827,7 @@ class MetricsPDFGenerator:
             x=shapes_x,
             y=shapes_y,
             mode="lines",
-            line=dict(color="lightgray", width=2),
+            line={"color": "lightgray", "width": 2},
             hoverinfo="skip",
         )
 
@@ -847,14 +847,14 @@ class MetricsPDFGenerator:
             x=x_coords,
             y=y_coords,
             mode="markers+text",
-            marker=dict(
-                size=NODE_SIZE * 1.2,
-                color="lightblue",
-                line=dict(color="darkblue", width=2),
-            ),
+            marker={
+                "size": NODE_SIZE * 1.2,
+                "color": "lightblue",
+                "line": {"color": "darkblue", "width": 2},
+            },
             text=texts,
             textposition="middle center",
-            textfont=dict(size=12, color="black", weight="bold"),
+            textfont={"size": 12, "color": "black", "weight": "bold"},
             hoverinfo="text",
             hovertext=[f"Q{qid}" for qid in range(self.n_qubits)],
         )
@@ -867,7 +867,7 @@ class MetricsPDFGenerator:
         metric_scale: float,
     ) -> list[go.Scatter]:
         """Create traces for coupling edges with values."""
-        traces = []
+        traces: list[go.Scatter] = []
 
         # Collect coupling values and combine bidirectional
         coupling_values: dict[tuple[int, int], float] = {}
@@ -912,7 +912,7 @@ class MetricsPDFGenerator:
                 x=[col1, col2],
                 y=[row1, row2],
                 mode="lines",
-                line=dict(color=color, width=3),
+                line={"color": color, "width": 3},
                 hoverinfo="skip",
             )
             traces.append(line_trace)
@@ -926,7 +926,7 @@ class MetricsPDFGenerator:
                 y=[mid_y],
                 mode="text",
                 text=[f"{value:.1f}"],
-                textfont=dict(size=11, color="black", weight="bold"),
+                textfont={"size": 11, "color": "black", "weight": "bold"},
                 hoverinfo="text",
                 hovertext=[f"{qid1}-{qid2}: {value:.2f}%"],
             )
@@ -979,7 +979,7 @@ class MetricsPDFGenerator:
             schema_key = self._map_config_to_schema_key(metric_key, metric_type)
             metric_data = getattr(metrics_source, schema_key, None)
             if metric_data:
-                for key, metric_value in metric_data.items():
+                for metric_value in metric_data.values():
                     if metric_value and metric_value.value is not None:
                         return True
         return False
@@ -1112,7 +1112,7 @@ class MetricsPDFGenerator:
 
             # Extract and scale values
             values = []
-            for key, metric_value in metric_data.items():
+            for metric_value in metric_data.values():
                 if metric_value and metric_value.value is not None:
                     scaled_value = metric_value.value * metric_meta.scale
                     values.append(scaled_value)
@@ -1131,7 +1131,7 @@ class MetricsPDFGenerator:
             extension = val_range * 0.05
 
             cdf_x = [min_val - extension]  # Start flat at 0%
-            cdf_y = [0]
+            cdf_y: list[float] = [0.0]
 
             for i, value in enumerate(values):
                 cdf_x.append(value)
@@ -1152,7 +1152,7 @@ class MetricsPDFGenerator:
                     y=cdf_y,
                     mode="lines",
                     name=f"{metric_meta.title} (n={n})",
-                    line=dict(color=color, width=2, shape="hv"),
+                    line={"color": color, "width": 2, "shape": "hv"},
                     hovertemplate=f"{metric_meta.title}: %{{x:.3f}}<br>Percentile: %{{y:.1f}}%<extra></extra>",
                 )
             )
@@ -1164,7 +1164,7 @@ class MetricsPDFGenerator:
                     y=[0, 50],
                     mode="lines",
                     name=f"{metric_meta.title} Median: {median:.2f}",
-                    line=dict(color=color, width=1, dash="dot"),
+                    line={"color": color, "width": 1, "dash": "dot"},
                     hoverinfo="skip",
                 )
             )
@@ -1174,28 +1174,28 @@ class MetricsPDFGenerator:
 
         fig.update_layout(
             title=None,
-            xaxis=dict(
-                title=dict(text=f"{cdf_group.title} ({cdf_group.unit})", font=dict(size=14)),
-                gridcolor="rgba(128,128,128,0.2)",
-                zeroline=False,
-            ),
-            yaxis=dict(
-                title=dict(text="Cumulative %", font=dict(size=14)),
-                range=[0, 100],
-                gridcolor="rgba(128,128,128,0.2)",
-                zeroline=False,
-            ),
+            xaxis={
+                "title": {"text": f"{cdf_group.title} ({cdf_group.unit})", "font": {"size": 14}},
+                "gridcolor": "rgba(128,128,128,0.2)",
+                "zeroline": False,
+            },
+            yaxis={
+                "title": {"text": "Cumulative %", "font": {"size": 14}},
+                "range": [0, 100],
+                "gridcolor": "rgba(128,128,128,0.2)",
+                "zeroline": False,
+            },
             showlegend=True,
-            legend=dict(
-                orientation="h",
-                yanchor="top",
-                y=-0.15,
-                xanchor="center",
-                x=0.5,
-                font=dict(size=11),
-                bgcolor="rgba(255,255,255,0.8)",
-            ),
-            margin=dict(l=70, r=40, t=30, b=100),
+            legend={
+                "orientation": "h",
+                "yanchor": "top",
+                "y": -0.15,
+                "xanchor": "center",
+                "x": 0.5,
+                "font": {"size": 11},
+                "bgcolor": "rgba(255,255,255,0.8)",
+            },
+            margin={"l": 70, "r": 40, "t": 30, "b": 100},
             width=500,
             height=450,
             plot_bgcolor="white",

@@ -15,12 +15,23 @@
       "mcp__serena__replace_regex",
       "mcp__serena__find_file",
       "mcp__serena__think_about_collected_information",
-      "mcp__serena__create_text_file"
+      "mcp__serena__create_text_file",
+      "Bash(task lint-python)",
+      "Bash(task lint-mypy:*)",
+      "mcp__serena__find_symbol",
+      "Bash(task lint-mypy:workflow:*)",
+      "Bash(grep:*)",
+      "Bash(cut:*)",
+      "mcp__serena__replace_content"
     ],
     "deny": []
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["o3", "gpt", "serena"],
+  "enabledMcpjsonServers": [
+    "o3",
+    "gpt",
+    "serena"
+  ],
   "statusLine": {
     "type": "command",
     "command": "bunx ccusage statusline"

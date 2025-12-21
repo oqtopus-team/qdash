@@ -15,14 +15,16 @@ from fastapi.logger import logger
 from fastapi.responses import FileResponse
 from git import Repo
 from git.exc import GitCommandError
-from qdash.api.lib.auth import get_current_active_user
-from qdash.api.schemas.auth import User
+from qdash.api.lib.auth import get_current_active_user  # noqa: TCH002
+from qdash.api.schemas.auth import User  # noqa: TCH002
 from qdash.api.schemas.file import (
     FileTreeNode,
     GitPushRequest,
     SaveFileRequest,
     ValidateFileRequest,
 )
+from qdash.common.datetime_utils import now_iso
+from qdash.common.paths import QUBEX_CONFIG_BASE
 
 router = APIRouter()
 gunicorn_logger = logging.getLogger("gunicorn.error")
@@ -32,14 +34,8 @@ if __name__ != "main":
 else:
     logger.setLevel(logging.DEBUG)
 
-# Get config path from environment variable
-# In Docker, CONFIG_PATH is mounted to /app/config/qubex
-# In local dev, it's ./config/qubex
-CONFIG_BASE_PATH = Path(os.getenv("CONFIG_PATH", "./config/qubex"))
-
-# If running in Docker (check if /app exists), use absolute path
-if Path("/app").exists() and not CONFIG_BASE_PATH.is_absolute():
-    CONFIG_BASE_PATH = Path("/app") / "config" / "qubex"
+# Use centralized path from common module
+CONFIG_BASE_PATH = QUBEX_CONFIG_BASE
 
 
 def validate_config_path(relative_path: str) -> Path:
@@ -484,8 +480,11 @@ def git_pull_config(
 
         # Parse and reconstruct URL with authentication
         parsed = urlparse(repo_url)
-        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-        auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
+        scheme = parsed.scheme if isinstance(parsed.scheme, str) else parsed.scheme.decode()
+        netloc = parsed.netloc if isinstance(parsed.netloc, str) else parsed.netloc.decode()
+        path = parsed.path if isinstance(parsed.path, str) else parsed.path.decode()
+        auth_netloc = f"{github_user}:{github_token}@{netloc}"
+        auth_url = urlunparse((scheme, auth_netloc, path, "", "", ""))
 
         # Create temporary directory and clone repository
         temp_dir = tempfile.mkdtemp()
@@ -527,7 +526,7 @@ def git_pull_config(
             # Log success with commit information
             current = repo.head.commit
             commit_sha = current.hexsha[:8]
-            commit_msg = current.message.strip()
+            commit_msg = str(current.message).strip()
 
             logger.info(f"Updated to commit: {commit_sha} - {commit_msg}")
             logger.info(f"Config files updated successfully in: {CONFIG_BASE_PATH}")
@@ -575,8 +574,6 @@ def git_push_config(
     import tempfile
     from urllib.parse import urlparse, urlunparse
 
-    import pendulum
-
     try:
         # Get authentication details from environment
         github_user = os.getenv("GITHUB_USER")
@@ -591,8 +588,11 @@ def git_push_config(
 
         # Parse and reconstruct URL with authentication
         parsed = urlparse(repo_url)
-        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-        auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
+        scheme = parsed.scheme if isinstance(parsed.scheme, str) else parsed.scheme.decode()
+        netloc = parsed.netloc if isinstance(parsed.netloc, str) else parsed.netloc.decode()
+        path = parsed.path if isinstance(parsed.path, str) else parsed.path.decode()
+        auth_netloc = f"{github_user}:{github_token}@{netloc}"
+        auth_url = urlunparse((scheme, auth_netloc, path, "", "", ""))
 
         # Create temporary directory and clone repository
         temp_dir = tempfile.mkdtemp()
@@ -631,7 +631,7 @@ def git_push_config(
             repo.git.config("user.email", "qdash-ui@users.noreply.github.com")
 
             # Commit with timestamp
-            now_jst = pendulum.now("Asia/Tokyo").to_iso8601_string()
+            now_jst = now_iso()
             commit_msg = f"{request.commit_message} at {now_jst}"
             repo.index.commit(commit_msg)
 

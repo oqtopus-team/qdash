@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import Depends, Header, HTTPException, Path, status
 from qdash.api.lib.auth import get_current_active_user
@@ -56,14 +56,14 @@ def _resolve_project_id(
     if project_id_header:
         return project_id_header
     if user.default_project_id:
-        return user.default_project_id
+        return str(user.default_project_id)
 
     # Fallback: check if user owns a project
     from qdash.dbmodel.project import ProjectDocument
 
     owned_project = ProjectDocument.find_one({"owner_username": user.username}).run()
     if owned_project:
-        return owned_project.project_id
+        return str(owned_project.project_id)
 
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -73,7 +73,8 @@ def _resolve_project_id(
 
 def _get_membership(project_id: str, username: str) -> ProjectMembershipDocument | None:
     """Get active membership for user in project."""
-    return ProjectMembershipDocument.get_active_membership(project_id, username)
+    result = ProjectMembershipDocument.get_active_membership(project_id, username)
+    return cast("ProjectMembershipDocument | None", result)
 
 
 def _check_permission(

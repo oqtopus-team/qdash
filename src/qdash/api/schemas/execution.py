@@ -1,8 +1,10 @@
 """Schema definitions for execution router."""
 
+from datetime import datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer, field_validator
+from qdash.common.datetime_utils import format_elapsed_time, parse_elapsed_time
 
 
 class ExecutionLockStatusResponse(BaseModel):
@@ -27,12 +29,24 @@ class Task(BaseModel):
     figure_path: list[str] | None = None
     json_figure_path: list[str] | None = None
     raw_data_path: list[str] | None = None
-    start_at: str | None = None
-    end_at: str | None = None
-    elapsed_time: str | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    elapsed_time: timedelta | None = None
     task_type: str | None = None
     default_view: bool = True
     over_threshold: bool = False
+
+    @field_validator("elapsed_time", mode="before")
+    @classmethod
+    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
+        """Parse elapsed_time from various formats."""
+        return parse_elapsed_time(v)
+
+    @field_serializer("elapsed_time")
+    @classmethod
+    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
+        """Serialize elapsed_time to H:MM:SS format."""
+        return format_elapsed_time(v) if v else None
 
 
 class ExecutionResponseSummary(BaseModel):
@@ -43,9 +57,9 @@ class ExecutionResponseSummary(BaseModel):
         name (str): The name of the execution.
         execution_id (str): The ID of the execution.
         status (str): The current status of the execution.
-        start_at (str): The start time of the execution.
-        end_at (str): The end time of the execution.
-        elapsed_time (str): The total elapsed time of the execution.
+        start_at (datetime | None): The start time of the execution.
+        end_at (datetime | None): The end time of the execution.
+        elapsed_time (timedelta | None): The total elapsed time of the execution.
         tags (list[str]): Tags associated with the execution.
         note (dict): Notes for the execution.
 
@@ -54,11 +68,23 @@ class ExecutionResponseSummary(BaseModel):
     name: str
     execution_id: str
     status: str
-    start_at: str
-    end_at: str
-    elapsed_time: str
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    elapsed_time: timedelta | None = None
     tags: list[str]
-    note: dict
+    note: dict[str, Any]
+
+    @field_validator("elapsed_time", mode="before")
+    @classmethod
+    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
+        """Parse elapsed_time from various formats."""
+        return parse_elapsed_time(v)
+
+    @field_serializer("elapsed_time")
+    @classmethod
+    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
+        """Serialize elapsed_time to H:MM:SS format."""
+        return format_elapsed_time(v) if v else None
 
 
 class ExecutionResponseDetail(BaseModel):
@@ -68,9 +94,9 @@ class ExecutionResponseDetail(BaseModel):
     ----------
         name (str): The name of the execution.
         status (str): The current status of the execution.
-        start_at (str): The start time of the execution.
-        end_at (str): The end time of the execution.
-        elapsed_time (str): The total elapsed time of the execution.
+        start_at (datetime | None): The start time of the execution.
+        end_at (datetime | None): The end time of the execution.
+        elapsed_time (timedelta | None): The total elapsed time of the execution.
         task (list[Task]): List of tasks in the execution.
         note (dict): Notes for the execution.
 
@@ -78,11 +104,23 @@ class ExecutionResponseDetail(BaseModel):
 
     name: str
     status: str
-    start_at: str
-    end_at: str
-    elapsed_time: str
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    elapsed_time: timedelta | None = None
     task: list[Task]
-    note: dict
+    note: dict[str, Any]
+
+    @field_validator("elapsed_time", mode="before")
+    @classmethod
+    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
+        """Parse elapsed_time from various formats."""
+        return parse_elapsed_time(v)
+
+    @field_serializer("elapsed_time")
+    @classmethod
+    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
+        """Serialize elapsed_time to H:MM:SS format."""
+        return format_elapsed_time(v) if v else None
 
 
 class ListExecutionsResponse(BaseModel):

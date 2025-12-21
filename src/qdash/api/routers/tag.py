@@ -6,15 +6,21 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from qdash.api.lib.project import ProjectContext, get_project_context
+from qdash.api.lib.project import (  # noqa: TCH002
+    ProjectContext,
+    get_project_context,
+)
 from qdash.api.schemas.tag import ListTagResponse, Tag
-from qdash.dbmodel.tag import TagDocument
+from qdash.repository.tag import MongoTagRepository
 
 router = APIRouter()
 
-# ロガーの設定
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+
+
+def get_tag_repository() -> MongoTagRepository:
+    """Get tag repository instance."""
+    return MongoTagRepository()
 
 
 @router.get(
@@ -25,6 +31,7 @@ logger.setLevel(logging.DEBUG)
 )
 def list_tags(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    tag_repo: Annotated[MongoTagRepository, Depends(get_tag_repository)],
 ) -> ListTagResponse:
     """List all tags for the current project.
 
@@ -35,6 +42,8 @@ def list_tags(
     ----------
     ctx : ProjectContext
         Project context with user and project information
+    tag_repo : MongoTagRepository
+        Repository for tag operations
 
     Returns
     -------
@@ -42,6 +51,5 @@ def list_tags(
         Wrapped list of tag names
 
     """
-    tags = TagDocument.find({"project_id": ctx.project_id}).run()
-    tags = [Tag(name=tag.name) for tag in tags]
-    return ListTagResponse(tags=tags)
+    tag_names = tag_repo.list_by_project(ctx.project_id)
+    return ListTagResponse(tags=[Tag(name=name) for name in tag_names])

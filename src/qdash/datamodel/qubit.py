@@ -1,4 +1,5 @@
 import math
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -45,10 +46,10 @@ class QubitModel(BaseModel):
     project_id: str | None = Field(None, description="Owning project identifier")
     username: None | str = Field(None, description="The username of the user who created the qubit")
     qid: str = Field(..., description="The qubit ID")
-    status: str = Field("pending", description="The status of the qubit")
+    status: str = Field(default="pending", description="The status of the qubit")
     chip_id: str | None = Field(None, description="The chip ID")
-    data: dict = Field(..., description="The data of the qubit")
-    best_data: dict = Field(
+    data: dict[str, Any] = Field(..., description="The data of the qubit")
+    best_data: dict[str, Any] = Field(
         default_factory=dict,
         description="The best calibration results, focusing on fidelity metrics",
     )
@@ -58,7 +59,7 @@ class QubitModel(BaseModel):
 
     @field_validator("data", mode="before")
     @classmethod
-    def sanitize_data(cls, v: object) -> dict:
+    def sanitize_data(cls, v: object) -> dict[str, Any]:
         def replace_nan(obj: object) -> object:
             if isinstance(obj, float) and math.isnan(obj):
                 return 0

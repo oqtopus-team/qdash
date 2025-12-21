@@ -38,12 +38,19 @@ Parameters
 ----------
 ctx : ProjectContext
     Project context with user and project information
+calibration_service : CalibrationService
+    Service for calibration operations
 
 Returns
 -------
 CalibrationNoteResponse
     The latest calibration note containing username, execution_id, task_id,
     note content, and timestamp
+
+Raises
+------
+HTTPException
+    404 if no calibration note is found
  * @summary Get the calibration note
  */
 export const getCalibrationNote = (

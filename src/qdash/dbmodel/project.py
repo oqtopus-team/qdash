@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
@@ -41,4 +41,5 @@ class ProjectDocument(Document):
     @classmethod
     def find_by_id(cls, project_id: str) -> ProjectDocument | None:
         """Helper to lookup project by id."""
-        return cls.find_one({"project_id": project_id}).run()
+        result = cls.find_one({"project_id": project_id}).run()
+        return cast("ProjectDocument | None", result)

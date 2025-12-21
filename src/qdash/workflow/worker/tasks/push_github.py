@@ -4,15 +4,19 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
-import pendulum
 from git import Repo
 from git.exc import GitCommandError
 from prefect import get_run_logger, task
+from qdash.common.datetime_utils import now_iso
+from qdash.common.paths import QUBEX_CONFIG_BASE
+
+# Default source path for calib_note.json (example chip: 64Qv1)
+DEFAULT_CALIB_NOTE_PATH = str(QUBEX_CONFIG_BASE / "64Qv1" / "calibration" / "calib_note.json")
 
 
 @task(task_run_name="Push GitHub")
 def push_github(
-    source_path: str = "/app/config/qubex/64Qv1/calibration/calib_note.json",
+    source_path: str = DEFAULT_CALIB_NOTE_PATH,
     repo_subpath: str = "64Qv1/calibration/calib_note.json",
     commit_message: str = "Update calib_note.json",
     branch: str = "main",
@@ -62,19 +66,19 @@ def push_github(
 
         # Git operations
         repo.index.add([str(target_file_path.relative_to(temp_dir))])
-        # 差分がなければスキップ
+        # Skip if no changes
         diff = repo.index.diff("HEAD")
         if not diff:
             logger.info("No changes to commit")
             return "No changes to commit"
-        now_jst = pendulum.now("Asia/Tokyo").to_iso8601_string()
+        now_jst = now_iso()
         repo.git.config("user.name", "github-actions[bot]")
         repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
         repo.index.commit(f"{commit_message} at {now_jst}")
 
         repo.remotes.origin.push()
 
-        return repo.head.commit.hexsha[:8]
+        return str(repo.head.commit.hexsha[:8])
 
     except GitCommandError as e:
         raise RuntimeError(f"Git push failed: {e.stderr}")
@@ -153,7 +157,7 @@ def push_github_batch(
             logger.info("No changes to commit")
             return "No changes to commit"
 
-        now_jst = pendulum.now("Asia/Tokyo").to_iso8601_string()
+        now_jst = now_iso()
         repo.git.config("user.name", "github-actions[bot]")
         repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
         repo.index.commit(f"{commit_message} at {now_jst}")
@@ -161,7 +165,7 @@ def push_github_batch(
         repo.remotes.origin.push()
 
         logger.info(f"Pushed {len(added_files)} files in single commit")
-        return repo.head.commit.hexsha[:8]
+        return str(repo.head.commit.hexsha[:8])
 
     except GitCommandError as e:
         raise RuntimeError(f"Git push failed: {e.stderr}")

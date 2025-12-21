@@ -1441,7 +1441,7 @@
           "execution"
         ],
         "summary": "Get the execution lock status",
-        "description": "Fetch the current status of the execution lock.\n\nThe execution lock prevents concurrent calibration workflows from running\nsimultaneously. This endpoint checks whether a lock is currently held.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nExecutionLockStatusResponse\n    Response containing lock status (True if locked, False if available)",
+        "description": "Fetch the current status of the execution lock.\n\nThe execution lock prevents concurrent calibration workflows from running\nsimultaneously. This endpoint checks whether a lock is currently held.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\n\nReturns\n-------\nExecutionLockStatusResponse\n    Response containing lock status (True if locked, False if available)",
         "operationId": "getExecutionLockStatus",
         "security": [
           {
@@ -1496,7 +1496,7 @@
           "execution"
         ],
         "summary": "List executions",
-        "description": "List executions for a given chip with pagination.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
+        "description": "List executions for a given chip with pagination.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
         "operationId": "listExecutions",
         "security": [
           {
@@ -1589,7 +1589,7 @@
           "execution"
         ],
         "summary": "Get an execution by its ID",
-        "description": "Return the execution detail by its ID.\n\nParameters\n----------\nexecution_id : str\n    ID of the execution to fetch\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
+        "description": "Return the execution detail by its ID.\n\nParameters\n----------\nexecution_id : str\n    ID of the execution to fetch\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\n\nReturns\n-------\nExecutionResponseDetail\n    Detailed execution information",
         "operationId": "getExecution",
         "security": [
           {
@@ -1991,7 +1991,7 @@
           "calibration"
         ],
         "summary": "Get the calibration note",
-        "description": "Get the latest calibration note for the master task.\n\nRetrieves the most recent calibration note from the database, sorted by timestamp\nin descending order. The note contains metadata about calibration parameters\nand configuration.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nCalibrationNoteResponse\n    The latest calibration note containing username, execution_id, task_id,\n    note content, and timestamp",
+        "description": "Get the latest calibration note for the master task.\n\nRetrieves the most recent calibration note from the database, sorted by timestamp\nin descending order. The note contains metadata about calibration parameters\nand configuration.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\ncalibration_service : CalibrationService\n    Service for calibration operations\n\nReturns\n-------\nCalibrationNoteResponse\n    The latest calibration note containing username, execution_id, task_id,\n    note content, and timestamp\n\nRaises\n------\nHTTPException\n    404 if no calibration note is found",
         "operationId": "getCalibrationNote",
         "security": [
           {
@@ -2102,7 +2102,7 @@
           "chip"
         ],
         "summary": "List all chips",
-        "description": "List all chips in the current project.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nListChipsResponse\n    Wrapped list of available chips",
+        "description": "List all chips in the current project.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nListChipsResponse\n    Wrapped list of available chips",
         "operationId": "listChips",
         "security": [
           {
@@ -2220,7 +2220,7 @@
           "chip"
         ],
         "summary": "Get available dates for a chip",
-        "description": "Fetch available dates for a chip from execution counter.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nChipDatesResponse\n    List of available dates",
+        "description": "Fetch available dates for a chip from execution counter.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipDatesResponse\n    List of available dates",
         "operationId": "getChipDates",
         "security": [
           {
@@ -2284,7 +2284,7 @@
           "chip"
         ],
         "summary": "Get a chip",
-        "description": "Get a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nChipResponse\n    Chip information\n\nRaises\n------\nHTTPException\n    If chip is not found",
+        "description": "Get a chip by its ID.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipResponse\n    Chip information\n\nRaises\n------\nHTTPException\n    If chip is not found",
         "operationId": "getChip",
         "security": [
           {
@@ -2348,7 +2348,7 @@
           "chip"
         ],
         "summary": "Get multiplexer details",
-        "description": "Get the multiplexer details.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmux_id : int\n    ID of the multiplexer\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nMuxDetailResponse\n    Multiplexer details",
+        "description": "Get the multiplexer details.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmux_id : int\n    ID of the multiplexer\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nMuxDetailResponse\n    Multiplexer details",
         "operationId": "getChipMux",
         "security": [
           {
@@ -2421,7 +2421,7 @@
           "chip"
         ],
         "summary": "List all multiplexers for a chip",
-        "description": "List all multiplexers for a chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nListMuxResponse\n    List of multiplexer details",
+        "description": "List all multiplexers for a chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nListMuxResponse\n    List of multiplexer details",
         "operationId": "listChipMuxes",
         "security": [
           {
@@ -2485,7 +2485,7 @@
           "task"
         ],
         "summary": "List all tasks",
-        "description": "List all tasks.\n\nArgs:\n----\n    ctx (ProjectContext): The project context with user and project information.\n    backend (Optional[str]): Optional backend name to filter tasks by.\n\nReturns:\n-------\n    list[TaskResponse]: The list of tasks.",
+        "description": "List all tasks.\n\nParameters\n----------\nctx : ProjectContext\n    The project context with user and project information.\ntask_repo : MongoTaskDefinitionRepository\n    Repository for task definition operations.\nbackend : str | None\n    Optional backend name to filter tasks by.\n\nReturns\n-------\nListTaskResponse\n    The list of tasks.",
         "operationId": "listTasks",
         "security": [
           {
@@ -2558,7 +2558,7 @@
           "task"
         ],
         "summary": "Get task result by task ID",
-        "description": "Get task result by task_id.\n\nArgs:\n----\n    task_id: The task ID to search for.\n    ctx: The project context with user and project information.\n\nReturns:\n-------\n    TaskResultResponse: The task result information including figure paths.",
+        "description": "Get task result by task_id.\n\nParameters\n----------\ntask_id : str\n    The task ID to search for.\nctx : ProjectContext\n    The project context with user and project information.\n\nReturns\n-------\nTaskResultResponse\n    The task result information including figure paths.",
         "operationId": "getTaskResult",
         "security": [
           {
@@ -2622,7 +2622,7 @@
           "task-file"
         ],
         "summary": "Get task file settings",
-        "description": "Get task file settings from config/settings.yaml.\n\nReturns\n-------\n    Task file settings including default backend",
+        "description": "Get task file settings from config/settings.yaml.\n\nUses ConfigLoader for unified loading with local override support.\n\nReturns\n-------\n    Task file settings including default backend",
         "operationId": "getTaskFileSettings",
         "responses": {
           "200": {
@@ -2649,7 +2649,7 @@
           "task-file"
         ],
         "summary": "List available task file backends",
-        "description": "List all available backend directories in caltasks.\n\nReturns\n-------\n    List of backend names and paths",
+        "description": "List all available backend directories in calibtasks.\n\nReturns\n-------\n    List of backend names and paths",
         "operationId": "listTaskFileBackends",
         "responses": {
           "200": {
@@ -2728,7 +2728,7 @@
           "task-file"
         ],
         "summary": "Get task file content for viewing/editing",
-        "description": "Get task file content for viewing/editing.\n\nArgs:\n----\n    path: Relative path from CALTASKS_BASE_PATH (e.g., \"qubex/one_qubit_coarse/check_rabi.py\")\n\nReturns:\n-------\n    File content and metadata",
+        "description": "Get task file content for viewing/editing.\n\nArgs:\n----\n    path: Relative path from CALIBTASKS_BASE_PATH (e.g., \"qubex/one_qubit_coarse/check_rabi.py\")\n\nReturns:\n-------\n    File content and metadata",
         "operationId": "getTaskFileContent",
         "security": [
           {
@@ -3566,7 +3566,7 @@
           "tag"
         ],
         "summary": "List all tags",
-        "description": "List all tags for the current project.\n\nRetrieves all tags associated with the current project's calibration data.\nTags are used to categorize and filter task results.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nListTagResponse\n    Wrapped list of tag names",
+        "description": "List all tags for the current project.\n\nRetrieves all tags associated with the current project's calibration data.\nTags are used to categorize and filter task results.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\ntag_repo : MongoTagRepository\n    Repository for tag operations\n\nReturns\n-------\nListTagResponse\n    Wrapped list of tag names",
         "operationId": "listTags",
         "security": [
           {
@@ -3996,7 +3996,7 @@
           "flow"
         ],
         "summary": "List flow helper files",
-        "description": "List all Python files in the qdash.workflow.flow module.\n\nReturns list of filenames that users can view for reference.",
+        "description": "List all Python files in the qdash.workflow.service module.\n\nReturns list of filenames that users can view for reference.",
         "operationId": "listFlowHelperFiles",
         "responses": {
           "200": {
@@ -5219,6 +5219,34 @@
           }
         }
       }
+    },
+    "/config/all": {
+      "get": {
+        "tags": [
+          "config",
+          "config"
+        ],
+        "summary": "Get all configuration",
+        "description": "Fetch all application configuration in a single request",
+        "operationId": "getConfigAll",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllConfigResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -5236,6 +5264,26 @@
         ],
         "title": "AddMemberRequest",
         "description": "Request to add a member to a project (always as viewer)."
+      },
+      "AllConfigResponse": {
+        "properties": {
+          "ui": {
+            "$ref": "#/components/schemas/UISettings"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metrics"
+          },
+          "copilot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Copilot"
+          }
+        },
+        "type": "object",
+        "title": "AllConfigResponse",
+        "description": "Response containing all application configuration."
       },
       "BackendResponseModel": {
         "properties": {
@@ -5317,7 +5365,15 @@
             "title": "Note"
           },
           "timestamp": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Timestamp"
           }
         },
@@ -5326,8 +5382,7 @@
           "username",
           "execution_id",
           "task_id",
-          "note",
-          "timestamp"
+          "note"
         ],
         "title": "CalibrationNoteResponse",
         "description": "CalibrationNote is a subclass of BaseModel."
@@ -5427,9 +5482,16 @@
             "default": {}
           },
           "installed_at": {
-            "type": "string",
-            "title": "Installed At",
-            "default": ""
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed At"
           }
         },
         "type": "object",
@@ -5652,7 +5714,15 @@
             "title": "Couplings"
           },
           "calibrated_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              }
+            ],
             "title": "Calibrated At"
           }
         },
@@ -5792,15 +5862,39 @@
             "title": "Status"
           },
           "start_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Start At"
           },
           "end_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "End At"
           },
           "elapsed_time": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "duration"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Elapsed Time"
           },
           "task": {
@@ -5820,14 +5914,11 @@
         "required": [
           "name",
           "status",
-          "start_at",
-          "end_at",
-          "elapsed_time",
           "task",
           "note"
         ],
         "title": "ExecutionResponseDetail",
-        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution."
+        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution."
       },
       "ExecutionResponseSummary": {
         "properties": {
@@ -5844,15 +5935,39 @@
             "title": "Status"
           },
           "start_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Start At"
           },
           "end_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "End At"
           },
           "elapsed_time": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "duration"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Elapsed Time"
           },
           "tags": {
@@ -5873,14 +5988,11 @@
           "name",
           "execution_id",
           "status",
-          "start_at",
-          "end_at",
-          "elapsed_time",
           "tags",
           "note"
         ],
         "title": "ExecutionResponseSummary",
-        "description": "ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    execution_id (str): The ID of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution.\n    tags (list[str]): Tags associated with the execution.\n    note (dict): Notes for the execution."
+        "description": "ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    execution_id (str): The ID of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    tags (list[str]): Tags associated with the execution.\n    note (dict): Notes for the execution."
       },
       "FidelityCondition": {
         "properties": {
@@ -5985,7 +6097,8 @@
           "next_run": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -6001,6 +6114,7 @@
           },
           "created_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Created At",
             "description": "Schedule creation time"
           }
@@ -6040,13 +6154,15 @@
           },
           "created_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Created At",
-            "description": "Creation timestamp (ISO format)"
+            "description": "Creation timestamp"
           },
           "updated_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Updated At",
-            "description": "Last update timestamp (ISO format)"
+            "description": "Last update timestamp"
           },
           "tags": {
             "items": {
@@ -6206,13 +6322,15 @@
           },
           "created_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Created At",
-            "description": "Creation timestamp (ISO format)"
+            "description": "Creation timestamp"
           },
           "updated_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Updated At",
-            "description": "Last update timestamp (ISO format)"
+            "description": "Last update timestamp"
           },
           "tags": {
             "items": {
@@ -6279,7 +6397,16 @@
           "value": {
             "anyOf": [
               {
-                "items": {},
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                },
                 "type": "array"
               },
               {
@@ -6640,7 +6767,8 @@
           "last_accessed_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -6705,12 +6833,14 @@
           },
           "timestamp": {
             "type": "string",
+            "format": "date-time",
             "title": "Timestamp"
           },
           "calibrated_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -6944,7 +7074,8 @@
           "start_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -6955,7 +7086,8 @@
           "end_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -6966,7 +7098,8 @@
           "elapsed_time": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "duration"
               },
               {
                 "type": "null"
@@ -7026,8 +7159,9 @@
           },
           "calibrated_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Calibrated At",
-            "description": "The time when the system information was created"
+            "description": "The time when the calibration was performed"
           },
           "execution_id": {
             "type": "string",
@@ -7172,7 +7306,8 @@
           "created_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -7227,10 +7362,12 @@
           },
           "created_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Created At"
           },
           "updated_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Updated At"
           }
         },
@@ -7802,14 +7939,15 @@
           "next_run": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Next Run",
-            "description": "Next scheduled run time (ISO format)"
+            "description": "Next scheduled run time"
           },
           "active": {
             "type": "boolean",
@@ -7867,10 +8005,6 @@
             "type": "string",
             "title": "Calib Data Path"
           },
-          "qpu_data_path": {
-            "type": "string",
-            "title": "Qpu Data Path"
-          },
           "backend": {
             "type": "string",
             "title": "Backend",
@@ -7910,6 +8044,11 @@
             "type": "string",
             "title": "Log Level",
             "default": "INFO"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "Asia/Tokyo"
           }
         },
         "additionalProperties": false,
@@ -7922,8 +8061,7 @@
           "slack_channel_id",
           "postgres_data_path",
           "mongo_data_path",
-          "calib_data_path",
-          "qpu_data_path"
+          "calib_data_path"
         ],
         "title": "Settings",
         "description": "Settings for the QDash application."
@@ -8102,7 +8240,8 @@
           "start_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -8113,7 +8252,8 @@
           "end_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -8124,7 +8264,8 @@
           "elapsed_time": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "duration"
               },
               {
                 "type": "null"
@@ -8524,7 +8665,8 @@
           "start_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -8535,7 +8677,8 @@
           "end_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -8546,7 +8689,8 @@
           "elapsed_time": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "duration"
               },
               {
                 "type": "null"
@@ -8627,15 +8771,39 @@
             "title": "Output Parameters"
           },
           "start_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Start At"
           },
           "end_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "End At"
           },
           "elapsed_time": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "duration"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Elapsed Time"
           }
         },
@@ -8649,13 +8817,10 @@
           "figure_path",
           "json_figure_path",
           "input_parameters",
-          "output_parameters",
-          "start_at",
-          "end_at",
-          "elapsed_time"
+          "output_parameters"
         ],
         "title": "TaskResultResponse",
-        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (str): Start time.\n    end_at (str): End time.\n    elapsed_time (str): Elapsed time."
+        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time."
       },
       "TimeSeriesData": {
         "properties": {
@@ -8709,6 +8874,56 @@
         ],
         "title": "TokenResponse",
         "description": "Token response model for login."
+      },
+      "UISettings": {
+        "properties": {
+          "task_files": {
+            "$ref": "#/components/schemas/UITaskFilesSettings"
+          }
+        },
+        "type": "object",
+        "title": "UISettings",
+        "description": "UI-specific settings."
+      },
+      "UITaskFilesSettings": {
+        "properties": {
+          "default_backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Backend"
+          },
+          "default_view_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default View Mode"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          }
+        },
+        "type": "object",
+        "title": "UITaskFilesSettings",
+        "description": "Task files editor settings."
       },
       "UpdateScheduleRequest": {
         "properties": {
@@ -8937,7 +9152,8 @@
           "created_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -8948,7 +9164,8 @@
           "updated_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"

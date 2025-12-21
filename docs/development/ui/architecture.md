@@ -17,48 +17,42 @@ This document describes the architecture of the QDash frontend application, incl
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Browser                                      │
-├─────────────────────────────────────────────────────────────────────┤
-│                      Next.js Application                             │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                    App Router (Pages)                         │   │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │   │
-│  │  │ /metrics │  │  /chip   │  │  /flow   │  │ /analysis│    │   │
-│  │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘    │   │
-│  └───────┼─────────────┼─────────────┼─────────────┼───────────┘   │
-│          │             │             │             │                │
-│  ┌───────┴─────────────┴─────────────┴─────────────┴───────────┐   │
-│  │                    Components Layer                          │   │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │   │
-│  │  │ features │  │   ui     │  │  charts  │  │ selectors│    │   │
-│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘    │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│  ┌───────────────────────────┴─────────────────────────────────┐   │
-│  │              State Management Layer                          │   │
-│  │  ┌─────────────────┐  ┌────────────────┐  ┌─────────────┐  │   │
-│  │  │  TanStack Query │  │ React Context  │  │    nuqs     │  │   │
-│  │  │  (Server State) │  │(Client State)  │  │ (URL State) │  │   │
-│  │  └────────┬────────┘  └────────────────┘  └─────────────┘  │   │
-│  └───────────┼─────────────────────────────────────────────────┘   │
-│              │                                                      │
-│  ┌───────────┴─────────────────────────────────────────────────┐   │
-│  │                   API Client Layer                           │   │
-│  │  ┌─────────────────────────────────────────────────────┐    │   │
-│  │  │         Auto-generated from OpenAPI (Orval)          │    │   │
-│  │  │    src/client/    │    src/schemas/                  │    │   │
-│  │  └──────────────────────────────┬──────────────────────┘    │   │
-│  └─────────────────────────────────┼───────────────────────────┘   │
-│                                    │                                │
-└────────────────────────────────────┼────────────────────────────────┘
-                                     │ HTTP (Axios)
-                                     ▼
-                          ┌──────────────────┐
-                          │   QDash API      │
-                          │   (FastAPI)      │
-                          └──────────────────┘
+```mermaid
+flowchart TB
+    subgraph Browser["Browser"]
+        subgraph NextJS["Next.js Application"]
+            subgraph Pages["App Router (Pages)"]
+                P1["/metrics"]
+                P2["/chip"]
+                P3["/flow"]
+                P4["/analysis"]
+            end
+
+            subgraph Components["Components Layer"]
+                C1["features"]
+                C2["ui"]
+                C3["charts"]
+                C4["selectors"]
+            end
+
+            subgraph State["State Management Layer"]
+                S1["TanStack Query<br/>(Server State)"]
+                S2["React Context<br/>(Client State)"]
+                S3["nuqs<br/>(URL State)"]
+            end
+
+            subgraph APIClient["API Client Layer"]
+                AC["Auto-generated from OpenAPI (Orval)<br/>src/client/ | src/schemas/"]
+            end
+        end
+    end
+
+    API["QDash API (FastAPI)"]
+
+    Pages --> Components
+    Components --> State
+    State --> APIClient
+    APIClient -->|"HTTP (Axios)"| API
 ```
 
 ---
@@ -185,45 +179,18 @@ components/
 
 ### Server State Flow (TanStack Query)
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                      Component                                │
-│  const { data, isLoading } = useQuery({                      │
-│    queryKey: ["chips", chipId],                              │
-│    queryFn: () => getChip(chipId),                           │
-│  });                                                          │
-└─────────────────────────┬────────────────────────────────────┘
-                          │
-                          ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    TanStack Query                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │    Cache     │  │   Deduping   │  │   Refetch    │       │
-│  │  Management  │  │              │  │   Strategy   │       │
-│  └──────────────┘  └──────────────┘  └──────────────┘       │
-└─────────────────────────┬────────────────────────────────────┘
-                          │
-                          ▼
-┌──────────────────────────────────────────────────────────────┐
-│               Auto-generated API Client                       │
-│  export function getChip(chipId: string) {                   │
-│    return customInstance<ChipDetail>({                       │
-│      url: `/api/chips/${chipId}`,                            │
-│      method: "GET",                                          │
-│    });                                                        │
-│  }                                                            │
-└─────────────────────────┬────────────────────────────────────┘
-                          │
-                          ▼
-┌──────────────────────────────────────────────────────────────┐
-│                   Custom Axios Instance                       │
-│  - Base URL configuration                                     │
-│  - Authentication headers (X-Username)                        │
-│  - Error handling                                             │
-└─────────────────────────┬────────────────────────────────────┘
-                          │
-                          ▼
-                    QDash API Server
+```mermaid
+flowchart TB
+    Component["Component<br/><code>useQuery({ queryKey, queryFn })</code>"]
+    TanStack["TanStack Query<br/>Cache Management | Deduping | Refetch Strategy"]
+    APIClient["Auto-generated API Client<br/><code>getChip(chipId)</code>"]
+    Axios["Custom Axios Instance<br/>Base URL | Auth Headers | Error Handling"]
+    API["QDash API Server"]
+
+    Component --> TanStack
+    TanStack --> APIClient
+    APIClient --> Axios
+    Axios --> API
 ```
 
 ### Mutation Flow
@@ -268,31 +235,16 @@ queryClient.invalidateQueries({ queryKey: ["chips", chipId] });
 
 ### Authentication Flow
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    User visits page                          │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│              middleware.ts (Edge Runtime)                    │
-│  - Check for username cookie                                 │
-│  - If missing and protected route → redirect to /login       │
-│  - If present → allow request                                │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   AuthProvider (Context)                     │
-│  - Provide username to components                            │
-│  - Handle login/logout                                       │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   API Requests                               │
-│  - X-Username header added by custom Axios instance          │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    Visit["User visits page"]
+    Middleware["middleware.ts (Edge Runtime)<br/>Check cookie → redirect if missing"]
+    AuthProvider["AuthProvider (Context)<br/>Provide username | Handle login/logout"]
+    APIRequests["API Requests<br/>X-Username header via Axios"]
+
+    Visit --> Middleware
+    Middleware --> AuthProvider
+    AuthProvider --> APIRequests
 ```
 
 ### Middleware Implementation
@@ -324,35 +276,21 @@ export const config = {
 
 ### Generation Pipeline
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│           FastAPI Backend (src/qdash/api/)                   │
-│  - Defines endpoints with Pydantic models                    │
-│  - Auto-generates OpenAPI spec at /openapi.json              │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│              docs/oas/openapi.json                           │
-│  - OpenAPI 3.0 specification                                 │
-│  - Downloaded via: curl http://api:$API_PORT/openapi.json    │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Orval Generator                           │
-│  - Reads OpenAPI spec                                        │
-│  - Generates TypeScript types → src/schemas/                 │
-│  - Generates React Query hooks → src/client/                 │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  Generated Code                              │
-│  src/schemas/              │  src/client/                    │
-│  - Types from Pydantic     │  - API functions               │
-│  - Request/Response models │  - React Query hooks           │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    FastAPI["FastAPI Backend<br/>Pydantic models → OpenAPI spec"]
+    OpenAPI["docs/oas/openapi.json<br/>OpenAPI 3.0 specification"]
+    Orval["Orval Generator<br/>Reads spec → generates code"]
+    Generated["Generated Code"]
+
+    FastAPI --> OpenAPI
+    OpenAPI --> Orval
+    Orval --> Generated
+
+    subgraph Generated["Generated Code"]
+        Schemas["src/schemas/<br/>TypeScript types"]
+        Client["src/client/<br/>React Query hooks"]
+    end
 ```
 
 ### Orval Configuration

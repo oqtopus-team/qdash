@@ -1,5 +1,7 @@
 """Admin schemas for user and project management."""
 
+from datetime import datetime
+
 from pydantic import BaseModel
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.user import SystemRole
@@ -23,7 +25,7 @@ class ProjectListItem(BaseModel):
     owner_username: str
     description: str | None = None
     member_count: int = 0
-    created_at: str | None = None
+    created_at: datetime | None = None
 
 
 class ProjectListResponse(BaseModel):
@@ -56,8 +58,8 @@ class UserDetailResponse(BaseModel):
     disabled: bool = False
     system_role: SystemRole = SystemRole.USER
     default_project_id: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # --- Member Management ---

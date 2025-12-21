@@ -59,7 +59,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import networkx as nx
 from qdash.dbmodel.initialize import initialize
-from qdash.workflow.engine.calibration.scheduler.cr_scheduler import CRScheduler
+from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler
 
 # ============================================================================
 # Configuration Constants
@@ -324,7 +324,7 @@ def main(
 
     if use_plugins:
         # Use plugin architecture with custom filters/scheduler
-        from qdash.workflow.engine.calibration.scheduler.plugins import (
+        from qdash.workflow.engine.scheduler.plugins import (
             CandidateQubitFilter,
             FidelityFilter,
             FrequencyDirectionalityFilter,

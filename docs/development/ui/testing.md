@@ -26,21 +26,22 @@ QDash UI currently uses a combination of:
 
 ### Testing Pyramid for QDash UI
 
-```
-                    ┌───────────────────┐
-                    │   E2E Tests       │  ← Future: Playwright/Cypress
-                    │   (Manual now)    │
-                    └─────────┬─────────┘
-                              │
-               ┌──────────────┴──────────────┐
-               │     Integration Tests       │  ← Future: Testing Library
-               │     (Component + API)       │
-               └──────────────┬──────────────┘
-                              │
-        ┌─────────────────────┴─────────────────────┐
-        │            Static Analysis                 │  ← Current
-        │    TypeScript + ESLint + Build Check      │
-        └───────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph E2E["E2E Tests (Future: Playwright/Cypress)"]
+        E2EContent["Manual testing now"]
+    end
+
+    subgraph Integration["Integration Tests (Future: Testing Library)"]
+        IntContent["Component + API"]
+    end
+
+    subgraph Static["Static Analysis (Current)"]
+        StaticContent["TypeScript + ESLint + Build Check"]
+    end
+
+    E2E --- Integration
+    Integration --- Static
 ```
 
 ---

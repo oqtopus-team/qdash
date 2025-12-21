@@ -33,40 +33,49 @@ tasks:
       - bun install
       - bun run docs:dev --host
 
+  # =============================================================================
+  # Python Tests (all tests run in-memory, no MongoDB required)
+  # =============================================================================
+
   test:
+    desc: Run all Python tests
     cmds:
-      - python -m pytest tests/ -v
-    desc: Run all tests with pytest
-
-  test-api:
-    cmds:
-      - python -m pytest tests/qdash/api/ -v
-    desc: Run API router tests
-
-  test-dbmodel:
-    cmds:
-      - python -m pytest tests/qdash/dbmodel/ -v
-    desc: Run database model tests
-
-  test-workflow:
-    cmds:
-      - python -m pytest tests/qdash/workflow/ -v
-    desc: Run workflow tests
-
-  test-coverage:
-    cmds:
-      - python -m pytest tests/ --cov=src/qdash --cov-report=term --cov-report=html
-    desc: Run tests with coverage report
+      - uv run pytest tests/ -v
 
   test-fast:
-    cmds:
-      - python -m pytest tests/ -v -x --tb=short
     desc: Run tests, stop on first failure
-
-  test-mypy:
     cmds:
-      - python -m mypy tests/
-    desc: Run mypy type checking on tests
+      - uv run pytest tests/ -v -x --tb=short
+
+  test-api:
+    desc: Run API router tests
+    cmds:
+      - uv run pytest tests/qdash/api/ -v
+
+  test-workflow:
+    desc: Run workflow engine tests
+    cmds:
+      - uv run pytest tests/qdash/workflow/ -v
+
+  test-repository:
+    desc: Run repository tests
+    cmds:
+      - uv run pytest tests/qdash/workflow/engine/repository/ -v
+
+  test-coverage:
+    desc: Run tests with coverage report
+    cmds:
+      - uv run pytest tests/ --cov=src/qdash --cov-report=term --cov-report=html
+
+  test-parallel:
+    desc: Run tests in parallel (requires pytest-xdist)
+    cmds:
+      - uv run pytest tests/ -v -n auto
+
+  test-watch:
+    desc: Run tests in watch mode (requires pytest-watch)
+    cmds:
+      - uv run ptw -- -v --tb=short
 
   build:
     dir: ui
@@ -78,6 +87,10 @@ tasks:
     cmds:
       - npm run docs:build
 
+  # =============================================================================
+  # Linting & Formatting (local development - auto-fix)
+  # =============================================================================
+
   lint:
     desc: Run all linting and formatting (Python + UI)
     cmds:
@@ -85,22 +98,83 @@ tasks:
       - task: lint-ui
 
   lint-python:
-    desc: Run Python linting and formatting
+    desc: Run Python linting and formatting (auto-fix)
     cmds:
-      - uv run ruff check --fix --quiet . # Excludes generated client (see pyproject.toml)
+      - uv run ruff check --fix --quiet .
       - uv run ruff format --quiet .
 
   lint-ui:
     dir: ui
-    desc: Run UI linting and formatting
+    desc: Run UI linting and formatting (auto-fix)
     cmds:
       - bunx prettier . --write --log-level error
       - bunx eslint . --fix -c eslint.config.mjs --quiet
 
-  lint-mypy:
-    desc: Run mypy type checking on clean modules only
+  # =============================================================================
+  # Local Check (run before push)
+  # =============================================================================
+
+  check:
+    desc: Run all checks locally (lint, typecheck, test)
     cmds:
-      - uv run mypy src/qdash/dbmodel --ignore-missing-imports
+      - task: ci-lint
+      - task: ci-typecheck
+      - task: ci-test
+
+  check-all:
+    desc: Run all checks including UI
+    cmds:
+      - task: check
+      - task: ci-ui
+
+  # =============================================================================
+  # CI Checks (check-only, no auto-fix)
+  # =============================================================================
+
+  ci:
+    desc: "[CI] Run all Python CI checks"
+    cmds:
+      - task: ci-lint
+      - task: ci-typecheck
+      - task: ci-test
+
+  ci-lint:
+    desc: Check Python linting (no auto-fix)
+    cmds:
+      - uv run ruff check .
+      - uv run ruff format --check .
+
+  ci-typecheck:
+    desc: Run mypy type checking
+    cmds:
+      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow
+
+  ci-test:
+    desc: Run all tests with coverage
+    cmds:
+      - uv run pytest tests/ -v --tb=short --cov=src/qdash --cov-report=xml --cov-report=term
+
+  ci-ui:
+    desc: Run all UI CI checks
+    dir: ui
+    cmds:
+      - bunx eslint . -c eslint.config.mjs
+      - bunx prettier . --check
+
+  ci-ui-build:
+    desc: Build UI for production
+    dir: ui
+    cmds:
+      - bun run build
+
+  # =============================================================================
+  # Legacy aliases (for backwards compatibility)
+  # =============================================================================
+
+  lint-mypy:
+    desc: "[Deprecated] Use ci-typecheck instead"
+    cmds:
+      - task: ci-typecheck
 
   tbls-docs:
     cmds:

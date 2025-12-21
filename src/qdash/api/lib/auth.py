@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from qdash.api.schemas.auth import User, UserInDB
@@ -8,24 +8,41 @@ from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.user import UserDocument
 
-# ロガーの設定
+# Logger configuration
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# モジュールレベルで初期化
+# Initialize at module level
 initialize()
 
-# bcryptの設定を最適化
+# Optimize bcrypt settings
 pwd_context = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto",
-    bcrypt__rounds=10,  # 開発環境では少なめに設定
+    bcrypt__rounds=10,  # Lower rounds for development
     bcrypt__ident="2b",
-    truncate_error=False,  # パスワードの長さチェックを無効化
+    truncate_error=False,  # Disable password length check
 )
 
 # Bearer Token authentication scheme
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def username_header(x_username: str | None = Header(None, alias="X-Username")) -> str | None:
+    """Extract username from X-Username header.
+
+    Parameters
+    ----------
+    x_username : str | None
+        Username from X-Username header (optional)
+
+    Returns
+    -------
+    str | None
+        Username or None if not provided
+
+    """
+    return x_username
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

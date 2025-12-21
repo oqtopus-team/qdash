@@ -1,9 +1,10 @@
-from typing import ClassVar
+from datetime import datetime
+from typing import Any, ClassVar
 
-import pendulum
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
+from qdash.common.datetime_utils import now
 from qdash.datamodel.system_info import SystemInfoModel
 
 
@@ -18,7 +19,7 @@ class CalibrationNoteDocument(Document):
         execution_id (str): The execution ID associated with this note.
         task_id (str): The task ID associated with this note.
         note (dict): The calibration note data.
-        timestamp (str): The time when the note was last updated.
+        timestamp (datetime): The time when the note was last updated.
         system_info (SystemInfoModel): The system information.
 
     """
@@ -28,9 +29,9 @@ class CalibrationNoteDocument(Document):
     chip_id: str = Field(..., description="The chip ID associated with this note")
     execution_id: str = Field(..., description="The execution ID associated with this note")
     task_id: str = Field(..., description="The task ID associated with this note")
-    note: dict = Field(..., description="The calibration note data")
-    timestamp: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+    note: dict[str, Any] = Field(..., description="The calibration note data")
+    timestamp: datetime = Field(
+        default_factory=now,
         description="The time when the note was last updated",
     )
     system_info: SystemInfoModel = Field(
@@ -65,7 +66,7 @@ class CalibrationNoteDocument(Document):
         chip_id: str,
         execution_id: str,
         task_id: str,
-        note: dict,
+        note: dict[str, Any],
         project_id: str,
     ) -> "CalibrationNoteDocument":
         """Upsert a calibration note.
@@ -106,7 +107,7 @@ class CalibrationNoteDocument(Document):
             return doc
 
         doc.note = note
-        doc.timestamp = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        doc.timestamp = now()
         doc.save()
         return doc
 

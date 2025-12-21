@@ -72,12 +72,12 @@ tests/qdash/workflow/
 │       └── repository/                    # Repository tests
 │           ├── __init__.py
 │           └── test_filesystem_impl.py    # Filesystem implementation tests
-└── flow/                              # Flow session and context tests
+└── service/                           # Calibration service tests
     ├── __init__.py
-    ├── test_config.py                 # FlowSessionConfig tests
+    ├── test_config.py                 # CalibServiceConfig tests
     ├── test_factory.py                # Factory tests
     ├── test_context.py                # SessionContext tests
-    └── test_session.py                # FlowSession tests
+    └── test_session.py                # CalibService tests
 ```
 
 ### Mapping Rules
@@ -90,8 +90,8 @@ tests/qdash/workflow/
 | `src/qdash/workflow/engine/calibration/execution/manager.py`      | `tests/qdash/workflow/engine/calibration/execution/test_manager.py`      |
 | `src/qdash/workflow/engine/calibration/execution/service.py`      | `tests/qdash/workflow/engine/calibration/execution/test_service.py`      |
 | `src/qdash/workflow/engine/calibration/scheduler/cr_scheduler.py` | `tests/qdash/workflow/engine/calibration/scheduler/test_cr_scheduler.py` |
-| `src/qdash/workflow/flow/context.py`                              | `tests/qdash/workflow/flow/test_context.py`                              |
-| `src/qdash/workflow/flow/session.py`                              | `tests/qdash/workflow/flow/test_session.py`                              |
+| `src/qdash/workflow/service/context.py`                           | `tests/qdash/workflow/service/test_context.py`                           |
+| `src/qdash/workflow/service/session.py`                           | `tests/qdash/workflow/service/test_session.py`                           |
 
 ---
 
@@ -716,6 +716,108 @@ class TestGlobalSessionHelpers:
 
 ## Database Testing
 
+### Using InMemory Repositories (Recommended)
+
+For most unit tests, use InMemory repository implementations instead of MongoDB.
+This approach is faster, doesn't require database setup, and provides better isolation.
+
+```python
+from qdash.workflow.engine.repository import (
+    InMemoryExecutionRepository,
+    InMemoryChipRepository,
+    InMemoryCalibrationNoteRepository,
+    InMemoryQubitCalibrationRepository,
+    InMemoryCouplingCalibrationRepository,
+    InMemoryExecutionCounterRepository,
+    InMemoryExecutionLockRepository,
+    InMemoryUserRepository,
+    InMemoryTaskRepository,
+)
+
+
+class TestWithInMemoryRepositories:
+    """Test using InMemory repositories."""
+
+    def test_generate_execution_id(self):
+        """Test execution ID generation without MongoDB."""
+        from qdash.workflow.service.calib_service import generate_execution_id
+
+        counter_repo = InMemoryExecutionCounterRepository()
+
+        id1 = generate_execution_id(
+            username="alice",
+            chip_id="chip_1",
+            project_id="proj-1",
+            counter_repo=counter_repo,
+        )
+        id2 = generate_execution_id(
+            username="alice",
+            chip_id="chip_1",
+            project_id="proj-1",
+            counter_repo=counter_repo,
+        )
+
+        assert id1.endswith("-000")
+        assert id2.endswith("-001")
+
+    def test_scheduler_with_injected_repository(self):
+        """Test CRScheduler with InMemory chip repository."""
+        from qdash.datamodel.chip import ChipModel
+        from qdash.workflow.engine.scheduler import CRScheduler
+
+        chip_repo = InMemoryChipRepository()
+        mock_chip = ChipModel(
+            chip_id="chip_1",
+            username="alice",
+            qubits={"0": {}, "1": {}},
+            couplings={"0-1": {}},
+            # ... other required fields
+        )
+        chip_repo.add_chip("alice", mock_chip)
+
+        scheduler = CRScheduler(
+            username="alice",
+            chip_id="chip_1",
+            chip_repo=chip_repo,
+        )
+        # Now scheduler uses InMemory data instead of MongoDB
+
+    def test_service_with_multiple_repositories(self):
+        """Test CalibService with multiple InMemory repositories."""
+        user_repo = InMemoryUserRepository()
+        lock_repo = InMemoryExecutionLockRepository()
+        counter_repo = InMemoryExecutionCounterRepository()
+
+        user_repo.add_user("alice", default_project_id="proj-1")
+
+        # Use DI to inject repositories
+        # (example pattern, actual implementation may vary)
+```
+
+**Benefits of InMemory Testing**:
+- No MongoDB setup required
+- Faster test execution
+- Better test isolation (no shared database state)
+- Easy to set up specific test scenarios
+- `clear()` method for test setup/teardown
+
+**Test Helper Methods**:
+
+Each InMemory repository provides helper methods for testing:
+
+```python
+# Add test data
+repo.add_chip("alice", mock_chip)
+repo.add_user("alice", default_project_id="proj-1")
+repo.add_tasks("alice", ["CheckFreq", "CheckRabi"])
+
+# Clear all data (useful in setup_method)
+repo.clear()
+
+# Get all stored data (for assertions)
+results = repo.get_all()
+```
+
 ### Using init_db Fixture
 
 For tests requiring MongoDB:
@@ -1010,6 +1112,6 @@ pytest tests/qdash/workflow/engine/calibration/test_cr_scheduler.py -v -k "param
 
 ## Related Documentation
 
-- [API Testing Guidelines](./api-testing-guidelines.md) - Testing guidelines for API endpoints
-- [CLAUDE.md](../../CLAUDE.md) - Project reference guide
-- [Python Flow Editor](../../CLAUDE.md#4-python-flow-editor-new-feature) - Flow helper documentation
+- [API Testing Guidelines](/development/api/testing) - Testing guidelines for API endpoints
+- [CLAUDE.md](https://github.com/oqtopus-team/qdash/blob/develop/CLAUDE.md) - Project reference guide
+- [Engine Architecture](./engine-architecture.md) - Workflow engine architecture

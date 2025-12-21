@@ -8,7 +8,7 @@ class FakeBackend(BaseBackend):
 
     name: str = "fake"
 
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         """Initialize the Fake backend with a configuration dictionary."""
         self._config = config
         self._instance: Any | None = None

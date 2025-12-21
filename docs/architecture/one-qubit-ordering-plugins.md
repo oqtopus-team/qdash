@@ -64,7 +64,7 @@ Frequency distribution (approximate MHz):
 Uses natural qubit ID order within each MUX.
 
 ```python
-from qdash.workflow.engine.calibration import (
+from qdash.workflow.engine import (
     OneQubitScheduler,
     DefaultOrderingStrategy,
 )
@@ -90,7 +90,7 @@ schedule = scheduler.generate_from_mux(
 Creates a checkerboard pattern across the chip where simultaneously calibrated qubits are spatially and frequency-separated.
 
 ```python
-from qdash.workflow.engine.calibration import (
+from qdash.workflow.engine import (
     OneQubitScheduler,
     CheckerboardOrderingStrategy,
 )
@@ -187,7 +187,7 @@ X = Calibrating, . = Idle
 ### Basic Usage
 
 ```python
-from qdash.workflow.engine.calibration import (
+from qdash.workflow.engine import (
     OneQubitScheduler,
     CheckerboardOrderingStrategy,
 )
@@ -211,11 +211,11 @@ for stage in schedule.stages:
 
 ```python
 from prefect import flow, task
-from qdash.workflow.engine.calibration import (
+from qdash.workflow.engine import (
     OneQubitScheduler,
     CheckerboardOrderingStrategy,
 )
-from qdash.workflow.flow import init_calibration, get_session, finish_calibration
+from qdash.workflow.service import init_calibration, get_session, finish_calibration
 
 @task
 def calibrate_mux_qubits(qids: list[str], tasks: list[str]) -> dict:
@@ -263,7 +263,7 @@ def frequency_aware_calibration(username: str, chip_id: str):
 You can create custom ordering strategies by extending `MuxOrderingStrategy`:
 
 ```python
-from qdash.workflow.engine.calibration.scheduler.one_qubit_plugins import (
+from qdash.workflow.engine.scheduler.one_qubit_plugins import (
     MuxOrderingStrategy,
     OrderingContext,
 )
@@ -366,19 +366,14 @@ For a full chip calibration with mixed boxes, expect **12 steps** (4 A + 8 MIXED
 
 Each Box B module controls 8 qubits (2 MUXes worth), but **Box B has no readout capability**. MIXED MUXes require Box A for readout, which creates a hardware constraint:
 
-```
-Box B Module Structure:
-┌─────────────────────────────────────┐
-│              Box B Module            │
-│  (controls 8 qubits, no readout)    │
-├──────────────┬──────────────────────┤
-│    MUX N     │      MUX N+4         │
-│  (4 qubits)  │    (4 qubits)        │
-└──────────────┴──────────────────────┘
-        │                  │
-        ▼                  ▼
-   Uses Box A         Uses Box A
-   for readout        for readout
+```mermaid
+flowchart TB
+    subgraph BoxB["Box B Module (controls 8 qubits, no readout)"]
+        MuxN["MUX N<br/>(4 qubits)"]
+        MuxN4["MUX N+4<br/>(4 qubits)"]
+    end
+    MuxN --> BoxA1["Uses Box A for readout"]
+    MuxN4 --> BoxA2["Uses Box A for readout"]
 ```
 
 **Constraint**: MUXes that share the same Box B module cannot calibrate simultaneously because they compete for Box A readout resources.
@@ -400,7 +395,7 @@ Group 2: [4, 7, 14]  → Steps 4-7
 ### Usage
 
 ```python
-from qdash.workflow.engine.calibration import OneQubitScheduler
+from qdash.workflow.engine import OneQubitScheduler
 
 scheduler = OneQubitScheduler(chip_id="64Qv3")
 
@@ -447,8 +442,8 @@ schedule_dict = schedule.to_dict()
 
 ```python
 from prefect import flow, task
-from qdash.workflow.engine.calibration import OneQubitScheduler
-from qdash.workflow.flow import init_calibration, get_session, finish_calibration
+from qdash.workflow.engine import OneQubitScheduler
+from qdash.workflow.service import init_calibration, get_session, finish_calibration
 
 @task
 def calibrate_qubits_parallel(qids: list[str], tasks: list[str]) -> dict:

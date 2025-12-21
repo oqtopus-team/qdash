@@ -7,9 +7,10 @@ This module provides base and specialized outlier detectors for quantum calibrat
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 import scipy.stats as stats
 
 logger = logging.getLogger(__name__)
@@ -22,10 +23,10 @@ class OutlierResult:
     original_count: int
     filtered_count: int
     outlier_count: int
-    outlier_qids: List[str]
+    outlier_qids: list[str]
     method_used: str
-    parameters: Dict[str, Any]
-    physical_violations: List[str]
+    parameters: dict[str, Any]
+    physical_violations: list[str]
 
 
 class OutlierDetector(ABC):
@@ -36,7 +37,7 @@ class OutlierDetector(ABC):
     Subclasses should override specific methods to customize behavior.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Default statistical thresholds
         self.default_thresholds = {
             "modified_z_score": 3.5,
@@ -48,7 +49,7 @@ class OutlierDetector(ABC):
         }
 
     @abstractmethod
-    def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
+    def get_physical_bounds(self, parameter_name: str) -> tuple[float, float]:
         """
         Get physical bounds for the parameter.
 
@@ -58,10 +59,11 @@ class OutlierDetector(ABC):
         Returns:
             Tuple of (min_bound, max_bound)
         """
-        pass
 
     @abstractmethod
-    def extract_parameter_values(self, data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+    def extract_parameter_values(
+        self, data: dict[str, Any], parameter_name: str
+    ) -> dict[str, float]:
         """
         Extract parameter values from task results.
 
@@ -72,14 +74,13 @@ class OutlierDetector(ABC):
         Returns:
             Dictionary mapping qid to parameter value
         """
-        pass
 
     def detect_outliers(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         parameter_name: str,
         method: str = "combined",
-        **kwargs,
+        **kwargs: Any,
     ) -> OutlierResult:
         """
         Detect outliers in the data.
@@ -124,7 +125,9 @@ class OutlierDetector(ABC):
 
         # Log detection results
         if outlier_qids:
-            logger.info(f"Detected {len(outlier_qids)} outliers in {parameter_name} data using {method}")
+            logger.info(
+                f"Detected {len(outlier_qids)} outliers in {parameter_name} data using {method}"
+            )
             logger.debug(f"Outlier QIDs: {outlier_qids}")
 
         return OutlierResult(
@@ -137,7 +140,9 @@ class OutlierDetector(ABC):
             physical_violations=violations,
         )
 
-    def _modified_z_score(self, values: np.ndarray, threshold: Optional[float] = None) -> Tuple[np.ndarray, List[str]]:
+    def _modified_z_score(
+        self, values: npt.NDArray[np.floating[Any]], threshold: float | None = None
+    ) -> tuple[npt.NDArray[np.bool_], list[str]]:
         """
         Modified Z-score using Median Absolute Deviation (MAD).
         More robust than standard Z-score for non-normal distributions.
@@ -157,7 +162,9 @@ class OutlierDetector(ABC):
         violations = [f"Modified Z-score > {threshold}"]
         return outlier_mask, violations
 
-    def _iqr_method(self, values: np.ndarray, multiplier: Optional[float] = None) -> Tuple[np.ndarray, List[str]]:
+    def _iqr_method(
+        self, values: npt.NDArray[np.floating[Any]], multiplier: float | None = None
+    ) -> tuple[npt.NDArray[np.bool_], list[str]]:
         """
         Interquartile Range (IQR) method for outlier detection.
         Robust to skewed distributions.
@@ -175,7 +182,9 @@ class OutlierDetector(ABC):
         violations = [f"IQR method with multiplier {multiplier}"]
         return outlier_mask, violations
 
-    def _physical_bounds(self, values: np.ndarray, parameter_name: str) -> Tuple[np.ndarray, List[str]]:
+    def _physical_bounds(
+        self, values: npt.NDArray[np.floating[Any]], parameter_name: str
+    ) -> tuple[npt.NDArray[np.bool_], list[str]]:
         """Check physical bounds for the parameter."""
         min_bound, max_bound = self.get_physical_bounds(parameter_name)
 
@@ -189,7 +198,9 @@ class OutlierDetector(ABC):
 
         return outlier_mask, violations
 
-    def _combined_method(self, values: np.ndarray, parameter_name: str, **kwargs) -> Tuple[np.ndarray, List[str]]:
+    def _combined_method(
+        self, values: npt.NDArray[np.floating[Any]], parameter_name: str, **kwargs: Any
+    ) -> tuple[npt.NDArray[np.bool_], list[str]]:
         """Combine physical bounds and statistical methods."""
         # Always check physical bounds first
         physical_outliers, physical_violations = self._physical_bounds(values, parameter_name)
@@ -198,7 +209,9 @@ class OutlierDetector(ABC):
         non_physical_outliers = ~physical_outliers
         if np.sum(non_physical_outliers) > 3:  # Need minimum data points
             valid_values = values[non_physical_outliers]
-            statistical_outliers, statistical_violations = self._modified_z_score(valid_values, **kwargs)
+            statistical_outliers, statistical_violations = self._modified_z_score(
+                valid_values, **kwargs
+            )
 
             # Map back to original indices
             full_statistical_mask = np.zeros(len(values), dtype=bool)
@@ -212,7 +225,9 @@ class OutlierDetector(ABC):
 
         return combined_outliers, combined_violations
 
-    def _z_score_scipy(self, values: np.ndarray, threshold: Optional[float] = None) -> Tuple[np.ndarray, List[str]]:
+    def _z_score_scipy(
+        self, values: npt.NDArray[np.floating[Any]], threshold: float | None = None
+    ) -> tuple[npt.NDArray[np.bool_], list[str]]:
         """Simple Z-score using scipy."""
         threshold = threshold or self.default_thresholds["z_score"]
 
@@ -224,7 +239,7 @@ class OutlierDetector(ABC):
         return outlier_mask, [f"Z-score > {threshold}"]
 
 
-def extract_coherence_time_values(data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+def extract_coherence_time_values(data: dict[str, Any], parameter_name: str) -> dict[str, float]:
     """Extract coherence time values from task results."""
     extracted = {}
 
@@ -232,14 +247,13 @@ def extract_coherence_time_values(data: Dict[str, Any], parameter_name: str) -> 
         value = None
 
         # Handle different data structures
-        if isinstance(task_result, dict):
-            if "output_parameters" in task_result:
-                param_value = task_result["output_parameters"].get(parameter_name)
-                if param_value is not None:
-                    if isinstance(param_value, dict):
-                        value = float(param_value.get("value", param_value.get("mean", 0)))
-                    else:
-                        value = float(param_value)
+        if isinstance(task_result, dict) and "output_parameters" in task_result:
+            param_value = task_result["output_parameters"].get(parameter_name)
+            if param_value is not None:
+                if isinstance(param_value, dict):
+                    value = float(param_value.get("value", param_value.get("mean", 0)))
+                else:
+                    value = float(param_value)
 
         # Validate and convert to microseconds if needed
         if value is not None and not np.isnan(value) and value > 0:
@@ -251,7 +265,7 @@ def extract_coherence_time_values(data: Dict[str, Any], parameter_name: str) -> 
     return extracted
 
 
-def extract_fidelity_values(data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+def extract_fidelity_values(data: dict[str, Any], parameter_name: str) -> dict[str, float]:
     """Extract fidelity values from task results."""
     extracted = {}
 
@@ -259,14 +273,13 @@ def extract_fidelity_values(data: Dict[str, Any], parameter_name: str) -> Dict[s
         value = None
 
         # Handle different data structures
-        if isinstance(task_result, dict):
-            if "output_parameters" in task_result:
-                param_value = task_result["output_parameters"].get(parameter_name)
-                if param_value is not None:
-                    if isinstance(param_value, dict):
-                        value = float(param_value.get("value", param_value.get("mean", 0)))
-                    else:
-                        value = float(param_value)
+        if isinstance(task_result, dict) and "output_parameters" in task_result:
+            param_value = task_result["output_parameters"].get(parameter_name)
+            if param_value is not None:
+                if isinstance(param_value, dict):
+                    value = float(param_value.get("value", param_value.get("mean", 0)))
+                else:
+                    value = float(param_value)
 
         # Include all numeric values for outlier detection
         if value is not None and not np.isnan(value):
@@ -278,45 +291,53 @@ def extract_fidelity_values(data: Dict[str, Any], parameter_name: str) -> Dict[s
 class T2StarOutlierDetector(OutlierDetector):
     """Detector for T2* (Ramsey) measurements."""
 
-    def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
+    def get_physical_bounds(self, parameter_name: str) -> tuple[float, float]:
         return (0.0, 1000.0)  # 0 to 1ms
 
-    def extract_parameter_values(self, data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+    def extract_parameter_values(
+        self, data: dict[str, Any], parameter_name: str
+    ) -> dict[str, float]:
         return extract_coherence_time_values(data, parameter_name)
 
 
 class T2EchoOutlierDetector(OutlierDetector):
     """Detector for T2 echo measurements."""
 
-    def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
+    def get_physical_bounds(self, parameter_name: str) -> tuple[float, float]:
         return (0.0, 2000.0)  # 0 to 2ms
 
-    def extract_parameter_values(self, data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+    def extract_parameter_values(
+        self, data: dict[str, Any], parameter_name: str
+    ) -> dict[str, float]:
         return extract_coherence_time_values(data, parameter_name)
 
 
 class T1OutlierDetector(OutlierDetector):
     """Detector for T1 relaxation time measurements."""
 
-    def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
+    def get_physical_bounds(self, parameter_name: str) -> tuple[float, float]:
         return (0.0, 10000.0)  # 0 to 10ms
 
-    def extract_parameter_values(self, data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+    def extract_parameter_values(
+        self, data: dict[str, Any], parameter_name: str
+    ) -> dict[str, float]:
         return extract_coherence_time_values(data, parameter_name)
 
 
 class GateFidelityOutlierDetector(OutlierDetector):
     """Detector for gate fidelity measurements."""
 
-    def get_physical_bounds(self, parameter_name: str) -> Tuple[float, float]:
+    def get_physical_bounds(self, parameter_name: str) -> tuple[float, float]:
         return (0.0, 1.0)  # 0 to 1 (100%)
 
-    def extract_parameter_values(self, data: Dict[str, Any], parameter_name: str) -> Dict[str, float]:
+    def extract_parameter_values(
+        self, data: dict[str, Any], parameter_name: str
+    ) -> dict[str, float]:
         return extract_fidelity_values(data, parameter_name)
 
 
 # Factory function to get appropriate detector
-def get_outlier_detector(task_name: str) -> Optional[OutlierDetector]:
+def get_outlier_detector(task_name: str) -> OutlierDetector | None:
     """
     Factory function to get the appropriate outlier detector for a task.
 
@@ -326,7 +347,7 @@ def get_outlier_detector(task_name: str) -> Optional[OutlierDetector]:
     Returns:
         Appropriate OutlierDetector instance or None
     """
-    detector_mapping: Dict[str, Type[OutlierDetector]] = {
+    detector_mapping: dict[str, type[OutlierDetector]] = {
         "CheckRamsey": T2StarOutlierDetector,
         "Ramsey": T2StarOutlierDetector,
         "T2Star": T2StarOutlierDetector,
@@ -349,8 +370,11 @@ def get_outlier_detector(task_name: str) -> Optional[OutlierDetector]:
 
 
 def filter_task_results_for_outliers(
-    task_results: Dict[str, Any], task_name: str, enable_filtering: bool = True, method: str = "combined"
-) -> Tuple[Dict[str, Any], Optional[OutlierResult]]:
+    task_results: dict[str, Any],
+    task_name: str,
+    enable_filtering: bool = True,
+    method: str = "combined",
+) -> tuple[dict[str, Any], OutlierResult | None]:
     """
     Filter task results to remove outliers based on task type.
 
@@ -394,9 +418,15 @@ def filter_task_results_for_outliers(
         return task_results, None
 
     # Detect outliers
-    outlier_result = detector.detect_outliers(task_results, parameter_name=parameter_name, method=method)
+    outlier_result = detector.detect_outliers(
+        task_results, parameter_name=parameter_name, method=method
+    )
 
     # Filter out outliers
-    filtered_results = {qid: result for qid, result in task_results.items() if qid not in outlier_result.outlier_qids}
+    filtered_results = {
+        qid: result
+        for qid, result in task_results.items()
+        if qid not in outlier_result.outlier_qids
+    }
 
     return filtered_results, outlier_result

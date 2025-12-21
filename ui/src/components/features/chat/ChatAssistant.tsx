@@ -80,7 +80,7 @@ export function ChatAssistant() {
 
     // Helper function to find the latest chip by installed_at
     const findLatestChip = (
-      chips: Array<{ chip_id: string; installed_at?: string }>,
+      chips: Array<{ chip_id: string; installed_at?: string | null }>,
     ) => {
       if (chips.length === 0) return null;
       return chips.reduce((latest, chip) => {

@@ -8,6 +8,11 @@ import type { Task } from "@/schemas";
 import { useGetTaskResult } from "@/client/task/task";
 import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureContent";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import {
+  formatDate as formatDateUtil,
+  formatTime as formatTimeUtil,
+  formatDateTime as formatDateTimeUtil,
+} from "@/utils/datetime";
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -146,24 +151,13 @@ export function TaskDetailModal({
     selectedDate && onNavigatePrevious && onNavigateNext && formatDate;
   const showDetailView = chipId;
 
-  const formatDateTime = (dateStr?: string | null) => {
+  const formatDateTimeLocal = (dateStr?: string | null) => {
     if (!dateStr) return "-";
-    const date = new Date(dateStr);
     return (
       <>
-        <div className="font-medium">
-          {date.toLocaleDateString("ja-JP", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          })}
-        </div>
+        <div className="font-medium">{formatDateUtil(dateStr)}</div>
         <div className="text-xs text-base-content/60">
-          {date.toLocaleTimeString("ja-JP", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })}
+          {formatTimeUtil(dateStr)}
         </div>
       </>
     );
@@ -281,7 +275,9 @@ export function TaskDetailModal({
                 <div className="text-sm text-base-content/60 mb-1">
                   Start Time
                 </div>
-                <div className="text-sm">{formatDateTime(task.start_at)}</div>
+                <div className="text-sm">
+                  {formatDateTimeLocal(task.start_at)}
+                </div>
               </div>
             )}
             {task.end_at && (
@@ -289,7 +285,9 @@ export function TaskDetailModal({
                 <div className="text-sm text-base-content/60 mb-1">
                   End Time
                 </div>
-                <div className="text-sm">{formatDateTime(task.end_at)}</div>
+                <div className="text-sm">
+                  {formatDateTimeLocal(task.end_at)}
+                </div>
               </div>
             )}
             {task.elapsed_time && (
@@ -411,7 +409,7 @@ export function TaskDetailModal({
                         <div className="card bg-base-200 p-4 rounded-xl">
                           <h4 className="font-medium mb-2">Calibrated At</h4>
                           <p className="text-sm">
-                            {new Date(task.end_at).toLocaleString()}
+                            {formatDateTimeUtil(task.end_at)}
                           </p>
                         </div>
                       )}

@@ -9,6 +9,7 @@ from qdash.api.routers import (
     backend,
     calibration,
     chip,
+    config,
     copilot,
     device_topology,
     execution,
@@ -107,3 +108,4 @@ app.include_router(
 app.include_router(
     topology.router, prefix="/topology", tags=["topology"], dependencies=auth_dependency
 )
+app.include_router(config.router, tags=["config"], dependencies=auth_dependency)

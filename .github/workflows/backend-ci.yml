@@ -1,0 +1,120 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "src/qdash/**"
+      - "!src/qdash/client/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Taskfile.yaml"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "src/qdash/**"
+      - "!src/qdash/client/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Taskfile.yaml"
+      - ".github/workflows/backend-ci.yml"
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Install Go Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        run: uv python install 3.10
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Run lint check
+        run: task ci-lint
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Install Go Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        run: uv python install 3.10
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Run type check
+        run: task ci-typecheck
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    needs: typecheck
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Install Go Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Run tests with coverage
+        run: task ci-test
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.10'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}

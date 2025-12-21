@@ -1,12 +1,13 @@
 import math
 import uuid
 from copy import deepcopy
+from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 import numpy as np
-import pendulum
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator
+from qdash.common.datetime_utils import format_elapsed_time, now, parse_elapsed_time
 from qdash.datamodel.system_info import SystemInfoModel
 
 SCHDULED = "scheduled"
@@ -16,13 +17,25 @@ FAILED = "failed"
 PENDING = "pending"
 SKIPPED = "skipped"
 
+# Task type definitions
+TaskType = Literal["qubit", "coupling", "global", "system"]
+
+
+class TaskTypes:
+    """Constants for task types."""
+
+    QUBIT: Final[TaskType] = "qubit"
+    COUPLING: Final[TaskType] = "coupling"
+    GLOBAL: Final[TaskType] = "global"
+    SYSTEM: Final[TaskType] = "system"
+
 
 class InputParameterModel(BaseModel):
     """Input parameter class."""
 
     unit: str = ""
     value_type: str = "float"
-    value: tuple | int | float | None = None
+    value: tuple[int | float, ...] | list[int | float] | int | float | None = None
     description: str = ""
 
     def get_value(self) -> Any:
@@ -61,12 +74,22 @@ class InputParameterModel(BaseModel):
                 for p in parts:
                     result *= p
                 return result
+            if self.value is None:
+                raise ValueError("Cannot convert None to int")
+            if isinstance(self.value, (tuple, list)):
+                raise ValueError("Cannot convert tuple/list to int")
             return int(self.value)
         elif self.value_type == "float":
+            if self.value is None:
+                raise ValueError("Cannot convert None to float")
+            if isinstance(self.value, (tuple, list)):
+                raise ValueError("Cannot convert tuple/list to float")
             return float(self.value)
         elif self.value_type == "str":
             return str(self.value)
         elif self.value_type == "list":
+            if not isinstance(self.value, (list, tuple)):
+                raise ValueError("Cannot convert non-iterable to list")
             return list(self.value)
         return self.value
 
@@ -86,9 +109,9 @@ class OutputParameterModel(BaseModel):
     error: float = 0
     unit: str = ""
     description: str = ""
-    calibrated_at: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
-        description="The time when the system information was created",
+    calibrated_at: datetime = Field(
+        default_factory=now,
+        description="The time when the calibration was performed",
     )
     execution_id: str = ""
     task_id: str = ""
@@ -147,10 +170,10 @@ class CalibDataModel(BaseModel):
             self.coupling[qid] = {}
         self.coupling[qid][parameter_name] = data
 
-    def __getitem__(self, key: str) -> dict:
+    def __getitem__(self, key: str) -> dict[str, dict[str, OutputParameterModel]]:
         """Get the item by key."""
         if key in ("qubit", "coupling"):
-            return getattr(self, key)  # type: ignore #noqa: PGH003
+            return getattr(self, key)  # type: ignore
         raise KeyError(f"Invalid key: {key}")
 
 
@@ -168,9 +191,9 @@ class BaseTaskResultModel(BaseModel):
         output_parameters (dict): The output parameters of the task.
         note (str): The note of the task.
         figure_path (list[str]): The path of the figure.
-        start_at (str): The time when the task started.
-        end_at (str): The time when the task ended.
-        elapsed_time (str): The elapsed time of the task.
+        start_at (datetime): The time when the task started.
+        end_at (datetime): The time when the task ended.
+        elapsed_time (timedelta): The elapsed time of the task.
         task_type (str): The type of the task.
         system_info (SystemInfoModel): The system information.
 
@@ -182,25 +205,43 @@ class BaseTaskResultModel(BaseModel):
     upstream_id: str = ""
     status: TaskStatusModel = TaskStatusModel.SCHEDULED
     message: str = ""
-    input_parameters: dict = {}
-    output_parameters: dict = {}
+    input_parameters: dict[str, Any] = {}
+    output_parameters: dict[str, Any] = {}
     output_parameter_names: list[str] = []
-    note: dict = {}
+    note: dict[str, Any] = {}
     figure_path: list[str] = []
     json_figure_path: list[str] = []
     raw_data_path: list[str] = []
-    start_at: str = ""
-    end_at: str = ""
-    elapsed_time: str = ""
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    elapsed_time: timedelta | None = None
     task_type: str = "global"
     system_info: SystemInfoModel = SystemInfoModel()
+
+    @field_validator("elapsed_time", mode="before")
+    @classmethod
+    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
+        """Parse elapsed_time from various formats including human-readable strings."""
+        return parse_elapsed_time(v)
+
+    @field_serializer("start_at", "end_at")
+    @classmethod
+    def _serialize_datetime(cls, v: datetime | None) -> str | None:
+        """Serialize datetime to ISO format for JSON compatibility."""
+        return v.isoformat() if v else None
+
+    @field_serializer("elapsed_time")
+    @classmethod
+    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
+        """Serialize elapsed_time to H:MM:SS format."""
+        return format_elapsed_time(v) if v else None
 
     def diagnose(self) -> None:
         """Diagnose the task result and raise an error if the task failed."""
         if self.status == TaskStatusModel.FAILED:
             raise RuntimeError(f"Task {self.name} failed with message: {self.message}")
 
-    def put_input_parameter(self, input_parameters: dict) -> None:
+    def put_input_parameter(self, input_parameters: dict[str, Any]) -> None:
         """Put a parameter to the task result."""
         copied_parameters = deepcopy(input_parameters)
         # Process the copied_parameters
@@ -213,7 +254,7 @@ class BaseTaskResultModel(BaseModel):
                 copied_parameters[key] = item
         self.input_parameters = copied_parameters
 
-    def put_output_parameter(self, output_parameters: dict) -> None:
+    def put_output_parameter(self, output_parameters: dict[str, Any]) -> None:
         import numpy as np
 
         """
@@ -231,7 +272,7 @@ class BaseTaskResultModel(BaseModel):
             self.output_parameter_names.append(key)
         self.output_parameters = copied_parameters
 
-    def put_note(self, note: dict) -> None:
+    def put_note(self, note: dict[str, Any]) -> None:
         """Put a note to the task result.
 
         Args:
@@ -241,22 +282,20 @@ class BaseTaskResultModel(BaseModel):
         """
         self.note = note
 
-    def calculate_elapsed_time(self, start_at: str, end_at: str) -> str:
+    def calculate_elapsed_time(self, start_at: datetime, end_at: datetime) -> timedelta:
         """Calculate the elapsed time.
 
         Args:
         ----
-            start_at (str): The start time.
-            end_at (str): The end time.
+            start_at (datetime): The start time.
+            end_at (datetime): The end time.
+
+        Returns:
+        -------
+            timedelta: The elapsed time.
 
         """
-        try:
-            start_time = pendulum.parse(start_at)
-            end_time = pendulum.parse(end_at)
-        except Exception as e:
-            error_message = f"Failed to parse the time. {e}"
-            raise ValueError(error_message)
-        return end_time.diff_for_humans(start_time, absolute=True)  # type: ignore #noqa: PGH003
+        return end_at - start_at
 
 
 class SystemTaskModel(BaseTaskResultModel):
@@ -345,5 +384,5 @@ class TaskModel(BaseModel):
     backend: str | None = Field(None, description="The backend of the task")
     description: str = Field(..., description="Detailed description of the task")
     task_type: str = Field(..., description="The type of the task")
-    input_parameters: dict = Field(..., description="The input parameters of the task")
-    output_parameters: dict = Field(..., description="The output parameters of the task")
+    input_parameters: dict[str, Any] = Field(..., description="The input parameters of the task")
+    output_parameters: dict[str, Any] = Field(..., description="The output parameters of the task")

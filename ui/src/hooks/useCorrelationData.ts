@@ -5,6 +5,7 @@ import type {
   StatisticalSummary,
   ParameterKey,
 } from "@/types/analysis";
+import { formatDateTime } from "@/utils/datetime";
 
 interface ParameterValue {
   value: number;
@@ -75,7 +76,7 @@ export function useCorrelationData(options: UseCorrelationDataOptions) {
       unit,
       description: paramData.description ?? "",
       updated: paramData.calibrated_at
-        ? new Date(paramData.calibrated_at).toLocaleString()
+        ? formatDateTime(paramData.calibrated_at)
         : "",
     };
   };

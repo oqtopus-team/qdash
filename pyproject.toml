@@ -24,31 +24,62 @@ packages = [
     "src",
     "src/qdash",
     "src/qdash/api",
+    "src/qdash/common",
     "src/qdash/workflow",
     "src/qdash/dbmodel",
     "src/qdash/datamodel",
-    "src/qdash/cli"
 ]
-
-[project.scripts]
-qdash = "qdash.cli:app"
-
-
 
 [tool.ruff]
 line-length = 100
-exclude = ["tools", "scripts", "qdash_client"]
+exclude = ["tools", "scripts"]
+target-version = "py310"
 lint.unfixable = ["F401"]
-# Temporarily use minimal rule set to get CI passing
 lint.select = [
-    "E9",  # syntax errors only
-    "F63", # comparison issues
-    "F7",  # syntax errors
-    "F82", # undefined names
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "C4",  # flake8-comprehensions
+    "RET", # flake8-return
+    "TCH", # flake8-type-checking
+    "PIE", # flake8-pie
+    "PERF", # perflint
+    "PLC", # pylint convention
+    "PLE", # pylint error
+    "PLW", # pylint warning
+    "RUF", # ruff-specific rules
+    "S",   # flake8-bandit (security)
 ]
-lint.ignore = []
+lint.ignore = [
+    "E501",  # line-too-long (handled by formatter)
+    "B904",  # raise-without-from-inside-except (TODO: fix in exception handling task)
+    "B008",  # function-call-in-default-argument (FastAPI Depends pattern)
+    "UP038", # non-pep604-isinstance (requires manual fix)
+    "B007",  # unused-loop-control-variable (minor style issue)
+    "B012",  # return-in-finally (intentional in specific cases)
+    "B027",  # empty-method-without-abstract-decorator (intentional default impl)
+    "RET505", # superfluous-else-return (style preference)
+    "RET506", # superfluous-else-raise (style preference)
+    "SIM102", # collapsible-if (readability preference)
+    "SIM108", # if-else-block-instead-of-if-exp (readability preference)
+    "PERF401", # manual-list-comprehension (readability over micro-optimization)
+    "PERF402", # manual-list-copy (readability over micro-optimization)
+    "PLW0603", # global-statement (used for singletons/caching)
+    "RUF003",  # ambiguous-unicode-character-comment (Japanese comments)
+    "RUF012",  # mutable-class-default (Pydantic models)
+    "S101",    # assert (used for runtime checks)
+]
 
 [tool.ruff.lint.per-file-ignores]
+"src/qdash/workflow/service/calib_service.py" = ["E402"]  # Circular import avoidance
+"src/qdash/workflow/paths.py" = ["F401"]  # Re-exports for backward compatibility
+"src/qdash/api/routers/auth.py" = ["S106"]  # "bearer" is standard token type
+"src/qdash/api/routers/flow.py" = ["S603", "S607"]  # ruff format subprocess call
+"src/qdash/api/lib/topology_config.py" = ["S112"]  # Skip invalid config files
 "tests/**" = [
     "ANN201",
     "ANN205",
@@ -59,21 +90,62 @@ lint.ignore = []
     "PLR2004",
     "PLR6301",
     "S101",
+    "S106",  # Test data passwords
+    "S108",  # /tmp usage in tests is acceptable
+    "RUF002", # Japanese in docstrings
 ]
 
 [tool.mypy]
-# Temporarily relaxed settings to reduce overwhelming errors
+strict = true
 ignore_missing_imports = true
-ignore_errors = false
 exclude = ["tools", "scripts"]
-# Disable strict checks temporarily
-disallow_untyped_defs = false
-warn_return_any = false
-check_untyped_defs = false
-no_implicit_optional = false
+# Disable error codes for known issues:
+# - misc: FastAPI untyped decorator warnings
+# - override: Liskov substitution violations in calibtasks (design issue)
+# - no-untyped-call: Calls to untyped external library functions
+disable_error_code = ["misc", "override", "no-untyped-call", "redundant-cast"]
+# Use explicit package bases to avoid src.qdash vs qdash conflicts
+explicit_package_bases = true
+mypy_path = "src"
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.coverage.run]
+source = ["src/qdash"]
+omit = [
+    # Data models - primarily type definitions
+    "src/qdash/datamodel/*",
+    # Database models - document definitions
+    "src/qdash/dbmodel/*",
+    # API schemas - request/response models
+    "src/qdash/api/schemas/*",
+    # Auto-generated client code
+    "src/qdash/client/*",
+    # Internal service modules
+    "src/qdash/workflow/service/_internal/*",
+    # Worker tasks
+    "src/qdash/workflow/worker/*",
+    # Setup scripts
+    "src/qdash/workflow/setup_work_pool.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "@abstractmethod",
+]
 
 [dependency-groups]
 api = [
@@ -100,6 +172,7 @@ api = [
     "plotly>=5.18.0",  # For chart generation
     "kaleido>=0.2.1",  # For Plotly image export
     "pillow>=10.0.0",  # For image processing
+    "croniter>=6.0.0",  # For cron schedule parsing
 ]
 workflow = [
     "pymongo==4.8.0",
@@ -113,6 +186,7 @@ workflow = [
     "filelock>=3.17.0",
     "gitpython>=3.1.44",
     "reportlab>=4.4.1",
+    "ruamel.yaml>=0.18.0",
 ]
 dev = [
     "ruff==0.5.5",
@@ -121,9 +195,14 @@ dev = [
     "pytest-env==1.1.3",
     "pytest-mypy==0.10.3",
     "pytest-asyncio==0.24.0",
-    "testcontainers[mongodb]==4.8.2",
-    "typer==0.14.0",
+    "pytest-mock==3.14.1",
+    "mongomock==4.1.2",
     "go-task-bin>=3.41.0",
+    "types-pyyaml>=6.0.12.20250809",
+    "types-python-dateutil>=2.9.0.20250809",
+    "types-croniter>=6.0.0.20250809",
+    "types-requests>=2.32.0.20250809",
+    "setuptools>=80.9.0",
 ]
 [tool.uv.sources]
 qubex = { git = "https://github.com/amachino/qubex.git", branch = "chore/chevron-fig" }

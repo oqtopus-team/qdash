@@ -18,7 +18,7 @@ logger = getLogger("uvicorn.app")
     description="Get settings from the server",
     operation_id="getSettings",
 )
-def get_settings(settings: Annotated[Settings, Depends(get_settings_dependency)]):
+def get_settings(settings: Annotated[Settings, Depends(get_settings_dependency)]) -> Settings:
     """Get server configuration settings.
 
     Retrieves the current server configuration including API ports, database

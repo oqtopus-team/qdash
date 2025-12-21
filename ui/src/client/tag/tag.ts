@@ -34,6 +34,8 @@ Parameters
 ----------
 ctx : ProjectContext
     Project context with user and project information
+tag_repo : MongoTagRepository
+    Repository for tag operations
 
 Returns
 -------

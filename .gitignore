@@ -191,6 +191,7 @@ sketch
 # End of https://www.toptal.com/developers/gitignore/api/python,react
 
 .env
+compose.override.yaml
 
 # Databases
 *.db
@@ -227,13 +228,16 @@ src/qdash/workflow/.system_note.json
 src/qdash/workflow/*.json
 src/qdash/workflow/.calibration/*.json
 src/qdash/workflow/.classifier/*/*
-# Ignore all files in config directory except metrics.yaml
+# Ignore all files in config directory except committed configs
 config/qubex/*
 !config/custom/*.template
 !config/metrics.yaml
 !config/settings.yaml
 !config/copilot.yaml
 !config/topologies/
+# Local settings overrides (not committed)
+# These allow per-developer customization without modifying committed files
+config/*.local.yaml
 src/tools/schedule/*
 .serena/cache/*
 .mcp.json

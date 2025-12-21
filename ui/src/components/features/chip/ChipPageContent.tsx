@@ -5,6 +5,8 @@ import React, { useState, useEffect } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
 
+import { formatDateTime } from "@/utils/datetime";
+
 import { CouplingGrid } from "./CouplingGrid";
 import { TaskResultGrid } from "./TaskResultGrid";
 import { CreateChipModal } from "./modals/CreateChipModal";
@@ -306,7 +308,7 @@ export function ChipPageContent() {
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
     if (diffInSeconds < 86400)
       return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    return date.toLocaleString();
+    return formatDateTime(date.toISOString());
   };
 
   // Get figure path from task

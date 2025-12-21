@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { CalibrationNoteResponseNote } from "./calibrationNoteResponseNote";
+import type { CalibrationNoteResponseTimestamp } from "./calibrationNoteResponseTimestamp";
 
 /**
  * CalibrationNote is a subclass of BaseModel.
@@ -15,5 +16,5 @@ export interface CalibrationNoteResponse {
   execution_id: string;
   task_id: string;
   note: CalibrationNoteResponseNote;
-  timestamp: string;
+  timestamp?: CalibrationNoteResponseTimestamp;
 }

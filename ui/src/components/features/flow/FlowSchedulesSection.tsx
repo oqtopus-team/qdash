@@ -4,6 +4,8 @@ import Link from "next/link";
 
 import { useQuery } from "@tanstack/react-query";
 
+import { formatDateTime } from "@/utils/datetime";
+
 import { listAllFlowSchedules } from "@/client/flow/flow";
 
 export function FlowSchedulesSection() {
@@ -107,8 +109,7 @@ export function FlowSchedulesSection() {
                         </p>
                       )}
                       <p className="text-xs opacity-60 mt-1">
-                        Created:{" "}
-                        {new Date(schedule.created_at).toLocaleString()}
+                        Created: {formatDateTime(schedule.created_at)}
                       </p>
                     </div>
                     <div className="text-xs opacity-60">→</div>
@@ -146,8 +147,7 @@ export function FlowSchedulesSection() {
                       </div>
                       {schedule.next_run && (
                         <p className="text-xs opacity-70 mt-1">
-                          Scheduled:{" "}
-                          {new Date(schedule.next_run).toLocaleString()}
+                          Scheduled: {formatDateTime(schedule.next_run)}
                         </p>
                       )}
                     </div>

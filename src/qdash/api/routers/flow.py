@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
 import httpx
 from croniter import croniter
@@ -39,22 +40,70 @@ from qdash.api.schemas.flow import (
     UpdateScheduleRequest,
     UpdateScheduleResponse,
 )
+from qdash.common.paths import SERVICE_DIR, TEMPLATES_DIR, USER_FLOWS_DIR
 from qdash.config import get_settings
-from qdash.dbmodel.flow import FlowDocument
-from zoneinfo import ZoneInfo
+from qdash.repository import MongoFlowRepository
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
 
 # Base directory for user flows (shared volume between API and Workflow containers)
-USER_FLOWS_BASE_DIR = Path("/app/qdash/workflow/user_flows")
+USER_FLOWS_BASE_DIR = USER_FLOWS_DIR
 
 # Deployment service URL (Deployment service container - internal Docker network)
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
 
 # Path to templates directory
-TEMPLATES_DIR = Path("/app/qdash/workflow/examples/templates")
 TEMPLATES_METADATA_FILE = TEMPLATES_DIR / "templates.json"
+
+# Default HTTP client configuration
+DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
+
+
+async def _http_post_with_retry(
+    url: str,
+    json_data: dict[str, Any],
+    *,
+    max_retries: int = 3,
+    timeout: httpx.Timeout | float = DEFAULT_TIMEOUT,
+) -> dict[str, Any]:
+    """Make HTTP POST request with retry logic.
+
+    Args:
+        url: Target URL
+        json_data: JSON payload
+        max_retries: Maximum retry attempts (default: 3)
+        timeout: Request timeout configuration
+
+    Returns:
+        Response JSON as dictionary
+
+    Raises:
+        HTTPException: If all retries fail or non-retryable error occurs
+
+    """
+    last_error: Exception | None = None
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for attempt in range(max_retries):
+            try:
+                response = await client.post(url, json=json_data)
+                response.raise_for_status()
+                result: dict[str, Any] = response.json()
+                return result
+            except (httpx.TimeoutException, httpx.ConnectError) as e:  # noqa: PERF203
+                last_error = e
+                if attempt < max_retries - 1:
+                    wait_time = 2**attempt  # Exponential backoff: 1s, 2s, 4s
+                    logger.warning(f"Attempt {attempt + 1} failed, retrying in {wait_time}s: {e}")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"All {max_retries} attempts failed: {e}")
+
+    # All retries exhausted
+    raise HTTPException(
+        status_code=500,
+        detail=f"Request failed after {max_retries} attempts: {last_error}",
+    )
 
 
 def get_user_flows_dir(username: str) -> Path:
@@ -122,12 +171,14 @@ def validate_flow_code(code: str, expected_function_name: str) -> None:
         if isinstance(node, ast.FunctionDef):
             # Check if function has @flow decorator
             for decorator in node.decorator_list:
-                if isinstance(decorator, ast.Name) and decorator.id == "flow":
-                    flow_functions.append(node.name)
-                elif (
-                    isinstance(decorator, ast.Call)
-                    and isinstance(decorator.func, ast.Name)
-                    and decorator.func.id == "flow"
+                if (
+                    isinstance(decorator, ast.Name)
+                    and decorator.id == "flow"
+                    or (
+                        isinstance(decorator, ast.Call)
+                        and isinstance(decorator.func, ast.Name)
+                        and decorator.func.id == "flow"
+                    )
                 ):
                     flow_functions.append(node.name)
 
@@ -184,8 +235,9 @@ async def register_flow_deployment(
             )
             response.raise_for_status()
             data = response.json()
-            logger.info(f"Successfully registered deployment: {data['deployment_id']}")
-            return data["deployment_id"]
+            deployment_id = str(data["deployment_id"])
+            logger.info(f"Successfully registered deployment: {deployment_id}")
+            return deployment_id
     except httpx.HTTPStatusError as e:
         logger.error(
             f"HTTP error during deployment registration: {e.response.status_code} - {e.response.text}"
@@ -243,7 +295,8 @@ async def save_flow(
     file_path = user_dir / f"{request.name}.py"
 
     # Check if flow already exists (to get old deployment_id)
-    existing_flow = FlowDocument.find_by_user_and_name(username, request.name, ctx.project_id)
+    flow_repo = MongoFlowRepository()
+    existing_flow = flow_repo.find_by_user_and_name(username, request.name, ctx.project_id)
     old_deployment_id = existing_flow.deployment_id if existing_flow else None
 
     # Write code to file
@@ -263,6 +316,7 @@ async def save_flow(
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
         if result.returncode == 0:
             logger.info(f"Auto-formatted flow code with ruff: {file_path}")
@@ -299,20 +353,21 @@ async def save_flow(
 
         if existing_flow:
             # Update existing flow
-            existing_flow.description = request.description
-            existing_flow.chip_id = request.chip_id
-            existing_flow.flow_function_name = request.flow_function_name
-            existing_flow.default_parameters = request.default_parameters
-            existing_flow.file_path = file_path_str
-            existing_flow.deployment_id = deployment_id
-            existing_flow.updated_at = datetime.now()
-            existing_flow.tags = request.tags
-            existing_flow.save()
+            flow_repo.update_flow(
+                flow=existing_flow,
+                description=request.description,
+                chip_id=request.chip_id,
+                flow_function_name=request.flow_function_name,
+                default_parameters=request.default_parameters,
+                file_path=file_path_str,
+                deployment_id=deployment_id,
+                tags=request.tags,
+            )
             logger.info(f"Updated flow '{request.name}' for user '{username}'")
             message = f"Flow '{request.name}' updated successfully"
         else:
             # Create new flow
-            flow_doc = FlowDocument(
+            flow_repo.create_flow(
                 project_id=ctx.project_id,
                 name=request.name,
                 username=username,
@@ -324,7 +379,6 @@ async def save_flow(
                 deployment_id=deployment_id,
                 tags=request.tags,
             )
-            flow_doc.insert()
             logger.info(f"Created new flow '{request.name}' for user '{username}'")
             message = f"Flow '{request.name}' created successfully"
 
@@ -359,7 +413,8 @@ async def list_flows(
     project_id = ctx.project_id
 
     try:
-        flows = FlowDocument.list_by_user(username, project_id)
+        flow_repo = MongoFlowRepository()
+        flows = flow_repo.list_by_user(username, project_id)
         logger.info(f"Listed {len(flows)} flows for user '{username}'")
 
         from qdash.api.schemas.flow import FlowSummary
@@ -370,8 +425,8 @@ async def list_flows(
                 description=flow.description,
                 chip_id=flow.chip_id,
                 flow_function_name=flow.flow_function_name,
-                created_at=flow.created_at.isoformat(),
-                updated_at=flow.updated_at.isoformat(),
+                created_at=flow.created_at,
+                updated_at=flow.updated_at,
                 tags=flow.tags,
             )
             for flow in flows
@@ -467,7 +522,7 @@ async def get_flow_template(template_id: str) -> FlowTemplateWithCode:
 # ============================================================================
 
 # Base directory for flow helper modules
-FLOW_HELPERS_DIR = Path("/app/qdash/workflow/flow")
+FLOW_HELPERS_DIR = SERVICE_DIR
 
 
 @router.get(
@@ -477,7 +532,7 @@ FLOW_HELPERS_DIR = Path("/app/qdash/workflow/flow")
     operation_id="listFlowHelperFiles",
 )
 async def list_flow_helper_files() -> list[str]:
-    """List all Python files in the qdash.workflow.flow module.
+    """List all Python files in the qdash.workflow.service module.
 
     Returns list of filenames that users can view for reference.
     """
@@ -575,7 +630,8 @@ async def list_all_flow_schedules(
     limit = min(limit, 100)
     username = ctx.user.username
     project_id = ctx.project_id
-    flows = FlowDocument.list_by_user(username, project_id)
+    flow_repo = MongoFlowRepository()
+    flows = flow_repo.list_by_user(username, project_id)
 
     all_schedules: list[FlowScheduleSummary] = []
 
@@ -597,7 +653,7 @@ async def list_all_flow_schedules(
                             cron=deployment.schedule.cron,
                             next_run=None,
                             active=deployment.is_schedule_active,
-                            created_at=deployment.created.isoformat() if deployment.created else "",
+                            created_at=deployment.created or datetime.now(timezone.utc),
                         )
                     )
             except Exception as e:
@@ -627,16 +683,18 @@ async def list_all_flow_schedules(
                                 flow_name=flow.name,
                                 schedule_type="one-time",
                                 cron=None,
-                                next_run=flow_run.next_scheduled_start_time.isoformat(),
+                                next_run=flow_run.next_scheduled_start_time,
                                 active=True,
-                                created_at=flow_run.created.isoformat() if flow_run.created else "",
+                                created_at=flow_run.created or datetime.now(timezone.utc),
                             )
                         )
             except Exception as e:
                 logger.warning(f"Failed to read scheduled flow runs for {flow.name}: {e}")
 
-    # Sort by next_run time
-    all_schedules.sort(key=lambda x: x.next_run or "")
+    # Sort by next_run time (None values at the end)
+    all_schedules.sort(
+        key=lambda x: (x.next_run is None, x.next_run or datetime.min.replace(tzinfo=timezone.utc))
+    )
 
     # Apply offset and limit to sorted results
     paginated_schedules = all_schedules[offset : offset + limit]
@@ -676,6 +734,7 @@ async def delete_flow_schedule(
     """
     username = ctx.user.username
     project_id = ctx.project_id
+    flow_repo = MongoFlowRepository()
 
     async with get_client() as client:
         # Try as deployment ID (cron schedule)
@@ -683,9 +742,9 @@ async def delete_flow_schedule(
             _ = await client.read_deployment(schedule_id)
 
             # Verify ownership
-            flow = FlowDocument.find_one(
+            flow = flow_repo.find_one(
                 {"project_id": project_id, "deployment_id": schedule_id, "username": username}
-            ).run()
+            )
             if not flow:
                 raise HTTPException(
                     status_code=403,
@@ -721,13 +780,13 @@ async def delete_flow_schedule(
 
             # Verify ownership through deployment
             if flow_run.deployment_id:
-                flow = FlowDocument.find_one(
+                flow = flow_repo.find_one(
                     {
                         "project_id": project_id,
                         "deployment_id": str(flow_run.deployment_id),
                         "username": username,
                     }
-                ).run()
+                )
                 if not flow:
                     raise HTTPException(
                         status_code=403,
@@ -777,13 +836,14 @@ async def update_flow_schedule(
     """
     username = ctx.user.username
     project_id = ctx.project_id
+    flow_repo = MongoFlowRepository()
 
     async with get_client() as client:
         try:
             # Verify ownership
-            flow = FlowDocument.find_one(
+            flow = flow_repo.find_one(
                 {"project_id": project_id, "deployment_id": schedule_id, "username": username}
-            ).run()
+            )
             if not flow:
                 raise HTTPException(
                     status_code=403,
@@ -804,7 +864,7 @@ async def update_flow_schedule(
                 except ValueError as e:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Invalid cron expression '{request.cron}': {str(e)}",
+                        detail=f"Invalid cron expression '{request.cron}': {e!s}",
                     )
 
                 # Use timezone from request (defaults to Asia/Tokyo in schema)
@@ -852,9 +912,10 @@ async def get_flow(
     """
     username = ctx.user.username
     project_id = ctx.project_id
+    flow_repo = MongoFlowRepository()
 
     # Find flow in database
-    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
+    flow = flow_repo.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -878,8 +939,8 @@ async def get_flow(
         chip_id=flow.chip_id,
         default_parameters=flow.default_parameters,
         file_path=flow.file_path,
-        created_at=flow.created_at.isoformat(),
-        updated_at=flow.updated_at.isoformat(),
+        created_at=flow.created_at,
+        updated_at=flow.updated_at,
         tags=flow.tags,
     )
 
@@ -908,9 +969,10 @@ async def execute_flow(
     username = ctx.user.username
     project_id = ctx.project_id
     settings = get_settings()
+    flow_repo = MongoFlowRepository()
 
     # Find flow in database
-    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
+    flow = flow_repo.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -980,9 +1042,10 @@ async def delete_flow(
     """
     username = ctx.user.username
     project_id = ctx.project_id
+    flow_repo = MongoFlowRepository()
 
     # Find flow in database
-    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
+    flow = flow_repo.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -1008,7 +1071,7 @@ async def delete_flow(
 
     # Delete from database
     try:
-        FlowDocument.delete_by_user_and_name(username, name, project_id)
+        flow_repo.delete_by_user_and_name(username, name, project_id)
         logger.info(f"Deleted flow '{name}' from database")
     except Exception as e:
         logger.error(f"Failed to delete flow from database: {e}")
@@ -1042,6 +1105,7 @@ async def schedule_flow(
 
     """
     username = ctx.user.username
+    flow_repo = MongoFlowRepository()
 
     # Validate request
     if not request.cron and not request.scheduled_time:
@@ -1058,7 +1122,7 @@ async def schedule_flow(
     project_id = ctx.project_id
 
     # Find flow
-    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
+    flow = flow_repo.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -1077,7 +1141,7 @@ async def schedule_flow(
         logger.error(f"Deployment {flow.deployment_id} not found in Prefect: {e}")
         raise HTTPException(
             status_code=400,
-            detail=f"Flow '{name}' deployment not found in Prefect. Please re-save the flow. Error: {str(e)}",
+            detail=f"Flow '{name}' deployment not found in Prefect. Please re-save the flow. Error: {e!s}",
         )
 
     # Merge parameters - include username, chip_id, and project_id from flow metadata
@@ -1100,85 +1164,47 @@ async def schedule_flow(
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid cron expression '{request.cron}': {str(e)}",
+                detail=f"Invalid cron expression '{request.cron}': {e!s}",
             )
 
         try:
-            # Configure httpx client with timeout and retry
-            timeout_config = httpx.Timeout(
-                connect=5.0,  # Connection timeout
-                read=30.0,  # Read timeout
-                write=10.0,  # Write timeout
-                pool=5.0,  # Pool timeout
+            await _http_post_with_retry(
+                f"{DEPLOYMENT_SERVICE_URL}/set-schedule",
+                {
+                    "deployment_id": flow.deployment_id,
+                    "cron": request.cron,
+                    "timezone": request.timezone,
+                    "active": request.active,
+                    "parameters": parameters,
+                },
+            )
+            logger.info(f"Set cron schedule for flow '{name}': {request.cron}")
+
+            # Calculate next run time from cron expression
+            next_run: datetime | None = None
+            try:
+                current_time = datetime.now(timezone.utc)
+                cron_iter = croniter(request.cron, current_time)
+                next_run = cron_iter.get_next(datetime)
+            except Exception as e:
+                logger.warning(f"Failed to calculate next run time: {e}")
+
+            return ScheduleFlowResponse(
+                schedule_id=flow.deployment_id,
+                flow_name=name,
+                schedule_type="cron",
+                cron=request.cron,
+                next_run=next_run,
+                active=request.active,
+                message=f"Cron schedule set successfully for flow '{name}'",
             )
 
-            async with httpx.AsyncClient(timeout=timeout_config) as client:
-                # Retry logic: try up to 3 times with exponential backoff
-                max_retries = 3
-                for attempt in range(max_retries):
-                    try:
-                        response = await client.post(
-                            f"{DEPLOYMENT_SERVICE_URL}/set-schedule",
-                            json={
-                                "deployment_id": flow.deployment_id,
-                                "cron": request.cron,
-                                "timezone": request.timezone,
-                                "active": request.active,
-                                "parameters": parameters,
-                            },
-                        )
-                        response.raise_for_status()
-                        break  # Success, exit retry loop
-                    except (httpx.TimeoutException, httpx.ConnectError) as e:
-                        if attempt < max_retries - 1:
-                            wait_time = 2**attempt  # Exponential backoff: 1s, 2s, 4s
-                            logger.warning(
-                                f"Attempt {attempt + 1} failed, retrying in {wait_time}s: {e}"
-                            )
-                            await asyncio.sleep(wait_time)
-                        else:
-                            raise  # Final attempt failed
-                    except httpx.HTTPStatusError:
-                        raise  # Don't retry on 4xx/5xx errors
-                response.raise_for_status()
-                data = response.json()
-
-                logger.info(f"Set cron schedule for flow '{name}': {request.cron}")
-
-                # Calculate next run time from cron expression
-                next_run = None
-                try:
-                    now = datetime.now(timezone.utc)
-                    cron_iter = croniter(request.cron, now)
-                    next_run_dt = cron_iter.get_next(datetime)
-                    next_run = next_run_dt.isoformat()
-                except Exception as e:
-                    logger.warning(f"Failed to calculate next run time: {e}")
-                    next_run = None
-
-                return ScheduleFlowResponse(
-                    schedule_id=flow.deployment_id,
-                    flow_name=name,
-                    schedule_type="cron",
-                    cron=request.cron,
-                    next_run=next_run,
-                    active=request.active,
-                    message=f"Cron schedule set successfully for flow '{name}'",
-                )
-
         except httpx.HTTPStatusError as e:
-            # Get detailed error from deployment service
             error_detail = e.response.text if hasattr(e.response, "text") else str(e)
             logger.error(f"Failed to set cron schedule: {error_detail}")
             raise HTTPException(
                 status_code=e.response.status_code if hasattr(e, "response") else 500,
                 detail=f"Failed to set cron schedule: {error_detail}",
-            )
-        except httpx.HTTPError as e:
-            logger.error(f"Failed to set cron schedule (network error): {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to set cron schedule (network error): {e}",
             )
 
     # Handle one-time schedule
@@ -1217,69 +1243,37 @@ async def schedule_flow(
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid scheduled_time format: {str(e)}",
+                detail=f"Invalid scheduled_time format: {e!s}",
             )
 
         try:
-            # Configure httpx client with timeout
-            timeout_config = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
+            data = await _http_post_with_retry(
+                f"{DEPLOYMENT_SERVICE_URL}/create-scheduled-run",
+                {
+                    "deployment_id": flow.deployment_id,
+                    "scheduled_time": request.scheduled_time,
+                    "parameters": parameters,
+                },
+            )
+            flow_run_id = data["flow_run_id"]
+            logger.info(f"Created one-time schedule for flow '{name}': {request.scheduled_time}")
 
-            async with httpx.AsyncClient(timeout=timeout_config) as client:
-                # Retry logic for one-time schedule creation
-                max_retries = 3
-                for attempt in range(max_retries):
-                    try:
-                        response = await client.post(
-                            f"{DEPLOYMENT_SERVICE_URL}/create-scheduled-run",
-                            json={
-                                "deployment_id": flow.deployment_id,
-                                "scheduled_time": request.scheduled_time,
-                                "parameters": parameters,
-                            },
-                        )
-                        response.raise_for_status()
-                        data = response.json()
-                        break  # Success
-                    except (httpx.TimeoutException, httpx.ConnectError) as e:
-                        if attempt < max_retries - 1:
-                            wait_time = 2**attempt
-                            logger.warning(
-                                f"Attempt {attempt + 1} failed, retrying in {wait_time}s: {e}"
-                            )
-                            await asyncio.sleep(wait_time)
-                        else:
-                            raise
-                    except httpx.HTTPStatusError:
-                        raise
-
-                flow_run_id = data["flow_run_id"]
-                logger.info(
-                    f"Created one-time schedule for flow '{name}': {request.scheduled_time}"
-                )
-
-                return ScheduleFlowResponse(
-                    schedule_id=flow_run_id,
-                    flow_name=name,
-                    schedule_type="one-time",
-                    cron=None,
-                    next_run=request.scheduled_time,
-                    active=True,
-                    message=f"One-time schedule created successfully for flow '{name}'",
-                )
+            return ScheduleFlowResponse(
+                schedule_id=flow_run_id,
+                flow_name=name,
+                schedule_type="one-time",
+                cron=None,
+                next_run=scheduled_dt,
+                active=True,
+                message=f"One-time schedule created successfully for flow '{name}'",
+            )
 
         except httpx.HTTPStatusError as e:
-            # Get detailed error from deployment service
             error_detail = e.response.text if hasattr(e.response, "text") else str(e)
             logger.error(f"Failed to create one-time schedule: {error_detail}")
             raise HTTPException(
                 status_code=e.response.status_code if hasattr(e, "response") else 500,
                 detail=f"Failed to create one-time schedule: {error_detail}",
-            )
-        except httpx.HTTPError as e:
-            logger.error(f"Failed to create one-time schedule (network error): {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to create one-time schedule (network error): {e}",
             )
 
     raise HTTPException(status_code=500, detail="Unexpected error in schedule creation")
@@ -1315,9 +1309,10 @@ async def list_flow_schedules(
     limit = min(limit, 100)
     username = ctx.user.username
     project_id = ctx.project_id
+    flow_repo = MongoFlowRepository()
 
     # Find flow
-    flow = FlowDocument.find_by_user_and_name(username, name, project_id)
+    flow = flow_repo.find_by_user_and_name(username, name, project_id)
     if not flow:
         raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -1340,7 +1335,7 @@ async def list_flow_schedules(
                         cron=deployment.schedule.cron,
                         next_run=None,  # Prefect calculates this internally
                         active=deployment.is_schedule_active,
-                        created_at=deployment.created.isoformat() if deployment.created else "",
+                        created_at=deployment.created or datetime.now(timezone.utc),
                     )
                 )
         except Exception as e:
@@ -1366,9 +1361,9 @@ async def list_flow_schedules(
                             flow_name=name,
                             schedule_type="one-time",
                             cron=None,
-                            next_run=flow_run.next_scheduled_start_time.isoformat(),
+                            next_run=flow_run.next_scheduled_start_time,
                             active=True,
-                            created_at=flow_run.created.isoformat() if flow_run.created else "",
+                            created_at=flow_run.created or datetime.now(timezone.utc),
                         )
                     )
         except Exception as e:

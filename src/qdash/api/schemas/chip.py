@@ -1,8 +1,10 @@
 """Schema definitions for chip router."""
 
+from datetime import datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer, field_validator
+from qdash.common.datetime_utils import format_elapsed_time, parse_elapsed_time
 
 
 class ChipResponse(BaseModel):
@@ -24,7 +26,7 @@ class ChipResponse(BaseModel):
     topology_id: str | None = None
     qubits: dict[str, Any] = {}
     couplings: dict[str, Any] = {}
-    installed_at: str = ""
+    installed_at: datetime | None = None
 
 
 class CreateChipRequest(BaseModel):
@@ -65,10 +67,22 @@ class MuxTask(BaseModel):
     figure_path: list[str] | None = None
     json_figure_path: list[str] | None = None
     raw_data_path: list[str] | None = None
-    start_at: str | None = None
-    end_at: str | None = None
-    elapsed_time: str | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    elapsed_time: timedelta | None = None
     task_type: str | None = None
+
+    @field_validator("elapsed_time", mode="before")
+    @classmethod
+    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
+        """Parse elapsed_time from various formats."""
+        return parse_elapsed_time(v)
+
+    @field_serializer("elapsed_time")
+    @classmethod
+    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
+        """Serialize elapsed_time to H:MM:SS format."""
+        return format_elapsed_time(v) if v else None
 
 
 class MuxDetailResponse(BaseModel):

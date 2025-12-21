@@ -2,11 +2,12 @@
 
 import io
 import re
-from typing import Annotated
+from datetime import timedelta
+from typing import Annotated, Any
 
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import networkx as nx
-import pendulum
 from fastapi import APIRouter, Depends
 from fastapi.logger import logger
 from fastapi.responses import Response
@@ -23,8 +24,8 @@ from qdash.api.schemas.device_topology import (
     QubitGateDuration,
     QubitLifetime,
 )
-from qdash.dbmodel.calibration_note import CalibrationNoteDocument
-from qdash.dbmodel.chip import ChipDocument
+from qdash.common.datetime_utils import now, to_datetime
+from qdash.repository import MongoCalibrationNoteRepository, MongoChipRepository
 
 router = APIRouter()
 
@@ -33,11 +34,13 @@ POSITION_SCALE = 50  # Grid spacing used in topology
 POSITION_DIVISOR = 30  # Divisor for final position
 
 
-def search_coupling_data_by_control_qid(cr_params: dict, search_term: str) -> dict:
+def search_coupling_data_by_control_qid(
+    cr_params: dict[str, Any], search_term: str
+) -> dict[str, Any]:
     """Search for coupling data by control qubit id."""
     filtered = {}
     for key, value in cr_params.items():
-        # キーが '-' を含む場合は、左側を抽出
+        # If key contains '-', extract the left side
         left_side = key.split("-")[0] if "-" in key else key
         if left_side == search_term:
             filtered[key] = value
@@ -57,7 +60,7 @@ def is_within_24h(calibrated_at: str | None) -> bool:
 
     Args:
     ----
-        calibrated_at: Timestamp string to check
+        calibrated_at: Timestamp string or datetime to check
 
     Returns:
     -------
@@ -67,16 +70,18 @@ def is_within_24h(calibrated_at: str | None) -> bool:
     if not calibrated_at:
         return False
     try:
-        now = pendulum.now(tz="Asia/Tokyo")
-        cutoff = now.subtract(hours=24)
-        calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
+        current_time = now()
+        cutoff = current_time - timedelta(hours=24)
+        calibrated_at_dt = to_datetime(calibrated_at)
+        if calibrated_at_dt is None:
+            return False
         return bool(calibrated_at_dt >= cutoff)
     except Exception:
         return False
 
 
 def get_value_within_24h_fallback(
-    data: dict,
+    data: dict[str, Any],
     use_24h: bool,
     fallback: float,
 ) -> float:
@@ -97,9 +102,9 @@ def get_value_within_24h_fallback(
         return fallback
 
     if use_24h:
-        return value if is_within_24h(calibrated_at) else fallback
+        return float(value) if is_within_24h(calibrated_at) else fallback
 
-    return value
+    return float(value)
 
 
 def normalize_coupling_key(control: str, target: str) -> str:
@@ -180,19 +185,22 @@ def get_device_topology(
     logger.info(f"project: {ctx.project_id}, user: {ctx.user.username}")
     qubits = []
     couplings = []
-    latest = (
-        CalibrationNoteDocument.find({"project_id": ctx.project_id, "task_id": "master"})
-        .sort([("timestamp", -1)])
-        .limit(1)
-        .run()
-    )[0]
+    calibration_note_repo = MongoCalibrationNoteRepository()
+    chip_repo = MongoChipRepository()
+
+    latest = calibration_note_repo.find_latest_master_by_project(project_id=ctx.project_id)
+    if latest is None:
+        raise ValueError(f"No master calibration note found for project {ctx.project_id}")
+
     cr_params = latest.note["cr_params"]
     drag_hpi_params = latest.note["drag_hpi_params"]
     drag_pi_params = latest.note["drag_pi_params"]
-    # chip_docs = ChipDocument.find_one({"chip_id": chip_id, "username": latest.username}).run()
-    chip_docs = ChipDocument.get_current_chip(username=latest.username)
+
+    chip_model = chip_repo.get_current_chip(username=latest.username)
+    if chip_model is None:
+        raise ValueError(f"No chip found for user {latest.username}")
     # Load topology config for position calculation
-    topology = load_topology(chip_docs.topology_id)
+    topology = load_topology(chip_model.topology_id)
     # Sort physical qubit indices and create id mapping
     sorted_physical_ids = sorted(request.qubits, key=lambda x: int(x))
     id_mapping = {pid: idx for idx, pid in enumerate(sorted_physical_ids)}
@@ -200,11 +208,11 @@ def get_device_topology(
 
     for qid in request.qubits:
         # Get qubit data with timestamp checks
-        x90_data = chip_docs.qubits[qid].data.get("x90_gate_fidelity", {})
-        t1_data = chip_docs.qubits[qid].data.get("t1", {})
-        t2_data = chip_docs.qubits[qid].data.get("t2_echo", {})
-        readout_0_data = chip_docs.qubits[qid].data.get("readout_fidelity_0", {})
-        readout_1_data = chip_docs.qubits[qid].data.get("readout_fidelity_1", {})
+        x90_data = chip_model.qubits[qid].data.get("x90_gate_fidelity", {})
+        t1_data = chip_model.qubits[qid].data.get("t1", {})
+        t2_data = chip_model.qubits[qid].data.get("t2_echo", {})
+        readout_0_data = chip_model.qubits[qid].data.get("readout_fidelity_0", {})
+        readout_1_data = chip_model.qubits[qid].data.get("readout_fidelity_1", {})
 
         x90_gate_fidelity = get_value_within_24h_fallback(
             x90_data, request.condition.qubit_fidelity.is_within_24h, fallback=0.25
@@ -282,7 +290,7 @@ def get_device_topology(
             control, target = split_q_string(cr_key)
             cr_duration = cr_value.get("duration", 20)
             # Get coupling fidelity data with timestamp check
-            coupling_data = chip_docs.couplings[f"{control}-{target}"].data.get(
+            coupling_data = chip_model.couplings[f"{control}-{target}"].data.get(
                 "zx90_gate_fidelity", {}
             )
             # zx90_gate_fidelity = (
@@ -387,11 +395,11 @@ def get_device_topology(
         device_id=request.device_id,
         qubits=filtered_qubits,
         couplings=filtered_couplings,
-        calibrated_at=latest.timestamp,  # type: ignore # noqa: PGH003
+        calibrated_at=latest.timestamp or "",
     )
 
 
-def generate_device_plot(data: dict) -> bytes:
+def generate_device_plot(data: dict[str, Any]) -> bytes:
     """Generate a plot of the quantum device and return it as bytes."""
     # Create a new graph
     g = nx.Graph()
@@ -457,7 +465,7 @@ def generate_device_plot(data: dict) -> bytes:
     # )
     sm = plt.cm.ScalarMappable(
         cmap="viridis",
-        norm=plt.Normalize(
+        norm=mcolors.Normalize(
             vmin=min(nx.get_node_attributes(g, "fidelity").values()),
             vmax=max(nx.get_node_attributes(g, "fidelity").values()),
         ),

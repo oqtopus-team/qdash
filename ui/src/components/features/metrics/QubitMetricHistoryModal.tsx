@@ -4,6 +4,7 @@ import React, { useState } from "react";
 
 import { useGetQubitMetricHistory } from "@/client/metrics/metrics";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
 
 interface MetricHistoryItem {
   value: number | null;
@@ -160,20 +161,12 @@ export function QubitMetricHistoryModal({
           )}
           <div className="flex items-center gap-2">
             <span className="font-semibold">Timestamp:</span>
-            <span>
-              {new Date(selectedItem.timestamp).toLocaleString("ja-JP", {
-                timeZone: "Asia/Tokyo",
-              })}
-            </span>
+            <span>{formatDateTime(selectedItem.timestamp)}</span>
           </div>
           {selectedItem.calibrated_at && (
             <div className="flex items-center gap-2">
               <span className="font-semibold">Calibrated At:</span>
-              <span>
-                {new Date(selectedItem.calibrated_at).toLocaleString("ja-JP", {
-                  timeZone: "Asia/Tokyo",
-                })}
-              </span>
+              <span>{formatDateTime(selectedItem.calibrated_at)}</span>
             </div>
           )}
         </div>
@@ -199,13 +192,7 @@ export function QubitMetricHistoryModal({
                   {formatMetricValue(item.value, metricUnit, 2)} {metricUnit}
                 </div>
                 <div className="text-[0.65rem] opacity-70">
-                  {new Date(item.timestamp).toLocaleString("ja-JP", {
-                    timeZone: "Asia/Tokyo",
-                    month: "numeric",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {formatDateTimeCompact(item.timestamp)}
                 </div>
                 {idx === 0 && (
                   <span className="badge badge-xs badge-success mt-0.5">
@@ -226,11 +213,7 @@ export function QubitMetricHistoryModal({
               </div>
               <div className="flex justify-between">
                 <span className="opacity-70">Timestamp:</span>
-                <span>
-                  {new Date(selectedItem.timestamp).toLocaleString("ja-JP", {
-                    timeZone: "Asia/Tokyo",
-                  })}
-                </span>
+                <span>{formatDateTime(selectedItem.timestamp)}</span>
               </div>
             </div>
           )}
@@ -253,13 +236,7 @@ export function QubitMetricHistoryModal({
                       {metricUnit}
                     </div>
                     <div className="text-xs opacity-70 mt-1">
-                      {new Date(item.timestamp).toLocaleString("ja-JP", {
-                        timeZone: "Asia/Tokyo",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatDateTimeCompact(item.timestamp)}
                     </div>
                     {idx === 0 && (
                       <span className="badge badge-sm badge-success mt-1">

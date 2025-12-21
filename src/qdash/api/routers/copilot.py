@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter
-
 from qdash.api.lib.copilot_config import load_copilot_config
 
 router = APIRouter()
@@ -37,4 +36,4 @@ async def get_copilot_config() -> dict[str, Any]:
 
     """
     config = load_copilot_config()
-    return config.model_dump()
+    return dict(config.model_dump())

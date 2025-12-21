@@ -4,6 +4,8 @@ import React, { useState, useRef, useLayoutEffect } from "react";
 
 import type { Task } from "@/schemas";
 
+import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
+
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 
@@ -347,16 +349,7 @@ export function TaskHistoryModal({
                       </span>
                       <span className="text-base-content/60">
                         {selectedTask.end_at
-                          ? new Date(selectedTask.end_at).toLocaleString(
-                              "ja-JP",
-                              {
-                                timeZone: "Asia/Tokyo",
-                                month: "numeric",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            )
+                          ? formatDateTimeCompact(selectedTask.end_at)
                           : "N/A"}
                       </span>
                     </div>
@@ -382,14 +375,7 @@ export function TaskHistoryModal({
                       {selectedTask.end_at && (
                         <div className="flex items-center gap-2">
                           <span className="font-semibold">Calibrated At:</span>
-                          <span>
-                            {new Date(selectedTask.end_at).toLocaleString(
-                              "ja-JP",
-                              {
-                                timeZone: "Asia/Tokyo",
-                              },
-                            )}
-                          </span>
+                          <span>{formatDateTime(selectedTask.end_at)}</span>
                         </div>
                       )}
                       {selectedTask.task_id && (
@@ -540,13 +526,7 @@ export function TaskHistoryModal({
                       </div>
                       <div className="text-[0.65rem] opacity-70">
                         {item.task.end_at
-                          ? new Date(item.task.end_at).toLocaleString("ja-JP", {
-                              timeZone: "Asia/Tokyo",
-                              month: "numeric",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
+                          ? formatDateTimeCompact(item.task.end_at)
                           : "N/A"}
                       </div>
                       {idx === 0 && (
@@ -619,16 +599,7 @@ export function TaskHistoryModal({
                           </div>
                           <div className="text-xs opacity-70 mt-1">
                             {item.task.end_at
-                              ? new Date(item.task.end_at).toLocaleString(
-                                  "ja-JP",
-                                  {
-                                    timeZone: "Asia/Tokyo",
-                                    month: "short",
-                                    day: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  },
-                                )
+                              ? formatDateTimeCompact(item.task.end_at)
                               : "N/A"}
                           </div>
                           {idx === 0 && (

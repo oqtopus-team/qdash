@@ -1,4 +1,6 @@
-from qdash.dbmodel.chip import ChipDocument
+from typing import Any, cast
+
+from qdash.datamodel.chip import ChipModel
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.worker.flows.push_props.formatter import format_number
@@ -75,9 +77,9 @@ def merge_properties(
 
 
 def get_chip_properties(
-    chip: ChipDocument, backend: QubexBackend, within_24hrs: bool = False, cutoff_hours: int = 24
-) -> tuple[ChipProperties, dict]:
-    """Extract chip properties from the ChipDocument.
+    chip: ChipModel, backend: QubexBackend, within_24hrs: bool = False, cutoff_hours: int = 24
+) -> tuple[ChipProperties, dict[str, Any]]:
+    """Extract chip properties from chip data.
 
     Returns:
         Tuple of (ChipProperties, stats_dict) where stats_dict contains data availability info
@@ -97,6 +99,8 @@ def get_chip_properties(
         raise ValueError(f"No digits found in chip_id: {backend.config['chip_id']}")
     n = int(match.group())
     exp = backend.get_instance()
+    if exp is None:
+        raise RuntimeError("Backend experiment instance is not initialized")
     for i in range(n):
         props.qubits[exp.get_qubit_label(i)] = QubitProperties()
 
@@ -137,7 +141,12 @@ def create_chip_properties(
 ) -> None:
     """Create and write chip properties to a YAML file."""
     initialize()
-    chip = ChipDocument.get_current_chip(username=username)
+    from qdash.repository import MongoChipRepository
+
+    chip_repo = MongoChipRepository()
+    chip = chip_repo.get_current_chip(username=username)
+    if chip is None:
+        raise ValueError(f"Chip not found for user {username}")
     from qdash.workflow.engine.backend.factory import create_backend
 
     backend = create_backend(
@@ -150,7 +159,7 @@ def create_chip_properties(
             "chip_id": chip_id,
         },
     )
-    props, _ = get_chip_properties(chip, within_24hrs=False, backend=backend)
+    props, _ = get_chip_properties(chip, within_24hrs=False, backend=cast(QubexBackend, backend))
 
     handler = ChipPropertyYAMLHandler(source_path)
     base = handler.read()

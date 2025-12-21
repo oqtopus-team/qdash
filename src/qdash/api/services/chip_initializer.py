@@ -1,6 +1,8 @@
 """Chip initialization service for API layer."""
 
 import logging
+from collections.abc import Mapping
+from typing import Any
 
 from qdash.api.lib.topology_config import load_topology
 from qdash.datamodel.coupling import CouplingModel
@@ -36,7 +38,7 @@ class ChipInitializer:
 
     @staticmethod
     def _generate_qubit_data(
-        topology_qubits: dict[int, dict],
+        topology_qubits: Mapping[int, Any],
         chip_id: str,
         username: str,
         project_id: str | None = None,
@@ -104,7 +106,7 @@ class ChipInitializer:
 
     @staticmethod
     def _generate_qubit_documents(
-        topology_qubits: dict[int, dict],
+        topology_qubits: Mapping[int, Any],
         username: str,
         chip_id: str,
         project_id: str | None = None,

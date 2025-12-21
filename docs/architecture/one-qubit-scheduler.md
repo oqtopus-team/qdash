@@ -59,7 +59,7 @@ Each MUX is classified based on the modules it uses:
 ### Basic Usage
 
 ```python
-from qdash.workflow.engine.calibration.scheduler import OneQubitScheduler
+from qdash.workflow.engine.scheduler import OneQubitScheduler
 
 scheduler = OneQubitScheduler(chip_id="64Qv3")
 
@@ -75,8 +75,8 @@ for stage in schedule.stages:
 
 ```python
 from prefect import flow
-from qdash.workflow.engine.calibration.scheduler import OneQubitScheduler
-from qdash.workflow.flow import init_calibration, get_session, finish_calibration
+from qdash.workflow.engine.scheduler import OneQubitScheduler
+from qdash.workflow.service import init_calibration, get_session, finish_calibration
 
 @flow
 def calibrate_chip(username: str, chip_id: str, qids: list[str]):

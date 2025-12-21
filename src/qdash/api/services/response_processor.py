@@ -5,9 +5,11 @@ This service handles post-processing of API responses, including outlier filteri
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, TypeVar
 
 from qdash.api.services.outlier_detection import filter_task_results_for_outliers
+
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
@@ -15,11 +17,13 @@ logger = logging.getLogger(__name__)
 class ResponseProcessor:
     """Service for processing API responses with optional outlier filtering."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Tasks are now determined by the detector factory
         pass
 
-    def process_task_response(self, response: Any, task_name: str, enable_outlier_filtering: bool = True) -> Any:
+    def process_task_response(
+        self, response: T, task_name: str, enable_outlier_filtering: bool = True
+    ) -> T:
         """
         Process task response with automatic outlier filtering if applicable.
 
@@ -44,7 +48,7 @@ class ResponseProcessor:
         response.result = filtered_results
         return response
 
-    def _apply_outlier_filtering(self, results: Dict[str, Any], task_name: str) -> Dict[str, Any]:
+    def _apply_outlier_filtering(self, results: dict[str, Any], task_name: str) -> dict[str, Any]:
         """Apply outlier filtering to task results."""
         # Convert Task objects to dict for outlier detection
         task_dict = {}
@@ -79,7 +83,9 @@ class ResponseProcessor:
                         if parameter_name in task.output_parameters:
                             # Set the outlier parameter value to None
                             task.output_parameters[parameter_name] = None
-                            logger.info(f"Set outlier parameter {parameter_name} to None for QID: {outlier_qid}")
+                            logger.info(
+                                f"Set outlier parameter {parameter_name} to None for QID: {outlier_qid}"
+                            )
             return filtered_results
 
         return results

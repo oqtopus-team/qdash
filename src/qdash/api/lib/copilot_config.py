@@ -2,17 +2,16 @@
 
 This module loads CopilotKit settings from YAML configuration file.
 The configuration provides settings for the CopilotKit-powered metrics analysis assistant.
+
+Uses ConfigLoader for unified configuration loading with local override support.
 """
 
 from __future__ import annotations
 
-import os
 from functools import lru_cache
-from pathlib import Path
-from typing import Any
 
-import yaml
 from pydantic import BaseModel
+from qdash.api.lib.config_loader import ConfigLoader
 
 
 class ScoringThreshold(BaseModel):
@@ -64,6 +63,9 @@ class CopilotConfig(BaseModel):
 def load_copilot_config() -> CopilotConfig:
     """Load Copilot configuration from YAML file.
 
+    Uses ConfigLoader for unified loading with local override support.
+    Configuration is loaded from copilot.yaml with optional copilot.local.yaml overlay.
+
     Returns
     -------
         CopilotConfig with all Copilot settings
@@ -73,28 +75,11 @@ def load_copilot_config() -> CopilotConfig:
         Returns default config (disabled) if file not found
 
     """
-    # Try multiple possible locations for the config file
-    possible_paths = [
-        # Docker environment: mounted at /app/config
-        Path("/app/config/copilot.yaml"),
-        # Local development: relative to project root
-        Path(__file__).parent.parent.parent.parent.parent / "config" / "copilot.yaml",
-        # Environment variable override
-        Path(os.getenv("COPILOT_CONFIG_PATH", "")) if os.getenv("COPILOT_CONFIG_PATH") else None,
-    ]
+    data = ConfigLoader.load_copilot()
 
-    config_path = None
-    for path in possible_paths:
-        if path and path.exists():
-            config_path = path
-            break
-
-    if not config_path:
+    if not data:
         # Return default disabled config if file not found
         return CopilotConfig(enabled=False)
-
-    with open(config_path) as f:
-        data = yaml.safe_load(f)
 
     try:
         # Transform scoring dict to use ScoringThreshold models

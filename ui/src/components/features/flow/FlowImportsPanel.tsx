@@ -43,7 +43,7 @@ export function FlowImportsPanel() {
       <div className="flex items-center bg-base-200 border-b border-base-300 overflow-x-auto">
         <div className="flex items-center px-3 py-1 border-r border-base-300">
           <span className="text-[10px] text-base-content/50 uppercase tracking-wider">
-            qdash.workflow.flow
+            qdash.workflow.service
           </span>
         </div>
         {isLoadingFiles ? (
@@ -108,7 +108,7 @@ export function FlowImportsPanel() {
       {/* Footer hint */}
       <div className="px-4 py-2 bg-base-200 border-t border-base-300 text-xs text-base-content/50">
         <code className="text-secondary">
-          from qdash.workflow.flow import ...
+          from qdash.workflow.service import ...
         </code>
         <span className="ml-4 text-base-content/30">Read-only reference</span>
       </div>

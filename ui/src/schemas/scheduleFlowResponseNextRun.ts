@@ -7,6 +7,6 @@
  */
 
 /**
- * Next scheduled run time (ISO format)
+ * Next scheduled run time
  */
 export type ScheduleFlowResponseNextRun = string | null;

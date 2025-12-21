@@ -26,7 +26,11 @@ from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
-from qdash.dbmodel.user import UserDocument
+from qdash.repository import (
+    MongoProjectMembershipRepository,
+    MongoProjectRepository,
+    MongoUserRepository,
+)
 
 router = APIRouter(
     prefix="/projects",
@@ -109,15 +113,14 @@ def list_projects(
     """List all projects the user has access to."""
     logger.debug(f"Listing projects for user {current_user.username}")
 
+    membership_repo = MongoProjectMembershipRepository()
+    project_repo = MongoProjectRepository()
+
     # Find all active memberships for this user
-    memberships = list(
-        ProjectMembershipDocument.find(
-            {"username": current_user.username, "status": "active"}
-        ).run()
-    )
+    memberships = membership_repo.find_by_username(current_user.username, status="active")
 
     project_ids = [m.project_id for m in memberships]
-    projects = list(ProjectDocument.find({"project_id": {"$in": project_ids}}).run())
+    projects = project_repo.find({"project_id": {"$in": project_ids}})
 
     return ProjectListResponse(
         projects=[_to_project_response(p) for p in projects],
@@ -182,8 +185,10 @@ def delete_project(
     """
     logger.warning(f"Deleting project {ctx.project_id} by user {ctx.user.username}")
 
+    membership_repo = MongoProjectMembershipRepository()
+
     # Delete all memberships
-    ProjectMembershipDocument.find({"project_id": ctx.project_id}).delete().run()
+    membership_repo.delete_by_project(ctx.project_id)
 
     # Delete project
     ctx.project.delete()
@@ -202,7 +207,8 @@ def list_members(
     ctx: Annotated[ProjectContext, Depends(get_project_context_from_path)],
 ) -> MemberListResponse:
     """List all members of a project."""
-    memberships = list(ProjectMembershipDocument.find({"project_id": ctx.project_id}).run())
+    membership_repo = MongoProjectMembershipRepository()
+    memberships = membership_repo.find_by_project(ctx.project_id)
 
     return MemberListResponse(
         members=[_to_member_response(m) for m in memberships],
@@ -223,15 +229,19 @@ def invite_member(
     admin: Annotated[User, Depends(get_admin_user)],
 ) -> MemberResponse:
     """Invite a user to the project. Admin only."""
+    project_repo = MongoProjectRepository()
+    user_repo = MongoUserRepository()
+    membership_repo = MongoProjectMembershipRepository()
+
     # Verify project exists
-    project = ProjectDocument.find_one({"project_id": project_id}).run()
+    project = project_repo.find_one({"project_id": project_id})
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project '{project_id}' not found",
         )
     # Check if user exists
-    target_user = UserDocument.find_one({"username": invite_data.username}).run()
+    target_user = user_repo.find_one({"username": invite_data.username})
     if not target_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -239,9 +249,9 @@ def invite_member(
         )
 
     # Check if already a member
-    existing = ProjectMembershipDocument.find_one(
+    existing = membership_repo.find_one(
         {"project_id": project_id, "username": invite_data.username}
-    ).run()
+    )
 
     if existing:
         if existing.status == "active":
@@ -254,21 +264,17 @@ def invite_member(
         existing.status = "active"
         existing.invited_by = admin.username
         existing.system_info.update_time()
-        existing.save()
+        membership_repo.save(existing)
         return _to_member_response(existing)
 
     # Create new membership
-    from qdash.datamodel.system_info import SystemInfoModel
-
-    membership = ProjectMembershipDocument(
+    membership = membership_repo.create_membership(
         project_id=project_id,
         username=invite_data.username,
         role=invite_data.role,
         status="active",  # Directly active for now (no invitation flow)
         invited_by=admin.username,
-        system_info=SystemInfoModel(),
     )
-    membership.insert()
 
     logger.info(
         f"Admin {admin.username} invited {invite_data.username} to project {project_id} as {invite_data.role}"
@@ -290,7 +296,10 @@ def update_member(
     admin: Annotated[User, Depends(get_admin_user)],
 ) -> MemberResponse:
     """Update a member's role. Admin only."""
-    project = ProjectDocument.find_one({"project_id": project_id}).run()
+    project_repo = MongoProjectRepository()
+    membership_repo = MongoProjectMembershipRepository()
+
+    project = project_repo.find_one({"project_id": project_id})
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -303,9 +312,7 @@ def update_member(
             detail="Cannot change the owner's role",
         )
 
-    membership = ProjectMembershipDocument.find_one(
-        {"project_id": project_id, "username": username}
-    ).run()
+    membership = membership_repo.find_one({"project_id": project_id, "username": username})
 
     if not membership:
         raise HTTPException(
@@ -315,7 +322,7 @@ def update_member(
 
     membership.role = update_data.role
     membership.system_info.update_time()
-    membership.save()
+    membership_repo.save(membership)
 
     return _to_member_response(membership)
 
@@ -332,7 +339,10 @@ def remove_member(
     admin: Annotated[User, Depends(get_admin_user)],
 ) -> None:
     """Remove a member from the project. Admin only."""
-    project = ProjectDocument.find_one({"project_id": project_id}).run()
+    project_repo = MongoProjectRepository()
+    membership_repo = MongoProjectMembershipRepository()
+
+    project = project_repo.find_one({"project_id": project_id})
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -345,9 +355,7 @@ def remove_member(
             detail="Cannot remove the project owner",
         )
 
-    membership = ProjectMembershipDocument.find_one(
-        {"project_id": project_id, "username": username}
-    ).run()
+    membership = membership_repo.find_one({"project_id": project_id, "username": username})
 
     if not membership:
         raise HTTPException(
@@ -357,7 +365,7 @@ def remove_member(
 
     membership.status = "revoked"
     membership.system_info.update_time()
-    membership.save()
+    membership_repo.save(membership)
 
     logger.info(f"Admin {admin.username} removed {username} from project {project_id}")
 
@@ -377,7 +385,11 @@ def transfer_ownership(
     admin: Annotated[User, Depends(get_admin_user)],
 ) -> ProjectResponse:
     """Transfer project ownership to another user. Admin only."""
-    project = ProjectDocument.find_one({"project_id": project_id}).run()
+    project_repo = MongoProjectRepository()
+    user_repo = MongoUserRepository()
+    membership_repo = MongoProjectMembershipRepository()
+
+    project = project_repo.find_one({"project_id": project_id})
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -391,7 +403,7 @@ def transfer_ownership(
         )
 
     # Ensure new owner exists
-    target_user = UserDocument.find_one({"username": new_owner.username}).run()
+    target_user = user_repo.find_one({"username": new_owner.username})
     if not target_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -399,41 +411,37 @@ def transfer_ownership(
         )
 
     # Update old owner membership to viewer
-    old_owner_membership = ProjectMembershipDocument.find_one(
+    old_owner_membership = membership_repo.find_one(
         {"project_id": project_id, "username": project.owner_username}
-    ).run()
+    )
     if old_owner_membership:
         old_owner_membership.role = ProjectRole.VIEWER
         old_owner_membership.system_info.update_time()
-        old_owner_membership.save()
+        membership_repo.save(old_owner_membership)
 
     # Update or create new owner membership
-    new_owner_membership = ProjectMembershipDocument.find_one(
+    new_owner_membership = membership_repo.find_one(
         {"project_id": project_id, "username": new_owner.username}
-    ).run()
+    )
 
     if new_owner_membership:
         new_owner_membership.role = ProjectRole.OWNER
         new_owner_membership.status = "active"
         new_owner_membership.system_info.update_time()
-        new_owner_membership.save()
+        membership_repo.save(new_owner_membership)
     else:
-        from qdash.datamodel.system_info import SystemInfoModel
-
-        new_owner_membership = ProjectMembershipDocument(
+        new_owner_membership = membership_repo.create_membership(
             project_id=project_id,
             username=new_owner.username,
             role=ProjectRole.OWNER,
             status="active",
             invited_by=admin.username,
-            system_info=SystemInfoModel(),
         )
-        new_owner_membership.insert()
 
     # Update project owner
     project.owner_username = new_owner.username
     project.system_info.update_time()
-    project.save()
+    project_repo.save(project)
 
     logger.warning(
         f"Admin {admin.username} transferred project {project_id} ownership to {new_owner.username}"

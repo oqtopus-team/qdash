@@ -30,9 +30,9 @@ class SlackContents:
     ts: str
     path: str
     header: str = ""
-    channel: str = ""  # デフォルトのチャンネルID
+    channel: str = ""  # Channel ID
     token: str = ""
-    broadcast: bool = False  # スレッド内の返信をチャンネルにも表示するかどうか
+    broadcast: bool = False  # Whether to also post thread replies to the channel
 
     def __init__(
         self,
@@ -42,9 +42,9 @@ class SlackContents:
         ts: str,
         path: str,
         header: str = "",
-        channel: str = "",  # デフォルトのチャンネルID
+        channel: str = "",  # Channel ID
         token: str = "",
-        broadcast: bool = False,  # スレッド内の返信をチャンネルにも表示するかどうか
+        broadcast: bool = False,  # Whether to also post thread replies to the channel
     ) -> None:
         """Initialize SlackContents."""
         self.status = status
@@ -129,13 +129,13 @@ class SlackContents:
                     thread_ts=self.ts if self.ts != "" else None,
                     reply_broadcast=self.broadcast
                     if self.ts != ""
-                    else False,  # スレッド内の返信時のみ有効
+                    else False,  # Only valid for thread replies
                     attachments=attachments,
                 )
                 return str(resp["ts"])
 
             # Case 2: File upload with message
-            # ファイルの存在確認
+            # Check if file exists
             if not os.path.exists(self.path):
                 logger.error(f"File not found: {self.path}")
                 return ""
@@ -148,24 +148,24 @@ class SlackContents:
                 thread_ts=self.ts if self.ts != "" else None,
                 reply_broadcast=self.broadcast
                 if self.ts != ""
-                else False,  # スレッド内の返信時のみ有効
+                else False,  # Only valid for thread replies
                 attachments=attachments,
             )
             message_ts = str(resp["ts"])
 
             # Then upload the file in the thread
             try:
-                # ファイルをアップロード
+                # Upload file
                 client.files_upload_v2(
-                    channel=self.channel,  # チャンネルID
-                    file=self.path,  # ファイルパス
-                    title=self.title,  # ファイルタイトル
+                    channel=self.channel,
+                    file=self.path,
+                    title=self.title,
                     thread_ts=self.ts,
                 )
                 logger.info("File upload successful")
             except Exception as e:
                 logger.error(f"File upload failed: {e}")
-                # ファイルアップロードが失敗してもメッセージのtsは返す
+                # Return message ts even if file upload fails
             return message_ts
 
         except SlackApiError as e:
@@ -179,48 +179,48 @@ class SlackContents:
 if __name__ == "__main__":
     settings = get_settings()
 
-    # 1. 新規メッセージを投稿
+    # 1. Post a new message
     slack = SlackContents(
         status=Status.RUNNING,
         title="Calibration Started",
         msg="Starting qubit calibration...",
-        ts="",  # 新規メッセージなのでts空
+        ts="",  # Empty ts for new message
         path="",
         header="Calibration Process",
-        channel=settings.slack_channel_id,  # チャンネルID
+        channel=settings.slack_channel_id,
         token=settings.slack_bot_token,
     )
     parent_ts = slack.send_slack()
     print(f"Parent message ts: {parent_ts}")
 
-    # 2. スレッド内に進捗メッセージを投稿
+    # 2. Post progress message in thread
     slack.update_contents(
         status=Status.RUNNING,
         title="Step 1",
         msg="Performing frequency calibration...",
-        ts=parent_ts,  # 親メッセージのtsを指定してスレッド内に投稿
-        broadcast=False,  # チャンネルには表示しない
+        ts=parent_ts,  # Use parent ts to post in thread
+        broadcast=False,  # Don't broadcast to channel
     )
     slack.send_slack()
 
-    # 3. スレッド内にファイルを添付
+    # 3. Attach file in thread
     slack.update_contents(
         status=Status.SUCCESS,
         title="Calibration Result",
         msg="Frequency calibration completed",
-        ts=parent_ts,  # 同じスレッド内
-        path="",  # 結果ファイル
-        broadcast=False,  # チャンネルには表示しない
+        ts=parent_ts,  # Same thread
+        path="",  # Result file
+        broadcast=False,  # Don't broadcast to channel
     )
     slack.send_slack()
 
-    # 4. スレッド内に完了メッセージを投稿（チャンネルにも表示）
+    # 4. Post completion message in thread (also broadcast to channel)
     slack.update_contents(
         status=Status.SUCCESS,
         title="Calibration Completed",
         msg="All calibration steps completed successfully",
-        ts=parent_ts,  # 同じスレッド内
+        ts=parent_ts,  # Same thread
         path="",
-        broadcast=True,  # チャンネルにも表示
+        broadcast=True,  # Also broadcast to channel
     )
     slack.send_slack()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import ClassVar
+from datetime import datetime  # noqa: TCH003
+from typing import ClassVar, cast
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
@@ -17,7 +18,7 @@ class ProjectMembershipDocument(Document):
     role: ProjectRole = Field(default=ProjectRole.VIEWER, description="Assigned project role")
     status: str = Field(default="pending", description="Invitation status")
     invited_by: str | None = Field(default=None, description="Inviter username")
-    last_accessed_at: str | None = Field(default=None, description="Last access timestamp ISO8601")
+    last_accessed_at: datetime | None = Field(default=None, description="Last access timestamp")
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="System info timestamps"
     )
@@ -38,6 +39,7 @@ class ProjectMembershipDocument(Document):
         cls, project_id: str, username: str
     ) -> ProjectMembershipDocument | None:
         """Fetch active membership for the user/project pair."""
-        return cls.find_one(
+        result = cls.find_one(
             {"project_id": project_id, "username": username, "status": "active"}
         ).run()
+        return cast("ProjectMembershipDocument | None", result)
