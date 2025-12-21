@@ -796,30 +796,52 @@ class FlowDocument(Document):
 
 ## Entity Relationship Diagram (Conceptual)
 
+```mermaid
+erDiagram
+    User ||--o{ ProjectMembership : has
+    Project ||--o{ ProjectMembership : has
+    Project ||--o{ Chip : contains
+    Project ||--o{ ExecutionHistory : contains
+    Chip ||--o{ Qubit : contains
+    Chip ||--o{ Coupling : contains
+    ExecutionHistory ||--o{ TaskResultHistory : contains
+
+    User {
+        string username PK
+        string default_project
+    }
+    ProjectMembership {
+        string project_id FK
+        string username FK
+        string role
+        string status
+    }
+    Project {
+        string project_id PK
+        string owner_user
+    }
+    Chip {
+        string chip_id PK
+        string project_id FK
+    }
+    ExecutionHistory {
+        string execution_id PK
+        string project_id FK
+    }
+    Qubit {
+        string qid
+        string chip_id FK
+    }
+    Coupling {
+        string coupling_id
+        string chip_id FK
+    }
+    TaskResultHistory {
+        string execution_id FK
+    }
 ```
-┌─────────────┐        ┌────────────────────┐        ┌───────────────┐
-│    User     │1     n │ ProjectMembership  │n     1 │    Project    │
-│ username PK │<------>│ project_id, user   │<------>│ project_id PK │
-│ default_proj│        │ role, status       │        │ owner_user    │
-└─────────────┘        └────────────────────┘        └────┬─────┬────┘
-                                                          │     │
-                                                          │     │
-                                                          │     │
-                                ┌─────────────────────────┘     └─────────────────────────┐
-                                │                                                       │
-                        ┌───────▼───────┐                                        ┌──────▼─────────┐
-                        │     Chip      │1     n                                  │ ExecutionHist │
-                        │ chip_id PK    │<----------------------------------------│ execution_id  │
-                        │ qubits/coupling│                                         │ task_results  │
-                        └───────┬───────┘                                         └──────┬────────┘
-                                │1                                                    1 │
-                ┌───────────────▼───────────────┐                         ┌────────────▼──────────┐
-                │          Qubit                │                         │   TaskResultHistory   │
-                │          Coupling             │                         │  CalibrationNote etc. │
-                └──────────────────────────────┘                         └───────────────────────┘
 
 Other project-scoped collections (tasks, tags, backends, flows, counters, locks, histories) all reference `project_id`, ensuring a single sharing boundary per project.
-```
 
 ---
 
