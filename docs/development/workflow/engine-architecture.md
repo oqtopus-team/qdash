@@ -141,7 +141,6 @@ orchestrator.complete()
 - `execution_id`: Current execution identifier
 - `task_result`: Container for qubit/coupling/global task results
 - `calib_data`: Calibration data (parameters extracted from tasks)
-- `controller_info`: Hardware controller information
 
 ### 3. TaskExecutor
 

@@ -384,8 +384,6 @@ class CalibOrchestrator:
                 if qid in self.task_context.calib_data.coupling
             },
         )
-        exec_context.controller_info = deepcopy(self.task_context.controller_info)
-
         # Set upstream task dependency
         if upstream_id is not None:
             exec_context.set_upstream_task_id(upstream_id)
@@ -439,8 +437,6 @@ class CalibOrchestrator:
         # Merge calibration data
         self.task_context.state.calib_data.qubit.update(executed_context.calib_data.qubit)
         self.task_context.state.calib_data.coupling.update(executed_context.calib_data.coupling)
-        self.task_context.controller_info.update(executed_context.controller_info)
-
         # Track task_id for upstream dependency
         executed_task = executed_context.get_task(task_name=task_name, task_type=task_type, qid=qid)
         self._last_executed_task_id_by_qid[qid] = executed_task.task_id

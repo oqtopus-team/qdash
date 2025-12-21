@@ -43,8 +43,6 @@ class ExecutionStateManager(BaseModel):
     status: ExecutionStatusModel = ExecutionStatusModel.SCHEDULED
     task_results: dict[str, TaskResultModel] = {}
     tags: list[str] = []
-    controller_info: dict[str, dict[str, Any]] = {}
-    fridge_info: dict[str, Any] = {}
     chip_id: str = ""
     project_id: str | None = None
     start_at: datetime | None = None
@@ -165,19 +163,6 @@ class ExecutionStateManager(BaseModel):
 
         self.system_info.update_time()
 
-    def merge_controller_info(self, controller_info: dict[str, dict[str, Any]]) -> None:
-        """Merge controller info into execution.
-
-        Parameters
-        ----------
-        controller_info : dict[str, dict]
-            The controller info to merge
-
-        """
-        for controller_id, info in controller_info.items():
-            self.controller_info[controller_id] = info
-        self.system_info.update_time()
-
     def get_qubit_parameter(self, qid: str, param_name: str) -> Any:
         """Get a qubit parameter from calibration data.
 
@@ -242,8 +227,6 @@ class ExecutionStateManager(BaseModel):
             status=self.status,
             task_results=self.task_results,
             tags=self.tags,
-            controller_info=self.controller_info,
-            fridge_info=self.fridge_info,
             chip_id=self.chip_id,
             project_id=self.project_id,
             start_at=self.start_at,
@@ -278,8 +261,6 @@ class ExecutionStateManager(BaseModel):
             status=ExecutionStatusModel(model.status),
             task_results=model.task_results,
             tags=model.tags,
-            controller_info=model.controller_info,
-            fridge_info=model.fridge_info,
             chip_id=model.chip_id,
             project_id=model.project_id,
             start_at=model.start_at,

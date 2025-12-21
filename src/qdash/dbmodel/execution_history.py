@@ -20,8 +20,7 @@ class ExecutionHistoryDocument(Document):
         status (str): The status of the execution. e.g. "completed".
         tasks (dict): The tasks of the execution. e.g. {"task1": "completed"}.
         calib_data (dict): The calibration data. e.g. {"qubit": {"0":{"qubit_frequency": 5.0}}, "coupling": {"0-1": {"coupling_strength": 0.1}}}.
-        fridge_info (dict): The fridge information. e.g. {"fridge1": "info1"}.
-        controller_info (dict): The controller information. e.g. {"controller1": "info1"}.
+
         note (str): The note. e.g. "This is a note".
         tags (list[str]): The tags. e.g. ["tag1", "tag2"].
         message (str): The message. e.g. "This is a message".
@@ -41,8 +40,6 @@ class ExecutionHistoryDocument(Document):
     status: str = Field(..., description="The status of the execution")
     task_results: dict[str, TaskResultModel] = Field(..., description="The results of the tasks")
     tags: list[str] = Field(..., description="The tags")
-    controller_info: dict[str, Any] = Field(..., description="The controller information")
-    fridge_info: dict[str, Any] = Field(..., description="The fridge information")
     chip_id: str = Field(..., description="The chip ID")
     start_at: datetime | None = Field(None, description="The time when the execution started")
     end_at: datetime | None = Field(None, description="The time when the execution ended")
@@ -102,8 +99,6 @@ class ExecutionHistoryDocument(Document):
             status=execution_model.status,
             task_results=execution_model.task_results,
             tags=execution_model.tags,
-            controller_info=execution_model.controller_info,
-            fridge_info=execution_model.fridge_info,
             chip_id=execution_model.chip_id,
             start_at=execution_model.start_at,
             end_at=execution_model.end_at,
@@ -131,8 +126,6 @@ class ExecutionHistoryDocument(Document):
         doc.note = execution_model.note
         doc.status = execution_model.status
         doc.tags = execution_model.tags
-        doc.controller_info = execution_model.controller_info
-        doc.fridge_info = execution_model.fridge_info
         doc.chip_id = execution_model.chip_id
         doc.start_at = execution_model.start_at
         doc.end_at = execution_model.end_at
