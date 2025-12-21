@@ -49,10 +49,6 @@ class QubitModel(BaseModel):
     status: str = Field(default="pending", description="The status of the qubit")
     chip_id: str | None = Field(None, description="The chip ID")
     data: dict[str, Any] = Field(..., description="The data of the qubit")
-    best_data: dict[str, Any] = Field(
-        default_factory=dict,
-        description="The best calibration results, focusing on fidelity metrics",
-    )
     node_info: NodeInfoModel | None = Field(
         default=None, description="The node information (deprecated)"
     )

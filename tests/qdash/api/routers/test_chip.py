@@ -84,7 +84,6 @@ class TestChipRouter:
                 qid=str(i),
                 status="pending",
                 data={},
-                best_data={},
                 system_info={},
             )
             qubit.insert()

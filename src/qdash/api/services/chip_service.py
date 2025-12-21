@@ -355,7 +355,6 @@ class ChipService:
                     chip_id=q["chip_id"],
                     status=q.get("status", "pending"),
                     data=q.get("data", {}),
-                    best_data=q.get("best_data", {}),
                 )
                 for q in qubits
             ],
@@ -388,7 +387,6 @@ class ChipService:
             chip_id=qubit["chip_id"],
             status=qubit.get("status", "pending"),
             data=qubit.get("data", {}),
-            best_data=qubit.get("best_data", {}),
         )
 
     def list_couplings(
@@ -430,7 +428,6 @@ class ChipService:
                     chip_id=c["chip_id"],
                     status=c.get("status", "pending"),
                     data=c.get("data", {}),
-                    best_data=c.get("best_data", {}),
                 )
                 for c in couplings
             ],
@@ -465,7 +462,6 @@ class ChipService:
             chip_id=coupling["chip_id"],
             status=coupling.get("status", "pending"),
             data=coupling.get("data", {}),
-            best_data=coupling.get("best_data", {}),
         )
 
     def get_metrics_summary(self, project_id: str, chip_id: str) -> MetricsSummaryResponse | None:

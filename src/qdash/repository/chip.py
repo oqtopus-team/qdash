@@ -320,7 +320,6 @@ class MongoChipRepository:
                     "chip_id": doc.chip_id,
                     "status": doc.status,
                     "data": doc.data,
-                    "best_data": doc.best_data,
                 }
                 for doc in docs
             ],
@@ -355,7 +354,6 @@ class MongoChipRepository:
             "chip_id": doc.chip_id,
             "status": doc.status,
             "data": doc.data,
-            "best_data": doc.best_data,
         }
 
     def list_couplings(
@@ -396,7 +394,6 @@ class MongoChipRepository:
                     "chip_id": doc.chip_id,
                     "status": doc.status,
                     "data": doc.data,
-                    "best_data": doc.best_data,
                 }
                 for doc in docs
             ],
@@ -433,7 +430,6 @@ class MongoChipRepository:
             "chip_id": doc.chip_id,
             "status": doc.status,
             "data": doc.data,
-            "best_data": doc.best_data,
         }
 
     def aggregate_metrics_summary(self, project_id: str, chip_id: str) -> dict[str, Any] | None:
@@ -688,7 +684,6 @@ class MongoChipRepository:
                 "chip_id": doc.chip_id,
                 "status": doc.status,
                 "data": doc.data,
-                "best_data": doc.best_data,
             }
             for doc in docs
         }
@@ -724,7 +719,6 @@ class MongoChipRepository:
                 "chip_id": doc.chip_id,
                 "status": doc.status,
                 "data": doc.data,
-                "best_data": doc.best_data,
             }
             for doc in docs
         }

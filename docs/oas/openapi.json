@@ -6112,12 +6112,6 @@
             "type": "object",
             "title": "Data",
             "default": {}
-          },
-          "best_data": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Best Data",
-            "default": {}
           }
         },
         "type": "object",
@@ -8415,12 +8409,6 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Data",
-            "default": {}
-          },
-          "best_data": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Best Data",
             "default": {}
           }
         },

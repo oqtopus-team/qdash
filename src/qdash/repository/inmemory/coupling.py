@@ -76,7 +76,6 @@ class InMemoryCouplingCalibrationRepository:
                 status="",
                 chip_id=chip_id,
                 data={},
-                best_data={},
                 edge_info=None,
             )
             self._couplings[key] = coupling
