@@ -1,5 +1,14 @@
 import { defineConfig } from "vitepress";
 import { withMermaid } from "vitepress-plugin-mermaid";
+import { full as emoji } from "markdown-it-emoji";
+
+// Convert emoji to Fluent Emoji (flat SVG)
+function emojiToCodePoints(emoji: string): string {
+  return [...emoji]
+    .map((char) => char.codePointAt(0)?.toString(16))
+    .filter(Boolean)
+    .join("-");
+}
 
 // https://vitepress.dev/reference/site-config
 export default withMermaid(
@@ -24,6 +33,18 @@ export default withMermaid(
         },
       ],
     ],
+
+    markdown: {
+      config: (md) => {
+        md.use(emoji);
+        md.renderer.rules.emoji = (tokens, idx) => {
+          const token = tokens[idx];
+          const codePoints = emojiToCodePoints(token.content);
+          const cdnUrl = `https://cdn.jsdelivr.net/gh/nicolo-ribaudo/fluentui-emoji-flat-svg@latest/${codePoints}.svg`;
+          return `<img src="${cdnUrl}" alt="${token.markup}" class="fluent-emoji" style="height: 1.2em; width: 1.2em; vertical-align: text-bottom; display: inline-block;" />`;
+        };
+      },
+    },
 
     mermaid: {
       theme: "neutral",

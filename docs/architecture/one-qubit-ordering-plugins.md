@@ -366,19 +366,14 @@ For a full chip calibration with mixed boxes, expect **12 steps** (4 A + 8 MIXED
 
 Each Box B module controls 8 qubits (2 MUXes worth), but **Box B has no readout capability**. MIXED MUXes require Box A for readout, which creates a hardware constraint:
 
-```
-Box B Module Structure:
-┌─────────────────────────────────────┐
-│              Box B Module            │
-│  (controls 8 qubits, no readout)    │
-├──────────────┬──────────────────────┤
-│    MUX N     │      MUX N+4         │
-│  (4 qubits)  │    (4 qubits)        │
-└──────────────┴──────────────────────┘
-        │                  │
-        ▼                  ▼
-   Uses Box A         Uses Box A
-   for readout        for readout
+```mermaid
+flowchart TB
+    subgraph BoxB["Box B Module (controls 8 qubits, no readout)"]
+        MuxN["MUX N<br/>(4 qubits)"]
+        MuxN4["MUX N+4<br/>(4 qubits)"]
+    end
+    MuxN --> BoxA1["Uses Box A for readout"]
+    MuxN4 --> BoxA2["Uses Box A for readout"]
 ```
 
 **Constraint**: MUXes that share the same Box B module cannot calibrate simultaneously because they compete for Box A readout resources.
