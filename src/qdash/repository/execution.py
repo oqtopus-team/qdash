@@ -75,7 +75,7 @@ class MongoExecutionRepository:
         port: int | None = None,
         username: str | None = None,
         password: str | None = None,
-        database: str = "qubex",
+        database: str | None = None,
     ):
         """Initialize MongoExecutionRepository.
 
@@ -89,15 +89,15 @@ class MongoExecutionRepository:
             MongoDB username (defaults to env var)
         password : str | None
             MongoDB password (defaults to env var)
-        database : str
-            Database name (defaults to 'qubex')
+        database : str | None
+            Database name (defaults to MONGO_DB_NAME env var or 'qdash')
 
         """
         self._host = host or "mongo"
         self._port = port or 27017
         self._username = username or os.getenv("MONGO_INITDB_ROOT_USERNAME")
         self._password = password or os.getenv("MONGO_INITDB_ROOT_PASSWORD")
-        self._database = database
+        self._database: str = database if database else os.getenv("MONGO_DB_NAME") or "qdash"
 
     def _get_client(self) -> MongoClient[Any]:
         """Get MongoDB client.
