@@ -17,48 +17,42 @@ This document describes the architecture of the QDash frontend application, incl
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Browser                                      │
-├─────────────────────────────────────────────────────────────────────┤
-│                      Next.js Application                             │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                    App Router (Pages)                         │   │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │   │
-│  │  │ /metrics │  │  /chip   │  │  /flow   │  │ /analysis│    │   │
-│  │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘    │   │
-│  └───────┼─────────────┼─────────────┼─────────────┼───────────┘   │
-│          │             │             │             │                │
-│  ┌───────┴─────────────┴─────────────┴─────────────┴───────────┐   │
-│  │                    Components Layer                          │   │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │   │
-│  │  │ features │  │   ui     │  │  charts  │  │ selectors│    │   │
-│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘    │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│  ┌───────────────────────────┴─────────────────────────────────┐   │
-│  │              State Management Layer                          │   │
-│  │  ┌─────────────────┐  ┌────────────────┐  ┌─────────────┐  │   │
-│  │  │  TanStack Query │  │ React Context  │  │    nuqs     │  │   │
-│  │  │  (Server State) │  │(Client State)  │  │ (URL State) │  │   │
-│  │  └────────┬────────┘  └────────────────┘  └─────────────┘  │   │
-│  └───────────┼─────────────────────────────────────────────────┘   │
-│              │                                                      │
-│  ┌───────────┴─────────────────────────────────────────────────┐   │
-│  │                   API Client Layer                           │   │
-│  │  ┌─────────────────────────────────────────────────────┐    │   │
-│  │  │         Auto-generated from OpenAPI (Orval)          │    │   │
-│  │  │    src/client/    │    src/schemas/                  │    │   │
-│  │  └──────────────────────────────┬──────────────────────┘    │   │
-│  └─────────────────────────────────┼───────────────────────────┘   │
-│                                    │                                │
-└────────────────────────────────────┼────────────────────────────────┘
-                                     │ HTTP (Axios)
-                                     ▼
-                          ┌──────────────────┐
-                          │   QDash API      │
-                          │   (FastAPI)      │
-                          └──────────────────┘
+```mermaid
+flowchart TB
+    subgraph Browser["Browser"]
+        subgraph NextJS["Next.js Application"]
+            subgraph Pages["App Router (Pages)"]
+                P1["/metrics"]
+                P2["/chip"]
+                P3["/flow"]
+                P4["/analysis"]
+            end
+
+            subgraph Components["Components Layer"]
+                C1["features"]
+                C2["ui"]
+                C3["charts"]
+                C4["selectors"]
+            end
+
+            subgraph State["State Management Layer"]
+                S1["TanStack Query<br/>(Server State)"]
+                S2["React Context<br/>(Client State)"]
+                S3["nuqs<br/>(URL State)"]
+            end
+
+            subgraph APIClient["API Client Layer"]
+                AC["Auto-generated from OpenAPI (Orval)<br/>src/client/ | src/schemas/"]
+            end
+        end
+    end
+
+    API["QDash API (FastAPI)"]
+
+    Pages --> Components
+    Components --> State
+    State --> APIClient
+    APIClient -->|"HTTP (Axios)"| API
 ```
 
 ---
